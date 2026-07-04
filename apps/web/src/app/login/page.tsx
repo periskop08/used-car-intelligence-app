@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function Login() {
   const router = useRouter();
 
@@ -16,7 +18,7 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    fetch("http://localhost:3000/auth/login", {
+    fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

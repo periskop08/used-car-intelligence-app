@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function Home() {
   const router = useRouter();
 
@@ -22,7 +24,7 @@ export default function Home() {
   // Fetch Brands on Load
   useEffect(() => {
     setLoadingBrands(true);
-    fetch("http://localhost:3000/vehicles/brands")
+    fetch(`${API_URL}/vehicles/brands`)
       .then(res => res.json())
       .then(data => {
         setBrands(Array.isArray(data) ? data : []);
@@ -42,7 +44,7 @@ export default function Home() {
     if (!brandId) return;
 
     setLoadingModels(true);
-    fetch(`http://localhost:3000/vehicles/models?brandId=${brandId}`)
+    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
       .then(res => res.json())
       .then(data => {
         setModels(Array.isArray(data) ? data : []);
@@ -60,7 +62,7 @@ export default function Home() {
     if (!modelId) return;
 
     setLoadingVariants(true);
-    fetch(`http://localhost:3000/vehicles/variants?modelId=${modelId}`)
+    fetch(`${API_URL}/vehicles/variants?modelId=${modelId}`)
       .then(res => res.json())
       .then(data => {
         setVariants(Array.isArray(data) ? data : []);

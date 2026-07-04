@@ -3,6 +3,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,7 +27,7 @@ function RegisterContent() {
     setError("");
     setLoading(true);
 
-    fetch("http://localhost:3000/auth/register", {
+    fetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

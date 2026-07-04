@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function VehicleDetail() {
   const params = useParams();
   const router = useRouter();
@@ -56,7 +58,7 @@ export default function VehicleDetail() {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    fetch(`http://localhost:3000/vehicles/variants/${variantId}`, { headers })
+    fetch(`${API_URL}/vehicles/variants/${variantId}`, { headers })
       .then(res => {
         if (!res.ok) throw new Error("Araç detayları yüklenemedi.");
         return res.json();
@@ -69,7 +71,7 @@ export default function VehicleDetail() {
 
     // If logged in, check if this vehicle is favorited
     if (token) {
-      fetch("http://localhost:3000/favorites", { headers })
+      fetch(`${API_URL}/favorites`, { headers })
         .then(res => res.json())
         .then(favs => {
           if (Array.isArray(favs)) {
@@ -99,7 +101,7 @@ export default function VehicleDetail() {
 
     setFavoriteError("");
 
-    fetch("http://localhost:3000/favorites/toggle", {
+    fetch(`${API_URL}/favorites/toggle`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -134,7 +136,7 @@ export default function VehicleDetail() {
     setGeneratingReport(true);
     setReportError("");
 
-    fetch("http://localhost:3000/reports/generate", {
+    fetch(`${API_URL}/reports/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -179,7 +181,7 @@ export default function VehicleDetail() {
     // Append user message immediately
     setChatMessages(prev => [...prev, { sender: "user", text: questionText }]);
 
-    fetch("http://localhost:3000/reports/chat", {
+    fetch(`${API_URL}/reports/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -218,7 +220,7 @@ export default function VehicleDetail() {
     setReviewSuccess("");
     setSubmittingReview(true);
 
-    fetch("http://localhost:3000/reviews", {
+    fetch(`${API_URL}/reviews`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function ComparisonPage() {
   const router = useRouter();
 
@@ -34,7 +36,7 @@ export default function ComparisonPage() {
 
   // Fetch brands on load
   useEffect(() => {
-    fetch("http://localhost:3000/vehicles/brands")
+    fetch(`${API_URL}/vehicles/brands`)
       .then(res => res.json())
       .then(data => {
         setBrands(Array.isArray(data) ? data : []);
@@ -52,7 +54,7 @@ export default function ComparisonPage() {
 
     if (!brandId) return;
     setLoadingModels1(true);
-    fetch(`http://localhost:3000/vehicles/models?brandId=${brandId}`)
+    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
       .then(res => res.json())
       .then(data => {
         setModels1(Array.isArray(data) ? data : []);
@@ -69,7 +71,7 @@ export default function ComparisonPage() {
 
     if (!modelId) return;
     setLoadingVariants1(true);
-    fetch(`http://localhost:3000/vehicles/variants?modelId=${modelId}`)
+    fetch(`${API_URL}/vehicles/variants?modelId=${modelId}`)
       .then(res => res.json())
       .then(data => {
         setVariants1(Array.isArray(data) ? data : []);
@@ -88,7 +90,7 @@ export default function ComparisonPage() {
 
     if (!brandId) return;
     setLoadingModels2(true);
-    fetch(`http://localhost:3000/vehicles/models?brandId=${brandId}`)
+    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
       .then(res => res.json())
       .then(data => {
         setModels2(Array.isArray(data) ? data : []);
@@ -105,7 +107,7 @@ export default function ComparisonPage() {
 
     if (!modelId) return;
     setLoadingVariants2(true);
-    fetch(`http://localhost:3000/vehicles/variants?modelId=${modelId}`)
+    fetch(`${API_URL}/vehicles/variants?modelId=${modelId}`)
       .then(res => res.json())
       .then(data => {
         setVariants2(Array.isArray(data) ? data : []);
@@ -126,7 +128,7 @@ export default function ComparisonPage() {
     setError("");
     setComparisonResult(null);
 
-    fetch("http://localhost:3000/comparisons", {
+    fetch(`${API_URL}/comparisons`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
