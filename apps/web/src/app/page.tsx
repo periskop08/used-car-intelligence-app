@@ -21,6 +21,12 @@ export default function Home() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingVariants, setLoadingVariants] = useState(false);
 
+  // AI Search states
+  const [aiQuery, setAiQuery] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+
   // Fetch Brands on Load
   useEffect(() => {
     setLoadingBrands(true);
@@ -75,6 +81,36 @@ export default function Home() {
     if (!selectedVariant) return;
     router.push(`/vehicle/${selectedVariant}`);
   };
+
+  const handleAiGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+
+    setGenerating(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch(`${API_URL}/vehicles/ai-generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: aiQuery }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Araç oluşturulurken bir hata oluştu.");
+      }
+
+      const data = await res.json();
+      router.push(`/vehicle/${data.variantId}`);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Araç oluşturulamadı. Lütfen marka, model ve yılı belirterek tekrar deneyin.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-start py-12 px-6 gap-16">
@@ -162,7 +198,45 @@ export default function Home() {
         >
           Aracı İncele & AI Raporu Al
         </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-2">
+          <div className="h-[1px] bg-white/10 flex-1"></div>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Veya Yapay Zeka Arama</span>
+          <div className="h-[1px] bg-white/10 flex-1"></div>
+        </div>
+
+        {/* Global AI Search Input */}
+        <form onSubmit={handleAiGenerate} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Yapay Zeka ile Global Arama (Tüm Dünya Modelleri)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiQuery}
+                onChange={e => setAiQuery(e.target.value)}
+                placeholder="Örn: Audi A4 2020 2.0 TDI S Tronic, BMW 320i 2018..."
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition flex-1"
+                disabled={generating}
+              />
+              <button
+                type="submit"
+                disabled={!aiQuery.trim() || generating}
+                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white px-6 rounded-xl text-sm font-bold transition flex items-center justify-center min-w-[140px]"
+              >
+                {generating ? "Oluşturuluyor..." : "AI ile Oluştur"}
+              </button>
+            </div>
+          </div>
+          {errorMsg && <p className="text-xs font-semibold text-rose-500">{errorMsg}</p>}
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            * İstediğiniz herhangi bir markayı, modeli, yılı, motoru ve şanzımanı yazın. Sistem bunu global veritabanından dinamik olarak üretip sisteme kaydedecektir.
+          </p>
+        </form>
       </div>
+
 
       {/* Subscription Tiers Segment */}
       <div id="packages" className="w-full max-w-5xl flex flex-col gap-8 items-center py-8">

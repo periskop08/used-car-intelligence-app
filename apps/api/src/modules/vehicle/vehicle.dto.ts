@@ -12,3 +12,10 @@ export class GetVariantsFilterDto {
   @IsUUID()
   modelId!: string;
 }
+
+export class AiGenerateVehicleDto {
+  @ApiProperty({ description: 'Araç arama sorgusu (örn: Audi A4 2019 2.0 TDI)' })
+  @IsString()
+  query!: string;
+}
+

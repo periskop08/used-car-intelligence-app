@@ -1,7 +1,9 @@
-import { Controller, Get, Query, Param, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, Headers, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { JwtService } from '@nestjs/jwt';
+import { AiGenerateVehicleDto } from './vehicle.dto';
+
 
 @ApiTags('Vehicles')
 @Controller('vehicles')
@@ -62,4 +64,12 @@ export class VehicleController {
 
     return this.vehicleService.getVariantDetail(id, userId);
   }
+
+  @Post('ai-generate')
+  @ApiOperation({ summary: 'Yapay Zeka ile Araç Varyantı Oluştur' })
+  @ApiResponse({ status: 201, description: 'Yeni oluşturulan veya mevcut olan araç varyantının IDsi.' })
+  aiGenerateVehicle(@Body() dto: AiGenerateVehicleDto) {
+    return this.vehicleService.aiGenerateVehicle(dto.query);
+  }
 }
+
