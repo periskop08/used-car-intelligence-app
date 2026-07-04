@@ -1,0 +1,22 @@
+{
+  "name": "used-car-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Used Car Intelligence App Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=apps/api",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "db:validate": "npm run db:validate --workspace=apps/api",
+    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "db:seed": "npm run db:seed --workspace=apps/api"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

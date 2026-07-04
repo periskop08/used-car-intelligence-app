@@ -1,0 +1,699 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  STANDARD
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+  TRIALING
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATIC
+  DCT
+  CVT
+}
+
+enum FeatureKey {
+  AI_CHAT
+  VEHICLE_COMPARISON
+}
+
+enum UsagePeriodType {
+  DAILY
+  MONTHLY
+  LIFETIME
+}
+
+enum SourceType {
+  TECHNICAL_SPEC
+  COMMON_PROBLEM
+  RECALL
+  USER_COMPLAINT
+  SERVICE_NOTE
+  MANUAL
+  OTHER
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  LPG
+  HYBRID
+  PLUG_IN_HYBRID
+  ELECTRIC
+  OTHER
+}
+
+enum BodyType {
+  SEDAN
+  HATCHBACK
+  SUV
+  COUPE
+  WAGON
+  PICKUP
+  VAN
+  CONVERTIBLE
+  MINIVAN
+  OTHER
+}
+
+enum VehicleInfoCategory {
+  ENGINE
+  TRANSMISSION
+  ELECTRONICS
+  SUSPENSION
+  BRAKE
+  BODY
+  PAINT
+  INTERIOR
+  TIRES
+  TEST_DRIVE
+  MAINTENANCE
+  DOCUMENTS
+  GENERAL
+}
+
+enum FinalDecision {
+  BUY
+  BUY_CAREFULLY
+  RISKY
+  AVOID
+  INSUFFICIENT_DATA
+}
+
+model User {
+  id                     String            @id @default(uuid())
+  email                  String            @unique
+  passwordHash           String
+  role                   Role              @default(USER)
+  subscriptionTier       SubscriptionTier  @default(FREE)
+  preferredLanguageCode  String?
+  preferredCountryId     String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  
+  subscriptions      Subscription[]
+  reviews            UserReview[]
+  favorites          FavoriteVehicle[]
+  comparisons        VehicleComparison[]
+  chatLogs           AiChatLog[]
+  auditLogs          AuditLog[]
+  featureUsages      FeatureUsage[]
+
+  preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
+  createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
+  approvedVariants   VehicleVariant[]          @relation("VariantApprovedBy")
+  createdProblems    CommonProblem[]           @relation("ProblemCreatedBy")
+  approvedProblems   CommonProblem[]           @relation("ProblemApprovedBy")
+  createdRecalls     Recall[]                  @relation("RecallCreatedBy")
+  approvedRecalls    Recall[]                  @relation("RecallApprovedBy")
+  createdQuestions   SellerQuestion[]          @relation("QuestionCreatedBy")
+  approvedQuestions  SellerQuestion[]          @relation("QuestionApprovedBy")
+  createdChecklists  InspectionChecklistItem[] @relation("ChecklistCreatedBy")
+  approvedChecklists InspectionChecklistItem[] @relation("ChecklistApprovedBy")
+}
+
+model SubscriptionPlan {
+  id        String           @id @default(uuid())
+  tier      SubscriptionTier @unique
+  name      String
+  priceTrl  Decimal
+  priceUsd  Decimal
+  limits    Json             // AI soru limitleri, karşılaştırma limitleri vb.
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  userId    String
+  planId    String
+  status    SubscriptionStatus @default(ACTIVE)
+  expiresAt DateTime
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id])
+  plan      SubscriptionPlan   @relation(fields: [planId], references: [id])
+}
+
+model FeatureUsage {
+  id          String          @id @default(uuid())
+  userId      String
+  featureKey  FeatureKey
+  periodType  UsagePeriodType
+  periodStart DateTime
+  count       Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, featureKey, periodType, periodStart])
+}
+
+model Country {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  createdAt   DateTime         @default(now())
+  
+  variants    VehicleVariant[]
+  recalls     Recall[]
+  preferredBy User[]           @relation("UserPreferredCountry")
+}
+
+model Language {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations BrandTranslation[]
+  models       Model[]
+  variants     VehicleVariant[]
+}
+
+model BrandTranslation {
+  id           String   @id @default(uuid())
+  brandId      String
+  languageCode String
+  name         String
+  
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  @@unique([brandId, languageCode])
+  @@index([languageCode])
+}
+
+model Model {
+  id        String   @id @default(uuid())
+  brandId   String
+  name      String
+  startYear Int
+  endYear   Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brand        Brand              @relation(fields: [brandId], references: [id])
+  translations ModelTranslation[]
+  generations  Generation[]
+  variants     VehicleVariant[]
+
+  @@unique([brandId, name])
+}
+
+model ModelTranslation {
+  id           String   @id @default(uuid())
+  modelId      String
+  languageCode String
+  name         String
+  
+  model        Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  @@unique([modelId, languageCode])
+  @@index([languageCode])
+}
+
+model Generation {
+  id          String   @id @default(uuid())
+  modelId     String
+  name        String
+  startYear   Int
+  endYear     Int?
+  bodyType    BodyType
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  model        Model                   @relation(fields: [modelId], references: [id])
+  translations GenerationTranslation[]
+  variants     VehicleVariant[]
+
+  @@unique([modelId, name, startYear, bodyType])
+}
+
+model GenerationTranslation {
+  id           String     @id @default(uuid())
+  generationId String
+  languageCode String
+  description  String
+  
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  @@unique([generationId, languageCode])
+  @@index([languageCode])
+}
+
+model Engine {
+  id           String   @id @default(uuid())
+  code         String
+  displacement Int
+  horsepower   Int
+  torque       Int
+  fuelType     FuelType
+  hasTurbo     Boolean  @default(false)
+  isHybrid     Boolean  @default(false)
+  isElectric   Boolean  @default(false)
+  description  String?
+  createdAt    DateTime @default(now())
+
+  variants     VehicleVariant[]
+
+  @@unique([code, displacement, horsepower, torque, fuelType])
+}
+
+model Transmission {
+  id        String           @id @default(uuid())
+  name      String
+  type      TransmissionType
+  speeds    Int
+  createdAt DateTime         @default(now())
+
+  variants  VehicleVariant[]
+
+  @@unique([name, type, speeds])
+}
+
+model Trim {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  translations TrimTranslation[]
+  variants     VehicleVariant[]
+}
+
+model TrimTranslation {
+  id           String   @id @default(uuid())
+  trimId       String
+  languageCode String
+  description  String
+  
+  trim         Trim     @relation(fields: [trimId], references: [id], onDelete: Cascade)
+  @@unique([trimId, languageCode])
+  @@index([languageCode])
+}
+
+model VehicleVariant {
+  id             String         @id @default(uuid())
+  brandId        String
+  modelId        String
+  generationId   String
+  engineId       String
+  transmissionId String
+  trimId         String
+  countryId      String
+  year           Int
+  status         ApprovalStatus @default(PENDING)
+  createdById    String?
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  brand        Brand        @relation(fields: [brandId], references: [id])
+  model        Model        @relation(fields: [modelId], references: [id])
+  generation   Generation   @relation(fields: [generationId], references: [id])
+  engine       Engine       @relation(fields: [engineId], references: [id])
+  transmission Transmission @relation(fields: [transmissionId], references: [id])
+  trim         Trim         @relation(fields: [trimId], references: [id])
+  country      Country      @relation(fields: [countryId], references: [id])
+
+  createdBy    User?        @relation("VariantCreatedBy", fields: [createdById], references: [id])
+  approvedBy   User?        @relation("VariantApprovedBy", fields: [approvedById], references: [id])
+
+  specs        TechnicalSpec?
+  problems     CommonProblem[]
+  recalls      Recall[]
+  reviews      UserReview[]
+  favorites    FavoriteVehicle[]
+  comparisons1 VehicleComparison[] @relation("Variant1Comparisons")
+  comparisons2 VehicleComparison[] @relation("Variant2Comparisons")
+  chatLogs     AiChatLog[]
+  questions    SellerQuestion[]
+  checklists   InspectionChecklistItem[]
+  aiReports    AiVehicleReport[]
+
+  @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
+  @@index([brandId])
+  @@index([modelId])
+  @@index([countryId])
+  @@index([year])
+  @@index([status])
+  @@index([brandId, modelId, countryId, year])
+}
+
+model TechnicalSpec {
+  id        String         @id @default(uuid())
+  variantId String         @unique
+  specs     Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  variant   VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model CommonProblem {
+  id                 String         @id @default(uuid())
+  variantId          String
+  title              String
+  description        String
+  affectedYears      String?
+  affectedEngine     String?
+  affectedTransmission String?
+  riskLevel          RiskLevel      @default(MEDIUM)
+  symptoms           String?
+  checkRecommendation String?
+  sourceUrl          String?
+  confidenceScore    Decimal        @default(1.0)
+  status             ApprovalStatus @default(PENDING)
+  createdById        String?
+  approvedById       String?
+  approvedAt         DateTime?
+  rejectedReason     String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  variant      VehicleVariant               @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdBy    User?                        @relation("ProblemCreatedBy", fields: [createdById], references: [id])
+  approvedBy   User?                        @relation("ProblemApprovedBy", fields: [approvedById], references: [id])
+  translations CommonProblemTranslation[]
+  sources      CommonProblemSource[]
+
+  @@index([variantId, status])
+}
+
+model CommonProblemTranslation {
+  id                  String        @id @default(uuid())
+  problemId           String
+  languageCode        String
+  title               String
+  description         String
+  symptoms            String?
+  checkRecommendation String?
+
+  problem             CommonProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  @@unique([problemId, languageCode])
+  @@index([languageCode])
+}
+
+model Recall {
+  id              String         @id @default(uuid())
+  variantId       String
+  title           String
+  description     String
+  countryId       String
+  date            DateTime
+  sourceUrl       String?
+  riskLevel       RiskLevel      @default(HIGH)
+  status          ApprovalStatus @default(PENDING)
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedReason  String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  variant         VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  country         Country        @relation(fields: [countryId], references: [id])
+  createdBy       User?          @relation("RecallCreatedBy", fields: [createdById], references: [id])
+  approvedBy      User?          @relation("RecallApprovedBy", fields: [approvedById], references: [id])
+  sources         RecallSource[]
+
+  @@index([variantId, status])
+}
+
+model SellerQuestion {
+  id              String              @id @default(uuid())
+  variantId       String
+  question        String
+  reason          String?
+  category        VehicleInfoCategory
+  riskLevel       RiskLevel           @default(MEDIUM)
+  sourceUrl       String?
+  confidenceScore Decimal             @default(1.0)
+  status          ApprovalStatus      @default(PENDING)
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedReason  String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  variant       VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation("QuestionCreatedBy", fields: [createdById], references: [id])
+  approvedBy    User?          @relation("QuestionApprovedBy", fields: [approvedById], references: [id])
+
+  translations  SellerQuestionTranslation[]
+
+  @@index([variantId, status])
+}
+
+model SellerQuestionTranslation {
+  id               String         @id @default(uuid())
+  sellerQuestionId String
+  languageCode     String
+  question         String
+  reason           String?
+
+  sellerQuestion   SellerQuestion @relation(fields: [sellerQuestionId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerQuestionId, languageCode])
+  @@index([languageCode])
+}
+
+model InspectionChecklistItem {
+  id              String              @id @default(uuid())
+  variantId       String
+  title           String
+  description     String?
+  category        VehicleInfoCategory
+  riskLevel       RiskLevel           @default(MEDIUM)
+  sortOrder       Int                 @default(0)
+  sourceUrl       String?
+  confidenceScore Decimal             @default(1.0)
+  status          ApprovalStatus      @default(PENDING)
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectedReason  String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  variant       VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation("ChecklistCreatedBy", fields: [createdById], references: [id])
+  approvedBy    User?          @relation("ChecklistApprovedBy", fields: [approvedById], references: [id])
+
+  translations  InspectionChecklistItemTranslation[]
+
+  @@index([variantId, status])
+}
+
+model InspectionChecklistItemTranslation {
+  id                  String                  @id @default(uuid())
+  checklistItemId     String
+  languageCode        String
+  title               String
+  description         String?
+
+  checklistItem       InspectionChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+
+  @@unique([checklistItemId, languageCode])
+  @@index([languageCode])
+}
+
+model RawSource {
+  id              String      @id @default(uuid())
+  sourceType      SourceType
+  url             String
+  title           String?
+  contentHash     String      @unique
+  extractedText   String?
+  languageCode    String?
+  countryCode     String?
+  confidenceScore Decimal     @default(1.0)
+  fetchedAt       DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+
+  problems        CommonProblemSource[]
+  recalls         RecallSource[]
+
+  @@index([url])
+}
+
+model CommonProblemSource {
+  id              String        @id @default(uuid())
+  problemId       String
+  sourceId        String
+  createdAt       DateTime      @default(now())
+
+  problem         CommonProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  source          RawSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, sourceId])
+}
+
+model RecallSource {
+  id              String        @id @default(uuid())
+  recallId        String
+  sourceId        String
+  createdAt       DateTime      @default(now())
+
+  recall          Recall        @relation(fields: [recallId], references: [id], onDelete: Cascade)
+  source          RawSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([recallId, sourceId])
+}
+
+model UserReview {
+  id            String         @id @default(uuid())
+  variantId     String
+  userId        String
+  comment       String
+  usageDuration Int
+  isOwner       Boolean        @default(true)
+  recommend     Boolean        @default(true)
+  status        ApprovalStatus @default(PENDING)
+  reviewDateKey String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  variant       VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating        UserRating?
+
+  @@unique([userId, variantId, reviewDateKey])
+  @@index([variantId, status])
+  @@index([userId, createdAt])
+}
+
+model UserRating {
+  id              String     @id @default(uuid())
+  reviewId        String     @unique
+  reliability     Int
+  fuelConsumption Int
+  comfort         Int
+  partCost        Int
+  maintenanceCost Int
+  resaleEase      Int
+  overall         Int
+
+  review          UserReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model FavoriteVehicle {
+  id        String         @id @default(uuid())
+  userId    String
+  variantId String
+  createdAt DateTime       @default(now())
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant   VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  @@unique([userId, variantId])
+}
+
+model VehicleComparison {
+  id         String   @id @default(uuid())
+  userId     String
+  variant1Id String
+  variant2Id String
+  createdAt  DateTime @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant1   VehicleVariant @relation("Variant1Comparisons", fields: [variant1Id], references: [id], onDelete: Cascade)
+  variant2   VehicleVariant @relation("Variant2Comparisons", fields: [variant2Id], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([variant1Id])
+  @@index([variant2Id])
+  @@index([createdAt])
+}
+
+model AiChatLog {
+  id        String   @id @default(uuid())
+  userId    String
+  variantId String
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant   VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([variantId])
+  @@index([createdAt])
+}
+
+model AiVehicleReport {
+  id               String         @id @default(uuid())
+  variantId        String
+  languageCode     String
+  summary          Json
+  riskScore        Int
+  buyabilityScore  Int
+  finalDecision    FinalDecision
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  variant          VehicleVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, languageCode])
+  @@index([languageCode])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
