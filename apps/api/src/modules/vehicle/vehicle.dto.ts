@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID, IsString, IsOptional } from 'class-validator';
+import { IsUUID, IsString, IsInt } from 'class-validator';
 
 export class GetModelsFilterDto {
   @ApiProperty({ description: 'Marka IDsi' })
@@ -23,6 +23,7 @@ export class AiGenerateVehicleDto {
   model!: string;
 
   @ApiProperty({ description: 'Yıl (örn: 2004)' })
+  @IsInt()
   year!: number;
 
   @ApiProperty({ description: 'Kasa Tipi (HATCHBACK, SEDAN, SUV, COUPE, CABRIOLET, WAGON, MINIVAN, OTHER)' })
@@ -37,5 +38,3 @@ export class AiGenerateVehicleDto {
   @IsString()
   engine!: string;
 }
-
-
