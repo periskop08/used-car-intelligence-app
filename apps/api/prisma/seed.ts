@@ -901,6 +901,238 @@ async function main() {
     }
   }
 
+  console.log('Seeding dynamic vehicle shells catalog...');
+  const brandModels = [
+    {
+      brand: "Peugeot",
+      models: [
+        { name: "206", years: [2000, 2004], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.4 HDi Dizel"], trans: ["Manuel", "Otomatik"] },
+        { name: "207", years: [2007, 2010], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.6 HDi Dizel"], trans: ["Manuel", "Otomatik"] },
+        { name: "208", years: [2013, 2017, 2021], body: BodyType.HATCHBACK, engines: ["1.2 PureTech", "1.6 BlueHDi Dizel"], trans: ["Manuel", "EAT6 Otomatik", "EAT8 Otomatik"] },
+        { name: "307", years: [2002, 2005], body: BodyType.HATCHBACK, engines: ["1.6 Benzin", "1.6 HDi Dizel", "2.0 Benzin"], trans: ["Manuel", "Otomatik"] },
+        { name: "308", years: [2008, 2015, 2021], body: BodyType.HATCHBACK, engines: ["1.6 THP Benzin", "1.6 BlueHDi Dizel", "1.2 PureTech"], trans: ["Manuel", "EAT6 Otomatik", "EAT8 Otomatik"] },
+        { name: "3008", years: [2010, 2017, 2022], body: BodyType.SUV, engines: ["1.6 THP Benzin", "1.6 BlueHDi Dizel", "1.5 BlueHDi Dizel"], trans: ["EAT6 Otomatik", "EAT8 Otomatik"] }
+      ]
+    },
+    {
+      brand: "Citroen",
+      models: [
+        { name: "C3", years: [2003, 2010, 2017], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.4 HDi Dizel", "1.2 PureTech"], trans: ["Manuel", "EAT6 Otomatik"] },
+        { name: "C4", years: [2004, 2012, 2020], body: BodyType.HATCHBACK, engines: ["1.6 Benzin", "1.6 HDi Dizel", "1.2 PureTech"], trans: ["Manuel", "EAT6 Otomatik", "EAT8 Otomatik"] },
+        { name: "C5", years: [2008, 2015], body: BodyType.SEDAN, engines: ["1.6 HDi Dizel", "2.0 HDi Dizel"], trans: ["Manuel", "Otomatik"] },
+        { name: "Berlingo", years: [2008, 2015, 2019], body: BodyType.VAN, engines: ["1.6 HDi Dizel", "1.5 BlueHDi Dizel"], trans: ["Manuel", "EAT8 Otomatik"] }
+      ]
+    },
+    {
+      brand: "Volkswagen",
+      models: [
+        { name: "Polo", years: [2002, 2009, 2017], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.4 TDI Dizel", "1.0 TSI Benzin", "1.6 TDI Dizel"], trans: ["Manuel", "DSG Otomatik"] },
+        { name: "Golf", years: [2004, 2009, 2013, 2020], body: BodyType.HATCHBACK, engines: ["1.6 Hit Benzin", "1.4 TSI Benzin", "1.6 TDI Dizel", "1.0 TSI Benzin", "1.5 eTSI Hibrit"], trans: ["Manuel", "DSG Otomatik"] },
+        { name: "Passat", years: [2006, 2011, 2015, 2020], body: BodyType.SEDAN, engines: ["1.6 FSI Benzin", "2.0 TDI Dizel", "1.4 TSI Benzin", "1.6 TDI Dizel", "1.5 TSI Benzin"], trans: ["Manuel", "DSG Otomatik"] },
+        { name: "Tiguan", years: [2008, 2016, 2021], body: BodyType.SUV, engines: ["1.4 TSI Benzin", "2.0 TDI Dizel", "1.5 TSI Benzin"], trans: ["Manuel", "DSG Otomatik"] },
+        { name: "Caddy", years: [2004, 2011, 2016, 2021], body: BodyType.VAN, engines: ["1.9 TDI Dizel", "1.6 TDI Dizel", "2.0 TDI Dizel"], trans: ["Manuel", "DSG Otomatik"] }
+      ]
+    },
+    {
+      brand: "Renault",
+      models: [
+        { name: "Clio", years: [2000, 2006, 2012, 2019], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.5 dCi Dizel", "0.9 TCe Benzin", "1.0 TCe Benzin"], trans: ["Manuel", "BVA Otomatik", "EDC Otomatik", "X-Tronic CVT"] },
+        { name: "Megane", years: [2003, 2009, 2016], body: BodyType.SEDAN, engines: ["1.6 Benzin", "1.5 dCi Dizel", "1.3 TCe Benzin"], trans: ["Manuel", "BVA Otomatik", "EDC Otomatik"] },
+        { name: "Fluence", years: [2010, 2013, 2016], body: BodyType.SEDAN, engines: ["1.6 Benzin", "1.5 dCi Dizel"], trans: ["Manuel", "EDC Otomatik"] },
+        { name: "Symbol", years: [2008, 2013], body: BodyType.SEDAN, engines: ["1.4 Benzin", "1.5 dCi Dizel"], trans: ["Manuel"] }
+      ]
+    },
+    {
+      brand: "Fiat",
+      models: [
+        { name: "Punto", years: [2006, 2012], body: BodyType.HATCHBACK, engines: ["1.4 Fire Benzin", "1.3 Multijet Dizel"], trans: ["Manuel", "Dualogic Yarı Otomatik"] },
+        { name: "Linea", years: [2007, 2012], body: BodyType.SEDAN, engines: ["1.4 Fire Benzin", "1.3 Multijet Dizel", "1.6 Multijet Dizel"], trans: ["Manuel"] },
+        { name: "Egea", years: [2015, 2020], body: BodyType.SEDAN, engines: ["1.4 Fire Benzin", "1.3 Multijet Dizel", "1.6 Multijet Dizel", "1.5 T4 Hibrit"], trans: ["Manuel", "DCT Otomatik"] },
+        { name: "Doblo", years: [2005, 2010, 2015], body: BodyType.VAN, engines: ["1.3 Multijet Dizel", "1.6 Multijet Dizel", "1.9 JTD Dizel"], trans: ["Manuel"] }
+      ]
+    },
+    {
+      brand: "Ford",
+      models: [
+        { name: "Fiesta", years: [2004, 2009, 2013, 2018], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.4 TDCi Dizel", "1.0 EcoBoost Benzin", "1.5 TDCi Dizel"], trans: ["Manuel", "Otomatik", "Powershift DCT"] },
+        { name: "Focus", years: [2005, 2011, 2015, 2019], body: BodyType.SEDAN, engines: ["1.6 Benzin", "1.6 TDCi Dizel", "1.0 EcoBoost Benzin", "1.5 TDCi Dizel", "1.5 EcoBlue Dizel"], trans: ["Manuel", "Otomatik", "Powershift DCT"] },
+        { name: "Mondeo", years: [2008, 2015], body: BodyType.SEDAN, engines: ["2.0 TDCi Dizel", "1.6 TDCi Dizel", "1.5 EcoBoost Benzin"], trans: ["Manuel", "Otomatik", "Powershift DCT"] }
+      ]
+    },
+    {
+      brand: "Opel",
+      models: [
+        { name: "Corsa", years: [2004, 2007, 2015, 2020], body: BodyType.HATCHBACK, engines: ["1.2 Benzin", "1.4 Benzin", "1.3 CDTI Dizel", "1.2 Turbo Benzin"], trans: ["Manuel", "Easytronic Yarı Otomatik", "Otomatik"] },
+        { name: "Astra", years: [2005, 2010, 2016, 2022], body: BodyType.HATCHBACK, engines: ["1.6 Benzin", "1.3 CDTI Dizel", "1.4 Turbo Benzin", "1.6 CDTI Dizel", "1.2 Turbo Benzin"], trans: ["Manuel", "Easytronic", "Active Select Otomatik", "AT6 Otomatik"] },
+        { name: "Insignia", years: [2009, 2014, 2017], body: BodyType.SEDAN, engines: ["1.6 Turbo Benzin", "2.0 CDTI Dizel", "1.6 CDTI Dizel", "1.5 Turbo Benzin"], trans: ["Manuel", "Active Select Otomatik", "AT6 Otomatik"] }
+      ]
+    },
+    {
+      brand: "Toyota",
+      models: [
+        { name: "Yaris", years: [2004, 2012, 2020], body: BodyType.HATCHBACK, engines: ["1.0 Benzin", "1.33 Benzin", "1.4 D-4D Dizel", "1.5 Hibrit"], trans: ["Manuel", "MMT Yarı Otomatik", "CVT Otomatik"] },
+        { name: "Corolla", years: [2004, 2007, 2013, 2019], body: BodyType.SEDAN, engines: ["1.6 Benzin", "1.4 D-4D Dizel", "1.8 Hibrit", "1.5 Benzin"], trans: ["Manuel", "MMT Yarı Otomatik", "CVT Otomatik"] },
+        { name: "Auris", years: [2007, 2013], body: BodyType.HATCHBACK, engines: ["1.6 Benzin", "1.4 D-4D Dizel", "1.33 Benzin"], trans: ["Manuel", "MMT Yarı Otomatik", "CVT Otomatik"] }
+      ]
+    },
+    {
+      brand: "Honda",
+      models: [
+        { name: "Civic", years: [2004, 2007, 2012, 2016, 2021], body: BodyType.SEDAN, engines: ["1.6 i-VTEC Benzin", "1.6 i-DTEC Dizel", "1.5 VTEC Turbo Benzin"], trans: ["Manuel", "Tork Konvertörlü Otomatik", "CVT Otomatik"] },
+        { name: "Accord", years: [2004, 2008, 2021], body: BodyType.SEDAN, engines: ["2.0 i-VTEC Benzin", "2.4 i-VTEC Benzin", "1.5 VTEC Turbo Benzin"], trans: ["Otomatik", "CVT Otomatik"] }
+      ]
+    },
+    {
+      brand: "Hyundai",
+      models: [
+        { name: "i10", years: [2008, 2014, 2020], body: BodyType.HATCHBACK, engines: ["1.1 Benzin", "1.2 Benzin", "1.0 Benzin"], trans: ["Manuel", "Otomatik"] },
+        { name: "i20", years: [2009, 2015, 2020], body: BodyType.HATCHBACK, engines: ["1.4 Benzin", "1.4 CRDi Dizel", "1.0 T-GDI Benzin"], trans: ["Manuel", "Otomatik", "DCT Otomatik"] },
+        { name: "i30", years: [2008, 2012, 2017], body: BodyType.HATCHBACK, engines: ["1.6 Benzin", "1.6 CRDi Dizel"], trans: ["Manuel", "Otomatik", "DCT Otomatik"] },
+        { name: "Tucson", years: [2005, 2015, 2021], body: BodyType.SUV, engines: ["2.0 CRDi Dizel", "1.6 T-GDI Benzin", "1.6 CRDi Dizel"], trans: ["Otomatik", "DCT Otomatik"] }
+      ]
+    },
+    {
+      brand: "Mercedes-Benz",
+      models: [
+        { name: "C-Class", years: [2007, 2014, 2021], body: BodyType.SEDAN, engines: ["C180 1.6 Benzin", "C200d 1.6 Dizel", "C200 1.5 Benzin Mild-Hybrid"], trans: ["7G-Tronic Otomatik", "9G-Tronic Otomatik"] },
+        { name: "E-Class", years: [2009, 2016, 2023], body: BodyType.SEDAN, engines: ["E250 2.0 Benzin", "E220d 2.0 Dizel", "E180 1.6 Benzin"], trans: ["7G-Tronic Otomatik", "9G-Tronic Otomatik"] }
+      ]
+    },
+    {
+      brand: "BMW",
+      models: [
+        { name: "3 Series", years: [2005, 2012, 2019], body: BodyType.SEDAN, engines: ["320i 2.0 Benzin", "320d 2.0 Dizel", "318i 1.5 Benzin", "320i 1.6 Benzin"], trans: ["Manuel", "ZF 6 İleri Otomatik", "ZF 8 İleri Otomatik"] },
+        { name: "5 Series", years: [2004, 2010, 2017], body: BodyType.SEDAN, engines: ["520d 2.0 Dizel", "520i 2.0 Benzin", "520i 1.6 Benzin"], trans: ["ZF 6 İleri Otomatik", "ZF 8 İleri Otomatik"] }
+      ]
+    },
+    {
+      brand: "Audi",
+      models: [
+        { name: "A3", years: [2004, 2013, 2020], body: BodyType.HATCHBACK, engines: ["1.6 Hit Benzin", "1.4 TFSI Benzin", "1.6 TDI Dizel", "1.5 TFSI Benzin", "30 TFSI 1.0 Benzin", "35 TFSI 1.5 Benzin"], trans: ["Manuel", "S Tronic Çift Kavrama"] },
+        { name: "A4", years: [2005, 2008, 2016], body: BodyType.SEDAN, engines: ["2.0 TDI Dizel", "1.8 TFSI Benzin", "1.4 TFSI Benzin", "2.0 TFSI Benzin"], trans: ["Manuel", "Multitronic CVT", "S Tronic Çift Kavrama"] }
+      ]
+    }
+  ];
+
+  for (const b of brandModels) {
+    let brand = await prisma.brand.findFirst({ where: { name: b.brand } });
+    if (!brand) {
+      brand = await prisma.brand.create({ data: { name: b.brand } });
+    }
+
+    for (const m of b.models) {
+      let model = await prisma.model.findFirst({ where: { brandId: brand.id, name: m.name } });
+      if (!model) {
+        model = await prisma.model.create({ data: { brandId: brand.id, name: m.name, startYear: m.years[0] } });
+      }
+
+      for (const yr of m.years) {
+        const genName = `${m.name} ${yr}-${yr + 6}`;
+        let gen = await prisma.generation.findFirst({ where: { modelId: model.id, name: genName } });
+        if (!gen) {
+          gen = await prisma.generation.create({
+            data: {
+              modelId: model.id,
+              name: genName,
+              startYear: yr,
+              endYear: yr + 6,
+              bodyType: m.body,
+              description: `${b.brand} ${m.name} ${genName} Jenerasyonu`
+            }
+          });
+        }
+
+        for (const engCode of m.engines) {
+          const lowerEng = engCode.toLowerCase();
+          const engineMatch = engCode.match(/\b(\d\.\d)\b/);
+          const displacement = engineMatch ? Math.round(parseFloat(engineMatch[0]) * 1000) : 1600;
+          let fuelType: FuelType = FuelType.PETROL;
+          if (lowerEng.includes("dizel") || lowerEng.includes("diesel") || lowerEng.includes("hdi") || lowerEng.includes("tdi") || lowerEng.includes("dci") || lowerEng.includes("cdti") || lowerEng.includes("bluehdi")) {
+            fuelType = FuelType.DIESEL;
+          } else if (lowerEng.includes("hibrit") || lowerEng.includes("hybrid") || lowerEng.includes("etsi")) {
+            fuelType = FuelType.HYBRID;
+          } else if (lowerEng.includes("lpg")) {
+            fuelType = FuelType.LPG;
+          }
+
+          let engine = await prisma.engine.findFirst({ where: { code: engCode } });
+          if (!engine) {
+            engine = await prisma.engine.create({
+              data: {
+                code: engCode,
+                displacement,
+                horsepower: lowerEng.includes("2.0") ? 150 : 110,
+                torque: fuelType === FuelType.DIESEL ? 240 : 150,
+                fuelType,
+                hasTurbo: lowerEng.includes("turbo") || lowerEng.includes("tsi") || lowerEng.includes("tfsi") || fuelType === FuelType.DIESEL
+              }
+            });
+          }
+
+          for (const trName of m.trans) {
+            const lowerTr = trName.toLowerCase();
+            let transType: TransmissionType = TransmissionType.AUTOMATIC;
+            if (lowerTr.includes("manuel") || lowerTr.includes("düz")) {
+              transType = TransmissionType.MANUAL;
+            } else if (lowerTr.includes("dsg") || lowerTr.includes("s tronic") || lowerTr.includes("edc") || lowerTr.includes("dct")) {
+              transType = TransmissionType.DCT;
+            } else if (lowerTr.includes("cvt") || lowerTr.includes("x-tronic")) {
+              transType = TransmissionType.CVT;
+            }
+
+            let trans = await prisma.transmission.findFirst({ where: { name: trName } });
+            if (!trans) {
+              trans = await prisma.transmission.create({
+                data: {
+                  name: trName,
+                  type: transType,
+                  speeds: lowerTr.includes("8") ? 8 : lowerTr.includes("7") ? 7 : 6
+                }
+              });
+            }
+
+            const trimName = "Standart Paket";
+            let trim = await prisma.trim.findFirst({ where: { name: trimName } });
+            if (!trim) {
+              trim = await prisma.trim.create({
+                data: { name: trimName, description: "Standart donanım seviyesi" }
+              });
+            }
+
+            const existingVariant = await prisma.vehicleVariant.findFirst({
+              where: {
+                modelId: model.id,
+                generationId: gen.id,
+                engineId: engine.id,
+                transmissionId: trans.id,
+                year: yr
+              }
+            });
+
+            if (!existingVariant) {
+              await prisma.vehicleVariant.create({
+                data: {
+                  brandId: brand.id,
+                  modelId: model.id,
+                  generationId: gen.id,
+                  engineId: engine.id,
+                  transmissionId: trans.id,
+                  trimId: trim.id,
+                  countryId: countryTr.id,
+                  year: yr,
+                  status: ApprovalStatus.APPROVED,
+                  createdById: demoAdmin.id,
+                  approvedById: demoAdmin.id,
+                  approvedAt: new Date()
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   console.log('Database seeded successfully!');
 }
 
