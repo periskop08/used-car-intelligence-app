@@ -14,8 +14,28 @@ export class GetVariantsFilterDto {
 }
 
 export class AiGenerateVehicleDto {
-  @ApiProperty({ description: 'Araç arama sorgusu (örn: Audi A4 2019 2.0 TDI)' })
+  @ApiProperty({ description: 'Marka (örn: Peugeot)' })
   @IsString()
-  query!: string;
+  brand!: string;
+
+  @ApiProperty({ description: 'Model (örn: 307)' })
+  @IsString()
+  model!: string;
+
+  @ApiProperty({ description: 'Yıl (örn: 2004)' })
+  year!: number;
+
+  @ApiProperty({ description: 'Kasa Tipi (HATCHBACK, SEDAN, SUV, COUPE, CABRIOLET, WAGON, MINIVAN, OTHER)' })
+  @IsString()
+  bodyType!: string;
+
+  @ApiProperty({ description: 'Şanzıman (Otomatik, Manuel, DSG, CVT, S Tronic, EDC, DCT)' })
+  @IsString()
+  transmission!: string;
+
+  @ApiProperty({ description: 'Motor / Yakıt (örn: 1.6 Benzin, 2.0 TDI, 1.5 dCi)' })
+  @IsString()
+  engine!: string;
 }
+
 

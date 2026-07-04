@@ -69,7 +69,7 @@ export class VehicleController {
   @ApiOperation({ summary: 'Yapay Zeka ile Araç Varyantı Oluştur' })
   @ApiResponse({ status: 201, description: 'Yeni oluşturulan veya mevcut olan araç varyantının IDsi.' })
   aiGenerateVehicle(@Body() dto: AiGenerateVehicleDto) {
-    return this.vehicleService.aiGenerateVehicle(dto.query);
+    return this.vehicleService.aiGenerateVehicle(dto);
   }
 }
 

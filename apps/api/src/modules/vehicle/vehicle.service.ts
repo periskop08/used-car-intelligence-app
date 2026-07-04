@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
+import { AiGenerateVehicleDto } from './vehicle.dto';
+
 
 
 @Injectable()
@@ -151,60 +153,52 @@ export class VehicleService {
     };
   }
 
-  async aiGenerateVehicle(queryStr: string) {
-    if (!queryStr || queryStr.trim().length < 3) {
-      throw new BadRequestException('Arama sorgusu en az 3 karakter olmalıdır.');
-    }
-
-    const words = queryStr.trim().split(/\s+/);
-    let brandName = words[0];
+  async aiGenerateVehicle(dto: AiGenerateVehicleDto) {
+    let brandName = dto.brand.trim();
     brandName = brandName.charAt(0).toUpperCase() + brandName.slice(1).toLowerCase();
 
-    const yearMatch = queryStr.match(/\b(19\d{2}|20\d{2})\b/);
-    const year = yearMatch ? parseInt(yearMatch[0], 10) : 2018;
-
-    let modelName = words[1] || 'Model';
+    let modelName = dto.model.trim();
     modelName = modelName.charAt(0).toUpperCase() + modelName.slice(1);
 
-    const engineMatch = queryStr.match(/\b(\d\.\d)\b/);
+    const year = Number(dto.year) || 2018;
+    let bodyType: BodyType = BodyType.SEDAN;
+    const bodyStr = dto.bodyType.toUpperCase();
+    if (bodyStr === 'HATCHBACK') bodyType = BodyType.HATCHBACK;
+    else if (bodyStr === 'SUV') bodyType = BodyType.SUV;
+    else if (bodyStr === 'COUPE') bodyType = BodyType.COUPE;
+    else if (bodyStr === 'CABRIOLET' || bodyStr === 'CONVERTIBLE') bodyType = BodyType.CONVERTIBLE;
+    else if (bodyStr === 'WAGON') bodyType = BodyType.WAGON;
+    else if (bodyStr === 'MINIVAN') bodyType = BodyType.MINIVAN;
+    else if (bodyStr === 'OTHER') bodyType = BodyType.OTHER;
+
+    const engineMatch = dto.engine.match(/\b(\d\.\d)\b/);
     const engineSize = engineMatch ? engineMatch[0] : '1.6';
 
     let fuelType: FuelType = FuelType.PETROL;
-    const lowerQuery = queryStr.toLowerCase();
-    if (lowerQuery.includes('tdi') || lowerQuery.includes('dci') || lowerQuery.includes('cdti') || lowerQuery.includes('diesel') || lowerQuery.includes('dizel') || lowerQuery.includes('bluehdi')) {
+    const lowerEngine = dto.engine.toLowerCase();
+    if (lowerEngine.includes('dizel') || lowerEngine.includes('diesel') || lowerEngine.includes('tdi') || lowerEngine.includes('dci') || lowerEngine.includes('cdti') || lowerEngine.includes('bluehdi') || lowerEngine.includes('hdi')) {
       fuelType = FuelType.DIESEL;
-    } else if (lowerQuery.includes('lpg') || lowerQuery.includes('eco')) {
+    } else if (lowerEngine.includes('lpg') || lowerEngine.includes('eco')) {
       fuelType = FuelType.LPG;
-    } else if (lowerQuery.includes('hybrid') || lowerQuery.includes('hibrit')) {
+    } else if (lowerEngine.includes('hybrid') || lowerEngine.includes('hibrit')) {
       fuelType = FuelType.HYBRID;
-    } else if (lowerQuery.includes('electric') || lowerQuery.includes('elektrik') || lowerQuery.includes('ev')) {
+    } else if (lowerEngine.includes('electric') || lowerEngine.includes('ev') || lowerEngine.includes('elektrik')) {
       fuelType = FuelType.ELECTRIC;
     }
 
-    let engineCode = `${engineSize} `;
-    if (fuelType === FuelType.DIESEL) {
-      engineCode += lowerQuery.includes('tdi') ? 'TDI' : lowerQuery.includes('dci') ? 'dCi' : 'Dizel';
-    } else if (fuelType === FuelType.LPG) {
-      engineCode += 'Eco LPG';
-    } else if (fuelType === FuelType.HYBRID) {
-      engineCode += 'Hybrid';
-    } else {
-      engineCode += lowerQuery.includes('tsi') ? 'TSI' : lowerQuery.includes('tfsi') ? 'TFSI' : 'Benzin';
-    }
+    let engineCode = dto.engine.trim();
 
-    let transName = 'Otomatik';
+    let transName = dto.transmission.trim();
     let transType: TransmissionType = TransmissionType.AUTOMATIC;
     let speeds = 6;
-    if (lowerQuery.includes('dsg') || lowerQuery.includes('s tronic') || lowerQuery.includes('dct') || lowerQuery.includes('edc') || lowerQuery.includes('çift kavrama')) {
-      transName = lowerQuery.includes('dsg') ? 'DSG' : lowerQuery.includes('s tronic') ? 'S Tronic' : lowerQuery.includes('edc') ? 'EDC' : 'Çift Kavrama DCT';
+    const lowerTrans = dto.transmission.toLowerCase();
+    if (lowerTrans.includes('dsg') || lowerTrans.includes('s tronic') || lowerTrans.includes('dct') || lowerTrans.includes('edc') || lowerTrans.includes('çift kavrama')) {
       transType = TransmissionType.DCT;
       speeds = 7;
-    } else if (lowerQuery.includes('cvt') || lowerQuery.includes('multidrive')) {
-      transName = 'CVT';
+    } else if (lowerTrans.includes('cvt') || lowerTrans.includes('multidrive')) {
       transType = TransmissionType.CVT;
       speeds = 7;
-    } else if (lowerQuery.includes('manuel') || lowerQuery.includes('düz') || lowerQuery.includes('manual')) {
-      transName = 'Manuel';
+    } else if (lowerTrans.includes('manuel') || lowerTrans.includes('düz') || lowerTrans.includes('manual')) {
       transType = TransmissionType.MANUAL;
       speeds = 6;
     }
@@ -259,11 +253,12 @@ export class VehicleService {
           name: genName,
           startYear: year - 2,
           endYear: year + 3,
-          bodyType: BodyType.SEDAN,
+          bodyType,
           description: `${brandName} ${modelName} ${year} Jenerasyonu`
         }
       });
     }
+
 
     let dbEngine = await this.prisma.engine.findFirst({
       where: { code: { equals: engineCode, mode: 'insensitive' } }
