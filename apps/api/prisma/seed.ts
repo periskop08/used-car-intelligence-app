@@ -1,9 +1,44 @@
-import { PrismaClient, Role, SubscriptionTier, SubscriptionStatus, ApprovalStatus, RiskLevel, TransmissionType, FuelType, BodyType, VehicleInfoCategory, FinalDecision } from '@prisma/client';
+import { PrismaClient, Role, SubscriptionTier, SubscriptionStatus, ApprovalStatus, RiskLevel, TransmissionType, FuelType, BodyType, VehicleInfoCategory } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+
+  // 0. Cleanup existing data to make seed idempotent
+  console.log('Cleaning up existing data...');
+  await prisma.auditLog.deleteMany();
+  await prisma.aiVehicleReport.deleteMany();
+  await prisma.aiChatLog.deleteMany();
+  await prisma.vehicleComparison.deleteMany();
+  await prisma.favoriteVehicle.deleteMany();
+  await prisma.userRating.deleteMany();
+  await prisma.userReview.deleteMany();
+  await prisma.inspectionChecklistItemTranslation.deleteMany();
+  await prisma.inspectionChecklistItem.deleteMany();
+  await prisma.sellerQuestionTranslation.deleteMany();
+  await prisma.sellerQuestion.deleteMany();
+  await prisma.commonProblemTranslation.deleteMany();
+  await prisma.commonProblem.deleteMany();
+  await prisma.recall.deleteMany();
+  await prisma.technicalSpec.deleteMany();
+  await prisma.vehicleVariant.deleteMany();
+  await prisma.trimTranslation.deleteMany();
+  await prisma.trim.deleteMany();
+  await prisma.transmission.deleteMany();
+  await prisma.engine.deleteMany();
+  await prisma.generationTranslation.deleteMany();
+  await prisma.generation.deleteMany();
+  await prisma.modelTranslation.deleteMany();
+  await prisma.model.deleteMany();
+  await prisma.brandTranslation.deleteMany();
+  await prisma.brand.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.subscriptionPlan.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.country.deleteMany();
+  await prisma.language.deleteMany();
+  console.log('Cleanup completed.');
 
   // 1. Languages
   const langTr = await prisma.language.upsert({
@@ -122,43 +157,28 @@ async function main() {
     }
   });
 
+  // Create active subscription for demoAdmin as PRO user
+  await prisma.subscription.create({
+    data: {
+      userId: demoAdmin.id,
+      planId: proPlan.id,
+      status: SubscriptionStatus.ACTIVE,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    }
+  });
+
   // 5. Brands
-  const brandToyota = await prisma.brand.upsert({
-    where: { name: 'Toyota' },
-    update: {},
-    create: {
+  const brandToyota = await prisma.brand.create({
+    data: {
       name: 'Toyota',
-      logoUrl: 'https://example.com/toyota-logo.png',
-      translations: {
-        create: [
-          { languageCode: 'tr', name: 'Toyota Türkiye' },
-          { languageCode: 'en', name: 'Toyota Global' }
-        ]
-      }
+      logoUrl: 'https://example.com/toyota-logo.png'
     }
   });
 
-  const brandVw = await prisma.brand.upsert({
-    where: { name: 'Volkswagen' },
-    update: {},
-    create: {
+  const brandVw = await prisma.brand.create({
+    data: {
       name: 'Volkswagen',
-      logoUrl: 'https://example.com/vw-logo.png',
-      translations: {
-        create: [
-          { languageCode: 'tr', name: 'Volkswagen Türkiye' },
-          { languageCode: 'en', name: 'Volkswagen Global' }
-        ]
-      }
-    }
-  });
-
-  const brandBmw = await prisma.brand.upsert({
-    where: { name: 'BMW' },
-    update: {},
-    create: {
-      name: 'BMW',
-      logoUrl: 'https://example.com/bmw-logo.png'
+      logoUrl: 'https://example.com/vw-logo.png'
     }
   });
 
@@ -167,13 +187,7 @@ async function main() {
     data: {
       brandId: brandToyota.id,
       name: 'Corolla',
-      startYear: 1966,
-      translations: {
-        create: [
-          { languageCode: 'tr', name: 'Corolla Türkiye' },
-          { languageCode: 'en', name: 'Corolla Global' }
-        ]
-      }
+      startYear: 1966
     }
   });
 
@@ -181,13 +195,7 @@ async function main() {
     data: {
       brandId: brandVw.id,
       name: 'Golf',
-      startYear: 1974,
-      translations: {
-        create: [
-          { languageCode: 'tr', name: 'Golf TR' },
-          { languageCode: 'en', name: 'Golf' }
-        ]
-      }
+      startYear: 1974
     }
   });
 
@@ -199,13 +207,18 @@ async function main() {
       startYear: 2012,
       endYear: 2020,
       bodyType: BodyType.HATCHBACK,
-      description: 'Volkswagen Golf 7. Jenerasyon',
-      translations: {
-        create: [
-          { languageCode: 'tr', description: 'Yedinci nesil Golf hatchback modeli.' },
-          { languageCode: 'en', description: 'Seventh generation Golf hatchback model.' }
-        ]
-      }
+      description: 'Volkswagen Golf 7. Jenerasyon'
+    }
+  });
+
+  const genCorolla11 = await prisma.generation.create({
+    data: {
+      modelId: modelCorolla.id,
+      name: 'Corolla E170',
+      startYear: 2013,
+      endYear: 2019,
+      bodyType: BodyType.SEDAN,
+      description: 'Toyota Corolla 11. Jenerasyon'
     }
   });
 
@@ -221,6 +234,17 @@ async function main() {
     }
   });
 
+  const engine16Valv = await prisma.engine.create({
+    data: {
+      code: '1.6 Valvematic',
+      displacement: 1598,
+      horsepower: 132,
+      torque: 160,
+      fuelType: FuelType.PETROL,
+      hasTurbo: false
+    }
+  });
+
   // 9. Transmissions
   const transDsg7 = await prisma.transmission.create({
     data: {
@@ -230,17 +254,26 @@ async function main() {
     }
   });
 
+  const transCvt = await prisma.transmission.create({
+    data: {
+      name: 'Multidrive S CVT',
+      type: TransmissionType.CVT,
+      speeds: 7
+    }
+  });
+
   // 10. Trims
   const trimComfort = await prisma.trim.create({
     data: {
       name: 'Comfortline',
-      description: 'Orta donanım seviyesi',
-      translations: {
-        create: [
-          { languageCode: 'tr', description: 'Comfortline standart donanım paketi' },
-          { languageCode: 'en', description: 'Comfortline mid-level trim level' }
-        ]
-      }
+      description: 'Orta donanım seviyesi'
+    }
+  });
+
+  const trimAdvance = await prisma.trim.create({
+    data: {
+      name: 'Advance',
+      description: 'Dolu donanım paketi'
     }
   });
 
@@ -273,54 +306,44 @@ async function main() {
     }
   });
 
-  // 12. Common Problems (2 Approved, 1 Pending)
-  const problemDsg = await prisma.commonProblem.create({
+  const variantCorollaTr = await prisma.vehicleVariant.create({
     data: {
-      variantId: variantGolfTr.id,
-      title: 'DSG Kavrama Aşınması',
-      description: 'DQ200 kuru tip DSG şanzımanda, yoğun dur-kalk trafikte kavrama aşınması ve sarsıntılı vites geçişleri görülebilmektedir.',
-      affectedYears: '2012-2019',
-      affectedEngine: 'Tüm 1.6 TDI motorlar',
-      affectedTransmission: 'DSG 7 Vites',
-      riskLevel: RiskLevel.MEDIUM,
-      symptoms: '1. vitesten 2. vitese geçerken sarsıntı, metalik sesler ve vites lambasının yanıp sönmesi.',
-      checkRecommendation: 'Alım öncesi test sürüşünde dik rampa kalkışlarında sarsıntı ve kararsızlık kontrol edilmeli.',
-      confidenceScore: 0.95,
+      brandId: brandToyota.id,
+      modelId: modelCorolla.id,
+      generationId: genCorolla11.id,
+      engineId: engine16Valv.id,
+      transmissionId: transCvt.id,
+      trimId: trimAdvance.id,
+      countryId: countryTr.id,
+      year: 2017,
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
       approvedById: demoAdmin.id,
       approvedAt: new Date(),
-      translations: {
-        create: [
-          {
-            languageCode: 'tr',
-            title: 'DSG Kavrama Aşınması',
-            description: 'DQ200 kuru tip DSG şanzımanda kavrama aşınması görülebilir.',
-            symptoms: 'Sarsıntılı vites geçişleri.',
-            checkRecommendation: 'Yol testinde vites geçişleri izlenmeli.'
-          },
-          {
-            languageCode: 'en',
-            title: 'DSG Clutch Wear',
-            description: 'DSG DQ200 transmission clutch wear issues are common.',
-            symptoms: 'Jerky shifts and metallic noises.',
-            checkRecommendation: 'Check shifting performance during road test.'
+      specs: {
+        create: {
+          specs: {
+            topSpeed: 190,
+            acceleration0to100: 11.1,
+            averageFuelConsumption: 6.1,
+            luggageCapacity: 452,
+            weight: 1310
           }
-        ]
+        }
       }
     }
   });
 
-  const problemDpf = await prisma.commonProblem.create({
+  // 12. Common Problems
+  // Golf DSG
+  await prisma.commonProblem.create({
     data: {
       variantId: variantGolfTr.id,
-      title: 'DPF (Dizel Partikül Filtresi) Tıkanması',
-      description: 'Kısa mesafeli şehir içi sürüşlerde DPF kendini temizleyemez ve tıkanma eğilimi gösterir.',
-      affectedYears: '2015-2020',
-      riskLevel: RiskLevel.LOW,
-      symptoms: 'Motor arıza lambası yanması, çekiş kaybı ve artan yakıt tüketimi.',
-      checkRecommendation: 'Gösterge panelindeki DPF lambasının sönük olduğundan emin olun.',
-      confidenceScore: 0.88,
+      title: 'DSG Kavrama Aşınması',
+      description: 'DQ200 kuru tip DSG şanzımanda, yoğun dur-kalk trafikte kavrama aşınması ve sarsıntılı vites geçişleri görülebilmektedir.',
+      riskLevel: RiskLevel.MEDIUM,
+      symptoms: '1. vitesten 2. vitese geçerken sarsıntı, metalik sesler ve vites lambasının yanıp sönmesi.',
+      checkRecommendation: 'Alım öncesi test sürüşünde dik rampa kalkışlarında sarsıntı ve kararsızlık kontrol edilmeli.',
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
       approvedById: demoAdmin.id,
@@ -328,18 +351,23 @@ async function main() {
     }
   });
 
-  const problemPending = await prisma.commonProblem.create({
+  // Corolla CVT
+  await prisma.commonProblem.create({
     data: {
-      variantId: variantGolfTr.id,
-      title: 'Klima Aktüatör Motoru Arızası (Örnek)',
-      description: 'Klima yönlendirme kapakçıklarında çıtırtı sesi gelmesi sorunu (İnceleme Bekliyor).',
-      riskLevel: RiskLevel.LOW,
-      status: ApprovalStatus.PENDING,
-      createdById: demoAdmin.id
+      variantId: variantCorollaTr.id,
+      title: 'CVT Şanzıman Kayış Kaydırması',
+      description: 'Multidrive S CVT şanzımanda, yüksek kilometrelerde kayış aşınması nedeniyle güç aktarımında gecikme ve kasnak uğultusu oluşabilir.',
+      riskLevel: RiskLevel.MEDIUM,
+      symptoms: 'Gaza basıldığında motor devrinin yükselmesi fakat aracın hızlanmaması (kayma hissi), yüksek hızlarda uğultu.',
+      checkRecommendation: 'Test sürüşünde ani dip gaz yapılarak şanzımanın gücü kararlı aktarıp aktarmadığı test edilmelidir.',
+      status: ApprovalStatus.APPROVED,
+      createdById: demoAdmin.id,
+      approvedById: demoAdmin.id,
+      approvedAt: new Date()
     }
   });
 
-  // 13. Seller Questions (2 Approved)
+  // 13. Seller Questions
   await prisma.sellerQuestion.create({
     data: {
       variantId: variantGolfTr.id,
@@ -350,25 +378,16 @@ async function main() {
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
       approvedById: demoAdmin.id,
-      approvedAt: new Date(),
-      translations: {
-        create: [
-          {
-            languageCode: 'tr',
-            question: 'DSG şanzıman mekatronik veya kavraması daha önce değişti mi?',
-            reason: 'Kavramanın yenilenmiş olması alıcı için büyük avantajdır.'
-          }
-        ]
-      }
+      approvedAt: new Date()
     }
   });
 
   await prisma.sellerQuestion.create({
     data: {
-      variantId: variantGolfTr.id,
-      question: 'Enjektör ve DPF bakımları düzenli yapıldı mı?',
-      reason: 'Dizel motorlarda enjektör ömrü ve DPF temizliği kritik maliyet kalemleridir.',
-      category: VehicleInfoCategory.ENGINE,
+      variantId: variantCorollaTr.id,
+      question: 'CVT şanzıman yağı ve şanzıman filtresi hiç değişti mi? En son ne zaman?',
+      reason: 'Toyota CVT şanzımanları uzun ömürlüdür ancak 60.000 km periyoduyla yağ değişimi sağlıklı çalışma için şarttır.',
+      category: VehicleInfoCategory.TRANSMISSION,
       riskLevel: RiskLevel.MEDIUM,
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
@@ -377,7 +396,7 @@ async function main() {
     }
   });
 
-  // 14. Inspection Checklist Items (2 Approved)
+  // 14. Inspection Checklist Items
   await prisma.inspectionChecklistItem.create({
     data: {
       variantId: variantGolfTr.id,
@@ -389,27 +408,18 @@ async function main() {
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
       approvedById: demoAdmin.id,
-      approvedAt: new Date(),
-      translations: {
-        create: [
-          {
-            languageCode: 'tr',
-            title: 'Şanzıman Yağ Kaçağı Kontrolü',
-            description: 'DSG kutusunun altı yağ kaçağı için incelenmelidir.'
-          }
-        ]
-      }
+      approvedAt: new Date()
     }
   });
 
   await prisma.inspectionChecklistItem.create({
     data: {
-      variantId: variantGolfTr.id,
-      title: 'Soğuk Çalıştırmada Enjektör Sesi',
-      description: 'Motor tamamen soğukken ilk marşta enjektörlerden şıkırtı sesi gelip gelmediği dinlenmelidir.',
-      category: VehicleInfoCategory.ENGINE,
-      riskLevel: RiskLevel.MEDIUM,
-      sortOrder: 2,
+      variantId: variantCorollaTr.id,
+      title: 'Direksiyon Kutusu Tıkırtı Kontrolü',
+      description: 'Araç lifte kaldırılmadan önce direksiyon hızlıca sağa sola sallanarak tıkırtı sesi gelip gelmediği kontrol edilmelidir. Bu modellerde direksiyon mili tıkırtısı yaygındır.',
+      category: VehicleInfoCategory.SUSPENSION,
+      riskLevel: RiskLevel.LOW,
+      sortOrder: 1,
       status: ApprovalStatus.APPROVED,
       createdById: demoAdmin.id,
       approvedById: demoAdmin.id,
@@ -417,8 +427,8 @@ async function main() {
     }
   });
 
-  // 15. User Reviews & Ratings (2 Reviews + 1-to-1 Ratings)
-  const review1 = await prisma.userReview.create({
+  // 15. User Reviews & Ratings
+  await prisma.userReview.create({
     data: {
       variantId: variantGolfTr.id,
       userId: demoUser.id,
@@ -442,25 +452,25 @@ async function main() {
     }
   });
 
-  const review2 = await prisma.userReview.create({
+  await prisma.userReview.create({
     data: {
-      variantId: variantGolfTr.id,
-      userId: demoAdmin.id, // using admin as a second review user
-      comment: 'Yol tutuşu ve iç mekan kalitesi harika. Ancak dizel motorun ses yalıtımı soğuk havalarda biraz zayıf. Şanzıman arızası yaşamadım ama bakımlarını hep yetkili serviste yaptırdım.',
-      usageDuration: 36,
+      variantId: variantCorollaTr.id,
+      userId: demoUser.id,
+      comment: 'Toyota Corolla 1.6 Valvematic tam bir sorunsuzluk abidesidir. Motoru neredeyse hiç arıza açmaz. CVT şanzımanı konforludur ancak hızlanırken biraz bağırıyor. Yakıtı şehir içi 8 litre civarı.',
+      usageDuration: 18,
       isOwner: true,
       recommend: true,
       status: ApprovalStatus.APPROVED,
-      reviewDateKey: '2026-07-03',
+      reviewDateKey: '2026-07-04',
       rating: {
         create: {
           reliability: 5,
-          fuelConsumption: 5,
+          fuelConsumption: 3,
           comfort: 4,
-          partCost: 3,
-          maintenanceCost: 4,
+          partCost: 5,
+          maintenanceCost: 5,
           resaleEase: 5,
-          overall: 5
+          overall: 4
         }
       }
     }
