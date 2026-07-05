@@ -43,6 +43,7 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       });
 
       const text = response.choices[0].message.content || '{"results": []}';
+      this.logger.log(`OpenAI Search Grounding Raw Response: ${text}`);
       const parsed = JSON.parse(text);
       const resultsArray = Array.isArray(parsed.results) ? parsed.results : [];
 

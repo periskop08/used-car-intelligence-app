@@ -126,6 +126,7 @@ Generate the JSON matching the required schema. Ensure it is strict JSON. Do not
       });
 
       const text = response.choices[0].message.content || '{}';
+      this.logger.log(`OpenAI Raw Response: ${text}`);
       const parsed = JSON.parse(text);
 
       // Normalize to ensure all arrays exist even if OpenAI returned an empty object or omitted keys
