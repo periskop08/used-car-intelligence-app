@@ -128,8 +128,16 @@ Generate the JSON matching the required schema. Ensure it is strict JSON. Do not
       const text = response.choices[0].message.content || '{}';
       const parsed = JSON.parse(text);
 
+      // Normalize to ensure all arrays exist even if OpenAI returned an empty object or omitted keys
+      const normalized = {
+        problems: Array.isArray(parsed.problems) ? parsed.problems : [],
+        recalls: Array.isArray(parsed.recalls) ? parsed.recalls : [],
+        sellerQuestions: Array.isArray(parsed.sellerQuestions) ? parsed.sellerQuestions : [],
+        checklists: Array.isArray(parsed.checklists) ? parsed.checklists : [],
+      };
+
       // Validate JSON structure using Zod
-      const validated = AIAnalysisOutputSchema.parse(parsed);
+      const validated = AIAnalysisOutputSchema.parse(normalized);
       return validated;
     } catch (error) {
       this.logger.error(`AI analysis failed: ${error.message}`);
