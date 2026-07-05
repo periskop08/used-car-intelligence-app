@@ -1,13 +1,16 @@
-import { Controller, Post, Get, Param, Query, Body, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Param, Query, Body, BadRequestException, HttpCode, HttpStatus, Request, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { ResearchService } from './research.service';
 import { ResearchScope, PriorityLevel } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { JwtService } from '@nestjs/jwt';
 
 @Controller('research')
 export class ResearchController {
   constructor(
     private researchService: ResearchService,
     private prisma: PrismaService,
+    private jwtService: JwtService,
   ) {}
 
   @Post('request')
@@ -75,6 +78,7 @@ export class ResearchController {
 
   @Post('batch-populate')
   async batchPopulate(
+    @Request() req: any,
     @Body()
     body: {
       countryCode: string;
@@ -88,8 +92,32 @@ export class ResearchController {
     },
   ) {
     const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
-    if (body.adminSecret !== systemSecret) {
-      throw new BadRequestException('Unauthorized batch request.');
+    const isSecretValid = body.adminSecret === systemSecret;
+
+    let isAuthorized = isSecretValid;
+
+    if (!isAuthorized) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const payload = await this.jwtService.verifyAsync(token, {
+            secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+          });
+          const user = await this.prisma.user.findUnique({
+            where: { id: payload.id },
+          });
+          if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+            isAuthorized = true;
+          }
+        } catch (e) {
+          // Token invalid
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new UnauthorizedException('Access denied. Valid ADMIN role or system secret is required.');
     }
 
     if (!body.countryCode || !body.languageCode) {
