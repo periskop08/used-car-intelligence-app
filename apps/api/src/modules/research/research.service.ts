@@ -119,9 +119,11 @@ export class ResearchService {
     onlyCoverage?: string[];
     dryRun: boolean;
   }): Promise<any> {
-    const limitVal = Math.min(dto.limit || 100, 500); // Safety limit cap at 500
+    const maxBatchLimit = Number(process.env.BATCH_MAX_LIMIT) || 500;
+    const limitVal = Math.min(dto.limit || 100, maxBatchLimit);
 
-    // Global daily budget limit check (Max 1000 jobs per 24 hours)
+    // Global daily budget limit check
+    const dailyLimit = Number(process.env.DAILY_RESEARCH_JOB_LIMIT) || 1000;
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const dailyJobsCreated = await this.prisma.vehicleResearchJob.count({
       where: { createdAt: { gte: oneDayAgo } },
@@ -144,8 +146,8 @@ export class ResearchService {
 
     const targetVariants = filtered.slice(0, limitVal);
 
-    if (dailyJobsCreated + targetVariants.length > 1000) {
-      throw new BadRequestException(`Global daily batch limit exceeded. Cannot queue ${targetVariants.length} jobs. Current 24h count: ${dailyJobsCreated}/1000.`);
+    if (dailyJobsCreated + targetVariants.length > dailyLimit) {
+      throw new BadRequestException(`Global daily batch limit exceeded. Cannot queue ${targetVariants.length} jobs. Current 24h count: ${dailyJobsCreated}/${dailyLimit}.`);
     }
 
     let wouldCreate = 0;
@@ -244,7 +246,8 @@ export class ResearchService {
 
     this.logger.log(`Processing Job ${job.id} for variant ${job.vehicleVariantId} (Attempt: ${job.attemptCount}/${job.maxAttempts}).`);
 
-    // Start a periodic heartbeat lock-refresh timer (Every 2 minutes)
+    // Start a periodic heartbeat lock-refresh timer
+    const heartbeatMins = Number(process.env.HEARTBEAT_INTERVAL_MINS) || 2;
     const heartbeatInterval = setInterval(async () => {
       try {
         await this.prisma.vehicleResearchJob.update({
@@ -255,7 +258,7 @@ export class ResearchService {
       } catch (err) {
         this.logger.error(`Failed to refresh heartbeat for Job ${job.id}: ${err.message}`);
       }
-    }, 2 * 60 * 1000);
+    }, heartbeatMins * 60 * 1000);
 
     try {
       // 4. Execute search queries based on variant specs
@@ -476,12 +479,13 @@ export class ResearchService {
    * Checks against heartbeat (last lockedAt must be older than 15 mins).
    */
   async recoverStuckJobs(): Promise<void> {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const timeoutMins = Number(process.env.WORKER_LOCK_TIMEOUT_MINS) || 15;
+    const timeoutAgo = new Date(Date.now() - timeoutMins * 60 * 1000);
     const result = await this.prisma.$executeRaw`
       UPDATE "VehicleResearchJob"
       SET "status" = 'QUEUED', "lockedAt" = NULL, "lockedBy" = NULL
       WHERE "status" = 'RUNNING'
-        AND "lockedAt" <= ${fifteenMinutesAgo}
+        AND "lockedAt" <= ${timeoutAgo}
     `;
     if (result > 0) {
       this.logger.warn(`Recovered ${result} stuck research jobs.`);
