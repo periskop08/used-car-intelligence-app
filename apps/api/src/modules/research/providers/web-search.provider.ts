@@ -19,7 +19,17 @@ export class WebSearchProvider implements SearchProvider {
     if (geminiKey) {
       this.logger.log(`Using Gemini Search Grounding for query: "${query}"`);
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+
+        if (geminiKey.startsWith('AQ')) {
+          headers['Authorization'] = `Bearer ${geminiKey}`;
+        } else {
+          url += `?key=${geminiKey}`;
+        }
+
         const requestBody = {
           contents: [
             {
@@ -49,9 +59,7 @@ Do not write any other introductory or concluding text. Return only the valid JS
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify(requestBody),
         });
 
