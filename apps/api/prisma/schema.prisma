@@ -28,10 +28,73 @@ enum SubscriptionStatus {
 }
 
 enum ApprovalStatus {
+  RAW
   PENDING
   APPROVED
   REJECTED
   ARCHIVED
+  STALE
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProblemType {
+  COMMON_PROBLEM
+  USER_COMPLAINT
+  CHECK_POINT
+  SERVICE_NOTE
+  RECALL_RELATED
+  GENERAL_RISK
+}
+
+enum ResearchScope {
+  FULL_REPORT
+  COMMON_PROBLEMS
+  RECALLS
+  SELLER_QUESTIONS
+  INSPECTION_CHECKLIST
+  TECHNICAL_SPECS
+}
+
+enum SourceKind {
+  OFFICIAL_RECALL
+  MANUFACTURER
+  SERVICE_NOTE
+  USER_REVIEW
+  FORUM
+  COMPLAINT_PLATFORM
+  BLOG_REVIEW
+  VIDEO_REVIEW
+  ADMIN_DEMO
+  UNKNOWN
+  MOCK
+}
+
+enum DataConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ResearchJobStatus {
+  QUEUED
+  RUNNING
+  NEEDS_REVIEW
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum DataCoverage {
+  NONE
+  LIMITED
+  MODERATE
+  GOOD
 }
 
 enum RiskLevel {
@@ -113,6 +176,8 @@ enum FinalDecision {
   RISKY
   AVOID
   INSUFFICIENT_DATA
+  BUYABLE
+  BUY_WITH_CAUTION
 }
 
 model User {
@@ -145,6 +210,7 @@ model User {
   approvedQuestions  SellerQuestion[]          @relation("QuestionApprovedBy")
   createdChecklists  InspectionChecklistItem[] @relation("ChecklistCreatedBy")
   approvedChecklists InspectionChecklistItem[] @relation("ChecklistApprovedBy")
+  researchJobs       VehicleResearchJob[]
 }
 
 model SubscriptionPlan {
@@ -349,6 +415,11 @@ model VehicleVariant {
   trimId         String
   countryId      String
   year           Int
+  yearStart      Int?
+  yearEnd        Int?
+  bodyType       BodyType?
+  fuelType       FuelType?
+  marketRegion   String?
   status         ApprovalStatus @default(PENDING)
   createdById    String?
   approvedById   String?
@@ -379,6 +450,8 @@ model VehicleVariant {
   questions    SellerQuestion[]
   checklists   InspectionChecklistItem[]
   aiReports    AiVehicleReport[]
+  researchJobs VehicleResearchJob[]
+  rawSources   RawSource[]
 
   @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
   @@index([brandId])
@@ -413,6 +486,15 @@ model CommonProblem {
   sourceUrl          String?
   confidenceScore    Decimal        @default(1.0)
   status             ApprovalStatus @default(PENDING)
+  problemType        ProblemType    @default(COMMON_PROBLEM)
+  inspectionAdvice   String?
+  dataConfidence     DataConfidence @default(MEDIUM)
+  sourceKind         SourceKind     @default(UNKNOWN)
+  affectedTrim       String?
+  sourceCount        Int            @default(1)
+  evidenceSummary    String?
+  lastCheckedAt      DateTime?
+  rejectedAt         DateTime?
   createdById        String?
   approvedById       String?
   approvedAt         DateTime?
@@ -453,6 +535,22 @@ model Recall {
   sourceUrl       String?
   riskLevel       RiskLevel      @default(HIGH)
   status          ApprovalStatus @default(PENDING)
+  vinCheckRequired            Boolean        @default(true)
+  officialCheckUrl            String?
+  recallDate                  DateTime?
+  remedy                      String?
+  manufacturerCampaignNumber  String?
+  nhtsaCampaignNumber         String?
+  safetyRisk                  String?
+  recallCode                  String?
+  officialSourceUrl           String?
+  sourceKind                  SourceKind     @default(OFFICIAL_RECALL)
+  affectedYears               String?
+  affectedEngine              String?
+  affectedTransmission        String?
+  countryCode                 String?
+  dataConfidence              DataConfidence @default(HIGH)
+  lastCheckedAt               DateTime?
   createdById     String?
   approvedById    String?
   approvedAt      DateTime?
@@ -476,6 +574,7 @@ model SellerQuestion {
   reason          String?
   category        VehicleInfoCategory
   riskLevel       RiskLevel           @default(MEDIUM)
+  priority        PriorityLevel       @default(MEDIUM)
   sourceUrl       String?
   confidenceScore Decimal             @default(1.0)
   status          ApprovalStatus      @default(PENDING)
@@ -515,6 +614,7 @@ model InspectionChecklistItem {
   description     String?
   category        VehicleInfoCategory
   riskLevel       RiskLevel           @default(MEDIUM)
+  priority        PriorityLevel       @default(MEDIUM)
   sortOrder       Int                 @default(0)
   sourceUrl       String?
   confidenceScore Decimal             @default(1.0)
@@ -555,28 +655,45 @@ model RawSource {
   title           String?
   contentHash     String      @unique
   extractedText   String?
-  languageCode    String?
-  countryCode     String?
+  languageCode    String      @default("tr")
+  countryCode     String      @default("TR")
+  marketRegion    String?
   confidenceScore Decimal     @default(1.0)
+  vehicleVariantId String?
+  sourceKind       SourceKind     @default(UNKNOWN)
+  rawText          String?
+  extractedSummary String?
+  reliabilityScore Decimal?
+  lastCheckedAt    DateTime?
+  status          ApprovalStatus @default(RAW)
+  metadata        Json?
   fetchedAt       DateTime    @default(now())
   createdAt       DateTime    @default(now())
 
+  variant         VehicleVariant? @relation(fields: [vehicleVariantId], references: [id])
   problems        CommonProblemSource[]
   recalls         RecallSource[]
 
   @@index([url])
+  @@index([vehicleVariantId, status])
 }
 
 model CommonProblemSource {
-  id              String        @id @default(uuid())
-  problemId       String
-  sourceId        String
-  createdAt       DateTime      @default(now())
+  id                     String        @id @default(uuid())
+  problemId              String
+  sourceId               String
+  sourceUrl              String?
+  sourceKind             SourceKind    @default(UNKNOWN)
+  evidenceText           String?
+  confidenceContribution Decimal?
+  createdAt              DateTime      @default(now())
 
   problem         CommonProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
   source          RawSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   @@unique([problemId, sourceId])
+  @@index([problemId])
+  @@index([sourceId])
 }
 
 model RecallSource {
@@ -679,6 +796,15 @@ model AiVehicleReport {
   riskScore        Int
   buyabilityScore  Int
   finalDecision    FinalDecision
+  biggestRisks     Json?
+  sellerQuestions  Json?
+  inspectionChecklist Json?
+  sourceVersion    String?
+  dataCoverage     DataCoverage?
+  coverageScore    Decimal?
+  status           ApprovalStatus @default(APPROVED)
+  generatedAt      DateTime?
+  approvedAt       DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -686,6 +812,31 @@ model AiVehicleReport {
 
   @@unique([variantId, languageCode])
   @@index([languageCode])
+  @@index([variantId, languageCode, status])
+}
+
+model VehicleResearchJob {
+  id                 String             @id @default(uuid())
+  vehicleVariantId   String
+  status             ResearchJobStatus  @default(QUEUED)
+  languageCode       String             @default("tr")
+  countryCode        String             @default("TR")
+  marketRegion       String?
+  researchScope      ResearchScope      @default(FULL_REPORT)
+  requestedByUserId  String?
+  requestedReason    String?
+  priority           PriorityLevel      @default(MEDIUM)
+  errorMessage       String?
+  attemptCount       Int                @default(0)
+  maxAttempts        Int                @default(3)
+  lockedAt           DateTime?
+  lockedBy           String?
+  nextRunAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  variant            VehicleVariant     @relation(fields: [vehicleVariantId], references: [id], onDelete: Cascade)
+  requestedBy        User?              @relation(fields: [requestedByUserId], references: [id])
 }
 
 model AuditLog {

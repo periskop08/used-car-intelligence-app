@@ -9,6 +9,7 @@ import { ReviewModule } from './modules/review/review.module';
 import { ReportModule } from './modules/report/report.module';
 import { FavoriteModule } from './modules/favorite/favorite.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
+import { ResearchModule } from './modules/research/research.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ComparisonModule } from './modules/comparison/comparison.module';
     ReportModule,
     FavoriteModule,
     ComparisonModule,
+    ResearchModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

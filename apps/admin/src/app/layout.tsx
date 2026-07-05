@@ -32,26 +32,20 @@ export default function RootLayout({
             {/* Sidebar Navigation */}
             <aside className="w-64 border-r border-slate-800 bg-slate-950/30 p-6 flex flex-col gap-2">
               <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Yönetim</div>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-orange-600/10 text-orange-500 font-semibold transition">
+              <a href="/" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
                 📊 Dashboard
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                🏷️ Markalar
+              <a href="/admin/research-jobs" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                ⚡ Araştırma İşleri (Jobs)
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                🚗 Modeller
+              <a href="/admin/raw-sources" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                🌐 Ham Kaynaklar (Sources)
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                ⚙️ Varyantlar
+              <a href="/admin/approvals" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                ✅ Onay Havuzu
               </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                ⚠️ Kronik Sorunlar
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                📢 Geri Çağırmalar
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
-                💬 Yorumlar
+              <a href="/admin/audit-logs" className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+                📜 Denetim Günlüğü (Audits)
               </a>
             </aside>
 

@@ -2,13 +2,17 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { GenerateReportDto, AskChatDto } from './report.dto';
-import { FeatureKey, ApprovalStatus, FinalDecision } from '@prisma/client';
+import { FeatureKey, ApprovalStatus, FinalDecision, DataCoverage } from '@prisma/client';
+import { AiReportGeneratorService } from '../research/ai-report-generator.service';
+import { CoverageService } from '../research/coverage.service';
 
 @Injectable()
 export class ReportService {
   constructor(
     private prisma: PrismaService,
     private featureLimitService: FeatureLimitService,
+    private reportGenerator: AiReportGeneratorService,
+    private coverageService: CoverageService,
   ) {}
 
   async generateReport(userId: string, dto: GenerateReportDto) {
@@ -20,117 +24,89 @@ export class ReportService {
     // 1. Transaction-safe limit check & usage increment
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
 
-    // 2. Fetch only APPROVED vehicle variant and details
-    const variant = await this.prisma.vehicleVariant.findFirst({
-      where: { id: dto.variantId, status: ApprovalStatus.APPROVED },
-      include: {
-        brand: true,
-        model: true,
-        generation: true,
-        engine: true,
-        transmission: true,
-        trim: true,
-        country: true,
-        specs: true,
-        problems: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-        recalls: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-      },
+    // 2. Fetch variant
+    const variant = await this.prisma.vehicleVariant.findUnique({
+      where: { id: dto.variantId },
     });
-
     if (!variant) {
-      throw new NotFoundException('Araç varyantı bulunamadı veya onaylanmış durumda değil.');
+      throw new NotFoundException('Araç varyantı bulunamadı.');
     }
 
-    // 3. Check for sufficient approved data (must have at least specs and some common problems to not be insufficient_data)
-    const hasSufficientData = variant.specs && variant.problems.length > 0;
-
-    let finalDecision: FinalDecision = FinalDecision.BUY_CAREFULLY;
-    let riskScore = 30;
-    let buyabilityScore = 80;
-    let reportSummary: any = {};
-
-    if (!hasSufficientData) {
-      finalDecision = FinalDecision.INSUFFICIENT_DATA;
-      riskScore = 0;
-      buyabilityScore = 0;
-      reportSummary = {
-        message: lang === 'tr' 
-          ? 'Bu araç için yeterli doğrulanmış veri bulunmuyor.' 
-          : 'Insufficient verified data found for this vehicle.',
-      };
-    } else {
-      // Calculate scores based on risk levels of approved problems
-      const hasHighRisk = variant.problems.some(p => p.riskLevel === 'HIGH') || variant.recalls.some(r => r.riskLevel === 'HIGH');
-      const hasMediumRisk = variant.problems.some(p => p.riskLevel === 'MEDIUM');
-
-      if (hasHighRisk) {
-        finalDecision = FinalDecision.RISKY;
-        riskScore = 75;
-        buyabilityScore = 40;
-      } else if (hasMediumRisk) {
-        finalDecision = FinalDecision.BUY_CAREFULLY;
-        riskScore = 45;
-        buyabilityScore = 70;
-      } else {
-        finalDecision = FinalDecision.BUY;
-        riskScore = 15;
-        buyabilityScore = 90;
-      }
-
-      if (lang === 'tr') {
-        reportSummary = {
-          title: `${variant.brand.name} ${variant.model.name} ${variant.year} AI Değerlendirme Raporu`,
-          summary: `${variant.brand.name} ${variant.model.name} (${variant.year}) jenerasyonu genel olarak dayanıklılığı ile bilinir. Ancak ${variant.problems.length} adet onaylanmış kronik sorun tespit edilmiştir.`,
-          biggestRisks: variant.problems.map(p => p.title),
-          shouldBuyComment: finalDecision === FinalDecision.RISKY 
-            ? 'Ciddi kronik sorunlar veya geri çağırma kayıtları mevcuttur, alım öncesi kapsamlı kontrol gerektirir.' 
-            : 'Genel durumu olumlu, kronik problemler göz önünde bulundurularak alınabilir.',
-          engineNotes: `${variant.engine.code} kodlu motorun verimliliği test edilmiştir.`,
-          transmissionNotes: `${variant.transmission.name} şanzıman vites geçişleri kontrol edilmelidir.`,
-        };
-      } else {
-        reportSummary = {
-          title: `${variant.brand.name} ${variant.model.name} ${variant.year} AI Evaluation Report`,
-          summary: `${variant.brand.name} ${variant.model.name} (${variant.year}) generation is generally known for its reliability, but ${variant.problems.length} verified chronic issues were identified.`,
-          biggestRisks: variant.problems.map(p => p.title),
-          shouldBuyComment: finalDecision === FinalDecision.RISKY 
-            ? 'Serious chronic issues or recall logs found, requires comprehensive inspection before purchase.' 
-            : 'Overall condition is good, acceptable purchase keeping known issues in mind.',
-          engineNotes: `Engine ${variant.engine.code} fuel efficiency is verified.`,
-          transmissionNotes: `Shifting performance of ${variant.transmission.name} should be tested.`,
-        };
-      }
-    }
-
-    // 4. Save/Cache report in database
-    const report = await this.prisma.aiVehicleReport.upsert({
+    // 3. Check for existing APPROVED AiVehicleReport cache
+    const existingReport = await this.prisma.aiVehicleReport.findUnique({
       where: {
         variantId_languageCode: {
-          variantId: variant.id,
+          variantId: dto.variantId,
           languageCode: lang,
         },
       },
-      update: {
-        summary: reportSummary,
-        riskScore,
-        buyabilityScore,
-        finalDecision,
-        updatedAt: new Date(),
-      },
-      create: {
-        variantId: variant.id,
-        languageCode: lang,
-        summary: reportSummary,
-        riskScore,
-        buyabilityScore,
-        finalDecision,
-      },
     });
 
+    if (existingReport && existingReport.status === ApprovalStatus.APPROVED) {
+      return existingReport;
+    }
+
+    // 4. Count APPROVED related entities (problems, recalls, checklists)
+    const approvedProblemsCount = await this.prisma.commonProblem.count({
+      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
+    });
+    const approvedRecallsCount = await this.prisma.recall.count({
+      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
+    });
+    const approvedChecklistsCount = await this.prisma.inspectionChecklistItem.count({
+      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
+    });
+
+    const totalApprovedCount = approvedProblemsCount + approvedRecallsCount + approvedChecklistsCount;
+
+    if (totalApprovedCount === 0) {
+      // 0 APPROVED records -> dataCoverage NONE
+      const report = await this.prisma.aiVehicleReport.upsert({
+        where: {
+          variantId_languageCode: {
+            variantId: dto.variantId,
+            languageCode: lang,
+          },
+        },
+        create: {
+          variantId: dto.variantId,
+          languageCode: lang,
+          summary: {
+            title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
+            message: lang === 'tr' 
+              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
+              : 'No approved chronic problems or recall records found for this vehicle variant.',
+          },
+          riskScore: 0,
+          buyabilityScore: 100,
+          finalDecision: FinalDecision.INSUFFICIENT_DATA,
+          dataCoverage: DataCoverage.NONE,
+          coverageScore: 0,
+          status: ApprovalStatus.APPROVED,
+          generatedAt: new Date(),
+        },
+        update: {
+          summary: {
+            title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
+            message: lang === 'tr' 
+              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
+              : 'No approved chronic problems or recall records found for this vehicle variant.',
+          },
+          riskScore: 0,
+          buyabilityScore: 100,
+          finalDecision: FinalDecision.INSUFFICIENT_DATA,
+          dataCoverage: DataCoverage.NONE,
+          coverageScore: 0,
+          status: ApprovalStatus.APPROVED,
+          generatedAt: new Date(),
+        },
+      });
+
+      return report;
+    }
+
+    // 5. Generate and cache report if approved data exists
+    const report = await this.reportGenerator.generateReportCache(dto.variantId, lang);
     return report;
   }
 
