@@ -107,8 +107,8 @@ Do not write any other introductory or concluding text. Return only the valid JS
           };
         });
       } catch (error) {
-        this.logger.error(`Error performing Gemini Search Grounding: ${error.message}`);
-        throw error;
+        this.logger.warn(`Error performing Gemini Search Grounding: ${error.message}. Falling back to zero-key DuckDuckGo search.`);
+        return this.searchDuckDuckGo(query);
       }
     }
 
@@ -117,8 +117,8 @@ Do not write any other introductory or concluding text. Return only the valid JS
     const cx = process.env.GOOGLE_SEARCH_CX;
 
     if (!apiKey || !cx) {
-      this.logger.error('Google Search API credentials are missing in production.');
-      throw new Error('Search provider is not configured in production.');
+      this.logger.warn('Google Search API credentials are missing in production. Falling back to zero-key DuckDuckGo search.');
+      return this.searchDuckDuckGo(query);
     }
 
     try {
@@ -160,7 +160,74 @@ Do not write any other introductory or concluding text. Return only the valid JS
         };
       });
     } catch (error) {
-      this.logger.error(`Error performing Google Custom Search: ${error.message}`);
+      this.logger.warn(`Error performing Google Custom Search: ${error.message}. Falling back to zero-key DuckDuckGo search.`);
+      return this.searchDuckDuckGo(query);
+    }
+  }
+
+  private async searchDuckDuckGo(query: string): Promise<SearchResult[]> {
+    this.logger.log(`Performing zero-key DuckDuckGo search for query: "${query}"`);
+    try {
+      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`DuckDuckGo returned status ${response.status}`);
+      }
+      const html = await response.text();
+      const results: SearchResult[] = [];
+      const resultBlockRegex = /<div class="result results_links results_links_deep web-result ">([\s\S]*?)<\/div>\s*<\/div>/g;
+      let match;
+      
+      while ((match = resultBlockRegex.exec(html)) !== null) {
+        const block = match[1];
+        const titleMatch = /class="result__a" href="([^"]+)".*?>([\s\S]*?)<\/a>/.exec(block);
+        const snippetMatch = /class="result__snippet" href="[^"]*".*?>([\s\S]*?)<\/a>/.exec(block);
+        
+        if (titleMatch) {
+          const rawUrl = titleMatch[1];
+          let itemUrl = rawUrl;
+          if (rawUrl.includes('uddg=')) {
+            const parts = rawUrl.split('uddg=');
+            if (parts[1]) {
+              itemUrl = decodeURIComponent(parts[1].split('&')[0]);
+            }
+          }
+          
+          const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+          const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+          
+          let sourceKind = SourceKind.UNKNOWN;
+          if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
+            sourceKind = SourceKind.FORUM;
+          } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
+            sourceKind = SourceKind.COMPLAINT_PLATFORM;
+          } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
+            sourceKind = SourceKind.OFFICIAL_RECALL;
+          } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
+            sourceKind = SourceKind.MANUFACTURER;
+          } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
+            sourceKind = SourceKind.BLOG_REVIEW;
+          } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
+            sourceKind = SourceKind.VIDEO_REVIEW;
+          }
+          
+          results.push({
+            url: itemUrl,
+            title,
+            snippet,
+            sourceKind,
+            reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
+          });
+        }
+      }
+      this.logger.log(`DuckDuckGo search returned ${results.length} results.`);
+      return results;
+    } catch (error) {
+      this.logger.error(`Error performing DuckDuckGo search: ${error.message}`);
       throw error;
     }
   }
