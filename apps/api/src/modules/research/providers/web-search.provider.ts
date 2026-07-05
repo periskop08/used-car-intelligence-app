@@ -14,28 +14,31 @@ export class WebSearchProvider implements SearchProvider {
       return this.generateMockResults(query);
     }
 
-    // Check for Gemini Search Grounding credentials
     const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      this.logger.log(`Using Gemini Search Grounding for query: "${query}"`);
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
+    if (!geminiKey) {
+      this.logger.error('GEMINI_API_KEY is missing in production.');
+      throw new Error('Gemini API credentials are missing in production.');
+    }
 
-        if (geminiKey.startsWith('AQ')) {
-          headers['Authorization'] = `Bearer ${geminiKey}`;
-        } else {
-          url += `?key=${geminiKey}`;
-        }
+    this.logger.log(`Using Gemini Search Grounding for query: "${query}"`);
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
 
-        const requestBody = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Perform a Google Search to retrieve actual web search results (such as forum threads, complaint platforms, official recalls, or manufacturer manuals) for: "${query}".
+      if (geminiKey.startsWith('AQ')) {
+        headers['Authorization'] = `Bearer ${geminiKey}`;
+      } else {
+        url += `?key=${geminiKey}`;
+      }
+
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: `Perform a Google Search to retrieve actual web search results (such as forum threads, complaint platforms, official recalls, or manufacturer manuals) for: "${query}".
 Return a JSON array containing the top search results found. Each item in the array MUST strictly conform to this schema:
 {
   "url": "the URL of the page",
@@ -43,98 +46,45 @@ Return a JSON array containing the top search results found. Each item in the ar
   "snippet": "a short text snippet describing the content found"
 }
 Do not write any other introductory or concluding text. Return only the valid JSON array.`
-                }
-              ]
-            }
-          ],
-          tools: [
-            {
-              googleSearch: {}
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json"
+              }
+            ]
           }
-        };
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Gemini Search Grounding API returned status ${response.status}. Details: ${errText}`);
-        }
-
-        const data = await response.json();
-        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!textContent) {
-          throw new Error('Gemini API returned an empty response.');
-        }
-
-        const parsedItems = JSON.parse(textContent);
-        if (!Array.isArray(parsedItems)) {
-          throw new Error('Gemini response is not a JSON array.');
-        }
-
-        return parsedItems.map((item: any) => {
-          const itemUrl = item.url || '';
-          let sourceKind = SourceKind.UNKNOWN;
-
-          if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
-            sourceKind = SourceKind.FORUM;
-          } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
-            sourceKind = SourceKind.COMPLAINT_PLATFORM;
-          } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
-            sourceKind = SourceKind.OFFICIAL_RECALL;
-          } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
-            sourceKind = SourceKind.MANUFACTURER;
-          } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
-            sourceKind = SourceKind.BLOG_REVIEW;
-          } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
-            sourceKind = SourceKind.VIDEO_REVIEW;
+        ],
+        tools: [
+          {
+            googleSearch: {}
           }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
 
-          return {
-            url: itemUrl,
-            title: item.title || '',
-            snippet: item.snippet || '',
-            sourceKind,
-            reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
-          };
-        });
-      } catch (error) {
-        this.logger.warn(`Error performing Gemini Search Grounding: ${error.message}. Falling back to zero-key DuckDuckGo search.`);
-        return this.searchDuckDuckGo(query);
-      }
-    }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+      });
 
-    // Fallback: Google Custom Search API
-    const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
-    const cx = process.env.GOOGLE_SEARCH_CX;
-
-    if (!apiKey || !cx) {
-      this.logger.warn('Google Search API credentials are missing in production. Falling back to zero-key DuckDuckGo search.');
-      return this.searchDuckDuckGo(query);
-    }
-
-    try {
-      // In production, fetch via official API
-      const url = `https://customsearch.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&gl=${countryCode}&hl=${languageCode}`;
-      const response = await fetch(url);
       if (!response.ok) {
         const errText = await response.text();
-        this.logger.error(`Google Search API Error Details: ${errText}`);
-        throw new Error(`Google Search API returned status ${response.status}. Details: ${errText}`);
+        throw new Error(`Gemini Search Grounding API returned status ${response.status}. Details: ${errText}`);
       }
-      const data = await response.json();
-      const items = data.items || [];
 
-      return items.map((item: any) => {
-        const itemUrl = item.link || '';
+      const data = await response.json();
+      const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textContent) {
+        throw new Error('Gemini API returned an empty response.');
+      }
+
+      const parsedItems = JSON.parse(textContent);
+      if (!Array.isArray(parsedItems)) {
+        throw new Error('Gemini response is not a JSON array.');
+      }
+
+      return parsedItems.map((item: any) => {
+        const itemUrl = item.url || '';
         let sourceKind = SourceKind.UNKNOWN;
 
         if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
@@ -160,74 +110,7 @@ Do not write any other introductory or concluding text. Return only the valid JS
         };
       });
     } catch (error) {
-      this.logger.warn(`Error performing Google Custom Search: ${error.message}. Falling back to zero-key DuckDuckGo search.`);
-      return this.searchDuckDuckGo(query);
-    }
-  }
-
-  private async searchDuckDuckGo(query: string): Promise<SearchResult[]> {
-    this.logger.log(`Performing zero-key DuckDuckGo search for query: "${query}"`);
-    try {
-      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`DuckDuckGo returned status ${response.status}`);
-      }
-      const html = await response.text();
-      const results: SearchResult[] = [];
-      const resultBlockRegex = /<div class="result results_links results_links_deep web-result ">([\s\S]*?)<\/div>\s*<\/div>/g;
-      let match;
-      
-      while ((match = resultBlockRegex.exec(html)) !== null) {
-        const block = match[1];
-        const titleMatch = /class="result__a" href="([^"]+)".*?>([\s\S]*?)<\/a>/.exec(block);
-        const snippetMatch = /class="result__snippet" href="[^"]*".*?>([\s\S]*?)<\/a>/.exec(block);
-        
-        if (titleMatch) {
-          const rawUrl = titleMatch[1];
-          let itemUrl = rawUrl;
-          if (rawUrl.includes('uddg=')) {
-            const parts = rawUrl.split('uddg=');
-            if (parts[1]) {
-              itemUrl = decodeURIComponent(parts[1].split('&')[0]);
-            }
-          }
-          
-          const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
-          const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-          
-          let sourceKind = SourceKind.UNKNOWN;
-          if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
-            sourceKind = SourceKind.FORUM;
-          } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
-            sourceKind = SourceKind.COMPLAINT_PLATFORM;
-          } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
-            sourceKind = SourceKind.OFFICIAL_RECALL;
-          } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
-            sourceKind = SourceKind.MANUFACTURER;
-          } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
-            sourceKind = SourceKind.BLOG_REVIEW;
-          } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
-            sourceKind = SourceKind.VIDEO_REVIEW;
-          }
-          
-          results.push({
-            url: itemUrl,
-            title,
-            snippet,
-            sourceKind,
-            reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
-          });
-        }
-      }
-      this.logger.log(`DuckDuckGo search returned ${results.length} results.`);
-      return results;
-    } catch (error) {
-      this.logger.error(`Error performing DuckDuckGo search: ${error.message}`);
+      this.logger.error(`Error performing Gemini Search Grounding: ${error.message}`);
       throw error;
     }
   }
