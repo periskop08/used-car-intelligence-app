@@ -18,23 +18,73 @@ export class EvidenceRulesService {
   }
 
   /**
-   * Evaluate CommonProblem auto-publish rules
+   * Evaluate CommonProblem auto-publish rules and variant match confidences
    */
   evaluateCommonProblem(
     prob: any,
     sources: any[],
+    variant?: any,
   ): {
     status: ApprovalStatus;
     dataConfidence: DataConfidence;
     problemType: ProblemType;
     metadata: any;
   } {
-    const domains = sources.map((s) => this.getDomain(s.url));
+    const domains = sources.map((s) => s.sourceDomain || this.getDomain(s.url));
     const uniqueDomains = Array.from(new Set(domains)).filter((d) => d !== 'unknown-domain');
     const uniqueKinds = Array.from(new Set(sources.map((s) => s.sourceKind)));
 
     const uniqueDomainCount = uniqueDomains.length;
     const uniqueKindCount = uniqueKinds.length;
+
+    // Calculate variant match confidence details
+    let variantMatchConfidence = 'HIGH';
+    const matchedFields: string[] = ['brand', 'model'];
+    const missingFields: string[] = ['trim'];
+    const mismatchFields: string[] = [];
+
+    if (variant) {
+      // Check Year Match
+      if (prob.affectedYears) {
+        const yearsStr = prob.affectedYears.toString();
+        if (yearsStr.includes(variant.year.toString())) {
+          matchedFields.push('year');
+        } else {
+          mismatchFields.push('year');
+          variantMatchConfidence = 'MEDIUM';
+        }
+      } else {
+        missingFields.push('year');
+      }
+
+      // Check Engine Match
+      if (prob.affectedEngine && prob.affectedEngine !== 'Tümü' && prob.affectedEngine !== 'ALL') {
+        const engineStr = prob.affectedEngine.toLowerCase();
+        const variantEngine = variant.engine?.code?.toLowerCase() || '';
+        if (engineStr.includes(variantEngine) || variantEngine.includes(engineStr)) {
+          matchedFields.push('engine');
+        } else {
+          mismatchFields.push('engine');
+          variantMatchConfidence = 'LOW';
+        }
+      } else {
+        matchedFields.push('engine'); // wildcards default match
+      }
+
+      // Check Transmission Match
+      if (prob.affectedTransmission && prob.affectedTransmission !== 'Tümü' && prob.affectedTransmission !== 'ALL') {
+        const transStr = prob.affectedTransmission.toLowerCase();
+        const variantTrans = variant.transmission?.name?.toLowerCase() || '';
+        if (transStr.includes(variantTrans) || variantTrans.includes(transStr)) {
+          matchedFields.push('transmission');
+        } else {
+          mismatchFields.push('transmission');
+          variantMatchConfidence = 'LOW';
+        }
+      } else {
+        matchedFields.push('transmission');
+      }
+    }
 
     // Checks for official/verified sources
     const hasOfficialSource = sources.some(
@@ -52,100 +102,59 @@ export class EvidenceRulesService {
       (s) => s.sourceKind === SourceKind.SERVICE_NOTE && s.isVerified !== true,
     ).length;
 
-    // Rule C & D: Official / Verified Service Bulletin
-    if (hasOfficialSource || hasVerifiedServiceNote) {
-      return {
-        status: ApprovalStatus.APPROVED,
-        dataConfidence: DataConfidence.HIGH,
-        problemType: prob.problemType || ProblemType.COMMON_PROBLEM,
-        metadata: {
-          publishedBy: 'AUTO_RULES',
-          publishedReason: hasOfficialSource ? 'official_source_present' : 'verified_service_bulletin',
-          uniqueDomainCount,
-          uniqueKindCount,
-          ruleVersion: 'v1',
-        },
-      };
+    // Decision Logic
+    let status: ApprovalStatus = ApprovalStatus.PENDING;
+    let dataConfidence: DataConfidence = DataConfidence.LOW;
+    let problemType: ProblemType = prob.problemType || ProblemType.COMMON_PROBLEM;
+    let reason = 'insufficient_evidence';
+
+    if (variantMatchConfidence === 'LOW') {
+      // Demote to PENDING if variant mismatch is detected
+      status = ApprovalStatus.PENDING;
+      reason = 'variant_mismatch_detected';
+    } else if (hasOfficialSource || hasVerifiedServiceNote) {
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = DataConfidence.HIGH;
+      reason = hasOfficialSource ? 'official_source_present' : 'verified_service_bulletin';
+    } else if (uniqueDomainCount >= 3) {
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = uniqueDomainCount >= 4 ? DataConfidence.HIGH : DataConfidence.MEDIUM;
+      reason = '3_unique_domains';
+    } else if (uniqueKindCount >= 2 && uniqueDomainCount >= 2) {
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = DataConfidence.MEDIUM;
+      reason = '2_kinds_and_2_domains';
+    } else if (unverifiedServiceNotesCount > 0) {
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = DataConfidence.LOW;
+      problemType = ProblemType.USER_COMPLAINT;
+      reason = 'unverified_service_note_only';
+    } else if (uniqueDomainCount >= 1) {
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = DataConfidence.LOW;
+      problemType = ProblemType.USER_COMPLAINT;
+      reason = 'weak_signal_user_complaint';
     }
 
-    // Rule A: 3+ unique domains
-    if (uniqueDomainCount >= 3) {
-      return {
-        status: ApprovalStatus.APPROVED,
-        dataConfidence: uniqueDomainCount >= 4 ? DataConfidence.HIGH : DataConfidence.MEDIUM,
-        problemType: prob.problemType || ProblemType.COMMON_PROBLEM,
-        metadata: {
-          publishedBy: 'AUTO_RULES',
-          publishedReason: '3_unique_domains',
-          uniqueDomainCount,
-          uniqueKindCount,
-          ruleVersion: 'v1',
-        },
-      };
-    }
+    const warningMsg = problemType === ProblemType.USER_COMPLAINT
+      ? 'Bu kayıt tekil kullanıcı deneyimi niteliğindedir. Her araçta görüleceği anlamına gelmez. Alım öncesi kontrol edilmesi önerilir.'
+      : undefined;
 
-    // Rule B: 2+ source kinds AND 2+ unique domains
-    if (uniqueKindCount >= 2 && uniqueDomainCount >= 2) {
-      return {
-        status: ApprovalStatus.APPROVED,
-        dataConfidence: DataConfidence.MEDIUM,
-        problemType: prob.problemType || ProblemType.COMMON_PROBLEM,
-        metadata: {
-          publishedBy: 'AUTO_RULES',
-          publishedReason: '2_kinds_and_2_domains',
-          uniqueDomainCount,
-          uniqueKindCount,
-          ruleVersion: 'v1',
-        },
-      };
-    }
-
-    // Unverified Service Notes present but not matching other rules
-    if (unverifiedServiceNotesCount > 0) {
-      // Unverified SERVICE_NOTE alone -> USER_COMPLAINT or CHECK_POINT
-      return {
-        status: ApprovalStatus.APPROVED,
-        dataConfidence: DataConfidence.LOW,
-        problemType: ProblemType.USER_COMPLAINT,
-        metadata: {
-          publishedBy: 'AUTO_RULES',
-          publishedReason: 'unverified_service_note_only',
-          uniqueDomainCount,
-          uniqueKindCount,
-          warningMsg: 'Bu kayıt doğrulanmamış servis notlarına dayanmaktadır. Her araçta görülmeyebilir.',
-          ruleVersion: 'v1',
-        },
-      };
-    }
-
-    // Weak signals: single forum thread or review
-    if (uniqueDomainCount >= 1) {
-      return {
-        status: ApprovalStatus.APPROVED,
-        dataConfidence: DataConfidence.LOW,
-        problemType: ProblemType.USER_COMPLAINT,
-        metadata: {
-          publishedBy: 'AUTO_RULES',
-          publishedReason: 'weak_signal_user_complaint',
-          uniqueDomainCount,
-          uniqueKindCount,
-          warningMsg: 'Bu kayıt tekil kullanıcı deneyimi niteliğindedir. Her araçta görüleceği anlamına gelmez. Alım öncesi kontrol edilmesi önerilir.',
-          ruleVersion: 'v1',
-        },
-      };
-    }
-
-    // Fails all evidence checks
     return {
-      status: ApprovalStatus.PENDING,
-      dataConfidence: DataConfidence.LOW,
-      problemType: ProblemType.COMMON_PROBLEM,
+      status,
+      dataConfidence,
+      problemType,
       metadata: {
         publishedBy: 'AUTO_RULES',
-        publishedReason: 'insufficient_evidence',
+        publishedReason: reason,
         uniqueDomainCount,
         uniqueKindCount,
-        ruleVersion: 'v1',
+        variantMatchConfidence,
+        matchedFields,
+        missingFields,
+        mismatchFields,
+        warningMsg,
+        ruleVersion: 'v2',
       },
     };
   }
@@ -175,7 +184,7 @@ export class EvidenceRulesService {
         metadata: {
           publishedBy: 'AUTO_RULES',
           publishedReason: 'official_recall_source',
-          ruleVersion: 'v1',
+          ruleVersion: 'v2',
         },
       };
     }
@@ -188,7 +197,7 @@ export class EvidenceRulesService {
         publishedBy: 'AUTO_RULES',
         publishedReason: 'rejected_unverified_recall_source',
         warningMsg: 'Geri çağırma kaydı resmi/üretici kanalları tarafından doğrulanmadığı için otomatik olarak reddedildi.',
-        ruleVersion: 'v1',
+        ruleVersion: 'v2',
       },
     };
   }

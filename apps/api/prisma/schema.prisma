@@ -673,6 +673,7 @@ model RawSource {
   metadata        Json?
   isVerified      Boolean        @default(false)
   isOfficial      Boolean        @default(false)
+  sourceDomain    String?
   fetchedAt       DateTime    @default(now())
   createdAt       DateTime    @default(now())
 
@@ -838,6 +839,7 @@ model VehicleResearchJob {
   lockedAt           DateTime?
   lockedBy           String?
   nextRunAt          DateTime?
+  metadata           Json?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime       @updatedAt
 

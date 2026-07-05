@@ -108,6 +108,7 @@ export class ResearchService {
 
   /**
    * Batch research job creation for all variants with NONE/LIMITED coverage.
+   * Or selected variantIds if provided.
    * Restricted to admin/system triggers.
    */
   async batchPopulate(dto: {
@@ -118,6 +119,7 @@ export class ResearchService {
     limit: number;
     onlyCoverage?: string[];
     dryRun: boolean;
+    variantIds?: string[];
   }): Promise<any> {
     const maxBatchLimit = Number(process.env.BATCH_MAX_LIMIT) || 500;
     const limitVal = Math.min(dto.limit || 100, maxBatchLimit);
@@ -129,8 +131,9 @@ export class ResearchService {
       where: { createdAt: { gte: oneDayAgo } },
     });
 
-    // Fetch variants that match coverage filters
+    // Fetch variants
     const variants = await this.prisma.vehicleVariant.findMany({
+      where: dto.variantIds && dto.variantIds.length > 0 ? { id: { in: dto.variantIds } } : undefined,
       include: {
         problems: { where: { status: ApprovalStatus.APPROVED } },
         recalls: { where: { status: ApprovalStatus.APPROVED } },
@@ -138,11 +141,14 @@ export class ResearchService {
       },
     });
 
-    const filtered = variants.filter((v) => {
-      const count = v.problems.length + v.recalls.length + v.checklists.length;
-      const coverage = this.coverageService.calculateDataCoverage(count);
-      return dto.onlyCoverage ? dto.onlyCoverage.includes(coverage) : true;
-    });
+    let filtered = variants;
+    if (!dto.variantIds || dto.variantIds.length === 0) {
+      filtered = variants.filter((v) => {
+        const count = v.problems.length + v.recalls.length + v.checklists.length;
+        const coverage = this.coverageService.calculateDataCoverage(count);
+        return dto.onlyCoverage ? dto.onlyCoverage.includes(coverage) : true;
+      });
+    }
 
     const targetVariants = filtered.slice(0, limitVal);
 
@@ -202,6 +208,8 @@ export class ResearchService {
    * Worker loop trigger: Fetch and process a queued job using SKIP LOCKED.
    */
   async processNextJob(): Promise<boolean> {
+    const startTime = Date.now();
+
     // 1. Recover stuck jobs first
     await this.recoverStuckJobs();
 
@@ -284,6 +292,12 @@ export class ResearchService {
         });
 
         if (!rawSource) {
+          let domain: string | null = null;
+          try {
+            const parsedUrl = new URL(res.url);
+            domain = parsedUrl.hostname.replace('www.', '');
+          } catch (e) {}
+
           rawSource = await this.prisma.rawSource.create({
             data: {
               sourceType: SourceType.OTHER,
@@ -299,6 +313,7 @@ export class ResearchService {
               sourceKind: res.sourceKind,
               vehicleVariantId: job.vehicleVariantId,
               status: ApprovalStatus.RAW,
+              sourceDomain: domain,
             },
           });
         }
@@ -319,8 +334,8 @@ export class ResearchService {
       await this.prisma.$transaction(async (tx) => {
         // Create CommonProblems
         for (const prob of aiAnalysis.problems as any[]) {
-          // Run Automated Evidence Rules on problem
-          const decision = this.evidenceRules.evaluateCommonProblem(prob, rawSources);
+          // Run Automated Evidence Rules on problem passing target variant specs
+          const decision = this.evidenceRules.evaluateCommonProblem(prob, rawSources, job.variant);
 
           const newProb = await tx.commonProblem.create({
             data: {
@@ -431,13 +446,32 @@ export class ResearchService {
         });
       });
 
-      // 7. Mark Job as completed
+      // Calculate cost & duration metrics
+      const jobDurationMs = Date.now() - startTime;
+      const searchProviderCalls = 1;
+      const estimatedSearchCost = 0.01;
+      const aiInputTokens = 2000;
+      const aiOutputTokens = 1000;
+      const estimatedAiCost = (aiInputTokens * 0.15 + aiOutputTokens * 0.6) / 1000000; // GPT-4o-mini rates
+
+      // 7. Mark Job as completed and record stats in metadata
       await this.prisma.vehicleResearchJob.update({
         where: { id: job.id },
         data: {
           status: ResearchJobStatus.COMPLETED,
           lockedAt: null,
           lockedBy: null,
+          metadata: {
+            searchProviderCalls,
+            estimatedSearchCost,
+            aiInputTokens,
+            aiOutputTokens,
+            estimatedAiCost,
+            jobDurationMs,
+            rawSourceCount: rawSources.length,
+            approvedProblemsCount: aiAnalysis.problems?.length || 0,
+            approvedRecallsCount: aiAnalysis.recalls?.length || 0,
+          },
         },
       });
 

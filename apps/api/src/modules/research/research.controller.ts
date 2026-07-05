@@ -15,6 +15,7 @@ export class ResearchController {
 
   @Post('request')
   async requestResearch(
+    @Request() req: any,
     @Body()
     body: {
       variantId: string;
@@ -28,6 +29,30 @@ export class ResearchController {
     const { variantId, userId, languageCode, countryCode, researchScope, priority } = body;
     if (!variantId || !userId) {
       throw new BadRequestException('variantId and userId are required.');
+    }
+
+    // Authenticate: x-admin-secret OR valid Bearer Token
+    const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
+    const headerSecret = req.headers['x-admin-secret'];
+    let isAuthorized = headerSecret === systemSecret;
+
+    if (!isAuthorized) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          await this.jwtService.verifyAsync(token, {
+            secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+          });
+          isAuthorized = true;
+        } catch (e) {
+          throw new UnauthorizedException('Invalid or expired authentication token');
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new UnauthorizedException('Authentication required to request research.');
     }
 
     const jobId = await this.researchService.requestResearch(
@@ -88,6 +113,7 @@ export class ResearchController {
       limit?: number;
       onlyCoverage?: string[];
       dryRun: boolean;
+      variantIds?: string[];
     },
   ) {
     const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
@@ -139,6 +165,7 @@ export class ResearchController {
       limit: body.limit || 100,
       onlyCoverage: body.onlyCoverage,
       dryRun: body.dryRun,
+      variantIds: body.variantIds,
     });
 
     // Write audit log
@@ -154,6 +181,7 @@ export class ResearchController {
             languageCode: body.languageCode,
             matchedVariants: result.matchedVariants,
             wouldCreateJobs: result.wouldCreateJobs,
+            variantIds: body.variantIds,
           },
         },
       });
@@ -164,7 +192,33 @@ export class ResearchController {
 
   @Post('process-next')
   @HttpCode(HttpStatus.OK)
-  async processNext() {
+  async processNext(@Request() req: any) {
+    const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
+    const headerSecret = req.headers['x-admin-secret'];
+    let isAuthorized = headerSecret === systemSecret;
+
+    if (!isAuthorized) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const payload = await this.jwtService.verifyAsync(token, {
+            secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+          });
+          const user = await this.prisma.user.findUnique({
+            where: { id: payload.id },
+          });
+          if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+            isAuthorized = true;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!isAuthorized) {
+      throw new UnauthorizedException('Access denied. Valid ADMIN role or system secret is required.');
+    }
+
     const processed = await this.researchService.processNextJob();
     return { success: true, processed };
   }
