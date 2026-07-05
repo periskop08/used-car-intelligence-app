@@ -21,15 +21,7 @@ export default function Home() {
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadingVariants, setLoadingVariants] = useState(false);
 
-  // AI Search states (structured)
-  const [aiBrand, setAiBrand] = useState("");
-  const [aiModel, setAiModel] = useState("");
-  const [aiYear, setAiYear] = useState("2018");
-  const [aiBodyType, setAiBodyType] = useState("HATCHBACK");
-  const [aiTransmission, setAiTransmission] = useState("Otomatik");
-  const [aiEngine, setAiEngine] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+
 
 
 
@@ -88,44 +80,7 @@ export default function Home() {
     router.push(`/vehicle/${selectedVariant}`);
   };
 
-  const handleAiGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiBrand.trim() || !aiModel.trim() || !aiEngine.trim()) {
-      setErrorMsg("Lütfen Marka, Model ve Motor alanlarını doldurun.");
-      return;
-    }
 
-    setGenerating(true);
-    setErrorMsg("");
-    try {
-      const res = await fetch(`${API_URL}/vehicles/ai-generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          brand: aiBrand,
-          model: aiModel,
-          year: Number(aiYear),
-          bodyType: aiBodyType,
-          transmission: aiTransmission,
-          engine: aiEngine,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Araç oluşturulurken bir hata oluştu.");
-      }
-
-      const data = await res.json();
-      router.push(`/vehicle/${data.variantId}`);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Araç oluşturulamadı. Lütfen girilen verileri kontrol edin.");
-    } finally {
-      setGenerating(false);
-    }
-  };
 
 
 
@@ -216,127 +171,7 @@ export default function Home() {
           Aracı İncele & AI Raporu Al
         </button>
 
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-2">
-          <div className="h-[1px] bg-white/10 flex-1"></div>
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Veya Yapay Zeka Arama</span>
-          <div className="h-[1px] bg-white/10 flex-1"></div>
-        </div>
 
-        {/* Global AI Search Input */}
-        <form onSubmit={handleAiGenerate} className="flex flex-col gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Brand Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marka</label>
-              <input
-                type="text"
-                value={aiBrand}
-                onChange={e => setAiBrand(e.target.value)}
-                placeholder="Örn: Peugeot"
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-                required
-              />
-            </div>
-
-            {/* Model Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Model</label>
-              <input
-                type="text"
-                value={aiModel}
-                onChange={e => setAiModel(e.target.value)}
-                placeholder="Örn: 307"
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-                required
-              />
-            </div>
-
-            {/* Year Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
-              <select
-                value={aiYear}
-                onChange={e => setAiYear(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-              >
-                {Array.from({ length: 30 }, (_, i) => 2026 - i).map(yr => (
-                  <option key={yr} value={yr}>
-                    {yr}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Body Type Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
-              <select
-                value={aiBodyType}
-                onChange={e => setAiBodyType(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-              >
-                <option value="HATCHBACK">Hatchback</option>
-                <option value="SEDAN">Sedan</option>
-                <option value="SUV">SUV / Crossover</option>
-                <option value="COUPE">Coupe</option>
-                <option value="CABRIOLET">Cabriolet</option>
-                <option value="WAGON">Station Wagon</option>
-                <option value="MINIVAN">Minivan</option>
-                <option value="OTHER">Diğer</option>
-              </select>
-            </div>
-
-            {/* Transmission Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman</label>
-              <select
-                value={aiTransmission}
-                onChange={e => setAiTransmission(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-              >
-                <option value="Otomatik">Otomatik (Tork Konvertörlü)</option>
-                <option value="Manuel">Manuel</option>
-                <option value="DSG">DSG / Çift Kavrama DCT</option>
-                <option value="CVT">CVT</option>
-                <option value="S Tronic">S Tronic</option>
-                <option value="EDC">EDC</option>
-              </select>
-            </div>
-
-            {/* Engine Input */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Yakıt</label>
-              <input
-                type="text"
-                value={aiEngine}
-                onChange={e => setAiEngine(e.target.value)}
-                placeholder="Örn: 1.6 Benzin, 2.0 TDI Dizel, 1.8 Hibrit"
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={generating}
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={generating}
-            className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-4 rounded-2xl shadow-xl shadow-orange-500/10 transition text-center"
-          >
-            {generating ? "Yapay Zeka Aracı Analiz Ediyor & Oluşturuyor..." : "Yapay Zeka ile Aracı Analiz Et & Kaydet"}
-          </button>
-
-          {errorMsg && <p className="text-xs font-semibold text-rose-500 text-center">{errorMsg}</p>}
-          <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-            * İstediğiniz herhangi bir dünya modelini yapılandırın. Sistem bunu global veritabanından dinamik olarak üretip sisteme kaydedecektir.
-          </p>
-        </form>
       </div>
 
 
