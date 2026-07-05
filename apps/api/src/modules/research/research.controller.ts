@@ -88,31 +88,31 @@ export class ResearchController {
       limit?: number;
       onlyCoverage?: string[];
       dryRun: boolean;
-      adminSecret?: string;
     },
   ) {
     const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
-    const isSecretValid = body.adminSecret === systemSecret;
+    const headerSecret = req.headers['x-admin-secret'];
+    const isSecretValid = headerSecret === systemSecret;
 
     let isAuthorized = isSecretValid;
+    let actingUserId: string | null = null;
 
-    if (!isAuthorized) {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.split(' ')[1];
-          const payload = await this.jwtService.verifyAsync(token, {
-            secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
-          });
-          const user = await this.prisma.user.findUnique({
-            where: { id: payload.id },
-          });
-          if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
-            isAuthorized = true;
-          }
-        } catch (e) {
-          // Token invalid
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const payload = await this.jwtService.verifyAsync(token, {
+          secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+        });
+        const user = await this.prisma.user.findUnique({
+          where: { id: payload.id },
+        });
+        if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+          isAuthorized = true;
+          actingUserId = user.id;
         }
+      } catch (e) {
+        // Token invalid
       }
     }
 
@@ -124,7 +124,14 @@ export class ResearchController {
       throw new BadRequestException('countryCode and languageCode are required.');
     }
 
-    return this.researchService.batchPopulate({
+    // Resolve an acting user ID for audit log if header-auth was used
+    if (!actingUserId) {
+      const systemUser = await this.prisma.user.findFirst();
+      actingUserId = systemUser?.id || null;
+    }
+
+    // Trigger batch populate service
+    const result = await this.researchService.batchPopulate({
       countryCode: body.countryCode,
       languageCode: body.languageCode,
       marketRegion: body.marketRegion,
@@ -133,6 +140,26 @@ export class ResearchController {
       onlyCoverage: body.onlyCoverage,
       dryRun: body.dryRun,
     });
+
+    // Write audit log
+    if (actingUserId) {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: actingUserId,
+          action: 'BATCH_POPULATE_TRIGGER',
+          details: {
+            dryRun: body.dryRun,
+            limit: body.limit || 100,
+            countryCode: body.countryCode,
+            languageCode: body.languageCode,
+            matchedVariants: result.matchedVariants,
+            wouldCreateJobs: result.wouldCreateJobs,
+          },
+        },
+      });
+    }
+
+    return result;
   }
 
   @Post('process-next')

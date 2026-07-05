@@ -4,6 +4,7 @@ import { WebSearchProvider } from './providers/web-search.provider';
 import { AiAnalysisService } from './ai-analysis.service';
 import { CoverageService } from './coverage.service';
 import { EvidenceRulesService } from './evidence-rules.service';
+import { AiReportGeneratorService } from './ai-report-generator.service';
 import {
   ResearchJobStatus,
   ResearchScope,
@@ -26,6 +27,7 @@ export class ResearchService {
     private aiAnalysisService: AiAnalysisService,
     private coverageService: CoverageService,
     private evidenceRules: EvidenceRulesService,
+    private reportGenerator: AiReportGeneratorService,
   ) {}
 
   /**
@@ -119,6 +121,12 @@ export class ResearchService {
   }): Promise<any> {
     const limitVal = Math.min(dto.limit || 100, 500); // Safety limit cap at 500
 
+    // Global daily budget limit check (Max 1000 jobs per 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const dailyJobsCreated = await this.prisma.vehicleResearchJob.count({
+      where: { createdAt: { gte: oneDayAgo } },
+    });
+
     // Fetch variants that match coverage filters
     const variants = await this.prisma.vehicleVariant.findMany({
       include: {
@@ -135,6 +143,10 @@ export class ResearchService {
     });
 
     const targetVariants = filtered.slice(0, limitVal);
+
+    if (dailyJobsCreated + targetVariants.length > 1000) {
+      throw new BadRequestException(`Global daily batch limit exceeded. Cannot queue ${targetVariants.length} jobs. Current 24h count: ${dailyJobsCreated}/1000.`);
+    }
 
     let wouldCreate = 0;
     let skippedExisting = 0;
@@ -231,6 +243,19 @@ export class ResearchService {
     });
 
     this.logger.log(`Processing Job ${job.id} for variant ${job.vehicleVariantId} (Attempt: ${job.attemptCount}/${job.maxAttempts}).`);
+
+    // Start a periodic heartbeat lock-refresh timer (Every 2 minutes)
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        await this.prisma.vehicleResearchJob.update({
+          where: { id: job.id },
+          data: { lockedAt: new Date() },
+        });
+        this.logger.log(`Refreshed lock heartbeat for Job ${job.id}.`);
+      } catch (err) {
+        this.logger.error(`Failed to refresh heartbeat for Job ${job.id}: ${err.message}`);
+      }
+    }, 2 * 60 * 1000);
 
     try {
       // 4. Execute search queries based on variant specs
@@ -413,12 +438,17 @@ export class ResearchService {
         },
       });
 
+      // Mark report cache as STALE so it recalculates with newly published data
+      await this.reportGenerator.markReportStale(job.vehicleVariantId);
+
       this.logger.log(`Job ${job.id} completed successfully.`);
       return true;
     } catch (error) {
       this.logger.error(`Error processing job ${job.id}: ${error.message}`);
       await this.handleJobFailure(job, error.message);
       return false;
+    } finally {
+      clearInterval(heartbeatInterval);
     }
   }
 
@@ -443,6 +473,7 @@ export class ResearchService {
 
   /**
    * Unlock jobs stuck in RUNNING state for more than 15 minutes.
+   * Checks against heartbeat (last lockedAt must be older than 15 mins).
    */
   async recoverStuckJobs(): Promise<void> {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
