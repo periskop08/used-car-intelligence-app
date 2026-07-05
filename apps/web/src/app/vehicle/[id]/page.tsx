@@ -349,19 +349,40 @@ export default function VehicleDetail() {
             <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">⚠️ Bilinen Kronik Arızalar</h2>
             {vehicle.problems.length > 0 ? (
               <div className="flex flex-col gap-4 mt-2">
-                {vehicle.problems.map((p: any) => (
-                  <div key={p.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200 text-sm">{p.title}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                        p.riskLevel === 'HIGH' ? 'bg-red-500/20 text-red-400' : p.riskLevel === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'
-                      }`}>{p.riskLevel} RİSK</span>
+                {vehicle.problems.map((p: any) => {
+                  const isComplaint = p.problemType === 'USER_COMPLAINT';
+                  return (
+                    <div key={p.id} className={`bg-slate-950/20 border p-4 rounded-xl flex flex-col gap-2 ${
+                      isComplaint ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-white/5'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-200 text-sm">{p.title}</span>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                            isComplaint ? 'bg-amber-600/20 text-amber-400' : 'bg-orange-600/20 text-orange-400'
+                          }`}>
+                            {isComplaint ? 'Kullanıcı Şikayeti' : 'Kronik Sorun'}
+                          </span>
+                          <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
+                            Güven: {p.dataConfidence}
+                          </span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                          p.riskLevel === 'HIGH' ? 'bg-red-500/20 text-red-400' : p.riskLevel === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'
+                        }`}>{p.riskLevel} RİSK</span>
+                      </div>
+                      <p className="text-xs text-slate-400">{p.description}</p>
+                      {p.symptoms && <p className="text-xs text-slate-500 font-medium">🚨 Belirtiler: {p.symptoms}</p>}
+                      {p.checkRecommendation && <p className="text-xs text-slate-500 font-medium">🔍 Kontrol Önerisi: {p.checkRecommendation}</p>}
+                      {p.metadata?.warningMsg && (
+                        <div className="bg-amber-950/20 border border-amber-900/30 p-2.5 rounded-lg text-[11px] text-amber-400/90 mt-1 flex items-start gap-2">
+                          <span>⚠️</span>
+                          <span>{p.metadata.warningMsg}</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-400">{p.description}</p>
-                    {p.symptoms && <p className="text-xs text-slate-500 font-medium">🚨 Belirtiler: {p.symptoms}</p>}
-                    {p.checkRecommendation && <p className="text-xs text-slate-500 font-medium">🔍 Kontrol Önerisi: {p.checkRecommendation}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-slate-500">Bu araç için onaylanmış bir kronik arıza bulunmamaktadır.</p>
