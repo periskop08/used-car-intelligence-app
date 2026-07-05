@@ -112,6 +112,12 @@ export class EvidenceRulesService {
       // Demote to PENDING if variant mismatch is detected
       status = ApprovalStatus.PENDING;
       reason = 'variant_mismatch_detected';
+    } else if (variantMatchConfidence === 'MEDIUM') {
+      // Missing critical fields or partial year mismatches -> demote to USER_COMPLAINT
+      status = ApprovalStatus.APPROVED;
+      dataConfidence = DataConfidence.LOW;
+      problemType = ProblemType.USER_COMPLAINT;
+      reason = 'variant_match_medium_demoted';
     } else if (hasOfficialSource || hasVerifiedServiceNote) {
       status = ApprovalStatus.APPROVED;
       dataConfidence = DataConfidence.HIGH;

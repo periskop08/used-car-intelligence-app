@@ -114,6 +114,34 @@ async function runTests() {
     'Verified SERVICE_NOTE should result in APPROVED CommonProblem with HIGH confidence'
   );
 
+  // Test 10: variantMatchConfidence === 'MEDIUM' -> Demoted to USER_COMPLAINT
+  const mediumMatchVariant = { year: 2018, engine: { code: '1.6 TDI' }, transmission: { name: 'DSG' } };
+  const mediumMatchSources = [
+    { url: 'https://forum.com/t1', sourceKind: SourceKind.FORUM, isOfficial: false, isVerified: false }
+  ];
+  // Year mismatch (e.g. 2015-2016 vs target 2018) should yield variantMatchConfidence MEDIUM
+  const res6 = evidenceRules.evaluateCommonProblem(
+    { title: 'Test', affectedYears: '2015-2016', affectedEngine: '1.6 TDI', affectedTransmission: 'DSG' },
+    mediumMatchSources,
+    mediumMatchVariant
+  );
+  assert(
+    res6.problemType === ProblemType.USER_COMPLAINT && res6.status === ApprovalStatus.APPROVED && res6.dataConfidence === DataConfidence.LOW,
+    'Medium variant match confidence should demote to USER_COMPLAINT with LOW confidence'
+  );
+
+  // Test 11: variantMatchConfidence === 'LOW' -> PENDING
+  // Engine mismatch (e.g. 2.0 TSI vs target 1.6 TDI) should yield variantMatchConfidence LOW
+  const res7 = evidenceRules.evaluateCommonProblem(
+    { title: 'Test', affectedYears: '2018', affectedEngine: '2.0 TSI', affectedTransmission: 'DSG' },
+    mediumMatchSources,
+    mediumMatchVariant
+  );
+  assert(
+    res7.status === ApprovalStatus.PENDING,
+    'Low variant match confidence (engine mismatch) should force status to PENDING'
+  );
+
   console.log(`=== TEST COMPLETE: ${passed} passed, ${failed} failed ===`);
   process.exit(failed > 0 ? 1 : 0);
 }
