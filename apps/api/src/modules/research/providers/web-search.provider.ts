@@ -28,7 +28,9 @@ export class WebSearchProvider implements SearchProvider {
       const url = `https://customsearch.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&gl=${countryCode}&hl=${languageCode}`;
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Google Search API returned status ${response.status}`);
+        const errText = await response.text();
+        this.logger.error(`Google Search API Error Details: ${errText}`);
+        throw new Error(`Google Search API returned status ${response.status}. Details: ${errText}`);
       }
       const data = await response.json();
       const items = data.items || [];
