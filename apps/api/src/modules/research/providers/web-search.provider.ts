@@ -14,7 +14,97 @@ export class WebSearchProvider implements SearchProvider {
       return this.generateMockResults(query);
     }
 
-    // Production search using licensed / official APIs (e.g. Google Custom Search)
+    // Check for Gemini Search Grounding credentials
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      this.logger.log(`Using Gemini Search Grounding for query: "${query}"`);
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const requestBody = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Perform a Google Search to retrieve actual web search results (such as forum threads, complaint platforms, official recalls, or manufacturer manuals) for: "${query}".
+Return a JSON array containing the top search results found. Each item in the array MUST strictly conform to this schema:
+{
+  "url": "the URL of the page",
+  "title": "the title of the page",
+  "snippet": "a short text snippet describing the content found"
+}
+Do not write any other introductory or concluding text. Return only the valid JSON array.`
+                }
+              ]
+            }
+          ],
+          tools: [
+            {
+              googleSearch: {}
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        };
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Gemini Search Grounding API returned status ${response.status}. Details: ${errText}`);
+        }
+
+        const data = await response.json();
+        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!textContent) {
+          throw new Error('Gemini API returned an empty response.');
+        }
+
+        const parsedItems = JSON.parse(textContent);
+        if (!Array.isArray(parsedItems)) {
+          throw new Error('Gemini response is not a JSON array.');
+        }
+
+        return parsedItems.map((item: any) => {
+          const itemUrl = item.url || '';
+          let sourceKind = SourceKind.UNKNOWN;
+
+          if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
+            sourceKind = SourceKind.FORUM;
+          } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
+            sourceKind = SourceKind.COMPLAINT_PLATFORM;
+          } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
+            sourceKind = SourceKind.OFFICIAL_RECALL;
+          } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
+            sourceKind = SourceKind.MANUFACTURER;
+          } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
+            sourceKind = SourceKind.BLOG_REVIEW;
+          } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
+            sourceKind = SourceKind.VIDEO_REVIEW;
+          }
+
+          return {
+            url: itemUrl,
+            title: item.title || '',
+            snippet: item.snippet || '',
+            sourceKind,
+            reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
+          };
+        });
+      } catch (error) {
+        this.logger.error(`Error performing Gemini Search Grounding: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // Fallback: Google Custom Search API
     const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
     const cx = process.env.GOOGLE_SEARCH_CX;
 
