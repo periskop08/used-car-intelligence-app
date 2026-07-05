@@ -112,7 +112,62 @@ Language for outputs: ${languageCode === 'tr' ? 'Turkish' : 'English'}
 Raw sources:
 ${sourcesText}
 
-Generate the JSON matching the required schema. Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`json) in your raw response.`;
+Generate a JSON object matching this exact schema:
+{
+  "problems": [
+    {
+      "title": "Problem Title",
+      "description": "Problem Description",
+      "affectedYears": "2015-2018",
+      "affectedEngine": "1.6 TDI",
+      "affectedTransmission": "DSG / DCT",
+      "riskLevel": "HIGH" | "MEDIUM" | "LOW",
+      "symptoms": "Symptoms description",
+      "checkRecommendation": "What to inspect",
+      "problemType": "COMMON_PROBLEM" | "RECALL" | "OTHER",
+      "evidenceText": "Excerpt or proof",
+      "confidenceContribution": 0.8
+    }
+  ],
+  "recalls": [
+    {
+      "title": "Recall Title",
+      "description": "Recall Description",
+      "safetyRisk": "Safety Risk Description",
+      "remedy": "Remedy Description",
+      "manufacturerCampaignNumber": "Campaign Code",
+      "nhtsaCampaignNumber": "NHTSA Code",
+      "officialCheckUrl": "https://...",
+      "affectedYears": "2015-2016",
+      "affectedEngine": "1.6 TDI",
+      "affectedTransmission": "DSG / DCT",
+      "vinCheckRequired": true,
+      "recallCode": "Recall Code",
+      "officialSourceUrl": "https://..."
+    }
+  ],
+  "sellerQuestions": [
+    {
+      "question": "Question text?",
+      "reason": "Why ask this",
+      "category": "ENGINE" | "TRANSMISSION" | "ELECTRONICS" | "SUSPENSION" | "BRAKE" | "BODY" | "PAINT" | "INTERIOR" | "TIRES" | "TEST_DRIVE" | "MAINTENANCE" | "DOCUMENTS" | "GENERAL",
+      "riskLevel": "HIGH" | "MEDIUM" | "LOW",
+      "priority": "HIGH" | "MEDIUM" | "LOW"
+    }
+  ],
+  "checklists": [
+    {
+      "title": "Checklist Item Title",
+      "description": "Details of check",
+      "category": "ENGINE" | "TRANSMISSION" | "ELECTRONICS" | "SUSPENSION" | "BRAKE" | "BODY" | "PAINT" | "INTERIOR" | "TIRES" | "TEST_DRIVE" | "MAINTENANCE" | "DOCUMENTS" | "GENERAL",
+      "riskLevel": "HIGH" | "MEDIUM" | "LOW",
+      "priority": "HIGH" | "MEDIUM" | "LOW",
+      "sortOrder": 0
+    }
+  ]
+}
+
+Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`json) in your raw response.`;
 
     try {
       const response = await openai.chat.completions.create({
@@ -129,12 +184,93 @@ Generate the JSON matching the required schema. Ensure it is strict JSON. Do not
       this.logger.log(`OpenAI Raw Response: ${text}`);
       const parsed = JSON.parse(text);
 
-      // Normalize to ensure all arrays exist even if OpenAI returned an empty object or omitted keys
+      // Normalize to ensure all arrays exist and map alternative key names
+      const problemsRaw = parsed.problems || parsed.CommonChronicProblems || [];
+      const recallsRaw = parsed.recalls || parsed.ManufacturerOrSafetyRecalls || [];
+      const sellerQuestionsRaw = parsed.sellerQuestions || parsed.CrucialQuestionsToAskSeller || [];
+
+      // If checklists is an object (key-value categories), flatten it into an array of objects
+      let checklistsRaw = parsed.checklists || parsed.SpecificChecklistItemsToInspect || [];
+      if (checklistsRaw && !Array.isArray(checklistsRaw) && typeof checklistsRaw === 'object') {
+        const flattened = [];
+        for (const [category, items] of Object.entries(checklistsRaw)) {
+          if (Array.isArray(items)) {
+            items.forEach((item: any, idx: number) => {
+              flattened.push({
+                title: typeof item === 'string' ? item : (item.title || ''),
+                description: typeof item === 'string' ? item : (item.description || ''),
+                category: category.toUpperCase(),
+                riskLevel: 'MEDIUM',
+                priority: 'MEDIUM',
+                sortOrder: idx,
+              });
+            });
+          }
+        }
+        checklistsRaw = flattened;
+      }
+
+      // Map array items to ensure correct fields
+      const problems = Array.isArray(problemsRaw)
+        ? problemsRaw.map((p: any) => ({
+            title: p.title || p.problem || '',
+            description: p.description || p.problem || '',
+            affectedYears: p.affectedYears || null,
+            affectedEngine: p.affectedEngine || null,
+            affectedTransmission: p.affectedTransmission || null,
+            riskLevel: p.riskLevel || 'MEDIUM',
+            symptoms: Array.isArray(p.symptoms) ? p.symptoms.join(', ') : (p.symptoms || null),
+            checkRecommendation: Array.isArray(p.recommendations) ? p.recommendations.join(', ') : (p.checkRecommendation || null),
+            problemType: p.problemType || 'COMMON_PROBLEM',
+            evidenceText: p.evidenceText || '',
+            confidenceContribution: p.confidenceContribution || 0.5,
+          }))
+        : [];
+
+      const recalls = Array.isArray(recallsRaw)
+        ? recallsRaw.map((r: any) => ({
+            title: r.title || r.recall || '',
+            description: r.description || r.recall || '',
+            safetyRisk: r.safetyRisk || null,
+            remedy: r.remedy || null,
+            manufacturerCampaignNumber: r.manufacturerCampaignNumber || null,
+            nhtsaCampaignNumber: r.nhtsaCampaignNumber || null,
+            officialCheckUrl: r.officialCheckUrl || null,
+            affectedYears: r.affectedYears || null,
+            affectedEngine: r.affectedEngine || null,
+            affectedTransmission: r.affectedTransmission || null,
+            vinCheckRequired: typeof r.vinCheckRequired === 'boolean' ? r.vinCheckRequired : true,
+            recallCode: r.recallCode || null,
+            officialSourceUrl: r.officialSourceUrl || null,
+          }))
+        : [];
+
+      const sellerQuestions = Array.isArray(sellerQuestionsRaw)
+        ? sellerQuestionsRaw.map((q: any) => ({
+            question: q.question || '',
+            reason: q.reason || '',
+            category: q.category || 'GENERAL',
+            riskLevel: q.riskLevel || 'MEDIUM',
+            priority: q.priority || 'MEDIUM',
+          }))
+        : [];
+
+      const checklists = Array.isArray(checklistsRaw)
+        ? checklistsRaw.map((c: any) => ({
+            title: c.title || '',
+            description: c.description || '',
+            category: c.category || 'GENERAL',
+            riskLevel: c.riskLevel || 'MEDIUM',
+            priority: c.priority || 'MEDIUM',
+            sortOrder: typeof c.sortOrder === 'number' ? c.sortOrder : 0,
+          }))
+        : [];
+
       const normalized = {
-        problems: Array.isArray(parsed.problems) ? parsed.problems : [],
-        recalls: Array.isArray(parsed.recalls) ? parsed.recalls : [],
-        sellerQuestions: Array.isArray(parsed.sellerQuestions) ? parsed.sellerQuestions : [],
-        checklists: Array.isArray(parsed.checklists) ? parsed.checklists : [],
+        problems,
+        recalls,
+        sellerQuestions,
+        checklists,
       };
 
       // Validate JSON structure using Zod
