@@ -97,13 +97,13 @@ export class AiAnalysisService {
 4. Specific checklist items to inspect.
 
 CRITICAL RULES FOR EXTRACTION:
-- Do not hallucinate or invent problems. Only extract issues directly mentioned or strongly supported by the provided sources.
+- Synthesize the information from the sources with your own extensive internal automotive knowledge about this specific vehicle variant. Supplement any missing recalls, checklists, or questions from your own knowledge base to provide a comprehensive, detailed report, while keeping the caution phrasing for community forum sources.
 - For issues originating from community forums or blogs, use non-definitive, cautious phrasing.
   - In Turkish: "bazı kullanıcılar ... bildirdi", "belirtildi", "görülebildiği ifade edildi" (never "kesindir" or "kronik hatadır" unless backed by official sources).
   - In English: "some users reported", "stated", "indicated" (never definitive).
 - Do not include duplicate items.
 - Categorize questions and checklist items correctly into their VehicleInfoCategory: ENGINE, TRANSMISSION, ELECTRONICS, SUSPENSION, BRAKE, BODY, PAINT, INTERIOR, TIRES, TEST_DRIVE, MAINTENANCE, DOCUMENTS, GENERAL.
-- Do not invent recall campaigns. Recalls must include official source references or numbers if mentioned.
+- Ensure recall details are accurate, adding real official recalls for this variant if known to you.
 - You must output strictly valid JSON conforming to the schema.`;
 
     const userPrompt = `Target vehicle: ${year} ${brandName} ${modelName}
