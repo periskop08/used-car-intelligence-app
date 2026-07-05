@@ -8,6 +8,8 @@ import { ResearchService } from './research.service';
 import { ResearchController } from './research.controller';
 import { AdminApprovalController } from './admin-approval.controller';
 
+import { EvidenceRulesService } from './evidence-rules.service';
+
 @Module({
   imports: [],
   controllers: [ResearchController, AdminApprovalController],
@@ -17,8 +19,9 @@ import { AdminApprovalController } from './admin-approval.controller';
     AiAnalysisService,
     CoverageService,
     AiReportGeneratorService,
+    EvidenceRulesService,
     ResearchService,
   ],
-  exports: [ResearchService, AiReportGeneratorService, CoverageService],
+  exports: [ResearchService, AiReportGeneratorService, CoverageService, EvidenceRulesService],
 })
 export class ResearchModule {}

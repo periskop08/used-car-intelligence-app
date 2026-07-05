@@ -499,6 +499,7 @@ model CommonProblem {
   approvedById       String?
   approvedAt         DateTime?
   rejectedReason     String?
+  metadata           Json?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
@@ -555,6 +556,7 @@ model Recall {
   approvedById    String?
   approvedAt      DateTime?
   rejectedReason  String?
+  metadata        Json?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -582,6 +584,7 @@ model SellerQuestion {
   approvedById    String?
   approvedAt      DateTime?
   rejectedReason  String?
+  metadata        Json?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -623,6 +626,7 @@ model InspectionChecklistItem {
   approvedById    String?
   approvedAt      DateTime?
   rejectedReason  String?
+  metadata        Json?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
@@ -667,6 +671,8 @@ model RawSource {
   lastCheckedAt    DateTime?
   status          ApprovalStatus @default(RAW)
   metadata        Json?
+  isVerified      Boolean        @default(false)
+  isOfficial      Boolean        @default(false)
   fetchedAt       DateTime    @default(now())
   createdAt       DateTime    @default(now())
 

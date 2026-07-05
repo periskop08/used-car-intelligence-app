@@ -73,6 +73,40 @@ export class ResearchController {
     return job;
   }
 
+  @Post('batch-populate')
+  async batchPopulate(
+    @Body()
+    body: {
+      countryCode: string;
+      languageCode: string;
+      marketRegion?: string;
+      researchScope?: ResearchScope;
+      limit?: number;
+      onlyCoverage?: string[];
+      dryRun: boolean;
+      adminSecret?: string;
+    },
+  ) {
+    const systemSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
+    if (body.adminSecret !== systemSecret) {
+      throw new BadRequestException('Unauthorized batch request.');
+    }
+
+    if (!body.countryCode || !body.languageCode) {
+      throw new BadRequestException('countryCode and languageCode are required.');
+    }
+
+    return this.researchService.batchPopulate({
+      countryCode: body.countryCode,
+      languageCode: body.languageCode,
+      marketRegion: body.marketRegion,
+      researchScope: body.researchScope || ResearchScope.FULL_REPORT,
+      limit: body.limit || 100,
+      onlyCoverage: body.onlyCoverage,
+      dryRun: body.dryRun,
+    });
+  }
+
   @Post('process-next')
   @HttpCode(HttpStatus.OK)
   async processNext() {

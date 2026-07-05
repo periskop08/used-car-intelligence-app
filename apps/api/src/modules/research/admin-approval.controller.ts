@@ -45,6 +45,33 @@ export class AdminApprovalController {
     };
   }
 
+  @Get('data-quality')
+  async getDataQualityItems() {
+    const problems = await this.prisma.commonProblem.findMany({
+      include: { variant: { include: { brand: true, model: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const recalls = await this.prisma.recall.findMany({
+      include: { variant: { include: { brand: true, model: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const questions = await this.prisma.sellerQuestion.findMany({
+      include: { variant: { include: { brand: true, model: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const checklists = await this.prisma.inspectionChecklistItem.findMany({
+      include: { variant: { include: { brand: true, model: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      problems,
+      recalls,
+      questions,
+      checklists,
+    };
+  }
+
   @Get('raw-sources')
   async listRawSources() {
     return this.prisma.rawSource.findMany({
@@ -121,20 +148,18 @@ export class AdminApprovalController {
 
     const oldStatus = rawSource.status;
 
-    // RAW -> PENDING -> APPROVED / REJECTED / ARCHIVED
-    // RAW -> ARCHIVED
-    const allowed =
-      (oldStatus === ApprovalStatus.RAW && ([ApprovalStatus.PENDING, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.PENDING &&
-        ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus));
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid RawSource status transition: ${oldStatus} -> ${newStatus}`);
-    }
-
+    const currentMeta = (rawSource.metadata as Record<string, any>) || {};
     const updated = await this.prisma.rawSource.update({
       where: { id },
-      data: { status: newStatus },
+      data: {
+        status: newStatus,
+        metadata: {
+          ...currentMeta,
+          lastModifiedBy: 'ADMIN',
+          adminOverride: true,
+          overrideReason: reason || 'Status updated by admin override',
+        },
+      },
     });
 
     await this.logAudit(adminUserId || 'system', 'RAW_SOURCE_STATUS_CHANGE', { id, oldStatus, newStatus, reason });
@@ -147,26 +172,19 @@ export class AdminApprovalController {
 
     const oldStatus = problem.status;
 
-    // PENDING -> APPROVED / REJECTED / ARCHIVED
-    // APPROVED -> STALE / ARCHIVED
-    // STALE -> PENDING / APPROVED / ARCHIVED
-    const allowed =
-      (oldStatus === ApprovalStatus.PENDING &&
-        ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.APPROVED && ([ApprovalStatus.STALE, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.STALE &&
-        ([ApprovalStatus.PENDING, ApprovalStatus.APPROVED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus));
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid CommonProblem status transition: ${oldStatus} -> ${newStatus}`);
-    }
-
+    const currentMeta = (problem.metadata as Record<string, any>) || {};
     const updated = await this.prisma.commonProblem.update({
       where: { id },
       data: {
         status: newStatus,
         rejectedReason: newStatus === ApprovalStatus.REJECTED ? reason : null,
         approvedAt: newStatus === ApprovalStatus.APPROVED ? new Date() : null,
+        metadata: {
+          ...currentMeta,
+          lastModifiedBy: 'ADMIN',
+          adminOverride: true,
+          overrideReason: reason || 'Status updated by admin override',
+        },
       },
     });
 
@@ -183,23 +201,19 @@ export class AdminApprovalController {
 
     const oldStatus = recall.status;
 
-    // PENDING -> APPROVED / REJECTED / ARCHIVED
-    // APPROVED -> STALE / ARCHIVED
-    const allowed =
-      (oldStatus === ApprovalStatus.PENDING &&
-        ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.APPROVED && ([ApprovalStatus.STALE, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus));
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid Recall status transition: ${oldStatus} -> ${newStatus}`);
-    }
-
+    const currentMeta = (recall.metadata as Record<string, any>) || {};
     const updated = await this.prisma.recall.update({
       where: { id },
       data: {
         status: newStatus,
         rejectedReason: newStatus === ApprovalStatus.REJECTED ? reason : null,
         approvedAt: newStatus === ApprovalStatus.APPROVED ? new Date() : null,
+        metadata: {
+          ...currentMeta,
+          lastModifiedBy: 'ADMIN',
+          adminOverride: true,
+          overrideReason: reason || 'Status updated by admin override',
+        },
       },
     });
 
@@ -216,23 +230,19 @@ export class AdminApprovalController {
 
     const oldStatus = question.status;
 
-    // PENDING -> APPROVED / REJECTED / ARCHIVED
-    // APPROVED -> ARCHIVED
-    const allowed =
-      (oldStatus === ApprovalStatus.PENDING &&
-        ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.APPROVED && newStatus === ApprovalStatus.ARCHIVED);
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid SellerQuestion status transition: ${oldStatus} -> ${newStatus}`);
-    }
-
+    const currentMeta = (question.metadata as Record<string, any>) || {};
     const updated = await this.prisma.sellerQuestion.update({
       where: { id },
       data: {
         status: newStatus,
         rejectedReason: newStatus === ApprovalStatus.REJECTED ? reason : null,
         approvedAt: newStatus === ApprovalStatus.APPROVED ? new Date() : null,
+        metadata: {
+          ...currentMeta,
+          lastModifiedBy: 'ADMIN',
+          adminOverride: true,
+          overrideReason: reason || 'Status updated by admin override',
+        },
       },
     });
 
@@ -249,23 +259,19 @@ export class AdminApprovalController {
 
     const oldStatus = item.status;
 
-    // PENDING -> APPROVED / REJECTED / ARCHIVED
-    // APPROVED -> ARCHIVED
-    const allowed =
-      (oldStatus === ApprovalStatus.PENDING &&
-        ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.APPROVED && newStatus === ApprovalStatus.ARCHIVED);
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid InspectionChecklistItem status transition: ${oldStatus} -> ${newStatus}`);
-    }
-
+    const currentMeta = (item.metadata as Record<string, any>) || {};
     const updated = await this.prisma.inspectionChecklistItem.update({
       where: { id },
       data: {
         status: newStatus,
         rejectedReason: newStatus === ApprovalStatus.REJECTED ? reason : null,
         approvedAt: newStatus === ApprovalStatus.APPROVED ? new Date() : null,
+        metadata: {
+          ...currentMeta,
+          lastModifiedBy: 'ADMIN',
+          adminOverride: true,
+          overrideReason: reason || 'Status updated by admin override',
+        },
       },
     });
 
@@ -281,18 +287,6 @@ export class AdminApprovalController {
     if (!report) throw new NotFoundException('AiVehicleReport not found.');
 
     const oldStatus = report.status;
-
-    // APPROVED -> STALE / ARCHIVED
-    // STALE -> APPROVED / ARCHIVED
-    // PENDING -> APPROVED / REJECTED
-    const allowed =
-      (oldStatus === ApprovalStatus.APPROVED && ([ApprovalStatus.STALE, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.STALE && ([ApprovalStatus.APPROVED, ApprovalStatus.ARCHIVED] as any[]).includes(newStatus)) ||
-      (oldStatus === ApprovalStatus.PENDING && ([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED] as any[]).includes(newStatus));
-
-    if (!allowed) {
-      throw new BadRequestException(`Invalid AiVehicleReport status transition: ${oldStatus} -> ${newStatus}`);
-    }
 
     const updated = await this.prisma.aiVehicleReport.update({
       where: { id },

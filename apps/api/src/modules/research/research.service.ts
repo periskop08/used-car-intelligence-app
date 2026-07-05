@@ -3,14 +3,15 @@ import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { AiAnalysisService } from './ai-analysis.service';
 import { CoverageService } from './coverage.service';
+import { EvidenceRulesService } from './evidence-rules.service';
 import {
   ResearchJobStatus,
   ResearchScope,
   PriorityLevel,
   ApprovalStatus,
-  SourceKind,
   SubscriptionTier,
   SourceType,
+  SourceKind,
 } from '@prisma/client';
 import { createHash } from 'crypto';
 
@@ -24,6 +25,7 @@ export class ResearchService {
     private searchProvider: WebSearchProvider,
     private aiAnalysisService: AiAnalysisService,
     private coverageService: CoverageService,
+    private evidenceRules: EvidenceRulesService,
   ) {}
 
   /**
@@ -100,6 +102,86 @@ export class ResearchService {
 
     this.logger.log(`Enqueued research job ${newJob.id} for variant ${variantId}.`);
     return newJob.id;
+  }
+
+  /**
+   * Batch research job creation for all variants with NONE/LIMITED coverage.
+   * Restricted to admin/system triggers.
+   */
+  async batchPopulate(dto: {
+    countryCode: string;
+    languageCode: string;
+    marketRegion?: string;
+    researchScope: ResearchScope;
+    limit: number;
+    onlyCoverage?: string[];
+    dryRun: boolean;
+  }): Promise<any> {
+    const limitVal = Math.min(dto.limit || 100, 500); // Safety limit cap at 500
+
+    // Fetch variants that match coverage filters
+    const variants = await this.prisma.vehicleVariant.findMany({
+      include: {
+        problems: { where: { status: ApprovalStatus.APPROVED } },
+        recalls: { where: { status: ApprovalStatus.APPROVED } },
+        checklists: { where: { status: ApprovalStatus.APPROVED } },
+      },
+    });
+
+    const filtered = variants.filter((v) => {
+      const count = v.problems.length + v.recalls.length + v.checklists.length;
+      const coverage = this.coverageService.calculateDataCoverage(count);
+      return dto.onlyCoverage ? dto.onlyCoverage.includes(coverage) : true;
+    });
+
+    const targetVariants = filtered.slice(0, limitVal);
+
+    let wouldCreate = 0;
+    let skippedExisting = 0;
+    const createdIds: string[] = [];
+
+    for (const v of targetVariants) {
+      // Check for active job
+      const activeJob = await this.prisma.vehicleResearchJob.findFirst({
+        where: {
+          vehicleVariantId: v.id,
+          languageCode: dto.languageCode,
+          countryCode: dto.countryCode,
+          researchScope: dto.researchScope,
+          status: { in: [ResearchJobStatus.QUEUED, ResearchJobStatus.RUNNING] },
+        },
+      });
+
+      if (activeJob) {
+        skippedExisting++;
+        continue;
+      }
+
+      wouldCreate++;
+
+      if (!dto.dryRun) {
+        const job = await this.prisma.vehicleResearchJob.create({
+          data: {
+            vehicleVariantId: v.id,
+            languageCode: dto.languageCode,
+            countryCode: dto.countryCode,
+            marketRegion: dto.marketRegion || null,
+            researchScope: dto.researchScope,
+            priority: PriorityLevel.LOW,
+            status: ResearchJobStatus.QUEUED,
+          },
+        });
+        createdIds.push(job.id);
+      }
+    }
+
+    return {
+      matchedVariants: filtered.length,
+      wouldCreateJobs: wouldCreate,
+      skippedBecauseActiveJobExists: skippedExisting,
+      estimatedProviderCalls: wouldCreate * 5,
+      createdJobIds: createdIds,
+    };
   }
 
   /**
@@ -205,10 +287,13 @@ export class ResearchService {
         job.languageCode
       );
 
-      // 6. DB transaction insertion for structured outputs in PENDING state
+      // 6. DB transaction insertion with Automated Evidence Rules
       await this.prisma.$transaction(async (tx) => {
         // Create CommonProblems
         for (const prob of aiAnalysis.problems as any[]) {
+          // Run Automated Evidence Rules on problem
+          const decision = this.evidenceRules.evaluateCommonProblem(prob, rawSources);
+
           const newProb = await tx.commonProblem.create({
             data: {
               variantId: job.vehicleVariantId,
@@ -220,11 +305,12 @@ export class ResearchService {
               riskLevel: prob.riskLevel,
               symptoms: prob.symptoms,
               checkRecommendation: prob.checkRecommendation,
-              problemType: prob.problemType,
-              dataConfidence: 'MEDIUM',
+              problemType: decision.problemType,
+              dataConfidence: decision.dataConfidence,
               sourceKind: SourceKind.UNKNOWN,
-              sourceCount: 1,
-              status: ApprovalStatus.PENDING,
+              sourceCount: rawSources.length,
+              status: decision.status,
+              metadata: decision.metadata,
             },
           });
 
@@ -245,6 +331,9 @@ export class ResearchService {
 
         // Create Recalls
         for (const rec of aiAnalysis.recalls as any[]) {
+          // Run Automated Evidence Rules on recall
+          const decision = this.evidenceRules.evaluateRecall(rec, rawSources);
+
           await tx.recall.create({
             data: {
               variantId: job.vehicleVariantId,
@@ -253,7 +342,7 @@ export class ResearchService {
               countryId: job.variant.countryId,
               date: new Date(),
               riskLevel: 'HIGH',
-              status: ApprovalStatus.PENDING,
+              status: decision.status,
               vinCheckRequired: rec.vinCheckRequired,
               officialCheckUrl: rec.officialCheckUrl,
               recallDate: rec.recallDate ? new Date(rec.recallDate) : new Date(),
@@ -268,12 +357,13 @@ export class ResearchService {
               affectedEngine: rec.affectedEngine || engineCode,
               affectedTransmission: rec.affectedTransmission || transName,
               countryCode: job.countryCode,
-              dataConfidence: 'HIGH',
+              dataConfidence: decision.dataConfidence,
+              metadata: decision.metadata,
             },
           });
         }
 
-        // Create Seller Questions
+        // Create Seller Questions (Auto-publish as APPROVED)
         for (const q of aiAnalysis.sellerQuestions as any[]) {
           await tx.sellerQuestion.create({
             data: {
@@ -283,12 +373,13 @@ export class ResearchService {
               category: q.category,
               riskLevel: q.riskLevel,
               priority: q.priority,
-              status: ApprovalStatus.PENDING,
+              status: ApprovalStatus.APPROVED,
+              metadata: { publishedBy: 'AUTO_RULES' },
             },
           });
         }
 
-        // Create Inspection Checklist Items
+        // Create Inspection Checklist Items (Auto-publish as APPROVED)
         for (const c of aiAnalysis.checklists as any[]) {
           await tx.inspectionChecklistItem.create({
             data: {
@@ -299,12 +390,13 @@ export class ResearchService {
               riskLevel: c.riskLevel,
               priority: c.priority,
               sortOrder: c.sortOrder,
-              status: ApprovalStatus.PENDING,
+              status: ApprovalStatus.APPROVED,
+              metadata: { publishedBy: 'AUTO_RULES' },
             },
           });
         }
 
-        // Update all related RawSources of this job to PENDING (analyzed, ready for admin review)
+        // Update all related RawSources of this job to PENDING
         await tx.rawSource.updateMany({
           where: { id: { in: rawSources.map((rs) => rs.id) } },
           data: { status: ApprovalStatus.PENDING },
