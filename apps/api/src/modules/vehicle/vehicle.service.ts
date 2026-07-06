@@ -81,11 +81,60 @@ export class VehicleService {
       throw new NotFoundException('Araç varyantı bulunamadı.');
     }
 
-    // Auto-generate details on demand if missing (dynamic shell catalog support)
-    if (!variant.specs || variant.problems.length === 0) {
+    // Check if we have completed a real AI research job for this variant
+    const completedJob = await this.prisma.vehicleResearchJob.findFirst({
+      where: {
+        vehicleVariantId: variantId,
+        status: 'COMPLETED',
+      },
+    });
+
+    if (!completedJob) {
+      // 1. Clean up old/mock data if any
+      await this.prisma.commonProblem.deleteMany({ where: { variantId } });
+      await this.prisma.recall.deleteMany({ where: { variantId } });
+      await this.prisma.sellerQuestion.deleteMany({ where: { variantId } });
+      await this.prisma.inspectionChecklistItem.deleteMany({ where: { variantId } });
+
+      // 2. Ensure TechnicalSpec is populated
       await this.populateVariantDetails(variant.id);
 
-      // Re-fetch fully populated variant
+      // 3. Check if a job is already queued or running
+      const activeJob = await this.prisma.vehicleResearchJob.findFirst({
+        where: {
+          vehicleVariantId: variantId,
+          status: { in: ['QUEUED', 'RUNNING'] },
+        },
+      });
+
+      if (!activeJob) {
+        // Enqueue the research job
+        await this.prisma.vehicleResearchJob.create({
+          data: {
+            vehicleVariantId: variantId,
+            languageCode: 'tr',
+            countryCode: 'TR',
+            researchScope: 'FULL_REPORT',
+            priority: 'MEDIUM',
+            status: 'QUEUED',
+          },
+        });
+
+        // Trigger the process-next endpoint asynchronously in the background
+        const adminSecret = process.env.ADMIN_SECRET || 'torque-scout-super-secret-admin-key';
+        const baseUrl = process.env.MOBILE_API_URL || 'http://localhost:3000';
+        
+        global.fetch(`${baseUrl}/research/process-next`, {
+          method: 'POST',
+          headers: {
+            'x-admin-secret': adminSecret,
+          },
+        }).catch((err: any) => {
+          console.error(`Failed to trigger background research worker: ${err.message}`);
+        });
+      }
+
+      // Re-fetch fully populated variant with fresh specs/problems (which will be empty initially)
       const freshVariant = await this.prisma.vehicleVariant.findFirst({
         where: { id: variantId, status: ApprovalStatus.APPROVED },
         include: {
@@ -119,12 +168,7 @@ export class VehicleService {
         },
       });
 
-      if (!freshVariant) {
-        throw new NotFoundException('Araç varyantı bulunamadı.');
-      }
-
-      // Assign the fresh variant to continue
-      return this.formatVariantDetail(freshVariant, userId);
+      return this.formatVariantDetail(freshVariant || variant, userId);
     }
 
     return this.formatVariantDetail(variant, userId);
@@ -385,29 +429,18 @@ export class VehicleService {
         transmission: true,
         trim: true,
         specs: true,
-        problems: true
       }
     });
 
     if (!variant) return;
 
-    // Check if it already has specs or problems
-    if (variant.specs || variant.problems.length > 0) {
+    // Check if it already has specs
+    if (variant.specs) {
       return;
     }
 
-    const adminUser = await this.prisma.user.findFirst({ where: { role: Role.ADMIN } });
-    if (!adminUser) {
-      throw new BadRequestException('Sistem yöneticisi bulunamadı.');
-    }
-
-    const demoUser = await this.prisma.user.findFirst({ where: { role: Role.USER } }) || adminUser;
-
-    const brandName = variant.brand.name;
     const engineCode = variant.engine.code;
     const fuelType = variant.engine.fuelType;
-    const transType = variant.transmission.type;
-    const transName = variant.transmission.name;
 
     const engineMatch = engineCode.match(/\b(\d\.\d)\b/);
     const engineSize = engineMatch ? engineMatch[0] : '1.6';
@@ -430,96 +463,5 @@ export class VehicleService {
         }
       }
     });
-
-    // Generate Problems
-    const problems: { title: string; desc: string; symp: string; check: string; risk: RiskLevel }[] = [];
-    
-    if (transType === TransmissionType.DCT) {
-      problems.push({
-        title: `${transName} Mekatronik ve Çift Kavrama Aşınması`,
-        desc: `Çift kavramalı ${transName} şanzımanlarda dur-kalk trafikte ısınma, basınç tüpü gevşemesi ve kavrama setinde aşınma kroniktir.`,
-        symp: 'Kalkışta titreme, vites geçişlerinde vuruntu, vites geçişlerinde kararsızlık.',
-        check: 'Test sürüşünde dik rampada yarım debriyaj kalkış testi yapılmalı ve titreme kontrol edilmelidir.',
-        risk: RiskLevel.HIGH
-      });
-    } else if (transType === TransmissionType.CVT) {
-      problems.push({
-        title: 'CVT Şanzıman Kayış Kaçırması ve Uğultu',
-        desc: 'Sürekli değişken oranlı CVT şanzımanlarda yüksek kilometrede kayış aşınması ve kasnak uğultusu kronikleşebilir.',
-        symp: 'Hızlanırken motor devrinin artmasına rağmen hızlanmanın yavaş kalması, yüksek hızlarda uğultulu ses.',
-        check: 'Düz yolda ani tam gaz verilerek devir saatinin dalgalanıp dalgalanmadığı izlenmelidir.',
-        risk: RiskLevel.MEDIUM
-      });
-    }
-
-    if (fuelType === FuelType.DIESEL) {
-      problems.push({
-        title: 'Dizel Partikül Filtresi (DPF) Tıkanması',
-        desc: 'Şehir içi kısa mesafe ve düşük devirli kullanımlarda DPF dolması ve egzoz tıkanması sık görülür.',
-        symp: 'Motor arıza lambası, egzozdan siyah duman, yakıt tüketiminde artış.',
-        check: 'Göstergede DPF lambası yanıp sönmediği kontrol edilmeli, rölantide duman takibi yapılmalıdır.',
-        risk: RiskLevel.MEDIUM
-      });
-    }
-
-    if (brandName.toLowerCase() === 'bmw') {
-      problems.push({
-        title: 'Vanos Valfi ve Yağ Kaçakları',
-        desc: 'BMW motorlarında supap zamanlama vanos valfleri ve karter conta bölgesinde yağ kaçakları yaygındır.',
-        symp: 'Motor altında yağ damlamaları, rölanti düzensizliği, motor gücünde kayıp.',
-        check: 'Lifte kaldırıldığında karter ve motor üst kapak contası altı kontrol edilmelidir.',
-        risk: RiskLevel.MEDIUM
-      });
-    } else if (brandName.toLowerCase() === 'audi' && fuelType === FuelType.PETROL) {
-      problems.push({
-        title: 'TFSI Piston Segman Yağ Yakması',
-        desc: 'Audi benzinli TFSI motorlarında piston segman yapısı nedeniyle yüksek miktarda motor yağı eksiltme görülebilir.',
-        symp: 'Egzozdan mavi duman gelmesi, yağ çubuğundaki hızlı düşüş.',
-        check: 'Ekzoz çıkışındaki kurum birikimi ve yağ çubuğu kontrol edilmelidir.',
-        risk: RiskLevel.HIGH
-      });
-    } else if (brandName.toLowerCase() === 'opel') {
-      problems.push({
-        title: 'Ateşleme Bobini ve Piston Kırma Riski',
-        desc: 'Özellikle Opel turbo benzinli motorlarda kalitesiz yakıt kullanımı sonucu ateşleme bobini arızası ve segman/piston hasarı oluşabilir.',
-        symp: 'Yüksek devirde tekleme, sarsıntılı çalışma, motor arıza lambasının yanması.',
-        check: 'Ani hızlanmalarda motorda tekleme veya kesiklik olup olmadığı test sürüşünde izlenmelidir.',
-        risk: RiskLevel.HIGH
-      });
-
-
-
-
-
-
-
-    }
-
-    if (problems.length === 0) {
-      problems.push({
-        title: 'Trim Sesleri ve Plastik Aşınması',
-        desc: 'İç mekandaki plastik aksamların zamanla gevşemesi sonucu trim sesleri ve konsol tıkırtıları oluşabilir.',
-        symp: 'Bozuk yollarda kokpitten gelen tıkırtılar.',
-        check: 'Test sürüşünde iç mekan sesleri dinlenmelidir.',
-        risk: RiskLevel.LOW
-      });
-    }
-
-    for (const prob of problems) {
-      await this.prisma.commonProblem.create({
-        data: {
-          variantId: variant.id,
-          title: prob.title,
-          description: prob.desc,
-          riskLevel: prob.risk,
-          symptoms: prob.symp,
-          checkRecommendation: prob.check,
-          status: ApprovalStatus.APPROVED,
-          createdById: adminUser.id,
-          approvedById: adminUser.id,
-          approvedAt: new Date()
-        }
-      });
-    }
   }
 }

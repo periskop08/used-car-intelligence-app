@@ -73,9 +73,10 @@ export class EvidenceRulesService {
 
       // Check Transmission Match
       if (prob.affectedTransmission && prob.affectedTransmission !== 'Tümü' && prob.affectedTransmission !== 'ALL') {
-        const transStr = prob.affectedTransmission.toLowerCase();
-        const variantTrans = variant.transmission?.name?.toLowerCase() || '';
-        if (transStr.includes(variantTrans) || variantTrans.includes(transStr)) {
+        const transTokens = prob.affectedTransmission.toLowerCase().split(/[^a-z0-9]+/);
+        const variantTransTokens = (variant.transmission?.name?.toLowerCase() || '').split(/[^a-z0-9]+/);
+        const hasIntersection = transTokens.some(t => t && variantTransTokens.includes(t));
+        if (hasIntersection) {
           matchedFields.push('transmission');
         } else {
           mismatchFields.push('transmission');
