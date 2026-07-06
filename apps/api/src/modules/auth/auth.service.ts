@@ -19,11 +19,14 @@ export class AuthService {
       throw new ConflictException('Email address already registered');
     }
 
+    const adminEmails = ['m.efeeguven@gmail.com', 'burhanseckin08@gmail.com'];
+    const assignedRole = adminEmails.includes(dto.email) ? Role.ADMIN : (dto.role || Role.USER);
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash: dto.password, // simple password storage for MVP
-        role: dto.role || Role.USER,
+        role: assignedRole,
         subscriptionTier: dto.subscriptionTier || SubscriptionTier.FREE,
         preferredLanguageCode: 'tr',
       },
@@ -64,6 +67,15 @@ export class AuthService {
     });
     if (!user || user.passwordHash !== dto.password) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const adminEmails = ['m.efeeguven@gmail.com', 'burhanseckin08@gmail.com'];
+    if (adminEmails.includes(user.email) && user.role !== Role.ADMIN) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { role: Role.ADMIN },
+      });
+      user.role = Role.ADMIN;
     }
 
     const payload = { id: user.id, email: user.email, role: user.role };

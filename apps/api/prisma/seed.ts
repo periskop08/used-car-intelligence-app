@@ -611,6 +611,29 @@ async function main() {
     }
   });
 
+  // Seed user admin promotes
+  await prisma.user.create({
+    data: {
+      email: 'm.efeeguven@gmail.com',
+      passwordHash: 'password123',
+      role: Role.ADMIN,
+      subscriptionTier: SubscriptionTier.PREMIUM,
+      preferredLanguageCode: 'tr',
+      preferredCountryId: countryTr.id
+    }
+  });
+
+  await prisma.user.create({
+    data: {
+      email: 'burhanseckin08@gmail.com',
+      passwordHash: 'password123',
+      role: Role.ADMIN,
+      subscriptionTier: SubscriptionTier.PREMIUM,
+      preferredLanguageCode: 'tr',
+      preferredCountryId: countryTr.id
+    }
+  });
+
   // Keep Golf Mk7 and Corolla in the seed explicitly as well, along with the loop vehicles
   const vwBrand = await prisma.brand.create({ data: { name: 'Volkswagen' } });
   const golfModel = await prisma.model.create({ data: { brandId: vwBrand.id, name: 'Golf', startYear: 1974 } });
