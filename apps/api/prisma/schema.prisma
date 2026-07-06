@@ -195,6 +195,7 @@ model User {
   subscriptions      Subscription[]
   reviews            UserReview[]
   favorites          FavoriteVehicle[]
+  favoriteListings   FavoriteListing[]
   comparisons        VehicleComparison[]
   chatLogs           AiChatLog[]
   auditLogs          AuditLog[]
@@ -969,6 +970,7 @@ model VehicleListing {
   media              ListingMedia[]
   leads              ListingLead[]
   views              ListingView[]
+  favorites          FavoriteListing[]
   
   @@index([vehicleVariantId])
   @@index([sellerId])
@@ -1040,4 +1042,17 @@ model ListingView {
   
   @@index([listingId])
   @@index([userId])
+}
+
+model FavoriteListing {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   VehicleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
 }

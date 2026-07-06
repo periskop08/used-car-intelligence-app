@@ -526,4 +526,58 @@ CRITICAL SAFETY RULES:
       },
     });
   }
+
+  async toggleFavorite(userId: string, listingId: string): Promise<{ isFavorited: boolean }> {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+    });
+    if (!listing) throw new NotFoundException('İlan bulunamadı.');
+
+    const existing = await this.prisma.favoriteListing.findUnique({
+      where: {
+        userId_listingId: {
+          userId,
+          listingId,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.favoriteListing.delete({
+        where: { id: existing.id },
+      });
+      return { isFavorited: false };
+    } else {
+      await this.prisma.favoriteListing.create({
+        data: {
+          userId,
+          listingId,
+        },
+      });
+      return { isFavorited: true };
+    }
+  }
+
+  async getFavorites(userId: string): Promise<any[]> {
+    const favorites = await this.prisma.favoriteListing.findMany({
+      where: { userId },
+      include: {
+        listing: {
+          include: {
+            vehicleVariant: {
+              include: {
+                brand: true,
+                model: true,
+              },
+            },
+            media: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    return favorites.map((f) => f.listing);
+  }
 }

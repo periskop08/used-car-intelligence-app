@@ -311,13 +311,19 @@ export default function SellerDashboard() {
                       </div>
                     </div>
 
-                    {/* Actions Column */}
+                     {/* Actions Column */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => router.push(`/listings/${listing.id}`)}
                         className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
                       >
                         İlanı Gör
+                      </button>
+                      <button
+                        onClick={() => router.push(`/listings/${listing.id}/edit`)}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600/10 border border-orange-500/20 text-orange-400 hover:bg-orange-600/20 transition"
+                      >
+                        Düzenle
                       </button>
                       {listing.status === "DRAFT" && (
                         <button

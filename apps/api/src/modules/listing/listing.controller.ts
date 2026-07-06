@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ListingService } from './listing.service';
-import { JwtAuthGuard } from '../auth/jwt.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 import {
   CreateListingDto,
@@ -40,8 +40,10 @@ export class ListingController {
   // ==========================================
 
   @Get('listings')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'ACTIVE durumundaki ilanları filtrele ve listele' })
   async getPublicListings(
+    @GetUser() user?: UserPayload,
     @Query('brandId') brandId?: string,
     @Query('modelId') modelId?: string,
     @Query('vehicleVariantId') vehicleVariantId?: string,
@@ -249,8 +251,25 @@ export class ListingController {
       this.listingService['prisma'].vehicleListing.count({ where: filters }),
     ]);
 
+    let favoritedIds = new Set<string>();
+    if (user?.id) {
+      const userFavs = await this.listingService['prisma'].favoriteListing.findMany({
+        where: {
+          userId: user.id,
+          listingId: { in: items.map((item) => item.id) },
+        },
+        select: { listingId: true },
+      });
+      favoritedIds = new Set(userFavs.map((f) => f.listingId));
+    }
+
+    const mappedItems = items.map((item) => ({
+      ...item,
+      isFavorited: favoritedIds.has(item.id),
+    }));
+
     return {
-      items,
+      items: mappedItems,
       total,
       page: pageNum,
       limit: limitNum,
@@ -259,8 +278,9 @@ export class ListingController {
   }
 
   @Get('listings/:id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Tek bir ilanı detaylarıyla çek' })
-  async getListingDetail(@Param('id') id: string) {
+  async getListingDetail(@Param('id') id: string, @GetUser() user?: UserPayload) {
     const listing = await this.listingService['prisma'].vehicleListing.findUnique({
       where: { id },
       include: {
@@ -286,7 +306,23 @@ export class ListingController {
       throw new NotFoundException('İlan bulunamadı.');
     }
 
-    return listing;
+    let isFavorited = false;
+    if (user?.id) {
+      const fav = await this.listingService['prisma'].favoriteListing.findUnique({
+        where: {
+          userId_listingId: {
+            userId: user.id,
+            listingId: id,
+          },
+        },
+      });
+      isFavorited = !!fav;
+    }
+
+    return {
+      ...listing,
+      isFavorited,
+    };
   }
 
   @Get('vehicle-reports/:variantId/related-listings')
@@ -567,5 +603,24 @@ export class ListingController {
     @Body() dto: ReplyToLeadDto,
   ) {
     return this.listingService.replyToLead(id, leadId, user.id, dto.replyMessage);
+  }
+
+  @Post('listings/:id/favorite')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'İlanı favorilere ekle / kaldır' })
+  async toggleFavorite(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.listingService.toggleFavorite(user.id, id);
+  }
+
+  @Get('me/favorites')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Kullanıcının favori ilanlarını listele' })
+  async getMyFavorites(@GetUser() user: UserPayload) {
+    return this.listingService.getFavorites(user.id);
   }
 }

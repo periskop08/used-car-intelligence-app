@@ -58,8 +58,13 @@ function ListingsContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  const [token, setToken] = useState("");
+
   // Fetch Brands on mount
   useEffect(() => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (savedToken) setToken(savedToken);
+
     fetch(`${API_URL}/vehicles/brands`)
       .then((res) => res.json())
       .then((data) => setBrands(Array.isArray(data) ? data : []))
@@ -129,7 +134,10 @@ function ListingsContent() {
     if (keyword) query += `&keyword=${encodeURIComponent(keyword)}`;
     if (includeDescription) query += `&includeDescription=true`;
 
-    fetch(`${API_URL}/listings${query}`)
+    const headers: any = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    fetch(`${API_URL}/listings${query}`, { headers })
       .then((res) => res.json())
       .then((data) => {
         setListings(Array.isArray(data.items) ? data.items : []);
@@ -145,7 +153,36 @@ function ListingsContent() {
 
   useEffect(() => {
     fetchListings();
-  }, [page, sort, selectedBrand, selectedModel, isAiReady]);
+  }, [page, sort, selectedBrand, selectedModel, isAiReady, token]);
+
+  const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!token) {
+      router.push(`/login?redirect=/listings`);
+      return;
+    }
+
+    fetch(`${API_URL}/listings/${listingId}/favorite`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("İşlem başarısız.");
+        return res.json();
+      })
+      .then((data) => {
+        setListings((prev) =>
+          prev.map((item) =>
+            item.id === listingId ? { ...item, isFavorited: data.isFavorited } : item
+          )
+        );
+      })
+      .catch((err) => console.error("Error toggling favorite:", err));
+  };
 
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -731,6 +768,19 @@ function ListingsContent() {
                     className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300"
                   >
                     <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden">
+                      {/* Favorite Button */}
+                      <button
+                        onClick={(e) => handleToggleFavorite(e, listing.id)}
+                        className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm ${
+                          listing.isFavorited
+                            ? "bg-red-500/20 text-red-500 border-red-500/40"
+                            : "bg-slate-950/80 text-slate-450 border-white/10 hover:text-white"
+                        }`}
+                        title={listing.isFavorited ? "Favorilerden Kaldır" : "Favoriye Ekle"}
+                      >
+                        {listing.isFavorited ? "❤️" : "🤍"}
+                      </button>
+
                       <img
                         src={cover}
                         alt={listing.title}

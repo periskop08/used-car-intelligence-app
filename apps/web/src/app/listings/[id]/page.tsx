@@ -27,10 +27,18 @@ export default function ListingDetail() {
   // Tab State for AI Analysis Box
   const [activeAiTab, setActiveAiTab] = useState<"problems" | "recalls" | "questions" | "checklist">("problems");
 
+  const [token, setToken] = useState("");
+
   useEffect(() => {
     if (!id) return;
 
-    fetch(`${API_URL}/listings/${id}`)
+    const savedToken = localStorage.getItem("accessToken");
+    if (savedToken) setToken(savedToken);
+
+    const headers: any = {};
+    if (savedToken) headers["Authorization"] = `Bearer ${savedToken}`;
+
+    fetch(`${API_URL}/listings/${id}`, { headers })
       .then((res) => {
         if (!res.ok) throw new Error("İlan yüklenemedi.");
         return res.json();
@@ -87,6 +95,28 @@ export default function ListingDetail() {
       });
   };
 
+  const handleToggleFavorite = () => {
+    if (!token) {
+      window.location.href = `/login?redirect=/listings/${id}`;
+      return;
+    }
+
+    fetch(`${API_URL}/listings/${id}/favorite`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("İşlem başarısız.");
+        return res.json();
+      })
+      .then((data) => {
+        setListing((prev: any) => ({ ...prev, isFavorited: data.isFavorited }));
+      })
+      .catch((err) => console.error("Error toggling favorite:", err));
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -138,6 +168,19 @@ export default function ListingDetail() {
           {/* Photo Gallery Grid */}
           <div className="flex flex-col gap-3">
             <div className="relative aspect-[16/9] w-full rounded-3xl overflow-hidden bg-slate-950 border border-white/5 shadow-xl">
+              {/* Favorite Toggle Button */}
+              <button
+                onClick={handleToggleFavorite}
+                className={`absolute top-4 right-4 z-10 w-10 h-10 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
+                  listing.isFavorited
+                    ? "bg-red-500/20 text-red-500 border-red-500/40"
+                    : "bg-slate-950/80 text-slate-400 border-white/10 hover:text-white"
+                }`}
+                title={listing.isFavorited ? "Favorilerden Kaldır" : "Favoriye Ekle"}
+              >
+                {listing.isFavorited ? "❤️" : "🤍"}
+              </button>
+
               <img
                 src={activePhoto || defaultImage}
                 alt={listing.title}
