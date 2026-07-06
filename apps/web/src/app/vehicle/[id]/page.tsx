@@ -376,6 +376,94 @@ export default function VehicleDetail() {
         {/* Specs, Problems & Reviews Column */}
         <div className="lg:col-span-2 flex flex-col gap-8">
           
+          {/* AI Report Card (Google AI Overview Style) */}
+          <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-6 rounded-3xl flex flex-col gap-5 shadow-orange-500/5 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
+            
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✨</span>
+                <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">Yapay Zeka Genel Değerlendirmesi</h2>
+              </div>
+              <span className="text-[9px] bg-orange-600/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
+                Google AI Overview Modu
+              </span>
+            </div>
+
+            {reportError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold">
+                ⚠️ {reportError}
+              </div>
+            )}
+
+            {!aiReport ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
+                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve tüm kronik durumları taranmış yapay zeka analiz raporunu derleyin.
+                </p>
+                <button
+                  onClick={() => handleGenerateReport(false)}
+                  disabled={generatingReport}
+                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition text-center text-sm"
+                >
+                  {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {/* Score indicators */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
+                    <span className="text-[10px] text-emerald-500 font-bold block mb-0.5">ALINABİLİRLİK</span>
+                    <span className="text-2xl font-black text-emerald-400">
+                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.buyabilityScore}`}
+                    </span>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-center">
+                    <span className="text-[10px] text-red-500 font-bold block mb-0.5">RİSK KATSAYISI</span>
+                    <span className="text-2xl font-black text-red-400">
+                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.riskScore}`}
+                    </span>
+                  </div>
+                  <div className="bg-slate-900/60 border border-white/5 p-4 rounded-2xl text-center flex flex-col justify-center h-full">
+                    <span className="text-[10px] text-slate-400 font-bold block mb-0.5">FİNAL KARAR</span>
+                    <span className={`text-xs font-black px-2 py-1 rounded font-mono ${
+                      aiReport.finalDecision === 'BUY' ? 'bg-emerald-500/25 text-emerald-400' : aiReport.finalDecision === 'BUY_CAREFULLY' ? 'bg-blue-500/25 text-blue-400' : 'bg-red-500/25 text-red-400'
+                    }`}>{aiReport.finalDecision}</span>
+                  </div>
+                </div>
+
+                {/* Structured Markdown comments */}
+                <div className="flex flex-col gap-4 text-xs text-slate-300">
+                  <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 flex flex-col gap-3">
+                    {renderMarkdown(aiReport.summary.summary)}
+                  </div>
+                  
+                  {aiReport.summary.shouldBuyComment && (
+                    <div className="bg-orange-500/[0.03] border border-orange-500/10 p-4 rounded-2xl flex items-start gap-3">
+                      <span className="text-lg">💡</span>
+                      <div className="flex-1">
+                        <span className="font-bold text-orange-400 block mb-1">Satın Alma Tavsiyesi ve Karar Gerekçesi:</span>
+                        {renderMarkdown(aiReport.summary.shouldBuyComment)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Regenerate Action */}
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={() => handleGenerateReport(true)}
+                    disabled={generatingReport}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl transition text-center text-xs"
+                  >
+                    {generatingReport ? "Yenileniyor..." : "Analizi Güncelle"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Tech Specs */}
           <div className="glass p-6 rounded-2xl flex flex-col gap-4">
             <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">📋 Teknik Özellikler</h2>
@@ -665,82 +753,6 @@ export default function VehicleDetail() {
 
         {/* AI Report & Custom AI Chat Column */}
         <div className="flex flex-col gap-6">
-          
-          {/* AI Report Card */}
-          <div className="glass p-6 rounded-3xl flex flex-col gap-6 shadow-2xl">
-            <h2 className="text-lg font-black text-slate-200">🤖 AI Karar Desteği</h2>
-
-            {reportError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold">
-                ⚠️ {reportError}
-              </div>
-            )}
-
-            {!aiReport ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
-                <p className="text-xs text-slate-400">
-                  Bu araç hakkında karar odaklı AI analiz raporu oluşturun. Alınabilirlik yüzdesini ve risk katsayısını öğrenin.
-                </p>
-                <button
-                  onClick={() => handleGenerateReport(false)}
-                  disabled={generatingReport}
-                  className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition text-center text-sm"
-                >
-                  {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {/* Scores */}
-                <div className="grid grid-cols-2 gap-3 text-center">
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
-                    <span className="text-[10px] text-emerald-500 font-bold block">ALINABİLİRLİK</span>
-                    <span className="text-3xl font-black text-emerald-400">
-                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.buyabilityScore}`}
-                    </span>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
-                    <span className="text-[10px] text-red-500 font-bold block">RİSK KATSAYISI</span>
-                    <span className="text-3xl font-black text-red-400">
-                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.riskScore}`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Decision Badge */}
-                <div className="bg-slate-900/60 p-4 rounded-xl flex items-center justify-between border border-white/5">
-                  <span className="text-xs text-slate-400 font-bold">FİNAL KARAR:</span>
-                  <span className={`text-xs font-black px-2 py-1 rounded font-mono ${
-                    aiReport.finalDecision === 'BUY' ? 'bg-emerald-500/25 text-emerald-400' : aiReport.finalDecision === 'BUY_CAREFULLY' ? 'bg-blue-500/25 text-blue-400' : 'bg-red-500/25 text-red-400'
-                  }`}>{aiReport.finalDecision}</span>
-                </div>
-
-                {/* AI Text Summary */}
-                <div className="flex flex-col gap-3 mt-2">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">Yapay Zeka Yorumu</h3>
-                  <div className="bg-slate-900/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
-                    {renderMarkdown(aiReport.summary.summary)}
-                  </div>
-                  <div className="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-xl border border-orange-500/10 flex items-start gap-2">
-                    <span className="text-sm select-none">💡</span>
-                    <div className="flex-1">
-                      <span className="font-bold text-slate-300 block mb-1">Tavsiye:</span>
-                      {renderMarkdown(aiReport.summary.shouldBuyComment)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Regenerate Action */}
-                <button
-                  onClick={() => handleGenerateReport(true)}
-                  disabled={generatingReport}
-                  className="w-full bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 rounded-xl transition text-center text-xs mt-4"
-                >
-                  {generatingReport ? "Yenileniyor..." : "Raporu Yenile"}
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* AI Chat Box (Custom Question Box) */}
           <div className="glass p-6 rounded-3xl flex flex-col gap-4 shadow-2xl border border-white/5 bg-slate-900/40">

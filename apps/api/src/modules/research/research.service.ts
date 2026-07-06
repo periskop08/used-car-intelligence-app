@@ -343,6 +343,8 @@ export class ResearchService {
           // Run Automated Evidence Rules on problem passing target variant specs
           const decision = this.evidenceRules.evaluateCommonProblem(prob, rawSources, job.variant);
 
+          const autoApprove = process.env.AUTO_APPROVE_RESEARCH === 'true' || process.env.NODE_ENV !== 'production';
+
           const newProb = await tx.commonProblem.create({
             data: {
               variantId: job.vehicleVariantId,
@@ -358,7 +360,7 @@ export class ResearchService {
               dataConfidence: decision.dataConfidence,
               sourceKind: SourceKind.UNKNOWN,
               sourceCount: rawSources.length,
-              status: decision.status,
+              status: autoApprove ? ApprovalStatus.APPROVED : decision.status,
               metadata: decision.metadata,
             },
           });
@@ -382,6 +384,7 @@ export class ResearchService {
         for (const rec of aiAnalysis.recalls as any[]) {
           // Run Automated Evidence Rules on recall
           const decision = this.evidenceRules.evaluateRecall(rec, rawSources);
+          const autoApprove = process.env.AUTO_APPROVE_RESEARCH === 'true' || process.env.NODE_ENV !== 'production';
 
           await tx.recall.create({
             data: {
@@ -391,7 +394,7 @@ export class ResearchService {
               countryId: job.variant.countryId,
               date: new Date(),
               riskLevel: 'HIGH',
-              status: decision.status,
+              status: autoApprove ? ApprovalStatus.APPROVED : decision.status,
               vinCheckRequired: rec.vinCheckRequired,
               officialCheckUrl: rec.officialCheckUrl,
               recallDate: rec.recallDate ? new Date(rec.recallDate) : new Date(),

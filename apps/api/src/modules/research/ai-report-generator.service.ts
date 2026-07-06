@@ -197,8 +197,8 @@ Output JSON format only:
 {
   "summary": {
     "title": "Short descriptive title",
-    "summary": "Detailed overview summary of the vehicle reliability, explaining exactly why the risk and buyability scores were set to their respective values",
-    "shouldBuyComment": "A clear, actionable purchase advice recommendation comment explaining the final decision"
+    "summary": "Detailed overview summary in Turkish Markdown. You MUST structure it EXACTLY under three H3 headers: '### ⚙️ Motor ve Şanzıman Kombinasyonu', '### 👍 Avantajları', and '### ⚠️ Dikkat Edilmesi Gerekenler ve Kronik Durumlar'. Under each header, provide highly technical, specific, bulleted details. Even if the list of approved chronic problems provided is brief or empty, you MUST use your extensive internal automotive knowledge about this specific vehicle variant to populate these sections with rich, precise details (e.g. details about the engine code like N20B20, transmission models like ZF 8HP, timing chain chain stretch, oil pump failures, etc.). Highlight key facts in **bold**.",
+    "shouldBuyComment": "A clear, actionable purchase advice recommendation comment in Turkish explaining the final decision in Markdown"
   },
   "riskScore": 0-100 score,
   "buyabilityScore": 0-100 score,

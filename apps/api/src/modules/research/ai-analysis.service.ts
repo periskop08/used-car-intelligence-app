@@ -98,6 +98,7 @@ export class AiAnalysisService {
 
 CRITICAL RULES FOR EXTRACTION:
 - Synthesize the information from the sources with your own extensive internal automotive knowledge about this specific vehicle variant. Supplement any missing recalls, checklists, or questions from your own knowledge base to provide a comprehensive, detailed report, while keeping the caution phrasing for community forum sources.
+- The chronic problem "title" MUST be highly specific and technically precise to the actual failed component or condition (e.g., "Triger Zinciri (Timing Chain) Gevşemesi" or "Yağ Soğutucusu Sızıntısı", NOT generic titles like "Motor Problemleri" or "Elektrik Sorunları").
 - For issues originating from community forums or blogs, use non-definitive, cautious phrasing.
   - In Turkish: "bazı kullanıcılar ... bildirdi", "belirtildi", "görülebildiği ifade edildi" (never "kesindir" or "kronik hatadır" unless backed by official sources).
   - In English: "some users reported", "stated", "indicated" (never definitive).
