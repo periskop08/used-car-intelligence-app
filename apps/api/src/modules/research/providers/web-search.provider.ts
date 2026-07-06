@@ -9,8 +9,51 @@ export class WebSearchProvider implements SearchProvider {
 
   async search(query: string, languageCode: string, countryCode: string): Promise<SearchResult[]> {
     const isProduction = process.env.NODE_ENV === 'production';
+    const serperKey = process.env.SERPER_API_KEY;
 
-    if (!isProduction) {
+    // 1. Try Serper.dev Google Search API first if key is present
+    if (serperKey) {
+      this.logger.log(`Using Serper.dev Live Search for query: "${query}"`);
+      try {
+        const response = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': serperKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            q: query,
+            gl: countryCode.toLowerCase() === 'tr' ? 'tr' : countryCode.toLowerCase(),
+            hl: languageCode.toLowerCase() === 'tr' ? 'tr' : languageCode.toLowerCase(),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Serper API returned status ${response.status}`);
+        }
+
+        const data: any = await response.json();
+        const organic = Array.isArray(data.organic) ? data.organic : [];
+
+        return organic.slice(0, 5).map((item: any) => {
+          const itemUrl = item.link || '';
+          const sourceKind = this.determineSourceKind(itemUrl);
+
+          return {
+            url: itemUrl,
+            title: item.title || '',
+            snippet: item.snippet || '',
+            sourceKind,
+            reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
+          };
+        });
+      } catch (error: any) {
+        this.logger.error(`Error performing Serper.dev Live Search: ${error.message}. Falling back to AI Search Grounding...`);
+      }
+    }
+
+    // 2. Fallback: OpenAI Search Grounding (generates realistic search results) or Mock in dev
+    if (!isProduction && !process.env.OPENAI_API_KEY) {
       this.logger.log(`Mocking search results for query: "${query}" in development/test environment.`);
       return this.generateMockResults(query);
     }
@@ -49,21 +92,7 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
 
       return resultsArray.map((item: any) => {
         const itemUrl = item.url || '';
-        let sourceKind = SourceKind.UNKNOWN;
-
-        if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club')) {
-          sourceKind = SourceKind.FORUM;
-        } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
-          sourceKind = SourceKind.COMPLAINT_PLATFORM;
-        } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
-          sourceKind = SourceKind.OFFICIAL_RECALL;
-        } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
-          sourceKind = SourceKind.MANUFACTURER;
-        } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
-          sourceKind = SourceKind.BLOG_REVIEW;
-        } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
-          sourceKind = SourceKind.VIDEO_REVIEW;
-        }
+        const sourceKind = this.determineSourceKind(itemUrl);
 
         return {
           url: itemUrl,
@@ -73,10 +102,28 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
           reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
         };
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error performing AI Search Grounding: ${error.message}`);
       throw error;
     }
+  }
+
+  private determineSourceKind(url: string): SourceKind {
+    const itemUrl = url.toLowerCase();
+    if (itemUrl.includes('forum') || itemUrl.includes('reddit') || itemUrl.includes('club') || itemUrl.includes('donanimhaber')) {
+      return SourceKind.FORUM;
+    } else if (itemUrl.includes('complaint') || itemUrl.includes('sikayetvar') || itemUrl.includes('pissedconsumer')) {
+      return SourceKind.COMPLAINT_PLATFORM;
+    } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
+      return SourceKind.OFFICIAL_RECALL;
+    } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
+      return SourceKind.MANUFACTURER;
+    } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
+      return SourceKind.BLOG_REVIEW;
+    } else if (itemUrl.includes('youtube') || itemUrl.includes('video')) {
+      return SourceKind.VIDEO_REVIEW;
+    }
+    return SourceKind.UNKNOWN;
   }
 
   private generateMockResults(query: string): SearchResult[] {
