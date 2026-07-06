@@ -514,6 +514,15 @@ const seedVehicles: SeedVehicle[] = [
 ];
 
 async function main() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const existingUsers = await prisma.user.count();
+
+  if (isProduction || (existingUsers > 0 && process.env.FORCE_SEED !== 'true')) {
+    console.warn('⚠️ SEED ABORTED: Database already contains data or is running in a production environment.');
+    console.warn('To force seed and clean existing data, set the FORCE_SEED=true environment variable.');
+    return;
+  }
+
   console.log('Seeding database with popular Turkish market cars...');
 
   // Cleanup before seed to ensure idempotency
