@@ -17,6 +17,17 @@ export class EvidenceRulesService {
     }
   }
 
+  private normalizeTerminology(str: string): string {
+    return str
+      .toLowerCase()
+      .replace(/\bmanual\b/g, 'manuel')
+      .replace(/\bautomatic\b/g, 'otomatik')
+      .replace(/\bdiesel\b/g, 'dizel')
+      .replace(/\bpetrol\b/g, 'benzin')
+      .replace(/\bgasoline\b/g, 'benzin')
+      .trim();
+  }
+
   /**
    * Evaluate CommonProblem auto-publish rules and variant match confidences
    */
@@ -59,9 +70,12 @@ export class EvidenceRulesService {
 
       // Check Engine Match
       if (prob.affectedEngine && prob.affectedEngine !== 'Tümü' && prob.affectedEngine !== 'ALL') {
-        const engineStr = prob.affectedEngine.toLowerCase();
-        const variantEngine = variant.engine?.code?.toLowerCase() || '';
-        if (engineStr.includes(variantEngine) || variantEngine.includes(engineStr)) {
+        const engineStr = this.normalizeTerminology(prob.affectedEngine);
+        const variantEngine = this.normalizeTerminology(variant.engine?.code || '');
+        const engineTokens = engineStr.split(/[^a-z0-9]+/);
+        const variantEngineTokens = variantEngine.split(/[^a-z0-9]+/);
+        const hasIntersection = engineTokens.some(t => t && t.length >= 2 && variantEngineTokens.includes(t));
+        if (hasIntersection || engineStr.includes(variantEngine) || variantEngine.includes(engineStr)) {
           matchedFields.push('engine');
         } else {
           mismatchFields.push('engine');
@@ -73,10 +87,12 @@ export class EvidenceRulesService {
 
       // Check Transmission Match
       if (prob.affectedTransmission && prob.affectedTransmission !== 'Tümü' && prob.affectedTransmission !== 'ALL') {
-        const transTokens = prob.affectedTransmission.toLowerCase().split(/[^a-z0-9]+/);
-        const variantTransTokens = (variant.transmission?.name?.toLowerCase() || '').split(/[^a-z0-9]+/);
+        const transStr = this.normalizeTerminology(prob.affectedTransmission);
+        const variantTrans = this.normalizeTerminology(variant.transmission?.name || '');
+        const transTokens = transStr.split(/[^a-z0-9]+/);
+        const variantTransTokens = variantTrans.split(/[^a-z0-9]+/);
         const hasIntersection = transTokens.some(t => t && variantTransTokens.includes(t));
-        if (hasIntersection) {
+        if (hasIntersection || transStr.includes(variantTrans) || variantTrans.includes(transStr)) {
           matchedFields.push('transmission');
         } else {
           mismatchFields.push('transmission');
