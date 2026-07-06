@@ -435,13 +435,13 @@ export default function ListingDetail() {
                     <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
                       {Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.map((p: string) => (
                         <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-orange-400">Lokal Boya</span>
                         </li>
                       ))}
                       {Array.isArray(listing.paintedParts) && listing.paintedParts.map((p: string) => (
                         <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-blue-400">Boyalı</span>
                         </li>
                       ))}
@@ -456,7 +456,7 @@ export default function ListingDetail() {
                     <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
                       {Array.isArray(listing.changedParts) && listing.changedParts.map((p: string) => (
                         <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-red-400">Değişen</span>
                         </li>
                       ))}

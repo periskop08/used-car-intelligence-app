@@ -755,13 +755,13 @@ export default function EditListing() {
                     <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
                       {localPaintedParts.map(p => (
                         <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-orange-400">Lokal Boya</span>
                         </li>
                       ))}
                       {paintedParts.map(p => (
                         <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-blue-400">Boyalı</span>
                         </li>
                       ))}
@@ -776,7 +776,7 @@ export default function EditListing() {
                     <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
                       {changedParts.map(p => (
                         <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
-                          <span>{p.replace(/_/g, " ")}</span>
+                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-red-400">Değişen</span>
                         </li>
                       ))}
