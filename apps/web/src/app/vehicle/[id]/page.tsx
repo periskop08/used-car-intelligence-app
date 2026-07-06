@@ -349,6 +349,17 @@ export default function VehicleDetail() {
             <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">⚠️ Bilinen Kronik Arızalar</h2>
             {vehicle.problems.length > 0 ? (
               <div className="flex flex-col gap-4 mt-2">
+                {/* Reassurance Banner */}
+                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
+                  <span className="text-xl">ℹ️</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-blue-400">Rapor Okuma Kılavuzu</span>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Burada listelenen kronik sorunlar, aracın geçmiş kullanıcı şikayetleri, forum tartışmaları ve servis bültenleri taranarak derlenmiştir. <strong>Bu sorunlar her araçta mutlaka görülecek anlamına gelmez ve tek başına araçtan vazgeçme sebebi olmamalıdır.</strong> Sağlıklı bir satın alma kararı için satıcıya aşağıdaki soruları sormanız ve ekspertiz muayenesinde checklist adımlarını özellikle inceletmeniz tavsiye edilir.
+                    </p>
+                  </div>
+                </div>
+
                 {vehicle.problems.map((p: any) => {
                   const isComplaint = p.problemType === 'USER_COMPLAINT';
                   return (
@@ -356,7 +367,7 @@ export default function VehicleDetail() {
                       isComplaint ? 'border-amber-500/20 bg-amber-500/[0.02]' : 'border-white/5'
                     }`}>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-slate-200 text-sm">{p.title}</span>
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
                             isComplaint ? 'bg-amber-600/20 text-amber-400' : 'bg-orange-600/20 text-orange-400'
@@ -366,6 +377,11 @@ export default function VehicleDetail() {
                           <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Güven: {p.dataConfidence}
                           </span>
+                          {p.sourceCount > 0 && (
+                            <span className="text-[9px] bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded font-bold">
+                              🔍 {p.sourceCount} Farklı Kaynaktan Analiz
+                            </span>
+                          )}
                         </div>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
                           p.riskLevel === 'HIGH' ? 'bg-red-500/20 text-red-400' : p.riskLevel === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'

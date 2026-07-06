@@ -198,6 +198,10 @@ export class VehicleService {
         riskLevel: p.riskLevel,
         symptoms: p.symptoms,
         checkRecommendation: p.checkRecommendation,
+        sourceCount: p.sourceCount,
+        problemType: p.problemType,
+        dataConfidence: p.dataConfidence,
+        metadata: p.metadata,
       })),
       recalls: variant.recalls.map((r: any) => ({
         id: r.id,
