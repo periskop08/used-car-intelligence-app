@@ -332,6 +332,12 @@ export class ResearchService {
 
       // 6. DB transaction insertion with Automated Evidence Rules
       await this.prisma.$transaction(async (tx) => {
+        // Clean up old/mock data if any to prevent duplication and clear fake reports
+        await tx.commonProblem.deleteMany({ where: { variantId: job.vehicleVariantId } });
+        await tx.recall.deleteMany({ where: { variantId: job.vehicleVariantId } });
+        await tx.sellerQuestion.deleteMany({ where: { variantId: job.vehicleVariantId } });
+        await tx.inspectionChecklistItem.deleteMany({ where: { variantId: job.vehicleVariantId } });
+
         // Create CommonProblems
         for (const prob of aiAnalysis.problems as any[]) {
           // Run Automated Evidence Rules on problem passing target variant specs
