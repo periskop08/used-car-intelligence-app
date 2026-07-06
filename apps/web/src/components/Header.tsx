@@ -41,6 +41,11 @@ export default function Header() {
         <a href="/listings" className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1.5 rounded-full hover:bg-orange-500/20 transition">
           İlanlar
         </a>
+        {user && (
+          <a href="/dashboard/listings" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
+            İlanlarım
+          </a>
+        )}
         <a href="/#packages" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Abonelik Paketleri
         </a>
