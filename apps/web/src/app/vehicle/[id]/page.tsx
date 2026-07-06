@@ -5,6 +5,22 @@ import { useParams, useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const categoryMap: Record<string, { label: string; desc: string }> = {
+  ENGINE: { label: 'Motor', desc: 'Aracın çalışmasını ve çekiş gücünü sağlayan ana motor ünitesi.' },
+  TRANSMISSION: { label: 'Şanzıman (Vites Kutusu)', desc: 'Motorun ürettiği gücü tekerleklere aktaran, vites geçişlerini sağlayan sistem.' },
+  ELECTRONICS: { label: 'Elektronik & Elektrik', desc: 'Aydınlatma, beyin (ECU), sensörler ve kablolama gibi elektriksel tüm aksamlar.' },
+  SUSPENSION: { label: 'Süspansiyon & Alt Takım', desc: 'Yol tutuşunu sağlayan amortisör, rotil ve salıncak gibi yürüyen aksam parçaları.' },
+  BRAKE: { label: 'Fren Sistemi', desc: 'Aracın güvenle yavaşlamasını ve durmasını sağlayan disk, balata ve fren hidroliği grubu.' },
+  BODY: { label: 'Kaporta & Şasi', desc: 'Aracın dış metal sacı, kapıları, tavanı ve aracın güvenliğini sağlayan taşıyıcı şasi iskeleti.' },
+  PAINT: { label: 'Boya & Kaplama', desc: 'Araçtaki boya kalınlıkları, sonradan yapılan lokal boyalar ve macun düzeltme durumları.' },
+  INTERIOR: { label: 'İç Mekan & Kabin', desc: 'Koltuklar, direksiyon, tuş takımları, klima ve ön konsol aksamı.' },
+  TIRES: { label: 'Lastikler & Jantlar', desc: 'Lastiklerin diş derinlikleri, üretim yılı (ömrü) ve jantların düzgünlüğü.' },
+  TEST_DRIVE: { label: 'Test Sürüşü Kontrolü', desc: 'Yolda sürüş yaparken vites geçişleri, sağa/sola çekme, gelen sesler ve hızlanma durumu.' },
+  MAINTENANCE: { label: 'Periyodik Bakım', desc: 'Motor yağı, filtreler ve triger kayışı gibi ağır bakımların zamanında yapılıp yapılmadığı.' },
+  DOCUMENTS: { label: 'Belgeler & Muayene', desc: 'Tramer hasar kaydı geçmişi, muayene geçerlilik süresi, ruhsat ve yedek anahtar durumu.' },
+  GENERAL: { label: 'Genel Kontroller', desc: 'Aracın genel durumuyla alakalı diğer temel fiziksel kontroller.' }
+};
+
 export default function VehicleDetail() {
   const params = useParams();
   const router = useRouter();
@@ -428,26 +444,46 @@ export default function VehicleDetail() {
                 <div>
                   <h3 className="text-sm font-bold text-slate-300 mb-2">💬 Satıcıya Sorulacak Sorular</h3>
                   <div className="flex flex-col gap-3">
-                    {vehicle.premiumFeatures.sellerQuestions.map((q: any) => (
-                      <div key={q.id} className="bg-slate-900/30 p-3 rounded-xl border border-white/5">
-                        <span className="text-xs text-orange-400 font-bold block mb-1">SORU: {q.question}</span>
-                        <span className="text-xs text-slate-400 font-semibold block mb-1">Kategori: {q.category} • Risk: {q.riskLevel}</span>
-                        <span className="text-xs text-slate-400">Gerekçe: {q.reason}</span>
-                      </div>
-                    ))}
+                    {vehicle.premiumFeatures.sellerQuestions.map((q: any) => {
+                      const catInfo = categoryMap[q.category] || { label: q.category, desc: '' };
+                      return (
+                        <div key={q.id} className="bg-slate-900/30 p-3.5 rounded-xl border border-white/5 flex flex-col gap-1.5">
+                          <span className="text-xs text-orange-400 font-bold block">SORU: {q.question}</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] text-slate-400 font-semibold block">
+                              Kategori: <strong className="text-slate-300">{catInfo.label}</strong> • Risk Seviyesi: <strong className="text-slate-300">{q.riskLevel}</strong>
+                            </span>
+                            {catInfo.desc && (
+                              <span className="text-[10px] text-slate-500 italic block">
+                                💡 Nedir: {catInfo.desc}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-slate-300 bg-slate-950/20 p-2 rounded-lg border border-white/5 mt-0.5">Gerekçe: {q.reason}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div>
                   <h3 className="text-sm font-bold text-slate-300 mb-2">📋 Ekspertiz Kontrol Listesi</h3>
                   <div className="flex flex-col gap-3">
-                    {vehicle.premiumFeatures.inspectionChecklist.map((c: any) => (
-                      <div key={c.id} className="bg-slate-900/30 p-3 rounded-xl border border-white/5">
-                        <span className="text-xs text-slate-200 font-bold block mb-1">{c.sortOrder}. {c.title} ({c.category})</span>
-                        <span className="text-xs text-slate-400 block mb-1">Risk Seviyesi: {c.riskLevel}</span>
-                        <span className="text-xs text-slate-400">{c.description}</span>
-                      </div>
-                    ))}
+                    {vehicle.premiumFeatures.inspectionChecklist.map((c: any) => {
+                      const catInfo = categoryMap[c.category] || { label: c.category, desc: '' };
+                      return (
+                        <div key={c.id} className="bg-slate-900/30 p-3.5 rounded-xl border border-white/5 flex flex-col gap-1.5">
+                          <span className="text-xs text-slate-200 font-bold block">{c.sortOrder}. {c.title} ({catInfo.label})</span>
+                          {catInfo.desc && (
+                            <span className="text-[10px] text-slate-500 italic block">
+                              💡 Nedir: {catInfo.desc}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-400 block">Risk Seviyesi: <strong className="text-slate-300">{c.riskLevel}</strong></span>
+                          <span className="text-xs text-slate-300 bg-slate-950/20 p-2 rounded-lg border border-white/5 mt-0.5">{c.description}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
