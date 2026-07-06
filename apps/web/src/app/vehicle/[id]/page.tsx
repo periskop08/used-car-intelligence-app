@@ -142,7 +142,7 @@ export default function VehicleDetail() {
   };
 
   // Generate Report
-  const handleGenerateReport = () => {
+  const handleGenerateReport = (force = false) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
       router.push("/login");
@@ -158,7 +158,7 @@ export default function VehicleDetail() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify({ variantId, languageCode: "tr" }),
+      body: JSON.stringify({ variantId, languageCode: "tr", force }),
     })
       .then(res => {
         if (!res.ok) {
@@ -635,7 +635,7 @@ export default function VehicleDetail() {
                   Bu araç hakkında karar odaklı AI analiz raporu oluşturun. Alınabilirlik yüzdesini ve risk katsayısını öğrenin.
                 </p>
                 <button
-                  onClick={handleGenerateReport}
+                  onClick={() => handleGenerateReport(false)}
                   disabled={generatingReport}
                   className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition text-center text-sm"
                 >
@@ -681,7 +681,7 @@ export default function VehicleDetail() {
 
                 {/* Regenerate Action */}
                 <button
-                  onClick={handleGenerateReport}
+                  onClick={() => handleGenerateReport(true)}
                   disabled={generatingReport}
                   className="w-full bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 rounded-xl transition text-center text-xs mt-4"
                 >

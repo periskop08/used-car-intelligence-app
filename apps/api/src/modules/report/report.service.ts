@@ -15,7 +15,7 @@ export class ReportService {
     private coverageService: CoverageService,
   ) {}
 
-  async generateReport(userId: string, dto: GenerateReportDto) {
+  async generateReport(userId: string, dto: GenerateReportDto & { force?: boolean }) {
     const lang = dto.languageCode || 'tr';
     if (lang !== 'tr' && lang !== 'en') {
       throw new BadRequestException('Desteklenen diller yalnızca "tr" ve "en" dilleridir.');
@@ -42,7 +42,8 @@ export class ReportService {
       },
     });
 
-    if (existingReport && existingReport.status === ApprovalStatus.APPROVED) {
+    const hasFullSummary = existingReport && existingReport.summary && typeof existingReport.summary === 'object' && (existingReport.summary as any).summary;
+    if (existingReport && existingReport.status === ApprovalStatus.APPROVED && !dto.force && hasFullSummary) {
       return existingReport;
     }
 
@@ -73,12 +74,15 @@ export class ReportService {
           languageCode: lang,
           summary: {
             title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            message: lang === 'tr' 
+            summary: lang === 'tr' 
               ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
               : 'No approved chronic problems or recall records found for this vehicle variant.',
+            shouldBuyComment: lang === 'tr'
+              ? 'Araç hakkında yeterli kronik sorun ve servis verisi bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
+              : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
           },
           riskScore: 0,
-          buyabilityScore: 100,
+          buyabilityScore: 0,
           finalDecision: FinalDecision.INSUFFICIENT_DATA,
           dataCoverage: DataCoverage.NONE,
           coverageScore: 0,
@@ -88,12 +92,15 @@ export class ReportService {
         update: {
           summary: {
             title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            message: lang === 'tr' 
+            summary: lang === 'tr' 
               ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
               : 'No approved chronic problems or recall records found for this vehicle variant.',
+            shouldBuyComment: lang === 'tr'
+              ? 'Araç hakkında yeterli kronik sorun ve servis verisi bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
+              : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
           },
           riskScore: 0,
-          buyabilityScore: 100,
+          buyabilityScore: 0,
           finalDecision: FinalDecision.INSUFFICIENT_DATA,
           dataCoverage: DataCoverage.NONE,
           coverageScore: 0,
