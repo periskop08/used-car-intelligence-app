@@ -15,6 +15,7 @@ export class ListingService {
         return rawQuota ? parseInt(rawQuota, 10) : 1;
       case SubscriptionTier.STANDARD:
         return 10;
+      case SubscriptionTier.PRO:
       case SubscriptionTier.PREMIUM:
         return 50;
       default:
