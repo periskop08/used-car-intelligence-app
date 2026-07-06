@@ -503,7 +503,7 @@ export default function UnifiedAdminPage() {
                   <tbody>
                     {jobs.map((job) => (
                       <tr key={job.id} className="border-b border-white/5 hover:bg-slate-950/20 text-slate-300">
-                        <td className="py-2.5 px-3 font-mono text-[10px]">{job.id.substring(0, 8)}...</td>
+                        <td className="py-2.5 px-3 font-mono text-[10px]">{job.id ? job.id.substring(0, 8) : ""}...</td>
                         <td className="py-2.5 px-3">
                           <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                             job.status === "COMPLETED"
@@ -516,7 +516,7 @@ export default function UnifiedAdminPage() {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 font-semibold">{job.priority}</td>
-                        <td className="py-2.5 px-3 font-mono text-[10px]">{job.variantId.substring(0, 8)}...</td>
+                        <td className="py-2.5 px-3 font-mono text-[10px]">{job.variantId ? job.variantId.substring(0, 8) : "N/A"}...</td>
                         <td className="py-2.5 px-3">{formatDate(job.updatedAt)}</td>
                       </tr>
                     ))}
