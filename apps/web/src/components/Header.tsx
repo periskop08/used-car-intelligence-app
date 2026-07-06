@@ -27,7 +27,7 @@ export default function Header() {
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#0b0f19]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
       <a href="/" className="flex items-center gap-2">
         <span className="text-2xl font-black tracking-wider bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
-          USED CAR INTEL
+          TORQUESCOUT
         </span>
       </a>
 
@@ -37,6 +37,9 @@ export default function Header() {
         </a>
         <a href="/comparison" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Araç Karşılaştırma
+        </a>
+        <a href="/listings" className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1.5 rounded-full hover:bg-orange-500/20 transition">
+          İlanlar
         </a>
         <a href="/#packages" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Abonelik Paketleri
@@ -51,7 +54,7 @@ export default function Header() {
               <span className="text-sm font-bold text-slate-200">{user.email}</span>
             </div>
             <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-              user.subscriptionTier === 'PRO' 
+              user.subscriptionTier === 'PREMIUM' 
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
                 : user.subscriptionTier === 'STANDARD'
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'

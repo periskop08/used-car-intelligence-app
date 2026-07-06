@@ -572,10 +572,10 @@ async function main() {
     }
   });
 
-  const proPlan = await prisma.subscriptionPlan.create({
+  const premiumPlan = await prisma.subscriptionPlan.create({
     data: {
-      tier: SubscriptionTier.PRO,
-      name: 'Pro Paket',
+      tier: SubscriptionTier.PREMIUM,
+      name: 'Premium Paket',
       priceTrl: 899,
       priceUsd: 24.99,
       limits: {
@@ -594,7 +594,7 @@ async function main() {
       email: 'admin@usedcarintel.com',
       passwordHash: '$2b$12$demoAdminHashForTestingPassword123!',
       role: Role.ADMIN,
-      subscriptionTier: SubscriptionTier.PRO,
+      subscriptionTier: SubscriptionTier.PREMIUM,
       preferredLanguageCode: 'tr',
       preferredCountryId: countryTr.id
     }

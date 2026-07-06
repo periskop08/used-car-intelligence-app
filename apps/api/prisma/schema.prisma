@@ -17,6 +17,7 @@ enum SubscriptionTier {
   FREE
   STANDARD
   PRO
+  PREMIUM
 }
 
 enum SubscriptionStatus {
@@ -211,6 +212,7 @@ model User {
   createdChecklists  InspectionChecklistItem[] @relation("ChecklistCreatedBy")
   approvedChecklists InspectionChecklistItem[] @relation("ChecklistApprovedBy")
   researchJobs       VehicleResearchJob[]
+  listings           VehicleListing[]
 }
 
 model SubscriptionPlan {
@@ -452,6 +454,7 @@ model VehicleVariant {
   aiReports    AiVehicleReport[]
   researchJobs VehicleResearchJob[]
   rawSources   RawSource[]
+  listings     VehicleListing[]
 
   @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
   @@index([brandId])
@@ -855,4 +858,173 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  PASSIVE
+  SOLD
+  EXPIRED
+  REJECTED
+  ARCHIVED
+}
+
+enum MediaModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ListingMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ListingPackageType {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+model VehicleListing {
+  id                 String             @id @default(uuid())
+  sellerId           String
+  seller             User               @relation(fields: [sellerId], references: [id])
+  
+  vehicleVariantId   String?            // Nullable only for drafts/variant request flows
+  vehicleVariant     VehicleVariant?    @relation(fields: [vehicleVariantId], references: [id])
+  
+  // Custom metadata if variant does not exist yet (variant request flow)
+  customBrand        String?
+  customModel        String?
+  customYear         Int?
+  customEngine       String?
+  customTransmission String?
+  
+  title              String
+  description        String?
+  
+  priceAmount        Decimal            @db.Decimal(12, 2)
+  currency           String             @default("TRY")
+  
+  // Global Location fields
+  countryCode        String             @default("TR") // Focuses on Turkey (TR) first
+  region             String?            // e.g. State in USA, region, etc.
+  city               String             // e.g. İstanbul
+  district           String?            // e.g. Kadıköy
+  
+  modelYear          Int
+  kilometers         Int
+  fuelType           FuelType?
+  transmission       TransmissionType?
+  bodyType           BodyType?
+  color              String?
+  
+  damageRecord       String?
+  tramerAmount       Int?               @default(0)
+  paintedParts       Json?              // Array of strings (e.g. ["FRONT_BUMPER"])
+  changedParts       Json?              // Array of strings (e.g. ["LEFT_FRONT_DOOR"])
+  maintenanceHistory String?
+  expertiseReportUrl String?
+  
+  plateHidden        Boolean            @default(true)
+  vinHidden          Boolean            @default(true)
+  
+  status             ListingStatus      @default(DRAFT)
+  isFeatured         Boolean            @default(false)
+  isAiReady          Boolean            @default(false)
+  
+  // Admin moderation & reports metadata
+  rejectionReason    String?
+  adminNote          String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reportCount        Int                @default(0)
+  fraudScore         Float              @default(0.0)
+  
+  // Independent Listing Duration tracking fields
+  publishedAt        DateTime?
+  expiresAt          DateTime?
+  passiveUntil       DateTime?
+  lastRenewedAt      DateTime?
+  packageAtPublish   ListingPackageType?
+  listingDurationDays Int?              // 30 for FREE/STANDARD, 45 for PREMIUM
+  
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  
+  media              ListingMedia[]
+  leads              ListingLead[]
+  views              ListingView[]
+  
+  @@index([vehicleVariantId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([city])
+  @@index([priceAmount])
+  @@index([createdAt])
+  @@index([modelYear])
+  @@index([kilometers])
+  @@index([countryCode, city])
+  @@index([status, expiresAt])
+  @@index([status, passiveUntil])
+  @@index([sellerId, status])
+}
+
+model ListingMedia {
+  id               String                @id @default(uuid())
+  listingId        String
+  listing          VehicleListing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  url              String                // Optimized medium url or fallback
+  thumbnailUrl     String?               // WebP thumbnail for list cards
+  mediumUrl        String?               // WebP medium version for details page
+  storageKey       String                // S3 / Cloudflare R2 object key
+  
+  type             ListingMediaType      @default(IMAGE)
+  sortOrder        Int                   @default(0) // sortOrder = 0 is cover photo
+  fileSize         Int                   // In bytes
+  mimeType         String                // e.g. "image/webp", "image/jpeg"
+  width            Int?
+  height           Int?
+  
+  moderationStatus MediaModerationStatus @default(PENDING)
+  createdAt        DateTime              @default(now())
+  
+  @@index([listingId])
+}
+
+model ListingLead {
+  id                 String         @id @default(uuid())
+  listingId          String
+  listing            VehicleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  buyerId            String?
+  buyerName          String
+  buyerPhone         String
+  buyerEmail         String
+  message            String
+  ipAddress          String?        // Saved for rate-limiting & anti-spam checks
+  communicationGranted Boolean        @default(false) // KVKK / GDPR compliance consent
+  
+  createdAt          DateTime       @default(now())
+  
+  @@index([listingId])
+  @@index([buyerId])
+}
+
+model ListingView {
+  id          String         @id @default(uuid())
+  listingId   String
+  listing     VehicleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  userId      String?
+  ipHash      String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+  
+  @@index([listingId])
+  @@index([userId])
 }

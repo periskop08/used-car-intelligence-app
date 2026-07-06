@@ -1,0 +1,306 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+export default function SellerDashboard() {
+  const router = useRouter();
+
+  // Data states
+  const [listings, setListings] = useState<any[]>([]);
+  const [quota, setQuota] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (!savedToken) {
+      router.push("/login?redirect=/dashboard/listings");
+      return;
+    }
+    setToken(savedToken);
+
+    // Fetch user listings & quota
+    Promise.all([
+      fetch(`${API_URL}/me/listings`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      }).then((res) => res.json()),
+      fetch(`${API_URL}/me/listing-quota`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      }).then((res) => res.json()),
+    ])
+      .then(([listingsData, quotaData]) => {
+        setListings(Array.isArray(listingsData) ? listingsData : []);
+        setQuota(quotaData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard load failed:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleRenew = (listingId: string) => {
+    setActionError("");
+    setActionSuccess("");
+
+    fetch(`${API_URL}/listings/${listingId}/renew`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((err) => {
+            throw new Error(err.message || "İlan yenilenemedi.");
+          });
+        }
+        return res.json();
+      })
+      .then(() => {
+        setActionSuccess("İlanınız başarıyla tekrar aktif edildi!");
+        // Refresh page data
+        return Promise.all([
+          fetch(`${API_URL}/me/listings`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+          fetch(`${API_URL}/me/listing-quota`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+        ]);
+      })
+      .then(([listingsData, quotaData]) => {
+        setListings(listingsData);
+        setQuota(quotaData);
+      })
+      .catch((err) => {
+        setActionError(err.message);
+      });
+  };
+
+  const handleStatusChange = (listingId: string, newStatus: string) => {
+    setActionError("");
+    setActionSuccess("");
+
+    fetch(`${API_URL}/listings/${listingId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status: newStatus }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((err) => {
+            throw new Error(err.message || "İlan durumu güncellenemedi.");
+          });
+        }
+        return res.json();
+      })
+      .then(() => {
+        setActionSuccess("İlan durumu başarıyla güncellendi!");
+        // Refresh page data
+        return Promise.all([
+          fetch(`${API_URL}/me/listings`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+          fetch(`${API_URL}/me/listing-quota`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+        ]);
+      })
+      .then(([listingsData, quotaData]) => {
+        setListings(listingsData);
+        setQuota(quotaData);
+      })
+      .catch((err) => {
+        setActionError(err.message);
+      });
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+  };
+
+  const getRemainingDays = (targetDateString?: string) => {
+    if (!targetDateString) return 0;
+    const diffTime = new Date(targetDateString).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <span className="animate-spin text-4xl">⏳</span>
+        <span className="text-slate-400 font-bold text-base">Dashboard yükleniyor...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-10">
+      {/* Title Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-200 tracking-tight">Satıcı Paneli</h1>
+          <p className="text-sm text-slate-400 mt-1">İlanlarınızı, yayın durumlarını ve aktif kota haklarınızı yönetin.</p>
+        </div>
+        <button
+          onClick={() => router.push("/listings/create")}
+          className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-2xl transition text-sm shadow-lg shadow-orange-500/10"
+        >
+          ➕ Yeni İlan Ekle
+        </button>
+      </div>
+
+      {actionError && <p className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{actionError}</p>}
+      {actionSuccess && <p className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">{actionSuccess}</p>}
+
+      {/* Quota Summary & Package Info Card */}
+      {quota && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-black uppercase">Aktif Paket</span>
+            <span className="text-xl font-black text-orange-400 mt-0.5">{quota.tier} Paket</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-black uppercase">Kullanılan İlan Kotası</span>
+            <span className="text-xl font-black text-slate-200 mt-0.5">{quota.activeCount} / {quota.limit} İlan</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-black uppercase">Kalan İlan Hakkı</span>
+            <span className="text-xl font-black text-emerald-400 mt-0.5">{quota.remaining} İlan</span>
+          </div>
+        </div>
+      )}
+
+      {/* Listings list */}
+      <div className="flex flex-col gap-4">
+        <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">İlanlarım</h3>
+
+        {listings.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4 border border-dashed border-white/10 rounded-3xl bg-slate-950/5">
+            <span className="text-4xl">🚗</span>
+            <span className="text-slate-300 font-bold text-lg">Henüz hiç ilan eklememişsiniz.</span>
+            <button
+              onClick={() => router.push("/listings/create")}
+              className="text-xs text-orange-500 font-bold hover:underline"
+            >
+              Hemen ilk ilanınızı ekleyin
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {listings.map((listing) => {
+              const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+              const remDays = getRemainingDays(listing.expiresAt);
+              const passiveRemDays = getRemainingDays(listing.passiveUntil);
+
+              return (
+                <div
+                  key={listing.id}
+                  className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-900/40 border border-white/5 rounded-3xl gap-6 hover:border-white/10 transition"
+                >
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    {/* Cover Photo */}
+                    <div className="w-24 aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex-shrink-0">
+                      <img src={coverImg} alt={listing.title} className="w-full h-full object-cover" />
+                    </div>
+
+                    {/* Listing Summary Info */}
+                    <div className="flex flex-col text-center md:text-left gap-1">
+                      <div className="flex items-center justify-center md:justify-start gap-2">
+                        <h4 className="font-extrabold text-slate-200 text-sm line-clamp-1">{listing.title}</h4>
+                        <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
+                          listing.status === "ACTIVE"
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : listing.status === "PENDING_REVIEW"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            : listing.status === "PASSIVE"
+                            ? "bg-slate-800 text-slate-400"
+                            : "bg-red-500/20 text-red-400 border border-red-500/30"
+                        }`}>
+                          {listing.status}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">
+                        {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}
+                      </span>
+
+                      {/* Dynamic Duration Badges */}
+                      <div className="mt-2 text-xs flex flex-col gap-0.5">
+                        {listing.status === "ACTIVE" && (
+                          <span className="text-emerald-400 font-bold">
+                            🟢 Yayında • Kalan süre: {remDays} gün (Bitiş: {formatDate(listing.expiresAt)})
+                          </span>
+                        )}
+                        {listing.status === "PASSIVE" && (
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            <span className="text-slate-400 font-medium">
+                              ⚪ Pasifte • Yenilemek için kalan süre: {passiveRemDays} gün (Son gün: {formatDate(listing.passiveUntil)})
+                            </span>
+                            <button
+                              onClick={() => handleRenew(listing.id)}
+                              className="w-fit bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition"
+                            >
+                              Tekrar Yayına Al (Yenile)
+                            </button>
+                          </div>
+                        )}
+                        {listing.status === "EXPIRED" && (
+                          <span className="text-red-400 font-bold">
+                            🔴 Süresi doldu • Yeniden yayınlamak için tekrar yayınlama akışını başlatın.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Column */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => router.push(`/listings/${listing.id}`)}
+                      className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
+                    >
+                      İlanı Gör
+                    </button>
+                    {listing.status === "DRAFT" && (
+                      <button
+                        onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition"
+                      >
+                        Yayınla
+                      </button>
+                    )}
+                    {listing.status === "ACTIVE" && (
+                      <button
+                        onClick={() => handleStatusChange(listing.id, "PASSIVE")}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-750 transition"
+                      >
+                        Pasife Al
+                      </button>
+                    )}
+                    {listing.status === "ACTIVE" && (
+                      <button
+                        onClick={() => handleStatusChange(listing.id, "SOLD")}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                      >
+                        Satıldı İşaretle
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

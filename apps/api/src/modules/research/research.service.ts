@@ -539,7 +539,7 @@ export class ResearchService {
     switch (tier) {
       case SubscriptionTier.FREE: return 1;
       case SubscriptionTier.STANDARD: return 3;
-      case SubscriptionTier.PRO: return 10;
+      case SubscriptionTier.PREMIUM: return 10;
       default: return 1;
     }
   }

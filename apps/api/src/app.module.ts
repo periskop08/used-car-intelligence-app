@@ -10,6 +10,7 @@ import { ReportModule } from './modules/report/report.module';
 import { FavoriteModule } from './modules/favorite/favorite.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
 import { ResearchModule } from './modules/research/research.module';
+import { ListingModule } from './modules/listing/listing.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ResearchModule } from './modules/research/research.module';
     FavoriteModule,
     ComparisonModule,
     ResearchModule,
+    ListingModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

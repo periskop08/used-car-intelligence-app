@@ -4,6 +4,8 @@ import { CoverageService } from './coverage.service';
 import { AiAnalysisService } from './ai-analysis.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { PrismaService } from '../../prisma.service';
+import { EvidenceRulesService } from './evidence-rules.service';
+import { AiReportGeneratorService } from './ai-report-generator.service';
 import { SourceKind, ApprovalStatus, DataCoverage } from '@used-car-intelligence/shared';
 
 describe('Research Module Tests', () => {
@@ -33,6 +35,8 @@ describe('Research Module Tests', () => {
         CoverageService,
         AiAnalysisService,
         WebSearchProvider,
+        EvidenceRulesService,
+        AiReportGeneratorService,
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();

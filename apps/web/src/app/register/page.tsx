@@ -17,7 +17,7 @@ function RegisterContent() {
 
   useEffect(() => {
     const urlTier = searchParams.get("tier");
-    if (urlTier === "STANDARD" || urlTier === "PRO") {
+    if (urlTier === "STANDARD" || urlTier === "PREMIUM") {
       setTier(urlTier);
     }
   }, [searchParams]);
@@ -106,7 +106,7 @@ function RegisterContent() {
             >
               <option value="FREE">FREE (Limitli)</option>
               <option value="STANDARD">STANDARD (349 TL / Ay)</option>
-              <option value="PRO">PRO (899 TL / Ay)</option>
+              <option value="PREMIUM">PREMIUM (899 TL / Ay)</option>
             </select>
           </div>
 
