@@ -713,12 +713,15 @@ function ListingsContent() {
             </label>
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition text-xs mt-3 shadow-lg shadow-orange-500/10"
-          >
-            Filtreleri Uygula (Ara)
-          </button>
+          {/* Sticky Apply Button */}
+          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-6 -mb-6 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
+            <button
+              type="submit"
+              className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+            >
+              🔍 Filtreleri Uygula (Ara)
+            </button>
+          </div>
         </form>
 
         {/* Right Listings Grid Column */}
