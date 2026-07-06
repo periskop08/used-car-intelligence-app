@@ -304,8 +304,11 @@ export class ListingController {
       throw new BadRequestException('Lütfen yüklenecek bir dosya seçin.');
     }
 
-    // Mock upload URL for MVP R2/S3 demonstration
-    const fileUrl = `https://r2.torquescout.com/listings/${id}/${Date.now()}-${file.originalname}`;
+    if (!file.buffer) {
+      throw new BadRequestException('Dosya içeriği okunamadı.');
+    }
+    const base64Data = file.buffer.toString('base64');
+    const fileUrl = `data:${file.mimetype};base64,${base64Data}`;
 
     return this.listingService.addMedia(id, user.id, {
       url: fileUrl,
