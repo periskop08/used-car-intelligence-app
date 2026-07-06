@@ -197,13 +197,12 @@ Output JSON format only:
 {
   "summary": {
     "title": "Short descriptive title",
-    "text": "Detailed overview summary of the vehicle reliability",
-    "engineNotes": "Summary of engine specs and notes",
-    "transmissionNotes": "Summary of transmission notes"
+    "summary": "Detailed overview summary of the vehicle reliability, explaining exactly why the risk and buyability scores were set to their respective values",
+    "shouldBuyComment": "A clear, actionable purchase advice recommendation comment explaining the final decision"
   },
   "riskScore": 0-100 score,
   "buyabilityScore": 0-100 score,
-  "finalDecision": "BUYABLE" | "BUY_WITH_CAUTION" | "RISKY" | "AVOID",
+  "finalDecision": "BUY" | "BUY_CAREFULLY" | "RISKY" | "AVOID",
   "biggestRisks": ["Risk 1", "Risk 2"],
   "sellerQuestions": ["Question 1", "Question 2"],
   "inspectionChecklist": ["Check item 1", "Check item 2"]
