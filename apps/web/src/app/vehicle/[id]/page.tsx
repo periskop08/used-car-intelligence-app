@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -47,6 +47,12 @@ export default function VehicleDetail() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sendingChat, setSendingChat] = useState(false);
   const [chatError, setChatError] = useState("");
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, sendingChat]);
 
   // Reviews states
   const [comment, setComment] = useState("");
@@ -692,49 +698,87 @@ export default function VehicleDetail() {
           </div>
 
           {/* AI Chat Box (Custom Question Box) */}
-          <div className="glass p-6 rounded-3xl flex flex-col gap-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-200">💬 Yapay Zekaya Soru Sor</h2>
+          <div className="glass p-6 rounded-3xl flex flex-col gap-4 shadow-2xl border border-white/5 bg-slate-900/40">
+            <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+              <span className="text-xl">💬</span>
+              <div className="flex flex-col">
+                <h2 className="text-sm font-bold text-slate-200">TorqueScout Yapay Zeka Danışmanı</h2>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Çevrimiçi • Rapor Verilerine Hakim
+                </span>
+              </div>
+            </div>
             
             {/* Messages Listing */}
-            <div className="max-h-60 overflow-y-auto flex flex-col gap-3 py-2">
+            <div className="max-h-80 overflow-y-auto flex flex-col gap-4 py-2 pr-1 custom-scrollbar">
               {chatMessages.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">Bu araç hakkında merak ettiğiniz bir şeyi sorun (Örn: DSG sorun çıkarır mı?).</p>
+                <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                  <span className="text-3xl">🤖</span>
+                  <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                    Merhaba! Ben TorqueScout AI. Bu aracın kronik sorunları, muayene checklisti veya satın alma uygunluğu hakkında bana dilediğiniz soruyu sorabilirsiniz.
+                  </p>
+                  <span className="text-[10px] text-slate-500 italic">Örn: "Şanzımanı uzun vadede üzer mi?", "Motor performansı nasıldır?"</span>
+                </div>
               ) : (
                 chatMessages.map((msg, idx) => (
-                  <div key={idx} className={`p-3 rounded-2xl max-w-[85%] text-xs ${
-                    msg.sender === 'user'
-                      ? 'bg-orange-600/10 border border-orange-500/20 self-end text-slate-200'
-                      : 'bg-slate-900 border border-white/5 self-start text-slate-300'
-                  }`}>
-                    {msg.text}
+                  <div
+                    key={idx}
+                    className={`flex gap-2.5 max-w-[85%] ${
+                      msg.sender === 'user' ? 'self-end flex-row-reverse' : 'self-start'
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 select-none ${
+                      msg.sender === 'user' ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30' : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                    }`}>
+                      {msg.sender === 'user' ? '🧑‍💻' : '🤖'}
+                    </div>
+                    {/* Bubble */}
+                    <div className={`p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                      msg.sender === 'user'
+                        ? 'bg-gradient-to-br from-orange-600/20 to-orange-700/5 border border-orange-500/20 text-slate-200 rounded-tr-none'
+                        : 'bg-slate-900 border border-white/5 text-slate-300 rounded-tl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
                   </div>
                 ))
               )}
               {sendingChat && (
-                <span className="text-[10px] text-slate-500 italic animate-pulse">Yapay zeka yanıt yazıyor...</span>
+                <div className="flex gap-2.5 self-start">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-blue-600/20 text-blue-400 border border-blue-500/30 animate-pulse select-none">
+                    🤖
+                  </div>
+                  <div className="p-3 rounded-2xl text-xs bg-slate-900 border border-white/5 text-slate-500 rounded-tl-none flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce delay-75"></span>
+                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce delay-150"></span>
+                  </div>
+                </div>
               )}
+              <div ref={chatEndRef} />
             </div>
 
             {chatError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2 rounded-xl font-semibold">
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2.5 rounded-xl font-semibold">
                 ⚠️ {chatError}
               </div>
             )}
 
             {/* Input Form */}
-            <form onSubmit={handleSendChat} className="flex gap-2">
+            <form onSubmit={handleSendChat} className="flex gap-2 border-t border-white/5 pt-3">
               <input
                 type="text"
                 required
                 value={chatQuestion}
                 onChange={e => setChatQuestion(e.target.value)}
-                placeholder="Şanzıman sağlam mı?..."
-                className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none"
+                placeholder="Bu araca dair aklınıza takılan soruyu yazın..."
+                className="flex-1 bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none placeholder:text-slate-500 focus:border-orange-500/50 transition"
               />
               <button
                 type="submit"
                 disabled={sendingChat || !chatQuestion.trim()}
-                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs"
+                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition"
               >
                 Sor
               </button>

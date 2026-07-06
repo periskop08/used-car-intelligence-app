@@ -5,6 +5,7 @@ import { GenerateReportDto, AskChatDto } from './report.dto';
 import { FeatureKey, ApprovalStatus, FinalDecision, DataCoverage } from '@prisma/client';
 import { AiReportGeneratorService } from '../research/ai-report-generator.service';
 import { CoverageService } from '../research/coverage.service';
+import OpenAI from 'openai';
 
 @Injectable()
 export class ReportService {
@@ -121,28 +122,71 @@ export class ReportService {
     // 1. Transaction-safe limit check
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
 
-    // 2. Fetch approved variant
+    // 2. Fetch approved variant along with its approved problems and recalls
     const variant = await this.prisma.vehicleVariant.findFirst({
       where: { id: dto.variantId, status: ApprovalStatus.APPROVED },
-      include: { brand: true, model: true },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        problems: {
+          where: { status: ApprovalStatus.APPROVED },
+        },
+        recalls: {
+          where: { status: ApprovalStatus.APPROVED },
+        },
+      },
     });
 
     if (!variant) {
       throw new NotFoundException('Araç varyantı bulunamadı veya onaylanmış durumda değil.');
     }
 
-    // 3. Generate mock response based on question keywords
-    const questionLower = dto.question.toLowerCase();
+    const apiKey = process.env.OPENAI_API_KEY;
     let response = '';
 
-    if (questionLower.includes('dsg') || questionLower.includes('şanzıman') || questionLower.includes('vites')) {
-      response = `Bu araçta kullanılan DSG DQ200 7-ileri kuru tip çift kavramalı şanzıman, özellikle yoğun dur-kalk trafikte ısınma ve aşınma eğilimindedir. Mekatronik arızası veya kavrama değişimi yüksek maliyetler doğurabilir. Şanzıman yağı ve vites geçiş kalitesi alım öncesinde mutlaka test edilmelidir.`;
-    } else if (questionLower.includes('motor') || questionLower.includes('enjektör') || questionLower.includes('dpf') || questionLower.includes('partikül')) {
-      response = `1.6 TDI CR motor seçeneğinde DPF (Dizel Partikül Filtresi) tıkanması kısa mesafe şehir içi kullanımlarında yaygındır. Motorun çekişini korumak için enjektör püskürtme değerleri ve DPF doluluk oranı teşhis cihazı ile kontrol edilmelidir.`;
-    } else if (questionLower.includes('kronik') || questionLower.includes('arıza') || questionLower.includes('sorun')) {
-      response = `Bu model için bilinen en kritik iki kronik arıza DSG kavrama aşınması ve dizel partikül filtresi tıkanmasıdır. Bunların dışında klimadaki aktüatör motorunun çıtırtı yapması dışında büyük bir kronik zayıflığı bulunmamaktadır.`;
+    if (!apiKey) {
+      // Dynamic fallback mock if key not set
+      const problemNames = variant.problems.map(p => p.title).join(', ');
+      response = `Bu araç (${variant.brand.name} ${variant.model.name} ${variant.generation?.name || ''}) için onaylanmış sorunlar arasında ${
+        problemNames || 'herhangi bir kritik kronik sorun bulunmamaktadır'
+      }. Detaylı bilgi için teknik raporu inceleyebilirsiniz.`;
     } else {
-      response = `${variant.brand.name} ${variant.model.name} (${variant.year}) modeli hakkında sorduğunuz soruya istinaden: Aracın genel güvenilirlik puanı oldukça yüksek olup, düzenli bakımları yapıldığı takdirde sorunsuz kullanılabilecek bir modeldir. Bahsettiğiniz detay hakkında yetkili servis geçmişini sorgulatmanızı tavsiye ederiz.`;
+      const openai = new OpenAI({ apiKey });
+      const problemsText = variant.problems
+        .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
+        .join('\n');
+      const recallsText = variant.recalls
+        .map((r: any) => `- ${r.title}: ${r.description}`)
+        .join('\n');
+
+      const systemPrompt = `You are an expert car buying assistant and AI vehicle advisor.
+The user is asking a question about a specific vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} (${variant.engine?.code || ''}, ${variant.transmission?.name || ''}).
+
+Here are the approved chronic problems for this vehicle:
+${problemsText || 'No major chronic problems recorded.'}
+
+Here are the approved recalls:
+${recallsText || 'No recalls recorded.'}
+
+Answer the user's question accurately based on this data. Do not hallucinate external issues that contradict this data. Always answer in Turkish, and keep your tone helpful, informative, and objective. Keep it concise but detailed enough to answer their question.`;
+
+      try {
+        const aiResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: dto.question }
+          ],
+          temperature: 0.7,
+        });
+
+        response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
+      } catch (err: any) {
+        response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+      }
     }
 
     // 4. Log the chat question
