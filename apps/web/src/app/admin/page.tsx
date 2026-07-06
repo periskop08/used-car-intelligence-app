@@ -43,16 +43,11 @@ export default function UnifiedAdminPage() {
 
     setToken(savedToken);
 
-    // Fetch user to verify admin role
-    fetch(`${API_URL}/me`, {
-      headers: { Authorization: `Bearer ${savedToken}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Unauthorized");
-        return res.json();
-      })
-      .then((user) => {
-        if (user.role !== "ADMIN") {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        if (parsedUser.role !== "ADMIN") {
           setErrorMsg("Bu sayfaya erişim yetkiniz bulunmamaktadır. Yalnızca yöneticiler girebilir.");
           setAuthLoading(false);
         } else {
@@ -62,11 +57,14 @@ export default function UnifiedAdminPage() {
           fetchAdminListings(savedToken);
           fetchResearchJobs(savedToken);
         }
-      })
-      .catch(() => {
+      } catch (e) {
         setErrorMsg("Oturum doğrulanamadı.");
         setAuthLoading(false);
-      });
+      }
+    } else {
+      setErrorMsg("Oturum bulunamadı. Lütfen giriş yapın.");
+      setAuthLoading(false);
+    }
   }, []);
 
   const fetchAdminListings = (jwtToken: string) => {
