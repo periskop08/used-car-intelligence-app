@@ -3,6 +3,46 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const PART_LABELS: Record<string, string> = {
+  FRONT_BUMPER: "Ön Tampon",
+  LEFT_FRONT_FENDER: "Sol Ön Çamurluk",
+  HOOD: "Kaput (Motor Kaputu)",
+  RIGHT_FRONT_FENDER: "Sağ Ön Çamurluk",
+  LEFT_FRONT_DOOR: "Sol Ön Kapı",
+  ROOF: "Tavan",
+  RIGHT_FRONT_DOOR: "Sağ Ön Kapı",
+  LEFT_REAR_DOOR: "Sol Arka Kapı",
+  RIGHT_REAR_DOOR: "Sağ Arka Kapı",
+  LEFT_REAR_FENDER: "Sol Arka Çamurluk",
+  TRUNK: "Bagaj Kapağı",
+  RIGHT_REAR_FENDER: "Sağ Arka Çamurluk",
+  REAR_BUMPER: "Arka Tampon"
+};
+
+const translateFuelType = (fuel: string) => {
+  if (!fuel) return "-";
+  const mapping: Record<string, string> = {
+    PETROL: "Benzin",
+    DIESEL: "Dizel",
+    LPG: "LPG",
+    HYBRID: "Hibrit",
+    PLUG_IN_HYBRID: "Plug-in Hibrit",
+    ELECTRIC: "Elektrik",
+    OTHER: "Diğer"
+  };
+  return mapping[fuel.toUpperCase()] || fuel;
+};
+
+const translateTransmission = (trans: string) => {
+  if (!trans) return "-";
+  const mapping: Record<string, string> = {
+    MANUAL: "Manuel",
+    AUTOMATIC: "Otomatik",
+    SEMI_AUTOMATIC: "Yarı Otomatik"
+  };
+  return mapping[trans.toUpperCase()] || trans;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function UnifiedAdminPage() {
@@ -326,15 +366,17 @@ export default function UnifiedAdminPage() {
                       <span className="text-[10px] text-slate-500 font-bold uppercase">Teknik Detaylar</span>
                       <span>Model Yılı: {listing.modelYear}</span>
                       <span>KM: {listing.kilometers.toLocaleString('tr-TR')} km</span>
-                      <span>Yakıt: {listing.fuelType}</span>
-                      <span>Şanzıman: {listing.transmission}</span>
+                      <span>Yakıt: {translateFuelType(listing.fuelType)}</span>
+                      <span>Şanzıman: {translateTransmission(listing.transmission)}</span>
                     </div>
 
                     <div className="flex flex-col gap-1 bg-slate-950/20 p-4 rounded-2xl border border-white/5">
                       <span className="text-[10px] text-slate-500 font-bold uppercase">Hasar & Tramer</span>
                       <span>Hasar Tutarı: {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasarsız"}</span>
                       <span>Gerekçe/Not: {listing.damageRecord || "Yok"}</span>
-                      <span>Boyalı Parçalar: {listing.paintedParts?.length > 0 ? listing.paintedParts.join(', ') : "Yok"}</span>
+                      <span>Boyalı Parçalar: {listing.paintedParts?.length > 0 ? listing.paintedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
+                      <span>Lokal Boyalı: {listing.localPaintedParts?.length > 0 ? listing.localPaintedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
+                      <span>Değişen Parçalar: {listing.changedParts?.length > 0 ? listing.changedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
                     </div>
 
                     <div className="flex flex-col justify-center gap-2">

@@ -229,11 +229,15 @@ export class ListingService {
     if (!listing) throw new NotFoundException('Listing not found.');
     if (listing.sellerId !== userId) throw new ForbiddenException('Not authorized.');
 
+    const dataToUpdate: any = { ...dto };
+    if (listing.status === ListingStatus.REJECTED) {
+      dataToUpdate.status = ListingStatus.PENDING_REVIEW;
+      dataToUpdate.rejectionReason = null;
+    }
+
     return this.prisma.vehicleListing.update({
       where: { id },
-      data: {
-        ...dto,
-      } as any,
+      data: dataToUpdate,
     });
   }
 
@@ -260,9 +264,14 @@ export class ListingService {
       await this.validateListingCanBecomeActive(id);
     }
 
+    const dataToUpdate: any = { status };
+    if (status === ListingStatus.PENDING_REVIEW) {
+      dataToUpdate.rejectionReason = null;
+    }
+
     return this.prisma.vehicleListing.update({
       where: { id },
-      data: { status },
+      data: dataToUpdate,
     });
   }
 

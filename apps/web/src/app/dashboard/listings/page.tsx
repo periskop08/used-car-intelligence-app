@@ -3,6 +3,30 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const translateFuelType = (fuel: string) => {
+  if (!fuel) return "-";
+  const mapping: Record<string, string> = {
+    PETROL: "Benzin",
+    DIESEL: "Dizel",
+    LPG: "LPG",
+    HYBRID: "Hibrit",
+    PLUG_IN_HYBRID: "Plug-in Hibrit",
+    ELECTRIC: "Elektrik",
+    OTHER: "Diğer"
+  };
+  return mapping[fuel.toUpperCase()] || fuel;
+};
+
+const translateTransmission = (trans: string) => {
+  if (!trans) return "-";
+  const mapping: Record<string, string> = {
+    MANUAL: "Manuel",
+    AUTOMATIC: "Otomatik",
+    SEMI_AUTOMATIC: "Yarı Otomatik"
+  };
+  return mapping[trans.toUpperCase()] || trans;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function SellerDashboard() {
@@ -297,6 +321,24 @@ export default function SellerDashboard() {
                               🔴 Süresi doldu • Yeniden yayınlamak için tekrar yayınlama akışını başlatın.
                             </span>
                           )}
+                          {listing.status === "REJECTED" && (
+                             <div className="flex flex-col gap-1.5 bg-red-500/10 border border-red-500/25 p-3.5 rounded-xl mt-1 w-full max-w-md">
+                               <span className="text-red-450 font-bold text-xs">🔴 İlanınız Reddedildi</span>
+                               {listing.rejectionReason && (
+                                 <p className="text-slate-350 text-[11px] leading-relaxed">
+                                   <strong className="text-slate-400">Gerekçe:</strong> {listing.rejectionReason}
+                                 </p>
+                               )}
+                               <p className="text-[10px] text-slate-500">
+                                 Lütfen ilanı düzenleyerek gerekli düzeltmeleri yapın ve onaylanması için tekrar yayınlayın.
+                                </p>
+                             </div>
+                           )}
+                           {listing.status === "PENDING_REVIEW" && (
+                             <span className="text-amber-400 font-bold text-[11px]">
+                               🟡 İlanınız onay bekliyor • Editörlerimiz tarafından incelenmektedir.
+                             </span>
+                           )}
                         </div>
 
                         {/* Leads Button */}
@@ -325,7 +367,7 @@ export default function SellerDashboard() {
                       >
                         Düzenle
                       </button>
-                      {listing.status === "DRAFT" && (
+                      {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
                         <button
                           onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
                           className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition"

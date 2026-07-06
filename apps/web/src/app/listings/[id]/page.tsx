@@ -154,6 +154,30 @@ export default function ListingDetail() {
     REAR_BUMPER: "Arka Tampon"
   };
 
+  const translateFuelType = (fuel: string) => {
+    if (!fuel) return "-";
+    const mapping: Record<string, string> = {
+      PETROL: "Benzin",
+      DIESEL: "Dizel",
+      LPG: "LPG",
+      HYBRID: "Hibrit",
+      PLUG_IN_HYBRID: "Plug-in Hibrit",
+      ELECTRIC: "Elektrik",
+      OTHER: "Diğer"
+    };
+    return mapping[fuel.toUpperCase()] || fuel;
+  };
+
+  const translateTransmission = (trans: string) => {
+    if (!trans) return "-";
+    const mapping: Record<string, string> = {
+      MANUAL: "Manuel",
+      AUTOMATIC: "Otomatik",
+      SEMI_AUTOMATIC: "Yarı Otomatik"
+    };
+    return mapping[trans.toUpperCase()] || trans;
+  };
+
   const getPartColorClass = (partKey: string) => {
     const isChanged = Array.isArray(listing.changedParts) && listing.changedParts.includes(partKey);
     const isPainted = Array.isArray(listing.paintedParts) && listing.paintedParts.includes(partKey);
@@ -258,11 +282,11 @@ export default function ListingDetail() {
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase font-black">Yakıt</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{listing.fuelType || "Belirtilmedi"}</span>
+              <span className="text-sm font-bold text-slate-200 mt-0.5">{translateFuelType(listing.fuelType)}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase font-black">Şanzıman</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{listing.transmission || "Belirtilmedi"}</span>
+              <span className="text-sm font-bold text-slate-200 mt-0.5">{translateTransmission(listing.transmission)}</span>
             </div>
           </div>
 
