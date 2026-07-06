@@ -44,6 +44,17 @@ export default function CreateListing() {
   const [bodyType, setBodyType] = useState("SEDAN");
   const [color, setColor] = useState("");
 
+  // Extended Details States
+  const [vehicleStatus, setVehicleStatus] = useState("USED"); 
+  const [hasWarranty, setHasWarranty] = useState(false);
+  const [heavyDamage, setHeavyDamage] = useState(false);
+  const [plateType, setPlateType] = useState("TR_PLATE"); 
+  const [sellerType, setSellerType] = useState("OWNER"); 
+  const [exchangeable, setExchangeable] = useState(false);
+  const [engineDisplacement, setEngineDisplacement] = useState("");
+  const [enginePower, setEnginePower] = useState("");
+  const [drivetrain, setDrivetrain] = useState("FWD");
+
   // Step 3: Condition & Paint checklist
   const [tramerAmount, setTramerAmount] = useState("0");
   const [damageRecord, setDamageRecord] = useState("");
@@ -252,6 +263,15 @@ export default function CreateListing() {
       customBrand: useCustomVariant ? customBrand : null,
       customModel: useCustomVariant ? customModel : null,
       customYear: useCustomVariant ? parseInt(customYear, 10) : null,
+      vehicleStatus,
+      hasWarranty,
+      heavyDamage,
+      plateType,
+      sellerType,
+      exchangeable,
+      engineDisplacement: engineDisplacement ? parseInt(engineDisplacement, 10) : null,
+      enginePower: enginePower ? parseInt(enginePower, 10) : null,
+      drivetrain,
     };
 
     createDraftListingOrGetId().then((listingId) => {
@@ -533,6 +553,111 @@ export default function CreateListing() {
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Araç Durumu</label>
+                <select
+                  value={vehicleStatus}
+                  onChange={(e) => setVehicleStatus(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                >
+                  <option value="USED">İkinci El</option>
+                  <option value="NEW">Sıfır</option>
+                  <option value="IMPORTED_NEW">İthal Sıfır</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Kimden</label>
+                <select
+                  value={sellerType}
+                  onChange={(e) => setSellerType(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                >
+                  <option value="OWNER">Sahibinden</option>
+                  <option value="DEALER">Galeriden</option>
+                  <option value="AUTHORIZED_DEALER">Yetkili Bayiden</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Plaka Uyruğu</label>
+                <select
+                  value={plateType}
+                  onChange={(e) => setPlateType(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                >
+                  <option value="TR_PLATE">TR Plakalı</option>
+                  <option value="MA_PLATE">Mavi Plakalı (MA)</option>
+                  <option value="SPECIAL_PLATE">Özel Plaka</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                <select
+                  value={drivetrain}
+                  onChange={(e) => setDrivetrain(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                >
+                  <option value="FWD">Önden Çekiş</option>
+                  <option value="RWD">Arkadan İtiş</option>
+                  <option value="4WD">4WD (Sürekli)</option>
+                  <option value="AWD">AWD (Elektronik)</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
+                <input
+                  type="number"
+                  value={engineDisplacement}
+                  onChange={(e) => setEngineDisplacement(e.target.value)}
+                  placeholder="Örn: 1598"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
+                <input
+                  type="number"
+                  value={enginePower}
+                  onChange={(e) => setEnginePower(e.target.value)}
+                  placeholder="Örn: 110"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 bg-slate-950/20 p-4 border border-white/5 rounded-2xl">
+              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={hasWarranty}
+                  onChange={(e) => setHasWarranty(e.target.checked)}
+                  className="accent-orange-500 rounded border-white/10"
+                />
+                <span>Garanti Kapsamında</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={heavyDamage}
+                  onChange={(e) => setHeavyDamage(e.target.checked)}
+                  className="accent-orange-500 rounded border-white/10"
+                />
+                <span>Ağır Hasar Kaydı Var</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={exchangeable}
+                  onChange={(e) => setExchangeable(e.target.checked)}
+                  className="accent-orange-500 rounded border-white/10"
+                />
+                <span>Takasa Uygun (Takaslı)</span>
+              </label>
             </div>
 
             <div className="flex flex-col gap-1.5">

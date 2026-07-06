@@ -81,6 +81,51 @@ export class CreateListingDto {
   @IsOptional()
   color?: string;
 
+  @ApiProperty({ example: 'USED', required: false })
+  @IsString()
+  @IsOptional()
+  vehicleStatus?: string;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  hasWarranty?: boolean;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  heavyDamage?: boolean;
+
+  @ApiProperty({ example: 'TR_PLATE', required: false })
+  @IsString()
+  @IsOptional()
+  plateType?: string;
+
+  @ApiProperty({ example: 'OWNER', required: false })
+  @IsString()
+  @IsOptional()
+  sellerType?: string;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  exchangeable?: boolean;
+
+  @ApiProperty({ example: 1598, required: false })
+  @IsNumber()
+  @IsOptional()
+  engineDisplacement?: number;
+
+  @ApiProperty({ example: 110, required: false })
+  @IsNumber()
+  @IsOptional()
+  enginePower?: number;
+
+  @ApiProperty({ example: 'FWD', required: false })
+  @IsString()
+  @IsOptional()
+  drivetrain?: string;
+
   @ApiProperty({ example: 'Yok', required: false })
   @IsString()
   @IsOptional()
@@ -198,6 +243,42 @@ export class UpdateListingDto {
   @IsString()
   @IsOptional()
   color?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleStatus?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  hasWarranty?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  heavyDamage?: boolean;
+
+  @IsString()
+  @IsOptional()
+  plateType?: string;
+
+  @IsString()
+  @IsOptional()
+  sellerType?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  exchangeable?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  engineDisplacement?: number;
+
+  @IsNumber()
+  @IsOptional()
+  enginePower?: number;
+
+  @IsString()
+  @IsOptional()
+  drivetrain?: string;
 
   @IsString()
   @IsOptional()

@@ -922,6 +922,17 @@ model VehicleListing {
   bodyType           BodyType?
   color              String?
   
+  // Extended Specifications & Filters
+  vehicleStatus      String?            // e.g. "USED", "NEW", "IMPORTED_NEW"
+  hasWarranty        Boolean            @default(false)
+  heavyDamage        Boolean            @default(false)
+  plateType          String?            // e.g. "TR_PLATE", "MA_PLATE", "SPECIAL_PLATE"
+  sellerType         String?            // e.g. "OWNER", "DEALER", "AUTHORIZED_DEALER"
+  exchangeable       Boolean            @default(false)
+  engineDisplacement Int?               // in cc, e.g. 1598
+  enginePower        Int?               // in HP, e.g. 110
+  drivetrain         String?            // e.g. "FWD", "RWD", "AWD", "AWD_ELECTRONIC"
+  
   damageRecord       String?
   tramerAmount       Int?               @default(0)
   paintedParts       Json?              // Array of strings (e.g. ["FRONT_BUMPER"])

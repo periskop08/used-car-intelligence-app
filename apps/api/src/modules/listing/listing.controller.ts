@@ -58,6 +58,23 @@ export class ListingController {
     @Query('sort') sort?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('vehicleStatus') vehicleStatus?: string,
+    @Query('hasWarranty') hasWarranty?: string,
+    @Query('heavyDamage') heavyDamage?: string,
+    @Query('plateType') plateType?: string,
+    @Query('sellerType') sellerType?: string,
+    @Query('exchangeable') exchangeable?: string,
+    @Query('minEngineDisplacement') minEngineDisplacement?: string,
+    @Query('maxEngineDisplacement') maxEngineDisplacement?: string,
+    @Query('minEnginePower') minEnginePower?: string,
+    @Query('maxEnginePower') maxEnginePower?: string,
+    @Query('drivetrain') drivetrain?: string,
+    @Query('district') district?: string,
+    @Query('color') color?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('keyword') keyword?: string,
+    @Query('includeDescription') includeDescription?: string,
+    @Query('currency') currency?: string,
   ) {
     // Parse filters
     const filters: any = {
@@ -101,15 +118,102 @@ export class ListingController {
       filters.city = city;
     }
 
+    if (district) {
+      const list = district.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.district = { in: list };
+      }
+    }
+
+    if (currency) {
+      filters.currency = currency;
+    }
+
     if (fuelType) {
-      filters.fuelType = fuelType;
+      const list = fuelType.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.fuelType = { in: list };
+      }
     }
 
     if (transmission) {
-      filters.transmission = transmission;
+      const list = transmission.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.transmission = { in: list };
+      }
     }
 
-    if (isAiReady !== undefined) {
+    if (bodyType) {
+      const list = bodyType.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.bodyType = { in: list };
+      }
+    }
+
+    if (color) {
+      const list = color.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.color = { in: list };
+      }
+    }
+
+    if (vehicleStatus) {
+      filters.vehicleStatus = vehicleStatus;
+    }
+
+    if (hasWarranty !== undefined && hasWarranty !== '') {
+      filters.hasWarranty = hasWarranty === 'true';
+    }
+
+    if (heavyDamage !== undefined && heavyDamage !== '') {
+      filters.heavyDamage = heavyDamage === 'true';
+    }
+
+    if (plateType) {
+      const list = plateType.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.plateType = { in: list };
+      }
+    }
+
+    if (sellerType) {
+      filters.sellerType = sellerType;
+    }
+
+    if (exchangeable !== undefined && exchangeable !== '') {
+      filters.exchangeable = exchangeable === 'true';
+    }
+
+    if (minEngineDisplacement || maxEngineDisplacement) {
+      filters.engineDisplacement = {};
+      if (minEngineDisplacement) filters.engineDisplacement.gte = parseInt(minEngineDisplacement, 10);
+      if (maxEngineDisplacement) filters.engineDisplacement.lte = parseInt(maxEngineDisplacement, 10);
+    }
+
+    if (minEnginePower || maxEnginePower) {
+      filters.enginePower = {};
+      if (minEnginePower) filters.enginePower.gte = parseInt(minEnginePower, 10);
+      if (maxEnginePower) filters.enginePower.lte = parseInt(maxEnginePower, 10);
+    }
+
+    if (drivetrain) {
+      const list = drivetrain.split(',').map(x => x.trim()).filter(Boolean);
+      if (list.length > 0) {
+        filters.drivetrain = { in: list };
+      }
+    }
+
+    if (keyword) {
+      const searchConditions: any[] = [
+        { title: { contains: keyword, mode: 'insensitive' } }
+      ];
+      if (includeDescription === 'true') {
+        searchConditions.push({ description: { contains: keyword, mode: 'insensitive' } });
+      }
+      filters.OR = searchConditions;
+    }
+
+    if (isAiReady !== undefined && isAiReady !== '') {
       filters.isAiReady = isAiReady === 'true';
     }
 
