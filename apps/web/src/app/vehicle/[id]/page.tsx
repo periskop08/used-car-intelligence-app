@@ -596,11 +596,15 @@ export default function VehicleDetail() {
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
                     <span className="text-[10px] text-emerald-500 font-bold block">ALINABİLİRLİK</span>
-                    <span className="text-3xl font-black text-emerald-400">%{aiReport.buyabilityScore}</span>
+                    <span className="text-3xl font-black text-emerald-400">
+                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.buyabilityScore}`}
+                    </span>
                   </div>
                   <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
                     <span className="text-[10px] text-red-500 font-bold block">RİSK KATSAYISI</span>
-                    <span className="text-3xl font-black text-red-400">%{aiReport.riskScore}</span>
+                    <span className="text-3xl font-black text-red-400">
+                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.riskScore}`}
+                    </span>
                   </div>
                 </div>
 
