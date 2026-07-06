@@ -1,14 +1,15 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { ListingService } from './listing.service';
+import { R2Service } from './r2.service';
 import { ListingController } from './listing.controller';
 import { JwtService } from '@nestjs/jwt';
 
 @Module({
   imports: [],
   controllers: [ListingController],
-  providers: [PrismaService, ListingService, JwtService],
-  exports: [ListingService],
+  providers: [PrismaService, ListingService, JwtService, R2Service],
+  exports: [ListingService, R2Service],
 })
 export class ListingModule implements OnModuleInit {
   constructor(private listingService: ListingService) {}

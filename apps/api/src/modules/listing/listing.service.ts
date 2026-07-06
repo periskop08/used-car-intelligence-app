@@ -2,11 +2,15 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException 
 import { PrismaService } from '../../prisma.service';
 import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto';
 import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier } from '@prisma/client';
+import { R2Service } from './r2.service';
 import OpenAI from 'openai';
 
 @Injectable()
 export class ListingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private r2Service: R2Service,
+  ) {}
 
   getQuotaForTier(tier: SubscriptionTier): number {
     switch (tier) {
@@ -276,7 +280,7 @@ export class ListingService {
   }
 
   // Add media and enforce rules
-  async addMedia(id: string, userId: string, fileData: { url: string; size: number; mime: string }) {
+  async addMedia(id: string, userId: string, file: { buffer: Buffer; size: number; mimetype: string }) {
     const listing = await this.prisma.vehicleListing.findUnique({
       where: { id },
       include: { media: true },
@@ -288,14 +292,17 @@ export class ListingService {
       throw new BadRequestException('Bu ilan için en fazla 10 fotoğraf yükleyebilirsiniz.');
     }
 
-    if (fileData.size > 5 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       throw new BadRequestException('Her fotoğraf maksimum 5MB olmalı.');
     }
 
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedMimeTypes.includes(fileData.mime)) {
+    if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException('Desteklenen formatlar JPEG, PNG ve WebP olsun.');
     }
+
+    // Upload to Cloudflare R2 and optimize to WebP
+    const uploadResult = await this.r2Service.uploadImage(file.buffer, `listings/${id}`);
 
     // sortOrder logic
     const sortOrder = listing.media.length; // sequential 0-indexed
@@ -303,12 +310,12 @@ export class ListingService {
     const media = await this.prisma.listingMedia.create({
       data: {
         listingId: id,
-        url: fileData.url,
-        thumbnailUrl: fileData.url, // thumbnail version
-        mediumUrl: fileData.url, // medium version
-        storageKey: `listings/${id}/${Date.now()}-${Math.random().toString(36).substring(7)}`,
-        fileSize: fileData.size,
-        mimeType: fileData.mime,
+        url: uploadResult.url,
+        thumbnailUrl: uploadResult.url, // thumbnail version
+        mediumUrl: uploadResult.url, // medium version
+        storageKey: uploadResult.storageKey,
+        fileSize: uploadResult.fileSize,
+        mimeType: uploadResult.mimeType,
         sortOrder,
         moderationStatus: MediaModerationStatus.PENDING,
       },
@@ -325,6 +332,11 @@ export class ListingService {
 
     const media = await this.prisma.listingMedia.findUnique({ where: { id: mediaId } });
     if (!media || media.listingId !== id) throw new NotFoundException('Media not found.');
+
+    // Delete from Cloudflare R2
+    if (media.storageKey) {
+      await this.r2Service.deleteImage(media.storageKey);
+    }
 
     await this.prisma.listingMedia.delete({ where: { id: mediaId } });
 

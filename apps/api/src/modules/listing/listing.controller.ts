@@ -449,13 +449,11 @@ export class ListingController {
     if (!file.buffer) {
       throw new BadRequestException('Dosya içeriği okunamadı.');
     }
-    const base64Data = file.buffer.toString('base64');
-    const fileUrl = `data:${file.mimetype};base64,${base64Data}`;
 
     return this.listingService.addMedia(id, user.id, {
-      url: fileUrl,
+      buffer: file.buffer,
       size: file.size,
-      mime: file.mimetype,
+      mimetype: file.mimetype,
     });
   }
 
