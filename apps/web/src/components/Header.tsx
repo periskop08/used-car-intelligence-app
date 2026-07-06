@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 
 export default function Header() {
-  const [user, setUser] = useState<{ email: string; subscriptionTier: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; subscriptionTier: string; role?: string } | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -44,6 +44,11 @@ export default function Header() {
         {user && (
           <a href="/dashboard/listings" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
             İlanlarım
+          </a>
+        )}
+        {user && user.role === 'ADMIN' && (
+          <a href="/admin" className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-full hover:bg-red-500/20 transition">
+            Admin Paneli
           </a>
         )}
         <a href="/#packages" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
