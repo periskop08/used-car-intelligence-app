@@ -13,6 +13,7 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activePhoto, setActivePhoto] = useState("");
+  const [hoveredPart, setHoveredPart] = useState("");
 
   // Lead Form States
   const [buyerName, setBuyerName] = useState("");
@@ -135,8 +136,6 @@ export default function ListingDetail() {
       </div>
     );
   }
-
-  const [hoveredPart, setHoveredPart] = useState("");
 
   const PART_LABELS: Record<string, string> = {
     FRONT_BUMPER: "Ön Tampon",
