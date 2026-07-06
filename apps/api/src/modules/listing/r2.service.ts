@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 
 @Injectable()
@@ -61,6 +61,20 @@ export class R2Service {
       fileSize: optimizedBuffer.length,
       mimeType: 'image/webp',
     };
+  }
+
+  /**
+   * Downloads a stream from Cloudflare R2.
+   */
+  async downloadStream(storageKey: string) {
+    const bucketName = process.env.R2_BUCKET_NAME;
+    const response = await this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: storageKey,
+      }),
+    );
+    return response.Body;
   }
 
   /**

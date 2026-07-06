@@ -14,9 +14,13 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  Res,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Response, Request } from 'express';
 import { ListingService } from './listing.service';
+import { R2Service } from './r2.service';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 import {
@@ -33,7 +37,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @ApiTags('Listings')
 @Controller()
 export class ListingController {
-  constructor(private listingService: ListingService) {}
+  constructor(
+    private listingService: ListingService,
+    private r2Service: R2Service,
+  ) {}
 
   // ==========================================
   // PUBLIC ENDPOINTS
@@ -43,6 +50,7 @@ export class ListingController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'ACTIVE durumundaki ilanları filtrele ve listele' })
   async getPublicListings(
+    @Req() req: Request,
     @GetUser() user?: UserPayload,
     @Query('brandId') brandId?: string,
     @Query('modelId') modelId?: string,
@@ -265,6 +273,7 @@ export class ListingController {
 
     const mappedItems = items.map((item) => ({
       ...item,
+      media: item.media ? this.formatMediaUrls(item.media, req) : [],
       isFavorited: favoritedIds.has(item.id),
     }));
 
@@ -277,10 +286,32 @@ export class ListingController {
     };
   }
 
+  @Get('listings/media-proxy/:folder/:key')
+  @ApiOperation({ summary: 'Proxy R2 media files to bypass ISP blocks' })
+  async proxyMedia(
+    @Param('folder') folder: string,
+    @Param('key') key: string,
+    @Res() res: Response,
+  ) {
+    const storageKey = `${folder}/${key}`;
+    try {
+      const stream = await this.r2Service.downloadStream(storageKey);
+      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+      (stream as any).pipe(res);
+    } catch (err) {
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+  }
+
   @Get('listings/:id')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Tek bir ilanı detaylarıyla çek' })
-  async getListingDetail(@Param('id') id: string, @GetUser() user?: UserPayload) {
+  async getListingDetail(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @GetUser() user?: UserPayload,
+  ) {
     const listing = await this.listingService['prisma'].vehicleListing.findUnique({
       where: { id },
       include: {
@@ -319,6 +350,10 @@ export class ListingController {
       isFavorited = !!fav;
     }
 
+    if (listing.media) {
+      listing.media = this.formatMediaUrls(listing.media, req);
+    }
+
     return {
       ...listing,
       isFavorited,
@@ -327,8 +362,11 @@ export class ListingController {
 
   @Get('vehicle-reports/:variantId/related-listings')
   @ApiOperation({ summary: 'Araç varyantına göre ilgili aktif ilanları listele' })
-  async getRelatedListings(@Param('variantId') variantId: string) {
-    return this.listingService['prisma'].vehicleListing.findMany({
+  async getRelatedListings(
+    @Param('variantId') variantId: string,
+    @Req() req: Request,
+  ) {
+    const listings = await this.listingService['prisma'].vehicleListing.findMany({
       where: {
         vehicleVariantId: variantId,
         status: ListingStatus.ACTIVE,
@@ -342,6 +380,11 @@ export class ListingController {
       orderBy: { createdAt: 'desc' },
       take: 4,
     });
+
+    return listings.map((l) => ({
+      ...l,
+      media: l.media ? this.formatMediaUrls(l.media, req) : [],
+    }));
   }
 
   @Post('listings/:id/leads')
@@ -618,7 +661,37 @@ export class ListingController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Kullanıcının favori ilanlarını listele' })
-  async getMyFavorites(@GetUser() user: UserPayload) {
-    return this.listingService.getFavorites(user.id);
+  async getMyFavorites(
+    @GetUser() user: UserPayload,
+    @Req() req: Request,
+  ) {
+    const list = await this.listingService.getFavorites(user.id);
+    return list.map((l) => ({
+      ...l,
+      media: l.media ? this.formatMediaUrls(l.media, req) : [],
+    }));
+  }
+
+  private formatMediaUrls(mediaList: any[], req: Request) {
+    const publicUrl = process.env.R2_PUBLIC_URL;
+    if (publicUrl && !publicUrl.includes('r2.dev')) {
+      return mediaList;
+    }
+
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const baseProxyUrl = `${protocol}://${host}/listings/media-proxy`;
+
+    return mediaList.map((m) => {
+      if (m.storageKey) {
+        return {
+          ...m,
+          url: `${baseProxyUrl}/${m.storageKey}`,
+          thumbnailUrl: `${baseProxyUrl}/${m.storageKey}`,
+          mediumUrl: `${baseProxyUrl}/${m.storageKey}`,
+        };
+      }
+      return m;
+    });
   }
 }
