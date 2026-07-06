@@ -39,7 +39,7 @@ export default function CreateListing() {
   const [kilometers, setKilometers] = useState("");
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
-  const [fuelType, setFuelType] = useState("GASOLINE");
+  const [fuelType, setFuelType] = useState("PETROL");
   const [transmission, setTransmission] = useState("MANUAL");
   const [bodyType, setBodyType] = useState("SEDAN");
   const [color, setColor] = useState("");
@@ -504,7 +504,7 @@ export default function CreateListing() {
                   onChange={(e) => setFuelType(e.target.value)}
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
                 >
-                  <option value="GASOLINE">Benzin</option>
+                  <option value="PETROL">Benzin</option>
                   <option value="DIESEL">Dizel</option>
                   <option value="LPG">LPG</option>
                   <option value="HYBRID">Hibrit</option>

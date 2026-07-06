@@ -125,6 +125,21 @@ export class CreateListingDto {
   @IsString()
   @IsOptional()
   vehicleVariantId?: string;
+
+  @ApiProperty({ example: 'Fiat', required: false })
+  @IsString()
+  @IsOptional()
+  customBrand?: string;
+
+  @ApiProperty({ example: 'Egea', required: false })
+  @IsString()
+  @IsOptional()
+  customModel?: string;
+
+  @ApiProperty({ example: 2018, required: false })
+  @IsNumber()
+  @IsOptional()
+  customYear?: number;
 }
 
 export class UpdateListingDto {
@@ -219,6 +234,18 @@ export class UpdateListingDto {
   @IsString()
   @IsOptional()
   vehicleVariantId?: string;
+
+  @IsString()
+  @IsOptional()
+  customBrand?: string;
+
+  @IsString()
+  @IsOptional()
+  customModel?: string;
+
+  @IsNumber()
+  @IsOptional()
+  customYear?: number;
 }
 
 export class UpdateListingStatusDto {
