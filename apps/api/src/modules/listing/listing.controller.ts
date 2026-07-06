@@ -25,6 +25,7 @@ import {
   UpdateListingStatusDto,
   UpdateMediaModerationDto,
   CreateLeadDto,
+  ReplyToLeadDto,
 } from './listing.dto';
 import { ListingStatus, MediaModerationStatus } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -449,5 +450,18 @@ export class ListingController {
     }
 
     return updatedMedia;
+  }
+
+  @Post('listings/:id/leads/:leadId/reply')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Müşteri talebine satıcı yanıtı gönder' })
+  async replyToLead(
+    @Param('id') id: string,
+    @Param('leadId') leadId: string,
+    @GetUser() user: UserPayload,
+    @Body() dto: ReplyToLeadDto,
+  ) {
+    return this.listingService.replyToLead(id, leadId, user.id, dto.replyMessage);
   }
 }

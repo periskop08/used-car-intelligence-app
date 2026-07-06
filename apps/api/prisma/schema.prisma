@@ -1008,6 +1008,8 @@ model ListingLead {
   message            String
   ipAddress          String?        // Saved for rate-limiting & anti-spam checks
   communicationGranted Boolean        @default(false) // KVKK / GDPR compliance consent
+  replyMessage       String?
+  repliedAt          DateTime?
   
   createdAt          DateTime       @default(now())
   

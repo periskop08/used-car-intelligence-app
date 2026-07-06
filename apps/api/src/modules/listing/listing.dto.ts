@@ -290,3 +290,10 @@ export class CreateLeadDto {
   @IsNotEmpty()
   communicationGranted!: boolean;
 }
+
+export class ReplyToLeadDto {
+  @ApiProperty({ example: 'Tabii, görüşebiliriz.' })
+  @IsString()
+  @IsNotEmpty()
+  replyMessage!: string;
+}

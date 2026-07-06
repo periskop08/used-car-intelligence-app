@@ -16,6 +16,7 @@ export default function SellerDashboard() {
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
   const [expandedLeads, setExpandedLeads] = useState<Record<string, boolean>>({});
+  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (!savedToken) {
@@ -132,6 +133,46 @@ export default function SellerDashboard() {
     if (!targetDateString) return 0;
     const diffTime = new Date(targetDateString).getTime() - Date.now();
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const handleSendReply = (listingId: string, leadId: string) => {
+    const textToSend = replyTexts[leadId];
+    if (!textToSend) return;
+
+    setActionError("");
+    setActionSuccess("");
+
+    fetch(`${API_URL}/listings/${listingId}/leads/${leadId}/reply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ replyMessage: textToSend }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        setActionSuccess("Mesaj yanıtınız başarıyla kaydedildi!");
+        setReplyTexts(prev => ({ ...prev, [leadId]: "" }));
+        return Promise.all([
+          fetch(`${API_URL}/me/listings`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+          fetch(`${API_URL}/me/listing-quota`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json()),
+        ]);
+      })
+      .then(([listingsData, quotaData]) => {
+        setListings(listingsData);
+        setQuota(quotaData);
+      })
+      .catch((err) => {
+        setActionError(err.message);
+      });
   };
 
   if (loading) {
@@ -323,6 +364,37 @@ export default function SellerDashboard() {
                             <p className="text-slate-300 italic leading-relaxed whitespace-pre-wrap">
                               "{lead.message}"
                             </p>
+                            
+                            {lead.replyMessage ? (
+                              <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-1 text-[11px]">
+                                <span className="font-bold text-emerald-400">🟢 Yanıtınız:</span>
+                                <p className="text-slate-200">{lead.replyMessage}</p>
+                                <span className="text-[9px] text-slate-500 text-right mt-1">{formatDate(lead.repliedAt)}</span>
+                              </div>
+                            ) : (
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleSendReply(listing.id, lead.id);
+                                }}
+                                className="mt-3 flex gap-2"
+                              >
+                                <input
+                                  type="text"
+                                  placeholder="Müşteriye yanıt yazın..."
+                                  value={replyTexts[lead.id] || ""}
+                                  required
+                                  onChange={(e) => setReplyTexts(prev => ({ ...prev, [lead.id]: e.target.value }))}
+                                  className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-250 outline-none focus:border-orange-500 transition"
+                                />
+                                <button
+                                  type="submit"
+                                  className="bg-orange-650 hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs transition"
+                                >
+                                  Cevapla
+                                </button>
+                              </form>
+                            )}
                           </div>
                         ))}
                       </div>

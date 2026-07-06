@@ -494,4 +494,27 @@ CRITICAL SAFETY RULES:
       expiredCount: expiredPassiveListings.length,
     };
   }
+
+  async replyToLead(id: string, leadId: string, userId: string, replyMessage: string) {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+    });
+    if (!listing) throw new NotFoundException('Listing not found.');
+    if (listing.sellerId !== userId) throw new ForbiddenException('Not authorized.');
+
+    const lead = await this.prisma.listingLead.findUnique({
+      where: { id: leadId },
+    });
+    if (!lead || lead.listingId !== id) {
+      throw new NotFoundException('Lead not found for this listing.');
+    }
+
+    return this.prisma.listingLead.update({
+      where: { id: leadId },
+      data: {
+        replyMessage,
+        repliedAt: new Date(),
+      },
+    });
+  }
 }
