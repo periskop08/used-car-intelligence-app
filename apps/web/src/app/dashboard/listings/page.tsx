@@ -15,7 +15,7 @@ export default function SellerDashboard() {
   const [token, setToken] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
-
+  const [expandedLeads, setExpandedLeads] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (!savedToken) {
@@ -203,98 +203,131 @@ export default function SellerDashboard() {
               const passiveRemDays = getRemainingDays(listing.passiveUntil);
 
               return (
-                <div
-                  key={listing.id}
-                  className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-900/40 border border-white/5 rounded-3xl gap-6 hover:border-white/10 transition"
-                >
-                  <div className="flex flex-col md:flex-row items-center gap-6">
-                    {/* Cover Photo */}
-                    <div className="w-24 aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex-shrink-0">
-                      <img src={coverImg} alt={listing.title} className="w-full h-full object-cover" />
-                    </div>
+                <div key={listing.id} className="flex flex-col p-6 bg-slate-900/40 border border-white/5 rounded-3xl gap-4 hover:border-white/10 transition">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                      {/* Cover Photo */}
+                      <div className="w-24 aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex-shrink-0">
+                        <img src={coverImg} alt={listing.title} className="w-full h-full object-cover" />
+                      </div>
 
-                    {/* Listing Summary Info */}
-                    <div className="flex flex-col text-center md:text-left gap-1">
-                      <div className="flex items-center justify-center md:justify-start gap-2">
-                        <h4 className="font-extrabold text-slate-200 text-sm line-clamp-1">{listing.title}</h4>
-                        <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
-                          listing.status === "ACTIVE"
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                            : listing.status === "PENDING_REVIEW"
-                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                            : listing.status === "PASSIVE"
-                            ? "bg-slate-800 text-slate-400"
-                            : "bg-red-500/20 text-red-400 border border-red-500/30"
-                        }`}>
-                          {listing.status}
+                      {/* Listing Summary Info */}
+                      <div className="flex flex-col text-center md:text-left gap-1">
+                        <div className="flex items-center justify-center md:justify-start gap-2">
+                          <h4 className="font-extrabold text-slate-200 text-sm line-clamp-1">{listing.title}</h4>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
+                            listing.status === "ACTIVE"
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : listing.status === "PENDING_REVIEW"
+                              ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              : listing.status === "PASSIVE"
+                              ? "bg-slate-800 text-slate-400"
+                              : "bg-red-500/20 text-red-400 border border-red-500/30"
+                          }`}>
+                            {listing.status}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500">
+                          {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}
                         </span>
-                      </div>
-                      <span className="text-[10px] text-slate-500">
-                        {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}
-                      </span>
 
-                      {/* Dynamic Duration Badges */}
-                      <div className="mt-2 text-xs flex flex-col gap-0.5">
-                        {listing.status === "ACTIVE" && (
-                          <span className="text-emerald-400 font-bold">
-                            🟢 Yayında • Kalan süre: {remDays} gün (Bitiş: {formatDate(listing.expiresAt)})
-                          </span>
-                        )}
-                        {listing.status === "PASSIVE" && (
-                          <div className="flex flex-col gap-1.5 mt-1">
-                            <span className="text-slate-400 font-medium">
-                              ⚪ Pasifte • Yenilemek için kalan süre: {passiveRemDays} gün (Son gün: {formatDate(listing.passiveUntil)})
+                        {/* Dynamic Duration Badges */}
+                        <div className="mt-2 text-xs flex flex-col gap-0.5">
+                          {listing.status === "ACTIVE" && (
+                            <span className="text-emerald-400 font-bold">
+                              🟢 Yayında • Kalan süre: {remDays} gün (Bitiş: {formatDate(listing.expiresAt)})
                             </span>
-                            <button
-                              onClick={() => handleRenew(listing.id)}
-                              className="w-fit bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition"
-                            >
-                              Tekrar Yayına Al (Yenile)
-                            </button>
-                          </div>
-                        )}
-                        {listing.status === "EXPIRED" && (
-                          <span className="text-red-400 font-bold">
-                            🔴 Süresi doldu • Yeniden yayınlamak için tekrar yayınlama akışını başlatın.
-                          </span>
+                          )}
+                          {listing.status === "PASSIVE" && (
+                            <div className="flex flex-col gap-1.5 mt-1">
+                              <span className="text-slate-400 font-medium">
+                                ⚪ Pasifte • Yenilemek için kalan süre: {passiveRemDays} gün (Son gün: {formatDate(listing.passiveUntil)})
+                              </span>
+                              <button
+                                onClick={() => handleRenew(listing.id)}
+                                className="w-fit bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition"
+                              >
+                                Tekrar Yayına Al (Yenile)
+                              </button>
+                            </div>
+                          )}
+                          {listing.status === "EXPIRED" && (
+                            <span className="text-red-400 font-bold">
+                              🔴 Süresi doldu • Yeniden yayınlamak için tekrar yayınlama akışını başlatın.
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Leads Button */}
+                        {listing.leads && listing.leads.length > 0 && (
+                          <button
+                            onClick={() => setExpandedLeads(prev => ({ ...prev, [listing.id]: !prev[listing.id] }))}
+                            className="mt-2 text-[10px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-lg w-fit hover:bg-orange-500/20 transition flex items-center gap-1"
+                          >
+                            📩 Gelen Talepler ({listing.leads.length})
+                          </button>
                         )}
                       </div>
                     </div>
+
+                    {/* Actions Column */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/listings/${listing.id}`)}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
+                      >
+                        İlanı Gör
+                      </button>
+                      {listing.status === "DRAFT" && (
+                        <button
+                          onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
+                          className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition"
+                        >
+                          Yayınla
+                        </button>
+                      )}
+                      {listing.status === "ACTIVE" && (
+                        <button
+                          onClick={() => handleStatusChange(listing.id, "PASSIVE")}
+                          className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-750 transition"
+                        >
+                          Pasife Al
+                        </button>
+                      )}
+                      {listing.status === "ACTIVE" && (
+                        <button
+                          onClick={() => handleStatusChange(listing.id, "SOLD")}
+                          className="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                        >
+                          Satıldı İşaretle
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Actions Column */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => router.push(`/listings/${listing.id}`)}
-                      className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
-                    >
-                      İlanı Gör
-                    </button>
-                    {listing.status === "DRAFT" && (
-                      <button
-                        onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
-                        className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition"
-                      >
-                        Yayınla
-                      </button>
-                    )}
-                    {listing.status === "ACTIVE" && (
-                      <button
-                        onClick={() => handleStatusChange(listing.id, "PASSIVE")}
-                        className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-750 transition"
-                      >
-                        Pasife Al
-                      </button>
-                    )}
-                    {listing.status === "ACTIVE" && (
-                      <button
-                        onClick={() => handleStatusChange(listing.id, "SOLD")}
-                        className="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                      >
-                        Satıldı İşaretle
-                      </button>
-                    )}
-                  </div>
+                  {/* Leads Dropdown Section */}
+                  {expandedLeads[listing.id] && listing.leads && listing.leads.length > 0 && (
+                    <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-3">
+                      <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">İlanınıza Gelen İletişim Talepleri</span>
+                      <div className="grid grid-cols-1 gap-3">
+                        {listing.leads.map((lead: any) => (
+                          <div key={lead.id} className="p-4 bg-slate-950/40 border border-white/5 rounded-2xl flex flex-col gap-2 text-xs">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                              <span>Müşteri: <strong className="text-slate-200">{lead.buyerName}</strong></span>
+                              <span>Tarih: {formatDate(lead.createdAt)}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] text-slate-450 border-b border-white/5 pb-2">
+                              <span>Telefon: <a href={`tel:${lead.buyerPhone}`} className="text-orange-400 hover:underline">{lead.buyerPhone}</a></span>
+                              <span>E-posta: <a href={`mailto:${lead.buyerEmail}`} className="text-orange-400 hover:underline">{lead.buyerEmail}</a></span>
+                            </div>
+                            <p className="text-slate-300 italic leading-relaxed whitespace-pre-wrap">
+                              "{lead.message}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

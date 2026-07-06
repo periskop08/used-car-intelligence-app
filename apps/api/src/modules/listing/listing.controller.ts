@@ -235,6 +235,7 @@ export class ListingController {
       include: {
         media: { orderBy: { sortOrder: 'asc' } },
         vehicleVariant: { include: { brand: true, model: true } },
+        leads: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
