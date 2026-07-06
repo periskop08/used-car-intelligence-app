@@ -21,6 +21,47 @@ const categoryMap: Record<string, { label: string; desc: string }> = {
   GENERAL: { label: 'Genel Kontroller', desc: 'Aracın genel durumuyla alakalı diğer temel fiziksel kontroller.' }
 };
 
+const parseBoldText = (content: string) => {
+  const parts = content.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-extrabold text-white">{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
+const renderMarkdown = (text: string) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div className="flex flex-col gap-2">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+
+        // Bullet point
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+          const content = trimmed.substring(2);
+          return (
+            <div key={idx} className="flex items-start gap-2 ml-2 my-0.5">
+              <span className="text-orange-500 select-none">•</span>
+              <span className="text-xs text-slate-300 leading-relaxed">{parseBoldText(content)}</span>
+            </div>
+          );
+        }
+
+        // Standard paragraph
+        return (
+          <p key={idx} className="text-xs text-slate-300 leading-relaxed my-0.5">
+            {parseBoldText(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function VehicleDetail() {
   const params = useParams();
   const router = useRouter();
@@ -675,14 +716,18 @@ export default function VehicleDetail() {
                 </div>
 
                 {/* AI Text Summary */}
-                <div className="flex flex-col gap-2 mt-2">
+                <div className="flex flex-col gap-3 mt-2">
                   <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest">Yapay Zeka Yorumu</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/20 p-3 rounded-xl border border-white/5">
-                    {aiReport.summary.summary}
-                  </p>
-                  <p className="text-xs text-slate-400 leading-relaxed font-semibold italic mt-1">
-                    💡 Tavsiye: {aiReport.summary.shouldBuyComment}
-                  </p>
+                  <div className="bg-slate-900/20 p-4 rounded-xl border border-white/5 flex flex-col gap-2">
+                    {renderMarkdown(aiReport.summary.summary)}
+                  </div>
+                  <div className="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-xl border border-orange-500/10 flex items-start gap-2">
+                    <span className="text-sm select-none">💡</span>
+                    <div className="flex-1">
+                      <span className="font-bold text-slate-300 block mb-1">Tavsiye:</span>
+                      {renderMarkdown(aiReport.summary.shouldBuyComment)}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Regenerate Action */}
