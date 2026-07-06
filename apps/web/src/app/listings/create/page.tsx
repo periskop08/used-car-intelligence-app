@@ -60,6 +60,7 @@ export default function CreateListing() {
   const [damageRecord, setDamageRecord] = useState("");
   const [paintedParts, setPaintedParts] = useState<string[]>([]);
   const [changedParts, setChangedParts] = useState<string[]>([]);
+  const [localPaintedParts, setLocalPaintedParts] = useState<string[]>([]);
   const [maintenanceHistory, setMaintenanceHistory] = useState("");
 
   // Step 4: Photo uploads
@@ -223,6 +224,25 @@ export default function CreateListing() {
     return data.id;
   };
 
+  const handlePartClick = (part: string) => {
+    let current = "ORIGINAL";
+    if (changedParts.includes(part)) current = "CHANGED";
+    else if (paintedParts.includes(part)) current = "PAINTED";
+    else if (localPaintedParts.includes(part)) current = "LOCAL_PAINTED";
+
+    if (current === "ORIGINAL") {
+      setLocalPaintedParts((prev) => [...prev, part]);
+    } else if (current === "LOCAL_PAINTED") {
+      setLocalPaintedParts((prev) => prev.filter((x) => x !== part));
+      setPaintedParts((prev) => [...prev, part]);
+    } else if (current === "PAINTED") {
+      setPaintedParts((prev) => prev.filter((x) => x !== part));
+      setChangedParts((prev) => [...prev, part]);
+    } else if (current === "CHANGED") {
+      setChangedParts((prev) => prev.filter((x) => x !== part));
+    }
+  };
+
   const handleTogglePart = (part: string, type: "painted" | "changed") => {
     const list = type === "painted" ? paintedParts : changedParts;
     const setter = type === "painted" ? setPaintedParts : setChangedParts;
@@ -258,6 +278,7 @@ export default function CreateListing() {
       damageRecord,
       paintedParts,
       changedParts,
+      localPaintedParts,
       maintenanceHistory,
       vehicleVariantId: useCustomVariant ? null : selectedVariant || null,
       customBrand: useCustomVariant ? customBrand : null,
@@ -718,51 +739,111 @@ export default function CreateListing() {
               </div>
             </div>
 
-            {/* Painted parts select checklist */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-300">Boyalı Parçalar</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
-                {PAINTED_COMPONENTS.map((part) => {
-                  const isSelected = paintedParts.includes(part);
-                  return (
-                    <button
-                      key={part}
-                      type="button"
-                      onClick={() => handleTogglePart(part, "painted")}
-                      className={`text-[10px] font-bold py-2 px-3 rounded-xl border text-center transition ${
-                        isSelected
-                          ? "bg-amber-500/20 border-amber-500 text-amber-400"
-                          : "bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/10"
-                      }`}
-                    >
-                      {part.replace(/_/g, " ")}
-                    </button>
-                  );
-                })}
+            {/* Visual Car Parts Selector */}
+            <div className="flex flex-col gap-4 bg-slate-950/20 p-6 border border-white/5 rounded-3xl mt-2">
+              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">Boyalı veya Değişen Parça Seçimi</span>
+              
+              <div className="flex items-center gap-4 text-xs font-bold mt-1">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
+                </span>
+                <span className="flex items-center gap-1.5 text-orange-400">
+                  <span className="w-3.5 h-3.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
+                </span>
+                <span className="flex items-center gap-1.5 text-blue-400">
+                  <span className="w-3.5 h-3.5 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
+                </span>
+                <span className="flex items-center gap-1.5 text-red-400">
+                  <span className="w-3.5 h-3.5 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
+                </span>
               </div>
-            </div>
 
-            {/* Changed parts select checklist */}
-            <div className="flex flex-col gap-2 mt-2">
-              <label className="text-xs font-bold text-slate-300">Değişen Parçalar</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
-                {PAINTED_COMPONENTS.map((part) => {
-                  const isSelected = changedParts.includes(part);
-                  return (
-                    <button
-                      key={part}
-                      type="button"
-                      onClick={() => handleTogglePart(part, "changed")}
-                      className={`text-[10px] font-bold py-2 px-3 rounded-xl border text-center transition ${
-                        isSelected
-                          ? "bg-red-500/20 border-red-500 text-red-400"
-                          : "bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/10"
-                      }`}
-                    >
-                      {part.replace(/_/g, " ")}
-                    </button>
-                  );
-                })}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center mt-4">
+                {/* 1. Car Visual Silhouette Grid */}
+                <div className="md:col-span-6 flex justify-center">
+                  <div className="grid grid-cols-5 grid-rows-6 gap-2 w-full max-w-sm aspect-[3/4] p-4 bg-slate-950/50 border border-white/5 rounded-3xl relative">
+                    {[
+                      { key: "FRONT_BUMPER", label: "Ön Tampon", grid: "col-start-2 col-end-5 row-start-1" },
+                      { key: "LEFT_FRONT_FENDER", label: "Sol Ön Ç.", grid: "col-start-1 row-start-2" },
+                      { key: "HOOD", label: "Kaput", grid: "col-start-2 col-end-5 row-start-2" },
+                      { key: "RIGHT_FRONT_FENDER", label: "Sağ Ön Ç.", grid: "col-start-5 row-start-2" },
+                      { key: "LEFT_FRONT_DOOR", label: "Sol Ön K.", grid: "col-start-1 row-start-3" },
+                      { key: "ROOF", label: "Tavan", grid: "col-start-2 col-end-5 row-start-3 row-end-5" },
+                      { key: "RIGHT_FRONT_DOOR", label: "Sağ Ön K.", grid: "col-start-5 row-start-3" },
+                      { key: "LEFT_REAR_DOOR", label: "Sol Arka K.", grid: "col-start-1 row-start-4" },
+                      { key: "RIGHT_REAR_DOOR", label: "Sağ Arka K.", grid: "col-start-5 row-start-4" },
+                      { key: "LEFT_REAR_FENDER", label: "Sol Arka Ç.", grid: "col-start-1 row-start-5" },
+                      { key: "TRUNK", label: "Bagaj K.", grid: "col-start-2 col-end-5 row-start-5" },
+                      { key: "RIGHT_REAR_FENDER", label: "Sağ Arka Ç.", grid: "col-start-5 row-start-5" },
+                      { key: "REAR_BUMPER", label: "Arka Tampon", grid: "col-start-2 col-end-5 row-start-6" }
+                    ].map((part) => {
+                      let currentVal = "Orijinal";
+                      let colorClass = "bg-slate-900 border border-white/10 text-slate-400";
+                      if (changedParts.includes(part.key)) {
+                        currentVal = "Değişen";
+                        colorClass = "bg-red-500/25 border-red-500 text-red-400";
+                      } else if (paintedParts.includes(part.key)) {
+                        currentVal = "Boyalı";
+                        colorClass = "bg-blue-500/25 border-blue-500 text-blue-400";
+                      } else if (localPaintedParts.includes(part.key)) {
+                        currentVal = "Lokal Boya";
+                        colorClass = "bg-orange-500/25 border-orange-500 text-orange-400";
+                      }
+
+                      return (
+                        <button
+                          key={part.key}
+                          type="button"
+                          onClick={() => handlePartClick(part.key)}
+                          className={`${part.grid} flex flex-col items-center justify-center p-2 rounded-xl text-[9px] font-black tracking-tight border transition duration-200 select-none ${colorClass}`}
+                          title={`${part.label}: ${currentVal} (Değiştirmek için tıklayın)`}
+                        >
+                          <span>{part.label}</span>
+                          <span className="opacity-60 text-[8px] font-medium mt-0.5">{currentVal}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Side Lists: Summarizing current selections */}
+                <div className="md:col-span-6 grid grid-cols-2 gap-4 h-full align-top">
+                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
+                    <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
+                      {localPaintedParts.map(p => (
+                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-orange-400">Lokal Boya</span>
+                        </li>
+                      ))}
+                      {paintedParts.map(p => (
+                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-blue-400">Boyalı</span>
+                        </li>
+                      ))}
+                      {localPaintedParts.length === 0 && paintedParts.length === 0 && (
+                        <span className="text-slate-500 font-bold text-[10px] italic">Hiç seçilmedi.</span>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
+                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
+                    <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
+                      {changedParts.map(p => (
+                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-red-400">Değişen</span>
+                        </li>
+                      ))}
+                      {changedParts.length === 0 && (
+                        <span className="text-slate-500 font-bold text-[10px] italic">Hiç seçilmedi.</span>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -146,6 +146,11 @@ export class CreateListingDto {
   @IsOptional()
   changedParts?: string[];
 
+  @ApiProperty({ example: ['ROOF'], required: false })
+  @IsArray()
+  @IsOptional()
+  localPaintedParts?: string[];
+
   @ApiProperty({ example: 'Tüm bakımları zamanında yapıldı.', required: false })
   @IsString()
   @IsOptional()
@@ -295,6 +300,10 @@ export class UpdateListingDto {
   @IsArray()
   @IsOptional()
   changedParts?: string[];
+
+  @IsArray()
+  @IsOptional()
+  localPaintedParts?: string[];
 
   @IsString()
   @IsOptional()

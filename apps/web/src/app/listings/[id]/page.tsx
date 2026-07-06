@@ -245,35 +245,114 @@ export default function ListingDetail() {
           <div className="flex flex-col gap-4 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
             <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/5 pb-3">Ekspertiz ve Boya/Değişen Durumu</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-400">Boyalı Parçalar:</span>
-                {listing.paintedParts && listing.paintedParts.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {listing.paintedParts.map((p: string) => (
-                      <span key={p} className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-500 italic">Belirtilmedi / Yok</span>
-                )}
+            {/* Visual Car Silhouette Grid (Read-only) */}
+            <div className="flex flex-col gap-4 bg-slate-950/20 p-6 border border-white/5 rounded-3xl mt-2">
+              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">Boyalı veya Değişen Parça Görseli</span>
+              
+              <div className="flex items-center gap-4 text-[10px] font-bold mt-1">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <span className="w-3 h-3 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
+                </span>
+                <span className="flex items-center gap-1.5 text-orange-400">
+                  <span className="w-3.5 h-3.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
+                </span>
+                <span className="flex items-center gap-1.5 text-blue-400">
+                  <span className="w-3 h-3 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
+                </span>
+                <span className="flex items-center gap-1.5 text-red-400">
+                  <span className="w-3 h-3 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
+                </span>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-400">Değişen Parçalar:</span>
-                {listing.changedParts && listing.changedParts.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {listing.changedParts.map((p: string) => (
-                      <span key={p} className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
-                        {p}
-                      </span>
-                    ))}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center mt-4">
+                {/* 1. Car Visual Silhouette Grid */}
+                <div className="md:col-span-6 flex justify-center">
+                  <div className="grid grid-cols-5 grid-rows-6 gap-1.5 w-full max-w-xs aspect-[3/4] p-3 bg-slate-950/50 border border-white/5 rounded-2xl relative">
+                    {[
+                      { key: "FRONT_BUMPER", label: "Ön Tampon", grid: "col-start-2 col-end-5 row-start-1" },
+                      { key: "LEFT_FRONT_FENDER", label: "Sol Ön Ç.", grid: "col-start-1 row-start-2" },
+                      { key: "HOOD", label: "Kaput", grid: "col-start-2 col-end-5 row-start-2" },
+                      { key: "RIGHT_FRONT_FENDER", label: "Sağ Ön Ç.", grid: "col-start-5 row-start-2" },
+                      { key: "LEFT_FRONT_DOOR", label: "Sol Ön K.", grid: "col-start-1 row-start-3" },
+                      { key: "ROOF", label: "Tavan", grid: "col-start-2 col-end-5 row-start-3 row-end-5" },
+                      { key: "RIGHT_FRONT_DOOR", label: "Sağ Ön K.", grid: "col-start-5 row-start-3" },
+                      { key: "LEFT_REAR_DOOR", label: "Sol Arka K.", grid: "col-start-1 row-start-4" },
+                      { key: "RIGHT_REAR_DOOR", label: "Sağ Arka K.", grid: "col-start-5 row-start-4" },
+                      { key: "LEFT_REAR_FENDER", label: "Sol Arka Ç.", grid: "col-start-1 row-start-5" },
+                      { key: "TRUNK", label: "Bagaj K.", grid: "col-start-2 col-end-5 row-start-5" },
+                      { key: "RIGHT_REAR_FENDER", label: "Sağ Arka Ç.", grid: "col-start-5 row-start-5" },
+                      { key: "REAR_BUMPER", label: "Arka Tampon", grid: "col-start-2 col-end-5 row-start-6" }
+                    ].map((part) => {
+                      let currentVal = "Orijinal";
+                      let colorClass = "bg-slate-900 border border-white/10 text-slate-400";
+                      
+                      const isChanged = Array.isArray(listing.changedParts) && listing.changedParts.includes(part.key);
+                      const isPainted = Array.isArray(listing.paintedParts) && listing.paintedParts.includes(part.key);
+                      const isLocalPainted = Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.includes(part.key);
+
+                      if (isChanged) {
+                        currentVal = "Değişen";
+                        colorClass = "bg-red-500/25 border-red-500 text-red-400";
+                      } else if (isPainted) {
+                        currentVal = "Boyalı";
+                        colorClass = "bg-blue-500/25 border-blue-500 text-blue-400";
+                      } else if (isLocalPainted) {
+                        currentVal = "Lokal Boya";
+                        colorClass = "bg-orange-500/25 border-orange-500 text-orange-400";
+                      }
+
+                      return (
+                        <div
+                          key={part.key}
+                          className={`${part.grid} flex flex-col items-center justify-center p-1 rounded-lg text-[8px] font-black tracking-tight border select-none ${colorClass}`}
+                          title={`${part.label}: ${currentVal}`}
+                        >
+                          <span>{part.label}</span>
+                          <span className="opacity-60 text-[7px] font-medium mt-0.5">{currentVal}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <span className="text-xs text-slate-500 italic">Belirtilmedi / Yok</span>
-                )}
+                </div>
+
+                {/* 2. Side Lists: Summarizing current selections */}
+                <div className="md:col-span-6 grid grid-cols-1 gap-4 h-full align-top">
+                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
+                    <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
+                      {Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.map((p: string) => (
+                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-orange-400">Lokal Boya</span>
+                        </li>
+                      ))}
+                      {Array.isArray(listing.paintedParts) && listing.paintedParts.map((p: string) => (
+                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-blue-400">Boyalı</span>
+                        </li>
+                      ))}
+                      {(!listing.localPaintedParts || listing.localPaintedParts.length === 0) && (!listing.paintedParts || listing.paintedParts.length === 0) && (
+                        <span className="text-slate-500 font-bold text-[10px] italic">Boyalı parça yok.</span>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
+                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
+                    <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
+                      {Array.isArray(listing.changedParts) && listing.changedParts.map((p: string) => (
+                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
+                          <span>{p.replace(/_/g, " ")}</span>
+                          <span className="font-bold text-red-400">Değişen</span>
+                        </li>
+                      ))}
+                      {(!listing.changedParts || listing.changedParts.length === 0) && (
+                        <span className="text-slate-500 font-bold text-[10px] italic">Değişen parça yok.</span>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -938,6 +938,7 @@ model VehicleListing {
   tramerAmount       Int?               @default(0)
   paintedParts       Json?              // Array of strings (e.g. ["FRONT_BUMPER"])
   changedParts       Json?              // Array of strings (e.g. ["LEFT_FRONT_DOOR"])
+  localPaintedParts  Json?              // Array of strings (e.g. ["ROOF"])
   maintenanceHistory String?
   expertiseReportUrl String?
   

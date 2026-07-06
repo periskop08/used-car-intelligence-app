@@ -213,6 +213,7 @@ export class ListingService {
         tramerAmount: dto.tramerAmount || 0,
         paintedParts: dto.paintedParts || [],
         changedParts: dto.changedParts || [],
+        localPaintedParts: dto.localPaintedParts || [],
         maintenanceHistory: dto.maintenanceHistory,
         expertiseReportUrl: dto.expertiseReportUrl,
         plateHidden: dto.plateHidden ?? true,
