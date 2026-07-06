@@ -286,14 +286,13 @@ export class ListingController {
     };
   }
 
-  @Get('listings/media-proxy/:folder/:key')
+  @Get('listings/media-proxy/*')
   @ApiOperation({ summary: 'Proxy R2 media files to bypass ISP blocks' })
   async proxyMedia(
-    @Param('folder') folder: string,
-    @Param('key') key: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    const storageKey = `${folder}/${key}`;
+    const storageKey = req.params[0];
     try {
       const stream = await this.r2Service.downloadStream(storageKey);
       res.setHeader('Content-Type', 'image/webp');
