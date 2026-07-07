@@ -292,13 +292,21 @@ export class ListingController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const storageKey = req.params[0];
+    const parts = req.url.split('/listings/media-proxy/');
+    const storageKey = parts[1]?.split('?')[0];
+
+    if (!storageKey) {
+      console.error('Proxy Media: No storageKey found in URL:', req.url);
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+
     try {
       const stream = await this.r2Service.downloadStream(storageKey);
       res.setHeader('Content-Type', 'image/webp');
       res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
       (stream as any).pipe(res);
     } catch (err) {
+      console.error(`Proxy Media: Failed to stream media for key ${storageKey}:`, err);
       throw new NotFoundException('Görsel bulunamadı.');
     }
   }
