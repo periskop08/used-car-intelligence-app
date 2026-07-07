@@ -16,6 +16,7 @@ export default function Home() {
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [selectedBodyType, setSelectedBodyType] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedEngine, setSelectedEngine] = useState("");
   const [selectedFuelType, setSelectedFuelType] = useState("");
@@ -55,6 +56,7 @@ export default function Home() {
   const handleBrandChange = (brandId: string) => {
     setSelectedBrand(brandId);
     setSelectedModel("");
+    setSelectedBodyType("");
     setSelectedYear("");
     setSelectedEngine("");
     setSelectedFuelType("");
@@ -78,6 +80,7 @@ export default function Home() {
   // Fetch Variants when Model changes
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
+    setSelectedBodyType("");
     setSelectedYear("");
     setSelectedEngine("");
     setSelectedFuelType("");
@@ -97,49 +100,64 @@ export default function Home() {
       .catch(() => setLoadingVariants(false));
   };
 
-  // 1. Years Options
-  const years = React.useMemo(() => {
+  // 1. Body Types Options
+  const bodyTypes = React.useMemo(() => {
     if (!variants.length) return [];
-    const uniqueYears = Array.from(new Set(variants.map((v) => v.year)));
-    return uniqueYears.sort((a, b) => b - a);
+    const uniqueBodies = Array.from(new Set(variants.map((v) => v.bodyType).filter(Boolean)));
+    return uniqueBodies.sort();
   }, [variants]);
 
-  // 2. Engines Options
+  // 2. Years Options
+  const years = React.useMemo(() => {
+    if (!selectedBodyType) return [];
+    const filtered = variants.filter((v) => v.bodyType === selectedBodyType);
+    const uniqueYears = Array.from(new Set(filtered.map((v) => v.year)));
+    return uniqueYears.sort((a, b) => b - a);
+  }, [variants, selectedBodyType]);
+
+  // 3. Engines Options
   const engines = React.useMemo(() => {
-    if (!selectedYear) return [];
-    const filtered = variants.filter((v) => v.year === parseInt(selectedYear, 10));
+    if (!selectedBodyType || !selectedYear) return [];
+    const filtered = variants.filter(
+      (v) => v.bodyType === selectedBodyType && v.year === parseInt(selectedYear, 10)
+    );
     const uniqueEngines = Array.from(new Set(filtered.map((v) => v.engine?.code).filter(Boolean)));
     return uniqueEngines.sort();
-  }, [variants, selectedYear]);
+  }, [variants, selectedBodyType, selectedYear]);
 
-  // 3. Fuel Types Options
+  // 4. Fuel Types Options
   const fuelTypes = React.useMemo(() => {
-    if (!selectedYear || !selectedEngine) return [];
+    if (!selectedBodyType || !selectedYear || !selectedEngine) return [];
     const filtered = variants.filter(
-      (v) => v.year === parseInt(selectedYear, 10) && v.engine?.code === selectedEngine
+      (v) =>
+        v.bodyType === selectedBodyType &&
+        v.year === parseInt(selectedYear, 10) &&
+        v.engine?.code === selectedEngine
     );
     const uniqueFuels = Array.from(new Set(filtered.map((v) => v.fuelType).filter(Boolean)));
     return uniqueFuels.sort();
-  }, [variants, selectedYear, selectedEngine]);
+  }, [variants, selectedBodyType, selectedYear, selectedEngine]);
 
-  // 4. Trims (Donanım Paketi) Options
+  // 5. Trims (Donanım Paketi) Options
   const trims = React.useMemo(() => {
-    if (!selectedYear || !selectedEngine || !selectedFuelType) return [];
+    if (!selectedBodyType || !selectedYear || !selectedEngine || !selectedFuelType) return [];
     const filtered = variants.filter(
       (v) =>
+        v.bodyType === selectedBodyType &&
         v.year === parseInt(selectedYear, 10) &&
         v.engine?.code === selectedEngine &&
         v.fuelType === selectedFuelType
     );
     const uniqueTrims = Array.from(new Set(filtered.map((v) => v.trim?.name).filter(Boolean)));
     return uniqueTrims.sort();
-  }, [variants, selectedYear, selectedEngine, selectedFuelType]);
+  }, [variants, selectedBodyType, selectedYear, selectedEngine, selectedFuelType]);
 
-  // 5. Transmissions Options
+  // 6. Transmissions Options
   const transmissions = React.useMemo(() => {
-    if (!selectedYear || !selectedEngine || !selectedFuelType || !selectedTrim) return [];
+    if (!selectedBodyType || !selectedYear || !selectedEngine || !selectedFuelType || !selectedTrim) return [];
     const filtered = variants.filter(
       (v) =>
+        v.bodyType === selectedBodyType &&
         v.year === parseInt(selectedYear, 10) &&
         v.engine?.code === selectedEngine &&
         v.fuelType === selectedFuelType &&
@@ -147,9 +165,15 @@ export default function Home() {
     );
     const uniqueTrans = Array.from(new Set(filtered.map((v) => v.transmission?.name).filter(Boolean)));
     return uniqueTrans.sort();
-  }, [variants, selectedYear, selectedEngine, selectedFuelType, selectedTrim]);
+  }, [variants, selectedBodyType, selectedYear, selectedEngine, selectedFuelType, selectedTrim]);
 
   // Auto-selection micro-interactions
+  useEffect(() => {
+    if (bodyTypes.length === 1 && !selectedBodyType) {
+      setSelectedBodyType(bodyTypes[0]);
+    }
+  }, [bodyTypes, selectedBodyType]);
+
   useEffect(() => {
     if (years.length === 1 && !selectedYear) {
       setSelectedYear(years[0].toString());
@@ -182,9 +206,18 @@ export default function Home() {
 
   // Matched Variant ID
   const matchedVariantId = React.useMemo(() => {
-    if (!selectedYear || !selectedEngine || !selectedFuelType || !selectedTrim || !selectedTransmission) return null;
+    if (
+      !selectedBodyType ||
+      !selectedYear ||
+      !selectedEngine ||
+      !selectedFuelType ||
+      !selectedTrim ||
+      !selectedTransmission
+    )
+      return null;
     const found = variants.find(
       (v) =>
+        v.bodyType === selectedBodyType &&
         v.year === parseInt(selectedYear, 10) &&
         v.engine?.code === selectedEngine &&
         v.fuelType === selectedFuelType &&
@@ -192,7 +225,15 @@ export default function Home() {
         v.transmission?.name === selectedTransmission
     );
     return found ? found.id : null;
-  }, [variants, selectedYear, selectedEngine, selectedFuelType, selectedTrim, selectedTransmission]);
+  }, [
+    variants,
+    selectedBodyType,
+    selectedYear,
+    selectedEngine,
+    selectedFuelType,
+    selectedTrim,
+    selectedTransmission,
+  ]);
 
   const handleInspect = () => {
     if (!matchedVariantId) return;
@@ -208,6 +249,21 @@ export default function Home() {
       case "PLUG_IN_HYBRID": return "Plug-in Hibrit";
       case "ELECTRIC": return "Elektrik";
       default: return fuel || "Diğer";
+    }
+  };
+
+  const displayBodyType = (body: string) => {
+    switch (body) {
+      case "SEDAN": return "Sedan";
+      case "HATCHBACK": return "Hatchback";
+      case "CONVERTIBLE": return "Cabrio";
+      case "COUPE": return "Coupe";
+      case "SUV": return "SUV";
+      case "WAGON": return "Station Wagon";
+      case "PICKUP": return "Pickup";
+      case "VAN": return "Van";
+      case "MINIVAN": return "Minivan";
+      default: return body || "Diğer";
     }
   };
 
@@ -273,6 +329,31 @@ export default function Home() {
             </select>
           </div>
 
+          {/* Body Type Dropdown */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+            <select
+              value={selectedBodyType}
+              onChange={(e) => {
+                setSelectedBodyType(e.target.value);
+                setSelectedYear("");
+                setSelectedEngine("");
+                setSelectedFuelType("");
+                setSelectedTrim("");
+                setSelectedTransmission("");
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedModel || loadingVariants || bodyTypes.length === 0}
+            >
+              <option value="">Seçiniz...</option>
+              {bodyTypes.map((body) => (
+                <option key={body} value={body}>
+                  {displayBodyType(body)}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Year Dropdown */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
@@ -286,7 +367,7 @@ export default function Home() {
                 setSelectedTransmission("");
               }}
               className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-              disabled={!selectedModel || loadingVariants || years.length === 0}
+              disabled={!selectedBodyType || years.length === 0}
             >
               <option value="">Seçiniz...</option>
               {years.map((y) => (
@@ -380,18 +461,16 @@ export default function Home() {
               ))}
             </select>
           </div>
-
-          {/* Submit Button aligned in the 4th column */}
-          <div className="flex flex-col justify-end">
-            <button
-              onClick={handleInspect}
-              disabled={!matchedVariantId}
-              className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-xl shadow-orange-500/10 transition text-center text-sm"
-            >
-              Aracı İncele & AI Raporu Al
-            </button>
-          </div>
         </div>
+
+        {/* Submit Action */}
+        <button
+          onClick={handleInspect}
+          disabled={!matchedVariantId}
+          className="w-full mt-4 bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed hover:opacity-90 text-white font-bold py-4 rounded-2xl shadow-xl shadow-orange-500/10 transition text-center"
+        >
+          Aracı İncele & AI Raporu Al
+        </button>
       </div>
 
       {/* Nasıl Çalışır Section */}
