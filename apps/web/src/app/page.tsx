@@ -16,7 +16,11 @@ export default function Home() {
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedEngine, setSelectedEngine] = useState("");
+  const [selectedFuelType, setSelectedFuelType] = useState("");
+  const [selectedTrim, setSelectedTrim] = useState("");
+  const [selectedTransmission, setSelectedTransmission] = useState("");
 
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -51,7 +55,11 @@ export default function Home() {
   const handleBrandChange = (brandId: string) => {
     setSelectedBrand(brandId);
     setSelectedModel("");
-    setSelectedVariant("");
+    setSelectedYear("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTrim("");
+    setSelectedTransmission("");
     setModels([]);
     setVariants([]);
 
@@ -70,7 +78,11 @@ export default function Home() {
   // Fetch Variants when Model changes
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
-    setSelectedVariant("");
+    setSelectedYear("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTrim("");
+    setSelectedTransmission("");
     setVariants([]);
 
     if (!modelId) return;
@@ -85,9 +97,118 @@ export default function Home() {
       .catch(() => setLoadingVariants(false));
   };
 
+  // 1. Years Options
+  const years = React.useMemo(() => {
+    if (!variants.length) return [];
+    const uniqueYears = Array.from(new Set(variants.map((v) => v.year)));
+    return uniqueYears.sort((a, b) => b - a);
+  }, [variants]);
+
+  // 2. Engines Options
+  const engines = React.useMemo(() => {
+    if (!selectedYear) return [];
+    const filtered = variants.filter((v) => v.year === parseInt(selectedYear, 10));
+    const uniqueEngines = Array.from(new Set(filtered.map((v) => v.engine?.code).filter(Boolean)));
+    return uniqueEngines.sort();
+  }, [variants, selectedYear]);
+
+  // 3. Fuel Types Options
+  const fuelTypes = React.useMemo(() => {
+    if (!selectedYear || !selectedEngine) return [];
+    const filtered = variants.filter(
+      (v) => v.year === parseInt(selectedYear, 10) && v.engine?.code === selectedEngine
+    );
+    const uniqueFuels = Array.from(new Set(filtered.map((v) => v.fuelType).filter(Boolean)));
+    return uniqueFuels.sort();
+  }, [variants, selectedYear, selectedEngine]);
+
+  // 4. Trims (Donanım Paketi) Options
+  const trims = React.useMemo(() => {
+    if (!selectedYear || !selectedEngine || !selectedFuelType) return [];
+    const filtered = variants.filter(
+      (v) =>
+        v.year === parseInt(selectedYear, 10) &&
+        v.engine?.code === selectedEngine &&
+        v.fuelType === selectedFuelType
+    );
+    const uniqueTrims = Array.from(new Set(filtered.map((v) => v.trim?.name).filter(Boolean)));
+    return uniqueTrims.sort();
+  }, [variants, selectedYear, selectedEngine, selectedFuelType]);
+
+  // 5. Transmissions Options
+  const transmissions = React.useMemo(() => {
+    if (!selectedYear || !selectedEngine || !selectedFuelType || !selectedTrim) return [];
+    const filtered = variants.filter(
+      (v) =>
+        v.year === parseInt(selectedYear, 10) &&
+        v.engine?.code === selectedEngine &&
+        v.fuelType === selectedFuelType &&
+        v.trim?.name === selectedTrim
+    );
+    const uniqueTrans = Array.from(new Set(filtered.map((v) => v.transmission?.name).filter(Boolean)));
+    return uniqueTrans.sort();
+  }, [variants, selectedYear, selectedEngine, selectedFuelType, selectedTrim]);
+
+  // Auto-selection micro-interactions
+  useEffect(() => {
+    if (years.length === 1 && !selectedYear) {
+      setSelectedYear(years[0].toString());
+    }
+  }, [years, selectedYear]);
+
+  useEffect(() => {
+    if (engines.length === 1 && !selectedEngine) {
+      setSelectedEngine(engines[0]);
+    }
+  }, [engines, selectedEngine]);
+
+  useEffect(() => {
+    if (fuelTypes.length === 1 && !selectedFuelType) {
+      setSelectedFuelType(fuelTypes[0]);
+    }
+  }, [fuelTypes, selectedFuelType]);
+
+  useEffect(() => {
+    if (trims.length === 1 && !selectedTrim) {
+      setSelectedTrim(trims[0]);
+    }
+  }, [trims, selectedTrim]);
+
+  useEffect(() => {
+    if (transmissions.length === 1 && !selectedTransmission) {
+      setSelectedTransmission(transmissions[0]);
+    }
+  }, [transmissions, selectedTransmission]);
+
+  // Matched Variant ID
+  const matchedVariantId = React.useMemo(() => {
+    if (!selectedYear || !selectedEngine || !selectedFuelType || !selectedTrim || !selectedTransmission) return null;
+    const found = variants.find(
+      (v) =>
+        v.year === parseInt(selectedYear, 10) &&
+        v.engine?.code === selectedEngine &&
+        v.fuelType === selectedFuelType &&
+        v.trim?.name === selectedTrim &&
+        v.transmission?.name === selectedTransmission
+    );
+    return found ? found.id : null;
+  }, [variants, selectedYear, selectedEngine, selectedFuelType, selectedTrim, selectedTransmission]);
+
   const handleInspect = () => {
-    if (!selectedVariant) return;
-    router.push(`/vehicle/${selectedVariant}`);
+    if (!matchedVariantId) return;
+    router.push(`/vehicle/${matchedVariantId}`);
+  };
+
+  const displayFuelType = (fuel: string) => {
+    switch (fuel) {
+      case "PETROL": return "Benzin";
+      case "DIESEL": return "Dizel";
+      case "LPG": return "LPG";
+      case "HYBRID": return "Hibrit";
+      case "PLUG_IN_HYBRID": return "Plug-in Hibrit";
+      case "ELECTRIC": return "Elektrik";
+      default: return fuel || "Diğer";
+    }
   };
 
   return (
@@ -110,19 +231,19 @@ export default function Home() {
       </div>
 
       {/* Interactive Vehicle Selector */}
-      <div className="w-full max-w-4xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5">
+      <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5">
         <h2 className="text-xl font-extrabold text-slate-200 flex items-center gap-2">
           🚗 Hızlı Araç Sorgulama
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Brand Dropdown */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marka</label>
             <select
               value={selectedBrand}
               onChange={(e) => handleBrandChange(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
               disabled={loadingBrands}
             >
               <option value="">Seçiniz...</option>
@@ -140,7 +261,7 @@ export default function Home() {
             <select
               value={selectedModel}
               onChange={(e) => handleModelChange(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
               disabled={!selectedBrand || loadingModels}
             >
               <option value="">Seçiniz...</option>
@@ -152,33 +273,125 @@ export default function Home() {
             </select>
           </div>
 
-          {/* Variant Dropdown */}
+          {/* Year Dropdown */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Varyant (Yıl/Motor/Şanzıman)</label>
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
             <select
-              value={selectedVariant}
-              onChange={(e) => setSelectedVariant(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-              disabled={!selectedModel || loadingVariants}
+              value={selectedYear}
+              onChange={(e) => {
+                setSelectedYear(e.target.value);
+                setSelectedEngine("");
+                setSelectedFuelType("");
+                setSelectedTrim("");
+                setSelectedTransmission("");
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedModel || loadingVariants || years.length === 0}
             >
               <option value="">Seçiniz...</option>
-              {variants.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.year} - {v.engine.code} - {v.transmission.name} ({v.trim.name})
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
                 </option>
               ))}
             </select>
           </div>
-        </div>
 
-        {/* Submit Action */}
-        <button
-          onClick={handleInspect}
-          disabled={!selectedVariant}
-          className="w-full mt-4 bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed hover:opacity-90 text-white font-bold py-4 rounded-2xl shadow-xl shadow-orange-500/10 transition text-center"
-        >
-          Aracı İncele & AI Raporu Al
-        </button>
+          {/* Engine Dropdown */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor</label>
+            <select
+              value={selectedEngine}
+              onChange={(e) => {
+                setSelectedEngine(e.target.value);
+                setSelectedFuelType("");
+                setSelectedTrim("");
+                setSelectedTransmission("");
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedYear || engines.length === 0}
+            >
+              <option value="">Seçiniz...</option>
+              {engines.map((eng) => (
+                <option key={eng} value={eng}>
+                  {eng}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fuel Type Dropdown */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+            <select
+              value={selectedFuelType}
+              onChange={(e) => {
+                setSelectedFuelType(e.target.value);
+                setSelectedTrim("");
+                setSelectedTransmission("");
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedEngine || fuelTypes.length === 0}
+            >
+              <option value="">Seçiniz...</option>
+              {fuelTypes.map((fuel) => (
+                <option key={fuel} value={fuel}>
+                  {displayFuelType(fuel)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Trim Dropdown */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+            <select
+              value={selectedTrim}
+              onChange={(e) => {
+                setSelectedTrim(e.target.value);
+                setSelectedTransmission("");
+              }}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedFuelType || trims.length === 0}
+            >
+              <option value="">Seçiniz...</option>
+              {trims.map((trimName) => (
+                <option key={trimName} value={trimName}>
+                  {trimName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Transmission Dropdown */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+            <select
+              value={selectedTransmission}
+              onChange={(e) => setSelectedTransmission(e.target.value)}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              disabled={!selectedTrim || transmissions.length === 0}
+            >
+              <option value="">Seçiniz...</option>
+              {transmissions.map((trans) => (
+                <option key={trans} value={trans}>
+                  {trans}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Submit Button aligned in the 4th column */}
+          <div className="flex flex-col justify-end">
+            <button
+              onClick={handleInspect}
+              disabled={!matchedVariantId}
+              className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-xl shadow-orange-500/10 transition text-center text-sm"
+            >
+              Aracı İncele & AI Raporu Al
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Nasıl Çalışır Section */}
