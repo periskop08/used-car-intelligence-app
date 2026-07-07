@@ -427,10 +427,40 @@ export default function VehicleDetail() {
                   </div>
                   <div className="bg-slate-900/60 border border-white/5 p-4 rounded-2xl text-center flex flex-col justify-center h-full">
                     <span className="text-[10px] text-slate-400 font-bold block mb-0.5">FİNAL KARAR</span>
-                    <span className={`text-xs font-black px-2 py-1 rounded font-mono ${
-                      aiReport.finalDecision === 'BUY' ? 'bg-emerald-500/25 text-emerald-400' : aiReport.finalDecision === 'BUY_CAREFULLY' ? 'bg-blue-500/25 text-blue-400' : 'bg-red-500/25 text-red-400'
-                    }`}>{aiReport.finalDecision}</span>
+                    <span className={`text-xs font-black px-2 py-1 rounded font-mono border ${
+                      aiReport.finalDecision === 'BUY' 
+                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
+                        : aiReport.finalDecision === 'BUY_CAREFULLY' 
+                        ? 'bg-blue-500/20 border-blue-500/30 text-blue-400' 
+                        : aiReport.finalDecision === 'RISKY' 
+                        ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' 
+                        : aiReport.finalDecision === 'AVOID' 
+                        ? 'bg-red-500/20 border-red-500/30 text-red-400' 
+                        : 'bg-slate-800 border-white/10 text-slate-400'
+                    }`}>
+                      {aiReport.finalDecision === 'BUY' 
+                        ? 'ALINIR' 
+                        : aiReport.finalDecision === 'BUY_CAREFULLY' 
+                        ? 'KONTROLLÜ ALINIR' 
+                        : aiReport.finalDecision === 'RISKY' 
+                        ? 'RİSKLİ' 
+                        : aiReport.finalDecision === 'AVOID' 
+                        ? 'ÖNERİLMEZ' 
+                        : 'VERİ YETERSİZ'}
+                    </span>
                   </div>
+                </div>
+
+                {/* Score Explanations Legend */}
+                <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 text-[11px] text-slate-400 leading-relaxed">
+                  <span className="font-bold text-slate-300 block mb-1">💡 Skorlar Nasıl Yorumlanmalı?</span>
+                  <p className="mb-1">
+                    Yapay zekamız, bu araca ait onaylanmış kronik sorun sıklığı, yedek parça maliyetleri ve servis bültenlerine dayanarak iki ana kriter hesaplar:
+                  </p>
+                  <ul className="list-disc pl-4 flex flex-col gap-1 mt-1 text-[10px]">
+                    <li><strong>Alınabilirlik Oranı:</strong> Aracın genel kronik sorunsuzluk seviyesi ve piyasadaki tercih edilebilirlik tavsiyesidir. Yüksek olması iyidir.</li>
+                    <li><strong>Risk Katsayısı:</strong> Aracın size uzun vadede açabileceği ağır arıza olasılığını ve maliyet risklerini temsil eder. Düşük olması iyidir.</li>
+                  </ul>
                 </div>
 
                 {/* Structured Markdown comments */}
