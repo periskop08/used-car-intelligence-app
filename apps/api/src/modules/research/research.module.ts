@@ -9,6 +9,7 @@ import { ResearchController } from './research.controller';
 import { AdminApprovalController } from './admin-approval.controller';
 
 import { EvidenceRulesService } from './evidence-rules.service';
+import { ResearchWorkerService } from './research-worker.service';
 
 @Module({
   imports: [],
@@ -21,6 +22,7 @@ import { EvidenceRulesService } from './evidence-rules.service';
     AiReportGeneratorService,
     EvidenceRulesService,
     ResearchService,
+    ResearchWorkerService,
   ],
   exports: [ResearchService, AiReportGeneratorService, CoverageService, EvidenceRulesService],
 })
