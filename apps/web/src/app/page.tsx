@@ -101,11 +101,17 @@ export default function Home() {
   };
 
   // 1. Body Types Options
-  const bodyTypes = React.useMemo(() => {
-    if (!variants.length) return [];
-    const uniqueBodies = Array.from(new Set(variants.map((v) => v.bodyType).filter(Boolean)));
-    return uniqueBodies.sort();
-  }, [variants]);
+  const bodyTypes = [
+    "SEDAN",
+    "HATCHBACK",
+    "SUV",
+    "COUPE",
+    "CONVERTIBLE",
+    "WAGON",
+    "MINIVAN",
+    "VAN",
+    "PICKUP"
+  ];
 
   // 2. Years Options
   const years = React.useMemo(() => {
@@ -343,7 +349,7 @@ export default function Home() {
                 setSelectedTransmission("");
               }}
               className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-              disabled={!selectedModel || loadingVariants || bodyTypes.length === 0}
+              disabled={!selectedModel || loadingVariants}
             >
               <option value="">Seçiniz...</option>
               {bodyTypes.map((body) => (
