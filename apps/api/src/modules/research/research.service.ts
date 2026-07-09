@@ -327,7 +327,13 @@ export class ResearchService {
         modelName,
         year,
         searchResults,
-        job.languageCode
+        job.languageCode,
+        {
+          engineCode: job.variant.engine.code,
+          transmissionName: job.variant.transmission.name,
+          fuelType: job.variant.fuelType,
+          hasTurbo: job.variant.engine.hasTurbo,
+        }
       );
 
       // 6. DB transaction insertion with Automated Evidence Rules

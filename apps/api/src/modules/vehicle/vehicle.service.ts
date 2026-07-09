@@ -6,6 +6,33 @@ import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from '
 
 
 
+function checkIfEngineHasTurbo(code: string, fuelType: FuelType): boolean {
+  const lower = code.toLowerCase();
+  if (fuelType === FuelType.DIESEL) return true;
+  if (fuelType === FuelType.ELECTRIC) return false;
+  
+  if (
+    lower.includes('turbo') || 
+    lower.includes('tsi') || 
+    lower.includes('tfsi') || 
+    lower.includes('t-gdi') || 
+    lower.includes('thp') || 
+    lower.includes('tce') || 
+    lower.includes('ecoboost') || 
+    lower.includes('boosterjet')
+  ) {
+    return true;
+  }
+  
+  if (/\b\d\.\d\s*[tT]\b/.test(code) || /\b\d\s*[tT]\b/.test(code) || /\d+s*[tT]\b/.test(code)) {
+    if (!lower.includes('vtec') && !lower.includes('vvti') && !lower.includes('vti') && !lower.includes('puretech')) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 @Injectable()
 export class VehicleService {
   constructor(
@@ -360,7 +387,7 @@ export class VehicleService {
           horsepower: fuelType === FuelType.ELECTRIC ? 204 : parseFloat(engineSize) > 2.0 ? 250 : 150,
           torque: fuelType === FuelType.ELECTRIC ? 310 : parseFloat(engineSize) > 2.0 ? 400 : 250,
           fuelType,
-          hasTurbo: fuelType === FuelType.ELECTRIC ? false : true
+          hasTurbo: checkIfEngineHasTurbo(engineCode, fuelType)
         }
       });
     }
@@ -510,7 +537,7 @@ export class VehicleService {
           horsepower: fuelType === FuelType.ELECTRIC ? 204 : parseFloat(engineSize) > 2.0 ? 250 : 150,
           torque: fuelType === FuelType.ELECTRIC ? 310 : parseFloat(engineSize) > 2.0 ? 400 : 250,
           fuelType,
-          hasTurbo: fuelType === FuelType.ELECTRIC ? false : true
+          hasTurbo: checkIfEngineHasTurbo(code, fuelType)
         }
       });
     }

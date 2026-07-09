@@ -70,6 +70,7 @@ export class AiAnalysisService {
     year: number,
     sources: Array<{ url: string; title: string; snippet: string }>,
     languageCode: string = 'tr',
+    specs?: { engineCode?: string; transmissionName?: string; fuelType?: string; hasTurbo?: boolean },
   ): Promise<AIAnalysisOutput> {
     const isProduction = process.env.NODE_ENV === 'production';
     const apiKey = process.env.OPENAI_API_KEY;
@@ -98,6 +99,8 @@ export class AiAnalysisService {
 
 CRITICAL RULES FOR EXTRACTION:
 - Synthesize the information from the sources with your own extensive internal automotive knowledge about this specific vehicle variant. Supplement any missing recalls, checklists, or questions from your own knowledge base to provide a comprehensive, detailed report, while keeping the caution phrasing for community forum sources.
+- CRITICAL: You must strictly respect the vehicle's engine and fuel specifications. If the target vehicle's engine is naturally aspirated (Turbocharged: No), you MUST NOT extract or suggest any turbocharger-related problems, recalls, seller questions, or inspection checklist items (e.g., no "Turbo Kontrolü", "turbo sızıntısı", etc.).
+- CRITICAL: Do NOT cross-contaminate or mix issues of different engine/fuel types (e.g., do not apply diesel engine i-DTEC issues to a petrol engine i-VTEC, and do not apply turbo problems to naturally aspirated engines).
 - The chronic problem "title" MUST be highly specific and technically precise to the actual failed component or condition (e.g., "Triger Zinciri (Timing Chain) Gevşemesi" or "Yağ Soğutucusu Sızıntısı", NOT generic titles like "Motor Problemleri" or "Elektrik Sorunları").
 - For issues originating from community forums or blogs, use non-definitive, cautious phrasing.
   - In Turkish: "bazı kullanıcılar ... bildirdi", "belirtildi", "görülebildiği ifade edildi" (never "kesindir" or "kronik hatadır" unless backed by official sources).
@@ -107,7 +110,11 @@ CRITICAL RULES FOR EXTRACTION:
 - Ensure recall details are accurate, adding real official recalls for this variant if known to you.
 - You must output strictly valid JSON conforming to the schema.`;
 
-    const userPrompt = `Target vehicle: ${year} ${brandName} ${modelName}
+    const specsText = specs
+      ? `\nEngine: ${specs.engineCode || 'N/A'} (${specs.fuelType || 'N/A'}, Turbocharged: ${specs.hasTurbo ? 'Yes' : 'No'})\nTransmission: ${specs.transmissionName || 'N/A'}`
+      : '';
+
+    const userPrompt = `Target vehicle: ${year} ${brandName} ${modelName}${specsText}
 Language for outputs: ${languageCode === 'tr' ? 'Turkish' : 'English'}
 
 Raw sources:
