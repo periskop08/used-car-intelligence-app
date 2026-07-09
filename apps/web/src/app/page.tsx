@@ -312,8 +312,8 @@ export default function Home() {
       {/* Hero Section */}
       <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-4 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-end flex-none w-48 opacity-80">
-          <svg width="180" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="hidden lg:flex items-center justify-end flex-none w-64 opacity-80">
+          <svg width="240" height="65" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stop-color="#0062ff" stop-opacity="0" />
@@ -341,8 +341,8 @@ export default function Home() {
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-48">
-          <svg width="150" height="150" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-64">
+          <svg width="190" height="190" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
