@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body className="min-h-screen flex flex-col bg-[#0b0f19]">
+      <body className="min-h-screen flex flex-col">
         {/* Client Header component */}
         <Header />
 
@@ -22,8 +22,8 @@ export default function RootLayout({
         <main className="flex-1 flex flex-col">{children}</main>
 
         {/* Footer */}
-        <footer className="border-t border-white/5 bg-[#070b12] py-8 text-center text-xs text-slate-600">
-          <p>© 2026 Used Car Intelligence App. Tüm hakları saklıdır.</p>
+        <footer className="border-t border-white/5 bg-[#020617]/40 py-8 text-center text-xs text-slate-600">
+          <p>© 2026 TorqueScout. Tüm hakları saklıdır.</p>
           <p className="mt-2 text-slate-700">AI analizi doğruluğu teknik veriler ve onaylanmış sorunlara dayanmaktadır.</p>
         </footer>
       </body>
