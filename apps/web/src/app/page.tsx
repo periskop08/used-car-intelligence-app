@@ -301,20 +301,71 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-start py-12 px-6 gap-16">
       {/* Hero Section */}
-      <div className="text-center max-w-3xl flex flex-col items-center gap-4">
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-slate-100">
-          İkinci El Araçta Doğru Bilgiye ve{" "}
-          <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
-            İlanlara
-          </span>{" "}
-          Tek Yerden Ulaşın
-        </h1>
-        <p className="text-slate-400 text-lg md:text-xl font-medium mt-2 leading-relaxed italic">
-          "İlanı gör, aracı anla, doğru kararı ver."
-        </p>
-        <p className="text-slate-500 text-sm max-w-xl leading-relaxed">
-          TorqueScout ile sadece ilanları listelemekle kalmaz, ilgilendiğiniz her aracın kronik arızalarını, geri çağırma kayıtlarını ve AI destekli ekspertiz kontrol noktalarını tek ekranda incelersiniz.
-        </p>
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-8 py-4">
+        {/* Left Side: Speed Lines (Hidden on Mobile) */}
+        <div className="hidden lg:flex items-center justify-end flex-1 opacity-80">
+          <svg width="220" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0062ff" stop-opacity="0" />
+                <stop offset="50%" stop-color="#0062ff" stop-opacity="0.5" />
+                <stop offset="100%" stop-color="#00f2fe" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="10" width="220" height="6" rx="3" fill="url(#left-lines-grad)" />
+            <rect x="40" y="26" width="180" height="6" rx="3" fill="url(#left-lines-grad)" />
+            <rect x="120" y="42" width="100" height="6" rx="3" fill="url(#left-lines-grad)" />
+          </svg>
+        </div>
+
+        {/* Center: Hero Text */}
+        <div className="text-center max-w-3xl flex-1 flex flex-col items-center gap-4">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white">
+            İlanı gör, aracı anla,{" "}
+            <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+              doğru kararı ver.
+            </span>
+          </h1>
+          <p className="text-slate-400 text-base md:text-lg font-medium leading-relaxed max-w-xl">
+            Araçları tanıyın, karşılaştırın ve size uygun ilanları keşfedin.
+          </p>
+        </div>
+
+        {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
+        <div className="hidden lg:flex items-center justify-start flex-1">
+          <svg width="150" height="150" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse duration-[3000ms] filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+            <defs>
+              <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#00f2fe" />
+                <stop offset="100%" stop-color="#0062ff" />
+              </linearGradient>
+              <linearGradient id="lines-gradient-large" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0062ff" stop-opacity="0.1" />
+                <stop offset="100%" stop-color="#00f2fe" />
+              </linearGradient>
+              <linearGradient id="arc-gradient-large" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stop-color="#0062ff" stop-opacity="0.2" />
+                <stop offset="100%" stop-color="#00d2ff" />
+              </linearGradient>
+            </defs>
+            
+            {/* Speed Lines */}
+            <rect x="15" y="75" width="35" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
+            <rect x="5" y="95" width="50" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
+            <rect x="20" y="115" width="25" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
+
+            {/* Speedometer Arc */}
+            <path d="M 125 155 A 60 60 0 0 0 175 75" stroke="url(#arc-gradient-large)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 5" />
+            <path d="M 115 165 A 72 72 0 0 0 182 68" stroke="url(#t-gradient-large)" stroke-width="5" stroke-linecap="round" opacity="0.8" />
+            
+            {/* Speedometer Needle */}
+            <line x1="145" y1="115" x2="175" y2="92" stroke="#00f2fe" stroke-width="4.5" stroke-linecap="round" />
+            <circle cx="145" cy="115" r="6" fill="#00f2fe" />
+
+            {/* Slanted "T" */}
+            <path d="M 78 55 L 140 55 L 132 75 L 112 75 L 87 165 L 62 165 L 87 75 L 67 75 Z" fill="url(#t-gradient-large)" />
+          </svg>
+        </div>
       </div>
 
       {/* Interactive Vehicle Selector */}
