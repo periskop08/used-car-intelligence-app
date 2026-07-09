@@ -52,9 +52,22 @@ export default function Header() {
         <a href="/comparison" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Araç Karşılaştırma
         </a>
-        <a href="/listings" className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3 py-1.5 rounded-full hover:bg-orange-500/20 transition">
-          İlanlar
-        </a>
+        <div className="relative group">
+          <button className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3.5 py-1.5 rounded-full hover:bg-orange-500/20 transition flex items-center gap-1.5 cursor-pointer">
+            <span>İlanlar</span>
+            <span className="text-[8px] text-orange-400/80">▼</span>
+          </button>
+          <div className="absolute left-0 top-full pt-2 w-44 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="bg-[#0f1422] border border-white/5 rounded-2xl shadow-2xl p-2 flex flex-col gap-1">
+              <a href="/listings" className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition">
+                🚗 İlanları İncele
+              </a>
+              <a href="/listings/create" className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition">
+                ➕ İlan Ekle
+              </a>
+            </div>
+          </div>
+        </div>
         {user && (
           <a href="/dashboard/listings" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
             İlanlarım
@@ -113,6 +126,15 @@ export default function Header() {
                     className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
                   >
                     <span>İlanlarım</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/listings/create"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>İlan Ekle</span>
                     <span className="text-slate-500">→</span>
                   </a>
 
