@@ -26,61 +26,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
-      <a href="/" className="flex flex-col select-none group/logo">
-        <div className="flex items-center leading-none">
-          {/* T with Speed Lines (SVG) */}
-          <svg width="24" height="28" viewBox="0 0 85 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-0.5">
-            <defs>
-              <linearGradient id="lines-gradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#0062ff" stop-opacity="0.1" />
-                <stop offset="100%" stop-color="#3b82f6" />
-              </linearGradient>
-            </defs>
-            {/* 3 Speed Lines on the Left */}
-            <rect x="15" y="28" width="30" height="6" rx="3" fill="url(#lines-gradient)" />
-            <rect x="5" y="44" width="40" height="6" rx="3" fill="url(#lines-gradient)" />
-            <rect x="20" y="60" width="22" height="6" rx="3" fill="url(#lines-gradient)" />
-            
-            {/* Slanted T Stem and Top Bar */}
-            <path d="M 52 15 L 85 15 L 79 28 L 68 28 L 48 90 L 35 90 L 55 28 L 47 28 Z" fill="#0f294a" />
-          </svg>
-          
-          {/* "orque" text */}
-          <span className="text-[26px] font-black text-[#0f294a] tracking-tight -ml-1">
-            orque
-          </span>
-
-          {/* "Sc" text */}
-          <span className="text-[26px] font-black bg-gradient-to-r from-blue-600 to-[#00d2ff] bg-clip-text text-transparent tracking-tight ml-0.5">
-            Sc
-          </span>
-
-          {/* Speedometer "o" (SVG) */}
-          <svg width="22" height="22" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-[1px] -mt-0.5">
-            <defs>
-              <linearGradient id="o-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#0062ff" />
-                <stop offset="100%" stop-color="#00f2fe" />
-              </linearGradient>
-            </defs>
-            {/* Outer Circle (Speedometer) */}
-            <circle cx="50" cy="50" r="42" stroke="url(#o-grad)" stroke-width="12" />
-            {/* Needle pointing to 2 o'clock */}
-            <line x1="50" y1="50" x2="72" y2="28" stroke="url(#o-grad)" stroke-width="10" stroke-linecap="round" />
-            {/* Center cap */}
-            <circle cx="50" cy="50" r="10" fill="url(#o-grad)" />
-          </svg>
-
-          {/* "ut" text */}
-          <span className="text-[26px] font-black text-[#00f2fe] tracking-tight">
-            ut
-          </span>
-        </div>
-        
-        {/* Subtitle */}
-        <span className="text-[7.5px] font-bold text-slate-400 tracking-[0.24em] mt-1.5 uppercase leading-none pl-[25px]">
-          İKİNCİ ELDE DOĞRU KARAR
-        </span>
+      <a href="/" className="flex items-center gap-3 group/logo">
+        <img 
+          src="/logo.png" 
+          alt="TorqueScout" 
+          className="h-11 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
+        />
       </a>
 
       <nav className="hidden md:flex items-center gap-8">
