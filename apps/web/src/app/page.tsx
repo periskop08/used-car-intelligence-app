@@ -364,25 +364,25 @@ export default function Home() {
             <rect x="20" y="115" width="25" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
 
             {/* Speedometer Arc */}
-            <path d="M 100 155 A 60 60 0 0 0 150 75" stroke="url(#arc-gradient-large)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 5" />
-            <path d="M 90 165 A 72 72 0 0 0 157 68" stroke="url(#t-gradient-large)" stroke-width="5" stroke-linecap="round" opacity="0.8" />
+            <path d="M 110 155 A 60 60 0 0 0 160 75" stroke="url(#arc-gradient-large)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 5" />
+            <path d="M 100 165 A 72 72 0 0 0 167 68" stroke="url(#t-gradient-large)" stroke-width="5" stroke-linecap="round" opacity="0.8" />
             
             {/* Speedometer Needle */}
             <line 
-              x1="120" 
+              x1="130" 
               y1="115" 
-              x2="155" 
+              x2="165" 
               y2="115" 
               stroke="#00f2fe" 
               strokeWidth="4.5" 
               strokeLinecap="round"
               style={{
                 transform: `rotate(${needleAngle}deg)`,
-                transformOrigin: '120px 115px',
+                transformOrigin: '130px 115px',
                 transition: 'transform 1.8s cubic-bezier(0.25, 0.8, 0.25, 1)'
               }}
             />
-            <circle cx="120" cy="115" r="6" fill="#00f2fe" />
+            <circle cx="130" cy="115" r="6" fill="#00f2fe" />
 
             {/* Slanted "T" */}
             <path d="M 68 55 L 152 55 L 144 75 L 112 75 L 87 165 L 62 165 L 87 75 L 57 75 Z" fill="url(#t-gradient-large)" />
