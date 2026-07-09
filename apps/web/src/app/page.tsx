@@ -40,6 +40,15 @@ export default function Home() {
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [loadingListings, setLoadingListings] = useState(false);
 
+  // Speedometer needle animation state (simulating acceleration)
+  const [needleAngle, setNeedleAngle] = useState(-30);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNeedleAngle((prev) => (prev === -30 ? 60 : -30));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Fetch Featured Listings on Load
   useEffect(() => {
     setLoadingListings(true);
@@ -301,10 +310,10 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-start py-12 px-6 gap-16">
       {/* Hero Section */}
-      <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-8 py-4">
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-4 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-end flex-1 opacity-80">
-          <svg width="220" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="hidden lg:flex items-center justify-end flex-none w-48 opacity-80">
+          <svg width="180" height="60" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stop-color="#0062ff" stop-opacity="0" />
@@ -319,21 +328,21 @@ export default function Home() {
         </div>
 
         {/* Center: Hero Text */}
-        <div className="text-center max-w-3xl flex-1 flex flex-col items-center gap-4">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white">
+        <div className="text-center flex-1 max-w-4xl flex flex-col items-center gap-4">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white whitespace-nowrap">
             İlanı gör, aracı anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
               doğru kararı ver.
             </span>
           </h1>
-          <p className="text-slate-400 text-base md:text-lg font-medium leading-relaxed max-w-xl">
+          <p className="text-slate-400 text-base md:text-lg font-medium leading-relaxed max-w-3xl">
             Araçları tanıyın, karşılaştırın ve size uygun ilanları keşfedin.
           </p>
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-1">
-          <svg width="150" height="150" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse duration-[3000ms] filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-48">
+          <svg width="150" height="150" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
@@ -359,7 +368,20 @@ export default function Home() {
             <path d="M 115 165 A 72 72 0 0 0 182 68" stroke="url(#t-gradient-large)" stroke-width="5" stroke-linecap="round" opacity="0.8" />
             
             {/* Speedometer Needle */}
-            <line x1="145" y1="115" x2="175" y2="92" stroke="#00f2fe" stroke-width="4.5" stroke-linecap="round" />
+            <line 
+              x1="145" 
+              y1="115" 
+              x2="180" 
+              y2="115" 
+              stroke="#00f2fe" 
+              strokeWidth="4.5" 
+              strokeLinecap="round"
+              style={{
+                transform: `rotate(${needleAngle}deg)`,
+                transformOrigin: '145px 115px',
+                transition: 'transform 1.8s cubic-bezier(0.25, 0.8, 0.25, 1)'
+              }}
+            />
             <circle cx="145" cy="115" r="6" fill="#00f2fe" />
 
             {/* Slanted "T" */}
