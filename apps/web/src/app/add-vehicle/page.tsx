@@ -59,6 +59,9 @@ export default function AddVehiclePage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Confirmation view state
+  const [isConfirming, setIsConfirming] = useState(false);
+
   // Check auth and fetch initial data
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
@@ -69,7 +72,7 @@ export default function AddVehiclePage() {
     setToken(savedToken);
     setAuthLoading(false);
 
-    // Populat years (2000 to current year 2026)
+    // Populate years (2000 to current year 2026)
     const yearList = [];
     for (let yr = 2026; yr >= 2000; yr--) {
       yearList.push(yr);
@@ -110,7 +113,8 @@ export default function AddVehiclePage() {
       });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Step 1: Pre-validation & enter confirmation mode
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
@@ -129,7 +133,15 @@ export default function AddVehiclePage() {
       return;
     }
 
+    setIsConfirming(true);
+  };
+
+  // Step 2: Final API submission
+  const handleFinalSubmit = () => {
+    setErrorMsg("");
+    setSuccessMsg("");
     setSubmitting(true);
+
     fetch(`${API_URL}/vehicles/suggest`, {
       method: "POST",
       headers: {
@@ -156,6 +168,7 @@ export default function AddVehiclePage() {
       })
       .then((data) => {
         setSuccessMsg(data.message || "Araç başarıyla ekleme talebi olarak admin onayına gönderildi!");
+        setIsConfirming(false);
         // Reset form
         setSelectedBrand("");
         setSelectedModel("");
@@ -183,6 +196,95 @@ export default function AddVehiclePage() {
     );
   }
 
+  // Confirmation mode view
+  if (isConfirming) {
+    const brandName = brands.find((b) => b.id === selectedBrand)?.name || "";
+    const modelName = models.find((m) => m.id === selectedModel)?.name || "";
+    const bodyTypeLabel = BODY_TYPES.find((b) => b.value === selectedBodyType)?.label || selectedBodyType;
+    const fuelTypeLabel = FUEL_TYPES.find((f) => f.value === selectedFuelType)?.label || selectedFuelType;
+    const transmissionLabel = TRANSMISSIONS.find((t) => t.value === selectedTransmission)?.label || selectedTransmission;
+
+    return (
+      <div className="flex-1 w-full max-w-3xl mx-auto px-6 py-12 flex flex-col gap-8 animate-in fade-in duration-200">
+        <div className="text-center">
+          <h1 className="text-3xl font-black text-slate-100 tracking-tight flex items-center justify-center gap-2">
+            📋 Talebinizi Kontrol Edin
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Araç ekleme önerinizi göndermeden önce bilgilerin doğruluğundan emin olun.
+          </p>
+        </div>
+
+        {errorMsg && (
+          <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl text-xs font-bold leading-relaxed">
+            🛑 {errorMsg}
+          </div>
+        )}
+
+        <div className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl text-xs font-semibold leading-relaxed">
+            💡 Araç bilgileriniz aşağıdaki şekilde kaydedilecektir. Bir hata fark ederseniz "Düzenle" butonuna tıklayarak düzeltebilirsiniz.
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-white/5 pb-6 text-sm">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Marka</span>
+              <span className="text-slate-200 font-semibold text-base">{brandName}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Model</span>
+              <span className="text-slate-200 font-semibold text-base">{modelName}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Model Yılı</span>
+              <span className="text-slate-200 font-semibold text-base">{selectedYear}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kasa Tipi</span>
+              <span className="text-slate-200 font-semibold text-base">{bodyTypeLabel}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Motor Özelliği</span>
+              <span className="text-slate-200 font-semibold text-base">{engineInput}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Yakıt Türü</span>
+              <span className="text-slate-200 font-semibold text-base">{fuelTypeLabel}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Donanım Paketi</span>
+              <span className="text-slate-200 font-semibold text-base">{trimInput}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Şanzıman Türü</span>
+              <span className="text-slate-200 font-semibold text-base">{transmissionLabel}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setIsConfirming(false)}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-350 font-bold py-3.5 rounded-xl transition text-sm cursor-pointer"
+              disabled={submitting}
+            >
+              ✏️ Düzenle
+            </button>
+            <button
+              type="button"
+              onClick={handleFinalSubmit}
+              className="flex-1 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white font-bold py-3.5 rounded-xl shadow-lg transition text-sm cursor-pointer"
+              disabled={submitting}
+            >
+              {submitting ? "Gönderiliyor..." : "Onayla ve Gönder 🚀"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Editable form mode
   return (
     <div className="flex-1 w-full max-w-3xl mx-auto px-6 py-12 flex flex-col gap-8">
       {/* Title */}
@@ -208,7 +310,7 @@ export default function AddVehiclePage() {
       )}
 
       {/* Form Card */}
-      <form onSubmit={handleSubmit} className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
+      <form onSubmit={handleFormSubmit} className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
           {/* Brand Dropdown */}
@@ -351,10 +453,9 @@ export default function AddVehiclePage() {
 
         <button
           type="submit"
-          disabled={submitting}
-          className="mt-4 w-full bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white font-bold py-3.5 rounded-xl shadow-lg transition"
+          className="mt-4 w-full bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white font-bold py-3.5 rounded-xl shadow-lg transition cursor-pointer"
         >
-          {submitting ? "Gönderiliyor..." : "Yeni Araç Önerisi Gönder ➕"}
+          Kontrol Et ve Devam Et 🔍
         </button>
       </form>
     </div>
