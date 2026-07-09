@@ -27,50 +27,11 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
       <a href="/" className="flex items-center gap-3 group/logo">
-        {/* Emblem SVG */}
-        <svg width="42" height="42" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="transform group-hover/logo:scale-105 transition duration-300">
-          <defs>
-            <linearGradient id="t-gradient" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#00f2fe" />
-              <stop offset="100%" stop-color="#0062ff" />
-            </linearGradient>
-            <linearGradient id="speed-gradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#0062ff" stop-opacity="0.1" />
-              <stop offset="100%" stop-color="#00f2fe" />
-            </linearGradient>
-            <linearGradient id="arc-gradient" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0%" stop-color="#0062ff" stop-opacity="0.2" />
-              <stop offset="100%" stop-color="#00d2ff" />
-            </linearGradient>
-          </defs>
-          
-          {/* Speed Lines on the Left */}
-          <rect x="15" y="75" width="35" height="7" rx="3.5" fill="url(#speed-gradient)" />
-          <rect x="5" y="95" width="50" height="7" rx="3.5" fill="url(#speed-gradient)" />
-          <rect x="20" y="115" width="25" height="7" rx="3.5" fill="url(#speed-gradient)" />
-
-          {/* Speedometer Arc on the Right */}
-          <path d="M 125 155 A 60 60 0 0 0 175 75" stroke="url(#arc-gradient)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 5" />
-          <path d="M 115 165 A 72 72 0 0 0 182 68" stroke="url(#t-gradient)" stroke-width="5" stroke-linecap="round" opacity="0.8" />
-          
-          {/* Speedometer Needle */}
-          <line x1="145" y1="115" x2="175" y2="92" stroke="#00f2fe" stroke-width="4.5" stroke-linecap="round" />
-          <circle cx="145" cy="115" r="6" fill="#00f2fe" />
-
-          {/* Slanted "T" */}
-          <path d="M 78 55 L 140 55 L 132 75 L 112 75 L 87 165 L 62 165 L 87 75 L 67 75 Z" fill="url(#t-gradient)" />
-        </svg>
-
-        {/* Text and Subtitle */}
-        <div className="flex flex-col select-none">
-          <div className="text-xl font-extrabold tracking-tight leading-none flex items-center">
-            <span className="text-white">Torque</span>
-            <span className="bg-gradient-to-r from-[#00f2fe] to-[#00d2ff] bg-clip-text text-transparent">Scout</span>
-          </div>
-          <span className="text-[7.5px] font-bold text-slate-400 tracking-[0.22em] mt-1.5 uppercase leading-none">
-            İKİNCİ ELDE DOĞRU KARAR
-          </span>
-        </div>
+        <img 
+          src="/logo.png" 
+          alt="TorqueScout" 
+          className="h-10 w-auto transform group-hover/logo:scale-[1.03] transition duration-300 filter drop-shadow-[0_0_8px_rgba(59,130,246,0.2)]"
+        />
       </a>
 
       <nav className="hidden md:flex items-center gap-8">
