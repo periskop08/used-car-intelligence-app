@@ -328,14 +328,14 @@ export default function Home() {
         </div>
 
         {/* Center: Hero Text */}
-        <div className="text-center flex-1 max-w-4xl flex flex-col items-center gap-4">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white whitespace-nowrap">
+        <div className="text-center flex-1 max-w-3xl flex flex-col items-center gap-2.5">
+          <h1 className="text-xl md:text-[34px] font-black tracking-tight leading-tight text-white whitespace-nowrap">
             İlanı gör, aracı anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
               doğru kararı ver.
             </span>
           </h1>
-          <p className="text-slate-400 text-base md:text-lg font-medium leading-relaxed max-w-3xl">
+          <p className="text-slate-400 text-xs md:text-[14px] font-medium leading-relaxed max-w-2xl">
             Araçları tanıyın, karşılaştırın ve size uygun ilanları keşfedin.
           </p>
         </div>
