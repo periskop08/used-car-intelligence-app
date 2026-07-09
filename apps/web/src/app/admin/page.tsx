@@ -43,6 +43,22 @@ const translateTransmission = (trans: string) => {
   return mapping[trans.toUpperCase()] || trans;
 };
 
+const displayBodyType = (body: string) => {
+  if (!body) return "-";
+  const mapping: Record<string, string> = {
+    SEDAN: "Sedan",
+    HATCHBACK: "Hatchback",
+    CONVERTIBLE: "Cabrio",
+    COUPE: "Coupe",
+    SUV: "SUV",
+    WAGON: "Station Wagon",
+    PICKUP: "Pickup",
+    VAN: "Van",
+    MINIVAN: "Minivan"
+  };
+  return mapping[body.toUpperCase()] || body;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function UnifiedAdminPage() {
@@ -54,7 +70,7 @@ export default function UnifiedAdminPage() {
   const [token, setToken] = useState("");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"listings" | "jobs">("listings");
+  const [activeTab, setActiveTab] = useState<"listings" | "jobs" | "variants">("listings");
 
   // Listings state
   const [listings, setListings] = useState<any[]>([]);
@@ -73,6 +89,16 @@ export default function UnifiedAdminPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Suggested variants states
+  const [variants, setVariants] = useState<any[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+
+  // Variant editing states
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [editEngine, setEditEngine] = useState("");
+  const [editTrim, setEditTrim] = useState("");
+  const [editYear, setEditYear] = useState("");
+
   // Verify Admin Role on Mount
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
@@ -88,7 +114,7 @@ export default function UnifiedAdminPage() {
       try {
         const parsedUser = JSON.parse(savedUser);
         if (parsedUser.role !== "ADMIN") {
-          setErrorMsg("Bu sayfaya erişim yetkiniz bulunmamaktadır. Yalnızca yöneticiler girebilir.");
+          setErrorMsg("Bu sayfaya erişim yetkiniz bulunamadı. Yalnızca yöneticiler girebilir.");
           setAuthLoading(false);
         } else {
           setIsAdmin(true);
@@ -96,6 +122,7 @@ export default function UnifiedAdminPage() {
           // Initial fetches
           fetchAdminListings(savedToken);
           fetchResearchJobs(savedToken);
+          fetchPendingVariants(savedToken);
         }
       } catch (e) {
         setErrorMsg("Oturum doğrulanamadı.");
@@ -268,6 +295,102 @@ export default function UnifiedAdminPage() {
       });
   };
 
+  const fetchPendingVariants = (jwtToken: string) => {
+    setVariantsLoading(true);
+    fetch(`${API_URL}/vehicles/admin/pending`, {
+      headers: { Authorization: `Bearer ${jwtToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Varyantlar yüklenemedi.");
+        return res.json();
+      })
+      .then((data) => {
+        setVariants(Array.isArray(data) ? data : []);
+        setVariantsLoading(false);
+      })
+      .catch((err) => {
+        setErrorMsg(err.message);
+        setVariantsLoading(false);
+      });
+  };
+
+  const handleApproveVariant = (variantId: string) => {
+    setActionLoading(true);
+    fetch(`${API_URL}/vehicles/admin/${variantId}/approve`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        alert("Araç varyantı başarıyla onaylandı ve yayına alındı!");
+        fetchPendingVariants(token);
+      })
+      .catch((err) => {
+        alert(`Hata: ${err.message}`);
+      })
+      .finally(() => {
+        setActionLoading(false);
+      });
+  };
+
+  const handleRejectVariant = (variantId: string) => {
+    const reason = prompt("Lütfen araç reddetme gerekçesini giriniz:");
+    if (!reason) return;
+
+    setActionLoading(true);
+    fetch(`${API_URL}/vehicles/admin/${variantId}/reject`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ reason }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        alert("Araç varyantı reddedildi!");
+        fetchPendingVariants(token);
+      })
+      .catch((err) => {
+        alert(`Hata: ${err.message}`);
+      })
+      .finally(() => {
+        setActionLoading(false);
+      });
+  };
+
+  const handleEditVariant = (variantId: string, updatedFields: any) => {
+    setActionLoading(true);
+    fetch(`${API_URL}/vehicles/admin/${variantId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(updatedFields),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        alert("Araç varyantı başarıyla güncellendi!");
+        fetchPendingVariants(token);
+      })
+      .catch((err) => {
+        alert(`Hata: ${err.message}`);
+      })
+      .finally(() => {
+        setActionLoading(false);
+      });
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
     const d = new Date(dateString);
@@ -322,6 +445,16 @@ export default function UnifiedAdminPage() {
           }`}
         >
           ⚡ Araştırma Kuyruğu ({jobs.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("variants")}
+          className={`px-4 py-2 font-bold text-sm transition-all rounded-t-xl ${
+            activeTab === "variants"
+              ? "bg-slate-900 border-t border-x border-white/10 text-orange-400"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          📋 Araç Onayları ({variants.length})
         </button>
       </div>
 
@@ -567,6 +700,149 @@ export default function UnifiedAdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: Variants Moderation */}
+      {activeTab === "variants" && (
+        <div className="flex flex-col gap-6">
+          {variantsLoading ? (
+            <div className="text-center py-12 text-slate-400">Onay bekleyen araçlar yükleniyor...</div>
+          ) : variants.length === 0 ? (
+            <p className="text-slate-400 italic text-center py-12">Onay bekleyen yeni araç önerisi bulunmuyor.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {variants.map((variant) => (
+                <div key={variant.id} className="p-6 bg-slate-900/20 border border-white/5 rounded-3xl flex flex-col gap-4">
+                  
+                  {/* Header info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-3">
+                    <div>
+                      <h4 className="font-extrabold text-slate-200 text-sm">
+                        {variant.brand?.name} {variant.model?.name}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Öneren: <strong className="text-slate-300">{variant.createdBy?.email || "Anonim"}</strong> • Tarih: {formatDate(variant.createdAt)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      ONAY BEKLİYOR
+                    </span>
+                  </div>
+
+                  {/* Body Info / Form for editing */}
+                  {editingVariantId === variant.id ? (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Motor</label>
+                        <input
+                          type="text"
+                          value={editEngine}
+                          onChange={(e) => setEditEngine(e.target.value)}
+                          className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Donanım Paketi</label>
+                        <input
+                          type="text"
+                          value={editTrim}
+                          onChange={(e) => setEditTrim(e.target.value)}
+                          className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Yıl</label>
+                        <input
+                          type="number"
+                          value={editYear}
+                          onChange={(e) => setEditYear(e.target.value)}
+                          className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-slate-200 outline-none"
+                        />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <button
+                          onClick={() => {
+                            handleEditVariant(variant.id, {
+                              engine: editEngine,
+                              trimName: editTrim,
+                              year: Number(editYear)
+                            });
+                            setEditingVariantId(null);
+                          }}
+                          className="bg-orange-655 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-xl transition"
+                        >
+                          Kaydet
+                        </button>
+                        <button
+                          onClick={() => setEditingVariantId(null)}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold py-2 px-4 rounded-xl transition"
+                        >
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs text-slate-300 bg-slate-950/20 p-4 rounded-2xl border border-white/5">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Kasa Tipi</span>
+                        <span className="font-semibold">{displayBodyType(variant.bodyType)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Motor</span>
+                        <span className="font-semibold">{variant.engine?.code}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Yakıt</span>
+                        <span className="font-semibold">{translateFuelType(variant.engine?.fuelType)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Donanım</span>
+                        <span className="font-semibold">{variant.trim?.name}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Şanzıman & Yıl</span>
+                        <span className="font-semibold">{translateTransmission(variant.transmission?.type)} ({variant.year})</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  {editingVariantId !== variant.id && (
+                    <div className="flex items-center gap-3 border-t border-white/5 pt-3 justify-end">
+                      <button
+                        onClick={() => {
+                          setEditingVariantId(variant.id);
+                          setEditEngine(variant.engine?.code || "");
+                          setEditTrim(variant.trim?.name || "");
+                          setEditYear(variant.year?.toString() || "");
+                        }}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded-xl transition text-xs"
+                        disabled={actionLoading}
+                      >
+                        ✏️ Düzenle
+                      </button>
+                      <button
+                        onClick={() => handleApproveVariant(variant.id)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition text-xs"
+                        disabled={actionLoading}
+                      >
+                        ✅ Onayla (Yayına Al)
+                      </button>
+                      <button
+                        onClick={() => handleRejectVariant(variant.id)}
+                        className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-xl transition text-xs"
+                        disabled={actionLoading}
+                      >
+                        ❌ Reddet
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

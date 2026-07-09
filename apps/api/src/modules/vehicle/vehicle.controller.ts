@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Query, Param, Body, Headers, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Query, Param, Body, Headers, BadRequestException, UseGuards, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleService } from './vehicle.service';
 import { JwtService } from '@nestjs/jwt';
-import { AiGenerateVehicleDto } from './vehicle.dto';
+import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { GetUser, UserPayload } from '../auth/get-user.decorator';
 
 
 @ApiTags('Vehicles')
@@ -70,6 +72,69 @@ export class VehicleController {
   @ApiResponse({ status: 201, description: 'Yeni oluşturulan veya mevcut olan araç varyantının IDsi.' })
   aiGenerateVehicle(@Body() dto: AiGenerateVehicleDto) {
     return this.vehicleService.aiGenerateVehicle(dto);
+  }
+
+  @Post('suggest')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Kullanıcı Tarafından Araç Ekleme Önerisi Gönder' })
+  suggestVehicle(@Body() dto: SuggestVehicleDto, @GetUser() user: UserPayload) {
+    return this.vehicleService.suggestVariant(dto, user.id);
+  }
+
+  @Get('admin/pending')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Onay Bekleyen Tüm Araç Varyantlarını Listele (Admin)' })
+  getPendingVariants(@GetUser() user: UserPayload) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.getPendingVariants();
+  }
+
+  @Patch('admin/:id/approve')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantını Onayla (Admin)' })
+  approveVariant(@Param('id') id: string, @GetUser() user: UserPayload) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.approveVariant(id, user.id);
+  }
+
+  @Patch('admin/:id/reject')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantını Reddet (Admin)' })
+  rejectVariant(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() body: { reason: string }
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    if (!body || !body.reason) {
+      throw new BadRequestException('Reddetme gerekçesi (reason) belirtilmelidir.');
+    }
+    return this.vehicleService.rejectVariant(id, body.reason, user.id);
+  }
+
+  @Patch('admin/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyant Bilgilerini Düzenle (Admin)' })
+  updateVariant(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() dto: AdminUpdateVariantDto
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.updateVariant(id, dto);
   }
 }
 

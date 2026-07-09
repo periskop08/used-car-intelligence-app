@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
-import { AiGenerateVehicleDto } from './vehicle.dto';
+import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
 
 
 
@@ -465,6 +465,272 @@ export class VehicleService {
           luggageCapacity: 450,
           weight: 1350
         }
+      }
+    });
+  }
+
+  // Helper mappings
+  private mapBodyType(bodyStr: string): BodyType {
+    const clean = bodyStr.toLowerCase().trim();
+    if (clean === 'sedan') return BodyType.SEDAN;
+    if (clean === 'hatchback') return BodyType.HATCHBACK;
+    if (clean === 'suv') return BodyType.SUV;
+    if (clean === 'coupe') return BodyType.COUPE;
+    if (clean === 'cabrio' || clean === 'cabriolet' || clean === 'convertible') return BodyType.CONVERTIBLE;
+    if (clean === 'station wagon' || clean === 'wagon') return BodyType.WAGON;
+    if (clean === 'minivan') return BodyType.MINIVAN;
+    if (clean === 'van') return BodyType.VAN;
+    if (clean === 'pick-up' || clean === 'pickup') return BodyType.PICKUP;
+    return BodyType.OTHER;
+  }
+
+  private mapFuelType(fuelStr: string): FuelType {
+    const clean = fuelStr.toLowerCase().trim();
+    if (clean === 'benzin' || clean === 'petrol') return FuelType.PETROL;
+    if (clean === 'dizel' || clean === 'diesel') return FuelType.DIESEL;
+    if (clean === 'hibrit' || clean === 'hybrid') return FuelType.HYBRID;
+    if (clean === 'elektrik' || clean === 'electric') return FuelType.ELECTRIC;
+    if (clean === 'lpg' || clean === 'lpg & benzin') return FuelType.LPG;
+    return FuelType.OTHER;
+  }
+
+  private async resolveEngine(engineCodeStr: string, fuelType: FuelType): Promise<any> {
+    const code = engineCodeStr.trim();
+    let dbEngine = await this.prisma.engine.findFirst({
+      where: { code: { equals: code, mode: 'insensitive' } }
+    });
+    if (!dbEngine) {
+      const engineMatch = code.match(/\b(\d\.\d)\b/);
+      const engineSize = engineMatch ? engineMatch[0] : '1.6';
+      const dispVal = Math.round(parseFloat(engineSize) * 1000);
+      dbEngine = await this.prisma.engine.create({
+        data: {
+          code,
+          displacement: dispVal || 1598,
+          horsepower: fuelType === FuelType.ELECTRIC ? 204 : parseFloat(engineSize) > 2.0 ? 250 : 150,
+          torque: fuelType === FuelType.ELECTRIC ? 310 : parseFloat(engineSize) > 2.0 ? 400 : 250,
+          fuelType,
+          hasTurbo: fuelType === FuelType.ELECTRIC ? false : true
+        }
+      });
+    }
+    return dbEngine;
+  }
+
+  private async resolveTransmission(transNameStr: string): Promise<any> {
+    const name = transNameStr.trim();
+    let dbTrans = await this.prisma.transmission.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } }
+    });
+    if (!dbTrans) {
+      let transType: TransmissionType = TransmissionType.AUTOMATIC;
+      let speeds = 6;
+      const lowerTrans = name.toLowerCase();
+      if (lowerTrans.includes('dsg') || lowerTrans.includes('s tronic') || lowerTrans.includes('dct') || lowerTrans.includes('edc') || lowerTrans.includes('çift kavrama')) {
+        transType = TransmissionType.DCT;
+        speeds = 7;
+      } else if (lowerTrans.includes('cvt') || lowerTrans.includes('multidrive')) {
+        transType = TransmissionType.CVT;
+        speeds = 7;
+      } else if (lowerTrans.includes('manuel') || lowerTrans.includes('düz') || lowerTrans.includes('manual')) {
+        transType = TransmissionType.MANUAL;
+        speeds = 6;
+      }
+      dbTrans = await this.prisma.transmission.create({
+        data: { name, type: transType, speeds }
+      });
+    }
+    return dbTrans;
+  }
+
+  private async resolveTrim(trimNameStr: string): Promise<any> {
+    const name = trimNameStr.trim();
+    let dbTrim = await this.prisma.trim.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } }
+    });
+    if (!dbTrim) {
+      dbTrim = await this.prisma.trim.create({
+        data: { name, description: `${name} Donanım Paketi` }
+      });
+    }
+    return dbTrim;
+  }
+
+  // Suggest a variant (pending approval)
+  async suggestVariant(dto: SuggestVehicleDto, userId?: string) {
+    const bodyType = this.mapBodyType(dto.bodyType);
+    const fuelType = this.mapFuelType(dto.fuelType);
+    
+    const dbEngine = await this.resolveEngine(dto.engine, fuelType);
+    const dbTrans = await this.resolveTransmission(dto.transmission);
+    const dbTrim = await this.resolveTrim(dto.trimName);
+
+    // Verify model exists
+    const dbModel = await this.prisma.model.findUnique({
+      where: { id: dto.modelId }
+    });
+    if (!dbModel) {
+      throw new NotFoundException('Seçilen model bulunamadı.');
+    }
+
+    // Get or create generation
+    let dbGen = await this.prisma.generation.findFirst({
+      where: { modelId: dto.modelId }
+    });
+    if (!dbGen) {
+      dbGen = await this.prisma.generation.create({
+        data: {
+          modelId: dto.modelId,
+          name: `${dbModel.name} Generation`,
+          startYear: dto.year - 5,
+          bodyType
+        }
+      });
+    }
+
+    // Get country
+    const countryTr = await this.prisma.country.findFirst({ where: { code: 'TR' } });
+    const countryId = countryTr ? countryTr.id : (await this.prisma.country.findFirst())?.id;
+    if (!countryId) {
+      throw new BadRequestException('Aktif ülke bulunamadı.');
+    }
+
+    // Check duplicate
+    const existing = await this.prisma.vehicleVariant.findFirst({
+      where: {
+        brandId: dto.brandId,
+        modelId: dto.modelId,
+        engineId: dbEngine.id,
+        transmissionId: dbTrans.id,
+        trimId: dbTrim.id,
+        year: dto.year
+      }
+    });
+
+    if (existing) {
+      if (existing.status === ApprovalStatus.APPROVED) {
+        throw new BadRequestException('Bu araç zaten sistemde kayıtlı ve onaylanmış durumda.');
+      }
+      return { success: true, message: 'Bu araç zaten eklenmiş ve onay bekliyor.', variantId: existing.id };
+    }
+
+    const variant = await this.prisma.vehicleVariant.create({
+      data: {
+        brandId: dto.brandId,
+        modelId: dto.modelId,
+        generationId: dbGen.id,
+        engineId: dbEngine.id,
+        transmissionId: dbTrans.id,
+        trimId: dbTrim.id,
+        countryId,
+        year: dto.year,
+        status: ApprovalStatus.PENDING,
+        createdById: userId
+      }
+    });
+
+    return { success: true, message: 'Araç ekleme talebi başarıyla oluşturuldu ve admin onayına gönderildi.', variantId: variant.id };
+  }
+
+  // Admin: Get all pending variants
+  async getPendingVariants() {
+    return this.prisma.vehicleVariant.findMany({
+      where: { status: ApprovalStatus.PENDING },
+      include: {
+        brand: true,
+        model: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+        createdBy: { select: { email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  // Admin: Approve a variant
+  async approveVariant(id: string, adminId: string) {
+    const variant = await this.prisma.vehicleVariant.findUnique({ where: { id } });
+    if (!variant) throw new NotFoundException('Varyant bulunamadı.');
+
+    const updated = await this.prisma.vehicleVariant.update({
+      where: { id },
+      data: {
+        status: ApprovalStatus.APPROVED,
+        approvedById: adminId,
+        approvedAt: new Date()
+      }
+    });
+
+    // Populate specs & checklists
+    await this.populateVariantDetails(id);
+
+    return { success: true, message: 'Araç varyantı onaylandı ve yayına alındı.', variantId: updated.id };
+  }
+
+  // Admin: Reject a variant
+  async rejectVariant(id: string, reason: string, adminId: string) {
+    const variant = await this.prisma.vehicleVariant.findUnique({ where: { id } });
+    if (!variant) throw new NotFoundException('Varyant bulunamadı.');
+
+    const updated = await this.prisma.vehicleVariant.update({
+      where: { id },
+      data: {
+        status: ApprovalStatus.REJECTED,
+        approvedById: adminId,
+        rejectedReason: reason
+      }
+    });
+
+    return { success: true, message: 'Araç varyantı reddedildi.', variantId: updated.id };
+  }
+
+  // Admin: Update variant fields
+  async updateVariant(id: string, dto: AdminUpdateVariantDto) {
+    const variant = await this.prisma.vehicleVariant.findUnique({
+      where: { id },
+      include: { engine: true, transmission: true, trim: true }
+    });
+    if (!variant) throw new NotFoundException('Varyant bulunamadı.');
+
+    const updateData: any = {};
+    if (dto.brandId) updateData.brandId = dto.brandId;
+    if (dto.modelId) updateData.modelId = dto.modelId;
+    if (dto.year) updateData.year = dto.year;
+
+    if (dto.bodyType) {
+      updateData.bodyType = this.mapBodyType(dto.bodyType);
+    }
+
+    if (dto.fuelType) {
+      updateData.fuelType = this.mapFuelType(dto.fuelType);
+    }
+
+    if (dto.engine) {
+      const fuelType = updateData.fuelType || variant.fuelType || FuelType.PETROL;
+      const dbEngine = await this.resolveEngine(dto.engine, fuelType);
+      updateData.engineId = dbEngine.id;
+    }
+
+    if (dto.transmission) {
+      const dbTrans = await this.resolveTransmission(dto.transmission);
+      updateData.transmissionId = dbTrans.id;
+    }
+
+    if (dto.trimName) {
+      const dbTrim = await this.resolveTrim(dto.trimName);
+      updateData.trimId = dbTrim.id;
+    }
+
+    return this.prisma.vehicleVariant.update({
+      where: { id },
+      data: updateData,
+      include: {
+        brand: true,
+        model: true,
+        engine: true,
+        transmission: true,
+        trim: true
       }
     });
   }

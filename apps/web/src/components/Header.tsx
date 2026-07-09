@@ -33,9 +33,20 @@ export default function Header() {
       </a>
 
       <nav className="hidden md:flex items-center gap-8">
-        <a href="/" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
-          Araç Sorgulama
-        </a>
+        <div className="relative group">
+          <button className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition flex items-center gap-1.5 cursor-pointer py-1">
+            <span>Araç Sorgulama</span>
+            <span className="text-[9px] text-slate-550 group-hover:text-orange-500 transition">▼</span>
+          </button>
+          <div className="absolute left-0 mt-2 w-44 bg-[#0f1422] border border-white/5 rounded-2xl shadow-2xl p-2 hidden group-hover:flex flex-col gap-1 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+            <a href="/" className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition">
+              🔍 Araç Sorgula
+            </a>
+            <a href="/add-vehicle" className="px-3 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition">
+              ➕ Araç Ekle
+            </a>
+          </div>
+        </div>
         <a href="/comparison" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Araç Karşılaştırma
         </a>
