@@ -284,7 +284,7 @@ export default function VehicleGuidePage() {
 
       <main className="flex-1 flex items-center justify-center p-4 relative">
         <div 
-          className="w-full max-w-[430px] h-[780px] bg-[#090d1a] border border-white/10 rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden select-none"
+          className="w-full max-w-[430px] md:max-w-[840px] h-[85vh] max-h-[760px] md:h-[580px] bg-[#090d1a] border border-white/10 rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden select-none"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -295,124 +295,139 @@ export default function VehicleGuidePage() {
               <p className="text-slate-400 text-sm font-bold">Harika bilgiler hazırlanıyor...</p>
             </div>
           ) : currentCard ? (
-            <div className={`flex-1 flex flex-col transition-transform duration-300 ${
+            <div className={`flex-1 flex flex-col md:flex-row transition-transform duration-300 h-full overflow-hidden ${
               slideDirection === "up" ? "-translate-y-full opacity-0" : 
               slideDirection === "down" ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
             }`}>
               
-              <div className="h-[260px] relative w-full overflow-hidden flex-none">
-                <img 
-                  src={currentCard.heroImageUrl || currentCard.placeholderImageUrl || "/brand-placeholder.png"} 
-                  alt={currentCard.imageAltText || "Araç görseli"} 
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#090d1a] via-transparent to-black/60" />
+              {/* LEFT COLUMN: Hero Image + Title & Summary */}
+              <div className="w-full md:w-[42%] flex flex-col border-b md:border-b-0 md:border-r border-white/5 h-auto md:h-full bg-[#080c18] flex-none md:flex-1">
+                <div className="h-[200px] md:h-[250px] relative w-full overflow-hidden flex-none">
+                  <img 
+                    src={currentCard.heroImageUrl || currentCard.placeholderImageUrl || "/brand-placeholder.png"} 
+                    alt={currentCard.imageAltText || "Araç görseli"} 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#080c18] via-transparent to-black/60" />
 
-                {historyStack.length > 0 && (
-                  <button 
-                    onClick={handleSwipePrev}
-                    className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/60 hover:text-white transition group z-20 cursor-pointer"
-                  >
-                    <span className="text-xs uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Önceki</span>
-                    <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7" />
-                    </svg>
-                  </button>
-                )}
-
-                <div className="absolute top-4 left-4 bg-orange-600/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-400/30 shadow-lg flex items-center gap-1.5">
-                  <span className="text-[10px] font-black tracking-wider text-white uppercase">Rehber</span>
-                </div>
-
-                <button 
-                  onClick={toggleFavorite}
-                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center transition cursor-pointer text-white"
-                >
-                  <span className="text-lg">{isFavorited ? "❤️" : "🤍"}</span>
-                </button>
-
-                {currentCard.imageSource && (
-                  <div className="absolute bottom-2 right-3 text-[9px] text-white/40 bg-black/30 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm">
-                    Görsel: {currentCard.imageSource} ({currentCard.imageLicense || "Lisanslı"})
-                  </div>
-                )}
-              </div>
-
-              <div className="px-6 py-4 flex flex-col gap-2 relative bg-[#090d1a] flex-none">
-                <div className="flex items-baseline gap-2">
-                  <h1 className="text-2xl font-black text-white tracking-tight uppercase">
-                    {currentCard.brand} <span className="text-orange-500">{currentCard.model}</span>
-                  </h1>
-                  {currentCard.generationCode && (
-                    <span className="text-xs font-mono font-bold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-400">
-                      {currentCard.generationCode}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-                  <span>📅 {currentCard.yearStart} - {currentCard.yearEnd || "Günümüz"}</span>
-                  {currentCard.bodyType && (
-                    <>
-                      <span className="text-slate-600">•</span>
-                      <span>🚗 {currentCard.bodyType}</span>
-                    </>
-                  )}
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed italic bg-white/5 border border-white/5 p-3 rounded-2xl">
-                  "{currentCard.shortSummary}"
-                </p>
-              </div>
-
-              <div className="flex-1 px-6 pb-2 overflow-y-auto flex flex-col gap-3 justify-start">
-                <div className="grid grid-cols-2 gap-3">
-                  {currentCard.facts.slice(0, 4).map((fact) => (
-                    <div 
-                      key={fact.id} 
-                      className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3 flex flex-col gap-1.5 transition duration-300"
+                  {historyStack.length > 0 && (
+                    <button 
+                      onClick={handleSwipePrev}
+                      className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 hover:bg-black/60 border border-white/10 px-3 py-1.5 rounded-full text-white/80 hover:text-white transition z-20 cursor-pointer"
                     >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">{getIcon(fact.iconKey)}</span>
-                        <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide truncate max-w-[120px]">
-                          {fact.title}
-                        </h3>
-                      </div>
-                      <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
-                        {fact.description}
-                      </p>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      <span className="text-[10px] uppercase font-black tracking-widest">Önceki</span>
+                    </button>
+                  )}
+
+                  <div className="absolute top-4 right-16 bg-orange-600/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-orange-400/30 shadow-lg flex items-center gap-1.5">
+                    <span className="text-[9px] font-black tracking-wider text-white uppercase">Rehber</span>
+                  </div>
+
+                  <button 
+                    onClick={toggleFavorite}
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center transition cursor-pointer text-white"
+                  >
+                    <span className="text-lg">{isFavorited ? "❤️" : "🤍"}</span>
+                  </button>
+
+                  {currentCard.imageSource && (
+                    <div className="absolute bottom-2 right-3 text-[9px] text-white/40 bg-black/30 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm">
+                      Görsel: {currentCard.imageSource} ({currentCard.imageLicense || "Lisanslı"})
                     </div>
-                  ))}
+                  )}
+                </div>
+
+                <div className="p-5 md:p-6 flex-1 flex flex-col gap-2.5 justify-center overflow-y-auto">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">
+                      {currentCard.brand} <span className="text-orange-500">{currentCard.model}</span>
+                    </h1>
+                    {currentCard.generationCode && (
+                      <span className="text-[10px] font-mono font-bold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-400">
+                        {currentCard.generationCode}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
+                    <span>📅 {currentCard.yearStart} - {currentCard.yearEnd || "Günümüz"}</span>
+                    {currentCard.bodyType && (
+                      <>
+                        <span className="text-slate-600">•</span>
+                        <span>🚗 {currentCard.bodyType}</span>
+                      </>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-350 leading-relaxed italic bg-white/5 border border-white/5 p-3.5 rounded-2xl">
+                    "{currentCard.shortSummary}"
+                  </p>
                 </div>
               </div>
 
-              <div className="p-6 border-t border-white/5 flex flex-col gap-3 bg-[#070b17] flex-none relative rounded-b-[48px]">
-                <button 
-                  onClick={handleSwipeNext}
-                  className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/50 hover:text-white transition group z-20 cursor-pointer"
-                >
-                  <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                  </svg>
-                  <span className="text-[9px] uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Sonraki</span>
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={fetchTechnicalInfo}
-                    className="flex-1 py-3 px-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
-                  >
-                    <span>🛠️ Teknik Bilgiler</span>
-                    <span>{techOpen ? "↑" : "↓"}</span>
-                  </button>
-
-                  <button 
-                    onClick={handleCtaClick}
-                    className="flex-1 py-3 px-4 rounded-2xl bg-orange-600 hover:bg-orange-500 text-xs font-black tracking-wide text-white shadow-lg shadow-orange-500/10 transition cursor-pointer select-none"
-                  >
-                    🔍 İlanlarını Gör
-                  </button>
+              {/* RIGHT COLUMN: Facts Grid + Footer CTA */}
+              <div className="flex-1 flex flex-col h-full justify-between bg-[#090d1a]">
+                
+                {/* Facts section */}
+                <div className="flex-1 p-5 md:p-6 overflow-y-auto flex flex-col gap-3 justify-center">
+                  <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 hidden md:block">
+                    🔍 Araç Hakkında Kritik Bilgiler
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {currentCard.facts.slice(0, 4).map((fact) => (
+                      <div 
+                        key={fact.id} 
+                        className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3.5 flex flex-col gap-1.5 transition duration-300"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">{getIcon(fact.iconKey)}</span>
+                          <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide truncate max-w-[150px]">
+                            {fact.title}
+                          </h3>
+                        </div>
+                        <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
+                          {fact.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Footer Controls & CTA */}
+                <div className="p-5 md:p-6 border-t border-white/5 flex flex-col gap-3.5 bg-[#070b17] flex-none relative">
+                  
+                  {/* Next Card floating arrow button on the right side */}
+                  <button 
+                    onClick={handleSwipeNext}
+                    className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/50 hover:text-white transition group z-20 cursor-pointer"
+                  >
+                    <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span className="text-[9px] uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Sonraki</span>
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={fetchTechnicalInfo}
+                      className="flex-1 py-3 px-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
+                    >
+                      <span>🛠️ Teknik Bilgiler</span>
+                      <span>{techOpen ? "↑" : "↓"}</span>
+                    </button>
+
+                    <button 
+                      onClick={handleCtaClick}
+                      className="flex-1 py-3 px-4 rounded-2xl bg-orange-600 hover:bg-orange-500 text-xs font-black tracking-wide text-white shadow-lg shadow-orange-500/10 transition cursor-pointer select-none"
+                    >
+                      <span>🔍 İlanlarını Gör</span>
+                    </button>
+                  </div>
+                </div>
+
               </div>
 
             </div>
