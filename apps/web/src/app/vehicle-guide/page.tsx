@@ -49,6 +49,49 @@ interface TechnicalInfo {
   localizedNotes?: string;
 }
 
+const translateFuel = (fuel: string) => {
+  const mapping: Record<string, string> = {
+    PETROL: "Benzin",
+    DIESEL: "Dizel",
+    HYBRID: "Hibrit",
+    LPG: "LPG",
+    ELECTRIC: "Elektrik"
+  };
+  return mapping[fuel.toUpperCase()] || fuel;
+};
+
+const translateTransmission = (transmission: string) => {
+  const mapping: Record<string, string> = {
+    AUTOMATIC: "Otomatik",
+    MANUAL: "Manuel",
+    SEMI_AUTOMATIC: "Yarı Otomatik"
+  };
+  return mapping[transmission.toUpperCase()] || transmission;
+};
+
+const translateDrivetrain = (drivetrain: string) => {
+  const mapping: Record<string, string> = {
+    FWD: "Önden Çekiş",
+    RWD: "Arkadan İtiş",
+    AWD: "Dört Tekerden Çekiş (AWD)",
+    "4WD": "4x4 (4WD)"
+  };
+  return mapping[drivetrain.toUpperCase()] || drivetrain;
+};
+
+const translateBodyType = (bodyType: string) => {
+  const mapping: Record<string, string> = {
+    SEDAN: "Sedan",
+    HATCHBACK: "Hatchback",
+    SUV: "SUV",
+    COUPE: "Kupe",
+    STATION_WAGON: "Station Wagon",
+    CONVERTIBLE: "Cabriolet",
+    MINIVAN: "Minivan"
+  };
+  return mapping[bodyType.toUpperCase()] || bodyType;
+};
+
 export default function VehicleGuidePage() {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [historyStack, setHistoryStack] = useState<string[]>([]);
@@ -334,7 +377,7 @@ export default function VehicleGuidePage() {
                     {currentCard.bodyType && (
                       <>
                         <span className="text-slate-600">•</span>
-                        <span>🚗 {currentCard.bodyType}</span>
+                        <span>🚗 {translateBodyType(currentCard.bodyType)}</span>
                       </>
                     )}
                   </div>
@@ -457,7 +500,7 @@ export default function VehicleGuidePage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Segment / Çekiş</span>
                       <span className="text-xs font-semibold text-slate-200">
-                        {technicalInfo.segment || "-"} Segment / {technicalInfo.drivetrain || "-"}
+                        {technicalInfo.segment || "-"} Segment / {technicalInfo.drivetrain ? translateDrivetrain(technicalInfo.drivetrain) : "-"}
                       </span>
                     </div>
 
@@ -471,7 +514,7 @@ export default function VehicleGuidePage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Şanzıman / Yakıt</span>
                       <span className="text-xs font-semibold text-slate-200">
-                        {Array.isArray(technicalInfo.transmissionOptions) ? technicalInfo.transmissionOptions.join(", ") : "-"} ({Array.isArray(technicalInfo.fuelTypes) ? technicalInfo.fuelTypes.join("/") : "-"})
+                        {Array.isArray(technicalInfo.transmissionOptions) ? technicalInfo.transmissionOptions.map(translateTransmission).join(", ") : "-"} ({Array.isArray(technicalInfo.fuelTypes) ? technicalInfo.fuelTypes.map(translateFuel).join(" / ") : "-"})
                       </span>
                     </div>
 
