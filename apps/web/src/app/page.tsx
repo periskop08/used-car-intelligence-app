@@ -385,7 +385,7 @@ export default function Home() {
             <circle cx="130" cy="115" r="6" fill="#00f2fe" />
 
             {/* Slanted "T" */}
-            <path d="M 68 55 L 152 55 L 146 71 L 106 71 L 83 165 L 66 165 L 89 71 L 59 71 Z" fill="url(#t-gradient-large)" />
+            <path d="M 68 55 L 152 55 L 138 71 L 106 71 L 83 165 L 66 165 L 89 71 L 80 71 Z" fill="url(#t-gradient-large)" />
           </svg>
         </div>
       </div>
