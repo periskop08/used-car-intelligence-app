@@ -310,18 +310,6 @@ export default function VehicleGuidePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#080c18] via-transparent to-black/60" />
 
-                  {historyStack.length > 0 && (
-                    <button 
-                      onClick={handleSwipePrev}
-                      className="absolute top-4 left-4 flex items-center gap-1 bg-black/40 hover:bg-black/60 border border-white/10 px-3 py-1.5 rounded-full text-white/80 hover:text-white transition z-20 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" />
-                      </svg>
-                      <span className="text-[10px] uppercase font-black tracking-widest">Önceki</span>
-                    </button>
-                  )}
-
                   <div className="absolute top-4 right-16 bg-orange-600/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-orange-400/30 shadow-lg flex items-center gap-1.5">
                     <span className="text-[9px] font-black tracking-wider text-white uppercase">Rehber</span>
                   </div>
@@ -365,34 +353,53 @@ export default function VehicleGuidePage() {
                   <p className="text-xs text-slate-350 leading-relaxed italic bg-white/5 border border-white/5 p-3.5 rounded-2xl">
                     "{currentCard.shortSummary}"
                   </p>
+
+                  {/* Previous / Next buttons placed side-by-side in left column */}
+                  <div className="flex items-center justify-center gap-6 mt-3 pt-3 border-t border-white/5 flex-none">
+                    <button 
+                      onClick={handleSwipePrev}
+                      disabled={historyStack.length === 0}
+                      className={`group flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold cursor-pointer select-none transition ${
+                        historyStack.length > 0 
+                          ? "bg-white/5 hover:bg-white/10 border-white/10 text-white/80 hover:text-white" 
+                          : "bg-white/0 border-white/5 text-white/20 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      <span className={`inline-block transition-transform duration-300 ${historyStack.length > 0 ? "group-hover:-translate-x-1.5 animate-pulse" : ""}`}>←</span>
+                      Önceki
+                    </button>
+
+                    <button 
+                      onClick={handleSwipeNext}
+                      className="group flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600/95 hover:bg-orange-500 border border-orange-400/20 text-white transition text-xs font-black tracking-wide cursor-pointer select-none shadow-md shadow-orange-500/10"
+                    >
+                      Sonraki
+                      <span className="inline-block transition-transform duration-300 group-hover:translate-x-1.5 animate-pulse">→</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* RIGHT COLUMN: Facts Grid + Footer CTA */}
               <div className="flex-1 flex flex-col h-full justify-between bg-[#090d1a]">
                 
-                {/* Facts section */}
-                <div className="flex-1 p-5 md:p-6 overflow-y-auto flex flex-col gap-3 justify-center">
-                  <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 hidden md:block">
+                {/* Facts section with no scrollbar on desktop */}
+                <div className="flex-1 p-5 md:p-6 overflow-y-auto md:overflow-hidden flex flex-col gap-2.5 justify-center">
+                  <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5 hidden md:block">
                     🔍 Araç Hakkında Kritik Bilgiler
                   </h2>
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2 md:gap-2.5">
                     {currentCard.facts.slice(0, 4).map((fact) => (
                       <div 
                         key={fact.id} 
-                        className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3 flex items-start gap-4 transition duration-300"
+                        className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3 md:p-2.5 flex flex-col gap-1 transition duration-300"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-lg flex-none mt-0.5">
-                          {getIcon(fact.iconKey)}
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide">
-                            {fact.title}
-                          </h3>
-                          <p className="text-[10.5px] leading-relaxed text-slate-400 font-medium">
-                            {fact.description}
-                          </p>
-                        </div>
+                        <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide">
+                          {fact.title}
+                        </h3>
+                        <p className="text-[10.5px] leading-relaxed text-slate-400 font-medium">
+                          {fact.description}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -401,17 +408,6 @@ export default function VehicleGuidePage() {
                 {/* Footer Controls & CTA */}
                 <div className="p-5 md:p-6 border-t border-white/5 flex flex-col gap-3.5 bg-[#070b17] flex-none relative">
                   
-                  {/* Next Card floating arrow button on the right side */}
-                  <button 
-                    onClick={handleSwipeNext}
-                    className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/50 hover:text-white transition group z-20 cursor-pointer"
-                  >
-                    <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                    </svg>
-                    <span className="text-[9px] uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Sonraki</span>
-                  </button>
-
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={fetchTechnicalInfo}
