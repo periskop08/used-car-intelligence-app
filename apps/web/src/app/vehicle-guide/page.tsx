@@ -310,17 +310,6 @@ export default function VehicleGuidePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#080c18] via-transparent to-black/60" />
 
-                  <div className="absolute top-4 right-16 bg-orange-600/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-orange-400/30 shadow-lg flex items-center gap-1.5">
-                    <span className="text-[9px] font-black tracking-wider text-white uppercase">Rehber</span>
-                  </div>
-
-                  <button 
-                    onClick={toggleFavorite}
-                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center transition cursor-pointer text-white"
-                  >
-                    <span className="text-lg">{isFavorited ? "❤️" : "🤍"}</span>
-                  </button>
-
                   {currentCard.imageSource && (
                     <div className="absolute bottom-2 right-3 text-[9px] text-white/40 bg-black/30 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm">
                       Görsel: {currentCard.imageSource} ({currentCard.imageLicense || "Lisanslı"})
@@ -371,7 +360,7 @@ export default function VehicleGuidePage() {
 
                     <button 
                       onClick={handleSwipeNext}
-                      className="group flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600/95 hover:bg-orange-500 border border-orange-400/20 text-white transition text-xs font-black tracking-wide cursor-pointer select-none shadow-md shadow-orange-500/10"
+                      className="group flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white transition text-xs font-bold cursor-pointer select-none"
                     >
                       Sonraki
                       <span className="inline-block transition-transform duration-300 group-hover:translate-x-1.5 animate-pulse">→</span>
@@ -385,9 +374,14 @@ export default function VehicleGuidePage() {
                 
                 {/* Facts section with no scrollbar on desktop */}
                 <div className="flex-1 p-5 md:p-6 overflow-y-auto md:overflow-hidden flex flex-col gap-2.5 justify-center">
-                  <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5 hidden md:block">
-                    🔍 Araç Hakkında Kritik Bilgiler
-                  </h2>
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                      🔍 Araç Hakkında Kritik Bilgiler
+                    </h2>
+                    <span className="text-[9px] font-black tracking-wider text-white bg-orange-600/90 border border-orange-500/25 px-2.5 py-0.5 rounded-full uppercase">
+                      Rehber
+                    </span>
+                  </div>
                   <div className="flex flex-col gap-2 md:gap-2.5">
                     {currentCard.facts.slice(0, 4).map((fact) => (
                       <div 
@@ -411,7 +405,7 @@ export default function VehicleGuidePage() {
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={fetchTechnicalInfo}
-                      className="flex-1 py-3 px-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
+                      className="flex-1 py-3 px-4 rounded-2xl bg-[#0f172a] border border-blue-900/60 hover:bg-[#1e293b] text-xs font-bold text-blue-300 hover:text-white flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
                     >
                       <span>🛠️ Teknik Bilgiler</span>
                       <span>{techOpen ? "↑" : "↓"}</span>
