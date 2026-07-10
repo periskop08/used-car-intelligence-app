@@ -391,7 +391,7 @@ export default function Home() {
       </div>
 
       {/* Interactive Vehicle Selector */}
-      <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5">
+      <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-8">
         <h2 className="text-xl font-extrabold text-slate-200 flex items-center gap-2">
           🚗 Hızlı Araç Sorgulama
         </h2>
