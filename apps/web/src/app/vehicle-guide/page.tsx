@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import Header from "../../components/Header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -282,7 +281,6 @@ export default function VehicleGuidePage() {
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans overflow-hidden">
-      <Header />
 
       <main className="flex-1 flex items-center justify-center p-4 relative">
         <div 
