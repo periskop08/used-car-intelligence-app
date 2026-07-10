@@ -308,7 +308,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start py-12 px-6 gap-16">
+    <div className="flex flex-col items-center justify-start pt-2 pb-12 px-6 gap-12">
       {/* Hero Section */}
       <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
