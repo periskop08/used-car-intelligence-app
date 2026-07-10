@@ -1,0 +1,14 @@
+# Ignore large data and backup files
+*.xlsx
+*.csv
+*.ndjson
+apps/api/db-backup-meta.json
+apps/api/db-backup-variants.ndjson
+apps/api/vehicle-verification-report.json
+apps/api/vehicle-verification-report.md
+apps/api/scratch/
+apps/api/scripts/
+apps/web/process_logo*.py
+node_modules/
+.next/
+dist/
