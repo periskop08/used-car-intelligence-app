@@ -312,8 +312,8 @@ export default function Home() {
       {/* Hero Section */}
       <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-end flex-none w-72 opacity-80">
-          <svg width="240" height="65" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="hidden lg:flex items-center justify-end flex-none w-80 opacity-80">
+          <svg width="270" height="70" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stop-color="#0062ff" stop-opacity="0" />
@@ -321,8 +321,8 @@ export default function Home() {
                 <stop offset="100%" stop-color="#00f2fe" />
               </linearGradient>
             </defs>
-            <rect x="0" y="10" width="220" height="6" rx="3" fill="url(#left-lines-grad)" />
-            <rect x="40" y="26" width="180" height="6" rx="3" fill="url(#left-lines-grad)" />
+            <rect x="40" y="10" width="180" height="6" rx="3" fill="url(#left-lines-grad)" />
+            <rect x="0" y="26" width="220" height="6" rx="3" fill="url(#left-lines-grad)" />
             <rect x="120" y="42" width="100" height="6" rx="3" fill="url(#left-lines-grad)" />
           </svg>
         </div>
@@ -341,8 +341,8 @@ export default function Home() {
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-72">
-          <svg width="220" height="220" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-80">
+          <svg width="250" height="250" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
