@@ -376,21 +376,23 @@ export default function VehicleGuidePage() {
                   <h2 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1 hidden md:block">
                     🔍 Araç Hakkında Kritik Bilgiler
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="flex flex-col gap-3">
                     {currentCard.facts.slice(0, 4).map((fact) => (
                       <div 
                         key={fact.id} 
-                        className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3.5 flex flex-col gap-1.5 transition duration-300"
+                        className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3 flex items-start gap-4 transition duration-300"
                       >
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-base">{getIcon(fact.iconKey)}</span>
-                          <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide truncate max-w-[150px]">
+                        <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-lg flex-none mt-0.5">
+                          {getIcon(fact.iconKey)}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide">
                             {fact.title}
                           </h3>
+                          <p className="text-[10.5px] leading-relaxed text-slate-400 font-medium">
+                            {fact.description}
+                          </p>
                         </div>
-                        <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
-                          {fact.description}
-                        </p>
                       </div>
                     ))}
                   </div>
