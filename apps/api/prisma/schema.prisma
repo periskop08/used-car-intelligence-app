@@ -200,6 +200,7 @@ model User {
   chatLogs           AiChatLog[]
   auditLogs          AuditLog[]
   featureUsages      FeatureUsage[]
+  guideViewHistories UserGuideCardViewHistory[]
 
   preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
   createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
@@ -1057,3 +1058,194 @@ model FavoriteListing {
   @@index([userId])
   @@index([listingId])
 }
+
+enum Locale {
+  tr
+  en
+}
+
+enum GuideStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum GuideFactType {
+  INTERESTING_FACT
+  BUYING_TIP
+  USER_EXPERIENCE
+  TECHNICAL_SUMMARY
+  KNOWN_ISSUE
+  VERSION_NOTE
+}
+
+enum GuideSourceType {
+  OFFICIAL
+  DISTRIBUTOR
+  PRESS
+  REVIEW
+  LISTING
+  USER_FEEDBACK
+  INTERNAL_RESEARCH
+  OTHER
+}
+
+enum GuideEventType {
+  GUIDE_CARD_VIEW
+  GUIDE_CARD_SWIPE_UP
+  GUIDE_CARD_SWIPE_DOWN
+  GUIDE_CARD_TIME_SPENT
+  GUIDE_TECHNICAL_INFO_OPENED
+  GUIDE_TECHNICAL_INFO_CLOSED
+  GUIDE_LISTING_CTA_CLICKED
+  GUIDE_CARD_SHARED
+  GUIDE_CARD_FAVORITED
+}
+
+model VehicleGuideCard {
+  id                  String                         @id @default(uuid())
+  brand               String
+  model               String
+  generationName      String?
+  generationCode      String?
+  bodyType            String?
+  yearStart           Int
+  yearEnd             Int?
+  heroImageUrl        String?
+  imageAltText        String?
+  imageSource         String?
+  imageLicense        String?
+  placeholderImageUrl String?
+  shortSummary        String?
+  ratingScore         Float?                         @default(0.0)
+  ratingCount         Int                            @default(0)
+  status              GuideStatus                    @default(DRAFT)
+  isActive            Boolean                        @default(true)
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  translations        VehicleGuideCardTranslation[]
+  facts               VehicleGuideFact[]
+  technicalInfos      VehicleGuideTechnicalInfo[]
+  viewHistories       UserGuideCardViewHistory[]
+  analyticsEvents     GuideAnalyticsEvent[]
+}
+
+model VehicleGuideCardTranslation {
+  id                  String            @id @default(uuid())
+  vehicleGuideCardId  String
+  locale              Locale
+  shortSummary        String
+
+  card                VehicleGuideCard  @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleGuideCardId, locale])
+}
+
+model VehicleGuideFact {
+  id                  String                      @id @default(uuid())
+  vehicleGuideCardId  String
+  factType            GuideFactType
+  title               String
+  description         String
+  iconKey             String?
+  displayOrder        Int                         @default(0)
+  confidenceLevel     DataConfidence              @default(HIGH)
+  sourceTitle         String?
+  sourceUrl           String?
+  sourceType          GuideSourceType             @default(INTERNAL_RESEARCH)
+  sourceNote          String?
+  verifiedAt          DateTime?
+  status              GuideStatus                 @default(DRAFT)
+  isActive            Boolean                     @default(true)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  card                VehicleGuideCard            @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+  translations        VehicleGuideFactTranslation[]
+}
+
+model VehicleGuideFactTranslation {
+  id                  String            @id @default(uuid())
+  vehicleGuideFactId  String
+  locale              Locale
+  title               String
+  description         String
+
+  fact                VehicleGuideFact  @relation(fields: [vehicleGuideFactId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleGuideFactId, locale])
+}
+
+model VehicleGuideTechnicalInfo {
+  id                  String                      @id @default(uuid())
+  vehicleGuideCardId  String
+  engineOptions       Json?                       // JSON Array: ["1.6 TDI", "2.0 TDI"]
+  fuelTypes           Json?                       // JSON Array: ["PETROL", "DIESEL"]
+  transmissionOptions Json?                       // JSON Array: ["MANUAL", "DSG"]
+  bodyTypes           Json?                       // JSON Array: ["SEDAN", "SUV"]
+  productionYears     String?
+  averageConsumption  String?
+  powerRange          String?
+  torqueRange         String?
+  drivetrain          String?
+  segment             String?
+  trunkVolume         String?
+  safetyInfo          String?
+  sourceTitle         String?
+  sourceUrl           String?
+  sourceType          GuideSourceType             @default(INTERNAL_RESEARCH)
+  verifiedAt          DateTime?
+  status              GuideStatus                 @default(DRAFT)
+  isActive            Boolean                     @default(true)
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  card                VehicleGuideCard            @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+  translations        VehicleGuideTechnicalInfoTranslation[]
+}
+
+model VehicleGuideTechnicalInfoTranslation {
+  id                           String                    @id @default(uuid())
+  vehicleGuideTechnicalInfoId  String
+  locale                       Locale
+  localizedNotes               String
+
+  technicalInfo                VehicleGuideTechnicalInfo @relation(fields: [vehicleGuideTechnicalInfoId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleGuideTechnicalInfoId, locale])
+}
+
+model UserGuideCardViewHistory {
+  id                  String            @id @default(uuid())
+  userId              String?
+  vehicleGuideCardId  String
+  viewedAt            DateTime          @default(now())
+  durationMs          Int?
+  openedTechnicalInfo Boolean           @default(false)
+  clickedListings     Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+
+  user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  card                VehicleGuideCard  @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+}
+
+model GuideAnalyticsEvent {
+  id                  String         @id @default(uuid())
+  userId              String?
+  sessionId           String?
+  vehicleGuideCardId  String
+  eventType           GuideEventType
+  brand               String
+  model               String
+  generationCode      String?
+  durationMs          Int?
+  deviceType          String?
+  locale              String
+  timestamp           DateTime       @default(now())
+
+  card                VehicleGuideCard @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+}
+

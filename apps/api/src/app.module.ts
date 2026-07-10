@@ -11,6 +11,7 @@ import { FavoriteModule } from './modules/favorite/favorite.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
 import { ResearchModule } from './modules/research/research.module';
 import { ListingModule } from './modules/listing/listing.module';
+import { VehicleGuideModule } from './modules/vehicle-guide/vehicle-guide.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ListingModule } from './modules/listing/listing.module';
     ComparisonModule,
     ResearchModule,
     ListingModule,
+    VehicleGuideModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

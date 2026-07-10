@@ -54,6 +54,9 @@ export default function Header() {
         <a href="/comparison" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
           Araç Karşılaştırma
         </a>
+        <a href="/vehicle-guide" className="text-sm font-semibold text-slate-300 hover:text-orange-500 transition">
+          Araç Rehberi
+        </a>
         <div className="relative group">
           <button className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/30 px-3.5 py-1.5 rounded-full hover:bg-orange-500/20 transition flex items-center gap-1.5 cursor-pointer">
             <span>İlanlar</span>

@@ -1,0 +1,521 @@
+"use client";
+
+import React, { useEffect, useState, useRef } from "react";
+import Header from "../../components/Header";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+interface Fact {
+  id: string;
+  factType: string;
+  title: string;
+  description: string;
+  iconKey: string;
+  displayOrder: number;
+}
+
+interface Card {
+  id: string;
+  brand: string;
+  model: string;
+  generationName: string;
+  generationCode: string;
+  bodyType: string;
+  yearStart: number;
+  yearEnd: number;
+  heroImageUrl: string;
+  imageAltText: string;
+  imageSource: string;
+  imageLicense: string;
+  placeholderImageUrl: string;
+  ratingScore: number;
+  ratingCount: number;
+  shortSummary: string;
+  facts: Fact[];
+}
+
+interface TechnicalInfo {
+  engineOptions?: string[];
+  fuelTypes?: string[];
+  transmissionOptions?: string[];
+  bodyTypes?: string[];
+  productionYears?: string;
+  averageConsumption?: string;
+  powerRange?: string;
+  torqueRange?: string;
+  drivetrain?: string;
+  segment?: string;
+  trunkVolume?: string;
+  safetyInfo?: string;
+  localizedNotes?: string;
+}
+
+export default function VehicleGuidePage() {
+  const [currentCard, setCurrentCard] = useState<Card | null>(null);
+  const [historyStack, setHistoryStack] = useState<string[]>([]);
+  const [techOpen, setTechOpen] = useState(false);
+  const [technicalInfo, setTechnicalInfo] = useState<TechnicalInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingTech, setLoadingTech] = useState(false);
+  const [slideDirection, setSlideDirection] = useState<"up" | "down" | "none">("none");
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const touchStartY = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
+  const [sessionId, setSessionId] = useState<string>("");
+
+  useEffect(() => {
+    let sessId = localStorage.getItem("guide_session_id");
+    if (!sessId) {
+      sessId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem("guide_session_id", sessId);
+    }
+    setSessionId(sessId);
+    fetchRandomCard(sessId, []);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (techOpen) return;
+      if (e.key === "ArrowDown") {
+        handleSwipeNext();
+      } else if (e.key === "ArrowUp") {
+        handleSwipePrev();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentCard, historyStack, techOpen, sessionId]);
+
+  const fetchRandomCard = async (sessId: string, currentHistory: string[]) => {
+    setLoading(true);
+    try {
+      const headers: any = {
+        "Content-Type": "application/json",
+        "x-session-id": sessId,
+      };
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${API_URL}/vehicle-guide/cards/random?locale=tr`, { headers });
+      if (!res.ok) throw new Error("No card found.");
+      const data = await res.json();
+      
+      setCurrentCard(data);
+      setTechOpen(false);
+      setTechnicalInfo(null);
+      setIsFavorited(false);
+
+      logAnalyticsEvent(data.id, "GUIDE_CARD_VIEW", sessId);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logAnalyticsEvent = async (cardId: string, eventType: string, sessId?: string) => {
+    try {
+      const headers: any = {
+        "Content-Type": "application/json",
+      };
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      await fetch(`${API_URL}/vehicle-guide/cards/${cardId}/event`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          eventType,
+          sessionId: sessId || sessionId,
+          durationMs: 0,
+          deviceType: "WEB_DESKTOP",
+          locale: "tr",
+        }),
+      });
+    } catch (err) {}
+  };
+
+  const handleSwipeNext = () => {
+    if (!currentCard) return;
+    setSlideDirection("up");
+    setTimeout(async () => {
+      const newHistory = [...historyStack, currentCard.id];
+      setHistoryStack(newHistory);
+      logAnalyticsEvent(currentCard.id, "GUIDE_CARD_SWIPE_UP");
+      await fetchRandomCard(sessionId, newHistory);
+      setSlideDirection("none");
+    }, 300);
+  };
+
+  const handleSwipePrev = async () => {
+    if (historyStack.length === 0) return;
+    setSlideDirection("down");
+    setTimeout(async () => {
+      const prevId = historyStack[historyStack.length - 1];
+      const newHistory = historyStack.slice(0, -1);
+      setHistoryStack(newHistory);
+
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/vehicle-guide/cards/${prevId}?locale=tr`);
+        if (!res.ok) throw new Error("Previous card not found.");
+        const data = await res.json();
+        setCurrentCard(data);
+        setTechOpen(false);
+        setTechnicalInfo(null);
+        setIsFavorited(false);
+        logAnalyticsEvent(prevId, "GUIDE_CARD_SWIPE_DOWN");
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+        setSlideDirection("none");
+      }
+    }, 300);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    const diffY = touchStartY.current - touchEndY.current;
+    if (Math.abs(diffY) > 60) {
+      if (diffY > 0) {
+        handleSwipeNext();
+      } else {
+        handleSwipePrev();
+      }
+    }
+  };
+
+  const fetchTechnicalInfo = async () => {
+    if (!currentCard) return;
+    if (techOpen) {
+      setTechOpen(false);
+      logAnalyticsEvent(currentCard.id, "GUIDE_TECHNICAL_INFO_CLOSED");
+      return;
+    }
+
+    setTechOpen(true);
+    logAnalyticsEvent(currentCard.id, "GUIDE_TECHNICAL_INFO_OPENED");
+
+    if (technicalInfo) return;
+
+    setLoadingTech(true);
+    try {
+      const res = await fetch(`${API_URL}/vehicle-guide/cards/${currentCard.id}/technical-info?locale=tr`);
+      if (res.ok) {
+        const data = await res.json();
+        setTechnicalInfo(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingTech(false);
+    }
+  };
+
+  const handleCtaClick = () => {
+    if (!currentCard) return;
+    logAnalyticsEvent(currentCard.id, "GUIDE_LISTING_CTA_CLICKED");
+    
+    const query = new URLSearchParams();
+    query.set("brand", currentCard.brand);
+    query.set("model", currentCard.model);
+    query.set("minYear", currentCard.yearStart.toString());
+    if (currentCard.yearEnd) {
+      query.set("maxYear", currentCard.yearEnd.toString());
+    }
+    if (currentCard.bodyType) {
+      query.set("bodyType", currentCard.bodyType);
+    }
+    
+    window.location.href = `/listings?${query.toString()}`;
+  };
+
+  const getIcon = (key?: string) => {
+    switch (key) {
+      case "ruler":
+      case "chassis":
+      case "weight":
+        return "📏";
+      case "comfort":
+      case "sound":
+      case "cabin":
+      case "ride":
+        return "🛋️";
+      case "gearbox":
+        return "⚙️";
+      case "engine":
+        return "🔌";
+      case "lpg":
+        return "🔥";
+      case "bodywork":
+        return "🚗";
+      case "lights":
+        return "💡";
+      case "price":
+        return "💎";
+      case "reliability":
+        return "🛡️";
+      default:
+        return "📢";
+    }
+  };
+
+  const toggleFavorite = () => {
+    setIsFavorited(!isFavorited);
+    if (currentCard) {
+      logAnalyticsEvent(currentCard.id, isFavorited ? "GUIDE_CARD_SHARED" : "GUIDE_CARD_FAVORITED");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans overflow-hidden">
+      <Header />
+
+      <main className="flex-1 flex items-center justify-center p-4 relative">
+        <div 
+          className="w-full max-w-[430px] h-[780px] bg-[#090d1a] border border-white/10 rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden select-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {loading ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-400 text-sm font-bold">Harika bilgiler hazırlanıyor...</p>
+            </div>
+          ) : currentCard ? (
+            <div className={`flex-1 flex flex-col transition-transform duration-300 ${
+              slideDirection === "up" ? "-translate-y-full opacity-0" : 
+              slideDirection === "down" ? "translate-y-full opacity-0" : "translate-y-0 opacity-100"
+            }`}>
+              
+              <div className="h-[260px] relative w-full overflow-hidden flex-none">
+                <img 
+                  src={currentCard.heroImageUrl || currentCard.placeholderImageUrl || "/brand-placeholder.png"} 
+                  alt={currentCard.imageAltText || "Araç görseli"} 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#090d1a] via-transparent to-black/60" />
+
+                {historyStack.length > 0 && (
+                  <button 
+                    onClick={handleSwipePrev}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/60 hover:text-white transition group z-20 cursor-pointer"
+                  >
+                    <span className="text-xs uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Önceki</span>
+                    <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                )}
+
+                <div className="absolute top-4 left-4 bg-orange-600/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-400/30 shadow-lg flex items-center gap-1.5">
+                  <span className="text-[10px] font-black tracking-wider text-white uppercase">Rehber</span>
+                </div>
+
+                <button 
+                  onClick={toggleFavorite}
+                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center transition cursor-pointer text-white"
+                >
+                  <span className="text-lg">{isFavorited ? "❤️" : "🤍"}</span>
+                </button>
+
+                {currentCard.imageSource && (
+                  <div className="absolute bottom-2 right-3 text-[9px] text-white/40 bg-black/30 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm">
+                    Görsel: {currentCard.imageSource} ({currentCard.imageLicense || "Lisanslı"})
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 flex flex-col gap-2 relative bg-[#090d1a] flex-none">
+                <div className="flex items-baseline gap-2">
+                  <h1 className="text-2xl font-black text-white tracking-tight uppercase">
+                    {currentCard.brand} <span className="text-orange-500">{currentCard.model}</span>
+                  </h1>
+                  {currentCard.generationCode && (
+                    <span className="text-xs font-mono font-bold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-slate-400">
+                      {currentCard.generationCode}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+                  <span>📅 {currentCard.yearStart} - {currentCard.yearEnd || "Günümüz"}</span>
+                  {currentCard.bodyType && (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      <span>🚗 {currentCard.bodyType}</span>
+                    </>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed italic bg-white/5 border border-white/5 p-3 rounded-2xl">
+                  "{currentCard.shortSummary}"
+                </p>
+              </div>
+
+              <div className="flex-1 px-6 pb-2 overflow-y-auto flex flex-col gap-3 justify-start">
+                <div className="grid grid-cols-2 gap-3">
+                  {currentCard.facts.slice(0, 4).map((fact) => (
+                    <div 
+                      key={fact.id} 
+                      className="bg-white/5 border border-white/5 hover:border-orange-500/20 rounded-2xl p-3 flex flex-col gap-1.5 transition duration-300"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base">{getIcon(fact.iconKey)}</span>
+                        <h3 className="text-xs font-black text-slate-200 uppercase tracking-wide truncate max-w-[120px]">
+                          {fact.title}
+                        </h3>
+                      </div>
+                      <p className="text-[10px] leading-relaxed text-slate-400 font-medium">
+                        {fact.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-white/5 flex flex-col gap-3 bg-[#070b17] flex-none relative rounded-b-[48px]">
+                <button 
+                  onClick={handleSwipeNext}
+                  className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 text-white/50 hover:text-white transition group z-20 cursor-pointer"
+                >
+                  <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span className="text-[9px] uppercase font-black tracking-widest opacity-80 group-hover:opacity-100">Sonraki</span>
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={fetchTechnicalInfo}
+                    className="flex-1 py-3 px-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer select-none"
+                  >
+                    <span>🛠️ Teknik Bilgiler</span>
+                    <span>{techOpen ? "↑" : "↓"}</span>
+                  </button>
+
+                  <button 
+                    onClick={handleCtaClick}
+                    className="flex-1 py-3 px-4 rounded-2xl bg-orange-600 hover:bg-orange-500 text-xs font-black tracking-wide text-white shadow-lg shadow-orange-500/10 transition cursor-pointer select-none"
+                  >
+                    🔍 İlanlarını Gör
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-6 text-center">
+              <p className="text-slate-400 text-sm font-bold">Görüntülenecek aktif rehber bulunamadı.</p>
+            </div>
+          )}
+
+          {techOpen && (
+            <div className="absolute inset-x-0 bottom-0 bg-[#090d1e] border-t border-white/15 rounded-t-[32px] p-6 shadow-2xl z-30 transition-transform duration-300 animate-in slide-in-from-bottom duration-300">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                <h2 className="text-sm font-black text-white uppercase tracking-wider">🛠️ Detaylı Teknik Veriler</h2>
+                <button 
+                  onClick={() => setTechOpen(false)}
+                  className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs text-slate-400 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {loadingTech ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-slate-400">Veriler yükleniyor...</span>
+                </div>
+              ) : technicalInfo ? (
+                <div className="flex flex-col gap-4 max-h-[360px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Üretim Yılları</span>
+                      <span className="text-xs font-semibold text-slate-200">{technicalInfo.productionYears || "-"}</span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Segment / Çekiş</span>
+                      <span className="text-xs font-semibold text-slate-200">
+                        {technicalInfo.segment || "-"} Segment / {technicalInfo.drivetrain || "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Motor Seçenekleri</span>
+                      <span className="text-xs font-semibold text-slate-200">
+                        {Array.isArray(technicalInfo.engineOptions) ? technicalInfo.engineOptions.join(", ") : "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Şanzıman / Yakıt</span>
+                      <span className="text-xs font-semibold text-slate-200">
+                        {Array.isArray(technicalInfo.transmissionOptions) ? technicalInfo.transmissionOptions.join(", ") : "-"} ({Array.isArray(technicalInfo.fuelTypes) ? technicalInfo.fuelTypes.join("/") : "-"})
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Ortalama Tüketim</span>
+                      <span className="text-xs font-semibold text-slate-200">{technicalInfo.averageConsumption || "-"}</span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Güç / Tork Aralığı</span>
+                      <span className="text-xs font-semibold text-slate-200">
+                        {technicalInfo.powerRange || "-"} / {technicalInfo.torqueRange || "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Bagaj Hacmi</span>
+                      <span className="text-xs font-semibold text-slate-200">{technicalInfo.trunkVolume || "-"}</span>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Güvenlik Değerlendirmesi</span>
+                      <span className="text-xs font-semibold text-slate-200">{technicalInfo.safetyInfo || "-"}</span>
+                    </div>
+                  </div>
+
+                  {technicalInfo.localizedNotes && (
+                    <div className="mt-2 bg-orange-500/5 border border-orange-500/15 p-3 rounded-2xl flex flex-col gap-1">
+                      <span className="text-[9px] font-extrabold text-orange-400 uppercase tracking-wider">💡 TorqueScout Uzman Notu</span>
+                      <p className="text-[10px] leading-relaxed text-slate-300 font-medium">
+                        {technicalInfo.localizedNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={handleCtaClick}
+                    className="w-full mt-2 py-3 px-4 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-black tracking-wide text-white transition cursor-pointer select-none"
+                  >
+                    🚗 Bu Modelin İlanlarını Listele
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 text-center py-6">Teknik bilgiler alınamadı.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
