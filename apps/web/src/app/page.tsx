@@ -310,9 +310,9 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-start py-12 px-6 gap-16">
       {/* Hero Section */}
-      <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-4 py-4">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-end flex-none w-64 opacity-80">
+        <div className="hidden lg:flex items-center justify-end flex-none w-72 opacity-80">
           <svg width="240" height="65" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
@@ -341,8 +341,8 @@ export default function Home() {
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-64">
-          <svg width="190" height="190" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-72">
+          <svg width="220" height="220" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
@@ -385,7 +385,7 @@ export default function Home() {
             <circle cx="130" cy="115" r="6" fill="#00f2fe" />
 
             {/* Slanted "T" */}
-            <path d="M 68 55 L 152 55 L 144 75 L 112 75 L 87 165 L 62 165 L 87 75 L 57 75 Z" fill="url(#t-gradient-large)" />
+            <path d="M 68 55 L 152 55 L 146 71 L 106 71 L 83 165 L 66 165 L 89 71 L 59 71 Z" fill="url(#t-gradient-large)" />
           </svg>
         </div>
       </div>
