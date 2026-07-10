@@ -312,8 +312,8 @@ export default function Home() {
       {/* Hero Section */}
       <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-4">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-end flex-none w-80 h-[250px] opacity-80">
-          <svg width="270" height="70" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="hidden lg:flex items-center justify-end flex-none w-96 h-[280px] opacity-80">
+          <svg width="310" height="80" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stop-color="#00f2fe" />
@@ -328,7 +328,7 @@ export default function Home() {
         </div>
 
         {/* Center: Hero Text */}
-        <div className="text-center flex-1 max-w-3xl flex flex-col items-center justify-center gap-2.5 h-[250px]">
+        <div className="text-center flex-1 max-w-3xl flex flex-col items-center justify-center gap-2.5 h-[280px]">
           <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white whitespace-nowrap">
             İlanı gör, aracı anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
@@ -341,16 +341,16 @@ export default function Home() {
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[250px]">
-          <svg width="250" height="250" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-96 h-[280px]">
+          <svg width="280" height="280" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
                 <stop offset="100%" stop-color="#0062ff" />
               </linearGradient>
               <linearGradient id="lines-gradient-large" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#00f2fe" />
-                <stop offset="100%" stop-color="#0062ff" stop-opacity="0.1" />
+                <stop offset="0%" stop-color="#0062ff" stop-opacity="0.1" />
+                <stop offset="100%" stop-color="#00f2fe" />
               </linearGradient>
               <linearGradient id="arc-gradient-large" x1="0" y1="1" x2="1" y2="0">
                 <stop offset="0%" stop-color="#0062ff" stop-opacity="0.2" />
@@ -359,9 +359,9 @@ export default function Home() {
             </defs>
             
             {/* Speed Lines */}
-            <rect x="5" y="75" width="35" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
+            <rect x="15" y="75" width="35" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
             <rect x="5" y="95" width="50" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
-            <rect x="5" y="115" width="25" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
+            <rect x="20" y="115" width="25" height="7" rx="3.5" fill="url(#lines-gradient-large)" />
 
             {/* Speedometer Arc */}
             <path d="M 110 155 A 60 60 0 0 0 160 75" stroke="url(#arc-gradient-large)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 5" />
