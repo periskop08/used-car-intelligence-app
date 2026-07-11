@@ -30,6 +30,9 @@ interface Card {
   ratingScore: number;
   ratingCount: number;
   shortSummary: string;
+  imageObjectPosition?: string;
+  imageFitMode?: string;
+  licenseLabelPosition?: string;
   facts: Fact[];
 }
 
@@ -90,6 +93,20 @@ const translateBodyType = (bodyType: string) => {
     MINIVAN: "Minivan"
   };
   return mapping[bodyType.toUpperCase()] || bodyType;
+};
+
+const getLicensePositionClass = (position?: string) => {
+  switch (position) {
+    case "bottom-left":
+      return "bottom-2 left-3";
+    case "top-right":
+      return "top-2 right-3";
+    case "top-left":
+      return "top-2 left-3";
+    case "bottom-right":
+    default:
+      return "bottom-2 right-3";
+  }
 };
 
 export default function VehicleGuidePage() {
@@ -345,16 +362,35 @@ export default function VehicleGuidePage() {
               
               {/* LEFT COLUMN: Hero Image + Title & Summary */}
               <div className="w-full md:w-[42%] flex flex-col border-b md:border-b-0 md:border-r border-white/5 h-auto md:h-full bg-[#080c18] flex-none md:flex-1">
-                <div className="h-[200px] md:h-[250px] relative w-full overflow-hidden flex-none">
-                  <img 
-                    src={currentCard.heroImageUrl || currentCard.placeholderImageUrl || "/brand-placeholder.png"} 
-                    alt={currentCard.imageAltText || "Araç görseli"} 
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#080c18] via-transparent to-black/60" />
+                <div className="relative w-full aspect-[16/9] overflow-hidden flex-none bg-[#080d1d] border-b border-white/5">
+                  {(() => {
+                    const imageUrl = currentCard.heroImageUrl || currentCard.placeholderImageUrl || `https://placehold.co/1280x720/0a0f24/e2e8f0?text=${encodeURIComponent(currentCard.brand + ' ' + currentCard.model)}`;
+                    return (
+                      <>
+                        {currentCard.imageFitMode === "contain" && (
+                          <div 
+                            className="absolute inset-0 bg-cover bg-center blur-2xl opacity-50 scale-110 pointer-events-none z-0"
+                            style={{
+                              backgroundImage: `url(${imageUrl})`,
+                            }}
+                          />
+                        )}
+                        <img 
+                          src={imageUrl} 
+                          alt={currentCard.imageAltText || `${currentCard.brand} ${currentCard.model}`} 
+                          className="w-full h-full relative z-10 block"
+                          style={{
+                            objectFit: (currentCard.imageFitMode || "cover") as any,
+                            objectPosition: currentCard.imageObjectPosition || "center center",
+                          }}
+                        />
+                      </>
+                    );
+                  })()}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#080c18] via-transparent to-black/60 z-20 pointer-events-none" />
 
                   {currentCard.imageSource && (
-                    <div className="absolute bottom-2 right-3 text-[9px] text-white/40 bg-black/30 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm">
+                    <div className={`absolute ${getLicensePositionClass(currentCard.licenseLabelPosition)} z-30 text-[9px] text-white/40 bg-black/40 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-sm pointer-events-none`}>
                       Görsel: {currentCard.imageSource} ({currentCard.imageLicense || "Lisanslı"})
                     </div>
                   )}

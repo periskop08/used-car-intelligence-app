@@ -1118,6 +1118,9 @@ model VehicleGuideCard {
   imageSource         String?
   imageLicense        String?
   placeholderImageUrl String?
+  imageObjectPosition String?                        @default("center center")
+  imageFitMode        String?                        @default("cover")
+  licenseLabelPosition String?                       @default("bottom-right")
   shortSummary        String?
   ratingScore         Float?                         @default(0.0)
   ratingCount         Int                            @default(0)

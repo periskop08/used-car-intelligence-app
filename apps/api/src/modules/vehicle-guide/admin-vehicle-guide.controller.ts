@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleGuideService } from './vehicle-guide.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -15,6 +16,18 @@ import {
 @UseGuards(JwtAuthGuard)
 export class AdminVehicleGuideController {
   constructor(private guideService: VehicleGuideService) {}
+
+  @Post('cards/:id/image')
+  @ApiOperation({ summary: 'Rehber kartına yeni görsel yükler (çözünürlük doğrulamalı ve WebP optimize)' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @GetUser() user: UserPayload,
+  ) {
+    this.assertAdmin(user);
+    return this.guideService.uploadGuideCardImage(id, file);
+  }
 
   @Get('cards')
   @ApiOperation({ summary: 'Tüm araç rehberi kartlarını listeler.' })

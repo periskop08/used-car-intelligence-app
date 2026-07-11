@@ -64,6 +64,21 @@ export class CreateGuideCardDto {
   @IsString()
   @IsOptional()
   shortSummary?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  imageObjectPosition?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  imageFitMode?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  licenseLabelPosition?: string;
 }
 
 export class UpdateGuideCardDto {
@@ -141,6 +156,21 @@ export class UpdateGuideCardDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  imageObjectPosition?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  imageFitMode?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  licenseLabelPosition?: string;
 }
 
 export class CreateGuideFactDto {

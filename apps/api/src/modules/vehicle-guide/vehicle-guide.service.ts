@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+const sharp = require('sharp');
 import { Locale, GuideStatus, GuideFactType, GuideSourceType, GuideEventType, DataConfidence } from '@prisma/client';
 import { 
   CreateGuideCardDto, UpdateGuideCardDto,
@@ -365,6 +367,109 @@ export class VehicleGuideService {
     return segmentFiltered;
   }
 
+  async uploadGuideCardImage(cardId: string, file: any) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel seçin.');
+    }
+
+    const card = await this.prisma.vehicleGuideCard.findUnique({
+      where: { id: cardId }
+    });
+
+    if (!card) {
+      throw new NotFoundException('Kart bulunamadı.');
+    }
+
+    // 1. Validate image dimensions using sharp
+    let metadata;
+    try {
+      metadata = await sharp(file.buffer).metadata();
+    } catch (err: any) {
+      throw new BadRequestException(`Görsel dosyası okunamadı veya geçersiz bir formatta: ${err.message}`);
+    }
+
+    const minWidth = 900;
+    const minHeight = 500;
+    if (!metadata.width || !metadata.height || metadata.width < minWidth || metadata.height < minHeight) {
+      throw new BadRequestException(
+        `Yüklenen görsel boyutu yetersiz (${metadata.width || 0}x${metadata.height || 0}px). En az ${minWidth}x${minHeight}px çözünürlükte olmalıdır.`
+      );
+    }
+
+    // 2. Setup R2/S3 client
+    const accountId = process.env.R2_ACCOUNT_ID;
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    const bucketName = process.env.R2_BUCKET_NAME;
+    const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
+
+    const s3Client = new S3Client({
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+      region: 'auto',
+    });
+
+    try {
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      // 3. Optimize and resize image for Desktop Hero (1280x720 WebP)
+      const desktopBuffer = await sharp(file.buffer)
+        .resize(1280, 720, {
+          fit: 'cover',
+          position: 'center',
+        })
+        .webp({ quality: 85 })
+        .toBuffer();
+
+      const desktopKey = `guide-cards/desktop/${uniqueId}.webp`;
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: desktopKey,
+          Body: desktopBuffer,
+          ContentType: 'image/webp',
+        })
+      );
+
+      // 4. Optimize and resize image for Mobile Hero (1080x720 WebP)
+      const mobileBuffer = await sharp(file.buffer)
+        .resize(1080, 720, {
+          fit: 'cover',
+          position: 'center',
+        })
+        .webp({ quality: 85 })
+        .toBuffer();
+
+      const mobileKey = `guide-cards/mobile/${uniqueId}.webp`;
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: mobileKey,
+          Body: mobileBuffer,
+          ContentType: 'image/webp',
+        })
+      );
+
+      const desktopUrl = `${publicUrl}/${desktopKey}`;
+
+      await this.prisma.vehicleGuideCard.update({
+        where: { id: cardId },
+        data: {
+          heroImageUrl: desktopUrl,
+          placeholderImageUrl: null
+        }
+      });
+
+      return {
+        success: true,
+        heroImageUrl: desktopUrl,
+        mobileHeroImageUrl: `${publicUrl}/${mobileKey}`
+      };
+    } catch (err: any) {
+      throw new BadRequestException(`Görsel R2'ye yüklenirken hata oluştu: ${err.message}`);
+    }
+  }
+
   // ==========================================
   // ADMIN PANEL ACTIONS
   // ==========================================
@@ -385,6 +490,9 @@ export class VehicleGuideService {
         imageLicense: dto.imageLicense,
         placeholderImageUrl: dto.placeholderImageUrl,
         shortSummary: dto.shortSummary,
+        imageObjectPosition: dto.imageObjectPosition,
+        imageFitMode: dto.imageFitMode,
+        licenseLabelPosition: dto.licenseLabelPosition,
         status: GuideStatus.DRAFT, // Default to DRAFT
         isActive: true,
       },
