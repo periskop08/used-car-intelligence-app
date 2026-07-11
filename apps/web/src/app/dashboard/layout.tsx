@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Header from "../../components/Header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -209,7 +208,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col">
-      <Header />
 
       <div className="flex-1 max-w-7xl w-full mx-auto flex px-4 py-8 gap-8">
         {/* Desktop Sidebar */}
