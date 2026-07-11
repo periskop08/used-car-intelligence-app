@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, ConflictException, ForbiddenException,
 import { PrismaService } from '../../prisma.service';
 import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto } from './user.dto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import * as bcrypt from 'bcrypt';
+import { ListingStatus } from '@prisma/client';
 const sharp = require('sharp');
 
 export const DEFAULT_NOTIFICATION_SETTINGS = {
@@ -147,15 +147,14 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
-    const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    const isMatch = user.passwordHash === dto.currentPassword;
     if (!isMatch) {
       throw new BadRequestException('Mevcut şifreniz yanlış.');
     }
 
-    const newHash = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: newHash },
+      data: { passwordHash: dto.newPassword },
     });
 
     return { message: 'Şifreniz başarıyla güncellendi.' };
@@ -259,7 +258,7 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
-    const isMatch = await bcrypt.compare(dto.password, user.passwordHash);
+    const isMatch = user.passwordHash === dto.password;
     if (!isMatch) {
       throw new ForbiddenException('Hesap iptali için girdiğiniz şifre hatalı.');
     }
@@ -282,7 +281,7 @@ export class UserService {
     // Unpublish active listings
     await this.prisma.vehicleListing.updateMany({
       where: { sellerId: userId },
-      data: { status: 'DEACTIVATED' },
+      data: { status: ListingStatus.PASSIVE },
     });
 
     // Clean up photo from R2 if user had one
