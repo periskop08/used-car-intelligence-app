@@ -109,6 +109,17 @@ const getLicensePositionClass = (position?: string) => {
   }
 };
 
+const formatImageUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
+    const parts = url.split(".r2.dev/");
+    if (parts.length > 1) {
+      return `${API_URL}/listings/media-proxy/${parts[1]}`;
+    }
+  }
+  return url;
+};
+
 export default function VehicleGuidePage() {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [historyStack, setHistoryStack] = useState<string[]>([]);
@@ -364,7 +375,10 @@ export default function VehicleGuidePage() {
               <div className="w-full md:w-[42%] flex flex-col border-b md:border-b-0 md:border-r border-white/5 h-auto md:h-full bg-[#080c18] flex-none md:flex-1">
                 <div className="relative w-full aspect-[16/9] overflow-hidden flex-none bg-[#080d1d] border-b border-white/5">
                   {(() => {
-                    const imageUrl = currentCard.heroImageUrl || currentCard.placeholderImageUrl || `https://placehold.co/1280x720/0a0f24/e2e8f0?text=${encodeURIComponent(currentCard.brand + ' ' + currentCard.model)}`;
+                    const rawUrl = currentCard.heroImageUrl || currentCard.placeholderImageUrl;
+                    const imageUrl = rawUrl 
+                      ? formatImageUrl(rawUrl) 
+                      : `https://placehold.co/1280x720/0a0f24/e2e8f0?text=${encodeURIComponent(currentCard.brand + ' ' + currentCard.model)}`;
                     return (
                       <>
                         {currentCard.imageFitMode === "contain" && (
