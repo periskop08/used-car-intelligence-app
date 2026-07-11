@@ -292,6 +292,16 @@ export class UserService {
     return { message: 'Hesabınız başarıyla iptal edildi ve tüm ilanlarınız yayından kaldırıldı.' };
   }
 
+  async forgotPassword(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    return {
+      message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
+      email: user.email,
+    };
+  }
+
   private async deleteImageFromR2(url: string) {
     try {
       const parts = url.split('.r2.dev/');

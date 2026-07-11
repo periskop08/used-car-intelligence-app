@@ -77,6 +77,12 @@ export class UserController {
     return this.userService.updateNotifications(user.id, dto);
   }
 
+  @Post('me/forgot-password')
+  @ApiOperation({ summary: 'Şifremi Unuttum Talebi Gönder' })
+  forgotPassword(@GetUser() user: UserPayload) {
+    return this.userService.forgotPassword(user.id);
+  }
+
   @Post('me/cancel-account')
   @ApiOperation({ summary: 'Hesap İptal Et (Deaktif Et)' })
   cancelAccount(

@@ -9,7 +9,39 @@ export default function PasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  const handleForgotPassword = () => {
+    setMessage({ type: "", text: "" });
+    setResetSending(true);
+
+    const token = localStorage.getItem("accessToken");
+    fetch(`${API_URL}/users/me/forgot-password`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || "Şifre sıfırlama bağlantısı gönderilemedi.");
+        }
+        return data;
+      })
+      .then((data) => {
+        setMessage({ 
+          type: "success", 
+          text: `Şifre sıfırlama bağlantısı e-posta adresinize (${data.email}) gönderilmiştir.` 
+        });
+        setResetSending(false);
+      })
+      .catch((err) => {
+        setMessage({ type: "error", text: err.message });
+        setResetSending(false);
+      });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +110,16 @@ export default function PasswordPage() {
               required
               className="w-full bg-[#05070f] border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
             />
+            <div className="flex justify-end mt-1.5">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetSending}
+                className="text-[10px] font-bold text-orange-400 hover:text-orange-350 hover:underline cursor-pointer transition select-none disabled:text-slate-600"
+              >
+                {resetSending ? "Gönderiliyor..." : "Şifremi Unuttum"}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1.5">
