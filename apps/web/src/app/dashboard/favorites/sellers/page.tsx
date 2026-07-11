@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { formatImageUrl } from "../../../../utils/media";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -108,7 +109,7 @@ export default function FavoriteSellersPage() {
             >
               <div className="w-16 h-16 rounded-2xl overflow-hidden bg-orange-600/10 border border-orange-500/20 flex items-center justify-center font-bold text-orange-400 text-xl">
                 {item.seller.profilePhotoUrl ? (
-                  <img src={item.seller.profilePhotoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={formatImageUrl(item.seller.profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   (item.seller.firstName || item.seller.email).slice(0, 2).toUpperCase()
                 )}

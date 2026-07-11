@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { formatImageUrl } from "../../../../utils/media";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -200,7 +201,7 @@ export default function PersonalInfoPage() {
       <div className="glass border border-white/5 rounded-3xl bg-[#090d1a]/45 backdrop-blur-md p-6 flex flex-col sm:flex-row items-center gap-6">
         <div className="relative group w-24 h-24 rounded-2xl overflow-hidden bg-orange-600/10 border border-orange-500/20 flex items-center justify-center font-bold text-orange-400 text-3xl">
           {profile?.profilePhotoUrl ? (
-            <img src={profile.profilePhotoUrl} alt="Profil" className="w-full h-full object-cover" />
+            <img src={formatImageUrl(profile.profilePhotoUrl)} alt="Profil" className="w-full h-full object-cover" />
           ) : (
             (firstName || profile?.email || "U").slice(0, 2).toUpperCase()
           )}

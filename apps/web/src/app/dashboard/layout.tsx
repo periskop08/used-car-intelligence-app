@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { formatImageUrl } from "../../utils/media";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -148,7 +149,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="p-4 border-b border-white/5 flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl overflow-hidden bg-orange-600/20 border border-orange-500/30 flex items-center justify-center font-bold text-orange-400">
             {profile.profilePhotoUrl ? (
-              <img src={profile.profilePhotoUrl} alt="Avatar" className="w-full h-full object-cover" />
+              <img src={formatImageUrl(profile.profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               (profile.firstName || profile.email).slice(0, 2).toUpperCase()
             )}

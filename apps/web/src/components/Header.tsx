@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { formatImageUrl } from "../utils/media";
 
 export default function Header() {
   const [user, setUser] = useState<{ email: string; subscriptionTier: string; role?: string } | null>(null);
@@ -97,7 +98,7 @@ export default function Header() {
             >
               <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-600/25 border border-orange-500/30 flex items-center justify-center font-black text-orange-400 text-sm">
                 {(user as any).profilePhotoUrl ? (
-                  <img src={(user as any).profilePhotoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={formatImageUrl((user as any).profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   ((user as any).firstName || user.email).slice(0, 2).toUpperCase()
                 )}
