@@ -6,3 +6,9 @@ export class ToggleFavoriteDto {
   @IsUUID()
   variantId!: string;
 }
+
+export class ToggleFavoriteSellerDto {
+  @ApiProperty({ description: 'Satıcı Kullanıcı UUIDsi' })
+  @IsUUID()
+  sellerId!: string;
+}

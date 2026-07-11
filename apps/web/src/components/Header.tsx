@@ -95,12 +95,28 @@ export default function Header() {
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-3 bg-slate-900/60 border border-white/10 px-4 py-2 rounded-2xl hover:border-orange-500/50 transition cursor-pointer select-none"
             >
-              <div className="w-8 h-8 rounded-xl bg-orange-600/25 border border-orange-500/30 flex items-center justify-center font-black text-orange-400 text-sm">
-                {user.email.slice(0, 2).toUpperCase()}
+              <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-600/25 border border-orange-500/30 flex items-center justify-center font-black text-orange-400 text-sm">
+                {(user as any).profilePhotoUrl ? (
+                  <img src={(user as any).profilePhotoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  ((user as any).firstName || user.email).slice(0, 2).toUpperCase()
+                )}
               </div>
               <div className="flex flex-col items-start hidden sm:flex">
                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Hoş Geldiniz</span>
-                <span className="text-xs font-bold text-slate-200">{user.email.split('@')[0]}</span>
+                <span className="text-xs font-bold text-slate-200">
+                  {(() => {
+                    const u = user as any;
+                    if (u.displayNamePreference === "USERNAME" && u.username) return u.username;
+                    if (u.displayNamePreference === "SHORT_NAME" && u.firstName) {
+                      return `${u.firstName} ${u.lastName ? u.lastName[0] + '.' : ''}`.trim();
+                    }
+                    if (u.firstName || u.lastName) {
+                      return `${u.firstName || ''} ${u.lastName || ''}`.trim();
+                    }
+                    return u.email.split('@')[0];
+                  })()}
+                </span>
               </div>
               <span className="text-xs text-slate-500">▼</span>
             </button>
@@ -149,6 +165,33 @@ export default function Header() {
                     className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
                   >
                     <span>Favorilerim</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/messages"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>Mesajlarım</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/subscription"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>Paketim</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/account/personal-info"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>Kişisel Bilgilerim</span>
                     <span className="text-slate-500">→</span>
                   </a>
 

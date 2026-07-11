@@ -181,6 +181,12 @@ enum FinalDecision {
   BUY_WITH_CAUTION
 }
 
+enum DisplayNamePreference {
+  FULL_NAME
+  SHORT_NAME
+  USERNAME
+}
+
 model User {
   id                     String            @id @default(uuid())
   email                  String            @unique
@@ -192,6 +198,17 @@ model User {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   
+  username               String?           @unique
+  firstName              String?
+  lastName               String?
+  phone                  String?           @unique
+  phoneVerifiedAt        DateTime?
+  emailVerifiedAt        DateTime?
+  profilePhotoUrl        String?
+  displayNamePreference  DisplayNamePreference @default(FULL_NAME)
+  notificationSettings   Json?
+  isActive               Boolean           @default(true)
+
   subscriptions      Subscription[]
   reviews            UserReview[]
   favorites          FavoriteVehicle[]
@@ -201,6 +218,13 @@ model User {
   auditLogs          AuditLog[]
   featureUsages      FeatureUsage[]
   guideViewHistories UserGuideCardViewHistory[]
+
+  savedSearches          SavedSearch[]
+  favoriteSellers        FavoriteSeller[]          @relation("FavoriteSellerUser")
+  favoritedBy            FavoriteSeller[]          @relation("FavoriteSellerSeller")
+  conversationsAsBuyer   Conversation[]            @relation("BuyerConversations")
+  conversationsAsSeller  Conversation[]            @relation("SellerConversations")
+  sentMessages           Message[]
 
   preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
   createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
@@ -973,6 +997,7 @@ model VehicleListing {
   leads              ListingLead[]
   views              ListingView[]
   favorites          FavoriteListing[]
+  conversations      Conversation[]
   
   @@index([vehicleVariantId])
   @@index([sellerId])
@@ -1250,5 +1275,69 @@ model GuideAnalyticsEvent {
   timestamp           DateTime       @default(now())
 
   card                VehicleGuideCard @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+}
+
+model FavoriteSeller {
+  id        String   @id @default(uuid())
+  userId    String
+  sellerId  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation("FavoriteSellerUser", fields: [userId], references: [id], onDelete: Cascade)
+  seller    User     @relation("FavoriteSellerSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sellerId])
+  @@index([userId])
+  @@index([sellerId])
+}
+
+model SavedSearch {
+  id                 String    @id @default(uuid())
+  userId             String
+  title              String
+  filters            Json
+  isEmailAlertActive Boolean   @default(true)
+  isPushAlertActive  Boolean   @default(false)
+  lastRunAt          DateTime?
+  lastMatchedCount   Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Conversation {
+  id            String         @id @default(uuid())
+  listingId     String
+  buyerId       String
+  sellerId      String
+  lastMessageAt DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  listing       VehicleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer         User           @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller        User           @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  @@unique([listingId, buyerId, sellerId])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
 }
 

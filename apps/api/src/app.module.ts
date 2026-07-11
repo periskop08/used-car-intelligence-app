@@ -12,6 +12,9 @@ import { ComparisonModule } from './modules/comparison/comparison.module';
 import { ResearchModule } from './modules/research/research.module';
 import { ListingModule } from './modules/listing/listing.module';
 import { VehicleGuideModule } from './modules/vehicle-guide/vehicle-guide.module';
+import { UserModule } from './modules/user/user.module';
+import { SavedSearchModule } from './modules/saved-search/saved-search.module';
+import { MessageModule } from './modules/message/message.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { VehicleGuideModule } from './modules/vehicle-guide/vehicle-guide.module
     ResearchModule,
     ListingModule,
     VehicleGuideModule,
+    UserModule,
+    SavedSearchModule,
+    MessageModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

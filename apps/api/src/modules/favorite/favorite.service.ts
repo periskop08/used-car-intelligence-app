@@ -72,4 +72,66 @@ export class FavoriteService {
 
     return { favorited: true, message: 'Araç favorilerinize eklendi.' };
   }
+
+  async getFavoriteSellers(userId: string) {
+    return this.prisma.favoriteSeller.findMany({
+      where: { userId },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePhotoUrl: true,
+            displayNamePreference: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async toggleFavoriteSeller(userId: string, sellerId: string) {
+    if (userId === sellerId) {
+      throw new HttpException(
+        'Kendi satıcı profilinizi favoriye ekleyemezsiniz.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Verify seller exists
+    const seller = await this.prisma.user.findUnique({
+      where: { id: sellerId },
+    });
+    if (!seller || !seller.isActive) {
+      throw new HttpException('Satıcı bulunamadı.', HttpStatus.NOT_FOUND);
+    }
+
+    const existing = await this.prisma.favoriteSeller.findUnique({
+      where: {
+        userId_sellerId: {
+          userId,
+          sellerId,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.favoriteSeller.delete({
+        where: { id: existing.id },
+      });
+      return { favorited: false, message: 'Satıcı favorilerinizden kaldırıldı.' };
+    }
+
+    await this.prisma.favoriteSeller.create({
+      data: {
+        userId,
+        sellerId,
+      },
+    });
+
+    return { favorited: true, message: 'Satıcı favorilerinize eklendi.' };
+  }
 }

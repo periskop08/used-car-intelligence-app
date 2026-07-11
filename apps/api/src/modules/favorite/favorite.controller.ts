@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { FavoriteService } from './favorite.service';
-import { ToggleFavoriteDto } from './favorite.dto';
+import { ToggleFavoriteDto, ToggleFavoriteSellerDto } from './favorite.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 
@@ -26,5 +26,21 @@ export class FavoriteController {
     @Body() dto: ToggleFavoriteDto,
   ) {
     return this.favoriteService.toggleFavorite(user.id, dto);
+  }
+
+  @Get('sellers')
+  @ApiOperation({ summary: 'Kullanıcının Favori Satıcılarını Listele' })
+  getFavoriteSellers(@GetUser() user: UserPayload) {
+    return this.favoriteService.getFavoriteSellers(user.id);
+  }
+
+  @Post('sellers/toggle')
+  @ApiOperation({ summary: 'Satıcıyı Favorilere Ekle / Kaldır' })
+  @ApiResponse({ status: 200, description: 'Satıcı başarıyla favorilere eklendi veya çıkarıldı.' })
+  toggleFavoriteSeller(
+    @GetUser() user: UserPayload,
+    @Body() dto: ToggleFavoriteSellerDto,
+  ) {
+    return this.favoriteService.toggleFavoriteSeller(user.id, dto.sellerId);
   }
 }
