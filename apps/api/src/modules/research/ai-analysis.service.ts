@@ -105,6 +105,7 @@ CRITICAL RULES FOR EXTRACTION:
 - For issues originating from community forums or blogs, use non-definitive, cautious phrasing.
   - In Turkish: "bazı kullanıcılar ... bildirdi", "belirtildi", "görülebildiği ifade edildi" (never "kesindir" or "kronik hatadır" unless backed by official sources).
   - In English: "some users reported", "stated", "indicated" (never definitive).
+- CRITICAL: Do NOT use definitive or alarmist words like "kronik", "kesin arızalı", "problemli", or "alınmaz" in the user-facing titles and descriptions. Instead, frame issues as "commonly reported conditions" or "inspection advice", using advisory phrasing such as "görülebilir", "dikkat edilmelidir", "kontrol edilmelidir", "bazı kullanıcı bildirimlerinde yer alır", "daha sık dile getirilebilir", "satın alma öncesi incelenmelidir".
 - Do not include duplicate items.
 - Categorize questions and checklist items correctly into their VehicleInfoCategory: ENGINE, TRANSMISSION, ELECTRONICS, SUSPENSION, BRAKE, BODY, PAINT, INTERIOR, TIRES, TEST_DRIVE, MAINTENANCE, DOCUMENTS, GENERAL.
 - Ensure recall details are accurate, adding real official recalls for this variant if known to you.

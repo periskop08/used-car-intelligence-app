@@ -396,7 +396,7 @@ export default function CreateListing() {
       {step === 1 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
           <h2 className="text-lg font-bold text-slate-200">🚗 Adım 1: Araç Varyant Seçimi</h2>
-          <p className="text-xs text-slate-400">Aracınızın teknik özelliklerinin ve kronik analizlerinin eşleşmesi için varyant seçiniz.</p>
+          <p className="text-xs text-slate-400">Aracınızın teknik özelliklerinin ve varyant analizlerinin eşleşmesi için varyant seçiniz.</p>
 
           <div className="flex items-center gap-2 cursor-pointer bg-slate-900/40 p-4 rounded-xl border border-white/5">
             <input

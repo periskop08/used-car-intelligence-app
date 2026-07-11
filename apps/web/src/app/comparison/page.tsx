@@ -166,7 +166,7 @@ export default function ComparisonPage() {
           ⚖️ Araç Karşılaştırma
         </h1>
         <p className="text-sm text-slate-400 mt-2">
-          İki farklı aracı yan yana getirerek teknik özelliklerini ve kronik risk seviyelerini analiz edin.
+          İki farklı aracı yan yana getirerek teknik özelliklerini ve karşılaştırmalı durum analizini inceleyin.
         </p>
       </div>
 
@@ -315,7 +315,7 @@ export default function ComparisonPage() {
             })}
 
             {/* Problems compared */}
-            <div className="text-slate-400 text-xs font-semibold text-left">Onaylı Kronik Hatalar</div>
+            <div className="text-slate-400 text-xs font-semibold text-left">Sık Karşılaşılan Durumlar</div>
             <div className="text-xs text-red-400 font-bold">{comparisonResult.vehicle1.problemsCount} Adet</div>
             <div className="text-xs text-red-400 font-bold">{comparisonResult.vehicle2.problemsCount} Adet</div>
 

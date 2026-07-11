@@ -76,10 +76,10 @@ export class ReportService {
           summary: {
             title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
             summary: lang === 'tr' 
-              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
+              ? 'Bu araç varyantı için onaylanmış detaylı bir satın alma veya geri çağırma kaydı bulunmamaktadır.' 
               : 'No approved chronic problems or recall records found for this vehicle variant.',
             shouldBuyComment: lang === 'tr'
-              ? 'Araç hakkında yeterli kronik sorun ve servis verisi bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
+              ? 'Araç hakkında yeterli veri bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
               : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
           },
           riskScore: 0,
@@ -94,10 +94,10 @@ export class ReportService {
           summary: {
             title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
             summary: lang === 'tr' 
-              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.' 
+              ? 'Bu araç varyantı için onaylanmış detaylı bir satın alma veya geri çağırma kaydı bulunmamaktadır.' 
               : 'No approved chronic problems or recall records found for this vehicle variant.',
             shouldBuyComment: lang === 'tr'
-              ? 'Araç hakkında yeterli kronik sorun ve servis verisi bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
+              ? 'Araç hakkında yeterli veri bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
               : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
           },
           riskScore: 0,

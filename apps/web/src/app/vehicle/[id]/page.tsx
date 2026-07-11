@@ -399,7 +399,7 @@ export default function VehicleDetail() {
             {!aiReport ? (
               <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
                 <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve tüm kronik durumları taranmış yapay zeka analiz raporunu derleyin.
+                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve sık karşılaşılan durumları taranmış yapay zeka analiz raporunu derleyin.
                 </p>
                 <button
                   onClick={() => handleGenerateReport(false)}
@@ -455,10 +455,10 @@ export default function VehicleDetail() {
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 text-[11px] text-slate-400 leading-relaxed">
                   <span className="font-bold text-slate-300 block mb-1">💡 Skorlar Nasıl Yorumlanmalı?</span>
                   <p className="mb-1">
-                    Yapay zekamız, bu araca ait onaylanmış kronik sorun sıklığı, yedek parça maliyetleri ve servis bültenlerine dayanarak iki ana kriter hesaplar:
+                    Yapay zekamız, bu araca ait onaylanmış durum sıklığı, yedek parça maliyetleri ve servis bültenlerine dayanarak iki ana kriter hesaplar:
                   </p>
                   <ul className="list-disc pl-4 flex flex-col gap-1 mt-1 text-[10px]">
-                    <li><strong>Alınabilirlik Oranı:</strong> Aracın genel kronik sorunsuzluk seviyesi ve piyasadaki tercih edilebilirlik tavsiyesidir. Yüksek olması iyidir.</li>
+                    <li><strong>Alınabilirlik Oranı:</strong> Aracın genel sorunsuzluk seviyesi ve piyasadaki tercih edilebilirlik tavsiyesidir. Yüksek olması iyidir.</li>
                     <li><strong>Risk Katsayısı:</strong> Aracın size uzun vadede açabileceği ağır arıza olasılığını ve maliyet risklerini temsil eder. Düşük olması iyidir.</li>
                   </ul>
                 </div>
@@ -527,16 +527,16 @@ export default function VehicleDetail() {
 
           {/* Chronic Problems */}
           <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">⚠️ Bilinen Kronik Arızalar</h2>
+            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">⚠️ Sık Karşılaşılan Durumlar</h2>
             {vehicle.problems.length > 0 ? (
               <div className="flex flex-col gap-4 mt-2">
                 {/* Reassurance Banner */}
                 <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
                   <span className="text-xl">ℹ️</span>
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-blue-400">Rapor Okuma Kılavuzu</span>
+                    <span className="text-xs font-bold text-blue-400">Bilgilendirme</span>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Burada listelenen kronik sorunlar, aracın geçmiş kullanıcı şikayetleri, forum tartışmaları ve servis bültenleri taranarak derlenmiştir. <strong>Bu sorunlar her araçta mutlaka görülecek anlamına gelmez ve tek başına araçtan vazgeçme sebebi olmamalıdır.</strong> Sağlıklı bir satın alma kararı için satıcıya aşağıdaki soruları sormanız ve ekspertiz muayenesinde checklist adımlarını özellikle inceletmeniz tavsiye edilir.
+                      Bu bölümde ilgili motor, şanzıman, yıl, kasa tipi ve donanım kombinasyonunda kullanıcıların daha sık dile getirdiği veya satın alma öncesi kontrol edilmesi önerilen durumlar yer alır. <strong>Bu durumlar her araçta mutlaka görülecek anlamına gelmez ve tek başına araçtan vazgeçme sebebi olmamalıdır.</strong> Sağlıklı bir satın alma kararı için satıcıya aşağıdaki soruları sormanız ve ekspertiz muayenesinde checklist adımlarını özellikle inceletmeniz tavsiye edilir.
                     </p>
                   </div>
                 </div>
@@ -553,7 +553,7 @@ export default function VehicleDetail() {
                           <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
                             isComplaint ? 'bg-amber-600/20 text-amber-400' : 'bg-orange-600/20 text-orange-400'
                           }`}>
-                            {isComplaint ? 'Kullanıcı Şikayeti' : 'Kronik Sorun'}
+                            {isComplaint ? 'Kullanıcı Şikayeti' : 'Sık Karşılaşılan Durum'}
                           </span>
                           <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
                             Güven: {p.dataConfidence}
@@ -582,7 +582,7 @@ export default function VehicleDetail() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Bu araç için onaylanmış bir kronik arıza bulunmamaktadır.</p>
+              <p className="text-sm text-slate-500">Bu araç için onaylanmış bir durum kaydı bulunmamaktadır.</p>
             )}
           </div>
 
@@ -708,7 +708,7 @@ export default function VehicleDetail() {
                     rows={4}
                     value={comment}
                     onChange={e => setComment(e.target.value)}
-                    placeholder="Aracın konforu, yakıt tüketimi, kronik problemleri hakkındaki deneyimlerinizi yazın..."
+                    placeholder="Aracın konforu, yakıt tüketimi, kullanıcı deneyimleri hakkındaki görüşlerinizi yazın..."
                     className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
                   />
                 </div>
@@ -802,7 +802,7 @@ export default function VehicleDetail() {
                 <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
                   <span className="text-3xl">🤖</span>
                   <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                    Merhaba! Ben TorqueScout AI. Bu aracın kronik sorunları, muayene checklisti veya satın alma uygunluğu hakkında bana dilediğiniz soruyu sorabilirsiniz.
+                    Merhaba! Ben TorqueScout AI. Bu araçta sık karşılaşılan durumlar, muayene checklisti veya satın alma uygunluğu hakkında bana dilediğiniz soruyu sorabilirsiniz.
                   </p>
                   <span className="text-[10px] text-slate-500 italic">Örn: "Şanzımanı uzun vadede üzer mi?", "Motor performansı nasıldır?"</span>
                 </div>

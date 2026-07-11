@@ -252,7 +252,7 @@ function ListingsContent() {
       {/* Title Header */}
       <div>
         <h1 className="text-3xl font-black text-slate-200 tracking-tight">Araç İlanları</h1>
-        <p className="text-sm text-slate-400 mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kronik detayları ile ikinci el ilanları.</p>
+        <p className="text-sm text-slate-400 mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kullanıcı analizleri ile ikinci el ilanları.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

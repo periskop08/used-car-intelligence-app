@@ -612,7 +612,7 @@ export default function ListingDetail() {
                     activeAiTab === "problems" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  Sorunlar
+                  Sık Karşılaşılanlar
                 </button>
                 <button
                   onClick={() => setActiveAiTab("recalls")}
@@ -645,7 +645,7 @@ export default function ListingDetail() {
                 {activeAiTab === "problems" && (
                   <div className="flex flex-col gap-3">
                     <p className="text-[10px] text-slate-400 italic">
-                      ⚠️ Bu varyantta bazı kullanıcılar tarafından raporlanmıştır. Her araçta görülmeyebilir. Alım öncesi ekspertiz önerilir.
+                      ⚠️ Bu varyantta bazı kullanıcılar tarafından dile getirilmiştir. Her araçta görülmeyebilir. Satın alma öncesi kontrol önerilir.
                     </p>
                     {vehicle.problems && vehicle.problems.length > 0 ? (
                       <div className="flex flex-col gap-3">
@@ -657,7 +657,7 @@ export default function ListingDetail() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-slate-400 italic">Bu varyanta ait bilinen kronik bir sorun bulunmamaktadır.</span>
+                      <span className="text-slate-400 italic">Bu varyanta ait bilinen sık karşılaşılan bir durum bulunmamaktadır.</span>
                     )}
                   </div>
                 )}

@@ -759,7 +759,7 @@ export default function Home() {
             <span className="text-3xl">🔍</span>
             <h3 className="text-lg font-bold text-slate-200 mt-4">1. İlanları Listele & Araştır</h3>
             <p className="text-xs text-slate-400 mt-2">
-              Sitedeki ilanları arayın ya da doğrudan marka-model girerek araçların kronik sorun veritabanını tarayın.
+              Sitedeki ilanları arayın ya da doğrudan marka-model girerek araçların sık karşılaşılan durumlar veritabanını tarayın.
             </p>
           </div>
           <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
@@ -857,7 +857,7 @@ export default function Home() {
               <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold">FREE</span>
               <h3 className="text-xl font-bold text-slate-200 mt-2">Ücretsiz Başlangıç</h3>
               <p className="text-2xl font-black text-white mt-1">0 TL <span className="text-xs text-slate-500">/ ömür boyu</span></p>
-              <p className="text-xs text-slate-400 mt-2">Temel kronik sorun ve tekil ilan yayınlama denemeleri için.</p>
+              <p className="text-xs text-slate-400 mt-2">Temel satın alma analizleri ve tekil ilan yayınlama denemeleri için.</p>
               <div className="border-t border-white/5 my-4"></div>
               <ul className="text-xs text-slate-400 flex flex-col gap-2">
                 <li>• Günlük 5 Yapay Zeka Mesaj Sınırı</li>

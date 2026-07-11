@@ -44,7 +44,7 @@ export class VehicleController {
 
   @Get('variants/:id')
   @ApiOperation({ summary: 'Araç Varyant Detayı' })
-  @ApiResponse({ status: 200, description: 'Seçili araç varyantının teknik özellikleri, kronik sorunları ve premium checklistleri.' })
+  @ApiResponse({ status: 200, description: 'Seçili araç varyantının teknik özellikleri, sık karşılaşılan durumları ve premium checklistleri.' })
   async getVariantDetail(
     @Param('id') id: string,
     @Headers('authorization') authHeader?: string,
