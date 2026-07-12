@@ -73,6 +73,7 @@ export default function FindMyCarPage() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(null);
   const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isFetchingRef = useRef<boolean>(false);
 
   // Get or Create Session ID & Merge if token exists
   useEffect(() => {
@@ -107,6 +108,8 @@ export default function FindMyCarPage() {
   };
 
   const fetchNextCard = async (initiateStateChange = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const activeSession = getOrInitSessionId();
       const headers: any = {};
@@ -139,6 +142,12 @@ export default function FindMyCarPage() {
         return;
       }
 
+      // Deduplicate cards: if fetched card is the same as current card, ignore/null it
+      if (currentCard && card.id === currentCard.id) {
+        setNextCardCache(null);
+        return;
+      }
+
       if (initiateStateChange) {
         setCurrentCard(card);
         setGameState("swiping");
@@ -150,6 +159,8 @@ export default function FindMyCarPage() {
     } catch (e) {
       console.error("Error fetching next card:", e);
       setGameState("error");
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
@@ -178,7 +189,7 @@ export default function FindMyCarPage() {
   };
 
   const handleSwipe = async (direction: "left" | "right") => {
-    if (!currentCard) return;
+    if (!currentCard || exitDirection) return;
 
     const action = direction === "right" ? "LIKE" : "DISLIKE";
     setExitDirection(direction);
@@ -186,6 +197,7 @@ export default function FindMyCarPage() {
     // Wait for exit transition
     setTimeout(async () => {
       try {
+        const activeSession = getOrInitSessionId();
         const headers: any = {
           "Content-Type": "application/json",
         };
@@ -195,7 +207,7 @@ export default function FindMyCarPage() {
           method: "POST",
           headers,
           body: JSON.stringify({
-            sessionId,
+            sessionId: activeSession,
             cardId: currentCard.id,
             action,
           }),
@@ -233,6 +245,7 @@ export default function FindMyCarPage() {
         }
       } catch (e) {
         console.error("Error submitting swipe:", e);
+        setExitDirection(null);
       }
     }, 300);
   };
@@ -423,14 +436,21 @@ export default function FindMyCarPage() {
                 }`}
               >
                 {/* Image & Main Info Overlay */}
-                <div className="relative h-48 md:h-full w-full md:w-[42%] bg-slate-900 pointer-events-none flex-none border-b md:border-b-0 md:border-r border-white/5">
+                <div className="relative h-48 md:h-full w-full md:w-[42%] bg-slate-950 pointer-events-none flex-none border-b md:border-b-0 md:border-r border-white/5 overflow-hidden">
+                  {/* Background Blur for aspect ratio fit */}
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center blur-2xl opacity-35 scale-110 pointer-events-none z-0"
+                    style={{
+                      backgroundImage: `url(${formatImageUrl(currentCard.imageUrl)})`,
+                    }}
+                  />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={formatImageUrl(currentCard.imageUrl)}
                     alt={currentCard.modelFamily}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain relative z-10 pointer-events-none"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] via-transparent to-black/40 md:bg-gradient-to-t md:from-[#0c1224]/95 md:via-[#0c1224]/30 md:to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] via-transparent to-black/40 md:bg-gradient-to-t md:from-[#0c1224]/95 md:via-[#0c1224]/30 md:to-black/20 z-20" />
 
                   {/* Brand & Model Overlay */}
                   <div className="absolute bottom-4 left-6 right-6">

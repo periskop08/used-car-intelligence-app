@@ -122,8 +122,14 @@ export class VehicleDiscoveryService {
       return allCards[0];
     } else {
       // 10-50 cards: Scored and adaptive cards
-      const profile = await this.prisma.userVehiclePreferenceProfile.findUnique({
-        where: { sessionId },
+      const profile = await this.prisma.userVehiclePreferenceProfile.findFirst({
+        where: {
+          OR: [
+            { sessionId },
+            ...(userId ? [{ userId }] : []),
+          ],
+        },
+        orderBy: { updatedAt: 'desc' },
       });
 
       const scoredCards = allCards.map(card => {
