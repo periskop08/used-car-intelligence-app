@@ -168,6 +168,7 @@ export default function FindMyCarPage() {
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      // Trigger build: Force Vercel rebuild for perfect AI image updates
       await fetch(`${API_URL}/vehicle-discovery/reset`, {
         method: "POST",
         headers,
