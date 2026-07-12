@@ -133,11 +133,55 @@ export default function FindMyCarPage() {
         .then((res) => res.json())
         .catch((e) => console.error("Error merging swipes:", e));
     }
+
+    // Check existing progress
+    if (savedSessionId) {
+      const headers: any = {};
+      if (savedToken) headers["Authorization"] = `Bearer ${savedToken}`;
+      fetch(`${API_URL}/vehicle-discovery/profile/${savedSessionId}`, { headers })
+        .then((res) => {
+          if (res.status === 200) {
+            return res.json();
+          }
+          return null;
+        })
+        .then((data) => {
+          if (data) {
+            setSwipesCount(data.totalSwipes);
+          }
+        })
+        .catch((e) => console.error("Error fetching initial profile:", e));
+    }
   }, []);
 
   const startDiscovery = async () => {
     setGameState("loading");
     await fetchNextCard(true);
+  };
+
+  const resetDiscovery = async () => {
+    setGameState("loading");
+    try {
+      const activeSession = getOrInitSessionId();
+      const headers: any = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      await fetch(`${API_URL}/vehicle-discovery/reset`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ sessionId: activeSession }),
+      });
+
+      setSwipesCount(0);
+      setNextCardCache(null);
+      setCurrentCard(null);
+      await fetchNextCard(true);
+    } catch (e) {
+      console.error("Error resetting discovery:", e);
+      setGameState("error");
+    }
   };
 
   const fetchNextCard = async (initiateStateChange = false) => {
@@ -380,13 +424,31 @@ export default function FindMyCarPage() {
               TorqueScout sana en yakın araç tiplerini çıkarsın.
             </p>
 
-            <button
-              onClick={startDiscovery}
-              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
-            >
-              <span>Keşfe Başla</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
+            {swipesCount > 0 && swipesCount < 30 ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={startDiscovery}
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
+                >
+                  <span>Kaldığın Yerden Devam Et ({swipesCount} / 30)</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={resetDiscovery}
+                  className="w-full bg-white/5 hover:bg-white/10 text-slate-300 font-semibold py-3.5 px-6 rounded-2xl border border-white/10 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Yeni Keşif Başlat</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={startDiscovery}
+                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
+              >
+                <span>Keşfe Başla</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            )}
             <div className="mt-4 text-[11px] text-slate-500">
               30 aracı değerlendir, sana en uygun araç tipini çıkaralım.
             </div>

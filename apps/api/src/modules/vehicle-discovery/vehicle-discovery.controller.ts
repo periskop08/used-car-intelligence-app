@@ -53,4 +53,14 @@ export class VehicleDiscoveryController {
   ) {
     return this.discoveryService.mergeSwipes(sessionId, user.id);
   }
+
+  @Post('reset')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Keşif oturumunu sıfırla' })
+  async resetSession(
+    @Body('sessionId') sessionId: string,
+    @GetUser() user?: UserPayload,
+  ) {
+    return this.discoveryService.resetSession(sessionId, user?.id);
+  }
 }

@@ -379,4 +379,28 @@ export class VehicleDiscoveryService {
     }
     return { success: true };
   }
+
+  async resetSession(sessionId: string, userId?: string) {
+    // Delete swipes for this session and user
+    await this.prisma.userVehiclePreferenceSwipe.deleteMany({
+      where: {
+        OR: [
+          { sessionId },
+          ...(userId ? [{ userId }] : []),
+        ],
+      },
+    });
+
+    // Delete preference profile for this session and user
+    await this.prisma.userVehiclePreferenceProfile.deleteMany({
+      where: {
+        OR: [
+          { sessionId },
+          ...(userId ? [{ userId }] : []),
+        ],
+      },
+    });
+
+    return { success: true };
+  }
 }
