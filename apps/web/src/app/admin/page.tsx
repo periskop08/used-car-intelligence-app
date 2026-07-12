@@ -59,6 +59,39 @@ const displayBodyType = (body: string) => {
   return mapping[body.toUpperCase()] || body;
 };
 
+const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+  GENERAL_SUGGESTION: "Genel Öneri",
+  BUG_REPORT: "Hata Bildirimi",
+  VEHICLE_QUERY_AI_REPORT: "Araç Sorgulama / AI Rapor",
+  INCORRECT_VEHICLE_DATA: "Eksik veya Hatalı Araç Bilgisi",
+  LISTINGS: "İlanlar",
+  MESSAGES: "Mesajlar",
+  FAVORITES: "Favoriler",
+  SUBSCRIPTION_PACKAGES: "Abonelik / Paketler",
+  ACCOUNT_PROFILE: "Hesap / Profil",
+  VEHICLE_GUIDE: "Araç Rehberi",
+  VEHICLE_COMPARISON: "Araç Karşılaştırma",
+  FIND_MY_CAR: "Aracını Bul",
+  DESIGN_USABILITY: "Tasarım / Kullanım Kolaylığı",
+  SECURITY_SUSPICIOUS_ACTIVITY: "Güvenlik / Şüpheli İşlem",
+  OTHER: "Diğer"
+};
+
+const FEEDBACK_STATUS_LABELS: Record<string, string> = {
+  NEW: "Yeni",
+  IN_REVIEW: "İnceleniyor",
+  RESOLVED: "Çözüldü",
+  REJECTED: "Reddedildi",
+  ARCHIVED: "Arşivlendi"
+};
+
+const FEEDBACK_PRIORITY_LABELS: Record<string, string> = {
+  LOW: "Düşük",
+  NORMAL: "Normal",
+  HIGH: "Yüksek",
+  URGENT: "Acil"
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function UnifiedAdminPage() {
@@ -70,7 +103,15 @@ export default function UnifiedAdminPage() {
   const [token, setToken] = useState("");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"listings" | "jobs" | "variants">("listings");
+  const [activeTab, setActiveTab] = useState<"listings" | "jobs" | "variants" | "feedbacks">("listings");
+
+  // Feedbacks State
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [feedbacksLoading, setFeedbacksLoading] = useState(false);
+  const [feedbackCategoryFilter, setFeedbackCategoryFilter] = useState("");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("");
+  const [feedbackPriorityFilter, setFeedbackPriorityFilter] = useState("");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
 
   // Listings state
   const [listings, setListings] = useState<any[]>([]);
@@ -123,6 +164,7 @@ export default function UnifiedAdminPage() {
           fetchAdminListings(savedToken);
           fetchResearchJobs(savedToken);
           fetchPendingVariants(savedToken);
+          fetchFeedbacks(savedToken);
         }
       } catch (e) {
         setErrorMsg("Oturum doğrulanamadı.");
@@ -133,6 +175,85 @@ export default function UnifiedAdminPage() {
       setAuthLoading(false);
     }
   }, []);
+
+  const fetchFeedbacks = (jwtToken: string) => {
+    setFeedbacksLoading(true);
+    const queryParams = new URLSearchParams();
+    if (feedbackCategoryFilter) queryParams.append("category", feedbackCategoryFilter);
+    if (feedbackStatusFilter) queryParams.append("status", feedbackStatusFilter);
+    if (feedbackPriorityFilter) queryParams.append("priority", feedbackPriorityFilter);
+    if (feedbackSearch) queryParams.append("search", feedbackSearch);
+
+    fetch(`${API_URL}/admin/feedbacks?${queryParams.toString()}`, {
+      headers: { Authorization: `Bearer ${jwtToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Geri bildirimler yüklenemedi.");
+        return res.json();
+      })
+      .then((data) => {
+        setFeedbacks(Array.isArray(data) ? data : []);
+        setFeedbacksLoading(false);
+      })
+      .catch((err) => {
+        setErrorMsg(err.message);
+        setFeedbacksLoading(false);
+      });
+  };
+
+  const handleUpdateFeedbackStatus = (feedbackId: string, status: string) => {
+    setActionLoading(true);
+    fetch(`${API_URL}/admin/feedbacks/${feedbackId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        fetchFeedbacks(token);
+        setActionLoading(false);
+      })
+      .catch((err) => {
+        alert(err.message);
+        setActionLoading(false);
+      });
+  };
+
+  const handleUpdateFeedbackPriority = (feedbackId: string, priority: string) => {
+    setActionLoading(true);
+    fetch(`${API_URL}/admin/feedbacks/${feedbackId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ priority }),
+    })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then(() => {
+        fetchFeedbacks(token);
+        setActionLoading(false);
+      })
+      .catch((err) => {
+        alert(err.message);
+        setActionLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (token && isAdmin) {
+      fetchFeedbacks(token);
+    }
+  }, [feedbackCategoryFilter, feedbackStatusFilter, feedbackPriorityFilter, feedbackSearch, token, isAdmin]);
 
   const fetchAdminListings = (jwtToken: string) => {
     setListingsLoading(true);
@@ -455,6 +576,16 @@ export default function UnifiedAdminPage() {
           }`}
         >
           📋 Araç Onayları ({variants.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("feedbacks")}
+          className={`px-4 py-2 font-bold text-sm transition-all rounded-t-xl ${
+            activeTab === "feedbacks"
+              ? "bg-slate-900 border-t border-x border-white/10 text-orange-400"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          💬 Geri Bildirimler ({feedbacks.length})
         </button>
       </div>
 
@@ -841,6 +972,194 @@ export default function UnifiedAdminPage() {
 
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT: Feedbacks Management */}
+      {activeTab === "feedbacks" && (
+        <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+          {/* Filters Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-5 bg-slate-900/20 border border-white/5 rounded-3xl backdrop-blur-sm">
+            {/* Search */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Kullanıcı Ara</label>
+              <input
+                type="text"
+                placeholder="E-posta veya kullanıcı adı..."
+                value={feedbackSearch}
+                onChange={(e) => setFeedbackSearch(e.target.value)}
+                className="bg-[#05070f] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
+              />
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Konu Filtrele</label>
+              <select
+                value={feedbackCategoryFilter}
+                onChange={(e) => setFeedbackCategoryFilter(e.target.value)}
+                className="bg-[#05070f] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
+              >
+                <option value="">Tüm Konular</option>
+                {Object.entries(FEEDBACK_CATEGORY_LABELS).map(([val, lbl]) => (
+                  <option key={val} value={val} className="bg-[#090d1a]">{lbl}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Durum Filtrele</label>
+              <select
+                value={feedbackStatusFilter}
+                onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+                className="bg-[#05070f] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
+              >
+                <option value="">Tüm Durumlar</option>
+                {Object.entries(FEEDBACK_STATUS_LABELS).map(([val, lbl]) => (
+                  <option key={val} value={val} className="bg-[#090d1a]">{lbl}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority Filter */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Öncelik Filtrele</label>
+              <select
+                value={feedbackPriorityFilter}
+                onChange={(e) => setFeedbackPriorityFilter(e.target.value)}
+                className="bg-[#05070f] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
+              >
+                <option value="">Tüm Öncelikler</option>
+                {Object.entries(FEEDBACK_PRIORITY_LABELS).map(([val, lbl]) => (
+                  <option key={val} value={val} className="bg-[#090d1a]">{lbl}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Feedback list */}
+          {feedbacksLoading ? (
+            <div className="text-center py-12 text-slate-400">Geri bildirim verileri yükleniyor...</div>
+          ) : feedbacks.length === 0 ? (
+            <p className="text-slate-400 italic text-center py-12">Kriterlere uygun geri bildirim bulunamadı.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {feedbacks.map((fb) => {
+                const priorityColor = fb.priority === "URGENT" ? "bg-red-500/10 text-red-400 border-red-500/20" : fb.priority === "HIGH" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" : fb.priority === "NORMAL" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-slate-800 text-slate-400 border-white/5";
+                const statusColor = fb.status === "NEW" ? "bg-sky-500/10 text-sky-400 border-sky-500/20" : fb.status === "IN_REVIEW" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : fb.status === "RESOLVED" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : fb.status === "REJECTED" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-slate-800 text-slate-400 border-white/5";
+                
+                return (
+                  <div key={fb.id} className="p-6 bg-slate-900/20 border border-white/5 rounded-3xl flex flex-col gap-4">
+                    {/* User and Meta Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-orange-600/20 border border-orange-500/30 flex items-center justify-center font-bold text-orange-400 text-xs shrink-0">
+                          {fb.user?.profilePhotoUrl ? (
+                            <img src={fb.user.profilePhotoUrl} alt="Avatar" className="w-full h-full object-cover rounded-xl" />
+                          ) : (
+                            (fb.user?.firstName || fb.user?.email || "U").slice(0, 2).toUpperCase()
+                          )}
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-xs font-bold text-slate-200 truncate">
+                            {fb.user?.firstName && fb.user?.lastName ? `${fb.user.firstName} ${fb.user.lastName}` : fb.user?.username || "Bilinmeyen Kullanıcı"}
+                          </span>
+                          <span className="text-[10px] text-slate-500 truncate">{fb.user?.email}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Category Badge */}
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-white/5">
+                          📂 {FEEDBACK_CATEGORY_LABELS[fb.subjectCategory] || fb.subjectCategory}
+                        </span>
+
+                        {/* Priority Badge */}
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${priorityColor}`}>
+                          ⚡ {FEEDBACK_PRIORITY_LABELS[fb.priority] || fb.priority}
+                        </span>
+
+                        {/* Status Badge */}
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${statusColor}`}>
+                          📌 {FEEDBACK_STATUS_LABELS[fb.status] || fb.status}
+                        </span>
+
+                        {/* Date */}
+                        <span className="text-[10px] text-slate-500 font-semibold sm:ml-2">
+                          📅 {formatDate(fb.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Message body */}
+                    <div className="text-xs font-medium text-slate-300 whitespace-pre-wrap bg-[#05070f]/50 p-4 rounded-2xl border border-white/5 leading-relaxed">
+                      {fb.message}
+                    </div>
+
+                    {/* Screenshot attachment preview */}
+                    {fb.attachmentUrl && (
+                      <div className="flex flex-col gap-1.5 self-start">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Ekran Görüntüsü</span>
+                        <a href={fb.attachmentUrl} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-xl border border-white/10 hover:border-orange-500 transition-all max-w-[200px]">
+                          <img src={fb.attachmentUrl} alt="Feedback Screenshot" className="max-h-24 w-auto object-cover rounded-xl transition duration-300 group-hover:scale-105" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white font-bold transition">🔎 Büyüt</div>
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Actions and Status Updates */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-white/5 pt-4 mt-1">
+                      <span className="text-[10px] text-slate-500 font-medium">Geri Bildirim ID: {fb.id}</span>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Status update select */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase">Durum:</span>
+                          <select
+                            value={fb.status}
+                            onChange={(e) => handleUpdateFeedbackStatus(fb.id, e.target.value)}
+                            disabled={actionLoading}
+                            className="bg-[#05070f] border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
+                          >
+                            {Object.entries(FEEDBACK_STATUS_LABELS).map(([val, lbl]) => (
+                              <option key={val} value={val} className="bg-[#090d1a]">{lbl}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Priority update select */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase">Öncelik:</span>
+                          <select
+                            value={fb.priority}
+                            onChange={(e) => handleUpdateFeedbackPriority(fb.id, e.target.value)}
+                            disabled={actionLoading}
+                            className="bg-[#05070f] border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
+                          >
+                            {Object.entries(FEEDBACK_PRIORITY_LABELS).map(([val, lbl]) => (
+                              <option key={val} value={val} className="bg-[#090d1a]">{lbl}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Quick Archive Button */}
+                        {fb.status !== "ARCHIVED" && (
+                          <button
+                            onClick={() => handleUpdateFeedbackStatus(fb.id, "ARCHIVED")}
+                            disabled={actionLoading}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 px-3 rounded-xl transition text-[11px]"
+                          >
+                            📦 Arşivle
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

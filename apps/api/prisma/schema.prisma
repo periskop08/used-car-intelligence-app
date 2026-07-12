@@ -239,6 +239,7 @@ model User {
   approvedChecklists InspectionChecklistItem[] @relation("ChecklistApprovedBy")
   researchJobs       VehicleResearchJob[]
   listings           VehicleListing[]
+  feedbacks          Feedback[]
 }
 
 model SubscriptionPlan {
@@ -1340,4 +1341,54 @@ model Message {
 
   @@index([conversationId])
 }
+
+enum FeedbackCategory {
+  GENERAL_SUGGESTION
+  BUG_REPORT
+  VEHICLE_QUERY_AI_REPORT
+  INCORRECT_VEHICLE_DATA
+  LISTINGS
+  MESSAGES
+  FAVORITES
+  SUBSCRIPTION_PACKAGES
+  ACCOUNT_PROFILE
+  VEHICLE_GUIDE
+  VEHICLE_COMPARISON
+  FIND_MY_CAR
+  DESIGN_USABILITY
+  SECURITY_SUSPICIOUS_ACTIVITY
+  OTHER
+}
+
+enum FeedbackStatus {
+  NEW
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+  ARCHIVED
+}
+
+enum FeedbackPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Feedback {
+  id              String           @id @default(uuid())
+  userId          String
+  subjectCategory FeedbackCategory
+  message         String           @db.Text
+  status          FeedbackStatus   @default(NEW)
+  priority        FeedbackPriority @default(NORMAL)
+  attachmentUrl   String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 
