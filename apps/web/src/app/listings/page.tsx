@@ -59,6 +59,8 @@ function ListingsContent() {
   const [loading, setLoading] = useState(false);
 
   const [token, setToken] = useState("");
+  const [preferenceProfileId, setPreferenceProfileId] = useState("");
+  const [prefSessionId, setPrefSessionId] = useState("");
 
   // Fetch Brands on mount
   useEffect(() => {
@@ -91,12 +93,16 @@ function ListingsContent() {
     const aiReady = searchParams.get("isAiReady") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
+    const profileId = searchParams.get("preferenceProfileId");
+    const sId = searchParams.get("sessionId");
     
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
     if (aiReady) setIsAiReady(true);
     if (statusVal) setVehicleStatuses(statusVal.split(","));
     if (cityVal) setCity(cityVal);
+    if (profileId) setPreferenceProfileId(profileId);
+    if (sId) setPrefSessionId(sId);
   }, [searchParams]);
 
   // Main Fetch function
@@ -112,6 +118,8 @@ function ListingsContent() {
     if (minKm) query += `&minKm=${minKm}`;
     if (maxKm) query += `&maxKm=${maxKm}`;
     if (isAiReady) query += `&isAiReady=true`;
+    if (preferenceProfileId) query += `&preferenceProfileId=${preferenceProfileId}`;
+    if (prefSessionId) query += `&sessionId=${prefSessionId}`;
 
     if (city) query += `&city=${encodeURIComponent(city)}`;
     if (district) query += `&district=${encodeURIComponent(district)}`;
@@ -153,7 +161,7 @@ function ListingsContent() {
 
   useEffect(() => {
     fetchListings();
-  }, [page, sort, selectedBrand, selectedModel, isAiReady, token]);
+  }, [page, sort, selectedBrand, selectedModel, isAiReady, token, preferenceProfileId, prefSessionId]);
 
   const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
     e.preventDefault();
@@ -747,6 +755,16 @@ function ListingsContent() {
               </select>
             </div>
           </div>
+
+          {preferenceProfileId && (
+            <div className="bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold px-4 py-3 rounded-2xl mb-6 flex items-center gap-2 animate-in fade-in duration-200">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+              </span>
+              <span>Seçimlerinize göre sana daha yakın ilanlar öne çıkarıldı.</span>
+            </div>
+          )}
 
           {/* Grid list */}
           {loading ? (

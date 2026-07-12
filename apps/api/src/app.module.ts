@@ -16,6 +16,7 @@ import { UserModule } from './modules/user/user.module';
 import { SavedSearchModule } from './modules/saved-search/saved-search.module';
 import { MessageModule } from './modules/message/message.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { VehicleDiscoveryModule } from './modules/vehicle-discovery/vehicle-discovery.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     SavedSearchModule,
     MessageModule,
     FeedbackModule,
+    VehicleDiscoveryModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

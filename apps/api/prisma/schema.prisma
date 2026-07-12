@@ -240,6 +240,8 @@ model User {
   researchJobs       VehicleResearchJob[]
   listings           VehicleListing[]
   feedbacks          Feedback[]
+  preferenceSwipes   UserVehiclePreferenceSwipe[]
+  preferenceProfiles UserVehiclePreferenceProfile[]
 }
 
 model SubscriptionPlan {
@@ -1390,5 +1392,79 @@ model Feedback {
 
   @@index([userId])
 }
+
+enum SwipeAction {
+  LIKE
+  DISLIKE
+}
+
+enum PreferenceConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model VehicleDiscoveryCard {
+  id                 String                        @id @default(uuid())
+  brand              String
+  modelFamily        String
+  generationName     String?
+  bodyType           String
+  fuelType           String
+  transmissionType   String
+  engineVersion      String
+  power              String
+  torque             String
+  productionYears    String
+  averageConsumption String
+  drivetrain         String
+  imageUrl           String
+  tags               Json                          // Standartlaştırılmış etiket listesi (String[])
+  isActive           Boolean                       @default(true)
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  swipes             UserVehiclePreferenceSwipe[]
+}
+
+model UserVehiclePreferenceSwipe {
+  id                     String               @id @default(uuid())
+  userId                 String?
+  sessionId              String
+  vehicleDiscoveryCardId String
+  action                 SwipeAction
+  createdAt              DateTime             @default(now())
+
+  card                   VehicleDiscoveryCard @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: Cascade)
+  user                   User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, vehicleDiscoveryCardId])
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model UserVehiclePreferenceProfile {
+  id                     String               @id @default(uuid())
+  userId                 String?
+  sessionId              String               @unique
+  totalSwipes            Int                  @default(0)
+  likeCount              Int                  @default(0)
+  dislikeCount           Int                  @default(0)
+  bodyTypeScores         Json                 // Record<string, number>
+  fuelTypeScores         Json                 // Record<string, number>
+  transmissionScores     Json                 // Record<string, number>
+  segmentScores          Json                 // Record<string, number>
+  brandScores            Json                 // Record<string, number>
+  modelFamilyScores      Json                 // Record<string, number>
+  featureScores          Json                 // Record<string, number>
+  resultSummary          String?              @db.Text
+  confidenceLevel        PreferenceConfidence @default(LOW)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  user                   User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 
 

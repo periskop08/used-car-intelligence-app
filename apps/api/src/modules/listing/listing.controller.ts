@@ -52,6 +52,8 @@ export class ListingController {
   async getPublicListings(
     @Req() req: Request,
     @GetUser() user?: UserPayload,
+    @Query('preferenceProfileId') preferenceProfileId?: string,
+    @Query('sessionId') requestSessionId?: string,
     @Query('brandId') brandId?: string,
     @Query('modelId') modelId?: string,
     @Query('vehicleVariantId') vehicleVariantId?: string,
@@ -239,13 +241,31 @@ export class ListingController {
     const limitNum = parseInt(limit || '10', 10);
     const skip = (pageNum - 1) * limitNum;
 
+    // Load preference profile if requested
+    let profile = null;
+    if (preferenceProfileId) {
+      profile = await this.listingService['prisma'].userVehiclePreferenceProfile.findUnique({
+        where: { id: preferenceProfileId },
+      });
+      if (profile) {
+        // Security check
+        if (profile.userId && profile.userId !== user?.id) {
+          throw new ForbiddenException('Bu tercih profiline erişim yetkiniz bulunmamaktadır.');
+        }
+        if (!profile.userId && profile.sessionId !== requestSessionId && profile.sessionId !== user?.id) {
+          throw new ForbiddenException('Bu tercih profiline erişim yetkiniz bulunmamaktadır.');
+        }
+      }
+    }
+
     // Execute query
-    const [items, total] = await Promise.all([
-      this.listingService['prisma'].vehicleListing.findMany({
+    let items: any[] = [];
+    let total = 0;
+
+    if (profile) {
+      // Scale-out warning for high scale: runtime scoring in-memory
+      const allMatching = await this.listingService['prisma'].vehicleListing.findMany({
         where: filters,
-        orderBy,
-        skip,
-        take: limitNum,
         include: {
           media: {
             where: { moderationStatus: MediaModerationStatus.APPROVED },
@@ -255,9 +275,61 @@ export class ListingController {
             include: { brand: true, model: true },
           },
         },
-      }),
-      this.listingService['prisma'].vehicleListing.count({ where: filters }),
-    ]);
+      });
+
+      const bodyScores = (profile.bodyTypeScores as Record<string, number>) || {};
+      const fuelScores = (profile.fuelTypeScores as Record<string, number>) || {};
+      const transScores = (profile.transmissionScores as Record<string, number>) || {};
+      const brandScores = (profile.brandScores as Record<string, number>) || {};
+      const modelScores = (profile.modelFamilyScores as Record<string, number>) || {};
+      const featureScores = (profile.featureScores as Record<string, number>) || {};
+
+      const scored = allMatching.map((item: any) => {
+        let score = 0;
+        if (item.vehicleVariant) {
+          const variant = item.vehicleVariant;
+          score += bodyScores[variant.bodyType] || 0;
+          score += fuelScores[variant.fuelType] || 0;
+          score += transScores[variant.transmissionType] || 0;
+          score += brandScores[variant.brand.name] || 0;
+          score += modelScores[variant.model.name] || 0;
+          const tags = (variant.tags as string[]) || [];
+          tags.forEach((tag: string) => {
+            score += featureScores[tag] || 0;
+          });
+        } else {
+          score += bodyScores[item.bodyType] || 0;
+          score += fuelScores[item.fuelType] || 0;
+          score += transScores[item.transmission] || 0;
+        }
+        return { item, score };
+      });
+
+      scored.sort((a: any, b: any) => b.score - a.score);
+      total = scored.length;
+      items = scored.slice(skip, skip + limitNum).map((x: any) => x.item);
+    } else {
+      const [dbItems, dbTotal] = await Promise.all([
+        this.listingService['prisma'].vehicleListing.findMany({
+          where: filters,
+          orderBy,
+          skip,
+          take: limitNum,
+          include: {
+            media: {
+              where: { moderationStatus: MediaModerationStatus.APPROVED },
+              orderBy: { sortOrder: 'asc' },
+            },
+            vehicleVariant: {
+              include: { brand: true, model: true },
+            },
+          },
+        }),
+        this.listingService['prisma'].vehicleListing.count({ where: filters }),
+      ]);
+      items = dbItems;
+      total = dbTotal;
+    }
 
     let favoritedIds = new Set<string>();
     if (user?.id) {
