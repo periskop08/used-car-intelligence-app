@@ -46,6 +46,39 @@ interface ProfileResult {
   topBrands: string[];
 }
 
+const translateBodyType = (bodyType: string) => {
+  if (!bodyType) return "";
+  const mapping: Record<string, string> = {
+    SEDAN: "Sedan",
+    HATCHBACK: "Hatchback",
+    SUV: "SUV",
+    COUPE: "Kupe",
+    STATION_WAGON: "Station Wagon",
+    CONVERTIBLE: "Cabriolet",
+    MINIVAN: "Minivan"
+  };
+  return mapping[bodyType.toUpperCase()] || bodyType;
+};
+
+const translateFuelType = (fuel: string) => {
+  if (!fuel) return "";
+  const f = fuel.toUpperCase();
+  if (f === "PETROL" || f === "BENZINLI") return "Benzinli";
+  if (f === "DIESEL" || f === "DIZEL") return "Dizel";
+  if (f === "HYBRID" || f === "HIBRIT") return "Hibrit";
+  if (f === "ELECTRIC" || f === "ELEKTRIK") return "Elektrikli";
+  if (f === "LPG") return "LPG";
+  return fuel;
+};
+
+const translateTransmission = (trans: string) => {
+  if (!trans) return "";
+  const t = trans.toUpperCase();
+  if (t === "AUTOMATIC" || t === "OTOMATIK") return "Otomatik";
+  if (t === "MANUAL" || t === "MANUEL") return "Manuel";
+  return trans;
+};
+
 export default function FindMyCarPage() {
   const [sessionId, setSessionId] = useState<string>("");
   const [token, setToken] = useState<string | null>(null);
@@ -480,24 +513,18 @@ export default function FindMyCarPage() {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 text-xs">
                     <div>
                       <span className="text-slate-500 block mb-0.5">Kasa Tipi</span>
-                      <span className="font-semibold text-slate-200">{currentCard.bodyType}</span>
+                      <span className="font-semibold text-slate-200">{translateBodyType(currentCard.bodyType)}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block mb-0.5">Yakıt Türü</span>
                       <span className="font-semibold text-slate-200">
-                        {currentCard.fuelType === "PETROL"
-                          ? "Benzinli"
-                          : currentCard.fuelType === "DIESEL"
-                          ? "Dizel"
-                          : currentCard.fuelType === "HYBRID"
-                          ? "Hibrit"
-                          : "Elektrikli"}
+                        {translateFuelType(currentCard.fuelType)}
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 block mb-0.5">Şanzıman Tipi</span>
                       <span className="font-semibold text-slate-200">
-                        {currentCard.transmissionType === "AUTOMATIC" ? "Otomatik" : "Manuel"}
+                        {translateTransmission(currentCard.transmissionType)}
                       </span>
                     </div>
                     <div>
