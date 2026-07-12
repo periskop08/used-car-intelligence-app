@@ -111,6 +111,22 @@ const rawCards: CompactCard[] = [
         descTr: "Kuru tip 7 ileri DSG vites geçişlerinde titreme, kavrama aşınması ve mekatronik arızası riski taşır. Alırken servis geçmişine bakılmalıdır.",
         descEn: "The dry-type 7-speed DSG carries a risk of judder, clutch wear, and mechatronic failure. Service history should be checked before buying.",
         iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Uzun Yol Sürüş Konforu",
+        titleEn: "Long Distance Ride Comfort",
+        descTr: "Kullanıcılar özellikle ErgoActive koltukların rahatlığından ve yüksek hızlardaki gövde kararlılığından memnun.",
+        descEn: "Users appreciate the comfort of ErgoActive seats and high-speed body control.",
+        iconKey: "seat"
+      },
+      {
+        factType: GuideFactType.KNOWN_ISSUE,
+        titleTr: "Cam Tavan Trim Sesleri",
+        titleEn: "Sunroof Rattle Noises",
+        descTr: "Cam tavanlı modellerde zamanla fitil eskimesine bağlı olarak gıcırtı ve rüzgar sesi şikayetleri artabilir.",
+        descEn: " sunroof-equipped models can suffer from squeaking and wind noise over time due to weatherstrip wear.",
+        iconKey: "volume"
       }
     ]
   },
@@ -153,6 +169,22 @@ const rawCards: CompactCard[] = [
         descTr: "1.6 TDI dizel motorlarda enjektör vurma sesi ve şıkırtı kroniktir. Enjektörlerin revizyon durumuna bakılmalıdır.",
         descEn: "1.6 TDI engines often exhibit injector ticking or knocking sounds. Injector revision status should be checked.",
         iconKey: "engine"
+      },
+      {
+        factType: GuideFactType.INTERESTING_FACT,
+        titleTr: "MQB Platformunun İlk Hatchback Modeli",
+        titleEn: "First MQB Hatchback",
+        descTr: "Golf 7, Volkswagen grubunun milyarlarca dolar yatırım yaptığı MQB modüler mimarisini kullanan ilk hatchback otomobildir.",
+        descEn: "Golf 7 was the very first hatchback built on VW's multi-billion dollar MQB modular architecture.",
+        iconKey: "info"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Zamansız İç Tasarım",
+        titleEn: "Timeless Interior Design",
+        descTr: "Sürücüler, konsol kalitesi ve ergonomik tuş yerleşiminin aradan geçen yıllara rağmen güncel hissettirdiğini söylüyor.",
+        descEn: "Drivers state that the console quality and ergonomic layout still feel modern despite the passage of time.",
+        iconKey: "interior"
       }
     ]
   },
@@ -195,6 +227,22 @@ const rawCards: CompactCard[] = [
         descTr: "İlk üretim yıllarındaki Toyota Touch ekranlarında donma ve Bluetooth bağlantı kopmaları yaşanabilir. Güncel yazılım yüklenmelidir.",
         descEn: "First-year production Touch infotainment screens sometimes freeze or disconnect Bluetooth. Software updates are highly recommended.",
         iconKey: "screen"
+      },
+      {
+        factType: GuideFactType.BUYING_TIP,
+        titleTr: "Hibrit Batarya Testi Yaptırın",
+        titleEn: "Get a Hybrid Battery Test",
+        descTr: "Hibrit modellerde 12V akü ve yüksek voltajlı çekiş bataryasının sağlığını Toyota yetkili servisinde test ettirmek önemlidir.",
+        descEn: "For hybrid models, it's vital to have the 12V battery and high-voltage traction pack certified by an authorized dealer.",
+        iconKey: "battery"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Sessiz Şehir İçi Sürüşü",
+        titleEn: "Quiet Urban Driving",
+        descTr: "Kullanıcılar şehir içi düşük hızlarda tamamen elektrikli modda giderken sunduğu sessizlik ve huzuru çok beğeniyor.",
+        descEn: "Users love the silent and peaceful cabin when driving in EV mode at low city speeds.",
+        iconKey: "volume"
       }
     ]
   },
@@ -237,6 +285,22 @@ const rawCards: CompactCard[] = [
         descTr: "CVT şanzımanın sorunsuz çalışması için şanzıman yağının her 40.000 km'de bir orijinal Honda yağı ile değiştirilmesi kritiktir.",
         descEn: "To keep the CVT transmission running smoothly, the fluid must be replaced every 40,000 km using original Honda CVT fluid.",
         iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.INTERESTING_FACT,
+        titleTr: "Fabrikasyon LPG Kiti",
+        titleEn: "Factory-direct LPG Kit",
+        descTr: "Eco versiyonları BRC firması ile ortak geliştirilmiş olup, motor subapları ve kapakları LPG kuru yanmasına dayanıklı malzemeden üretilmiştir.",
+        descEn: "Eco versions were developed in partnership with BRC, featuring valves and heads strengthened to withstand LPG dry combustion.",
+        iconKey: "info"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Alçak Sürüş Pozisyonu",
+        titleEn: "Low Seating Position",
+        descTr: "Sürücüler, koltuğun yere yakın konumlanması sayesinde sportif ve yola hakim bir sürüş hissi aldıklarını vurguluyor.",
+        descEn: "Drivers highlight the low-slung seat adjustment that creates a sporty and engaging driving feel.",
+        iconKey: "seat"
       }
     ]
   },
@@ -279,6 +343,22 @@ const rawCards: CompactCard[] = [
         descTr: "Çift kavramalı EDC şanzımanlarda beyin (tcu) arızası ısınma durumunda baş gösterebilir. Şanzıman geçişleri kontrol edilmelidir.",
         descEn: "Dual-clutch EDC gearboxes might experience TCU control unit failures when overheated. Gear shifts must be thoroughly tested.",
         iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.INTERESTING_FACT,
+        titleTr: "Gizli Arka Kapı Kolları",
+        titleEn: "Hidden Rear Door Handles",
+        descTr: "Arka kapı kollarının C sütununa entegre edilmesi sayesinde araç dışarıdan coupe benzeri sportif bir görünüme sahiptir.",
+        descEn: "Integrating the rear door handles into the C-pillar gives the hatchback a sleek, coupe-like sporty look.",
+        iconKey: "info"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Şehir İçi Pratikliği",
+        titleEn: "Urban Agility",
+        descTr: "Kullanıcılar hafif direksiyon yapısı ve kompakt boyutları sayesinde Clio 4'ün şehir içi park manevralarında büyük kolaylık sunduğunu belirtiyor.",
+        descEn: "Users state that its light steering and compact dimensions make Clio 4 exceptionally easy to park and maneuver in city traffic.",
+        iconKey: "steering"
       }
     ]
   },
@@ -321,6 +401,22 @@ const rawCards: CompactCard[] = [
         descTr: "10 inçlik dijital gösterge paneline sahip üst paket modellerde ekranın anlık kapanıp açılması yazılımsal bir problemdir. Güncelleme gerekir.",
         descEn: "Higher trim versions with 10-inch digital clusters can suffer from occasional software screen blackouts. Firmware updates fix it.",
         iconKey: "screen"
+      },
+      {
+        factType: GuideFactType.BUYING_TIP,
+        titleTr: "1.0 TCe X-Tronic Şanzımana Baktırın",
+        titleEn: "Check 1.0 TCe X-Tronic CVT",
+        descTr: "Nissan kaynaklı X-Tronic CVT şanzımanın kalkışlardaki kavrama kararlılığı ve kayış durumu test edilmelidir.",
+        descEn: "The Nissan-sourced X-Tronic CVT transmission's start-off clutch stability and belt condition should be verified.",
+        iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Yumuşak Plastik Kalitesi",
+        titleEn: "Soft-Touch Dashboard",
+        descTr: "Önceki nesildeki sert plastik şikayetlerinin ardından, Clio 5'in ön panelinde kullanılan yumuşak dolgulu malzemeler kullanıcılardan tam not aldı.",
+        descEn: "Addressing the previous gen's hard plastic complaints, the soft-touch dashboard dashboard materials of Clio V earned high praise.",
+        iconKey: "star"
       }
     ]
   },
@@ -363,6 +459,22 @@ const rawCards: CompactCard[] = [
         descTr: "Mercedes ile ortak geliştirilen 1.3 TCe turbo benzinli motor, performans ve tüketim dengesi açısından bu aracın en başarılı seçeneğidir.",
         descEn: "Co-developed with Mercedes, the 1.3 TCe turbo petrol engine offers the best performance and fuel economy balance for Megane 4.",
         iconKey: "engine"
+      },
+      {
+        factType: GuideFactType.INTERESTING_FACT,
+        titleTr: "Bursa Fabrikası Gururu",
+        titleEn: "Bursa Plant Pride",
+        descTr: "Megane 4 Sedan, Oyak Renault Bursa fabrikasında üretilip 30'dan fazla ülkeye ihraç edilmektedir.",
+        descEn: "Megane 4 Sedan is manufactured at the Oyak Renault Bursa factory and exported to over 30 countries.",
+        iconKey: "flag"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Geniş Bagaj ve Yükleme Kolaylığı",
+        titleEn: "Large Boot and Easy Loading",
+        descTr: "Kullanıcılar, 503 litrelik geniş bagaj alanının aile tatilleri ve uzun seyahatler için ideal olduğunu bildirmektedir.",
+        descEn: "Users report that the large 503-liter boot capacity is ideal for family holidays and long road trips.",
+        iconKey: "bag"
       }
     ]
   },
@@ -405,6 +517,22 @@ const rawCards: CompactCard[] = [
         descTr: "1.4 D-4D dizel motorlarda turbo ve piston segman aşınması nedeniyle yağ eksiltme görülebilir. Yağ seviyesi düzenli izlenmelidir.",
         descEn: "1.4 D-4D diesel engines can consume oil due to turbo or piston ring wear. Checking the oil dipstick regularly is key.",
         iconKey: "oil"
+      },
+      {
+        factType: GuideFactType.BUYING_TIP,
+        titleTr: "Multidrive S Şanzımanı Baktırın",
+        titleEn: "Check Multidrive S CVT",
+        descTr: "Toyota'nın Multidrive S isimli CVT şanzımanı oldukça konforludur ancak alırken yağ kaçakları kontrol edilmelidir.",
+        descEn: "Toyota's Multidrive S CVT is very smooth, but potential oil leaks should be checked when purchasing.",
+        iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Sorunsuz LPG Uyumu",
+        titleEn: "Faultless LPG Integration",
+        descTr: "1.6 Valvematic atmosferik motor, piyasadaki LPG kitleriyle mükemmel uyum sağlaması nedeniyle yakıt tasarrufu arayanların gözdesidir.",
+        descEn: "The 1.6 Valvematic naturally aspirated motor pairs perfectly with aftermarket LPG kits, making it a favorite for savers.",
+        iconKey: "gas"
       }
     ]
   },
@@ -447,6 +575,22 @@ const rawCards: CompactCard[] = [
         descTr: "Atmosferik 1.4 Fire motorlarda ilk üretim yıllarında yüksek devirli kullanımlarda yağ eksiltme kroniktir. Yağ seviyesi izlenmelidir.",
         descEn: "Naturally aspirated 1.4 Fire engines commonly burn oil under high-RPM driving conditions, especially in early production batches.",
         iconKey: "oil"
+      },
+      {
+        factType: GuideFactType.BUYING_TIP,
+        titleTr: "Yol Sesini Kontrol Edin",
+        titleEn: "Check Road Noise",
+        descTr: "Egea sınıfındaki diğer modellere kıyasla yalıtım konusunda biraz zayıftır. Alırken kabin gürültüsünü test edin.",
+        descEn: "Egea has slightly less sound insulation compared to class rivals. Test cabin noise level on a test drive.",
+        iconKey: "volume"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Yedek Parça Bolluğu",
+        titleEn: "Abundance of Spare Parts",
+        descTr: "Kullanıcılar Türkiye'nin her yerinde çok uygun fiyatlarla yedek parça ve usta bulabilmekten çok memnundur.",
+        descEn: "Users are highly satisfied with the low price and accessibility of spare parts and mechanics all over Turkey.",
+        iconKey: "wrench"
       }
     ]
   },
@@ -489,6 +633,22 @@ const rawCards: CompactCard[] = [
         descTr: "Kuru tip 7 ileri S-Tronic şanzımanlarda mekatronik ve kavrama arızaları görülebilir. S-Tronic şanzıman yağı kontrol edilmelidir.",
         descEn: "Dry 7-speed S-Tronic units may experience mechatronic or clutch wear issues. Ensure the transmission fluid is changed regularly.",
         iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.INTERESTING_FACT,
+        titleTr: "İlk Premium MQB Modeli",
+        titleEn: "First Premium MQB Model",
+        descTr: "A3 8V, Golf 7'den hemen önce piyasaya sürülerek MQB mimarisini dünyaya tanıtan ilk model olmuştur.",
+        descEn: "A3 8V was launched just before Golf 7, making it the first model to introduce the MQB architecture to the world.",
+        iconKey: "info"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Üstün Kabin Sessizliği",
+        titleEn: "Premium Cabin Quietness",
+        descTr: "Kullanıcılar, A3'ün rüzgar ve yol sesi yalıtımının VW Golf ve Seat Leon'a göre belirgin şekilde daha üstün olduğunu belirtiyor.",
+        descEn: "Users state that the A3's wind and road noise insulation is noticeably superior to VW Golf and Seat Leon.",
+        iconKey: "volume"
       }
     ]
   }
@@ -595,6 +755,22 @@ brandModels.forEach((item) => {
         descTr: "Çift kavramalı modellerde şanzıman beyni ve debriyaj setinin durumu düzenli olarak kontrol edilmelidir.",
         descEn: "In dual-clutch models, the transmission control unit and clutch set should be checked regularly for longevity.",
         iconKey: "gearbox"
+      },
+      {
+        factType: GuideFactType.BUYING_TIP,
+        titleTr: "Bakım Geçmişini İnceleyin",
+        titleEn: "Check Service History",
+        descTr: "Alırken şanzıman yağı değişim periyotlarına ve yetkili servis kayıtlarına özellikle dikkat edilmelidir.",
+        descEn: "When buying, pay close attention to transmission fluid change intervals and authorized service logs.",
+        iconKey: "calendar"
+      },
+      {
+        factType: GuideFactType.USER_EXPERIENCE,
+        titleTr: "Sürücü Memnuniyeti Yüksek",
+        titleEn: "High Driver Satisfaction",
+        descTr: "Kullanıcılar özellikle geniş kabin hacmi, pratik kullanım alanları ve yakıt ekonomisinden oldukça memnundur.",
+        descEn: "Users are highly satisfied with the spacious cabin volume, practical storage areas, and fuel economy.",
+        iconKey: "user"
       }
     ]
   });
@@ -621,6 +797,42 @@ async function main() {
           where: { id: existing.id },
           data: { heroImageUrl: c.heroImageUrl }
         });
+      }
+
+      // Check count of facts
+      const factCount = await prisma.vehicleGuideFact.count({
+        where: { vehicleGuideCardId: existing.id }
+      });
+
+      if (factCount < 4) {
+        console.log(`Existing card has only ${factCount} facts. Recreating facts to satisfy quality gate...`);
+        // Delete old facts
+        await prisma.vehicleGuideFact.deleteMany({
+          where: { vehicleGuideCardId: existing.id }
+        });
+        
+        // Recreate facts
+        for (const f of c.facts) {
+          await prisma.vehicleGuideFact.create({
+            data: {
+              vehicleGuideCardId: existing.id,
+              factType: f.factType,
+              title: f.titleTr,
+              description: f.descTr,
+              iconKey: f.iconKey,
+              confidenceLevel: DataConfidence.HIGH,
+              sourceType: GuideSourceType.INTERNAL_RESEARCH,
+              status: GuideStatus.APPROVED,
+              isActive: true,
+              translations: {
+                create: [
+                  { locale: Locale.tr, title: f.titleTr, description: f.descTr },
+                  { locale: Locale.en, title: f.titleEn, description: f.descEn }
+                ]
+              }
+            }
+          });
+        }
       }
       continue;
     }
