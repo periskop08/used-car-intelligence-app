@@ -1036,11 +1036,39 @@ async function main() {
   await prisma.userVehiclePreferenceProfile.deleteMany();
   await prisma.vehicleDiscoveryCard.deleteMany();
 
+  // Load guide cards for matching image URLs
+  const guideCards = await prisma.vehicleGuideCard.findMany({
+    select: { brand: true, model: true, heroImageUrl: true }
+  });
+
   const cards = generateAllCards();
-  console.log(`Seeding ${cards.length} VehicleDiscoveryCard records with realistic specs...`);
+
+  // Map card image URLs dynamically to the corresponding guide card's heroImageUrl
+  const mappedCards = cards.map((c) => {
+    // Normalization helper
+    const norm = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, "").replace("serisi", "").replace("series", "");
+    const cBrand = norm(c.brand);
+    const cModel = norm(c.modelFamily);
+
+    // Find best match in guideCards
+    const match = guideCards.find((g) => {
+      if (norm(g.brand) !== cBrand) return false;
+      const gModel = norm(g.model);
+      return cModel.includes(gModel) || gModel.includes(cModel);
+    });
+
+    const finalImageUrl = (match && match.heroImageUrl) ? match.heroImageUrl : c.imageUrl;
+
+    return {
+      ...c,
+      imageUrl: finalImageUrl,
+    };
+  });
+
+  console.log(`Seeding ${mappedCards.length} VehicleDiscoveryCard records with realistic specs...`);
 
   await prisma.vehicleDiscoveryCard.createMany({
-    data: cards.map((c) => ({
+    data: mappedCards.map((c) => ({
       brand: c.brand,
       modelFamily: c.modelFamily,
       bodyType: c.bodyType,

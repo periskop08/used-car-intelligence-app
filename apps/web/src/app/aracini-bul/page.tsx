@@ -349,7 +349,7 @@ export default function FindMyCarPage() {
 
         {/* SWIPING STATE */}
         {gameState === "swiping" && currentCard && (
-          <div className="w-full flex flex-col items-center max-w-sm">
+          <div className="w-full flex flex-col items-center max-w-sm md:max-w-[800px]">
             {/* Progress Indicators */}
             <div className="w-full mb-6 text-center">
               <div className="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-1">
@@ -372,11 +372,11 @@ export default function FindMyCarPage() {
             </div>
 
             {/* Stack Container */}
-            <div className="relative w-full h-[520px] mb-8 select-none">
+            <div className="relative w-full h-[540px] md:h-[500px] mb-8 select-none">
               {/* Back Card 2 (Visual stacked card) */}
-              <div className="absolute inset-0 bg-[#090d1a]/90 border border-white/5 rounded-3xl scale-95 translate-y-3 opacity-60 -z-10 shadow-lg pointer-events-none" />
+              <div className="absolute inset-0 bg-[#090d1a]/90 border border-white/10 rounded-[32px] scale-95 translate-y-3 opacity-60 -z-10 shadow-lg pointer-events-none" />
               {/* Back Card 3 (Visual stacked card) */}
-              <div className="absolute inset-0 bg-[#090d1a]/80 border border-white/5 rounded-3xl scale-90 translate-y-6 opacity-30 -z-20 shadow-md pointer-events-none" />
+              <div className="absolute inset-0 bg-[#090d1a]/80 border border-white/10 rounded-[32px] scale-90 translate-y-6 opacity-30 -z-20 shadow-md pointer-events-none" />
 
               {/* Main Active Card */}
               <div
@@ -388,19 +388,19 @@ export default function FindMyCarPage() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 style={getCardStyle()}
-                className={`absolute inset-0 bg-[#0c1224] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col cursor-grab active:cursor-grabbing ${
+                className={`absolute inset-0 bg-[#0c1224] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col md:flex-row cursor-grab active:cursor-grabbing ${
                   isDragging ? "select-none" : ""
                 }`}
               >
                 {/* Image & Main Info Overlay */}
-                <div className="relative h-48 w-full bg-slate-900 pointer-events-none">
+                <div className="relative h-48 md:h-full w-full md:w-[42%] bg-slate-900 pointer-events-none flex-none border-b md:border-b-0 md:border-r border-white/5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={currentCard.imageUrl}
                     alt={currentCard.modelFamily}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] via-transparent to-black/40" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] via-transparent to-black/40 md:bg-gradient-to-t md:from-[#0c1224]/95 md:via-[#0c1224]/30 md:to-black/20" />
 
                   {/* Brand & Model Overlay */}
                   <div className="absolute bottom-4 left-6 right-6">
@@ -492,7 +492,7 @@ export default function FindMyCarPage() {
             </div>
 
             {/* Swipe Controls Button Bar */}
-            <div className="flex justify-center items-center gap-6 w-full px-6">
+            <div className="flex justify-between items-center w-full px-4 md:px-0 mt-4 md:mt-2">
               <button
                 onClick={() => handleSwipe("left")}
                 disabled={!!exitDirection}
