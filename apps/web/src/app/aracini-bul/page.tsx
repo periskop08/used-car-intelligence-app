@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Check, X, ArrowRight, RefreshCcw, Sparkles, Car, Settings, CheckCircle } from "lucide-react";
-import Header from "../../components/Header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -40,8 +39,18 @@ export default function FindMyCarPage() {
   const [sessionId, setSessionId] = useState<string>("");
   const [token, setToken] = useState<string | null>(null);
   
-  // Game states: 'intro' | 'loading' | 'swiping' | 'result' | 'empty'
-  const [gameState, setGameState] = useState<"intro" | "loading" | "swiping" | "result" | "empty">("intro");
+  // Game states: 'intro' | 'loading' | 'swiping' | 'result' | 'empty' | 'error'
+  const [gameState, setGameState] = useState<"intro" | "loading" | "swiping" | "result" | "empty" | "error">("intro");
+
+  const getOrInitSessionId = (): string => {
+    if (sessionId) return sessionId;
+    let savedSessionId = localStorage.getItem("discoverySessionId");
+    if (!savedSessionId) {
+      savedSessionId = crypto.randomUUID();
+      localStorage.setItem("discoverySessionId", savedSessionId);
+    }
+    return savedSessionId;
+  };
   
   const [currentCard, setCurrentCard] = useState<DiscoveryCard | null>(null);
   const [nextCardCache, setNextCardCache] = useState<DiscoveryCard | null>(null);
@@ -88,16 +97,28 @@ export default function FindMyCarPage() {
 
   const fetchNextCard = async (initiateStateChange = false) => {
     try {
+      const activeSession = getOrInitSessionId();
       const headers: any = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(
-        `${API_URL}/vehicle-discovery/cards/next?sessionId=${sessionId}`,
+        `${API_URL}/vehicle-discovery/cards/next?sessionId=${activeSession}`,
         { headers }
       );
+
+      if (res.status === 404) {
+        setGameState("error");
+        return;
+      }
+
+      if (res.status !== 200) {
+        setGameState("error");
+        return;
+      }
+
       const card = await res.json();
 
-      if (!card || res.status !== 200) {
+      if (!card) {
         if (initiateStateChange) {
           // If initiating and no cards returned, check if we already have 30+ swipes to show results
           await checkProfileResults();
@@ -117,16 +138,17 @@ export default function FindMyCarPage() {
       }
     } catch (e) {
       console.error("Error fetching next card:", e);
-      setGameState("empty");
+      setGameState("error");
     }
   };
 
   const checkProfileResults = async () => {
     try {
+      const activeSession = getOrInitSessionId();
       const headers: any = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${API_URL}/vehicle-discovery/profile/${sessionId}`, {
+      const res = await fetch(`${API_URL}/vehicle-discovery/profile/${activeSession}`, {
         headers,
       });
 
@@ -140,7 +162,7 @@ export default function FindMyCarPage() {
       }
     } catch (e) {
       console.error("Error loading preference profile:", e);
-      setGameState("empty");
+      setGameState("error");
     }
   };
 
@@ -282,8 +304,6 @@ export default function FindMyCarPage() {
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-orange-500/30 selection:text-orange-200">
-      <Header />
-
       <main className="flex-1 flex flex-col justify-center items-center px-4 py-8 max-w-4xl mx-auto w-full">
         {/* INTRO STATE */}
         {gameState === "intro" && (
@@ -605,6 +625,23 @@ export default function FindMyCarPage() {
                 Tercih Profilini Yükle
               </button>
             )}
+          </div>
+        )}
+
+        {/* ERROR STATE */}
+        {gameState === "error" && (
+          <div className="text-center max-w-sm bg-white/[0.02] border border-white/5 p-8 rounded-3xl backdrop-blur-md">
+            <RefreshCcw className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Bağlantı Kurulamadı</h2>
+            <p className="text-slate-400 text-xs leading-relaxed mb-6">
+              Platform veri bağlantısı kurulamadı. Sunucu güncelleniyor veya uykuda olabilir. Lütfen tekrar deneyin.
+            </p>
+            <button
+              onClick={startDiscovery}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3.5 px-6 rounded-2xl transition duration-150 cursor-pointer"
+            >
+              Tekrar Dene
+            </button>
           </div>
         )}
       </main>
