@@ -196,6 +196,24 @@ export default function Header() {
                     <span className="text-slate-500">→</span>
                   </a>
 
+                  <a
+                    href="/dashboard/support/help"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>Yardım Merkezi</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/support/feedback"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-slate-100 transition"
+                  >
+                    <span>Geri Bildirim Gönder</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
                   <div className="border-t border-white/5 my-1" />
 
                   <button
