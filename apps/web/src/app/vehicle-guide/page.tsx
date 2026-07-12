@@ -120,6 +120,7 @@ const formatImageUrl = (url?: string) => {
   return url;
 };
 
+// Trigger build: Force fresh Vercel build to fetch the brand new AI-generated images and 75 models from Neon database
 export default function VehicleGuidePage() {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [historyStack, setHistoryStack] = useState<string[]>([]);
