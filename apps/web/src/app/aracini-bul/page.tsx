@@ -5,6 +5,17 @@ import { Check, X, ArrowRight, RefreshCcw, Sparkles, Car, Settings, CheckCircle 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const formatImageUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
+    const parts = url.split(".r2.dev/");
+    if (parts.length > 1) {
+      return `${API_URL}/listings/media-proxy/${parts[1]}`;
+    }
+  }
+  return url;
+};
+
 interface DiscoveryCard {
   id: string;
   brand: string;
@@ -378,6 +389,25 @@ export default function FindMyCarPage() {
               {/* Back Card 3 (Visual stacked card) */}
               <div className="absolute inset-0 bg-[#090d1a]/80 border border-white/10 rounded-[32px] scale-90 translate-y-6 opacity-30 -z-20 shadow-md pointer-events-none" />
 
+              {/* Side Swipe Buttons (Desktop) */}
+              <button
+                onClick={() => handleSwipe("left")}
+                disabled={!!exitDirection}
+                className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-20 z-20 w-16 h-16 bg-[#ef4444]/10 hover:bg-[#ef4444]/25 text-[#ef4444] border border-[#ef4444]/30 hover:border-[#ef4444]/60 rounded-full items-center justify-center transition duration-150 shadow-lg cursor-pointer active:scale-95 shadow-red-500/5"
+                title="Bana Göre Değil"
+              >
+                <X className="w-7 h-7" />
+              </button>
+
+              <button
+                onClick={() => handleSwipe("right")}
+                disabled={!!exitDirection}
+                className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-20 z-20 w-16 h-16 bg-[#22c55e]/10 hover:bg-[#22c55e]/25 text-[#22c55e] border border-[#22c55e]/30 hover:border-[#22c55e]/60 rounded-full items-center justify-center transition duration-150 shadow-lg cursor-pointer active:scale-95 shadow-green-500/5"
+                title="Beğendim"
+              >
+                <Check className="w-7 h-7" />
+              </button>
+
               {/* Main Active Card */}
               <div
                 onMouseDown={handleMouseDown}
@@ -396,7 +426,7 @@ export default function FindMyCarPage() {
                 <div className="relative h-48 md:h-full w-full md:w-[42%] bg-slate-900 pointer-events-none flex-none border-b md:border-b-0 md:border-r border-white/5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={currentCard.imageUrl}
+                    src={formatImageUrl(currentCard.imageUrl)}
                     alt={currentCard.modelFamily}
                     className="w-full h-full object-cover"
                   />
@@ -492,7 +522,7 @@ export default function FindMyCarPage() {
             </div>
 
             {/* Swipe Controls Button Bar */}
-            <div className="flex justify-between items-center w-full px-4 md:px-0 mt-4 md:mt-2">
+            <div className="flex md:hidden justify-between items-center w-full px-4 md:px-0 mt-4 md:mt-2">
               <button
                 onClick={() => handleSwipe("left")}
                 disabled={!!exitDirection}
