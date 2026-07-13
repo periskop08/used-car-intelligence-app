@@ -263,9 +263,13 @@ JSON Schema format:
 
     if (toRemove.length > 0) {
       const idsToRemove = toRemove.map(v => v.id);
-      await prisma.vehicleVariant.deleteMany({
-        where: { id: { in: idsToRemove } }
-      });
+      const deleteChunkSize = 10000;
+      for (let i = 0; i < idsToRemove.length; i += deleteChunkSize) {
+        const chunk = idsToRemove.slice(i, i + deleteChunkSize);
+        await prisma.vehicleVariant.deleteMany({
+          where: { id: { in: chunk } }
+        });
+      }
       console.log(`   [OK] ${toRemove.length} hatalı/yapay varyant silindi.`);
     }
 

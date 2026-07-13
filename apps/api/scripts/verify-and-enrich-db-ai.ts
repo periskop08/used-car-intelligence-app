@@ -327,9 +327,13 @@ JSON Schema format:
   if (toRemove.length > 0) {
     console.log(` -> ${toRemove.length} hatalı/yapay varyant siliniyor...`);
     const idsToRemove = toRemove.map(v => v.id);
-    await prisma.vehicleVariant.deleteMany({
-      where: { id: { in: idsToRemove } }
-    });
+    const deleteChunkSize = 10000;
+    for (let i = 0; i < idsToRemove.length; i += deleteChunkSize) {
+      const chunk = idsToRemove.slice(i, i + deleteChunkSize);
+      await prisma.vehicleVariant.deleteMany({
+        where: { id: { in: chunk } }
+      });
+    }
     console.log(" -> Silme işlemi tamamlandı.");
   }
 
@@ -429,24 +433,32 @@ JSON Schema format:
         trimMap.set(v.trim.toLowerCase(), trimId);
       }
 
-      await prisma.vehicleVariant.create({
-        data: {
-          brandId,
-          modelId,
-          generationId: genId,
-          engineId,
-          transmissionId,
-          trimId,
-          countryId,
-          year: v.year,
-          yearStart: 2000,
-          yearEnd: 2026,
-          bodyType: bodyTypeEnum,
-          fuelType: mapFuelType(v.fuel),
-          marketRegion: 'Turkey',
-          status: ApprovalStatus.APPROVED
+      try {
+        await prisma.vehicleVariant.create({
+          data: {
+            brandId,
+            modelId,
+            generationId: genId,
+            engineId,
+            transmissionId,
+            trimId,
+            countryId,
+            year: v.year,
+            yearStart: 2000,
+            yearEnd: 2026,
+            bodyType: bodyTypeEnum,
+            fuelType: mapFuelType(v.fuel),
+            marketRegion: 'Turkey',
+            status: ApprovalStatus.APPROVED
+          }
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          // Silently skip duplicate variants
+          continue;
         }
-      });
+        throw err;
+      }
 
       count++;
       if (count % chunkSize === 0 || count === toAdd.length) {
