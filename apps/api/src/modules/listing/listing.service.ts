@@ -97,9 +97,30 @@ export class ListingService {
     }
     const variant = await this.prisma.vehicleVariant.findUnique({
       where: { id: listing.vehicleVariantId },
+      include: {
+        brand: true,
+        model: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+      },
     });
     if (!variant || variant.status !== 'APPROVED') {
-      throw new BadRequestException('Bağlı vehicleVariant status değeri APPROVED olmalı.');
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
+    }
+
+    // Verify all critical fields are populated
+    if (
+      !variant.brand?.name ||
+      !variant.model?.name ||
+      !variant.year ||
+      !variant.bodyType ||
+      !variant.engine?.code ||
+      !variant.fuelType ||
+      !variant.transmission?.name ||
+      !variant.trim?.name
+    ) {
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
     }
 
     // 4. Approved Media Check

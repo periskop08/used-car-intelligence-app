@@ -92,6 +92,13 @@ const mappings = [
     generation: "Corolla E170",
     localPath: "/Users/periskop/.gemini/antigravity-ide/brain/2c76700d-6cad-401c-8924-b092fb61fdf5/toyota_corolla_e170_ai_render_1783880344462.png",
     storageKey: "guide-cards/toyota-corolla-e170.webp"
+  },
+  {
+    brand: "BMW",
+    model: "3 Serisi",
+    generation: "3 Serisi F30",
+    localPath: "/Users/periskop/.gemini/antigravity-ide/brain/2c76700d-6cad-401c-8924-b092fb61fdf5/bmw_3_serisi_f30_ai_render_1783881053552.png",
+    storageKey: "guide-cards/desktop/1783879499899-pwruah.webp"
   }
 ];
 

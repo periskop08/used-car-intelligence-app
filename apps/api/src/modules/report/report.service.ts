@@ -25,12 +25,33 @@ export class ReportService {
     // 1. Transaction-safe limit check & usage increment
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
 
-    // 2. Fetch variant
+    // 2. Fetch variant with relations
     const variant = await this.prisma.vehicleVariant.findUnique({
       where: { id: dto.variantId },
+      include: {
+        brand: true,
+        model: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+      },
     });
-    if (!variant) {
-      throw new NotFoundException('Araç varyantı bulunamadı.');
+    if (!variant || variant.status !== ApprovalStatus.APPROVED) {
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
+    }
+
+    // Verify all critical fields are populated
+    if (
+      !variant.brand?.name ||
+      !variant.model?.name ||
+      !variant.year ||
+      !variant.bodyType ||
+      !variant.engine?.code ||
+      !variant.fuelType ||
+      !variant.transmission?.name ||
+      !variant.trim?.name
+    ) {
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
     }
 
     // 3. Check for existing APPROVED AiVehicleReport cache

@@ -2,7 +2,7 @@ import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.service';
 
-function getBodyTypeTr(bt: string): string {
+export function getBodyTypeTr(bt: string): string {
   if (!bt) return 'Sedan';
   const upper = bt.toUpperCase();
   if (upper === 'SEDAN') return 'Sedan';
@@ -17,7 +17,7 @@ function getBodyTypeTr(bt: string): string {
   return 'Sedan';
 }
 
-function getBodyTypeEnum(tr: string): string {
+export function getBodyTypeEnum(tr: string): string {
   const clean = tr.toLowerCase().trim();
   if (clean === 'sedan') return 'SEDAN';
   if (clean === 'hatchback') return 'HATCHBACK';
@@ -31,7 +31,7 @@ function getBodyTypeEnum(tr: string): string {
   return 'SEDAN';
 }
 
-function getFuelTypeTr(ft: string): string {
+export function getFuelTypeTr(ft: string): string {
   if (!ft) return 'Benzin';
   const upper = ft.toUpperCase();
   if (upper === 'PETROL') return 'Benzin';
@@ -42,7 +42,7 @@ function getFuelTypeTr(ft: string): string {
   return 'Benzin';
 }
 
-function getFuelTypeEnums(tr: string): string[] {
+export function getFuelTypeEnums(tr: string): string[] {
   const clean = tr.toLowerCase().trim();
   if (clean === 'benzin') return ['PETROL'];
   if (clean === 'dizel') return ['DIESEL'];
@@ -52,7 +52,7 @@ function getFuelTypeEnums(tr: string): string[] {
   return ['PETROL'];
 }
 
-function getTransmissionTr(name: string): string {
+export function getTransmissionTr(name: string): string {
   const lower = name.toLowerCase().trim();
   if (lower.includes('manuel') || lower.includes('düz') || lower.includes('manual')) {
     return 'Manuel';
@@ -74,13 +74,13 @@ export class VehicleFiltersController {
     const variants = await this.prisma.vehicleVariant.findMany({
       where: { status: 'APPROVED' },
       select: { brand: { select: { name: true } } },
-      distinct: ['brandId'],
     });
-    const brands = variants.map(v => v.brand.name);
-    brands.sort();
+    // Distinct brands in memory
+    const brandsSet = new Set(variants.map(v => v.brand.name));
+    const sortedBrands = Array.from(brandsSet).sort();
     return {
       success: true,
-      data: brands.map(name => ({ label: name, value: name })),
+      data: sortedBrands.map(name => ({ label: name, value: name })),
     };
   }
 
@@ -97,241 +97,261 @@ export class VehicleFiltersController {
         brand: { name: { equals: brand, mode: 'insensitive' } },
       },
       select: { model: { select: { name: true } } },
-      distinct: ['modelId'],
     });
-    const models = variants.map(v => v.model.name);
-    models.sort();
+    const modelsSet = new Set(variants.map(v => v.model.name));
+    const sortedModels = Array.from(modelsSet).sort();
     return {
       success: true,
-      data: models.map(name => ({ label: name, value: name })),
-    };
-  }
-
-  @Get('body-types')
-  @ApiOperation({ summary: 'Seçilen Marka, Model ve Yıla Ait Kasa Tipleri' })
-  @ApiQuery({ name: 'brand', required: false })
-  @ApiQuery({ name: 'model', required: false })
-  @ApiQuery({ name: 'year', required: false })
-  async getBodyTypes(
-    @Query('brand') brand?: string,
-    @Query('model') model?: string,
-    @Query('year') year?: string,
-  ) {
-    if (brand && model && year) {
-      const variants = await this.prisma.vehicleVariant.findMany({
-        where: {
-          status: 'APPROVED',
-          brand: { name: { equals: brand, mode: 'insensitive' } },
-          model: { name: { equals: model, mode: 'insensitive' } },
-          year: Number(year),
-        },
-        select: { bodyType: true },
-        distinct: ['bodyType'],
-      });
-      const types = Array.from(new Set(variants.map(v => getBodyTypeTr(v.bodyType?.toString() || '')))).filter(Boolean);
-      types.sort();
-      return {
-        success: true,
-        data: types.map(name => ({ label: name, value: name })),
-      };
-    }
-
-    const bodyTypes = [
-      'Sedan',
-      'Hatchback',
-      'SUV',
-      'Coupe',
-      'Cabrio',
-      'Station Wagon',
-      'Minivan',
-      'Van',
-      'Pick-up'
-    ];
-    return {
-      success: true,
-      data: bodyTypes.map(name => ({ label: name, value: name })),
+      data: sortedModels.map(name => ({ label: name, value: name })),
     };
   }
 
   @Get('years')
   @ApiOperation({ summary: 'Seçilen Marka ve Modele Ait Yıllar' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: false })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
   async getYears(
     @Query('brand') brand: string,
-    @Query('model') model: string,
-    @Query('body_type') bodyType?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
   ) {
-    if (!brand || !model) {
-      throw new BadRequestException('brand ve model query parametreleri gereklidir.');
+    const targetModel = model || modelFamily;
+    if (!brand || !targetModel) {
+      throw new BadRequestException('brand ve modelFamily query parametreleri gereklidir.');
     }
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        ...(bodyType ? { bodyType: getBodyTypeEnum(bodyType) as any } : {}),
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
       },
       select: { year: true },
-      distinct: ['year'],
     });
-    const years = variants.map(v => v.year);
-    years.sort((a, b) => b - a); // En yeni yıl ilk sırada
+    const yearsSet = new Set(variants.map(v => v.year));
+    const sortedYears = Array.from(yearsSet).sort((a, b) => b - a);
     return {
       success: true,
-      data: years.map(yr => ({ label: yr.toString(), value: yr.toString() })),
+      data: sortedYears.map(yr => ({ label: yr.toString(), value: yr.toString() })),
+    };
+  }
+
+  @Get('body-types')
+  @ApiOperation({ summary: 'Seçilen Marka, Model ve Yıla Ait Kasa Tipleri' })
+  @ApiQuery({ name: 'brand', required: true })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
+  @ApiQuery({ name: 'year', required: true })
+  async getBodyTypes(
+    @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
+    @Query('year') year: string,
+  ) {
+    const targetModel = model || modelFamily;
+    if (!brand || !targetModel || !year) {
+      throw new BadRequestException('brand, modelFamily ve year query parametreleri gereklidir.');
+    }
+    const variants = await this.prisma.vehicleVariant.findMany({
+      where: {
+        status: 'APPROVED',
+        brand: { name: { equals: brand, mode: 'insensitive' } },
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        year: Number(year),
+      },
+      select: { bodyType: true },
+    });
+    const typesSet = new Set(variants.map(v => getBodyTypeTr(v.bodyType?.toString() || '')));
+    const sortedTypes = Array.from(typesSet).filter(Boolean).sort();
+    return {
+      success: true,
+      data: sortedTypes.map(name => ({ label: name, value: name })),
     };
   }
 
   @Get('engines')
-  @ApiOperation({ summary: 'Seçilen Marka, Model, Kasa Tipi ve Yıla Ait Motor Seçenekleri' })
+  @ApiOperation({ summary: 'Seçilen Kombinasyona Ait Motor Seçenekleri' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: true })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
-  @ApiQuery({ name: 'fuel_type', required: false })
+  @ApiQuery({ name: 'bodyType', required: false })
+  @ApiQuery({ name: 'body_type', required: false })
   async getEngines(
     @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily: string,
     @Query('model') model: string,
-    @Query('body_type') bodyType: string,
     @Query('year') year: string,
-    @Query('fuel_type') fuelType?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('body_type') bodyTypeLegacy?: string,
   ) {
-    if (!brand || !model || !bodyType || !year) {
-      throw new BadRequestException('brand, model, body_type ve year query parametreleri gereklidir.');
+    const targetModel = model || modelFamily;
+    const targetBodyType = bodyType || bodyTypeLegacy;
+    if (!brand || !targetModel || !year || !targetBodyType) {
+      throw new BadRequestException('brand, modelFamily, year ve bodyType query parametreleri gereklidir.');
     }
-    const fuelEnums = fuelType ? getFuelTypeEnums(fuelType) : undefined;
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        bodyType: getBodyTypeEnum(bodyType) as any,
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        bodyType: getBodyTypeEnum(targetBodyType) as any,
         year: Number(year),
-        ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
       },
       select: { engine: { select: { code: true } } },
-      distinct: ['engineId'],
     });
-    const engines = Array.from(new Set(variants.map(v => v.engine.code))); // Tekilleştirme
-    engines.sort();
+    const enginesSet = new Set(variants.map(v => v.engine.code));
+    const sortedEngines = Array.from(enginesSet).filter(Boolean).sort();
     return {
       success: true,
-      data: engines.map(code => ({ label: code, value: code })),
+      data: sortedEngines.map(code => ({ label: code, value: code })),
     };
   }
 
   @Get('fuel-types')
   @ApiOperation({ summary: 'Seçilen Kombinasyona Ait Yakıt Tipleri' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: true })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
+  @ApiQuery({ name: 'bodyType', required: false })
+  @ApiQuery({ name: 'body_type', required: false })
+  @ApiQuery({ name: 'engineVersion', required: false })
   @ApiQuery({ name: 'engine', required: false })
   async getFuelTypes(
     @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily: string,
     @Query('model') model: string,
-    @Query('body_type') bodyType: string,
     @Query('year') year: string,
-    @Query('engine') engine?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('body_type') bodyTypeLegacy?: string,
+    @Query('engineVersion') engineVersion?: string,
+    @Query('engine') engineLegacy?: string,
   ) {
-    if (!brand || !model || !bodyType || !year) {
+    const targetModel = model || modelFamily;
+    const targetBodyType = bodyType || bodyTypeLegacy;
+    const targetEngine = engineVersion || engineLegacy;
+    if (!brand || !targetModel || !year || !targetBodyType || !targetEngine) {
       throw new BadRequestException('Gerekli query parametreleri eksik.');
     }
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        bodyType: getBodyTypeEnum(bodyType) as any,
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        bodyType: getBodyTypeEnum(targetBodyType) as any,
         year: Number(year),
-        ...(engine ? { engine: { code: engine } } : {}),
+        engine: { code: targetEngine },
       },
       select: { fuelType: true },
-      distinct: ['fuelType'],
     });
     const order = ['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG & Benzin'];
-    const fuelTypes = Array.from(new Set(variants.map(v => getFuelTypeTr(v.fuelType?.toString() || '')))).filter(Boolean);
-    fuelTypes.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const fuelsSet = new Set(variants.map(v => getFuelTypeTr(v.fuelType?.toString() || '')));
+    const sortedFuels = Array.from(fuelsSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
     return {
       success: true,
-      data: fuelTypes.map(name => ({ label: name, value: name })),
+      data: sortedFuels.map(name => ({ label: name, value: name })),
     };
   }
 
   @Get('transmissions')
   @ApiOperation({ summary: 'Seçilen Kombinasyona Ait Şanzıman Tipleri' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: true })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
-  @ApiQuery({ name: 'engine', required: true })
-  @ApiQuery({ name: 'fuel_type', required: true })
+  @ApiQuery({ name: 'bodyType', required: false })
+  @ApiQuery({ name: 'body_type', required: false })
+  @ApiQuery({ name: 'engineVersion', required: false })
+  @ApiQuery({ name: 'engine', required: false })
+  @ApiQuery({ name: 'fuelType', required: false })
+  @ApiQuery({ name: 'fuel_type', required: false })
   async getTransmissions(
     @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily: string,
     @Query('model') model: string,
-    @Query('body_type') bodyType: string,
     @Query('year') year: string,
-    @Query('engine') engine: string,
-    @Query('fuel_type') fuelType: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('body_type') bodyTypeLegacy?: string,
+    @Query('engineVersion') engineVersion?: string,
+    @Query('engine') engineLegacy?: string,
+    @Query('fuelType') fuelType?: string,
+    @Query('fuel_type') fuelTypeLegacy?: string,
   ) {
-    if (!brand || !model || !bodyType || !year || !engine || !fuelType) {
+    const targetModel = model || modelFamily;
+    const targetBodyType = bodyType || bodyTypeLegacy;
+    const targetEngine = engineVersion || engineLegacy;
+    const targetFuel = fuelType || fuelTypeLegacy;
+    if (!brand || !targetModel || !year || !targetBodyType || !targetEngine || !targetFuel) {
       throw new BadRequestException('Gerekli query parametreleri eksik.');
     }
-    const fuelEnums = getFuelTypeEnums(fuelType);
+    const fuelEnums = getFuelTypeEnums(targetFuel);
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        bodyType: getBodyTypeEnum(bodyType) as any,
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        bodyType: getBodyTypeEnum(targetBodyType) as any,
         year: Number(year),
-        engine: { code: engine },
+        engine: { code: targetEngine },
         fuelType: { in: fuelEnums as any },
       },
       select: { transmission: { select: { name: true } } },
-      distinct: ['transmissionId'],
     });
     const order = ['Manuel', 'Otomatik', 'Yarı Otomatik'];
-    const transmissions = Array.from(new Set(variants.map(v => getTransmissionTr(v.transmission.name)))).filter(Boolean);
-    transmissions.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const transSet = new Set(variants.map(v => getTransmissionTr(v.transmission.name)));
+    const sortedTrans = Array.from(transSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
     return {
       success: true,
-      data: transmissions.map(name => ({ label: name, value: name })),
+      data: sortedTrans.map(name => ({ label: name, value: name })),
     };
   }
 
   @Get('trims')
   @ApiOperation({ summary: 'Seçilen Kombinasyona Ait Donanım Paketleri' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: true })
+  @ApiQuery({ name: 'modelFamily', required: false })
+  @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
-  @ApiQuery({ name: 'engine', required: true })
-  @ApiQuery({ name: 'fuel_type', required: true })
+  @ApiQuery({ name: 'bodyType', required: false })
+  @ApiQuery({ name: 'body_type', required: false })
+  @ApiQuery({ name: 'engineVersion', required: false })
+  @ApiQuery({ name: 'engine', required: false })
+  @ApiQuery({ name: 'fuelType', required: false })
+  @ApiQuery({ name: 'fuel_type', required: false })
+  @ApiQuery({ name: 'transmissionType', required: false })
   @ApiQuery({ name: 'transmission_type', required: false })
   async getTrims(
     @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily: string,
     @Query('model') model: string,
-    @Query('body_type') bodyType: string,
     @Query('year') year: string,
-    @Query('engine') engine: string,
-    @Query('fuel_type') fuelType: string,
-    @Query('transmission_type') transmissionType?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('body_type') bodyTypeLegacy?: string,
+    @Query('engineVersion') engineVersion?: string,
+    @Query('engine') engineLegacy?: string,
+    @Query('fuelType') fuelType?: string,
+    @Query('fuel_type') fuelTypeLegacy?: string,
+    @Query('transmissionType') transmissionType?: string,
+    @Query('transmission_type') transmissionTypeLegacy?: string,
   ) {
-    if (!brand || !model || !bodyType || !year || !engine || !fuelType) {
+    const targetModel = model || modelFamily;
+    const targetBodyType = bodyType || bodyTypeLegacy;
+    const targetEngine = engineVersion || engineLegacy;
+    const targetFuel = fuelType || fuelTypeLegacy;
+    const targetTrans = transmissionType || transmissionTypeLegacy;
+    if (!brand || !targetModel || !year || !targetBodyType || !targetEngine || !targetFuel || !targetTrans) {
       throw new BadRequestException('Gerekli query parametreleri eksik.');
     }
-    const fuelEnums = getFuelTypeEnums(fuelType);
+    const fuelEnums = getFuelTypeEnums(targetFuel);
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        bodyType: getBodyTypeEnum(bodyType) as any,
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        bodyType: getBodyTypeEnum(targetBodyType) as any,
         year: Number(year),
-        engine: { code: engine },
+        engine: { code: targetEngine },
         fuelType: { in: fuelEnums as any },
       },
       select: {
@@ -339,65 +359,60 @@ export class VehicleFiltersController {
         transmission: { select: { name: true } },
       },
     });
-    const filtered = transmissionType
-      ? variants.filter(v => getTransmissionTr(v.transmission.name) === transmissionType)
-      : variants;
-    const trims = Array.from(new Set(filtered.map(v => v.trim.name))).filter(Boolean);
-    trims.sort();
-    if (trims.length === 0) {
-      return {
-        success: true,
-        data: [],
-        message: 'Bu kombinasyon için doğrulanmış varyant bulunamadı.',
-      };
-    }
+    const filtered = variants.filter(v => getTransmissionTr(v.transmission.name) === targetTrans);
+    const trimsSet = new Set(filtered.map(v => v.trim.name));
+    const sortedTrims = Array.from(trimsSet).filter(Boolean).sort();
     return {
       success: true,
-      data: trims.map(name => ({ label: name, value: name })),
+      data: sortedTrims.map(name => ({ label: name, value: name })),
     };
   }
 
   @Get('match-variant')
   @ApiOperation({ summary: 'Seçilen Tüm Kriterlere Uygun Araç Varyantı Kimliğini Al' })
-  @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'model', required: true })
-  @ApiQuery({ name: 'body_type', required: true })
-  @ApiQuery({ name: 'year', required: true })
-  @ApiQuery({ name: 'engine', required: true })
-  @ApiQuery({ name: 'fuel_type', required: true })
-  @ApiQuery({ name: 'trim', required: true })
-  @ApiQuery({ name: 'transmission', required: true })
   async matchVariant(
     @Query('brand') brand: string,
+    @Query('modelFamily') modelFamily: string,
     @Query('model') model: string,
-    @Query('body_type') bodyType: string,
     @Query('year') year: string,
-    @Query('engine') engine: string,
-    @Query('fuel_type') fuelType: string,
-    @Query('trim') trim: string,
-    @Query('transmission') transmission: string,
+    @Query('bodyType') bodyType: string,
+    @Query('body_type') bodyTypeLegacy: string,
+    @Query('engineVersion') engineVersion: string,
+    @Query('engine') engineLegacy: string,
+    @Query('fuelType') fuelType: string,
+    @Query('fuel_type') fuelTypeLegacy: string,
+    @Query('trimPackage') trimPackage: string,
+    @Query('trim') trimLegacy: string,
+    @Query('transmissionType') transmissionType: string,
+    @Query('transmission') transmissionLegacy: string,
   ) {
-    if (!brand || !model || !bodyType || !year || !engine || !fuelType || !trim || !transmission) {
+    const targetModel = model || modelFamily;
+    const targetBodyType = bodyType || bodyTypeLegacy;
+    const targetEngine = engineVersion || engineLegacy;
+    const targetFuel = fuelType || fuelTypeLegacy;
+    const targetTrim = trimPackage || trimLegacy;
+    const targetTrans = transmissionType || transmissionLegacy;
+    if (!brand || !targetModel || !year || !targetBodyType || !targetEngine || !targetFuel || !targetTrim || !targetTrans) {
       throw new BadRequestException('Gerekli query parametreleri eksik.');
     }
-    const fuelEnums = getFuelTypeEnums(fuelType);
-    const found = await this.prisma.vehicleVariant.findFirst({
+    const fuelEnums = getFuelTypeEnums(targetFuel);
+    const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: model, mode: 'insensitive' } },
-        bodyType: getBodyTypeEnum(bodyType) as any,
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        bodyType: getBodyTypeEnum(targetBodyType) as any,
         year: Number(year),
-        engine: { code: engine },
+        engine: { code: targetEngine },
         fuelType: { in: fuelEnums as any },
-        trim: { name: { equals: trim, mode: 'insensitive' } },
-        transmission: { name: { equals: transmission, mode: 'insensitive' } },
+        trim: { name: { equals: targetTrim, mode: 'insensitive' } },
       },
-      select: { id: true },
+      include: { transmission: true },
     });
+    const matched = variants.find(v => getTransmissionTr(v.transmission.name) === targetTrans);
     return {
       success: true,
-      variantId: found ? found.id : null,
+      variantId: matched ? matched.id : null,
     };
   }
 }

@@ -31,18 +31,33 @@ export class ComparisonService {
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON);
 
     // 2. Fetch both approved variants
-    const variant1 = await this.prisma.vehicleVariant.findFirst({
-      where: { id: dto.variant1Id, status: ApprovalStatus.APPROVED },
+    const variant1 = await this.prisma.vehicleVariant.findUnique({
+      where: { id: dto.variant1Id },
       include: { brand: true, model: true, generation: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
     });
 
-    const variant2 = await this.prisma.vehicleVariant.findFirst({
-      where: { id: dto.variant2Id, status: ApprovalStatus.APPROVED },
+    const variant2 = await this.prisma.vehicleVariant.findUnique({
+      where: { id: dto.variant2Id },
       include: { brand: true, model: true, generation: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
     });
 
-    if (!variant1 || !variant2) {
-      throw new NotFoundException('Karşılaştırılacak araç varyantlarından biri veya ikisi bulunamadı veya onaylanmamış.');
+    if (!variant1 || variant1.status !== ApprovalStatus.APPROVED || !variant2 || variant2.status !== ApprovalStatus.APPROVED) {
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
+    }
+
+    // Verify all critical fields are populated for both variants
+    const isInvalid = (v: any) =>
+      !v.brand?.name ||
+      !v.model?.name ||
+      !v.year ||
+      !v.bodyType ||
+      !v.engine?.code ||
+      !v.fuelType ||
+      !v.transmission?.name ||
+      !v.trim?.name;
+
+    if (isInvalid(variant1) || isInvalid(variant2)) {
+      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
     }
 
     // 3. Save comparison log in DB

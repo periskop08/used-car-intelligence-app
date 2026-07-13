@@ -149,6 +149,19 @@ export default function Home() {
   useEffect(() => {
     setYears([]);
     setSelectedYear("");
+    setBodyTypes([]);
+    setSelectedBodyType("");
+    setEngines([]);
+    setSelectedEngine("");
+    setFuelTypes([]);
+    setSelectedFuelType("");
+    setTransmissions([]);
+    setSelectedTransmission("");
+    setTrims([]);
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
     if (!selectedBrand || !selectedModel) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -156,7 +169,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingYears(true);
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}`)
+    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -171,6 +184,17 @@ export default function Home() {
   useEffect(() => {
     setBodyTypes([]);
     setSelectedBodyType("");
+    setEngines([]);
+    setSelectedEngine("");
+    setFuelTypes([]);
+    setSelectedFuelType("");
+    setTransmissions([]);
+    setSelectedTransmission("");
+    setTrims([]);
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
     if (!selectedBrand || !selectedModel || !selectedYear) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -178,7 +202,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingBodyTypes(true);
-    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&year=${selectedYear}`)
+    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${selectedYear}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -193,6 +217,15 @@ export default function Home() {
   useEffect(() => {
     setEngines([]);
     setSelectedEngine("");
+    setFuelTypes([]);
+    setSelectedFuelType("");
+    setTransmissions([]);
+    setSelectedTransmission("");
+    setTrims([]);
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
     if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -200,7 +233,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingEngines(true);
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&body_type=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}`)
+    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -216,6 +249,13 @@ export default function Home() {
     setFuelTypes([]);
     setSelectedFuelType("");
     setIsFuelTypeAutoSelected(false);
+    setTransmissions([]);
+    setSelectedTransmission("");
+    setTrims([]);
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
     if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -223,7 +263,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingFuels(true);
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&body_type=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engine=${encodeURIComponent(selectedEngine)}`)
+    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -245,6 +285,11 @@ export default function Home() {
   useEffect(() => {
     setTransmissions([]);
     setSelectedTransmission("");
+    setTrims([]);
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
     if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedFuelType || !selectedEngine) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -252,7 +297,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingTransmissions(true);
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&body_type=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engine=${encodeURIComponent(selectedEngine)}&fuel_type=${encodeURIComponent(selectedFuelType)}`)
+    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -268,6 +313,8 @@ export default function Home() {
     setTrims([]);
     setSelectedTrim("");
     setNoTrimFound(false);
+    setMatchedVariantId(null);
+
     if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedFuelType || !selectedEngine || !selectedTransmission) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
@@ -275,7 +322,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingTrims(true);
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&body_type=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engine=${encodeURIComponent(selectedEngine)}&fuel_type=${encodeURIComponent(selectedFuelType)}&transmission_type=${encodeURIComponent(selectedTransmission)}`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}&transmissionType=${encodeURIComponent(selectedTransmission)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -322,7 +369,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingMatch(true);
-    fetch(`${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(brandName)}&model=${encodeURIComponent(modelName)}&body_type=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engine=${encodeURIComponent(selectedEngine)}&fuel_type=${encodeURIComponent(selectedFuelType)}&trim=${encodeURIComponent(selectedTrim)}&transmission=${encodeURIComponent(selectedTransmission)}`)
+    fetch(`${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}&trimPackage=${encodeURIComponent(selectedTrim)}&transmissionType=${encodeURIComponent(selectedTransmission)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && res.variantId) {

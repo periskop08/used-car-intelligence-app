@@ -42,3 +42,13 @@ yarn-error.log*
 *.sw?
 .DS_Store
 .vercel
+.env*.local
+
+# Large data files and backups
+*.xlsx
+*.csv
+*.ndjson
+*.jpg
+*.png
+__pycache__/
+apps/api/scratch/
