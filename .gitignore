@@ -52,3 +52,7 @@ yarn-error.log*
 *.png
 __pycache__/
 apps/api/scratch/
+
+# Exclude public web assets
+!apps/web/public/**/*.png
+!apps/web/public/**/*.jpg
