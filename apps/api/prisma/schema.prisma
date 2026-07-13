@@ -1424,6 +1424,7 @@ model VehicleDiscoveryCard {
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
   swipes             UserVehiclePreferenceSwipe[]
+  impressions        VehicleDiscoveryCardImpression[]
 }
 
 model UserVehiclePreferenceSwipe {
@@ -1436,6 +1437,21 @@ model UserVehiclePreferenceSwipe {
 
   card                   VehicleDiscoveryCard @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: Cascade)
   user                   User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, vehicleDiscoveryCardId])
+  @@index([userId])
+  @@index([sessionId])
+}
+
+model VehicleDiscoveryCardImpression {
+  id                     String               @id @default(uuid())
+  userId                 String?
+  sessionId              String
+  vehicleDiscoveryCardId String
+  shownAt                DateTime             @default(now())
+  createdAt              DateTime             @default(now())
+
+  card                   VehicleDiscoveryCard @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, vehicleDiscoveryCardId])
   @@index([userId])

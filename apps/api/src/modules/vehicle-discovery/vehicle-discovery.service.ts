@@ -8,6 +8,14 @@ export class VehicleDiscoveryService {
 
   constructor(private prisma: PrismaService) {}
 
+  getBaseModel(modelFamily: string): string {
+    const parts = modelFamily.split(" ");
+    if (parts.length > 1 && (parts[1].toLowerCase() === "serisi" || parts[1].toLowerCase() === "series")) {
+      return `${parts[0]} ${parts[1]}`;
+    }
+    return parts[0];
+  }
+
   private translateFuel(fuel: string): string {
     const mappings: Record<string, string> = {
       PETROL: 'benzinli',
@@ -89,37 +97,93 @@ export class VehicleDiscoveryService {
       return null;
     }
 
-    // 2. Fetch active cards that haven't been swiped yet
-    const allCards = await this.prisma.vehicleDiscoveryCard.findMany({
+    // 2. Get all shown card IDs (impressions) for this session or user
+    const impressions = await this.prisma.vehicleDiscoveryCardImpression.findMany({
+      where: {
+        OR: [
+          { sessionId },
+          ...(userId ? [{ userId }] : []),
+        ],
+      },
+      select: { vehicleDiscoveryCardId: true },
+    });
+    const shownCardIds = impressions.map(i => i.vehicleDiscoveryCardId);
+
+    // 3. Exclude any cards that have been swiped or shown
+    const excludedCardIds = Array.from(new Set([...swipedCardIds, ...shownCardIds]));
+
+    // 4. Fetch candidate cards (active and not swiped/shown yet)
+    let candidateCards = await this.prisma.vehicleDiscoveryCard.findMany({
       where: {
         isActive: true,
-        id: { notIn: swipedCardIds },
+        id: { notIn: excludedCardIds },
       },
     });
 
-    if (allCards.length === 0) {
+    // If candidate list is empty and we haven't reached 50 swipes, we can soften shown-card rules
+    // (excluding swiped cards must NEVER be bypassed, but we can bypass shown impressions if needed)
+    if (candidateCards.length === 0) {
+      candidateCards = await this.prisma.vehicleDiscoveryCard.findMany({
+        where: {
+          isActive: true,
+          id: { notIn: swipedCardIds },
+        },
+      });
+    }
+
+    if (candidateCards.length === 0) {
       return null;
     }
 
-    // 3. Selection Strategy
+    // 5. Fetch recent 5 shown cards to apply diversity penalties
+    const recentImpressions = await this.prisma.vehicleDiscoveryCardImpression.findMany({
+      where: {
+        OR: [
+          { sessionId },
+          ...(userId ? [{ userId }] : []),
+        ],
+      },
+      orderBy: { shownAt: 'desc' },
+      take: 5,
+      include: { card: true },
+    });
+    const recentCards = recentImpressions.map(ri => ri.card);
+
+    let selectedCard: any = null;
+
     if (totalSwipesCount < 10) {
-      // First 10 cards: Balanced discovery set. Count shown body types and select the least shown.
-      const swipedCards = await this.prisma.vehicleDiscoveryCard.findMany({
-        where: { id: { in: swipedCardIds } },
-        select: { bodyType: true },
-      });
-      const bodyTypeCounts: Record<string, number> = {};
-      swipedCards.forEach(c => {
-        bodyTypeCounts[c.bodyType] = (bodyTypeCounts[c.bodyType] || 0) + 1;
+      // First 10 cards: Maximize variety/exploration
+      const shownBrands = new Set(recentCards.map(c => c.brand));
+      const shownBodies = new Set(recentCards.map(c => c.bodyType));
+      const shownFuels = new Set(recentCards.map(c => c.fuelType));
+      
+      const candidatesWithDiversityScore = candidateCards.map(card => {
+        let score = 0;
+        
+        // Brand variety bonus
+        if (!shownBrands.has(card.brand)) score += 5.0;
+        
+        // Body variety bonus
+        if (!shownBodies.has(card.bodyType)) score += 4.0;
+        
+        // Fuel variety bonus
+        if (!shownFuels.has(card.fuelType)) score += 3.0;
+
+        // Brand + modelFamily consecutive exclusion penalty
+        if (recentCards.length > 0 && recentCards[0].brand.toUpperCase() === card.brand.toUpperCase() && this.getBaseModel(recentCards[0].modelFamily) === this.getBaseModel(card.modelFamily)) {
+          score -= 100.0;
+        }
+
+        // Penalty if brand + modelFamily is present in the last 5 cards at all
+        if (recentCards.some(rc => rc.brand.toUpperCase() === card.brand.toUpperCase() && this.getBaseModel(rc.modelFamily) === this.getBaseModel(card.modelFamily))) {
+          score -= 50.0;
+        }
+
+        return { card, score };
       });
 
-      allCards.sort((a, b) => {
-        const countA = bodyTypeCounts[a.bodyType] || 0;
-        const countB = bodyTypeCounts[b.bodyType] || 0;
-        return countA - countB;
-      });
-
-      return allCards[0];
+      candidatesWithDiversityScore.sort((a, b) => b.score - a.score);
+      selectedCard = candidatesWithDiversityScore[0].card;
     } else {
       // 10-50 cards: Scored and adaptive cards
       const profile = await this.prisma.userVehiclePreferenceProfile.findFirst({
@@ -132,8 +196,9 @@ export class VehicleDiscoveryService {
         orderBy: { updatedAt: 'desc' },
       });
 
-      const scoredCards = allCards.map(card => {
-        let score = 0;
+      const scoredCandidates = candidateCards.map(card => {
+        let relevanceScore = 0;
+
         if (profile) {
           const bodyScores = (profile.bodyTypeScores as Record<string, number>) || {};
           const fuelScores = (profile.fuelTypeScores as Record<string, number>) || {};
@@ -141,42 +206,115 @@ export class VehicleDiscoveryService {
           const brandScores = (profile.brandScores as Record<string, number>) || {};
           const featureScores = (profile.featureScores as Record<string, number>) || {};
 
-          score += bodyScores[card.bodyType] || 0;
-          score += fuelScores[card.fuelType] || 0;
-          score += transScores[card.transmissionType] || 0;
-          score += brandScores[card.brand] || 0;
+          relevanceScore += bodyScores[card.bodyType] || 0;
+          relevanceScore += fuelScores[card.fuelType] || 0;
+          relevanceScore += transScores[card.transmissionType] || 0;
+          relevanceScore += brandScores[card.brand] || 0;
           const cardTags = (card.tags as string[]) || [];
           cardTags.forEach(tag => {
-            score += featureScores[tag] || 0;
+            relevanceScore += featureScores[tag] || 0;
           });
         }
-        return { card, score };
+
+        let penalty = 0;
+
+        // 1. Same brand + modelFamily in last 5 cards: penalty -3.0
+        if (recentCards.some(rc => rc.brand.toUpperCase() === card.brand.toUpperCase() && this.getBaseModel(rc.modelFamily) === this.getBaseModel(card.modelFamily))) {
+          penalty += 3.0;
+        }
+
+        // 2. Same brand + modelFamily + bodyType combination in last 5 cards: strong avoidance
+        if (recentCards.some(rc => rc.brand.toUpperCase() === card.brand.toUpperCase() && this.getBaseModel(rc.modelFamily) === this.getBaseModel(card.modelFamily) && rc.bodyType === card.bodyType)) {
+          penalty += 5.0;
+        }
+
+        // 3. Same bodyType + fuelType + transmissionType combination in last 2 cards: penalty -2.0
+        if (recentCards.slice(0, 2).some(rc => rc.bodyType === card.bodyType && rc.fuelType === card.fuelType && rc.transmissionType === card.transmissionType)) {
+          penalty += 2.0;
+        }
+
+        // 4. Same bodyType in all last 3 cards: penalty -1.5
+        if (recentCards.length >= 3 && recentCards.slice(0, 3).every(rc => rc.bodyType === card.bodyType)) {
+          penalty += 1.5;
+        }
+
+        // 5. Same fuelType in all last 3 cards: penalty -1.2
+        if (recentCards.length >= 3 && recentCards.slice(0, 3).every(rc => rc.fuelType === card.fuelType)) {
+          penalty += 1.2;
+        }
+
+        // 6. Same transmissionType in all last 3 cards: penalty -1.0
+        if (recentCards.length >= 3 && recentCards.slice(0, 3).every(rc => rc.transmissionType === card.transmissionType)) {
+          penalty += 1.0;
+        }
+
+        // 7. Jaccard Tag Similarity with last 3 cards:
+        let maxJaccardSim = 0;
+        const candTags = new Set((card.tags as string[]) || []);
+        
+        recentCards.slice(0, 3).forEach(rc => {
+          const rcTags = new Set((rc.tags as string[]) || []);
+          const intersection = new Set([...candTags].filter(x => rcTags.has(x)));
+          const union = new Set([...candTags, ...rcTags]);
+          const sim = union.size > 0 ? intersection.size / union.size : 0;
+          if (sim > maxJaccardSim) maxJaccardSim = sim;
+        });
+
+        if (maxJaccardSim > 0.80) {
+          penalty += 2.5;
+        } else if (maxJaccardSim > 0.65) {
+          penalty += 1.5;
+        }
+
+        // Strict consecutive duplicate protection
+        if (recentCards.length > 0 && recentCards[0].brand.toUpperCase() === card.brand.toUpperCase() && this.getBaseModel(recentCards[0].modelFamily) === this.getBaseModel(card.modelFamily)) {
+          penalty += 10.0;
+        }
+
+        const finalScore = relevanceScore - penalty;
+        return { card, finalScore };
       });
 
-      if (totalSwipesCount >= 30 && profile) {
-        // 30-50 cards: Conflict resolution (find close category matches and pit them against each other)
+      scoredCandidates.sort((a, b) => b.finalScore - a.finalScore);
+
+      // Conflict resolution for cards 30-50
+      if (totalSwipesCount >= 30 && totalSwipesCount < 50 && profile) {
         const bodyScores = (profile.bodyTypeScores as Record<string, number>) || {};
         const sortedBodies = Object.entries(bodyScores).sort((a, b) => b[1] - a[1]);
         if (sortedBodies.length >= 2) {
           const [body1, score1] = sortedBodies[0];
           const [body2, score2] = sortedBodies[1];
           if (Math.abs(score1 - score2) <= 2.5) {
-            const conflictCards = allCards.filter(c => c.bodyType === body1 || c.bodyType === body2);
-            if (conflictCards.length > 0) {
-              return conflictCards[Math.floor(Math.random() * conflictCards.length)];
+            const lastShownBody = recentCards.length > 0 ? recentCards[0].bodyType : null;
+            const targetBody = lastShownBody === body1 ? body2 : body1;
+            const targetCandidate = scoredCandidates.find(sc => sc.card.bodyType === targetBody);
+            if (targetCandidate) {
+              selectedCard = targetCandidate.card;
             }
           }
         }
       }
 
-      // Epsilon-greedy exploration (70% best match, 30% random)
-      scoredCards.sort((a, b) => b.score - a.score);
-      if (Math.random() < 0.7) {
-        return scoredCards[0].card;
-      } else {
-        return scoredCards[Math.floor(Math.random() * scoredCards.length)].card;
+      if (!selectedCard) {
+        if (Math.random() < 0.8 || scoredCandidates.length < 5) {
+          selectedCard = scoredCandidates[0].card;
+        } else {
+          const topPool = scoredCandidates.slice(0, 5);
+          selectedCard = topPool[Math.floor(Math.random() * topPool.length)].card;
+        }
       }
     }
+
+    // 6. Record Impression in DB so it is never shown twice in this session
+    await this.prisma.vehicleDiscoveryCardImpression.create({
+      data: {
+        sessionId,
+        userId: userId || null,
+        vehicleDiscoveryCardId: selectedCard.id,
+      },
+    });
+
+    return selectedCard;
   }
 
   async recordSwipe(
@@ -365,6 +503,12 @@ export class VehicleDiscoveryService {
       data: { userId },
     });
 
+    // Merge impressions
+    await this.prisma.vehicleDiscoveryCardImpression.updateMany({
+      where: { sessionId, userId: null },
+      data: { userId },
+    });
+
     // Merge profile
     const guestProfile = await this.prisma.userVehiclePreferenceProfile.findUnique({
       where: { sessionId },
@@ -383,6 +527,16 @@ export class VehicleDiscoveryService {
   async resetSession(sessionId: string, userId?: string) {
     // Delete swipes for this session and user
     await this.prisma.userVehiclePreferenceSwipe.deleteMany({
+      where: {
+        OR: [
+          { sessionId },
+          ...(userId ? [{ userId }] : []),
+        ],
+      },
+    });
+
+    // Delete impressions for this session and user
+    await this.prisma.vehicleDiscoveryCardImpression.deleteMany({
       where: {
         OR: [
           { sessionId },
