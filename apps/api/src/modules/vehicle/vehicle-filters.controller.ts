@@ -143,10 +143,10 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
   async getBodyTypes(
-    @Query('brand') brand: string,
+    @Query('brand') brand?: string,
+    @Query('year') year?: string,
     @Query('modelFamily') modelFamily?: string,
     @Query('model') model?: string,
-    @Query('year') year: string,
   ) {
     const targetModel = model || modelFamily;
     if (!brand || !targetModel || !year) {
@@ -178,10 +178,10 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'bodyType', required: false })
   @ApiQuery({ name: 'body_type', required: false })
   async getEngines(
-    @Query('brand') brand: string,
-    @Query('modelFamily') modelFamily: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
+    @Query('brand') brand?: string,
+    @Query('year') year?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
     @Query('bodyType') bodyType?: string,
     @Query('body_type') bodyTypeLegacy?: string,
   ) {
@@ -219,10 +219,10 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'engineVersion', required: false })
   @ApiQuery({ name: 'engine', required: false })
   async getFuelTypes(
-    @Query('brand') brand: string,
-    @Query('modelFamily') modelFamily: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
+    @Query('brand') brand?: string,
+    @Query('year') year?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
     @Query('bodyType') bodyType?: string,
     @Query('body_type') bodyTypeLegacy?: string,
     @Query('engineVersion') engineVersion?: string,
@@ -267,10 +267,10 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'fuelType', required: false })
   @ApiQuery({ name: 'fuel_type', required: false })
   async getTransmissions(
-    @Query('brand') brand: string,
-    @Query('modelFamily') modelFamily: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
+    @Query('brand') brand?: string,
+    @Query('year') year?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
     @Query('bodyType') bodyType?: string,
     @Query('body_type') bodyTypeLegacy?: string,
     @Query('engineVersion') engineVersion?: string,
@@ -322,10 +322,10 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'transmissionType', required: false })
   @ApiQuery({ name: 'transmission_type', required: false })
   async getTrims(
-    @Query('brand') brand: string,
-    @Query('modelFamily') modelFamily: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
+    @Query('brand') brand?: string,
+    @Query('year') year?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
     @Query('bodyType') bodyType?: string,
     @Query('body_type') bodyTypeLegacy?: string,
     @Query('engineVersion') engineVersion?: string,
@@ -371,20 +371,20 @@ export class VehicleFiltersController {
   @Get('match-variant')
   @ApiOperation({ summary: 'Seçilen Tüm Kriterlere Uygun Araç Varyantı Kimliğini Al' })
   async matchVariant(
-    @Query('brand') brand: string,
-    @Query('modelFamily') modelFamily: string,
-    @Query('model') model: string,
-    @Query('year') year: string,
-    @Query('bodyType') bodyType: string,
-    @Query('body_type') bodyTypeLegacy: string,
-    @Query('engineVersion') engineVersion: string,
-    @Query('engine') engineLegacy: string,
-    @Query('fuelType') fuelType: string,
-    @Query('fuel_type') fuelTypeLegacy: string,
-    @Query('trimPackage') trimPackage: string,
-    @Query('trim') trimLegacy: string,
-    @Query('transmissionType') transmissionType: string,
-    @Query('transmission') transmissionLegacy: string,
+    @Query('brand') brand?: string,
+    @Query('modelFamily') modelFamily?: string,
+    @Query('model') model?: string,
+    @Query('year') year?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('body_type') bodyTypeLegacy?: string,
+    @Query('engineVersion') engineVersion?: string,
+    @Query('engine') engineLegacy?: string,
+    @Query('fuelType') fuelType?: string,
+    @Query('fuel_type') fuelTypeLegacy?: string,
+    @Query('trimPackage') trimPackage?: string,
+    @Query('trim') trimLegacy?: string,
+    @Query('transmissionType') transmissionType?: string,
+    @Query('transmission') transmissionLegacy?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
