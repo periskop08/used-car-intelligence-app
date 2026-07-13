@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-// Trigger build: Force Vercel rebuild for cache-busted images
+// Trigger build: Force Vercel rebuild for verified technical specifications
 export default function Home() {
   const router = useRouter();
 
