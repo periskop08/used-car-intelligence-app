@@ -72,7 +72,7 @@ export class VehicleFiltersController {
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
   async getBrands() {
     const variants = await this.prisma.vehicleVariant.findMany({
-      where: { status: 'APPROVED' },
+      where: { status: 'APPROVED', year: { gte: 2000 } },
       select: { brand: { select: { name: true } } },
     });
     // Distinct brands in memory
@@ -94,6 +94,7 @@ export class VehicleFiltersController {
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
+        year: { gte: 2000 },
         brand: { name: { equals: brand, mode: 'insensitive' } },
       },
       select: { model: { select: { name: true } } },
@@ -123,6 +124,7 @@ export class VehicleFiltersController {
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
+        year: { gte: 2000 },
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
       },
