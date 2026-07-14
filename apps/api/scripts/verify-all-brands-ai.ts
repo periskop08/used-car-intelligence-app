@@ -7,8 +7,6 @@ import * as dotenv from 'dotenv';
 // Load environment variables (.env is in apps/api directory)
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-process.env.DATABASE_URL = "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";
-
 const prisma = new PrismaClient();
 
 const openai = new OpenAI({

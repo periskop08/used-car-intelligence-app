@@ -1,3 +1,5 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
 const { PrismaClient } = require("@prisma/client");
 const OpenAI = require("openai");
 const path = require("path");
@@ -8,7 +10,7 @@ require("dotenv").config({ path: path.join(__dirname, "../.env") });
 let prisma = new PrismaClient({
   datasources: {
     db: {
-      url: "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require"
+      url: process.env.DATABASE_URL
     }
   }
 });
@@ -42,7 +44,7 @@ async function handleConnectionError() {
   prisma = new PrismaClient({
     datasources: {
       db: {
-        url: "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require"
+        url: process.env.DATABASE_URL
       }
     }
   });

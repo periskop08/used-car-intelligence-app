@@ -1,4 +1,4 @@
-process.env.DATABASE_URL = "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const { PrismaClient } = require("@prisma/client");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
