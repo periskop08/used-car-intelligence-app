@@ -193,7 +193,7 @@ async function main() {
   let totalAdded = 0;
 
   // Process combinations in parallel batches
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 30;
   for (let i = 0; i < uniqueCombos.length; i += BATCH_SIZE) {
     const batch = uniqueCombos.slice(i, i + BATCH_SIZE);
     
@@ -267,11 +267,11 @@ JSON Schema format:
       const validVariantsList = resultJson.variants;
 
       for (const v of validVariantsList) {
-        const bType = normalizeKey(getBodyTypeName(mapBodyType(v.bodyType)));
-        const eng = normalizeKey(v.engine);
-        const fuel = normalizeKey(getFuelTypeName(mapFuelType(v.fuel)));
-        const trans = normalizeKey(getTransmissionTr(v.transmission));
-        const trim = normalizeKey(v.trim);
+        const bType = normalizeKey(getBodyTypeName(mapBodyType(v.bodyType || 'Sedan')));
+        const eng = normalizeKey(v.engine || '1.6');
+        const fuel = normalizeKey(getFuelTypeName(mapFuelType(v.fuel || 'Benzin')));
+        const trans = normalizeKey(getTransmissionTr(v.transmission || 'Manuel'));
+        const trim = normalizeKey(v.trim || 'Standart');
 
         const key = `${bType}_${eng}_${fuel}_trans_${trim}`;
         validKeysSet.add(key);
@@ -318,11 +318,11 @@ JSON Schema format:
       }
 
       const toAddList = validVariantsList.filter((v: any) => {
-        const bType = normalizeKey(getBodyTypeName(mapBodyType(v.bodyType)));
-        const eng = normalizeKey(v.engine);
-        const fuel = normalizeKey(getFuelTypeName(mapFuelType(v.fuel)));
-        const trans = normalizeKey(getTransmissionTr(v.transmission));
-        const trim = normalizeKey(v.trim);
+        const bType = normalizeKey(getBodyTypeName(mapBodyType(v.bodyType || 'Sedan')));
+        const eng = normalizeKey(v.engine || '1.6');
+        const fuel = normalizeKey(getFuelTypeName(mapFuelType(v.fuel || 'Benzin')));
+        const trans = normalizeKey(getTransmissionTr(v.transmission || 'Manuel'));
+        const trim = normalizeKey(v.trim || 'Standart');
 
         const key = `${bType}_${eng}_${fuel}_trans_${trim}`;
         return !dbKeysSet.has(key);
@@ -351,9 +351,19 @@ JSON Schema format:
 
           let brandId = brandMap.get(brand.toLowerCase());
           if (!brandId) {
-            const newBrand = await prisma.brand.create({ data: { name: brand, isActive: true } });
-            brandId = newBrand.id;
-            brandMap.set(brand.toLowerCase(), brandId);
+            try {
+              const newBrand = await prisma.brand.create({ data: { name: brand, isActive: true } });
+              brandId = newBrand.id;
+              brandMap.set(brand.toLowerCase(), brandId);
+            } catch (err: any) {
+              if (err.code === 'P2002') {
+                const existing = await prisma.brand.findUnique({ where: { name: brand } });
+                brandId = existing!.id;
+                brandMap.set(brand.toLowerCase(), brandId);
+              } else {
+                throw err;
+              }
+            }
           }
 
           const models = await prisma.model.findMany({ where: { brandId } });
@@ -378,60 +388,131 @@ JSON Schema format:
 
           let modelId = modelMap.get(model.toLowerCase());
           if (!modelId) {
-            const newModel = await prisma.model.create({
-              data: { brandId, name: model, startYear: 2000, endYear: 2026 }
-            });
-            modelId = newModel.id;
-            modelMap.set(model.toLowerCase(), modelId);
+            try {
+              const newModel = await prisma.model.create({
+                data: { brandId, name: model, startYear: 2000, endYear: 2026 }
+              });
+              modelId = newModel.id;
+              modelMap.set(model.toLowerCase(), modelId);
+            } catch (err: any) {
+              if (err.code === 'P2002') {
+                const existing = await prisma.model.findUnique({
+                  where: { brandId_name: { brandId, name: model } }
+                });
+                modelId = existing!.id;
+                modelMap.set(model.toLowerCase(), modelId);
+              } else {
+                throw err;
+              }
+            }
           }
 
           for (const v of toAddList) {
-            const bodyTypeEnum = mapBodyType(v.bodyType);
+            const bodyTypeEnum = mapBodyType(v.bodyType || 'Sedan');
             const genName = `${model} Jenerasyonu`;
             
             let genId = genMap.get(`${modelId}_${genName.toLowerCase()}_${bodyTypeEnum}`);
             if (!genId) {
-              const newGen = await prisma.generation.create({
-                data: { modelId, name: genName, startYear: 2000, endYear: 2026, bodyType: bodyTypeEnum }
-              });
-              genId = newGen.id;
-              genMap.set(`${modelId}_${genName.toLowerCase()}_${bodyTypeEnum}`, genId);
-            }
-
-            let engineId = engineMap.get(v.engine.toLowerCase());
-            if (!engineId) {
-              const fuelType = mapFuelType(v.fuel);
-              const horsepower = v.engine.includes('2.0') ? 150 : 110;
-              const torque = Math.round(horsepower * 1.3);
-              const newEngine = await prisma.engine.create({
-                data: {
-                  code: v.engine.substring(0, 30),
-                  displacement: v.engine.includes('2.0') ? 2000 : 1600,
-                  horsepower,
-                  torque,
-                  fuelType,
-                  hasTurbo: v.engine.toLowerCase().includes('t') || v.engine.toLowerCase().includes('turbo')
+              try {
+                const newGen = await prisma.generation.create({
+                  data: { modelId, name: genName, startYear: 2000, endYear: 2026, bodyType: bodyTypeEnum }
+                });
+                genId = newGen.id;
+                genMap.set(`${modelId}_${genName.toLowerCase()}_${bodyTypeEnum}`, genId);
+              } catch (err: any) {
+                if (err.code === 'P2002') {
+                  const existing = await prisma.generation.findFirst({
+                    where: { modelId, name: genName, startYear: 2000, bodyType: bodyTypeEnum }
+                  });
+                  genId = existing!.id;
+                  genMap.set(`${modelId}_${genName.toLowerCase()}_${bodyTypeEnum}`, genId);
+                } else {
+                  throw err;
                 }
-              });
-              engineId = newEngine.id;
-              engineMap.set(v.engine.toLowerCase(), engineId);
+              }
             }
 
-            let transmissionId = transmissionMap.get(v.transmission.toLowerCase());
+            const vEngine = v.engine || '1.6';
+            let engineId = engineMap.get(vEngine.toLowerCase());
+            if (!engineId) {
+              const fuelType = mapFuelType(v.fuel || 'Benzin');
+              const horsepower = vEngine.includes('2.0') ? 150 : 110;
+              const torque = Math.round(horsepower * 1.3);
+              const code = vEngine.substring(0, 30);
+              try {
+                const newEngine = await prisma.engine.create({
+                  data: {
+                    code,
+                    displacement: vEngine.includes('2.0') ? 2000 : 1600,
+                    horsepower,
+                    torque,
+                    fuelType,
+                    hasTurbo: vEngine.toLowerCase().includes('t') || vEngine.toLowerCase().includes('turbo')
+                  }
+                });
+                engineId = newEngine.id;
+                engineMap.set(vEngine.toLowerCase(), engineId);
+              } catch (err: any) {
+                if (err.code === 'P2002') {
+                  const existing = await prisma.engine.findFirst({
+                    where: {
+                      code,
+                      displacement: vEngine.includes('2.0') ? 2000 : 1600,
+                      horsepower,
+                      torque,
+                      fuelType
+                    }
+                  });
+                  engineId = existing!.id;
+                  engineMap.set(vEngine.toLowerCase(), engineId);
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            const vTrans = v.transmission || 'Manuel';
+            let transmissionId = transmissionMap.get(vTrans.toLowerCase());
             if (!transmissionId) {
-              const type = mapTransmissionType(v.transmission);
-              const newTrans = await prisma.transmission.create({
-                data: { name: v.transmission, type, speeds: type === TransmissionType.MANUAL ? 6 : 8 }
-              });
-              transmissionId = newTrans.id;
-              transmissionMap.set(v.transmission.toLowerCase(), transmissionId);
+              const type = mapTransmissionType(vTrans);
+              const speeds = type === TransmissionType.MANUAL ? 6 : 8;
+              try {
+                const newTrans = await prisma.transmission.create({
+                  data: { name: vTrans, type, speeds }
+                });
+                transmissionId = newTrans.id;
+                transmissionMap.set(vTrans.toLowerCase(), transmissionId);
+              } catch (err: any) {
+                if (err.code === 'P2002') {
+                  const existing = await prisma.transmission.findFirst({
+                    where: { name: vTrans, type, speeds }
+                  });
+                  transmissionId = existing!.id;
+                  transmissionMap.set(vTrans.toLowerCase(), transmissionId);
+                } else {
+                  throw err;
+                }
+              }
             }
 
-            let trimId = trimMap.get(v.trim.toLowerCase());
+            const vTrim = v.trim || 'Standart';
+            let trimId = trimMap.get(vTrim.toLowerCase());
             if (!trimId) {
-              const newTrim = await prisma.trim.create({ data: { name: v.trim } });
-              trimId = newTrim.id;
-              trimMap.set(v.trim.toLowerCase(), trimId);
+              try {
+                const newTrim = await prisma.trim.create({ data: { name: vTrim } });
+                trimId = newTrim.id;
+                trimMap.set(vTrim.toLowerCase(), trimId);
+              } catch (err: any) {
+                if (err.code === 'P2002') {
+                  const existing = await prisma.trim.findFirst({
+                    where: { name: vTrim }
+                  });
+                  trimId = existing!.id;
+                  trimMap.set(vTrim.toLowerCase(), trimId);
+                } else {
+                  throw err;
+                }
+              }
             }
 
             try {
@@ -448,7 +529,7 @@ JSON Schema format:
                   yearStart: 2000,
                   yearEnd: 2026,
                   bodyType: bodyTypeEnum,
-                  fuelType: mapFuelType(v.fuel),
+                  fuelType: mapFuelType(v.fuel || 'Benzin'),
                   marketRegion: 'Turkey',
                   status: ApprovalStatus.APPROVED
                 }
