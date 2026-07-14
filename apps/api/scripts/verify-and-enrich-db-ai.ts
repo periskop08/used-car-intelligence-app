@@ -8,6 +8,8 @@ import * as dotenv from 'dotenv';
 // Load environment variables (.env is in apps/api directory)
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
+process.env.DATABASE_URL = "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";
+
 const prisma = new PrismaClient();
 
 const openai = new OpenAI({
@@ -137,35 +139,64 @@ async function main() {
 Your goal is to output a clean, accurate catalog schema for the brand "${targetBrand}" for the Turkish market, covering years 2000 to 2026.
 
 RULES:
-1. Strip suffixes like "Boxer" or "VTi" from the engine code unless they are part of the standard name (e.g. use clean motor capacities like "1.5", "1.6", "2.0", "2.5" instead of "1.5 Boxer" or "2.0 Boxer").
-2. Match high-performance trims like "WRX STi" or "M Sport" or "S Line" to their correct engines (e.g. Subaru Impreza WRX STi must ONLY be mapped to "2.0" or "2.5" engines, never to "1.5" or "1.6" engines!).
-3. Year ranges must be realistic (2000 to 2026).
-4. All text must use standard Turkish title casing for Model and Trim names (e.g. "Wrx Sti" is ok).
-5. Output MUST be a structured JSON object matching the JSON schema below.
+1. CRITICAL: You MUST split each model into its distinct real-world generation codes (e.g., for Golf: 'Golf 5', 'Golf 6', 'Golf 7', 'Golf 8'; for A3: 'A3 (8P)', 'A3 (8V)', 'A3 (8Y)') with their actual startYear and endYear.
+2. Specifications (engines, fuel types, transmission types, and trim packages) vary dramatically by generation. You must NEVER mix specifications across different generations. For example, older trims like 'Ambition' and engines like '1.6' must never appear in the 2020+ generation (8Y), and newer engines like '35 TFSI' must never appear in the 2000-2012 generations. Be extremely precise!
+3. Strip suffixes like "Boxer" or "VTi" from the engine code unless they are part of the standard name (e.g. use clean motor capacities like "1.5", "1.6", "2.0", "2.5" instead of "1.5 Boxer" or "2.0 Boxer").
+4. Year ranges must be realistic (2000 to 2026).
+5. All text must use standard Turkish title casing for Model and Trim names (e.g. "Wrx Sti" is ok).
+6. Output MUST be a structured JSON object matching the JSON schema below.
 
 JSON Schema format:
 {
   "models": [
     {
-      "name": "Impreza",
+      "name": "A3",
       "generations": [
         {
-          "name": "Impreza Jenerasyonu",
-          "startYear": 2000,
+          "name": "A3 (8P)",
+          "startYear": 2003,
+          "endYear": 2012,
+          "bodyTypes": ["Hatchback"],
+          "specs": [
+            {
+              "engine": "1.6",
+              "fuel": "Benzin",
+              "transmission": "Manuel",
+              "trims": ["Attraction", "Ambition"]
+            }
+          ]
+        },
+        {
+          "name": "A3 (8V)",
+          "startYear": 2012,
+          "endYear": 2020,
+          "bodyTypes": ["Sedan", "Hatchback"],
+          "specs": [
+            {
+              "engine": "1.6 TDI",
+              "fuel": "Dizel",
+              "transmission": "Otomatik",
+              "trims": ["Dynamic", "Sport", "Design"]
+            },
+            {
+              "engine": "1.5 TFSI",
+              "fuel": "Benzin",
+              "transmission": "Otomatik",
+              "trims": ["Dynamic", "Sport", "Design"]
+            }
+          ]
+        },
+        {
+          "name": "A3 (8Y)",
+          "startYear": 2020,
           "endYear": 2026,
           "bodyTypes": ["Sedan", "Hatchback"],
           "specs": [
             {
-              "engine": "1.5",
+              "engine": "35 TFSI",
               "fuel": "Benzin",
-              "transmission": "Manuel",
-              "trims": ["Active", "Comfort", "Elegance"]
-            },
-            {
-              "engine": "2.5",
-              "fuel": "Benzin",
-              "transmission": "Manuel",
-              "trims": ["Wrx Sti", "Wrx"]
+              "transmission": "Otomatik",
+              "trims": ["Advanced", "S Line"]
             }
           ]
         }

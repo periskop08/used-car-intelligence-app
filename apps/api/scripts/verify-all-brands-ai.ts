@@ -7,6 +7,8 @@ import * as dotenv from 'dotenv';
 // Load environment variables (.env is in apps/api directory)
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
+process.env.DATABASE_URL = "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";
+
 const prisma = new PrismaClient();
 
 const openai = new OpenAI({
@@ -305,9 +307,7 @@ JSON Schema format:
       const genMap = new Map<string, string>();
       generations.forEach(g => genMap.set(`${g.modelId}_${g.name.toLowerCase()}_${g.bodyType}`, g.id));
 
-      let count = 0;
-      const chunkSize = 200;
-
+      const dataToInsert: any[] = [];
       for (const v of toAdd) {
         let modelId = modelMap.get(v.model.toLowerCase());
         if (!modelId) {
@@ -365,36 +365,43 @@ JSON Schema format:
           trimMap.set(v.trim.toLowerCase(), trimId);
         }
 
-        try {
-          await prisma.vehicleVariant.create({
-            data: {
-              brandId,
-              modelId,
-              generationId: genId,
-              engineId,
-              transmissionId,
-              trimId,
-              countryId,
-              year: v.year,
-              yearStart: 2000,
-              yearEnd: 2026,
-              bodyType: bodyTypeEnum,
-              fuelType: mapFuelType(v.fuel),
-              marketRegion: 'Turkey',
-              status: ApprovalStatus.APPROVED
-            }
-          });
-        } catch (err: any) {
-          if (err.code === 'P2002') {
-            continue;
-          }
-          throw err;
-        }
+        dataToInsert.push({
+          brandId,
+          modelId,
+          generationId: genId,
+          engineId,
+          transmissionId,
+          trimId,
+          countryId,
+          year: v.year,
+          yearStart: 2000,
+          yearEnd: 2026,
+          bodyType: bodyTypeEnum,
+          fuelType: mapFuelType(v.fuel),
+          marketRegion: 'Turkey',
+          status: ApprovalStatus.APPROVED
+        });
+      }
 
-        count++;
-        if (count % chunkSize === 0 || count === toAdd.length) {
+      let count = 0;
+      const insertBatchSize = 50;
+      for (let i = 0; i < dataToInsert.length; i += insertBatchSize) {
+        const batch = dataToInsert.slice(i, i + insertBatchSize);
+        await Promise.all(
+          batch.map(async (data) => {
+            try {
+              await prisma.vehicleVariant.create({ data });
+            } catch (err: any) {
+              if (err.code === 'P2002') {
+                return; // Skip duplicate
+              }
+              throw err;
+            }
+          })
+        );
+        count += batch.length;
+        if (count % 200 === 0 || count === toAdd.length) {
           console.log(`   -> Eklendi: ${count}/${toAdd.length} varyant...`);
-          await new Promise(resolve => setTimeout(resolve, 5));
         }
       }
       console.log(`   [OK] ${toAdd.length} yeni varyant başarıyla eklendi.`);

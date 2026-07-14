@@ -173,7 +173,11 @@ export default function Home() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setYears(res.data.map((item: any) => parseInt(item.value)));
+          const list = res.data.map((item: any) => parseInt(item.value));
+          setYears(list);
+          if (list.length === 1) {
+            setSelectedYear(list[0].toString());
+          }
         }
         setLoadingYears(false);
       })
@@ -206,7 +210,11 @@ export default function Home() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setBodyTypes(res.data.map((item: any) => item.value.toUpperCase()));
+          const list = res.data.map((item: any) => item.value.toUpperCase());
+          setBodyTypes(list);
+          if (list.length === 1) {
+            setSelectedBodyType(list[0]);
+          }
         }
         setLoadingBodyTypes(false);
       })
@@ -237,7 +245,11 @@ export default function Home() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setEngines(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setEngines(list);
+          if (list.length === 1) {
+            setSelectedEngine(list[0]);
+          }
         }
         setLoadingEngines(false);
       })
@@ -301,7 +313,11 @@ export default function Home() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setTransmissions(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setTransmissions(list);
+          if (list.length === 1) {
+            setSelectedTransmission(list[0]);
+          }
         }
         setLoadingTransmissions(false);
       })
@@ -334,6 +350,9 @@ export default function Home() {
           });
           
           setTrims(cleanTrims);
+          if (cleanTrims.length === 1) {
+            setSelectedTrim(cleanTrims[0]);
+          }
           if (cleanTrims.length === 0) {
             setNoTrimFound(true);
           } else {

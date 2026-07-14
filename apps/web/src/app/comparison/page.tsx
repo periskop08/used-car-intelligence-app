@@ -169,7 +169,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setYears1(res.data.map((item: any) => parseInt(item.value)));
+          const list = res.data.map((item: any) => parseInt(item.value));
+          setYears1(list);
+          if (list.length === 1) {
+            setSelectedYear1(list[0].toString());
+          }
         }
         setLoadingYears1(false);
       })
@@ -187,7 +191,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setBodyTypes1(res.data.map((item: any) => item.value.toUpperCase()));
+          const list = res.data.map((item: any) => item.value.toUpperCase());
+          setBodyTypes1(list);
+          if (list.length === 1) {
+            setSelectedBodyType1(list[0]);
+          }
         }
         setLoadingBodyTypes1(false);
       })
@@ -205,7 +213,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setEngines1(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setEngines1(list);
+          if (list.length === 1) {
+            setSelectedEngine1(list[0]);
+          }
         }
         setLoadingEngines1(false);
       })
@@ -223,7 +235,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setFuelTypes1(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setFuelTypes1(list);
+          if (list.length === 1) {
+            setSelectedFuelType1(list[0]);
+          }
         }
         setLoadingFuels1(false);
       })
@@ -241,7 +257,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setTransmissions1(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setTransmissions1(list);
+          if (list.length === 1) {
+            setSelectedTransmission1(list[0]);
+          }
         }
         setLoadingTransmissions1(false);
       })
@@ -260,7 +280,11 @@ export default function ComparisonPage() {
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           const raw = res.data.map((item: any) => item.value);
-          setTrims1(raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim())));
+          const list = raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim()));
+          setTrims1(list);
+          if (list.length === 1) {
+            setSelectedTrim1(list[0]);
+          }
         }
         setLoadingTrims1(false);
       })
@@ -343,7 +367,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setYears2(res.data.map((item: any) => parseInt(item.value)));
+          const list = res.data.map((item: any) => parseInt(item.value));
+          setYears2(list);
+          if (list.length === 1) {
+            setSelectedYear2(list[0].toString());
+          }
         }
         setLoadingYears2(false);
       })
@@ -361,7 +389,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setBodyTypes2(res.data.map((item: any) => item.value.toUpperCase()));
+          const list = res.data.map((item: any) => item.value.toUpperCase());
+          setBodyTypes2(list);
+          if (list.length === 1) {
+            setSelectedBodyType2(list[0]);
+          }
         }
         setLoadingBodyTypes2(false);
       })
@@ -379,7 +411,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setEngines2(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setEngines2(list);
+          if (list.length === 1) {
+            setSelectedEngine2(list[0]);
+          }
         }
         setLoadingEngines2(false);
       })
@@ -397,7 +433,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setFuelTypes2(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setFuelTypes2(list);
+          if (list.length === 1) {
+            setSelectedFuelType2(list[0]);
+          }
         }
         setLoadingFuels2(false);
       })
@@ -415,7 +455,11 @@ export default function ComparisonPage() {
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          setTransmissions2(res.data.map((item: any) => item.value));
+          const list = res.data.map((item: any) => item.value);
+          setTransmissions2(list);
+          if (list.length === 1) {
+            setSelectedTransmission2(list[0]);
+          }
         }
         setLoadingTransmissions2(false);
       })
@@ -434,7 +478,11 @@ export default function ComparisonPage() {
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           const raw = res.data.map((item: any) => item.value);
-          setTrims2(raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim())));
+          const list = raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim()));
+          setTrims2(list);
+          if (list.length === 1) {
+            setSelectedTrim2(list[0]);
+          }
         }
         setLoadingTrims2(false);
       })

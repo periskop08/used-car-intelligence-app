@@ -2,12 +2,19 @@ import { PrismaClient, BodyType, FuelType, TransmissionType, ApprovalStatus } fr
 import * as fs from 'fs';
 import * as path from 'path';
 
+process.env.DATABASE_URL = "postgresql://neondb_owner:npg_e2n8mgMpUHxw@ep-empty-lake-atmq2yyk.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";
+
 const prisma = new PrismaClient();
 
 const CSV_PATH = path.join(__dirname, '../scratch/TorqueScout_Satariz_Verified_Taxonomy_Varyant_DB_2000_2026.csv');
 
 const BRANDS_LIST = [
-  'Citroen'
+  'Renault', 'Fiat', 'Volkswagen', 'Toyota', 'Ford',
+  'Opel', 'Peugeot', 'Hyundai', 'Honda', 'Citroen',
+  'Nissan', 'Skoda', 'Seat', 'Kia', 'Dacia',
+  'Volvo', 'Chevrolet', 'Mazda', 'Suzuki', 'Mitsubishi',
+  'Mini', 'Alfa Romeo', 'Jeep', 'Lexus', 'Cupra',
+  'DS Automobiles', 'Tesla', 'BYD', 'MG', 'Togg', 'Porsche'
 ];
 
 function parseCSVLine(line: string): string[] {
@@ -307,9 +314,7 @@ async function main() {
       const genMap = new Map<string, string>();
       generations.forEach(g => genMap.set(`${g.modelId}_${g.name.toLowerCase()}_${g.bodyType}`, g.id));
 
-      let count = 0;
-      const chunkSize = 250;
-
+      const dataToInsert: any[] = [];
       for (const v of toAdd) {
         let modelId = modelMap.get(v.model.toLowerCase());
         if (!modelId) {
@@ -336,68 +341,97 @@ async function main() {
           const fuelType = mapFuelType(v.fuel);
           const horsepower = v.engine.includes('2.0') ? 150 : v.engine.includes('3.0') ? 220 : 110;
           const torque = Math.round(horsepower * 1.3);
-          const newEngine = await prisma.engine.create({
-            data: {
-              code: v.engine.substring(0, 30),
-              displacement: v.engine.includes('2.0') ? 2000 : v.engine.includes('3.0') ? 3000 : 1600,
-              horsepower,
-              torque,
-              fuelType,
-              hasTurbo: v.engine.toLowerCase().includes('t') || v.engine.toLowerCase().includes('turbo')
+          const code = v.engine.substring(0, 30);
+          const displacement = v.engine.includes('2.0') ? 2000 : v.engine.includes('3.0') ? 3000 : 1600;
+          const hasTurbo = v.engine.toLowerCase().includes('t') || v.engine.toLowerCase().includes('turbo');
+          try {
+            const newEngine = await prisma.engine.create({
+              data: { code, displacement, horsepower, torque, fuelType, hasTurbo }
+            });
+            engineId = newEngine.id;
+          } catch (err: any) {
+            if (err.code === 'P2002') {
+              const existing = await prisma.engine.findFirst({
+                where: { code, displacement, horsepower, torque, fuelType }
+              });
+              engineId = existing!.id;
+            } else {
+              throw err;
             }
-          });
-          engineId = newEngine.id;
+          }
           engineMap.set(v.engine.toLowerCase(), engineId);
         }
 
         let transmissionId = transmissionMap.get(v.transmission.toLowerCase());
         if (!transmissionId) {
           const type = mapTransmissionType(v.transmission);
-          const newTrans = await prisma.transmission.create({
-            data: { name: v.transmission, type, speeds: type === TransmissionType.MANUAL ? 6 : 8 }
-          });
-          transmissionId = newTrans.id;
+          const name = v.transmission;
+          const speeds = type === TransmissionType.MANUAL ? 6 : 8;
+          try {
+            const newTrans = await prisma.transmission.create({
+              data: { name, type, speeds }
+            });
+            transmissionId = newTrans.id;
+          } catch (err: any) {
+            if (err.code === 'P2002') {
+              const existing = await prisma.transmission.findFirst({
+                where: { name, type, speeds }
+              });
+              transmissionId = existing!.id;
+            } else {
+              throw err;
+            }
+          }
           transmissionMap.set(v.transmission.toLowerCase(), transmissionId);
         }
 
         let trimId = trimMap.get(v.trim.toLowerCase());
         if (!trimId) {
-          const newTrim = await prisma.trim.create({ data: { name: v.trim } });
-          trimId = newTrim.id;
+          try {
+            const newTrim = await prisma.trim.create({ data: { name: v.trim } });
+            trimId = newTrim.id;
+          } catch (err: any) {
+            if (err.code === 'P2002') {
+              const existing = await prisma.trim.findFirst({
+                where: { name: v.trim }
+              });
+              trimId = existing!.id;
+            } else {
+              throw err;
+            }
+          }
           trimMap.set(v.trim.toLowerCase(), trimId);
         }
 
-        try {
-          await prisma.vehicleVariant.create({
-            data: {
-              brandId,
-              modelId,
-              generationId: genId,
-              engineId,
-              transmissionId,
-              trimId,
-              countryId,
-              year: v.year,
-              yearStart: 2000,
-              yearEnd: 2026,
-              bodyType: bodyTypeEnum,
-              fuelType: mapFuelType(v.fuel),
-              marketRegion: 'Turkey',
-              status: ApprovalStatus.APPROVED
-            }
-          });
-        } catch (err: any) {
-          if (err.code === 'P2002') {
-            // Silently skip duplicate variants
-            continue;
-          }
-          throw err;
-        }
+        dataToInsert.push({
+          brandId,
+          modelId,
+          generationId: genId,
+          engineId,
+          transmissionId,
+          trimId,
+          countryId,
+          year: v.year,
+          yearStart: 2000,
+          yearEnd: 2026,
+          bodyType: bodyTypeEnum,
+          fuelType: mapFuelType(v.fuel),
+          marketRegion: 'Turkey',
+          status: ApprovalStatus.APPROVED
+        });
+      }
 
-        count++;
-        if (count % chunkSize === 0 || count === toAdd.length) {
+      let count = 0;
+      const createManyChunkSize = 2000;
+      for (let i = 0; i < dataToInsert.length; i += createManyChunkSize) {
+        const chunk = dataToInsert.slice(i, i + createManyChunkSize);
+        await prisma.vehicleVariant.createMany({
+          data: chunk,
+          skipDuplicates: true
+        });
+        count += chunk.length;
+        if (count % 4000 === 0 || count === toAdd.length) {
           console.log(`   -> Eklendi: ${count}/${toAdd.length} varyant...`);
-          await new Promise(resolve => setTimeout(resolve, 5));
         }
       }
       console.log(`   [OK] ${toAdd.length} yeni varyant başarıyla eklendi.`);
