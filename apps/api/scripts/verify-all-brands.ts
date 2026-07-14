@@ -4,7 +4,6 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import { PrismaClient, BodyType, FuelType, TransmissionType, ApprovalStatus } from '@prisma/client';
 import * as fs from 'fs';
-import * as path from 'path';
 
 const prisma = new PrismaClient();
 
