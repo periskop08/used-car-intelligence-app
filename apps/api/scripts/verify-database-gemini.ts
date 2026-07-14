@@ -148,7 +148,7 @@ async function main() {
       apiKey: geminiApiKey,
       baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
     });
-    modelName = "gemini-1.5-pro";
+    modelName = "gemini-flash-latest";
   } else if (openaiApiKey) {
     console.log("🔵 Using OpenAI API...");
     openai = new OpenAI({
@@ -236,18 +236,58 @@ JSON Schema format:
 }`;
 
         try {
-          const completion = await openai.chat.completions.create({
-            model: modelName,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: `Generate the clean automotive configuration list for: ${brand} ${model} (${year})` }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.0
-          });
+          if (geminiApiKey) {
+            // Call Gemini API directly via native HTTP fetch
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+            const prompt = `${systemPrompt}\n\nGenerate the clean automotive configuration list for: ${brand} ${model} (${year})`;
 
-          const rawJson = completion.choices[0].message.content || '{}';
-          resultJson = JSON.parse(rawJson);
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{ text: prompt }]
+                }],
+                generationConfig: {
+                  temperature: 0,
+                  responseMimeType: 'application/json'
+                }
+              })
+            });
+
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error(`Gemini API returned status ${response.status}: ${errText}`);
+            }
+
+            const responseData: any = await response.json();
+            let rawJson = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+            // Strip comments and trailing commas for robust parsing
+            rawJson = rawJson.replace(/\/\/.*/g, '');
+            rawJson = rawJson.replace(/,\s*([\]}])/g, '$1');
+            resultJson = JSON.parse(rawJson);
+          } else {
+            // Fallback to OpenAI API
+            const params: any = {
+              model: modelName,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Generate the clean automotive configuration list for: ${brand} ${model} (${year})` }
+              ],
+              temperature: 0.0,
+              response_format: { type: "json_object" }
+            };
+            const completion = await openai.chat.completions.create(params);
+            let rawJson = completion.choices[0].message.content || '{}';
+            if (rawJson.includes('```')) {
+              rawJson = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+            }
+            rawJson = rawJson.replace(/\/\/.*/g, '');
+            rawJson = rawJson.replace(/,\s*([\]}])/g, '$1');
+            resultJson = JSON.parse(rawJson);
+          }
 
           // Save to cache (using a safe block to write concurrently)
           cache[cacheKey] = resultJson;
