@@ -269,15 +269,15 @@ export class ResearchService {
     }, heartbeatMins * 60 * 1000);
 
     try {
-      // 4. Execute search queries based on variant specs
       const brandName = job.variant.brand.name;
       const modelName = job.variant.model.name;
       const engineCode = job.variant.engine.code;
       const transName = job.variant.transmission.name;
       const year = job.variant.year;
+      const trimName = job.variant.trim?.name || '';
 
-      const query = `${year} ${brandName} ${modelName} ${engineCode} ${transName} problems recalls reliability`;
-      const searchResults = await this.searchProvider.search(query, job.languageCode, job.countryCode);
+      const query = `${year} ${brandName} ${modelName} ${trimName} ${engineCode} ${transName} problems recalls reliability`;
+      const searchResults = await this.searchProvider.search(query.trim(), job.languageCode, job.countryCode);
 
       // Save raw sources
       const rawSources = [];
@@ -333,6 +333,7 @@ export class ResearchService {
           transmissionName: job.variant.transmission.name,
           fuelType: job.variant.fuelType,
           hasTurbo: job.variant.engine.hasTurbo,
+          trimName: job.variant.trim?.name || '',
         }
       );
 

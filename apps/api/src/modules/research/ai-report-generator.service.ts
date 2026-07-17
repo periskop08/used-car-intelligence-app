@@ -261,7 +261,8 @@ Output JSON format only:
   "inspectionChecklist": ["Check item 1", "Check item 2"]
 }`;
 
-    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} (${variant.engine.code}, ${variant.transmission.name}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
+    const trimName = variant.trim?.name || '';
+    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} ${trimName} (${variant.engine.code}, ${variant.transmission.name}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
 Language: ${languageCode === 'tr' ? 'Turkish' : 'English'}
 
 Approved Chronic Problems:

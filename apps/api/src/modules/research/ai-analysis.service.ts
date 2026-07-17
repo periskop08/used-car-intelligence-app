@@ -70,7 +70,7 @@ export class AiAnalysisService {
     year: number,
     sources: Array<{ url: string; title: string; snippet: string }>,
     languageCode: string = 'tr',
-    specs?: { engineCode?: string; transmissionName?: string; fuelType?: string; hasTurbo?: boolean },
+    specs?: { engineCode?: string; transmissionName?: string; fuelType?: string; hasTurbo?: boolean; trimName?: string },
   ): Promise<AIAnalysisOutput> {
     const isProduction = process.env.NODE_ENV === 'production';
     const apiKey = process.env.OPENAI_API_KEY;
@@ -113,7 +113,7 @@ CRITICAL RULES FOR EXTRACTION:
 - You must output strictly valid JSON conforming to the schema.`;
 
     const specsText = specs
-      ? `\nEngine: ${specs.engineCode || 'N/A'} (${specs.fuelType || 'N/A'}, Turbocharged: ${specs.hasTurbo ? 'Yes' : 'No'})\nTransmission: ${specs.transmissionName || 'N/A'}`
+      ? `\nEngine: ${specs.engineCode || 'N/A'} (${specs.fuelType || 'N/A'}, Turbocharged: ${specs.hasTurbo ? 'Yes' : 'No'})\nTransmission: ${specs.transmissionName || 'N/A'}\nTrim (Donanım): ${specs.trimName || 'N/A'}`
       : '';
 
     const userPrompt = `Target vehicle: ${year} ${brandName} ${modelName}${specsText}
