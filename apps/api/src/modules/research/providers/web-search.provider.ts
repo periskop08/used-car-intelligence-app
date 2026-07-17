@@ -99,7 +99,7 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
             { role: 'user', content: systemPrompt },
           ],
           temperature: 0.3,
-          response_format: { type: 'json_object' },
+          response_format: modelName.startsWith('gemini') ? undefined : { type: 'json_object' },
           max_tokens: 4000,
         });
 
@@ -118,7 +118,6 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
               { role: 'user', content: systemPrompt },
             ],
             temperature: 0.3,
-            response_format: { type: 'json_object' },
             max_tokens: 4000,
           });
           text = response.choices[0].message.content || '{"results": []}';

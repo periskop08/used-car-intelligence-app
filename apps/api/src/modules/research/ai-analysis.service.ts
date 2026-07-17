@@ -201,7 +201,7 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
             { role: 'user', content: userPrompt },
           ],
           temperature: 0.1,
-          response_format: { type: 'json_object' },
+          response_format: aiModelName.startsWith('gemini') ? undefined : { type: 'json_object' },
           max_tokens: 4000,
         });
         text = response.choices[0].message.content || '{}';
@@ -220,7 +220,6 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
               { role: 'user', content: userPrompt },
             ],
             temperature: 0.1,
-            response_format: { type: 'json_object' },
             max_tokens: 4000,
           });
           text = response.choices[0].message.content || '{}';
