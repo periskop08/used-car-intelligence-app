@@ -208,7 +208,8 @@ export default function FindMyCarPage() {
         return;
       }
 
-      const card = await res.json();
+      const text = await res.text();
+      const card = text ? JSON.parse(text) : null;
 
       if (!card) {
         if (initiateStateChange) {
