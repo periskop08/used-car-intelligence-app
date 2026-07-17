@@ -383,6 +383,126 @@ export class ListingController {
     }
   }
 
+  @Get('listings/feed')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Reels tarzı dikey İlan Akışı verisi al' })
+  async getListingFeed(
+    @Req() req: Request,
+    @GetUser() user?: UserPayload,
+    @Query('limit') limitStr?: string,
+    @Query('excludeIds') excludeIdsStr?: string,
+    @Query('seed') seed?: string,
+  ) {
+    const limit = parseInt(limitStr || '10', 10);
+    const excludeIds = excludeIdsStr ? excludeIdsStr.split(',').map((x) => x.trim()).filter(Boolean) : [];
+
+    const result = await this.listingService.getListingFeed(limit, excludeIds, seed);
+
+    let favoritedIds = new Set<string>();
+    if (user?.id && result.items.length > 0) {
+      const userFavs = await this.listingService['prisma'].favoriteListing.findMany({
+        where: {
+          userId: user.id,
+          listingId: { in: result.items.map((item) => item.id) },
+        },
+        select: { listingId: true },
+      });
+      favoritedIds = new Set(userFavs.map((f) => f.listingId));
+    }
+
+    const mappedItems = result.items.map((item) => {
+      const formattedMedia = item.media ? this.formatMediaUrls(item.media, req) : [];
+      const photos = formattedMedia.map((m: any) => ({
+        id: m.id,
+        url: m.url,
+        order: m.sortOrder || 0,
+      }));
+
+      const variant = item.vehicleVariant;
+      const specs = variant?.specs;
+
+      const location = {
+        city: item.city,
+        district: item.district || '',
+        neighborhood: '',
+      };
+
+      const displayName = item.seller.firstName && item.seller.lastName
+        ? `${item.seller.firstName} ${item.seller.lastName}`
+        : item.seller.email.split('@')[0];
+
+      const seller = {
+        id: item.sellerId,
+        displayName,
+        memberSince: new Date(item.seller.createdAt).toLocaleDateString('tr-TR', {
+          year: 'numeric',
+          month: 'long',
+        }),
+        avatarUrl: item.seller.profilePhotoUrl || null,
+      };
+
+      const vehicle = {
+        brand: variant?.brand?.name || item.customBrand || '',
+        modelFamily: variant?.model?.name || item.customModel || '',
+        modelName: variant?.model?.name || item.customModel || '',
+        year: item.modelYear,
+        fuelType: item.fuelType || '',
+        transmissionType: item.transmission || '',
+        condition: item.vehicleStatus || 'USED',
+        mileage: item.kilometers,
+        bodyType: item.bodyType || '',
+        enginePower: item.enginePower ? `${item.enginePower} HP` : '',
+        engineCapacity: item.engineDisplacement ? `${item.engineDisplacement} cc` : '',
+        drivetrain: item.drivetrain || '',
+        color: item.color || '',
+        warranty: item.hasWarranty,
+        heavyDamage: item.heavyDamage,
+        plateOrigin: item.plateType || 'TR_PLATE',
+        sellerType: item.sellerType || 'OWNER',
+        exchange: item.exchangeable,
+        trimPackage: variant?.trim?.name || null,
+        engineVersion: variant?.engine?.code || null,
+      };
+
+      const technicalSummary = {
+        maxPower: specs?.maxPowerHp ? `${specs.maxPowerHp} HP` : null,
+        topSpeed: specs?.topSpeedKmh ? `${specs.topSpeedKmh} km/h` : null,
+        acceleration0100: specs?.acceleration0100s ? `${specs.acceleration0100s} sn` : null,
+        fuelConsumption: specs?.fuelConsumptionAvg ? `${specs.fuelConsumptionAvg} lt/100km` : null,
+      };
+
+      const breadcrumb = [
+        'Vasıta',
+        'Otomobil',
+        variant?.brand?.name || '',
+        variant?.model?.name || '',
+      ].filter(Boolean);
+
+      return {
+        id: item.id,
+        title: item.title,
+        price: parseFloat(item.priceAmount.toString()),
+        currency: item.currency,
+        listingDate: new Date(item.publishedAt || item.createdAt).toLocaleDateString('tr-TR'),
+        listingNo: item.id.substring(0, 8).toUpperCase(),
+        location,
+        seller,
+        vehicle,
+        photos,
+        technicalSummary,
+        breadcrumb,
+        isFavorite: favoritedIds.has(item.id),
+        detailUrl: `/listings/${item.id}`,
+      };
+    });
+
+    return {
+      items: mappedItems,
+      hasMore: result.hasMore,
+      nextSeed: result.nextSeed,
+    };
+  }
+
   @Get('listings/:id')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Tek bir ilanı detaylarıyla çek' })

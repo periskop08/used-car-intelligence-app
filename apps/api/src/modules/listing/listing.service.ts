@@ -623,4 +623,155 @@ CRITICAL SAFETY RULES:
     });
     return favorites.map((f) => f.listing);
   }
+
+  async getListingFeed(limit: number, excludeIds?: string[], seed?: string) {
+    const activeSeed = seed || Math.random().toString(36).substring(2, 15);
+    
+    // 1. Fetch Candidate Pool
+    const candidates = await this.prisma.vehicleListing.findMany({
+      where: {
+        status: ListingStatus.ACTIVE,
+        expiresAt: { gt: new Date() },
+        media: {
+          some: {
+            moderationStatus: MediaModerationStatus.APPROVED,
+          },
+        },
+        seller: {
+          isActive: true,
+        },
+        id: excludeIds && excludeIds.length > 0 ? { notIn: excludeIds.slice(0, 100) } : undefined,
+      },
+      take: 100, // Candidate pool limit
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        media: {
+          where: { moderationStatus: MediaModerationStatus.APPROVED },
+          orderBy: { sortOrder: 'asc' },
+        },
+        seller: true,
+        vehicleVariant: {
+          include: {
+            brand: true,
+            model: true,
+            engine: true,
+            transmission: true,
+            trim: true,
+            specs: true,
+          },
+        },
+      },
+    });
+
+    // 2. Validate mandatory fields
+    const validCandidates = candidates.filter((c) => {
+      if (!c.media || c.media.length === 0) return false;
+      const variant = c.vehicleVariant;
+      if (!variant) return false;
+      if (!variant.brand || !variant.brand.name) return false;
+      if (!variant.model || !variant.model.name) return false;
+      if (
+        !c.id ||
+        !c.title ||
+        c.priceAmount === undefined ||
+        c.priceAmount === null ||
+        !c.modelYear ||
+        !c.fuelType ||
+        !c.transmission ||
+        c.kilometers === undefined ||
+        c.kilometers === null ||
+        !c.bodyType ||
+        !c.city ||
+        !c.district
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    // 3. Seeded Random Generator
+    let hash = 0;
+    for (let i = 0; i < activeSeed.length; i++) {
+      hash = activeSeed.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const prng = () => {
+      const x = Math.sin(hash++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    // 4. Score each listing: score = randomWeight + featuredBoost + recentBoost + photoCountBoost
+    const scoredCandidates = validCandidates.map((item) => {
+      let score = prng(); // Random Weight [0, 1]
+      
+      if (item.isFeatured) {
+        score += 1.5; // Featured Boost
+      }
+
+      // Recent Boost: Newer listings get a boost (up to 1.0)
+      const ageInHours = (Date.now() - new Date(item.publishedAt || item.createdAt).getTime()) / (1000 * 60 * 60);
+      const recentBoost = Math.max(0, 1 - ageInHours / 72); // Boost for the first 72 hours
+      score += recentBoost;
+
+      // Photo Count Boost (up to 0.5)
+      const photoCount = item.media?.length || 0;
+      score += Math.min(0.5, photoCount * 0.05);
+
+      return { item, score };
+    });
+
+    // Sort by score descending
+    scoredCandidates.sort((a, b) => b.score - a.score);
+    let sortedItems = scoredCandidates.map((x) => x.item);
+
+    // 5. Apply Diversity Guard
+    const finalItems: any[] = [];
+    const pool = [...sortedItems];
+
+    while (pool.length > 0) {
+      let foundIdx = -1;
+      for (let i = 0; i < pool.length; i++) {
+        const item = pool[i];
+        const prev1 = finalItems[finalItems.length - 1];
+
+        // Son 5 listingId tekrar etmesin
+        const recentIds = finalItems.slice(-5).map((x) => x.id);
+        if (recentIds.includes(item.id)) continue;
+
+        // Son 5'te aynı sellerId en fazla 2 kez olsun
+        const recentSellers = finalItems.slice(-5).filter((x) => x.sellerId === item.sellerId);
+        if (recentSellers.length >= 2) continue;
+
+        // Aynı marka üst üste gelmesin
+        if (prev1 && item.vehicleVariant && prev1.vehicleVariant) {
+          const itemBrandId = item.vehicleVariant.brandId;
+          const prevBrandId = prev1.vehicleVariant.brandId;
+          if (itemBrandId === prevBrandId && pool.length > 1) {
+            continue;
+          }
+        }
+
+        foundIdx = i;
+        break;
+      }
+
+      if (foundIdx === -1) {
+        foundIdx = 0;
+      }
+
+      finalItems.push(pool.splice(foundIdx, 1)[0]);
+    }
+
+    // Slice to limit
+    const items = finalItems.slice(0, limit);
+    const hasMore = finalItems.length > limit;
+
+    return {
+      items,
+      hasMore,
+      nextSeed: activeSeed,
+    };
+  }
 }
+

@@ -92,6 +92,9 @@ export default function Header() {
               <a href="/aracini-bul" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
                 <span>🧭</span> Aracını Bul
               </a>
+              <a href="/kesfet/ilan-akisi" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
+                <span>🎞️</span> İlan Akışı
+              </a>
             </div>
           </div>
         </div>
@@ -345,6 +348,9 @@ export default function Header() {
                     </a>
                     <a href="/aracini-bul" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
                       🧭 Aracını Bul
+                    </a>
+                    <a href="/kesfet/ilan-akisi" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
+                      🎞️ İlan Akışı
                     </a>
                   </div>
                 )}
