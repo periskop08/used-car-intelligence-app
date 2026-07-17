@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Header from "../../../components/Header";
 
 // Env variable for API URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -340,11 +339,8 @@ export default function ListingFeedPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060913] text-white flex flex-col font-sans select-none overflow-hidden">
-      <Header />
-
-      <div className="flex-1 flex justify-center items-center py-4 px-2 md:px-0">
-        <div className="w-full max-w-[440px] h-[calc(100dvh-76px)] bg-[#0b0f19] border border-white/10 rounded-[32px] shadow-2xl relative flex flex-col overflow-hidden">
+    <div className="flex-1 flex justify-center items-center py-6 px-4">
+      <div className="w-full max-w-[540px] h-[calc(100dvh-180px)] min-h-[660px] bg-[#0b0f19] border border-white/10 rounded-[36px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] relative flex flex-col overflow-hidden">
           
           {loading && listings.length === 0 ? (
             <div className="flex-1 flex flex-col justify-center items-center gap-3">
@@ -423,7 +419,7 @@ export default function ListingFeedPage() {
                     </div>
 
                     {/* Compact Image Container with horizontal photo swipe only */}
-                    <div className="relative w-full h-[220px] rounded-2xl overflow-hidden border border-white/10 bg-black/40">
+                    <div className="relative w-full h-[260px] rounded-2xl overflow-hidden border border-white/10 bg-black/40">
                       {item.photos.length > 0 ? (
                         <>
                           <img
@@ -507,7 +503,7 @@ export default function ListingFeedPage() {
                     </div>
 
                     {/* Tab Contents - Compact Height to avoid overflow & scroll conflict */}
-                    <div className="flex-1 h-[140px] bg-black/20 border border-white/5 rounded-xl p-3 my-2 overflow-hidden text-xs">
+                    <div className="flex-1 h-[180px] bg-black/20 border border-white/5 rounded-2xl p-4 my-2 overflow-hidden text-xs">
                       {activeTab === "info" && (
                         <div className="w-full h-full overflow-y-auto pr-1 flex flex-col gap-1 text-[11px] scrollbar-none">
                           <div className="flex justify-between border-b border-white/5 pb-1">
@@ -618,6 +614,5 @@ export default function ListingFeedPage() {
 
         </div>
       </div>
-    </div>
   );
 }
