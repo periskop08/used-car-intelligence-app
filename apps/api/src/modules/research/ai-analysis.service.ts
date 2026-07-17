@@ -234,6 +234,24 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
         checklistsRaw = flattened;
       }
 
+      const validProblemTypes = ['COMMON_PROBLEM', 'USER_COMPLAINT', 'CHECK_POINT', 'SERVICE_NOTE', 'RECALL_RELATED', 'GENERAL_RISK'];
+      const normalizeProblemType = (val: string): string => {
+        const upper = (val || '').toUpperCase();
+        return validProblemTypes.includes(upper) ? upper : 'COMMON_PROBLEM';
+      };
+
+      const validRiskLevels = ['HIGH', 'MEDIUM', 'LOW'];
+      const normalizeRiskLevel = (val: string): string => {
+        const upper = (val || '').toUpperCase();
+        return validRiskLevels.includes(upper) ? upper : 'MEDIUM';
+      };
+
+      const validPriorities = ['HIGH', 'MEDIUM', 'LOW'];
+      const normalizePriority = (val: string): string => {
+        const upper = (val || '').toUpperCase();
+        return validPriorities.includes(upper) ? upper : 'MEDIUM';
+      };
+
       // Map array items to ensure correct fields
       const problems = Array.isArray(problemsRaw)
         ? problemsRaw.map((p: any) => ({
@@ -242,10 +260,10 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
             affectedYears: p.affectedYears || null,
             affectedEngine: p.affectedEngine || null,
             affectedTransmission: p.affectedTransmission || null,
-            riskLevel: p.riskLevel || 'MEDIUM',
+            riskLevel: normalizeRiskLevel(p.riskLevel),
             symptoms: Array.isArray(p.symptoms) ? p.symptoms.join(', ') : (p.symptoms || null),
             checkRecommendation: Array.isArray(p.recommendations) ? p.recommendations.join(', ') : (p.checkRecommendation || null),
-            problemType: p.problemType || 'COMMON_PROBLEM',
+            problemType: normalizeProblemType(p.problemType),
             evidenceText: p.evidenceText || '',
             confidenceContribution: p.confidenceContribution || 0.5,
           }))
@@ -274,8 +292,8 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
             question: q.question || '',
             reason: q.reason || '',
             category: q.category || 'GENERAL',
-            riskLevel: q.riskLevel || 'MEDIUM',
-            priority: q.priority || 'MEDIUM',
+            riskLevel: normalizeRiskLevel(q.riskLevel),
+            priority: normalizePriority(q.priority),
           }))
         : [];
 
@@ -284,8 +302,8 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
             title: c.title || '',
             description: c.description || '',
             category: c.category || 'GENERAL',
-            riskLevel: c.riskLevel || 'MEDIUM',
-            priority: c.priority || 'MEDIUM',
+            riskLevel: normalizeRiskLevel(c.riskLevel),
+            priority: normalizePriority(c.priority),
             sortOrder: typeof c.sortOrder === 'number' ? c.sortOrder : 0,
           }))
         : [];
