@@ -252,6 +252,12 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
         return validPriorities.includes(upper) ? upper : 'MEDIUM';
       };
 
+      const validCategories = ['ENGINE', 'TRANSMISSION', 'ELECTRONICS', 'SUSPENSION', 'BRAKE', 'BODY', 'PAINT', 'INTERIOR', 'TIRES', 'TEST_DRIVE', 'MAINTENANCE', 'DOCUMENTS', 'GENERAL'];
+      const normalizeCategory = (val: string): string => {
+        const upper = (val || '').toUpperCase();
+        return validCategories.includes(upper) ? upper : 'GENERAL';
+      };
+
       // Map array items to ensure correct fields
       const problems = Array.isArray(problemsRaw)
         ? problemsRaw.map((p: any) => ({
@@ -291,7 +297,7 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
         ? sellerQuestionsRaw.map((q: any) => ({
             question: q.question || '',
             reason: q.reason || '',
-            category: q.category || 'GENERAL',
+            category: normalizeCategory(q.category),
             riskLevel: normalizeRiskLevel(q.riskLevel),
             priority: normalizePriority(q.priority),
           }))
@@ -301,7 +307,7 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
         ? checklistsRaw.map((c: any) => ({
             title: c.title || '',
             description: c.description || '',
-            category: c.category || 'GENERAL',
+            category: normalizeCategory(c.category),
             riskLevel: normalizeRiskLevel(c.riskLevel),
             priority: normalizePriority(c.priority),
             sortOrder: typeof c.sortOrder === 'number' ? c.sortOrder : 0,
