@@ -459,6 +459,8 @@ export class ResearchService {
           where: { id: { in: rawSources.map((rs) => rs.id) } },
           data: { status: ApprovalStatus.PENDING },
         });
+      }, {
+        timeout: 30000,
       });
 
       // Calculate cost & duration metrics
