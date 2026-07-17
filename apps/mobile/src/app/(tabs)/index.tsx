@@ -29,13 +29,6 @@ interface Model {
   name: string;
 }
 
-interface Variant {
-  id: string;
-  year: number;
-  engine: { name: string; code: string };
-  transmission: { name: string };
-}
-
 interface Listing {
   id: string;
   title: string;
@@ -64,16 +57,29 @@ export default function MobileDashboard() {
   // Dropdown States
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [variants, setVariants] = useState<Variant[]>([]);
+  const [years, setYears] = useState<string[]>([]);
+  const [bodyTypes, setBodyTypes] = useState<string[]>([]);
+  const [engines, setEngines] = useState<string[]>([]);
+  const [fuelTypes, setFuelTypes] = useState<string[]>([]);
+  const [transmissions, setTransmissions] = useState<string[]>([]);
+  const [trims, setTrims] = useState<string[]>([]);
 
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string>('');
+  const [selectedBodyType, setSelectedBodyType] = useState<string>('');
+  const [selectedEngine, setSelectedEngine] = useState<string>('');
+  const [selectedFuelType, setSelectedFuelType] = useState<string>('');
+  const [selectedTransmission, setSelectedTransmission] = useState<string>('');
+  const [selectedTrim, setSelectedTrim] = useState<string>('');
 
   // Modal States
   const [modalVisible, setModalVisible] = useState(false);
-  const [activeStep, setActiveStep] = useState<'brand' | 'model' | 'variant'>('brand');
+  const [activeStep, setActiveStep] = useState<
+    'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
+  >('brand');
   const [searchText, setSearchText] = useState('');
+  const [matchingVariant, setMatchingVariant] = useState(false);
 
   // Favorites Local State
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
@@ -83,6 +89,86 @@ export default function MobileDashboard() {
     fetchFeaturedListings();
     fetchBrands();
   }, []);
+
+  // Cascading Fetches
+  useEffect(() => {
+    if (selectedBrand) {
+      fetchModels(selectedBrand.id);
+    } else {
+      setModels([]);
+      setSelectedModel(null);
+    }
+  }, [selectedBrand]);
+
+  useEffect(() => {
+    if (selectedBrand && selectedModel) {
+      fetchYears();
+    } else {
+      setYears([]);
+      setSelectedYear('');
+    }
+  }, [selectedBrand, selectedModel]);
+
+  useEffect(() => {
+    if (selectedBrand && selectedModel && selectedYear) {
+      fetchBodyTypes();
+    } else {
+      setBodyTypes([]);
+      setSelectedBodyType('');
+    }
+  }, [selectedBrand, selectedModel, selectedYear]);
+
+  useEffect(() => {
+    if (selectedBrand && selectedModel && selectedYear && selectedBodyType) {
+      fetchEngines();
+    } else {
+      setEngines([]);
+      setSelectedEngine('');
+    }
+  }, [selectedBrand, selectedModel, selectedYear, selectedBodyType]);
+
+  useEffect(() => {
+    if (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine) {
+      fetchFuelTypes();
+    } else {
+      setFuelTypes([]);
+      setSelectedFuelType('');
+    }
+  }, [selectedBrand, selectedModel, selectedYear, selectedBodyType, selectedEngine]);
+
+  useEffect(() => {
+    if (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine && selectedFuelType) {
+      fetchTransmissions();
+    } else {
+      setTransmissions([]);
+      setSelectedTransmission('');
+    }
+  }, [selectedBrand, selectedModel, selectedYear, selectedBodyType, selectedEngine, selectedFuelType]);
+
+  useEffect(() => {
+    if (
+      selectedBrand &&
+      selectedModel &&
+      selectedYear &&
+      selectedBodyType &&
+      selectedEngine &&
+      selectedFuelType &&
+      selectedTransmission
+    ) {
+      fetchTrims();
+    } else {
+      setTrims([]);
+      setSelectedTrim('');
+    }
+  }, [
+    selectedBrand,
+    selectedModel,
+    selectedYear,
+    selectedBodyType,
+    selectedEngine,
+    selectedFuelType,
+    selectedTransmission,
+  ]);
 
   const checkUserSession = async () => {
     try {
@@ -111,8 +197,7 @@ export default function MobileDashboard() {
         const data = await res.json();
         const items = data.listings || data || [];
         setListings(items);
-        
-        // Populate initial favorites status
+
         const favs: Record<string, boolean> = {};
         items.forEach((x: any) => {
           favs[x.id] = x.isFavorite || false;
@@ -150,25 +235,168 @@ export default function MobileDashboard() {
     }
   };
 
-  const fetchVariants = async (modelId: string) => {
+  const fetchYears = async () => {
+    if (!selectedBrand || !selectedModel) return;
     try {
-      const res = await fetch(`${API_URL}/vehicles/variants?modelId=${modelId}`);
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(selectedModel.name)}`
+      );
       if (res.ok) {
         const data = await res.json();
-        setVariants(data);
+        if (data.success) setYears(data.data.map((y: any) => y.value.toString()));
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const openSelector = (step: 'brand' | 'model' | 'variant') => {
+  const fetchBodyTypes = async () => {
+    if (!selectedBrand || !selectedModel || !selectedYear) return;
+    try {
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setBodyTypes(data.data.map((b: any) => b.value));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchEngines = async () => {
+    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType) return;
+    try {
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(
+          selectedModel.name
+        )}&year=${selectedYear}&bodyType=${selectedBodyType}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setEngines(data.data.map((b: any) => b.value));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchFuelTypes = async () => {
+    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine) return;
+    try {
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(
+          selectedModel.name
+        )}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(
+          selectedEngine
+        )}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setFuelTypes(data.data.map((b: any) => b.value));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchTransmissions = async () => {
+    if (
+      !selectedBrand ||
+      !selectedModel ||
+      !selectedYear ||
+      !selectedBodyType ||
+      !selectedEngine ||
+      !selectedFuelType
+    )
+      return;
+    try {
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(
+          selectedModel.name
+        )}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(
+          selectedEngine
+        )}&fuelType=${selectedFuelType}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setTransmissions(data.data.map((b: any) => b.value));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchTrims = async () => {
+    if (
+      !selectedBrand ||
+      !selectedModel ||
+      !selectedYear ||
+      !selectedBodyType ||
+      !selectedEngine ||
+      !selectedFuelType ||
+      !selectedTransmission
+    )
+      return;
+    try {
+      const res = await fetch(
+        `${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(
+          selectedBrand.name
+        )}&modelFamily=${encodeURIComponent(
+          selectedModel.name
+        )}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(
+          selectedEngine
+        )}&fuelType=${selectedFuelType}&transmission=${selectedTransmission}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setTrims(data.data.map((b: any) => b.value));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const openSelector = (
+    step: 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
+  ) => {
     if (step === 'model' && !selectedBrand) {
       alert('Lütfen önce marka seçiniz.');
       return;
     }
-    if (step === 'variant' && !selectedModel) {
+    if (step === 'year' && !selectedModel) {
       alert('Lütfen önce model seçiniz.');
+      return;
+    }
+    if (step === 'bodyType' && !selectedYear) {
+      alert('Lütfen önce model yılı seçiniz.');
+      return;
+    }
+    if (step === 'engine' && !selectedBodyType) {
+      alert('Lütfen önce kasa tipi seçiniz.');
+      return;
+    }
+    if (step === 'fuelType' && !selectedEngine) {
+      alert('Lütfen önce motor seçiniz.');
+      return;
+    }
+    if (step === 'transmission' && !selectedFuelType) {
+      alert('Lütfen önce yakıt türü seçiniz.');
+      return;
+    }
+    if (step === 'trim' && !selectedTransmission) {
+      alert('Lütfen önce şanzıman seçiniz.');
       return;
     }
     setActiveStep(step);
@@ -180,17 +408,47 @@ export default function MobileDashboard() {
     if (activeStep === 'brand') {
       setSelectedBrand(item);
       setSelectedModel(null);
-      setSelectedVariant(null);
-      setModels([]);
-      setVariants([]);
-      fetchModels(item.id);
+      setSelectedYear('');
+      setSelectedBodyType('');
+      setSelectedEngine('');
+      setSelectedFuelType('');
+      setSelectedTransmission('');
+      setSelectedTrim('');
     } else if (activeStep === 'model') {
       setSelectedModel(item);
-      setSelectedVariant(null);
-      setVariants([]);
-      fetchVariants(item.id);
-    } else if (activeStep === 'variant') {
-      setSelectedVariant(item);
+      setSelectedYear('');
+      setSelectedBodyType('');
+      setSelectedEngine('');
+      setSelectedFuelType('');
+      setSelectedTransmission('');
+      setSelectedTrim('');
+    } else if (activeStep === 'year') {
+      setSelectedYear(item.name);
+      setSelectedBodyType('');
+      setSelectedEngine('');
+      setSelectedFuelType('');
+      setSelectedTransmission('');
+      setSelectedTrim('');
+    } else if (activeStep === 'bodyType') {
+      setSelectedBodyType(item.name);
+      setSelectedEngine('');
+      setSelectedFuelType('');
+      setSelectedTransmission('');
+      setSelectedTrim('');
+    } else if (activeStep === 'engine') {
+      setSelectedEngine(item.name);
+      setSelectedFuelType('');
+      setSelectedTransmission('');
+      setSelectedTrim('');
+    } else if (activeStep === 'fuelType') {
+      setSelectedFuelType(item.name);
+      setSelectedTransmission('');
+      setSelectedTrim('');
+    } else if (activeStep === 'transmission') {
+      setSelectedTransmission(item.name);
+      setSelectedTrim('');
+    } else if (activeStep === 'trim') {
+      setSelectedTrim(item.name);
     }
     setModalVisible(false);
   };
@@ -203,43 +461,85 @@ export default function MobileDashboard() {
       return;
     }
     const currentFav = favorites[id];
-    setFavorites(prev => ({ ...prev, [id]: !currentFav }));
+    setFavorites((prev) => ({ ...prev, [id]: !currentFav }));
     try {
       const response = await fetch(`${API_URL}/listings/${id}/favorite`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
       if (!response.ok) throw new Error();
     } catch {
-      setFavorites(prev => ({ ...prev, [id]: currentFav }));
+      setFavorites((prev) => ({ ...prev, [id]: currentFav }));
       alert('Favori işlemi başarısız oldu.');
     }
   };
 
-  const handleAnalyze = () => {
-    if (!selectedVariant) {
-      alert('Lütfen sorgulama yapmak için Marka, Model ve Varyant seçiniz.');
+  const handleAnalyze = async () => {
+    if (
+      !selectedBrand ||
+      !selectedModel ||
+      !selectedYear ||
+      !selectedBodyType ||
+      !selectedEngine ||
+      !selectedFuelType ||
+      !selectedTransmission ||
+      !selectedTrim
+    ) {
+      alert('Lütfen tüm 8 filtre seçimini tamamlayınız.');
       return;
     }
-    router.push({
-      pathname: '/vehicle-report',
-      params: { variantId: selectedVariant.id },
-    });
+
+    setMatchingVariant(true);
+    try {
+      const url = `${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(
+        selectedBrand.name
+      )}&modelFamily=${encodeURIComponent(
+        selectedModel.name
+      )}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(
+        selectedEngine
+      )}&fuelType=${selectedFuelType}&transmission=${selectedTransmission}&trim=${encodeURIComponent(
+        selectedTrim
+      )}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (res.ok && data.success && data.variantId) {
+        router.push({
+          pathname: '/vehicle-report',
+          params: { variantId: data.variantId },
+        });
+      } else {
+        alert('Seçtiğiniz kriterlerde doğrulanmış bir araç varyantı bulunamadı.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Sunucuyla bağlantı kurulurken bir hata oluştu.');
+    } finally {
+      setMatchingVariant(false);
+    }
   };
 
   const getFilteredOptions = () => {
-    const list =
-      activeStep === 'brand'
-        ? brands
-        : activeStep === 'model'
-        ? models
-        : variants.map((v) => ({
-            id: v.id,
-            name: `${v.year} - ${v.engine?.code || v.engine?.name || ''} - ${v.transmission?.name || ''}`,
-          }));
+    let list: any[] = [];
+    if (activeStep === 'brand') {
+      list = brands;
+    } else if (activeStep === 'model') {
+      list = models;
+    } else if (activeStep === 'year') {
+      list = years.map((x) => ({ id: x, name: x }));
+    } else if (activeStep === 'bodyType') {
+      list = bodyTypes.map((x) => ({ id: x, name: x }));
+    } else if (activeStep === 'engine') {
+      list = engines.map((x) => ({ id: x, name: x }));
+    } else if (activeStep === 'fuelType') {
+      list = fuelTypes.map((x) => ({ id: x, name: x }));
+    } else if (activeStep === 'transmission') {
+      list = transmissions.map((x) => ({ id: x, name: x }));
+    } else if (activeStep === 'trim') {
+      list = trims.map((x) => ({ id: x, name: x }));
+    }
 
     if (!searchText) return list;
     return list.filter((item) =>
@@ -254,7 +554,6 @@ export default function MobileDashboard() {
         {/* Speed Lines Header & Menu */}
         <View style={styles.topHeader}>
           <View style={styles.logoRow}>
-            {/* Speed Lines Logo mockup */}
             <View style={styles.speedLogo}>
               <View style={styles.speedBar1} />
               <View style={styles.speedBar2} />
@@ -297,11 +596,11 @@ export default function MobileDashboard() {
           )}
         </View>
 
-        {/* Hızlı Araç Sorgulama Form Card */}
+        {/* Hızlı Araç Sorgulama Form Card - Detailed with 8 cascade filters */}
         <View style={styles.queryCard}>
           <Text style={styles.queryCardTitle}>🔍 Hızlı Araç Sorgulama</Text>
 
-          {/* Brand Row */}
+          {/* 1. Brand Row */}
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Marka</Text>
             <TouchableOpacity style={styles.dropdownTrigger} onPress={() => openSelector('brand')}>
@@ -312,10 +611,14 @@ export default function MobileDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* Model Row */}
+          {/* 2. Model Row */}
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Model</Text>
-            <TouchableOpacity style={styles.dropdownTrigger} onPress={() => openSelector('model')}>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedBrand && styles.dropdownDisabled]}
+              onPress={() => openSelector('model')}
+              disabled={!selectedBrand}
+            >
               <Text style={[styles.dropdownValue, !selectedModel && styles.dropdownPlaceholder]}>
                 {selectedModel ? selectedModel.name : 'Seçiniz...'}
               </Text>
@@ -323,22 +626,103 @@ export default function MobileDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* Variant Row */}
+          {/* 3. Model Yılı Row */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Varyant (Yıl, Motor, Şanzıman)</Text>
-            <TouchableOpacity style={styles.dropdownTrigger} onPress={() => openSelector('variant')}>
-              <Text style={[styles.dropdownValue, !selectedVariant && styles.dropdownPlaceholder]} numberOfLines={1}>
-                {selectedVariant
-                  ? `${selectedVariant.year} - ${selectedVariant.engine?.code || selectedVariant.engine?.name || ''} - ${selectedVariant.transmission?.name || ''}`
-                  : 'Seçiniz...'}
+            <Text style={styles.formLabel}>Model Yılı</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedModel && styles.dropdownDisabled]}
+              onPress={() => openSelector('year')}
+              disabled={!selectedModel}
+            >
+              <Text style={[styles.dropdownValue, !selectedYear && styles.dropdownPlaceholder]}>
+                {selectedYear ? selectedYear : 'Seçiniz...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          {/* 4. Kasa Tipi Row */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Kasa Tipi</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedYear && styles.dropdownDisabled]}
+              onPress={() => openSelector('bodyType')}
+              disabled={!selectedYear}
+            >
+              <Text style={[styles.dropdownValue, !selectedBodyType && styles.dropdownPlaceholder]}>
+                {selectedBodyType ? selectedBodyType : 'Seçiniz...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          {/* 5. Motor Row */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Motor</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedBodyType && styles.dropdownDisabled]}
+              onPress={() => openSelector('engine')}
+              disabled={!selectedBodyType}
+            >
+              <Text style={[styles.dropdownValue, !selectedEngine && styles.dropdownPlaceholder]}>
+                {selectedEngine ? selectedEngine : 'Seçiniz...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          {/* 6. Yakıt Türü Row */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Yakıt Türü</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedEngine && styles.dropdownDisabled]}
+              onPress={() => openSelector('fuelType')}
+              disabled={!selectedEngine}
+            >
+              <Text style={[styles.dropdownValue, !selectedFuelType && styles.dropdownPlaceholder]}>
+                {selectedFuelType ? selectedFuelType : 'Seçiniz...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          {/* 7. Şanzıman Row */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Şanzıman</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedFuelType && styles.dropdownDisabled]}
+              onPress={() => openSelector('transmission')}
+              disabled={!selectedFuelType}
+            >
+              <Text style={[styles.dropdownValue, !selectedTransmission && styles.dropdownPlaceholder]}>
+                {selectedTransmission ? selectedTransmission : 'Seçiniz...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#475569" />
+            </TouchableOpacity>
+          </View>
+
+          {/* 8. Paket Row */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Paket / Trim</Text>
+            <TouchableOpacity
+              style={[styles.dropdownTrigger, !selectedTransmission && styles.dropdownDisabled]}
+              onPress={() => openSelector('trim')}
+              disabled={!selectedTransmission}
+            >
+              <Text style={[styles.dropdownValue, !selectedTrim && styles.dropdownPlaceholder]}>
+                {selectedTrim ? selectedTrim : 'Seçiniz...'}
               </Text>
               <Ionicons name="chevron-down" size={16} color="#475569" />
             </TouchableOpacity>
           </View>
 
           {/* Submit Action */}
-          <TouchableOpacity style={styles.analyzeBtn} onPress={handleAnalyze} activeOpacity={0.8}>
-            <Text style={styles.analyzeBtnText}>Aracı İncele & AI Raporu Al</Text>
+          <TouchableOpacity style={styles.analyzeBtn} onPress={handleAnalyze} activeOpacity={0.8} disabled={matchingVariant}>
+            {matchingVariant ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.analyzeBtnText}>Aracı İncele & AI Raporu Al</Text>
+            )}
           </TouchableOpacity>
 
           {/* Register Prompt */}
@@ -365,7 +749,9 @@ export default function MobileDashboard() {
           ) : listings.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselContainer}>
               {listings.map((item) => {
-                const coverImage = item.media?.[0]?.url || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?q=80&w=600&auto=format&fit=crop';
+                const coverImage =
+                  item.media?.[0]?.url ||
+                  'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?q=80&w=600&auto=format&fit=crop';
                 const isFavorite = favorites[item.id] || false;
 
                 return (
@@ -380,7 +766,11 @@ export default function MobileDashboard() {
                         <Text style={styles.aiBadgeText}>🤖 AI Analizi İlan</Text>
                       </View>
                       <TouchableOpacity style={styles.heartBtn} onPress={() => handleFavoriteToggle(item.id)}>
-                        <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={16} color={isFavorite ? '#ef4444' : '#fff'} />
+                        <Ionicons
+                          name={isFavorite ? 'heart' : 'heart-outline'}
+                          size={16}
+                          color={isFavorite ? '#ef4444' : '#fff'}
+                        />
                       </TouchableOpacity>
                     </View>
 
@@ -465,7 +855,21 @@ export default function MobileDashboard() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {activeStep === 'brand' ? 'Marka Seçin' : activeStep === 'model' ? 'Model Seçin' : 'Varyant Seçin'}
+                {activeStep === 'brand'
+                  ? 'Marka Seçin'
+                  : activeStep === 'model'
+                  ? 'Model Seçin'
+                  : activeStep === 'year'
+                  ? 'Model Yılı Seçin'
+                  : activeStep === 'bodyType'
+                  ? 'Kasa Tipi Seçin'
+                  : activeStep === 'engine'
+                  ? 'Motor Seçin'
+                  : activeStep === 'fuelType'
+                  ? 'Yakıt Türü Seçin'
+                  : activeStep === 'transmission'
+                  ? 'Şanzıman Seçin'
+                  : 'Paket/Trim Seçin'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#f8fafc" />
@@ -511,7 +915,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingTop: 8,
-    paddingBottom: 80, // space for floating menu button
+    paddingBottom: 80,
   },
   topHeader: {
     flexDirection: 'row',
@@ -660,6 +1064,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 12,
+  },
+  dropdownDisabled: {
+    opacity: 0.4,
   },
   dropdownValue: {
     fontSize: 13,
