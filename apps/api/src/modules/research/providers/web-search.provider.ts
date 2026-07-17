@@ -52,21 +52,22 @@ export class WebSearchProvider implements SearchProvider {
       }
     }
 
-    // 2. Fallback: OpenAI Search Grounding (generates realistic search results) or Mock in dev
-    if (!isProduction && !process.env.OPENAI_API_KEY) {
+    // 2. Fallback: OpenAI Search Grounding or Gemini Fallback
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    if (!isProduction && !openaiKey && !geminiApiKey) {
       this.logger.log(`Mocking search results for query: "${query}" in development/test environment.`);
       return this.generateMockResults(query);
     }
 
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      this.logger.error('OPENAI_API_KEY is missing in production.');
-      throw new Error('OpenAI API credentials are missing in production.');
+    if (!openaiKey && !geminiApiKey) {
+      this.logger.error('Both OPENAI_API_KEY and GEMINI_API_KEY are missing.');
+      throw new Error('Search credentials are missing.');
     }
 
     this.logger.log(`Using AI-Powered Search Grounding for query: "${query}"`);
     try {
-      const openai = new OpenAI({ apiKey: openaiKey });
       const systemPrompt = `You are a web search engine retriever. Generate the top 5 highly realistic, accurate search results that would appear on the web (including forums like GolfMK7, Reddit, complaint sites like Şikayetvar, official recall sites, or manufacturer manuals) for the search query: "${query}".
 Return a JSON object containing a "results" array, where each object strictly matches this schema:
 {
@@ -76,17 +77,33 @@ Return a JSON object containing a "results" array, where each object strictly ma
 }
 Ensure the output is strict JSON. Do not include markdown code block formatting (like \`\`\`json).`;
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'user', content: systemPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      });
+      let text = '{"results": []}';
+      if (openaiKey) {
+        try {
+          const openai = new OpenAI({ apiKey: openaiKey });
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'user', content: systemPrompt },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          });
 
-      const text = response.choices[0].message.content || '{"results": []}';
-      this.logger.log(`OpenAI Search Grounding Raw Response: ${text}`);
+          text = response.choices[0].message.content || '{"results": []}';
+          this.logger.log(`OpenAI Search Grounding Raw Response: ${text}`);
+        } catch (err: any) {
+          if (geminiApiKey) {
+            this.logger.error(`OpenAI search grounding failed: ${err.message}. Trying Gemini fallback...`);
+            text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
+          } else {
+            throw err;
+          }
+        }
+      } else if (geminiApiKey) {
+        text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
+      }
+
       const parsed = JSON.parse(text);
       const resultsArray = Array.isArray(parsed.results) ? parsed.results : [];
 
@@ -164,5 +181,37 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       case SourceKind.VIDEO_REVIEW: return 0.3;
       default: return 0.2;
     }
+  }
+
+  private async callGeminiSearch(prompt: string, apiKey: string): Promise<string> {
+    const modelName = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini search grounding returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '{"results": []}';
   }
 }
