@@ -2,9 +2,10 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { GenerateReportDto, AskChatDto } from './report.dto';
-import { FeatureKey, ApprovalStatus, FinalDecision, DataCoverage } from '@prisma/client';
+import { FeatureKey, ApprovalStatus, FinalDecision, DataCoverage, PriorityLevel, ResearchScope } from '@prisma/client';
 import { AiReportGeneratorService } from '../research/ai-report-generator.service';
 import { CoverageService } from '../research/coverage.service';
+import { ResearchService } from '../research/research.service';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class ReportService {
     private featureLimitService: FeatureLimitService,
     private reportGenerator: AiReportGeneratorService,
     private coverageService: CoverageService,
+    private researchService: ResearchService,
   ) {}
 
   async generateReport(userId: string, dto: GenerateReportDto & { force?: boolean }) {
@@ -67,6 +69,22 @@ export class ReportService {
     const hasFullSummary = existingReport && existingReport.summary && typeof existingReport.summary === 'object' && (existingReport.summary as any).summary;
     if (existingReport && existingReport.status === ApprovalStatus.APPROVED && !dto.force && hasFullSummary) {
       return existingReport;
+    }
+
+    if (dto.force) {
+      try {
+        await this.researchService.requestResearch(
+          dto.variantId,
+          userId,
+          lang,
+          'TR',
+          ResearchScope.FULL_REPORT,
+          PriorityLevel.HIGH,
+        );
+        await this.researchService.processNextJob();
+      } catch (err) {
+        console.error('Failed to trigger or process research job in generateReport:', err.message);
+      }
     }
 
     // 4. Count APPROVED related entities (problems, recalls, checklists)
