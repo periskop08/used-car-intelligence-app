@@ -75,6 +75,7 @@ export default function VehicleDetail() {
   // AI report generation states
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState("");
+  const [countdown, setCountdown] = useState<number | null>(null);
   
   // Auth state
   const [user, setUser] = useState<any>(null);
@@ -154,6 +155,19 @@ export default function VehicleDetail() {
     fetchVehicleDetails();
   }, [variantId]);
 
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      setCountdown(null);
+      handleGenerateReport(true);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
   // Toggle Favorite
   const handleToggleFavorite = () => {
     const token = localStorage.getItem("accessToken");
@@ -218,6 +232,9 @@ export default function VehicleDetail() {
       .then(data => {
         setAiReport(data);
         setGeneratingReport(false);
+        if (data.finalDecision === 'INSUFFICIENT_DATA' && countdown === null) {
+          setCountdown(30);
+        }
       })
       .catch(err => {
         setReportError(err.message);
@@ -407,6 +424,42 @@ export default function VehicleDetail() {
                   className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition text-center text-sm"
                 >
                   {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
+                </button>
+              </div>
+            ) : countdown !== null ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center gap-5">
+                <div className="relative flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
+                  <div className="absolute text-lg font-black text-orange-500">{countdown}</div>
+                </div>
+                <div className="flex flex-col gap-2 max-w-md">
+                  <h3 className="text-sm font-bold text-slate-200 animate-pulse">Yapay Zeka Analizi Hazırlanıyor...</h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Bu araç varyantı platformda ilk defa analiz ediliyor. Web taraması, kronik hata arşivleri ve geri çağırma listeleri taranıyor. Lütfen bekleyin, raporunuz hazırlanıyor...
+                  </p>
+                </div>
+                <div className="w-full bg-slate-900 rounded-full h-1.5 dark:bg-slate-800 max-w-xs overflow-hidden">
+                  <div 
+                    className="bg-orange-600 h-1.5 rounded-full transition-all duration-1000 ease-linear" 
+                    style={{ width: `${((30 - countdown) / 30) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            ) : aiReport.finalDecision === 'INSUFFICIENT_DATA' ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
+                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl max-w-md">
+                  <span className="text-2xl mb-2 block">⚠️</span>
+                  <span className="text-xs font-bold text-amber-400 block mb-1">Analiz Tamamlanamadı</span>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Yapay zekamız web taramalarını tamamladı ancak bu araç varyantına dair yeterli miktarda doğrulanmış kronik hata veya servis kaydı bulamadı. Tekrar denemek için güncelleyebilirsiniz.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleGenerateReport(true)}
+                  disabled={generatingReport}
+                  className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-xl transition text-center text-xs"
+                >
+                  {generatingReport ? "Yenileniyor..." : "Yeniden Analiz Et"}
                 </button>
               </div>
             ) : (
