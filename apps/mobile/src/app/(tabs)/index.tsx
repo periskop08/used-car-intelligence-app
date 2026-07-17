@@ -641,80 +641,85 @@ export default function MobileDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* 4. Kasa Tipi Row */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Kasa Tipi</Text>
-            <TouchableOpacity
-              style={[styles.dropdownTrigger, !selectedYear && styles.dropdownDisabled]}
-              onPress={() => openSelector('bodyType')}
-              disabled={!selectedYear}
-            >
-              <Text style={[styles.dropdownValue, !selectedBodyType && styles.dropdownPlaceholder]}>
-                {selectedBodyType ? selectedBodyType : 'Seçiniz...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#475569" />
-            </TouchableOpacity>
-          </View>
+          {/* Show the remaining 5 filters only if Model Yılı is selected */}
+          {!!selectedYear && (
+            <View style={{ gap: 14 }}>
+              {/* 4. Kasa Tipi Row */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Kasa Tipi</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownTrigger, !selectedYear && styles.dropdownDisabled]}
+                  onPress={() => openSelector('bodyType')}
+                  disabled={!selectedYear}
+                >
+                  <Text style={[styles.dropdownValue, !selectedBodyType && styles.dropdownPlaceholder]}>
+                    {selectedBodyType ? selectedBodyType : 'Seçiniz...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
 
-          {/* 5. Motor Row */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Motor</Text>
-            <TouchableOpacity
-              style={[styles.dropdownTrigger, !selectedBodyType && styles.dropdownDisabled]}
-              onPress={() => openSelector('engine')}
-              disabled={!selectedBodyType}
-            >
-              <Text style={[styles.dropdownValue, !selectedEngine && styles.dropdownPlaceholder]}>
-                {selectedEngine ? selectedEngine : 'Seçiniz...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#475569" />
-            </TouchableOpacity>
-          </View>
+              {/* 5. Motor Row */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Motor</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownTrigger, !selectedBodyType && styles.dropdownDisabled]}
+                  onPress={() => openSelector('engine')}
+                  disabled={!selectedBodyType}
+                >
+                  <Text style={[styles.dropdownValue, !selectedEngine && styles.dropdownPlaceholder]}>
+                    {selectedEngine ? selectedEngine : 'Seçiniz...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
 
-          {/* 6. Yakıt Türü Row */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Yakıt Türü</Text>
-            <TouchableOpacity
-              style={[styles.dropdownTrigger, !selectedEngine && styles.dropdownDisabled]}
-              onPress={() => openSelector('fuelType')}
-              disabled={!selectedEngine}
-            >
-              <Text style={[styles.dropdownValue, !selectedFuelType && styles.dropdownPlaceholder]}>
-                {selectedFuelType ? selectedFuelType : 'Seçiniz...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#475569" />
-            </TouchableOpacity>
-          </View>
+              {/* 6. Yakıt Türü Row */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Yakıt Türü</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownTrigger, !selectedEngine && styles.dropdownDisabled]}
+                  onPress={() => openSelector('fuelType')}
+                  disabled={!selectedEngine}
+                >
+                  <Text style={[styles.dropdownValue, !selectedFuelType && styles.dropdownPlaceholder]}>
+                    {selectedFuelType ? selectedFuelType : 'Seçiniz...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
 
-          {/* 7. Şanzıman Row */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Şanzıman</Text>
-            <TouchableOpacity
-              style={[styles.dropdownTrigger, !selectedFuelType && styles.dropdownDisabled]}
-              onPress={() => openSelector('transmission')}
-              disabled={!selectedFuelType}
-            >
-              <Text style={[styles.dropdownValue, !selectedTransmission && styles.dropdownPlaceholder]}>
-                {selectedTransmission ? selectedTransmission : 'Seçiniz...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#475569" />
-            </TouchableOpacity>
-          </View>
+              {/* 7. Şanzıman Row */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Şanzıman</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownTrigger, !selectedFuelType && styles.dropdownDisabled]}
+                  onPress={() => openSelector('transmission')}
+                  disabled={!selectedFuelType}
+                >
+                  <Text style={[styles.dropdownValue, !selectedTransmission && styles.dropdownPlaceholder]}>
+                    {selectedTransmission ? selectedTransmission : 'Seçiniz...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
 
-          {/* 8. Paket Row */}
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Paket / Trim</Text>
-            <TouchableOpacity
-              style={[styles.dropdownTrigger, !selectedTransmission && styles.dropdownDisabled]}
-              onPress={() => openSelector('trim')}
-              disabled={!selectedTransmission}
-            >
-              <Text style={[styles.dropdownValue, !selectedTrim && styles.dropdownPlaceholder]}>
-                {selectedTrim ? selectedTrim : 'Seçiniz...'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#475569" />
-            </TouchableOpacity>
-          </View>
+              {/* 8. Paket Row */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Paket / Trim</Text>
+                <TouchableOpacity
+                  style={[styles.dropdownTrigger, !selectedTransmission && styles.dropdownDisabled]}
+                  onPress={() => openSelector('trim')}
+                  disabled={!selectedTransmission}
+                >
+                  <Text style={[styles.dropdownValue, !selectedTrim && styles.dropdownPlaceholder]}>
+                    {selectedTrim ? selectedTrim : 'Seçiniz...'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#475569" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Submit Action */}
           <TouchableOpacity style={styles.analyzeBtn} onPress={handleAnalyze} activeOpacity={0.8} disabled={matchingVariant}>
