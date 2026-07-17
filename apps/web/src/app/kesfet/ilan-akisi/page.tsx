@@ -340,7 +340,7 @@ export default function ListingFeedPage() {
 
   return (
     <div className="flex-1 flex justify-center items-center py-6 px-4">
-      <div className="w-full max-w-[540px] h-[calc(100dvh-180px)] min-h-[660px] bg-[#0b0f19] border border-white/10 rounded-[36px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)] relative flex flex-col overflow-hidden">
+      <div className="w-full max-w-[430px] md:max-w-[840px] h-[85vh] max-h-[760px] md:h-[580px] bg-[#0b0f19] border border-white/10 rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden select-none">
           
           {loading && listings.length === 0 ? (
             <div className="flex-1 flex flex-col justify-center items-center gap-3">
@@ -384,42 +384,11 @@ export default function ListingFeedPage() {
                     key={item.id}
                     ref={(el) => { cardRefs.current[item.id] = el; }}
                     data-id={item.id}
-                    className="w-full h-full scroll-snap-align-start flex flex-col justify-between p-4 relative"
+                    className="w-full h-full scroll-snap-align-start flex flex-col md:flex-row relative"
                     style={{ scrollSnapAlign: "start", height: "100%" }}
                   >
-                    {/* Top Bar Actions */}
-                    <div className="flex justify-between items-center z-10 pb-2">
-                      <button
-                        onClick={() => { window.location.href = "/"; }}
-                        className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10"
-                      >
-                        ◀
-                      </button>
-                      <span className="text-xs font-black tracking-wider text-slate-400 uppercase">
-                        🎞️ İLAN AKIŞI
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleShare(item)}
-                          className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10"
-                        >
-                          📤
-                        </button>
-                        <button
-                          onClick={() => handleFavoriteToggle(item.id, item)}
-                          className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${
-                            isFav
-                              ? "bg-red-500/20 border-red-500/50 text-red-500"
-                              : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                          }`}
-                        >
-                          {isFav ? "❤️" : "🤍"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Compact Image Container with horizontal photo swipe only */}
-                    <div className="relative w-full h-[260px] rounded-2xl overflow-hidden border border-white/10 bg-black/40">
+                    {/* Left Column: Image Container */}
+                    <div className="w-full md:w-[45%] h-[260px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-black/40">
                       {item.photos.length > 0 ? (
                         <>
                           <img
@@ -427,10 +396,10 @@ export default function ListingFeedPage() {
                             alt={item.title}
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-[10px] font-bold text-slate-300">
+                          <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded bg-black/60 text-[10px] font-bold text-slate-300 z-10">
                             {activePhoto + 1} / {item.photos.length}
                           </div>
-                          {/* Carousel Navigation overlays */}
+                          {/* Carousel Navigation */}
                           {item.photos.length > 1 && (
                             <>
                               <button
@@ -440,7 +409,7 @@ export default function ListingFeedPage() {
                                     [item.id]: Math.max(0, activePhoto - 1),
                                   }))
                                 }
-                                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs"
+                                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs text-white z-10"
                               >
                                 ◀
                               </button>
@@ -451,7 +420,7 @@ export default function ListingFeedPage() {
                                     [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
                                   }))
                                 }
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs text-white z-10"
                               >
                                 ▶
                               </button>
@@ -465,147 +434,176 @@ export default function ListingFeedPage() {
                       )}
                     </div>
 
-                    {/* Listing Title & Location */}
-                    <div className="py-2">
-                      <p className="text-xs font-bold text-slate-200 line-clamp-1">
-                        {item.title.toUpperCase()}
-                      </p>
-                      <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
-                        <span>
-                          👤 {item.seller.displayName} ({item.seller.memberSince})
-                        </span>
-                        <span>
-                          📍 {item.location.city}, {item.location.district}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Breadcrumb */}
-                    <div className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-[10px] font-semibold text-blue-400 whitespace-nowrap overflow-x-auto scrollbar-none">
-                      {item.breadcrumb.join(" > ")}
-                    </div>
-
-                    {/* Glassmorphism Tabs */}
-                    <div className="grid grid-cols-3 gap-1 mt-2">
-                      {(["info", "desc", "loc"] as const).map((tab) => (
+                    {/* Right Column: Details & Actions */}
+                    <div className="flex-1 flex flex-col justify-between p-5 md:p-6 overflow-hidden bg-[#090d1a] h-[calc(100%-260px)] md:h-full">
+                      {/* Top Bar Actions */}
+                      <div className="flex justify-between items-center z-10 pb-2">
                         <button
-                          key={tab}
-                          onClick={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
-                          className={`py-1 text-[10px] font-black rounded-lg border transition-all ${
-                            activeTab === tab
-                              ? "bg-blue-600/20 border-blue-500 text-blue-400"
-                              : "bg-white/5 border-white/5 text-slate-400 hover:text-slate-300"
-                          }`}
+                          onClick={() => { window.location.href = "/"; }}
+                          className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10 text-xs"
                         >
-                          {tab === "info" ? "Özellikler" : tab === "desc" ? "Açıklama" : "Konum"}
+                          ◀
                         </button>
-                      ))}
-                    </div>
-
-                    {/* Tab Contents - Compact Height to avoid overflow & scroll conflict */}
-                    <div className="flex-1 h-[180px] bg-black/20 border border-white/5 rounded-2xl p-4 my-2 overflow-hidden text-xs">
-                      {activeTab === "info" && (
-                        <div className="w-full h-full overflow-y-auto pr-1 flex flex-col gap-1 text-[11px] scrollbar-none">
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">Fiyat</span>
-                            <span className="font-extrabold text-orange-500">
-                              {item.price.toLocaleString("tr-TR")} {item.currency}
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">İlan No</span>
-                            <span className="text-slate-200">{item.listingNo}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">Model Yılı</span>
-                            <span className="text-slate-200">{item.vehicle.year}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">KM</span>
-                            <span className="text-slate-200">
-                              {item.vehicle.mileage.toLocaleString("tr-TR")} km
-                            </span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">Yakıt</span>
-                            <span className="text-slate-200">{item.vehicle.fuelType}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-white/5 pb-1">
-                            <span className="text-slate-400">Vites</span>
-                            <span className="text-slate-200">{item.vehicle.transmissionType}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {activeTab === "desc" && (
-                        <div className="w-full h-full flex flex-col justify-between">
-                          <p className="text-slate-300 italic line-clamp-4 leading-relaxed text-[11px]">
-                            "Bu araç TorqueScout akıllı yapay zeka analizinden başarıyla geçti. Hasar geçmişi ve kronik problemleri sorgulandı."
-                          </p>
-                          <a
-                            href={item.detailUrl}
-                            onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
-                            className="text-[10px] text-orange-400 font-extrabold self-end hover:underline"
+                        <span className="text-[10px] md:text-xs font-black tracking-wider text-slate-400 uppercase">
+                          🎞️ İLAN AKIŞI
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleShare(item)}
+                            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10 text-xs"
                           >
-                            İlan Detayına Git ➔
-                          </a>
-                        </div>
-                      )}
-
-                      {activeTab === "loc" && (
-                        <div className="w-full h-full flex flex-col justify-between">
-                          <div className="text-slate-300 flex flex-col gap-1 text-[11px]">
-                            <p className="font-bold text-white">📍 İlan Konumu</p>
-                            <p>Şehir: {item.location.city}</p>
-                            <p>İlçe: {item.location.district || "Belirtilmemiş"}</p>
-                          </div>
-                          <a
-                            href={item.detailUrl}
-                            onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
-                            className="text-[10px] text-blue-400 font-extrabold self-end hover:underline"
+                            📤
+                          </button>
+                          <button
+                            onClick={() => handleFavoriteToggle(item.id, item)}
+                            className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors text-xs ${
+                              isFav
+                                ? "bg-red-500/20 border-red-500/50 text-red-500"
+                                : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                            }`}
                           >
-                            Haritada Göster ➔
-                          </a>
+                            {isFav ? "❤️" : "🤍"}
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Compact Specs Box */}
-                    <div className="bg-[#141b2c] border border-blue-500/10 rounded-xl p-2 flex justify-between text-[9px] text-slate-300 mb-2">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-500">Güç</span>
-                        <span className="font-bold">{item.technicalSummary.maxPower || "-"}</span>
+                      {/* Title & Seller */}
+                      <div className="mt-1 md:mt-2">
+                        <h2 className="text-xs md:text-sm font-black tracking-tight text-white line-clamp-1">
+                          {item.title.toUpperCase()}
+                        </h2>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+                          <span>👤 {item.seller.displayName}</span>
+                          <span>📍 {item.location.city}, {item.location.district}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-500">Azami Hız</span>
-                        <span className="font-bold">{item.technicalSummary.topSpeed || "-"}</span>
+
+                      {/* Breadcrumb */}
+                      <div className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-[9px] md:text-[10px] text-blue-400 font-semibold mt-2 line-clamp-1">
+                        {item.breadcrumb.join(" > ")}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-500">0-100 km/s</span>
-                        <span className="font-bold">{item.technicalSummary.acceleration0100 || "-"}</span>
+
+                      {/* Tabs */}
+                      <div className="grid grid-cols-3 gap-1 mt-2.5">
+                        {(["info", "desc", "loc"] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
+                            className={`py-1.5 text-[9px] md:text-[10px] font-black rounded-lg border transition-all ${
+                              activeTab === tab
+                                ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                                : "bg-white/5 border-white/5 text-slate-400 hover:text-slate-300"
+                            }`}
+                          >
+                            {tab === "info" ? "Özellikler" : tab === "desc" ? "Açıklama" : "Konum"}
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] text-slate-500">Tüketim</span>
-                        <span className="font-bold">{item.technicalSummary.fuelConsumption || "-"}</span>
+
+                      {/* Tab Content Box - compact scroll */}
+                      <div className="flex-1 min-h-[90px] md:min-h-[120px] bg-black/20 border border-white/5 rounded-xl p-3 my-2 overflow-hidden text-xs">
+                        {activeTab === "info" && (
+                          <div className="w-full h-full overflow-y-auto pr-1 flex flex-col gap-1 text-[10px] md:text-[11px] scrollbar-none">
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">Fiyat</span>
+                              <span className="font-extrabold text-orange-500">
+                                {item.price.toLocaleString("tr-TR")} {item.currency}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">İlan No</span>
+                              <span className="text-slate-200">{item.listingNo}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">Model Yılı</span>
+                              <span className="text-slate-200">{item.vehicle.year}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">KM</span>
+                              <span className="text-slate-200">
+                                {item.vehicle.mileage.toLocaleString("tr-TR")} km
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">Yakıt</span>
+                              <span className="text-slate-200">{item.vehicle.fuelType}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-slate-400">Vites</span>
+                              <span className="text-slate-200">{item.vehicle.transmissionType}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTab === "desc" && (
+                          <div className="w-full h-full flex flex-col justify-between">
+                            <p className="text-slate-300 italic line-clamp-3 md:line-clamp-4 leading-relaxed text-[10px] md:text-[11px]">
+                              "Bu araç TorqueScout akıllı yapay zeka analizinden başarıyla geçti. Hasar geçmişi ve kronik problemleri sorgulandı."
+                            </p>
+                            <a
+                              href={item.detailUrl}
+                              onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
+                              className="text-[9px] md:text-[10px] text-orange-400 font-extrabold self-end hover:underline"
+                            >
+                              İlan Detayına Git ➔
+                            </a>
+                          </div>
+                        )}
+
+                        {activeTab === "loc" && (
+                          <div className="w-full h-full flex flex-col justify-between">
+                            <div className="text-slate-300 flex flex-col gap-1 text-[10px] md:text-[11px]">
+                              <p className="font-bold text-white">📍 İlan Konumu</p>
+                              <p>Şehir: {item.location.city}</p>
+                              <p>İlçe: {item.location.district || "Belirtilmemiş"}</p>
+                            </div>
+                            <a
+                              href={item.detailUrl}
+                              onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
+                              className="text-[9px] md:text-[10px] text-blue-400 font-extrabold self-end hover:underline"
+                            >
+                              Haritada Göster ➔
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Specs */}
+                      <div className="bg-[#141b2c] border border-blue-500/10 rounded-xl p-2 md:p-2.5 flex justify-between text-[9px] text-slate-300 mb-2">
+                        <div className="flex flex-col">
+                          <span className="text-[7px] md:text-[8px] text-slate-500">Güç</span>
+                          <span className="font-bold">{item.technicalSummary.maxPower || "-"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[7px] md:text-[8px] text-slate-500">Azami Hız</span>
+                          <span className="font-bold">{item.technicalSummary.topSpeed || "-"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[7px] md:text-[8px] text-slate-500">0-100 km/s</span>
+                          <span className="font-bold">{item.technicalSummary.acceleration0100 || "-"}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[7px] md:text-[8px] text-slate-500">Tüketim</span>
+                          <span className="font-bold">{item.technicalSummary.fuelConsumption || "-"}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-white/5">
+                        <button
+                          onClick={() => handleCall(item)}
+                          className="flex-1 py-2.5 rounded-xl text-[10px] md:text-xs font-black tracking-wider uppercase bg-[#141b2c] border border-white/10 hover:bg-[#1a233a] transition-all text-slate-200"
+                        >
+                          📞 Arama Başlat
+                        </button>
+                        <button
+                          onClick={() => handleMessage(item)}
+                          className="flex-1 py-2.5 rounded-xl text-[10px] md:text-xs font-black tracking-wider uppercase bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 transition-all text-white shadow-lg shadow-orange-500/15"
+                        >
+                          💬 Mesaj Gönder
+                        </button>
                       </div>
                     </div>
-
-                    {/* Action CTA Buttons */}
-                    <div className="flex gap-2 pt-2 border-t border-white/5">
-                      <button
-                        onClick={() => handleCall(item)}
-                        className="flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase bg-[#141b2c] border border-white/10 hover:bg-[#1a233a] transition-all text-slate-200"
-                      >
-                        📞 Arama Başlat
-                      </button>
-                      <button
-                        onClick={() => handleMessage(item)}
-                        className="flex-1 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 transition-all text-white shadow-lg shadow-orange-500/15"
-                      >
-                        💬 Mesaj Gönder
-                      </button>
-                    </div>
-
                   </div>
                 );
               })}
