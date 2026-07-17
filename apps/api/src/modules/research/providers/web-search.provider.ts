@@ -66,19 +66,7 @@ export class WebSearchProvider implements SearchProvider {
       throw new Error('Search credentials are missing.');
     }
 
-    let openai: OpenAI;
-    let modelName = 'gpt-4o-mini';
-
-    if (openaiKey) {
-      openai = new OpenAI({ apiKey: openaiKey });
-      modelName = 'gpt-4o-mini';
-    } else {
-      openai = new OpenAI({
-        apiKey: geminiApiKey,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-      });
-      modelName = 'gemini-flash-latest';
-    }
+    const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
 
     this.logger.log(`Using AI-Powered Search Grounding for query: "${query}"`);
     try {
@@ -92,39 +80,29 @@ Return a JSON object containing a "results" array, where each object strictly ma
 Ensure the output is strict JSON. Do not include markdown code block formatting (like \`\`\`json).`;
 
       let text = '{"results": []}';
-      try {
-        const response = await openai.chat.completions.create({
-          model: modelName,
-          messages: [
-            { role: 'user', content: systemPrompt },
-          ],
-          temperature: 0.3,
-          response_format: modelName.startsWith('gemini') ? undefined : { type: 'json_object' },
-          max_tokens: 4000,
-        });
-
-        text = response.choices[0].message.content || '{"results": []}';
-        this.logger.log(`AI Search Grounding Raw Response: ${text}`);
-      } catch (err: any) {
-        if (openaiKey && geminiApiKey) {
-          this.logger.error(`OpenAI Search Grounding failed: ${err.message}. Trying Gemini fallback...`);
-          const geminiOpenai = new OpenAI({
-            apiKey: geminiApiKey,
-            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-          });
-          const response = await geminiOpenai.chat.completions.create({
-            model: 'gemini-flash-latest',
+      if (openai) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
             messages: [
               { role: 'user', content: systemPrompt },
             ],
             temperature: 0.3,
-            max_tokens: 4000,
+            response_format: { type: 'json_object' },
           });
+
           text = response.choices[0].message.content || '{"results": []}';
-          this.logger.log(`Gemini Fallback Search Grounding Raw Response: ${text}`);
-        } else {
-          throw err;
+          this.logger.log(`AI Search Grounding Raw Response: ${text}`);
+        } catch (err: any) {
+          if (geminiApiKey) {
+            this.logger.error(`OpenAI Search Grounding failed: ${err.message}. Trying Gemini fallback...`);
+            text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
+          } else {
+            throw err;
+          }
         }
+      } else {
+        text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
       }
 
       const cleanedText = this.cleanJsonString(text);
@@ -237,5 +215,37 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       }
     }
     return escaped;
+  }
+
+  private async callGeminiSearch(prompt: string, apiKey: string): Promise<string> {
+    const modelName = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini search grounding returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '{"results": []}';
   }
 }

@@ -86,19 +86,7 @@ export class AiAnalysisService {
       throw new Error('AI analysis service is not configured.');
     }
 
-    let openai: OpenAI;
-    let aiModelName = 'gpt-4o-mini';
-
-    if (apiKey) {
-      openai = new OpenAI({ apiKey });
-      aiModelName = 'gpt-4o-mini';
-    } else {
-      openai = new OpenAI({
-        apiKey: geminiApiKey,
-        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-      });
-      aiModelName = 'gemini-flash-latest';
-    }
+    const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
     const sourcesText = sources
       .map((s, index) => `[Source ${index + 1}]\nURL: ${s.url}\nTitle: ${s.title}\nExcerpt: ${s.snippet}\n`)
@@ -193,40 +181,29 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
 
     try {
       let text = '{}';
-      try {
-        const response = await openai.chat.completions.create({
-          model: aiModelName,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.1,
-          response_format: aiModelName.startsWith('gemini') ? undefined : { type: 'json_object' },
-          max_tokens: 4000,
-        });
-        text = response.choices[0].message.content || '{}';
-        this.logger.log(`AI Raw Response: ${text}`);
-      } catch (err: any) {
-        if (apiKey && geminiApiKey) {
-          this.logger.error(`OpenAI failed: ${err.message}. Trying Gemini fallback...`);
-          const geminiOpenai = new OpenAI({
-            apiKey: geminiApiKey,
-            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-          });
-          const response = await geminiOpenai.chat.completions.create({
-            model: 'gemini-flash-latest',
+      if (openai) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt },
             ],
             temperature: 0.1,
-            max_tokens: 4000,
+            response_format: { type: 'json_object' },
           });
           text = response.choices[0].message.content || '{}';
-          this.logger.log(`Gemini Fallback Raw Response: ${text}`);
-        } else {
-          throw err;
+          this.logger.log(`AI Raw Response: ${text}`);
+        } catch (err: any) {
+          if (geminiApiKey) {
+            this.logger.error(`OpenAI failed: ${err.message}. Trying Gemini fallback...`);
+            text = await this.callGemini(systemPrompt, userPrompt);
+          } else {
+            throw err;
+          }
         }
+      } else {
+        text = await this.callGemini(systemPrompt, userPrompt);
       }
       const cleanedText = this.cleanJsonString(text);
       const parsed = JSON.parse(cleanedText);
@@ -443,5 +420,48 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
       }
     }
     return escaped;
+  }
+
+  private async callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      throw new Error('Neither OPENAI_API_KEY nor GEMINI_API_KEY is available.');
+    }
+
+    const modelName = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt + "\n\n" + userPrompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+      throw new Error('Gemini API returned empty contents');
+    }
+
+    this.logger.log(`Gemini Native Raw Response: ${candidateText}`);
+    return candidateText;
   }
 }
