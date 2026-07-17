@@ -71,46 +71,6 @@ export class AiReportGeneratorService {
     }
     const coverageScore = this.coverageService.calculateCoverageScore(approvedSources);
 
-    // 4. Check if there are no approved items (NONE or LIMITED with 0 count)
-    if (totalApprovedCount === 0) {
-      // Return a basic warning report without invoking AI (cost saving and no hallucination)
-      const report = await this.prisma.aiVehicleReport.upsert({
-        where: { variantId_languageCode: { variantId, languageCode } },
-        create: {
-          variantId,
-          languageCode,
-          summary: {
-            title: languageCode === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            message: languageCode === 'tr'
-              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.'
-              : 'No approved chronic problems or recall records found for this vehicle variant.',
-          },
-          riskScore: 0,
-          buyabilityScore: 0,
-          finalDecision: FinalDecision.INSUFFICIENT_DATA,
-          dataCoverage: DataCoverage.NONE,
-          coverageScore: 0,
-          status: ApprovalStatus.APPROVED,
-          generatedAt: new Date(),
-        },
-        update: {
-          summary: {
-            title: languageCode === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            message: languageCode === 'tr'
-              ? 'Bu araç varyantı için onaylanmış detaylı kronik sorun veya geri çağırma kaydı bulunmamaktadır.'
-              : 'No approved chronic problems or recall records found for this vehicle variant.',
-          },
-          riskScore: 0,
-          buyabilityScore: 0,
-          finalDecision: FinalDecision.INSUFFICIENT_DATA,
-          dataCoverage: DataCoverage.NONE,
-          coverageScore: 0,
-          status: ApprovalStatus.APPROVED,
-          generatedAt: new Date(),
-        },
-      });
-      return report;
-    }
 
     // 5. Generate structured report using AI or Mock
     const apiKey = process.env.OPENAI_API_KEY;
@@ -315,49 +275,56 @@ ${checklistText}
 
 Generate the summarized report JSON.`;
 
-    const modelName = 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
+    let lastError: Error | null = null;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: systemPrompt + "\n\n" + userPrompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json"
+    for (const modelName of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt + "\n\n" + userPrompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Gemini model ${modelName} returned status ${response.status}: ${errText}`);
         }
-      })
-    });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini report compiler returned status ${response.status}: ${errText}`);
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        return JSON.parse(this.cleanJsonString(text));
+      } catch (err: any) {
+        lastError = err;
+        this.logger.warn(`Gemini model ${modelName} failed inside invokeReportGemini: ${err.message}. Trying next model...`);
+      }
     }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    return JSON.parse(this.cleanJsonString(text));
+    throw lastError || new Error('All Gemini models failed inside invokeReportGemini');
   }
 
   private cleanJsonString(str: string): string {
     let cleaned = str.trim();
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.substring(7);
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(3);
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.substring(0, cleaned.length - 3);
-    }
-    cleaned = cleaned.trim();
 
     let inString = false;
     let escaped = '';

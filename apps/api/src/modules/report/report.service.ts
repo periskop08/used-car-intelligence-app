@@ -100,57 +100,6 @@ export class ReportService {
 
     const totalApprovedCount = approvedProblemsCount + approvedRecallsCount + approvedChecklistsCount;
 
-    if (totalApprovedCount === 0) {
-      // 0 APPROVED records -> dataCoverage NONE
-      const report = await this.prisma.aiVehicleReport.upsert({
-        where: {
-          variantId_languageCode: {
-            variantId: dto.variantId,
-            languageCode: lang,
-          },
-        },
-        create: {
-          variantId: dto.variantId,
-          languageCode: lang,
-          summary: {
-            title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            summary: lang === 'tr' 
-              ? 'Bu araç varyantı için onaylanmış detaylı bir satın alma veya geri çağırma kaydı bulunmamaktadır.' 
-              : 'No approved chronic problems or recall records found for this vehicle variant.',
-            shouldBuyComment: lang === 'tr'
-              ? 'Araç hakkında yeterli veri bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
-              : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
-          },
-          riskScore: 0,
-          buyabilityScore: 0,
-          finalDecision: FinalDecision.INSUFFICIENT_DATA,
-          dataCoverage: DataCoverage.NONE,
-          coverageScore: 0,
-          status: ApprovalStatus.APPROVED,
-          generatedAt: new Date(),
-        },
-        update: {
-          summary: {
-            title: lang === 'tr' ? 'Veri Kapsamı Yetersiz' : 'Insufficient Data Coverage',
-            summary: lang === 'tr' 
-              ? 'Bu araç varyantı için onaylanmış detaylı bir satın alma veya geri çağırma kaydı bulunmamaktadır.' 
-              : 'No approved chronic problems or recall records found for this vehicle variant.',
-            shouldBuyComment: lang === 'tr'
-              ? 'Araç hakkında yeterli veri bulunmadığı için yapay zeka tarafından satın alma tavsiyesi oluşturulamadı.'
-              : 'AI purchase advice could not be generated due to insufficient chronic problem and service data.',
-          },
-          riskScore: 0,
-          buyabilityScore: 0,
-          finalDecision: FinalDecision.INSUFFICIENT_DATA,
-          dataCoverage: DataCoverage.NONE,
-          coverageScore: 0,
-          status: ApprovalStatus.APPROVED,
-          generatedAt: new Date(),
-        },
-      });
-
-      return report;
-    }
 
     // 5. Generate and cache report if approved data exists
     const report = await this.reportGenerator.generateReportCache(dto.variantId, lang);
@@ -184,16 +133,30 @@ export class ReportService {
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
     let response = '';
 
-    if (!apiKey) {
+    if (!apiKey && !geminiApiKey) {
       // Dynamic fallback mock if key not set
       const problemNames = variant.problems.map(p => p.title).join(', ');
       response = `Bu araç (${variant.brand.name} ${variant.model.name} ${variant.generation?.name || ''}) için onaylanmış sorunlar arasında ${
         problemNames || 'herhangi bir kritik kronik sorun bulunmamaktadır'
       }. Detaylı bilgi için teknik raporu inceleyebilirsiniz.`;
     } else {
-      const openai = new OpenAI({ apiKey });
+      let openai: OpenAI;
+      let modelName = 'gpt-4o-mini';
+
+      if (apiKey) {
+        openai = new OpenAI({ apiKey });
+        modelName = 'gpt-4o-mini';
+      } else {
+        openai = new OpenAI({
+          apiKey: geminiApiKey,
+          baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+        });
+        modelName = 'gemini-flash-latest';
+      }
+
       const problemsText = variant.problems
         .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
         .join('\n');
@@ -214,7 +177,7 @@ Answer the user's question accurately based on this data. Do not hallucinate ext
 
       try {
         const aiResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: modelName,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: dto.question }
@@ -224,7 +187,28 @@ Answer the user's question accurately based on this data. Do not hallucinate ext
 
         response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
       } catch (err: any) {
-        response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+        if (apiKey && geminiApiKey) {
+          console.error(`OpenAI chat failed: ${err.message}. Trying Gemini fallback...`);
+          try {
+            const geminiOpenai = new OpenAI({
+              apiKey: geminiApiKey,
+              baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+            });
+            const aiResponse = await geminiOpenai.chat.completions.create({
+              model: 'gemini-flash-latest',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: dto.question }
+              ],
+              temperature: 0.7,
+            });
+            response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
+          } catch (geminiErr: any) {
+            response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}. Gemini hatası: ${geminiErr.message}`;
+          }
+        } else {
+          response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+        }
       }
     }
 

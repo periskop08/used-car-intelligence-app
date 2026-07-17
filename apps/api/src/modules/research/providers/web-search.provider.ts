@@ -187,15 +187,11 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
 
   private cleanJsonString(str: string): string {
     let cleaned = str.trim();
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.substring(7);
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(3);
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.substring(0, cleaned.length - 3);
-    }
-    cleaned = cleaned.trim();
 
     let inString = false;
     let escaped = '';
@@ -218,34 +214,45 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
   }
 
   private async callGeminiSearch(prompt: string, apiKey: string): Promise<string> {
-    const modelName = 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
+    let lastError: Error | null = null;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json"
+    for (const modelName of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Gemini model ${modelName} returned status ${response.status}: ${errText}`);
         }
-      })
-    });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini search grounding returned status ${response.status}: ${errText}`);
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '{"results": []}';
+      } catch (err: any) {
+        lastError = err;
+        this.logger.warn(`Gemini model ${modelName} failed inside callGeminiSearch: ${err.message}. Trying next model...`);
+      }
     }
 
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '{"results": []}';
+    throw lastError || new Error('All Gemini models failed inside callGeminiSearch');
   }
 }
