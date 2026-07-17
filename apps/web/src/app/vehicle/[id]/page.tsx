@@ -464,6 +464,19 @@ export default function VehicleDetail() {
               </div>
             ) : (
               <div className="flex flex-col gap-5">
+                {/* Trim Package Compatibility Warning */}
+                {aiReport.summary.trimWarning && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-start gap-3">
+                    <span className="text-xl">⚠️</span>
+                    <div className="flex-1">
+                      <span className="font-bold text-amber-400 block mb-1 text-xs">Donanım Paketi Uyumsuzluğu Uyarısı:</span>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {aiReport.summary.trimWarning}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Score indicators */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                   <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
