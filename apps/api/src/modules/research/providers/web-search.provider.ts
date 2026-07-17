@@ -128,7 +128,8 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
         }
       }
 
-      const parsed = JSON.parse(text);
+      const cleanedText = this.cleanJsonString(text);
+      const parsed = JSON.parse(cleanedText);
       const resultsArray = Array.isArray(parsed.results) ? parsed.results : [];
 
       return resultsArray.map((item: any) => {
@@ -205,5 +206,37 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       case SourceKind.VIDEO_REVIEW: return 0.3;
       default: return 0.2;
     }
+  }
+
+  private cleanJsonString(str: string): string {
+    let cleaned = str.trim();
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.substring(7);
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.substring(3);
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3);
+    }
+    cleaned = cleaned.trim();
+
+    let inString = false;
+    let escaped = '';
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (char === '"' && (i === 0 || cleaned[i - 1] !== '\\')) {
+        inString = !inString;
+        escaped += char;
+      } else if (inString && char === '\n') {
+        escaped += '\\n';
+      } else if (inString && char === '\r') {
+        escaped += '\\r';
+      } else if (inString && char === '\t') {
+        escaped += '\\t';
+      } else {
+        escaped += char;
+      }
+    }
+    return escaped;
   }
 }
