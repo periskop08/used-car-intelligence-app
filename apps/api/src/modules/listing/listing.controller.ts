@@ -882,7 +882,7 @@ export class ListingController {
     const baseProxyUrl = `${protocol}://${host}/listings/media-proxy`;
 
     return mediaList.map((m) => {
-      if (m.storageKey) {
+      if (m.storageKey && !m.url?.startsWith('http')) {
         return {
           ...m,
           url: `${baseProxyUrl}/${m.storageKey}`,

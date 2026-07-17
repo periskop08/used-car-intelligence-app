@@ -367,12 +367,7 @@ export default function ListingFeedPage() {
           ) : (
             <div
               ref={containerRef}
-              className="flex-1 overflow-y-scroll scroll-snap-y-mandatory"
-              style={{
-                scrollSnapType: "y mandatory",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
+              className="flex-1 overflow-y-auto snap-y snap-mandatory scrollbar-none"
             >
               {listings.map((item, index) => {
                 const activeTab = activeTabs[item.id] || "info";
@@ -384,8 +379,7 @@ export default function ListingFeedPage() {
                     key={item.id}
                     ref={(el) => { cardRefs.current[item.id] = el; }}
                     data-id={item.id}
-                    className="w-full h-full scroll-snap-align-start flex flex-col md:flex-row relative"
-                    style={{ scrollSnapAlign: "start", height: "100%" }}
+                    className="w-full h-full snap-start flex-none flex flex-col md:flex-row relative"
                   >
                     {/* Left Column: Image Container */}
                     <div className="w-full md:w-[45%] h-[260px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-black/40">
