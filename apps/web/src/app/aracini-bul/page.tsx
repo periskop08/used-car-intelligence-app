@@ -442,6 +442,26 @@ export default function FindMyCarPage() {
                   <span>Yeni Keşif Başlat</span>
                 </button>
               </div>
+            ) : swipesCount >= 30 ? (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={startDiscovery}
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-orange-500/15 hover:shadow-orange-500/25 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
+                >
+                  <span>
+                    {swipesCount >= 50
+                      ? "Tercih Raporunu Görüntüle"
+                      : `Değerlendirmeye Devam Et (${swipesCount} / 50)`}
+                  </span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={resetDiscovery}
+                  className="w-full bg-white/5 hover:bg-white/10 text-slate-300 font-semibold py-3.5 px-6 rounded-2xl border border-white/10 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Seçimlerimi Sıfırla ve Yeni Keşif Başlat</span>
+                </button>
+              </div>
             ) : (
               <button
                 onClick={startDiscovery}
@@ -738,6 +758,14 @@ export default function FindMyCarPage() {
                   <span>20 Araç Daha Değerlendir</span>
                 </button>
               )}
+
+              <button
+                onClick={resetDiscovery}
+                className="w-full bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3.5 px-6 rounded-2xl border border-white/5 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                <span>Seçimleri Sıfırla ve Yeniden Başla</span>
+              </button>
             </div>
           </div>
         )}
