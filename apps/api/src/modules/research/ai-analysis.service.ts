@@ -74,18 +74,19 @@ export class AiAnalysisService {
   ): Promise<AIAnalysisOutput> {
     const isProduction = process.env.NODE_ENV === 'production';
     const apiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
 
-    if (!isProduction && !apiKey) {
-      this.logger.log('Mocking AI analysis results in development/test environment (no OPENAI_API_KEY).');
+    if (!isProduction && !apiKey && !geminiApiKey) {
+      this.logger.log('Mocking AI analysis results in development/test environment (no API keys).');
       return this.generateMockAnalysis();
     }
 
-    if (!apiKey) {
-      this.logger.error('OPENAI_API_KEY is missing in production.');
-      throw new Error('AI analysis service is not configured in production.');
+    if (!apiKey && !geminiApiKey) {
+      this.logger.error('Both OPENAI_API_KEY and GEMINI_API_KEY are missing.');
+      throw new Error('AI analysis service is not configured.');
     }
 
-    const openai = new OpenAI({ apiKey });
+    const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
     const sourcesText = sources
       .map((s, index) => `[Source ${index + 1}]\nURL: ${s.url}\nTitle: ${s.title}\nExcerpt: ${s.snippet}\n`)
@@ -179,18 +180,27 @@ Generate a JSON object matching this exact schema:
 Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`json) in your raw response.`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      });
-
-      const text = response.choices[0].message.content || '{}';
-      this.logger.log(`OpenAI Raw Response: ${text}`);
+      let text = '{}';
+      if (openai) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+          });
+          text = response.choices[0].message.content || '{}';
+          this.logger.log(`OpenAI Raw Response: ${text}`);
+        } catch (err: any) {
+          this.logger.error(`OpenAI failed: ${err.message}. Trying Gemini fallback...`);
+          text = await this.callGemini(systemPrompt, userPrompt);
+        }
+      } else {
+        text = await this.callGemini(systemPrompt, userPrompt);
+      }
       const parsed = JSON.parse(text);
 
       // Normalize to ensure all arrays exist and map alternative key names
@@ -373,5 +383,48 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
         }
       ],
     };
+  }
+
+  private async callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      throw new Error('Neither OPENAI_API_KEY nor GEMINI_API_KEY is available.');
+    }
+
+    const modelName = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt + "\n\n" + userPrompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+      throw new Error('Gemini API returned empty contents');
+    }
+
+    this.logger.log(`Gemini Raw Response: ${candidateText}`);
+    return candidateText;
   }
 }

@@ -184,16 +184,16 @@ export class ReportService {
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
     let response = '';
 
-    if (!apiKey) {
+    if (!apiKey && !geminiApiKey) {
       // Dynamic fallback mock if key not set
       const problemNames = variant.problems.map(p => p.title).join(', ');
       response = `Bu araç (${variant.brand.name} ${variant.model.name} ${variant.generation?.name || ''}) için onaylanmış sorunlar arasında ${
         problemNames || 'herhangi bir kritik kronik sorun bulunmamaktadır'
       }. Detaylı bilgi için teknik raporu inceleyebilirsiniz.`;
     } else {
-      const openai = new OpenAI({ apiKey });
       const problemsText = variant.problems
         .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
         .join('\n');
@@ -212,19 +212,36 @@ ${recallsText || 'No recalls recorded.'}
 
 Answer the user's question accurately based on this data. Do not hallucinate external issues that contradict this data. Always answer in Turkish, and keep your tone helpful, informative, and objective. Keep it concise but detailed enough to answer their question.`;
 
-      try {
-        const aiResponse = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: dto.question }
-          ],
-          temperature: 0.7,
-        });
+      if (apiKey) {
+        try {
+          const openai = new OpenAI({ apiKey });
+          const aiResponse = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: dto.question }
+            ],
+            temperature: 0.7,
+          });
 
-        response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
-      } catch (err: any) {
-        response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+          response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
+        } catch (err: any) {
+          if (geminiApiKey) {
+            try {
+              response = await this.callGeminiChat(systemPrompt, dto.question, geminiApiKey);
+            } catch (geminiErr: any) {
+              response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}. Gemini hatası: ${geminiErr.message}`;
+            }
+          } else {
+            response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+          }
+        }
+      } else if (geminiApiKey) {
+        try {
+          response = await this.callGeminiChat(systemPrompt, dto.question, geminiApiKey);
+        } catch (geminiErr: any) {
+          response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${geminiErr.message}`;
+        }
       }
     }
 
@@ -239,5 +256,37 @@ Answer the user's question accurately based on this data. Do not hallucinate ext
     });
 
     return { response };
+  }
+
+  private async callGeminiChat(systemPrompt: string, userQuestion: string, apiKey: string): Promise<string> {
+    const modelName = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt + "\n\nSoru: " + userQuestion }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API error: ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yanıt oluşturulamadı.';
   }
 }
