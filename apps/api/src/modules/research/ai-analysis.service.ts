@@ -202,6 +202,7 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
           ],
           temperature: 0.1,
           response_format: { type: 'json_object' },
+          max_tokens: 4000,
         });
         text = response.choices[0].message.content || '{}';
         this.logger.log(`AI Raw Response: ${text}`);
@@ -220,6 +221,7 @@ Ensure it is strict JSON. Do not include markdown code block syntax (like \`\`\`
             ],
             temperature: 0.1,
             response_format: { type: 'json_object' },
+            max_tokens: 4000,
           });
           text = response.choices[0].message.content || '{}';
           this.logger.log(`Gemini Fallback Raw Response: ${text}`);

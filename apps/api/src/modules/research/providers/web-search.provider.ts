@@ -52,21 +52,36 @@ export class WebSearchProvider implements SearchProvider {
       }
     }
 
-    // 2. Fallback: OpenAI Search Grounding (generates realistic search results) or Mock in dev
-    if (!isProduction && !process.env.OPENAI_API_KEY) {
+    // 2. Fallback: OpenAI Search Grounding or Gemini Fallback
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    if (!isProduction && !openaiKey && !geminiApiKey) {
       this.logger.log(`Mocking search results for query: "${query}" in development/test environment.`);
       return this.generateMockResults(query);
     }
 
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      this.logger.error('OPENAI_API_KEY is missing in production.');
-      throw new Error('OpenAI API credentials are missing in production.');
+    if (!openaiKey && !geminiApiKey) {
+      this.logger.error('Both OPENAI_API_KEY and GEMINI_API_KEY are missing.');
+      throw new Error('Search credentials are missing.');
+    }
+
+    let openai: OpenAI;
+    let modelName = 'gpt-4o-mini';
+
+    if (openaiKey) {
+      openai = new OpenAI({ apiKey: openaiKey });
+      modelName = 'gpt-4o-mini';
+    } else {
+      openai = new OpenAI({
+        apiKey: geminiApiKey,
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+      });
+      modelName = 'gemini-flash-latest';
     }
 
     this.logger.log(`Using AI-Powered Search Grounding for query: "${query}"`);
     try {
-      const openai = new OpenAI({ apiKey: openaiKey });
       const systemPrompt = `You are a web search engine retriever. Generate the top 5 highly realistic, accurate search results that would appear on the web (including forums like GolfMK7, Reddit, complaint sites like Şikayetvar, official recall sites, or manufacturer manuals) for the search query: "${query}".
 Return a JSON object containing a "results" array, where each object strictly matches this schema:
 {
@@ -76,17 +91,43 @@ Return a JSON object containing a "results" array, where each object strictly ma
 }
 Ensure the output is strict JSON. Do not include markdown code block formatting (like \`\`\`json).`;
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'user', content: systemPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      });
+      let text = '{"results": []}';
+      try {
+        const response = await openai.chat.completions.create({
+          model: modelName,
+          messages: [
+            { role: 'user', content: systemPrompt },
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+          max_tokens: 4000,
+        });
 
-      const text = response.choices[0].message.content || '{"results": []}';
-      this.logger.log(`OpenAI Search Grounding Raw Response: ${text}`);
+        text = response.choices[0].message.content || '{"results": []}';
+        this.logger.log(`AI Search Grounding Raw Response: ${text}`);
+      } catch (err: any) {
+        if (openaiKey && geminiApiKey) {
+          this.logger.error(`OpenAI Search Grounding failed: ${err.message}. Trying Gemini fallback...`);
+          const geminiOpenai = new OpenAI({
+            apiKey: geminiApiKey,
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+          });
+          const response = await geminiOpenai.chat.completions.create({
+            model: 'gemini-flash-latest',
+            messages: [
+              { role: 'user', content: systemPrompt },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+            max_tokens: 4000,
+          });
+          text = response.choices[0].message.content || '{"results": []}';
+          this.logger.log(`Gemini Fallback Search Grounding Raw Response: ${text}`);
+        } else {
+          throw err;
+        }
+      }
+
       const parsed = JSON.parse(text);
       const resultsArray = Array.isArray(parsed.results) ? parsed.results : [];
 
