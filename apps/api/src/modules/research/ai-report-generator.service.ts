@@ -114,18 +114,32 @@ export class AiReportGeneratorService {
 
     // 5. Generate structured report using AI or Mock
     const apiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
     const isProduction = process.env.NODE_ENV === 'production';
 
     let aiOutput: any;
 
-    if (!isProduction && !apiKey) {
+    if (!isProduction && !apiKey && !geminiApiKey) {
       this.logger.log('Mocking AI Report generation in development/test environment.');
       aiOutput = this.generateMockReport(variant, languageCode);
     } else {
-      if (!apiKey) {
-        throw new Error('OPENAI_API_KEY is not configured in production.');
+      const openai = apiKey ? new OpenAI({ apiKey }) : null;
+      if (openai) {
+        try {
+          aiOutput = await this.invokeReportAI(variant, languageCode, openai);
+        } catch (err: any) {
+          if (geminiApiKey) {
+            this.logger.error(`OpenAI Report generation failed: ${err.message}. Trying Gemini fallback...`);
+            aiOutput = await this.invokeReportGemini(variant, languageCode, geminiApiKey);
+          } else {
+            throw err;
+          }
+        }
+      } else if (geminiApiKey) {
+        aiOutput = await this.invokeReportGemini(variant, languageCode, geminiApiKey);
+      } else {
+        throw new Error('Neither OPENAI_API_KEY nor GEMINI_API_KEY is configured.');
       }
-      aiOutput = await this.invokeReportAI(variant, languageCode, apiKey);
     }
 
     // 6. Save or update AiVehicleReport
@@ -179,9 +193,7 @@ export class AiReportGeneratorService {
     this.logger.log(`Marked AI Vehicle Reports for variant ${variantId} as STALE.`);
   }
 
-  private async invokeReportAI(variant: any, languageCode: string, apiKey: string): Promise<any> {
-    const openai = new OpenAI({ apiKey });
-
+  private async invokeReportAI(variant: any, languageCode: string, openai: OpenAI): Promise<any> {
     const problemsText = variant.problems
       .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
       .join('\n');
@@ -232,7 +244,8 @@ Generate the summarized report JSON.`;
       response_format: { type: 'json_object' },
     });
 
-    return JSON.parse(response.choices[0].message.content || '{}');
+    const text = response.choices[0].message.content || '{}';
+    return JSON.parse(this.cleanJsonString(text));
   }
 
   private generateMockReport(variant: any, languageCode: string): any {
@@ -259,5 +272,110 @@ Generate the summarized report JSON.`;
       sellerQuestions: ['Şanzıman bakımı ne zaman yapıldı?'],
       inspectionChecklist: ['Silindir kapak contası yağ sızıntısı kontrolü'],
     };
+  }
+
+  private async invokeReportGemini(variant: any, languageCode: string, apiKey: string): Promise<any> {
+    const problemsText = variant.problems
+      .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
+      .join('\n');
+    const recallsText = variant.recalls
+      .map((r: any) => `- ${r.title}: ${r.description}`)
+      .join('\n');
+    const checklistText = variant.checklists
+      .map((c: any) => `- ${c.title}: ${c.description || ''}`)
+      .join('\n');
+
+    const systemPrompt = `You are a vehicle report cache compiler AI. You take approved vehicle data and summarize it into a structured vehicle purchase advice report.
+Output JSON format only:
+{
+  "summary": {
+    "title": "Short descriptive title",
+    "summary": "Detailed overview summary in Turkish Markdown. You MUST structure it EXACTLY under three H3 headers: '### ⚙️ Motor ve Şanzıman Kombinasyonu', '### 👍 Avantajları', and '### ⚠️ Dikkat Edilmesi Gerekenler ve Sık Karşılaşılan Durumlar'. Under each header, provide highly technical, specific, bulleted details. Even if the list of approved chronic problems provided is brief or empty, you MUST use your extensive internal automotive knowledge about this specific vehicle variant to populate these sections with rich, precise details (e.g. details about the engine code like N20B20, transmission models like ZF 8HP, timing chain chain stretch, oil pump failures, etc.). Highlight key facts in **bold**. CRITICAL: You must strictly respect the vehicle's engine and fuel specifications. If the vehicle is naturally aspirated (Turbocharged: No), you MUST NOT include any turbocharger-related details, checks, or instructions. Do NOT mix diesel issues (e.g. i-DTEC) with petrol engines (e.g. i-VTEC).",
+    "shouldBuyComment": "A clear, actionable purchase advice recommendation comment in Turkish explaining the final decision in Markdown"
+  },
+  "riskScore": 0-100 score representing the probability and severity of failures/recalls,
+  "buyabilityScore": 0-100 score representing overall purchase recommendations. IMPORTANT: riskScore and buyabilityScore MUST be mathematically complementary (i.e., buyabilityScore = 100 - riskScore). If a vehicle has high risk, its buyability must be low, and vice versa.,
+  "finalDecision": "BUY" | "BUY_CAREFULLY" | "RISKY" | "AVOID",
+  "biggestRisks": ["Risk 1", "Risk 2"],
+  "sellerQuestions": ["Question 1", "Question 2"],
+  "inspectionChecklist": ["Check item 1", "Check item 2"]
+}`;
+
+    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} (${variant.engine.code}, ${variant.transmission.name}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
+Language: ${languageCode === 'tr' ? 'Turkish' : 'English'}
+
+Approved Chronic Problems:
+${problemsText}
+
+Approved Recalls:
+${recallsText}
+
+Approved Checklists:
+${checklistText}
+
+Generate the summarized report JSON.`;
+
+    const modelName = 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt + "\n\n" + userPrompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini report compiler returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    return JSON.parse(this.cleanJsonString(text));
+  }
+
+  private cleanJsonString(str: string): string {
+    let cleaned = str.trim();
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.substring(7);
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.substring(3);
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3);
+    }
+    cleaned = cleaned.trim();
+
+    let inString = false;
+    let escaped = '';
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (char === '"' && (i === 0 || cleaned[i - 1] !== '\\')) {
+        inString = !inString;
+        escaped += char;
+      } else if (inString && char === '\n') {
+        escaped += '\\n';
+      } else if (inString && char === '\r') {
+        escaped += '\\r';
+      } else if (inString && char === '\t') {
+        escaped += '\\t';
+      } else {
+        escaped += char;
+      }
+    }
+    return escaped;
   }
 }
