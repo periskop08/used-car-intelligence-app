@@ -155,16 +155,52 @@ export default function VehicleDetail() {
     }
     if (variantId) {
       fetchVehicleDetails(variantId);
+      // Automatically load the AI report on page mount if logged in
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        handleGenerateReport(false);
+      }
     }
   }, [variantId]);
+
+  // Poll report status silently in the background
+  const checkReportStatusSilently = () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    fetch(`${API_URL}/reports/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ variantId, languageCode: "tr", force: false }),
+    })
+      .then(res => {
+        if (res.ok) return res.json();
+      })
+      .then(data => {
+        if (data && data.finalDecision !== 'INSUFFICIENT_DATA') {
+          setAiReport(data);
+          setCountdown(null);
+        }
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
       setCountdown(null);
-      handleGenerateReport(true);
+      handleGenerateReport(false); // check final status one last time
       return;
     }
+
+    // Check silently every 3 seconds (e.g. at 27, 24, 21, 18, 15, 12, 9, 6, 3 seconds remaining)
+    if (countdown > 0 && countdown % 3 === 0) {
+      checkReportStatusSilently();
+    }
+
     const timer = setTimeout(() => {
       setCountdown(countdown - 1);
     }, 1000);
@@ -235,8 +271,13 @@ export default function VehicleDetail() {
       .then(data => {
         setAiReport(data);
         setGeneratingReport(false);
-        if (data.finalDecision === 'INSUFFICIENT_DATA' && countdown === null) {
-          setCountdown(30);
+        if (data.finalDecision === 'INSUFFICIENT_DATA') {
+          if (countdown === null && !force) {
+            setCountdown(30);
+            handleGenerateReport(true); // immediately trigger background research
+          }
+        } else {
+          setCountdown(null); // Stop countdown if loaded successfully
         }
       })
       .catch(err => {
