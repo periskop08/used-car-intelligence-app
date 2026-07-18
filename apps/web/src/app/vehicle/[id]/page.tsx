@@ -432,7 +432,29 @@ export default function VehicleDetail() {
       </div>
 
       {/* Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {aiReport?.summary?.trimWarning ? (
+        <div className="bg-[#0b0f19]/60 border border-red-500/20 p-8 md:p-12 rounded-3xl flex flex-col items-center justify-center text-center gap-6 shadow-2xl shadow-red-500/5 max-w-4xl mx-auto w-full mt-4">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 text-4xl animate-bounce">
+            ⚠️
+          </div>
+          <div className="flex flex-col gap-3 max-w-2xl">
+            <h2 className="text-2xl md:text-3xl font-black text-red-400 tracking-tight">Böyle Bir Araç Yoktur!</h2>
+            <p className="text-sm text-slate-300 leading-relaxed mt-2">
+              {aiReport.summary.trimWarning}
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              Lütfen filtreleme kriterlerini (Marka, Model, Yıl, Kasa, Motor, Şanzıman, Paket) gerçekte üretilmiş olan kombinasyonlara göre seçiniz.
+            </p>
+          </div>
+          <a
+            href="/"
+            className="mt-4 bg-orange-600 hover:bg-orange-500 text-white font-bold px-6 py-3 rounded-xl transition text-sm shadow-lg shadow-orange-500/20"
+          >
+            Filtreleri Düzelt ➔
+          </a>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Specs, Problems & Reviews Column */}
         <div className="lg:col-span-2 flex flex-col gap-8">
@@ -983,7 +1005,8 @@ export default function VehicleDetail() {
           </div>
         </div>
 
-      </div>
+        </div>
+      )}
     </div>
   );
 }
