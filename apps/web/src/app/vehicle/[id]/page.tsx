@@ -402,6 +402,24 @@ export default function VehicleDetail() {
             Araç özellikleri yükleniyor ve yapay zeka analizi başlatılıyor. Raporunuz hazırlanıyor, lütfen bekleyin...
           </p>
         </div>
+        {/* Road and Driving Car Animation */}
+        <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
+          <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
+              style={{ width: `${((30 - (countdown || 30)) / 30) * 100}%` }}
+            ></div>
+          </div>
+          <div 
+            className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
+            style={{ 
+              left: `calc(${((30 - (countdown || 30)) / 30) * 100}% - 14px)`,
+              transform: 'scaleX(-1)'
+            }}
+          >
+            🚗
+          </div>
+        </div>
       </div>
     );
   }
@@ -509,11 +527,23 @@ export default function VehicleDetail() {
                     Bu araç varyantı platformda ilk defa analiz ediliyor. Web taraması, kronik hata arşivleri ve geri çağırma listeleri taranıyor. Lütfen bekleyin, raporunuz hazırlanıyor...
                   </p>
                 </div>
-                <div className="w-full bg-slate-900 rounded-full h-1.5 dark:bg-slate-800 max-w-xs overflow-hidden">
+                {/* Road and Driving Car Animation */}
+                <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
+                  <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${((30 - countdown) / 30) * 100}%` }}
+                    ></div>
+                  </div>
                   <div 
-                    className="bg-orange-600 h-1.5 rounded-full transition-all duration-1000 ease-linear" 
-                    style={{ width: `${((30 - countdown) / 30) * 100}%` }}
-                  ></div>
+                    className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
+                    style={{ 
+                      left: `calc(${((30 - countdown) / 30) * 100}% - 14px)`,
+                      transform: 'scaleX(-1)'
+                    }}
+                  >
+                    🚗
+                  </div>
                 </div>
               </div>
             ) : !aiReport ? (
