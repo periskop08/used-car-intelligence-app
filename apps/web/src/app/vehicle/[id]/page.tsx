@@ -457,20 +457,7 @@ export default function VehicleDetail() {
               </div>
             )}
 
-            {!aiReport ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
-                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve sık karşılaşılan durumları taranmış yapay zeka analiz raporunu derleyin.
-                </p>
-                <button
-                  onClick={() => handleGenerateReport(false)}
-                  disabled={generatingReport}
-                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition text-center text-sm"
-                >
-                  {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
-                </button>
-              </div>
-            ) : countdown !== null ? (
+            {countdown !== null ? (
               <div className="flex flex-col items-center justify-center py-8 text-center gap-5">
                 <div className="relative flex items-center justify-center">
                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
@@ -488,6 +475,19 @@ export default function VehicleDetail() {
                     style={{ width: `${((30 - countdown) / 30) * 100}%` }}
                   ></div>
                 </div>
+              </div>
+            ) : !aiReport ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
+                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve sık karşılaşılan durumları taranmış yapay zeka analiz raporunu derleyin.
+                </p>
+                <button
+                  onClick={() => handleGenerateReport(false)}
+                  disabled={generatingReport}
+                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition text-center text-sm"
+                >
+                  {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
+                </button>
               </div>
             ) : aiReport.finalDecision === 'INSUFFICIENT_DATA' ? (
               <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
