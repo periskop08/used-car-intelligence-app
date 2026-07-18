@@ -182,7 +182,7 @@ Output JSON format only:
 }`;
 
     const trimName = variant.trim?.name || '';
-    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} ${trimName} (${variant.engine.code}, ${variant.transmission.name}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
+    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} ${trimName} (${variant.engine.code}, ${variant.transmission.name}, Body Type: ${variant.bodyType}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
 Language: ${languageCode === 'tr' ? 'Turkish' : 'English'}
 
 Approved Chronic Problems:
@@ -265,7 +265,7 @@ Output JSON format only:
 }`;
 
     const trimName = variant.trim?.name || '';
-    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} ${trimName} (${variant.engine.code}, ${variant.transmission.name}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
+    const userPrompt = `Target Vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} ${trimName} (${variant.engine.code}, ${variant.transmission.name}, Body Type: ${variant.bodyType}, Fuel: ${variant.fuelType}, Turbocharged: ${variant.engine.hasTurbo ? 'Yes' : 'No'})
 Language: ${languageCode === 'tr' ? 'Turkish' : 'English'}
 
 Approved Chronic Problems:
