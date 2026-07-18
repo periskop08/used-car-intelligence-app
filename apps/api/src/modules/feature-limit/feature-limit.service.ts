@@ -15,6 +15,18 @@ export class FeatureLimitService {
    * Loads the limits configuration based on the user's current effective subscription tier.
    */
   async getEffectivePlanLimits(userId: string): Promise<PlanLimits> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email))) {
+      return {
+        aiChat: { period: 'daily', limit: null },
+        vehicleComparison: { period: 'monthly', limit: null },
+        favoriteVehicle: { period: 'lifetime', limit: null },
+        sellerQuestions: true,
+        detailedRiskNotes: true,
+        inspectionChecklist: true,
+      };
+    }
+
     const tier = await this.subscriptionService.getEffectiveTier(userId);
     
     const plan = await this.prisma.subscriptionPlan.findUnique({
@@ -41,6 +53,11 @@ export class FeatureLimitService {
    * Prevents race conditions. Throws HttpException (429) if the limit is exceeded.
    */
   async checkAndIncrement(userId: string, featureKey: FeatureKey): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email))) {
+      return; // Admins / Founders bypass all limits
+    }
+
     await this.prisma.$transaction(async (tx) => {
       // 1. Get effective tier
       const activeSub = await tx.subscription.findFirst({
