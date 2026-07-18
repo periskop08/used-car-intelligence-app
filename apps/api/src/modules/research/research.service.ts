@@ -493,6 +493,9 @@ export class ResearchService {
         },
       });
 
+      // Update/populate real technical specs from Gemini in the background
+      await this.updateVariantSpecs(job.vehicleVariantId);
+
       // Mark report cache as STALE so it recalculates with newly published data
       await this.reportGenerator.markReportStale(job.vehicleVariantId);
 
@@ -550,6 +553,127 @@ export class ResearchService {
       case SubscriptionTier.STANDARD: return 3;
       case SubscriptionTier.PREMIUM: return 10;
       default: return 1;
+    }
+  }
+
+  private async updateVariantSpecs(variantId: string) {
+    try {
+      const variant = await this.prisma.vehicleVariant.findUnique({
+        where: { id: variantId },
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+        }
+      });
+
+      if (!variant) return;
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        this.logger.warn('GEMINI_API_KEY is not defined. Skipping background specs update.');
+        return;
+      }
+
+      const brandName = variant.brand.name;
+      const modelName = variant.model.name;
+      const generationName = variant.generation.name;
+      const bodyType = variant.generation.bodyType;
+      const engineCode = variant.engine.code;
+      const fuelType = variant.engine.fuelType;
+      const transmissionName = variant.transmission.name;
+      const trimName = variant.trim?.name || '';
+      const year = variant.year;
+
+      const userPrompt = `Aşağıdaki araç kombinasyonunun gerçek hayattaki teknik özelliklerini bulup JSON formatında döndür.
+Araç: ${year} ${brandName} ${modelName} (${generationName} - ${bodyType})
+Motor: ${engineCode} (${fuelType})
+Şanzıman: ${transmissionName}
+Paket: ${trimName}
+
+İstenen JSON formatı:
+{
+  "topSpeed": number (Maksimum hız km/h cinsinden tam sayı, örn: 210),
+  "acceleration0to100": number (0-100 hızlanma saniye cinsinden, örn: 9.2),
+  "averageFuelConsumption": number (Ortalama yakıt tüketimi lt/100km cinsinden, örn: 6.4. Eğer elektrikli ise 0),
+  "luggageCapacity": number (Bagaj hacmi litre cinsinden tam sayı, örn: 450),
+  "weight": number (Boş ağırlık kg cinsinden tam sayı, örn: 1380)
+}
+
+Önemli:
+- Yalnızca bu JSON formatını döndür, açıklama veya markdown ekleme.
+- Eğer kesin değerleri bulamazsan, bu aracın motor gücü ve sınıfına göre en gerçekçi tahmini değerleri yaz (örneğin 1.6 atmosferik benzinli araç için bagajı 400-500, ağırlığı 1200-1300, 0-100'ü 10-12 saniye civarı yap).`;
+
+      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
+      let parsedSpecs: any = null;
+
+      for (const modelName of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          const response = await global.fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: userPrompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
+          });
+
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+          
+          let cleanText = text.trim();
+          if (cleanText.startsWith('```json')) {
+            cleanText = cleanText.substring(7);
+          }
+          if (cleanText.endsWith('```')) {
+            cleanText = cleanText.substring(0, cleanText.length - 3);
+          }
+          cleanText = cleanText.trim();
+
+          const parsed = JSON.parse(cleanText);
+          if (
+            typeof parsed.topSpeed === 'number' &&
+            typeof parsed.acceleration0to100 === 'number' &&
+            typeof parsed.averageFuelConsumption === 'number' &&
+            typeof parsed.luggageCapacity === 'number' &&
+            typeof parsed.weight === 'number'
+          ) {
+            parsedSpecs = parsed;
+            break;
+          }
+        } catch (err) {
+          // ignore and try next model
+        }
+      }
+
+      if (parsedSpecs) {
+        await this.prisma.technicalSpec.deleteMany({ where: { variantId } });
+        await this.prisma.technicalSpec.create({
+          data: {
+            variantId,
+            specs: {
+              topSpeed: parsedSpecs.topSpeed,
+              acceleration0to100: parsedSpecs.acceleration0to100,
+              averageFuelConsumption: parsedSpecs.averageFuelConsumption,
+              luggageCapacity: parsedSpecs.luggageCapacity,
+              weight: parsedSpecs.weight,
+            }
+          }
+        });
+        this.logger.log(`Successfully updated technical specifications using Gemini for variant ${variantId} in background.`);
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to update variant specs in background: ${err.message}`);
     }
   }
 }
