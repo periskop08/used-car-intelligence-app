@@ -153,6 +153,13 @@ export default function VehicleDetail() {
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      setCountdown(30);
+    }
+  }, []);
+
+  useEffect(() => {
     if (variantId) {
       fetchVehicleDetails(variantId);
       // Automatically load the AI report on page mount if logged in
@@ -272,8 +279,10 @@ export default function VehicleDetail() {
         setAiReport(data);
         setGeneratingReport(false);
         if (data.finalDecision === 'INSUFFICIENT_DATA') {
-          if (countdown === null && !force) {
-            setCountdown(30);
+          if (!force) {
+            if (countdown === null) {
+              setCountdown(30);
+            }
             handleGenerateReport(true); // immediately trigger background research
           }
         } else {
@@ -382,8 +391,17 @@ export default function VehicleDetail() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center py-24">
-        <div className="text-slate-400 font-bold text-lg animate-pulse">Araç verileri yükleniyor...</div>
+      <div className="flex-1 flex flex-col items-center justify-center py-24 text-center gap-6 min-h-[60vh]">
+        <div className="relative flex items-center justify-center animate-in fade-in duration-500">
+          <div className="animate-spin rounded-full h-20 w-20 border-t-2 border-b-2 border-orange-500"></div>
+          <div className="absolute text-xl font-black text-orange-500">{countdown || 30}</div>
+        </div>
+        <div className="flex flex-col gap-2 max-w-md px-6 animate-pulse">
+          <h3 className="text-sm font-bold text-slate-200">Yapay Zeka Analizi Hazırlanıyor...</h3>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Araç özellikleri yükleniyor ve yapay zeka analizi başlatılıyor. Raporunuz hazırlanıyor, lütfen bekleyin...
+          </p>
+        </div>
       </div>
     );
   }
