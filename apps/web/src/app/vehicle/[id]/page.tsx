@@ -115,14 +115,15 @@ export default function VehicleDetail() {
   const [submittingReview, setSubmittingReview] = useState(false);
 
   // Fetch variant detail & favorites on load
-  const fetchVehicleDetails = () => {
+  const fetchVehicleDetails = (id: string) => {
+    if (!id) return;
     const token = localStorage.getItem("accessToken");
     const headers: any = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    fetch(`${API_URL}/vehicles/variants/${variantId}`, { headers })
+    fetch(`${API_URL}/vehicles/variants/${id}`, { headers })
       .then(res => {
         if (!res.ok) throw new Error("Araç detayları yüklenemedi.");
         return res.json();
@@ -139,7 +140,7 @@ export default function VehicleDetail() {
         .then(res => res.json())
         .then(favs => {
           if (Array.isArray(favs)) {
-            const exists = favs.some((f: any) => f.variantId === variantId);
+            const exists = favs.some((f: any) => f.variantId === id);
             setIsFavorited(exists);
           }
         })
@@ -152,7 +153,9 @@ export default function VehicleDetail() {
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
-    fetchVehicleDetails();
+    if (variantId) {
+      fetchVehicleDetails(variantId);
+    }
   }, [variantId]);
 
   useEffect(() => {
@@ -328,7 +331,7 @@ export default function VehicleDetail() {
         setComment("");
         setSubmittingReview(false);
         // Refresh details to load new pending reviews list (or wait approval)
-        fetchVehicleDetails();
+        fetchVehicleDetails(variantId);
       })
       .catch(err => {
         setReviewError(Array.isArray(err.message) ? err.message[0] : err.message);

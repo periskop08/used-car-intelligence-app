@@ -221,7 +221,16 @@ export default function Header() {
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
-                    <span>Favorilerim</span>
+                    <span>Favori İlanlarım</span>
+                    <span className="text-slate-500">→</span>
+                  </a>
+
+                  <a
+                    href="/dashboard/favorites/reports"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
+                  >
+                    <span>Favori Raporlarım</span>
                     <span className="text-slate-500">→</span>
                   </a>
 
@@ -411,7 +420,10 @@ export default function Header() {
                         İlanlarım
                       </a>
                       <a href="/dashboard/favorites" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
-                        Favorilerim
+                        Favori İlanlarım
+                      </a>
+                      <a href="/dashboard/favorites/reports" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
+                        Favori Raporlarım
                       </a>
                       <a href="/dashboard/messages" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
                         Mesajlarım

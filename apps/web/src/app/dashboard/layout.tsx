@@ -28,6 +28,7 @@ const MENU_GROUPS: MenuGroup[] = [
     title: "Favorilerim",
     items: [
       { name: "Favori İlanlarım", href: "/dashboard/favorites" },
+      { name: "Favori Raporlarım", href: "/dashboard/favorites/reports" },
       { name: "Favori Satıcılarım", href: "/dashboard/favorites/sellers" },
       { name: "Favori Aramalarım", href: "/dashboard/favorites/searches" },
     ],
