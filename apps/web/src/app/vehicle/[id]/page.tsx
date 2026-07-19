@@ -190,6 +190,7 @@ export default function VehicleDetail() {
         if (data && data.finalDecision !== 'INSUFFICIENT_DATA') {
           setAiReport(data);
           setCountdown(null);
+          fetchVehicleDetails(variantId);
         }
       })
       .catch(() => {});
@@ -287,6 +288,7 @@ export default function VehicleDetail() {
           }
         } else {
           setCountdown(null); // Stop countdown if loaded successfully
+          fetchVehicleDetails(variantId);
         }
       })
       .catch(err => {
@@ -389,7 +391,9 @@ export default function VehicleDetail() {
       });
   };
 
-  if (loading) {
+  const isPageLoading = loading || (countdown !== null && (!aiReport || aiReport.finalDecision === 'INSUFFICIENT_DATA'));
+
+  if (isPageLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-24 text-center gap-6 min-h-[60vh]">
         <div className="relative flex items-center justify-center animate-in fade-in duration-500">
