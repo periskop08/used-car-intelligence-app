@@ -72,6 +72,9 @@ export class ReportService {
     }
 
     if (dto.force) {
+      if (existingReport && (existingReport.summary as any)?.trimWarning) {
+        throw new BadRequestException('Böyle bir araç kombinasyonu gerçekte üretilmediği için yeniden araştırma yapılamaz.');
+      }
       try {
         await this.researchService.requestResearch(
           dto.variantId,

@@ -55,6 +55,18 @@ export class ResearchController {
       throw new UnauthorizedException('Authentication required to request research.');
     }
 
+    const existingReport = await this.prisma.aiVehicleReport.findUnique({
+      where: {
+        variantId_languageCode: {
+          variantId,
+          languageCode: languageCode || 'tr',
+        },
+      },
+    });
+    if (existingReport && (existingReport.summary as any)?.trimWarning) {
+      throw new BadRequestException('Böyle bir araç kombinasyonu gerçekte üretilmediği için araştırma yapılamaz.');
+    }
+
     const jobId = await this.researchService.requestResearch(
       variantId,
       userId,

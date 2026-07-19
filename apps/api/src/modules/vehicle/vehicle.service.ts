@@ -116,6 +116,19 @@ export class VehicleService {
       },
     });
 
+    const existingReport = await this.prisma.aiVehicleReport.findUnique({
+      where: {
+        variantId_languageCode: {
+          variantId,
+          languageCode: 'tr',
+        },
+      },
+    });
+
+    if (existingReport && (existingReport.summary as any)?.trimWarning) {
+      return this.formatVariantDetail(variant, userId);
+    }
+
     if (!completedJob) {
       // 1. Clean up old/mock data if any
       await this.prisma.commonProblem.deleteMany({ where: { variantId } });

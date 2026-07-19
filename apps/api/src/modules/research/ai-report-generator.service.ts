@@ -139,6 +139,20 @@ export class AiReportGeneratorService {
       },
     });
 
+    if (aiOutput.summary?.trimWarning) {
+      await this.prisma.vehicleResearchJob.updateMany({
+        where: {
+          vehicleVariantId: variantId,
+          status: { in: ['QUEUED', 'RUNNING'] },
+        },
+        data: {
+          status: 'FAILED',
+          errorMessage: `Vehicle does not exist: ${aiOutput.summary.trimWarning}`,
+        },
+      });
+      this.logger.warn(`Cancelled active research jobs for variant ${variantId} due to trim/combination warning.`);
+    }
+
     return report;
   }
 
