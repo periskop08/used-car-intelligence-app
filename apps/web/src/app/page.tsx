@@ -61,7 +61,7 @@ export default function Home() {
   // Fetch Featured Listings on Load
   useEffect(() => {
     setLoadingListings(true);
-    fetch(`${API_URL}/listings?limit=4&sort=featured`)
+    fetch(`${API_URL}/listings?limit=8&sort=featured`)
       .then((res) => res.json())
       .then((data) => {
         setFeaturedListings(data.items && Array.isArray(data.items) ? data.items : []);
@@ -829,46 +829,46 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             {featuredListings.map((listing: any) => {
               const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
               return (
                 <a
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300"
+                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300"
                 >
-                  <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden">
+                  <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
                     <img
                       src={coverImg}
                       alt={listing.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                     />
                     {listing.isAiReady && (
-                      <span className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow-lg shadow-orange-950/20">
+                      <span className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow-lg shadow-orange-950/20">
                         ✨ AI Analizli
                       </span>
                     )}
                   </div>
 
-                  <div className="p-4 flex flex-col justify-between flex-1 gap-4">
+                  <div className="p-3 flex flex-col justify-between flex-1 gap-3">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
                         {listing.modelYear} • {listing.city}
                       </span>
-                      <h3 className="font-bold text-slate-200 text-sm line-clamp-1 group-hover:text-orange-400 transition mt-1">
+                      <h3 className="font-bold text-slate-200 text-xs line-clamp-1 group-hover:text-orange-400 transition mt-0.5">
                         {listing.title}
                       </h3>
-                      <p className="text-slate-400 text-xs mt-1">
+                      <p className="text-slate-400 text-[10px] mt-0.5">
                         {listing.kilometers.toLocaleString('tr-TR')} km
                       </p>
                     </div>
 
-                    <div className="border-t border-white/5 pt-3 flex items-center justify-between">
-                      <span className="font-black text-slate-100 text-sm">
+                    <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                      <span className="font-black text-slate-100 text-[13px]">
                         {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <span className="text-[9px] text-slate-500 font-mono">
                         {listing.vehicleVariant?.brand.name}
                       </span>
                     </div>
