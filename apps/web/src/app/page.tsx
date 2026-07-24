@@ -497,12 +497,12 @@ export default function Home() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-start pt-2 pb-12 px-6 gap-12">
+    <div className="flex flex-col items-center justify-start pt-2 pb-12 px-6 gap-8">
       {/* Hero Section */}
-      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-4">
+      <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-2">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[280px] opacity-80">
-          <svg width="310" height="80" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[160px] opacity-80">
+          <svg width="260" height="64" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stop-color="#00f2fe" />
@@ -517,7 +517,7 @@ export default function Home() {
         </div>
 
         {/* Center: Hero Text */}
-        <div className="text-left flex-1 max-w-2xl flex flex-col items-start justify-center gap-2.5 h-[280px]">
+        <div className="text-left flex-1 max-w-2xl flex flex-col items-start justify-center gap-2 h-[160px]">
           <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white whitespace-nowrap">
             İlanı gör, aracı anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
@@ -530,8 +530,8 @@ export default function Home() {
         </div>
 
         {/* Right Side: Emblem Logo Symbol (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[280px]">
-          <svg width="280" height="280" viewBox="-50 0 250 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[160px]">
+          <svg width="200" height="160" viewBox="-50 0 250 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_0_15px_rgba(59,130,246,0.15)]">
             <defs>
               <linearGradient id="t-gradient-large" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0%" stop-color="#00f2fe" />
@@ -580,7 +580,7 @@ export default function Home() {
       </div>
 
       {/* Interactive Vehicle Selector */}
-      <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-16">
+      <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-6">
         <h2 className="text-xl font-extrabold text-slate-200 flex items-center gap-2">
           🚗 Hızlı Araç Sorgulama
         </h2>
