@@ -63,7 +63,7 @@ export default function Home() {
   // Fetch Featured Listings on Load
   useEffect(() => {
     setLoadingListings(true);
-    fetch(`${API_URL}/listings?limit=10&sort=featured`)
+    fetch(`${API_URL}/listings?limit=16&sort=featured`)
       .then((res) => res.json())
       .then((data) => {
         setFeaturedListings(data.items && Array.isArray(data.items) ? data.items : []);
@@ -864,7 +864,7 @@ export default function Home() {
 
           <div 
             ref={scrollRef} 
-            className="flex gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-4"
+            className="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-4"
           >
             {featuredListings.map((listing: any) => {
               const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
@@ -872,7 +872,7 @@ export default function Home() {
                 <a
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[85%] sm:w-[calc((100%-16px)/2)] lg:w-[calc((100%-48px)/4)] flex-shrink-0 snap-start"
+                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[280px] sm:w-[340px] lg:w-[242px] flex-shrink-0 snap-start"
                 >
                   <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
                     <img
