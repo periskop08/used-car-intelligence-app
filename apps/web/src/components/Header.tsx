@@ -44,21 +44,32 @@ export default function Header() {
       
       {/* Left: Logo */}
       <a href="/" className="flex items-center gap-2.5 group/logo select-none -skew-x-12 transform group-hover/logo:scale-[1.02] transition duration-300">
-        {/* Three horizontal speed capsules (exact matching) */}
-        <div className="flex flex-col gap-[3.5px] mt-0.5">
-          <div className="h-[3.5px] w-[18px] bg-sky-500 rounded-full"></div>
+        {/* Three horizontal speed capsules (right-aligned for outer-turned speed look) */}
+        <div className="flex flex-col items-end gap-[3.5px] mt-[1.5px]">
+          <div className="h-[3.5px] w-[16px] bg-sky-500 rounded-full"></div>
           <div className="h-[3.5px] w-[24px] bg-sky-500 rounded-full"></div>
-          <div className="h-[3.5px] w-[18px] bg-sky-500 rounded-full"></div>
+          <div className="h-[3.5px] w-[16px] bg-sky-500 rounded-full"></div>
         </div>
         {/* Brand Text: TorkScoute */}
-        <div className="flex items-baseline -ml-0.5">
-          <span className="text-2xl font-black tracking-tight text-white font-sans">
-            Tork
+        <div className="flex items-baseline -ml-0.5 font-sans font-black text-2xl tracking-tight text-white">
+          <span>Tork</span>
+          <span className="text-sky-500 ml-1">S</span>
+          <span className="text-cyan-400">c</span>
+          {/* Speedometer inline SVG for letter 'o' */}
+          <span className="text-cyan-400 inline-flex items-center mx-[1px] self-center">
+            <svg className="w-[17px] h-[17px] stroke-[3.5] stroke-current fill-none" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              {/* Speedometer Ticks */}
+              <line x1="7" y1="7" x2="8.5" y2="8.5" strokeWidth="2.5" />
+              <line x1="12" y1="3" x2="12" y2="5.5" strokeWidth="2.5" />
+              <line x1="17" y1="7" x2="15.5" y2="8.5" strokeWidth="2.5" />
+              {/* Indicator Needle */}
+              <line x1="12" y1="12" x2="18.5" y2="5.5" strokeWidth="3" />
+              {/* Spindle Center Dot */}
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            </svg>
           </span>
-          <span className="text-2xl font-black tracking-tight font-sans">
-            <span className="text-sky-500">S</span>
-            <span className="text-cyan-400">coute</span>
-          </span>
+          <span className="text-cyan-400">ute</span>
         </div>
       </a>
 
