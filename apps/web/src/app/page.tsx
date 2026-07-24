@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 // TorqueScout Homepage - Selector Update
@@ -58,10 +58,12 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   // Fetch Featured Listings on Load
   useEffect(() => {
     setLoadingListings(true);
-    fetch(`${API_URL}/listings?limit=8&sort=featured`)
+    fetch(`${API_URL}/listings?limit=10&sort=featured`)
       .then((res) => res.json())
       .then((data) => {
         setFeaturedListings(data.items && Array.isArray(data.items) ? data.items : []);
@@ -69,6 +71,37 @@ export default function Home() {
       })
       .catch(() => setLoadingListings(false));
   }, []);
+
+  // Auto-scroll loop for Featured Listings slider
+  useEffect(() => {
+    if (featuredListings.length === 0) return;
+
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const container = scrollRef.current;
+        const card = container.querySelector('a');
+        if (!card) return;
+
+        const cardWidth = card.getBoundingClientRect().width;
+        const gap = 16; // gap-4 = 16px
+        const scrollStep = cardWidth + gap;
+
+        let newScrollLeft = container.scrollLeft + scrollStep;
+        
+        // Loop back to start if we exceed the scroll limit
+        if (newScrollLeft >= container.scrollWidth - container.clientWidth - 10) {
+          newScrollLeft = 0;
+        }
+
+        container.scrollTo({
+          left: newScrollLeft,
+          behavior: "smooth",
+        });
+      }
+    }, 3500); // Scroll every 3.5 seconds
+
+    return () => clearInterval(interval);
+  }, [featuredListings]);
 
   // Fetch Brands on Load
   useEffect(() => {
@@ -829,14 +862,17 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          <div 
+            ref={scrollRef} 
+            className="flex gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-4"
+          >
             {featuredListings.map((listing: any) => {
               const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
               return (
                 <a
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300"
+                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[85%] sm:w-[calc((100%-16px)/2)] lg:w-[calc((100%-48px)/4)] flex-shrink-0 snap-start"
                 >
                   <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
                     <img
