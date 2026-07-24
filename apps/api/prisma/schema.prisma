@@ -242,6 +242,7 @@ model User {
   feedbacks          Feedback[]
   preferenceSwipes   UserVehiclePreferenceSwipe[]
   preferenceProfiles UserVehiclePreferenceProfile[]
+  discoverySessions  VehicleDiscoverySession[]
 }
 
 model SubscriptionPlan {
@@ -484,6 +485,10 @@ model VehicleVariant {
   researchJobs VehicleResearchJob[]
   rawSources   RawSource[]
   listings     VehicleListing[]
+
+  representativeCard    VehicleDiscoveryCard? @relation("DiscoveryCardRepresentativeVariant")
+  mappedCards           VehicleDiscoveryCardVariant[]
+  priceSnapshot         VehicleVariantPriceSnapshot?
 
   @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
   @@index([brandId])
@@ -1425,6 +1430,15 @@ model VehicleDiscoveryCard {
   updatedAt          DateTime                      @updatedAt
   swipes             UserVehiclePreferenceSwipe[]
   impressions        VehicleDiscoveryCardImpression[]
+
+  representativeVariantId String? @unique
+  representativeVariant   VehicleVariant? @relation("DiscoveryCardRepresentativeVariant", fields: [representativeVariantId], references: [id], onDelete: SetNull)
+  mappedVariants          VehicleDiscoveryCardVariant[]
+  priceSnapshot           VehicleDiscoveryCardPriceSnapshot?
+  yearFrom                Int?
+  yearTo                  Int?
+  archivedAt              DateTime?
+  swipesV2                VehicleDiscoverySessionItem[]
 }
 
 model UserVehiclePreferenceSwipe {
@@ -1480,6 +1494,204 @@ model UserVehiclePreferenceProfile {
   user                   User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum VehicleDiscoveryMode {
+  RANDOM
+  FILTERED
+}
+
+enum VehicleDiscoverySessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+  CANCELLED
+}
+
+enum VehicleDiscoveryAction {
+  LIKE
+  DISLIKE
+}
+
+enum PriceConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum VehiclePriceSourceType {
+  ACTIVE_LISTINGS
+  RELATED_VARIANT_FALLBACK
+  MANUAL
+  IMPORTED
+}
+
+enum CardVariantReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CardVariantMatchSource {
+  AUTO
+  MANUAL
+}
+
+enum VehicleDiscoveryAnalyticsEventType {
+  PAGE_VIEWED
+  FILTER_CHANGED
+  FILTERED_DISCOVERY_STARTED
+  RANDOM_DISCOVERY_STARTED
+  VEHICLE_LIKED
+  VEHICLE_DISLIKED
+  VEHICLE_SHOWN
+  SESSION_RESUMED
+  SESSION_ABANDONED
+  GUEST_SESSION_MERGED
+  LOW_RESULT_WARNING_SHOWN
+  NO_RESULTS_SHOWN
+  FILTERS_UPDATED
+  FILTERS_CLEARED
+  RANDOM_MODE_SELECTED
+  DISCOVERY_COMPLETED
+  RECOMMENDATION_OPENED
+  LISTING_OPENED
+}
+
+model VehicleDiscoveryGuestIdentity {
+  id         String                    @id @default(cuid())
+  tokenHash  String                    @unique
+  expiresAt  DateTime
+  sessions   VehicleDiscoverySession[]
+  createdAt  DateTime                  @default(now())
+  lastUsedAt DateTime                  @default(now())
+  mergedAt   DateTime?
+}
+
+model VehicleDiscoverySession {
+  id              String                        @id @default(cuid())
+  userId          String?
+  guestIdentityId String?
+  mode            VehicleDiscoveryMode
+  status          VehicleDiscoverySessionStatus @default(ACTIVE)
+  minimumPrice    Decimal                       @default(0) @db.Decimal(18, 2)
+  maximumPrice    Decimal?                      @db.Decimal(18, 2)
+  
+  bodyTypes       BodyType[]
+  fuelTypes       FuelType[]
+  transmissions   TransmissionType[]
+
+  targetCount     Int
+  currentIndex    Int                           @default(0)
+  version         Int                           @default(0)
+  filterRevision  Int                           @default(0)
+
+  lastActivityAt  DateTime                      @default(now())
+  expiresAt       DateTime
+
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  completedAt     DateTime?
+
+  user            User?                         @relation(fields: [userId], references: [id])
+  guestIdentity   VehicleDiscoveryGuestIdentity? @relation(fields: [guestIdentityId], references: [id])
+  items           VehicleDiscoverySessionItem[]
+  analyticsEvents VehicleDiscoveryAnalyticsEvent[]
+
+  @@index([userId, status, createdAt])
+  @@index([guestIdentityId])
+  @@index([status, expiresAt])
+  @@index([status, lastActivityAt])
+}
+
+model VehicleDiscoverySessionItem {
+  id                     String                  @id @default(cuid())
+  sessionId              String
+  vehicleDiscoveryCardId String
+  position               Int
+  action                 VehicleDiscoveryAction?
+  shownAt                DateTime?
+  actionAt               DateTime?
+  createdAt              DateTime                @default(now())
+
+  session                VehicleDiscoverySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  card                   VehicleDiscoveryCard    @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, vehicleDiscoveryCardId])
+  @@unique([sessionId, position])
+  @@index([sessionId, position])
+  @@index([vehicleDiscoveryCardId])
+}
+
+model VehicleDiscoveryCardVariant {
+  cardId           String
+  vehicleVariantId String
+  matchConfidence  Float?
+  matchSource      CardVariantMatchSource  @default(AUTO)
+  reviewStatus     CardVariantReviewStatus @default(PENDING)
+  
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  reviewNote       String?
+
+  card    VehicleDiscoveryCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  variant VehicleVariant       @relation(fields: [vehicleVariantId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, vehicleVariantId])
+  @@index([vehicleVariantId])
+}
+
+model VehicleDiscoveryCardPriceSnapshot {
+  id                String                 @id @default(cuid())
+  cardId            String                 @unique
+  estimatedMin      Decimal                @db.Decimal(18, 2)
+  estimatedMax      Decimal                @db.Decimal(18, 2)
+  medianPrice       Decimal?               @db.Decimal(18, 2)
+  sampleSize        Int                    @default(0)
+  confidenceLevel   PriceConfidenceLevel
+  sourceType        VehiclePriceSourceType
+  calculatedAt      DateTime               @default(now())
+  freshUntil        DateTime
+  validUntil        DateTime
+
+  card              VehicleDiscoveryCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([validUntil])
+  @@index([confidenceLevel])
+}
+
+model VehicleVariantPriceSnapshot {
+  id               String                 @id @default(cuid())
+  vehicleVariantId String                 @unique
+  estimatedMin     Decimal                @db.Decimal(18, 2)
+  estimatedMax     Decimal                @db.Decimal(18, 2)
+  medianPrice      Decimal?               @db.Decimal(18, 2)
+  sampleSize       Int                    @default(0)
+  confidenceLevel  PriceConfidenceLevel
+  sourceType       VehiclePriceSourceType
+  calculatedAt      DateTime               @default(now())
+  freshUntil        DateTime
+  validUntil        DateTime
+
+  vehicleVariant   VehicleVariant         @relation(fields: [vehicleVariantId], references: [id], onDelete: Cascade)
+
+  @@index([validUntil])
+  @@index([confidenceLevel])
+}
+
+model VehicleDiscoveryAnalyticsEvent {
+  id        String                             @id @default(cuid())
+  sessionId String?
+  userId    String?
+  eventType VehicleDiscoveryAnalyticsEventType
+  metadata  Json?
+  createdAt DateTime                           @default(now())
+
+  session   VehicleDiscoverySession?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
 }
 
 
