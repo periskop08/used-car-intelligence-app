@@ -436,9 +436,10 @@ export class VehicleDiscoveryService {
       fuelTypes?: FuelType[];
       transmissions?: TransmissionType[];
     };
+    targetCount?: number;
     identity: { userId?: string; guestIdentityId?: string };
   }) {
-    const { sessionId, filters, identity } = params;
+    const { sessionId, filters, targetCount, identity } = params;
     const now = new Date();
 
     return this.prisma.$transaction(async (tx) => {
@@ -458,8 +459,8 @@ export class VehicleDiscoveryService {
         throw new BadRequestException("Bu oturuma erişim yetkiniz yok.");
       }
 
-      if (session.status !== VehicleDiscoverySessionStatus.ACTIVE || session.expiresAt <= now) {
-        throw new BadRequestException("Keşif oturumu aktif değil.");
+      if (session.expiresAt <= now) {
+        throw new BadRequestException("Keşif oturumu süresi dolmuş.");
       }
 
       // Delete all unswiped items after the current index (positional cleanup)
@@ -482,6 +483,9 @@ export class VehicleDiscoveryService {
           bodyTypes: filters.bodyTypes || [],
           fuelTypes: filters.fuelTypes || [],
           transmissions: filters.transmissions || [],
+          targetCount: targetCount || session.targetCount,
+          status: VehicleDiscoverySessionStatus.ACTIVE, // Reset status to active
+          completedAt: null, // Clear completion date
           mode: VehicleDiscoveryMode.FILTERED,
           filterRevision: nextFilterRevision,
           version: nextVersion,
@@ -598,19 +602,34 @@ export class VehicleDiscoveryService {
     let matchedVariants: any[] = [];
     let softeningLevel = 0;
 
+    const getTopKeys = (scores: Record<string, number>) => {
+      return Object.entries(scores)
+        .filter(([_, val]) => val > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([key]) => key);
+    };
+
+    const topBrands = getTopKeys(brandScores);
+    const topBodies = getTopKeys(bodyTypeScores) as BodyType[];
+    const topFuels = getTopKeys(fuelTypeScores) as FuelType[];
+
     // We only recommend APPROVED variants that have active price snapshots (Turkey-only)
     // Filter conditions layers
-    while (matchedVariants.length < 5 && softeningLevel <= 3) {
+    while (matchedVariants.length < 5 && softeningLevel <= 4) {
       const bodyFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 2) 
         ? (session.bodyTypes && session.bodyTypes.length > 0 ? { in: session.bodyTypes } : undefined)
-        : undefined;
+        : (softeningLevel < 1 && topBodies.length > 0 ? { in: topBodies } : undefined);
 
       const fuelFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 1)
         ? (session.fuelTypes && session.fuelTypes.length > 0 ? { in: session.fuelTypes } : undefined)
-        : undefined;
+        : (softeningLevel < 1 && topFuels.length > 0 ? { in: topFuels } : undefined);
 
       const transFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 1)
         ? (session.transmissions && session.transmissions.length > 0 ? { type: { in: session.transmissions } } : undefined)
+        : undefined;
+
+      const brandFilter = (softeningLevel < 2 && topBrands.length > 0)
+        ? { name: { in: topBrands } }
         : undefined;
 
       const priceFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 3)
@@ -628,8 +647,10 @@ export class VehicleDiscoveryService {
           bodyType: bodyFilter,
           fuelType: fuelFilter,
           transmission: transFilter,
+          brand: brandFilter,
           ...priceFilter
         },
+        take: 200, // Safety limit to prevent memory exhaustion!
         include: {
           brand: true,
           model: true,
