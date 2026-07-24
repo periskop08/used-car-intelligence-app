@@ -43,12 +43,20 @@ export default function Header() {
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
       
       {/* Left: Logo */}
-      <a href="/" className="flex items-center gap-3 group/logo">
-        <img 
-          src="/logo.png" 
-          alt="TorqueScout" 
-          className="h-11 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
-        />
+      <a href="/" className="flex items-center gap-2.5 group/logo select-none">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/20 transform group-hover/logo:scale-105 transition duration-300">
+          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[17px] font-black tracking-tight leading-none text-white">
+            Tork<span className="text-orange-500">Squate</span>
+          </span>
+          <span className="text-[7.5px] font-bold text-slate-500 tracking-widest uppercase leading-none mt-1">
+            Yeni Nesil Araç Platformu
+          </span>
+        </div>
       </a>
 
       {/* Middle: Desktop Navigation */}

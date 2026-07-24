@@ -814,37 +814,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Nasıl Çalışır Section */}
-      <div className="w-full max-w-5xl flex flex-col gap-8 items-center py-8 border-t border-white/5">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-slate-200">TorqueScout Nasıl Çalışır?</h2>
-          <p className="text-sm text-slate-400 mt-1 font-medium">İlanı gör, aracı anla, doğru kararı ver.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
-          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
-            <span className="text-3xl">🔍</span>
-            <h3 className="text-lg font-bold text-slate-200 mt-4">1. İlanları Listele & Araştır</h3>
-            <p className="text-xs text-slate-400 mt-2">
-              Sitedeki ilanları arayın ya da doğrudan marka-model girerek araçların sık karşılaşılan durumlar veritabanını tarayın.
-            </p>
-          </div>
-          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
-            <span className="text-3xl">🤖</span>
-            <h3 className="text-lg font-bold text-slate-200 mt-4">2. AI Destekli Detayları Oku</h3>
-            <p className="text-xs text-slate-400 mt-2">
-              Araç varyantına bağlı recall (geri çağırma) kayıtlarını, kullanıcı şikayetlerini ve satıcıya özel kontrol checklistini anında inceleyin.
-            </p>
-          </div>
-          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
-            <span className="text-3xl">🤝</span>
-            <h3 className="text-lg font-bold text-slate-200 mt-4">3. Güvenle Satın Al</h3>
-            <p className="text-xs text-slate-400 mt-2">
-              Ekspertiz sırasında neleri kontrol etmeniz gerektiğini bilerek satıcıyla masaya tam donanımlı oturun.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Nasıl Çalışır section moved to bottom */}
 
       {/* Featured Listings Section */}
       {featuredListings.length > 0 && (
@@ -977,6 +947,38 @@ export default function Home() {
             <a href="/register?tier=PREMIUM" className="border border-white/10 text-center py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 transition">
               Premium Paket Satın Al
             </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Nasıl Çalışır Section - Moved below Packages */}
+      <div className="w-full max-w-5xl flex flex-col gap-8 items-center py-8 border-t border-white/5 mt-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-extrabold text-slate-200">TorkSquate Nasıl Çalışır?</h2>
+          <p className="text-sm text-slate-400 mt-1 font-medium">İlanı gör, aracı anla, doğru kararı ver.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-4">
+          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
+            <span className="text-3xl">🔍</span>
+            <h3 className="text-lg font-bold text-slate-200 mt-4">1. İlanları Listele & Araştır</h3>
+            <p className="text-xs text-slate-400 mt-2">
+              Sitedeki ilanları arayın ya da doğrudan marka-model girerek araçların sık karşılaşılan durumlar veritabanını tarayın.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
+            <span className="text-3xl">🤖</span>
+            <h3 className="text-lg font-bold text-slate-200 mt-4">2. AI Destekli Detayları Oku</h3>
+            <p className="text-xs text-slate-400 mt-2">
+              Araç varyantına bağlı recall (geri çağırma) kayıtlarını, kullanıcı şikayetlerini ve satıcıya özel kontrol checklistini anında inceleyin.
+            </p>
+          </div>
+          <div className="flex flex-col items-center text-center p-6 bg-slate-950/20 border border-white/5 rounded-3xl">
+            <span className="text-3xl">🤝</span>
+            <h3 className="text-lg font-bold text-slate-200 mt-4">3. Güvenle Satın Al</h3>
+            <p className="text-xs text-slate-400 mt-2">
+              Ekspertiz sırasında neleri kontrol etmeniz gerektiğini bilerek satıcıyla masaya tam donanımlı oturun.
+            </p>
           </div>
         </div>
       </div>
