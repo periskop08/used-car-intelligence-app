@@ -43,21 +43,21 @@ export default function Header() {
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
       
       {/* Left: Logo */}
-      <a href="/" className="flex items-center gap-2 group/logo select-none">
-        <div className="flex items-center justify-center transform group-hover/logo:scale-[1.03] transition duration-300">
-          <svg className="h-7 w-auto text-cyan-400" viewBox="0 0 48 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            {/* Trailing speed lines */}
-            <path d="M4 8h12M2 12h10M4 16h12" strokeWidth="2.5" />
-            {/* Double chevrons */}
-            <path d="m20 6 6 6-6 6M28 6l6 6-6 6" />
-          </svg>
+      <a href="/" className="flex items-center gap-2.5 group/logo select-none -skew-x-12 transform group-hover/logo:scale-[1.02] transition duration-300">
+        {/* Three horizontal speed capsules (exact matching) */}
+        <div className="flex flex-col gap-[3.5px] mt-0.5">
+          <div className="h-[3.5px] w-[18px] bg-sky-500 rounded-full"></div>
+          <div className="h-[3.5px] w-[24px] bg-sky-500 rounded-full"></div>
+          <div className="h-[3.5px] w-[18px] bg-sky-500 rounded-full"></div>
         </div>
-        <div className="flex flex-col -ml-1.5">
-          <span className="text-xl font-extrabold italic tracking-tighter leading-none text-white font-sans">
-            Tork<span className="text-cyan-400">Squate</span>
+        {/* Brand Text: TorkScoute */}
+        <div className="flex items-baseline -ml-0.5">
+          <span className="text-2xl font-black tracking-tight text-white font-sans">
+            Tork
           </span>
-          <span className="text-[7.5px] font-bold text-cyan-400 tracking-widest uppercase leading-none mt-1.5 italic font-sans">
-            Yeni Nesil Araç Platformu
+          <span className="text-2xl font-black tracking-tight font-sans">
+            <span className="text-sky-500">S</span>
+            <span className="text-cyan-400">coute</span>
           </span>
         </div>
       </a>
