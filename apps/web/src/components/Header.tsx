@@ -43,34 +43,38 @@ export default function Header() {
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
       
       {/* Left: Logo */}
-      <a href="/" className="flex items-center gap-2.5 group/logo select-none -skew-x-12 transform group-hover/logo:scale-[1.02] transition duration-300">
-        {/* Three horizontal speed capsules (right-aligned for outer-turned speed look) */}
-        <div className="flex flex-col items-end gap-[3.5px] mt-[1.5px]">
-          <div className="h-[3.5px] w-[16px] bg-sky-500 rounded-full"></div>
-          <div className="h-[3.5px] w-[24px] bg-sky-500 rounded-full"></div>
-          <div className="h-[3.5px] w-[16px] bg-sky-500 rounded-full"></div>
-        </div>
-        {/* Brand Text: TorkScoute */}
-        <div className="flex items-baseline -ml-0.5 font-sans font-black text-2xl tracking-tight text-white">
-          <span>Tork</span>
-          <span className="text-sky-500 ml-1">S</span>
-          <span className="text-cyan-400">c</span>
-          {/* Speedometer inline SVG for letter 'o' */}
-          <span className="text-cyan-400 inline-flex items-center mx-[1px] self-center">
-            <svg className="w-[17px] h-[17px] stroke-[3.5] stroke-current fill-none" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              {/* Speedometer Ticks */}
-              <line x1="7" y1="7" x2="8.5" y2="8.5" strokeWidth="2.5" />
-              <line x1="12" y1="3" x2="12" y2="5.5" strokeWidth="2.5" />
-              <line x1="17" y1="7" x2="15.5" y2="8.5" strokeWidth="2.5" />
-              {/* Indicator Needle */}
-              <line x1="12" y1="12" x2="18.5" y2="5.5" strokeWidth="3" />
-              {/* Spindle Center Dot */}
-              <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-            </svg>
-          </span>
-          <span className="text-cyan-400">ute</span>
-        </div>
+      <a href="/" className="flex items-center group/logo select-none -skew-x-12 transform group-hover/logo:scale-[1.02] transition duration-300">
+        <svg className="h-9 w-auto" viewBox="0 0 122 24" xmlns="http://www.w3.org/2000/svg">
+          {/* Three horizontal speed capsules (aligned on the right, top is longest sticking out left) */}
+          <rect x="2" y="9.2" width="14" height="3.2" rx="1.6" fill="#3b82f6" />
+          <rect x="6" y="13.4" width="10" height="3.2" rx="1.6" fill="#3b82f6" />
+          <rect x="10" y="17.6" width="6" height="3.2" rx="1.6" fill="#3b82f6" />
+
+          {/* Custom extending T letter (roofing o and r) */}
+          <rect x="0" y="3" width="54" height="4.2" rx="0.8" fill="#ffffff" />
+          <rect x="18" y="3" width="4.5" height="19.5" rx="0.8" fill="#ffffff" />
+
+          {/* Brand Text: Tork */}
+          <text x="22.5" y="20.5" fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">o</text>
+          <text x="32" y="20.5" fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">r</text>
+          <text x="40.5" y="20.5" fill="#ffffff" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">k</text>
+
+          {/* Brand Text: Scoute */}
+          <text x="53.5" y="20.5" fill="#3b82f6" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">S</text>
+          <text x="65.5" y="20.5" fill="#22d3ee" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">c</text>
+
+          {/* Speedometer inline o */}
+          <circle cx="82" cy="14" r="6.8" stroke="#22d3ee" strokeWidth="2.5" fill="none" />
+          <line x1="77.5" y1="9.5" x2="79" y2="11" stroke="#22d3ee" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="82" cy="9.2" r="0.8" fill="#22d3ee" />
+          <line x1="86.5" y1="9.5" x2="85" y2="11" stroke="#22d3ee" strokeWidth="1.8" strokeLinecap="round" />
+          <line x1="82" y1="14" x2="87.5" y2="8.5" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="82" cy="14" r="1.2" fill="#22d3ee" />
+
+          <text x="90.5" y="20.5" fill="#22d3ee" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">u</text>
+          <text x="100.5" y="20.5" fill="#22d3ee" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">t</text>
+          <text x="107" y="20.5" fill="#22d3ee" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="18px">e</text>
+        </svg>
       </a>
 
       {/* Middle: Desktop Navigation */}
