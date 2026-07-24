@@ -173,6 +173,42 @@ export default function FindMyCarPage() {
     { key: "AUTOMATIC", label: "Otomatik" }
   ];
 
+  // customFetch helper to support both localstorage fallback and credentials
+  const customFetch = async (
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> => {
+    const headers = { ...(options.headers as Record<string, string> || {}) };
+    
+    // 1. Bearer Token if authenticated user
+    const activeToken = token || localStorage.getItem("accessToken");
+    if (activeToken) {
+      headers["Authorization"] = `Bearer ${activeToken}`;
+    }
+
+    // 2. x-guest-token if guest identity token is saved
+    const savedGuestToken = localStorage.getItem("discoveryGuestToken");
+    if (savedGuestToken) {
+      headers["x-guest-token"] = savedGuestToken;
+    }
+
+    const mergedOptions: RequestInit = {
+      ...options,
+      headers,
+      credentials: "include"
+    };
+
+    const res = await fetch(url, mergedOptions);
+
+    // 3. Extract x-guest-token response header to save it for fallback
+    const newGuestToken = res.headers.get("x-guest-token");
+    if (newGuestToken) {
+      localStorage.setItem("discoveryGuestToken", newGuestToken);
+    }
+
+    return res;
+  };
+
   // Load Session and Cookies
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
@@ -197,18 +233,14 @@ export default function FindMyCarPage() {
   }, [gameState, exitDirection, currentCard, sessionVersion]);
 
   // Start or resume discovery session
-  const startOrResumeSession = async (authToken?: string | null) => {
+  const startOrResumeSession = async (authToken?: string | null): Promise<string> => {
     try {
       const activeToken = authToken !== undefined ? authToken : token;
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-      if (activeToken) headers["Authorization"] = `Bearer ${activeToken}`;
 
       // POST /sessions
-      const res = await fetch(`${API_URL}/vehicle-discovery/sessions`, {
+      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions`, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           filters: {
             minimumPrice: minPrice ? Number(minPrice) : undefined,
@@ -238,32 +270,59 @@ export default function FindMyCarPage() {
           setSelectedFuels(data.session.fuelTypes || []);
           setSelectedTransmissions(data.session.transmissions || []);
         }
+
+        // Merge session swipes if authenticated and just started
+        if (activeToken) {
+          customFetch(`${API_URL}/vehicle-discovery/merge`, { method: "POST" })
+            .then(async (mergeRes) => {
+              if (mergeRes.status === 200 || mergeRes.status === 201) {
+                localStorage.removeItem("discoveryGuestToken");
+              }
+            })
+            .catch((e) => console.error("Error merging swipes:", e));
+        }
+
+        return data.session.id;
+      } else {
+        setGameState("error");
+        return "";
       }
     } catch (e) {
       console.error("Error starting discovery session:", e);
       setGameState("error");
+      return "";
     }
   };
 
   const startDiscovery = async () => {
     setGameState("loading");
-    await fetchNextCard(true);
+    let activeSessionId = sessionId;
+    if (!activeSessionId) {
+      const activeToken = token || localStorage.getItem("accessToken");
+      activeSessionId = await startOrResumeSession(activeToken);
+    }
+    if (activeSessionId) {
+      await fetchNextCard(true, activeSessionId);
+    }
   };
 
   // Submit filters changes
   const applyFilters = async () => {
-    if (!sessionId) return;
     setGameState("loading");
     setShowFilterPanel(false);
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (!sessionId) {
+        const activeToken = token || localStorage.getItem("accessToken");
+        const newSId = await startOrResumeSession(activeToken);
+        if (newSId) {
+          await fetchNextCard(true, newSId);
+        }
+        return;
+      }
 
-      const res = await fetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/filters`, {
+      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/filters`, {
         method: "PATCH",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           filters: {
             minimumPrice: minPrice ? Number(minPrice) : 0,
@@ -281,7 +340,9 @@ export default function FindMyCarPage() {
         setSessionVersion(data.session.version);
         setWarningMessage(data.warning);
         setNextCardCache(null);
-        await fetchNextCard(true);
+        await fetchNextCard(true, sessionId);
+      } else {
+        setGameState("error");
       }
     } catch (e) {
       console.error("Error updating filters:", e);
@@ -293,7 +354,6 @@ export default function FindMyCarPage() {
   const resetDiscovery = async () => {
     setGameState("loading");
     try {
-      // Clear cookie/session by initiating fresh
       setMinPrice("");
       setMaxPrice("");
       setSelectedBodies([]);
@@ -303,15 +363,10 @@ export default function FindMyCarPage() {
       setNextCardCache(null);
       setCurrentCard(null);
 
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(`${API_URL}/vehicle-discovery/sessions`, {
+      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({ filters: {} }) // Blank startup
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filters: {} })
       });
 
       if (res.status === 201 || res.status === 200) {
@@ -321,6 +376,8 @@ export default function FindMyCarPage() {
         setSessionVersion(data.session.version);
         setTargetCount(data.session.targetCount);
         setGameState("intro");
+      } else {
+        setGameState("error");
       }
     } catch (e) {
       console.error("Error resetting discovery:", e);
@@ -329,28 +386,25 @@ export default function FindMyCarPage() {
   };
 
   // Fetch Next Card
-  const fetchNextCard = async (initiateStateChange = false) => {
-    if (isFetchingRef.current) return;
+  const fetchNextCard = async (initiateStateChange = false, targetSessionId?: string) => {
+    const sId = targetSessionId || sessionId;
+    if (isFetchingRef.current || !sId) return;
     isFetchingRef.current = true;
     try {
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(
-        `${API_URL}/vehicle-discovery/sessions/${sessionId}/next`,
-        { headers }
+      const res = await customFetch(
+        `${API_URL}/vehicle-discovery/sessions/${sId}/next`
       );
 
       if (res.status === 200) {
         const data = await res.json();
         if (data.status === "COMPLETED") {
-          await loadResults(sessionId);
+          await loadResults(sId);
           return;
         }
 
         const card = data.card;
         if (!card) {
-          await loadResults(sessionId);
+          await loadResults(sId);
           return;
         }
 
@@ -361,10 +415,12 @@ export default function FindMyCarPage() {
           setGameState("swiping");
           // Pre-fetch next card
           isFetchingRef.current = false;
-          fetchNextCard(false);
+          fetchNextCard(false, sId);
         } else {
           setNextCardCache(card);
         }
+      } else {
+        setGameState("error");
       }
     } catch (e) {
       console.error("Error fetching next card:", e);
@@ -383,14 +439,9 @@ export default function FindMyCarPage() {
 
     setTimeout(async () => {
       try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json"
-        };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-
-        const res = await fetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/swipes`, {
+        const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/swipes`, {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             cardId: currentCard.id,
             action,
@@ -414,21 +465,25 @@ export default function FindMyCarPage() {
           if (nextCardCache) {
             setCurrentCard(nextCardCache);
             setNextCardCache(null);
-            fetchNextCard(false);
+            fetchNextCard(false, sessionId);
           } else {
             setGameState("loading");
-            await fetchNextCard(true);
+            await fetchNextCard(true, sessionId);
           }
         } else if (res.status === 409) {
           // Version conflict, reload session candidate card
           setOffsetX(0);
           setExitDirection(null);
           setGameState("loading");
-          await fetchNextCard(true);
+          await fetchNextCard(true, sessionId);
+        } else {
+          setExitDirection(null);
+          setGameState("error");
         }
       } catch (e) {
         console.error("Error submitting swipe:", e);
         setExitDirection(null);
+        setGameState("error");
       }
     }, 250);
   };
@@ -437,11 +492,7 @@ export default function FindMyCarPage() {
   const loadResults = async (sId: string, authToken?: string | null) => {
     setGameState("loading");
     try {
-      const activeToken = authToken !== undefined ? authToken : token;
-      const headers: Record<string, string> = {};
-      if (activeToken) headers["Authorization"] = `Bearer ${activeToken}`;
-
-      const res = await fetch(`${API_URL}/vehicle-discovery/sessions/${sId}/results`, { headers });
+      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sId}/results`);
       if (res.status === 200) {
         const data = await res.json();
         setResultsData(data);
@@ -768,7 +819,7 @@ export default function FindMyCarPage() {
                 <button
                   onClick={() => handleSwipe("left")}
                   disabled={!!exitDirection}
-                  className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-16 z-20 w-12 h-12 bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/30 hover:border-red-500/50 rounded-full items-center justify-center transition duration-150 shadow-md cursor-pointer active:scale-95"
+                  className="w-12 h-12 bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/30 hover:border-red-500/50 rounded-full flex items-center justify-center transition duration-150 shadow-md cursor-pointer active:scale-95 absolute top-1/2 -translate-y-1/2 -left-16 z-20"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -776,7 +827,7 @@ export default function FindMyCarPage() {
                 <button
                   onClick={() => handleSwipe("right")}
                   disabled={!!exitDirection}
-                  className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-16 z-20 w-12 h-12 bg-green-500/10 hover:bg-green-500/25 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-full items-center justify-center transition duration-150 shadow-md cursor-pointer active:scale-95"
+                  className="w-12 h-12 bg-green-500/10 hover:bg-green-500/25 text-green-400 border border-green-500/30 hover:border-green-500/50 rounded-full flex items-center justify-center transition duration-150 shadow-md cursor-pointer active:scale-95 absolute top-1/2 -translate-y-1/2 -right-16 z-20"
                 >
                   <Check className="w-5 h-5" />
                 </button>
@@ -1185,7 +1236,7 @@ export default function FindMyCarPage() {
         {/* ERROR STATE */}
         {gameState === "error" && (
           <div className="text-center max-w-sm bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-md shadow-2xl">
-            <RefreshCcw className="w-12 h-12 text-orange-500 mx-auto mb-4 animate-spin" />
+            <RefreshCcw className="w-12 h-12 text-orange-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold mb-2">Veri Bağlantısı Hatası</h2>
             <p className="text-slate-400 text-xs leading-relaxed mb-6">
               Platform veri tabanı veya servis bağlantısında geçici bir kesinti oluştu. Lütfen tekrar deneyin.

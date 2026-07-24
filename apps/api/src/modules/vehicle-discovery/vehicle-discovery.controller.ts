@@ -16,9 +16,12 @@ export class VehicleDiscoveryController {
     req: Request,
     res: Response
   ): Promise<string> {
-    const cookieHeader = req.headers.cookie || '';
-    const match = cookieHeader.match(/discovery_guest_token=([^;]+)/);
-    let token = match ? match[1] : null;
+    let token = (req.headers['x-guest-token'] as string) || null;
+    if (!token) {
+      const cookieHeader = req.headers.cookie || '';
+      const match = cookieHeader.match(/discovery_guest_token=([^;]+)/);
+      token = match ? match[1] : null;
+    }
     let guestIdentityId = '';
 
     if (token) {
@@ -58,10 +61,13 @@ export class VehicleDiscoveryController {
       // Write cookie
       res.cookie('discovery_guest_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: true,
+        sameSite: 'none', // Set SameSite=None to support cross-domain cookies
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
       });
+
+      // Write custom header for localstorage fallback
+      res.setHeader('x-guest-token', token);
     }
 
     return guestIdentityId;
