@@ -179,13 +179,15 @@ export class VehicleDiscoveryService {
   private async populateSessionItems(params: {
     session: any;
     startIndex: number;
+    tx?: Prisma.TransactionClient;
   }): Promise<{ warning: string | null }> {
-    const { session, startIndex } = params;
+    const { session, startIndex, tx } = params;
+    const db = tx || this.prisma;
 
     let warning: string | null = null;
 
     // Get all cards to filter
-    const allCards = await this.prisma.vehicleDiscoveryCard.findMany({
+    const allCards = await db.vehicleDiscoveryCard.findMany({
       where: { isActive: true, archivedAt: null },
       include: {
         priceSnapshot: true
@@ -265,7 +267,7 @@ export class VehicleDiscoveryService {
       actionAt: null
     }));
 
-    await this.prisma.vehicleDiscoverySessionItem.createMany({
+    await db.vehicleDiscoverySessionItem.createMany({
       data: itemsToInsert
     });
 
@@ -490,7 +492,8 @@ export class VehicleDiscoveryService {
       // Seed items starting from current index
       const { warning } = await this.populateSessionItems({
         session: updatedSession,
-        startIndex: session.currentIndex
+        startIndex: session.currentIndex,
+        tx
       });
 
       const freshSession = await tx.vehicleDiscoverySession.findUnique({
