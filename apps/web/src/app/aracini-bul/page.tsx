@@ -125,7 +125,6 @@ export default function FindMyCarPage() {
   const [gameState, setGameState] = useState<"intro" | "loading" | "swiping" | "result" | "empty" | "error">("intro");
   
   const [currentCard, setCurrentCard] = useState<DiscoveryCard | null>(null);
-  const [nextCardCache, setNextCardCache] = useState<DiscoveryCard | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [sessionVersion, setSessionVersion] = useState<number>(0);
   const [targetCount, setTargetCount] = useState<number>(20);
@@ -146,7 +145,6 @@ export default function FindMyCarPage() {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [exitDirection, setExitDirection] = useState<"left" | "right" | null>(null);
   const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const isFetchingRef = useRef<boolean>(false);
 
   // Body Styles Options (6 Basic Types)
   const bodyStyles = [
@@ -302,7 +300,7 @@ export default function FindMyCarPage() {
       activeSessionId = await startOrResumeSession(activeToken);
     }
     if (activeSessionId) {
-      await fetchNextCard(true, activeSessionId);
+      await fetchNextCard(activeSessionId);
     }
   };
 
@@ -315,7 +313,7 @@ export default function FindMyCarPage() {
         const activeToken = token || localStorage.getItem("accessToken");
         const newSId = await startOrResumeSession(activeToken);
         if (newSId) {
-          await fetchNextCard(true, newSId);
+          await fetchNextCard(newSId);
         }
         return;
       }
@@ -339,8 +337,7 @@ export default function FindMyCarPage() {
         setCurrentIndex(data.session.currentIndex);
         setSessionVersion(data.session.version);
         setWarningMessage(data.warning);
-        setNextCardCache(null);
-        await fetchNextCard(true, sessionId);
+        await fetchNextCard(sessionId);
       } else {
         setGameState("error");
       }
@@ -360,7 +357,6 @@ export default function FindMyCarPage() {
       setSelectedFuels([]);
       setSelectedTransmissions([]);
       setWarningMessage(null);
-      setNextCardCache(null);
       setCurrentCard(null);
 
       const res = await customFetch(`${API_URL}/vehicle-discovery/sessions`, {
@@ -386,10 +382,9 @@ export default function FindMyCarPage() {
   };
 
   // Fetch Next Card
-  const fetchNextCard = async (initiateStateChange = false, targetSessionId?: string) => {
+  const fetchNextCard = async (targetSessionId?: string) => {
     const sId = targetSessionId || sessionId;
-    if (isFetchingRef.current || !sId) return;
-    isFetchingRef.current = true;
+    if (!sId) return;
     try {
       const res = await customFetch(
         `${API_URL}/vehicle-discovery/sessions/${sId}/next`
@@ -408,25 +403,16 @@ export default function FindMyCarPage() {
           return;
         }
 
-        if (initiateStateChange) {
-          setCurrentCard(card);
-          setCurrentIndex(data.currentIndex);
-          setSessionVersion(data.version);
-          setGameState("swiping");
-          // Pre-fetch next card
-          isFetchingRef.current = false;
-          fetchNextCard(false, sId);
-        } else {
-          setNextCardCache(card);
-        }
+        setCurrentCard(card);
+        setCurrentIndex(data.currentIndex);
+        setSessionVersion(data.version);
+        setGameState("swiping");
       } else {
         setGameState("error");
       }
     } catch (e) {
       console.error("Error fetching next card:", e);
       setGameState("error");
-    } finally {
-      isFetchingRef.current = false;
     }
   };
 
@@ -461,21 +447,15 @@ export default function FindMyCarPage() {
             return;
           }
 
-          // Load next card
-          if (nextCardCache) {
-            setCurrentCard(nextCardCache);
-            setNextCardCache(null);
-            fetchNextCard(false, sessionId);
-          } else {
-            setGameState("loading");
-            await fetchNextCard(true, sessionId);
-          }
+          // Fetch next card now that the index has been incremented
+          setGameState("loading");
+          await fetchNextCard(sessionId);
         } else if (res.status === 409) {
           // Version conflict, reload session candidate card
           setOffsetX(0);
           setExitDirection(null);
           setGameState("loading");
-          await fetchNextCard(true, sessionId);
+          await fetchNextCard(sessionId);
         } else {
           setExitDirection(null);
           setGameState("error");
@@ -1109,9 +1089,50 @@ export default function FindMyCarPage() {
 
             {/* Results Actions */}
             <div className="flex flex-col md:flex-row gap-4 mt-6">
+              {currentIndex < 50 && (
+                <button
+                  onClick={async () => {
+                    setGameState("loading");
+                    try {
+                      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/filters`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          filters: {
+                            minimumPrice: minPrice ? Number(minPrice) : 0,
+                            maximumPrice: maxPrice ? Number(maxPrice) : null,
+                            bodyTypes: selectedBodies,
+                            fuelTypes: selectedFuels,
+                            transmissions: selectedTransmissions
+                          },
+                          targetCount: 50
+                        })
+                      });
+                      if (res.status === 200) {
+                        const data = await res.json();
+                        setCurrentIndex(data.session.currentIndex);
+                        setSessionVersion(data.session.version);
+                        setTargetCount(data.session.targetCount);
+                        setWarningMessage(data.warning);
+                        await fetchNextCard(sessionId);
+                      } else {
+                        setGameState("error");
+                      }
+                    } catch (e) {
+                      console.error("Error extending session:", e);
+                      setGameState("error");
+                    }
+                  }}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3.5 px-6 rounded-2xl border border-white/5 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCcw className="w-4 h-4" />
+                  <span>20 Araç Daha Değerlendir</span>
+                </button>
+              )}
+
               <button
                 onClick={resetDiscovery}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-4 px-6 rounded-2xl border border-white/5 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3.5 px-6 rounded-2xl border border-white/5 transition duration-150 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <RefreshCcw className="w-4 h-4" />
                 <span>Seçimleri Sıfırla ve Yeniden Keşfet</span>
@@ -1134,7 +1155,7 @@ export default function FindMyCarPage() {
                 </button>
               </div>
 
-              {/* Price inputs */}
+              {/* Price price inputs */}
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fiyat Filtresi (TL)</span>
                 <div className="grid grid-cols-2 gap-2">
