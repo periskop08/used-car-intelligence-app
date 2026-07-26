@@ -88,11 +88,34 @@ export default function ListingFeedPage() {
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const loadingMoreRef = useRef(false);
 
-  // Refs for scroll snapping
+  // Refs for scroll snapping & scrolling lock
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const viewedTimerRefs = useRef<Record<string, NodeJS.Timeout>>({});
   const viewedLoggedRefs = useRef<Record<string, boolean>>({});
+  const isScrollingRef = useRef(false);
+
+  const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current) return;
+    
+    if (Math.abs(e.deltaY) > 15) {
+      if (e.deltaY > 0 && currentIndex < listings.length - 1) {
+        isScrollingRef.current = true;
+        const targetId = listings[currentIndex + 1]?.id;
+        if (targetId && cardRefs.current[targetId]) {
+          cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        setTimeout(() => { isScrollingRef.current = false; }, 500);
+      } else if (e.deltaY < 0 && currentIndex > 0) {
+        isScrollingRef.current = true;
+        const targetId = listings[currentIndex - 1]?.id;
+        if (targetId && cardRefs.current[targetId]) {
+          cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        setTimeout(() => { isScrollingRef.current = false; }, 500);
+      }
+    }
+  };
 
   // Generate initial seed on client load
   useEffect(() => {
@@ -367,7 +390,8 @@ export default function ListingFeedPage() {
           ) : (
             <div
               ref={containerRef}
-              className="flex-1 overflow-y-auto snap-y snap-mandatory scrollbar-none"
+              onWheel={handleWheelScroll}
+              className="flex-1 overflow-y-auto snap-y snap-mandatory snap-always scroll-smooth scrollbar-none"
             >
               {listings.map((item, index) => {
                 const activeTab = activeTabs[item.id] || "info";
@@ -379,67 +403,115 @@ export default function ListingFeedPage() {
                     key={item.id}
                     ref={(el) => { cardRefs.current[item.id] = el; }}
                     data-id={item.id}
-                    className="w-full h-full snap-start flex-none flex flex-col md:flex-row relative"
+                    className="w-full h-full snap-start snap-always flex-none flex flex-col md:flex-row relative"
                   >
-                    {/* Left Column: Image Container (Rectangular Centered with Top/Bottom Photo Nav) */}
+                    {/* Left Column: Image Container (Rectangular Centered with Listing Nav & Photo Arrows) */}
                     <div className="w-full md:w-[48%] h-[320px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-[#060913] flex flex-col justify-between items-center p-3 select-none">
-                      {item.photos.length > 0 ? (
-                        <>
-                          {/* Top Photo Nav Button ("Önceki Fotoğraf") */}
-                          <button
-                            disabled={activePhoto === 0}
-                            onClick={() =>
-                              setActivePhotoIndices((prev) => ({
-                                ...prev,
-                                [item.id]: Math.max(0, activePhoto - 1),
-                              }))
+                      {/* Top Button: Önceki İlan */}
+                      <button
+                        disabled={index === 0}
+                        onClick={() => {
+                          if (index > 0) {
+                            const targetId = listings[index - 1]?.id;
+                            if (targetId && cardRefs.current[targetId]) {
+                              cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
                             }
-                            className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
-                              activePhoto === 0
-                                ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
-                                : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
-                            }`}
-                          >
-                            <span>▲</span>
-                            <span>Önceki Fotoğraf</span>
-                          </button>
+                          }
+                        }}
+                        className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
+                          index === 0
+                            ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
+                            : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
+                        }`}
+                      >
+                        <span>▲</span>
+                        <span>Önceki İlan</span>
+                      </button>
 
-                          {/* Centered Rectangular Image */}
-                          <div className="relative w-full flex-1 max-h-[220px] md:max-h-[380px] my-2 flex items-center justify-center overflow-hidden rounded-2xl bg-black/80 border border-white/5">
+                      {/* Centered Rectangular Image Box with Left/Right Photo Arrows */}
+                      <div className="relative w-full flex-1 max-h-[220px] md:max-h-[380px] my-2 flex items-center justify-center overflow-hidden rounded-2xl bg-black/80 border border-white/5 group">
+                        {item.photos.length > 0 ? (
+                          <>
                             <img
                               src={item.photos[activePhoto]?.url}
                               alt={item.title}
                               className="w-full h-full object-contain"
                             />
+                            
+                            {/* Photo counter badge */}
                             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-slate-300 border border-white/10 z-10">
                               {activePhoto + 1} / {item.photos.length}
                             </div>
-                          </div>
 
-                          {/* Bottom Photo Nav Button ("Sonraki Fotoğraf") */}
-                          <button
-                            disabled={activePhoto >= item.photos.length - 1}
-                            onClick={() =>
-                              setActivePhotoIndices((prev) => ({
-                                ...prev,
-                                [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                              }))
+                            {/* Left/Right Photo Carousel Arrows */}
+                            {item.photos.length > 1 && (
+                              <>
+                                <button
+                                  disabled={activePhoto === 0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActivePhotoIndices((prev) => ({
+                                      ...prev,
+                                      [item.id]: Math.max(0, activePhoto - 1),
+                                    }));
+                                  }}
+                                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold transition-all z-20 ${
+                                    activePhoto === 0
+                                      ? "bg-black/30 border-white/5 text-slate-600 opacity-30 cursor-not-allowed"
+                                      : "bg-slate-900/80 hover:bg-orange-500 border-white/20 text-white shadow-lg cursor-pointer active:scale-95"
+                                  }`}
+                                  title="Önceki Fotoğraf"
+                                >
+                                  ◀
+                                </button>
+                                <button
+                                  disabled={activePhoto >= item.photos.length - 1}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActivePhotoIndices((prev) => ({
+                                      ...prev,
+                                      [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
+                                    }));
+                                  }}
+                                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold transition-all z-20 ${
+                                    activePhoto >= item.photos.length - 1
+                                      ? "bg-black/30 border-white/5 text-slate-600 opacity-30 cursor-not-allowed"
+                                      : "bg-slate-900/80 hover:bg-orange-500 border-white/20 text-white shadow-lg cursor-pointer active:scale-95"
+                                  }`}
+                                  title="Sonraki Fotoğraf"
+                                >
+                                  ▶
+                                </button>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
+                            Görsel Bulunmuyor
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bottom Button: Sonraki İlan */}
+                      <button
+                        disabled={index >= listings.length - 1}
+                        onClick={() => {
+                          if (index < listings.length - 1) {
+                            const targetId = listings[index + 1]?.id;
+                            if (targetId && cardRefs.current[targetId]) {
+                              cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
                             }
-                            className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
-                              activePhoto >= item.photos.length - 1
-                                ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
-                                : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
-                            }`}
-                          >
-                            <span>▼</span>
-                            <span>Sonraki Fotoğraf</span>
-                          </button>
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
-                          Görsel Bulunmuyor
-                        </div>
-                      )}
+                          }
+                        }}
+                        className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
+                          index >= listings.length - 1
+                            ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
+                            : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
+                        }`}
+                      >
+                        <span>▼</span>
+                        <span>Sonraki İlan</span>
+                      </button>
                     </div>
 
                     {/* Right Column: Details & Actions */}
