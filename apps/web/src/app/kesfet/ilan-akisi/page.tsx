@@ -381,45 +381,59 @@ export default function ListingFeedPage() {
                     data-id={item.id}
                     className="w-full h-full snap-start flex-none flex flex-col md:flex-row relative"
                   >
-                    {/* Left Column: Image Container */}
-                    <div className="w-full md:w-[45%] h-[260px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-black/40">
+                    {/* Left Column: Image Container (Rectangular Centered with Top/Bottom Photo Nav) */}
+                    <div className="w-full md:w-[48%] h-[320px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-[#060913] flex flex-col justify-between items-center p-3 select-none">
                       {item.photos.length > 0 ? (
                         <>
-                          <img
-                            src={item.photos[activePhoto]?.url}
-                            alt={item.title}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded bg-black/60 text-[10px] font-bold text-slate-300 z-10">
-                            {activePhoto + 1} / {item.photos.length}
+                          {/* Top Photo Nav Button ("Önceki Fotoğraf") */}
+                          <button
+                            disabled={activePhoto === 0}
+                            onClick={() =>
+                              setActivePhotoIndices((prev) => ({
+                                ...prev,
+                                [item.id]: Math.max(0, activePhoto - 1),
+                              }))
+                            }
+                            className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
+                              activePhoto === 0
+                                ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
+                                : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
+                            }`}
+                          >
+                            <span>▲</span>
+                            <span>Önceki Fotoğraf</span>
+                          </button>
+
+                          {/* Centered Rectangular Image */}
+                          <div className="relative w-full flex-1 max-h-[220px] md:max-h-[380px] my-2 flex items-center justify-center overflow-hidden rounded-2xl bg-black/80 border border-white/5">
+                            <img
+                              src={item.photos[activePhoto]?.url}
+                              alt={item.title}
+                              className="w-full h-full object-contain"
+                            />
+                            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-slate-300 border border-white/10 z-10">
+                              {activePhoto + 1} / {item.photos.length}
+                            </div>
                           </div>
-                          {/* Carousel Navigation */}
-                          {item.photos.length > 1 && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  setActivePhotoIndices((prev) => ({
-                                    ...prev,
-                                    [item.id]: Math.max(0, activePhoto - 1),
-                                  }))
-                                }
-                                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs text-white z-10"
-                              >
-                                ◀
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setActivePhotoIndices((prev) => ({
-                                    ...prev,
-                                    [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                                  }))
-                                }
-                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-xs text-white z-10"
-                              >
-                                ▶
-                              </button>
-                            </>
-                          )}
+
+                          {/* Bottom Photo Nav Button ("Sonraki Fotoğraf") */}
+                          <button
+                            disabled={activePhoto >= item.photos.length - 1}
+                            onClick={() =>
+                              setActivePhotoIndices((prev) => ({
+                                ...prev,
+                                [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
+                              }))
+                            }
+                            className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
+                              activePhoto >= item.photos.length - 1
+                                ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
+                                : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
+                            }`}
+                          >
+                            <span>▼</span>
+                            <span>Sonraki Fotoğraf</span>
+                          </button>
                         </>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
@@ -429,7 +443,7 @@ export default function ListingFeedPage() {
                     </div>
 
                     {/* Right Column: Details & Actions */}
-                    <div className="flex-1 flex flex-col justify-between p-5 md:p-6 overflow-hidden bg-[#090d1a] h-[calc(100%-260px)] md:h-full">
+                    <div className="flex-1 flex flex-col justify-between p-5 md:p-6 overflow-hidden bg-[#090d1a] h-[calc(100%-320px)] md:h-full">
                       {/* Top Bar Actions */}
                       <div className="flex justify-between items-center z-10 pb-2">
                         <button
@@ -582,20 +596,16 @@ export default function ListingFeedPage() {
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-2 border-t border-white/5">
-                        <button
-                          onClick={() => handleCall(item)}
-                          className="flex-1 py-2.5 rounded-xl text-[10px] md:text-xs font-black tracking-wider uppercase bg-[#141b2c] border border-white/10 hover:bg-[#1a233a] transition-all text-slate-200"
+                      {/* Single Primary Action: İlana Git */}
+                      <div className="pt-2 border-t border-white/5">
+                        <a
+                          href={item.detailUrl || `/listings/${item.id}`}
+                          onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
+                          className="w-full py-3 rounded-2xl text-xs md:text-sm font-black tracking-wider uppercase bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/35 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
                         >
-                          📞 Arama Başlat
-                        </button>
-                        <button
-                          onClick={() => handleMessage(item)}
-                          className="flex-1 py-2.5 rounded-xl text-[10px] md:text-xs font-black tracking-wider uppercase bg-gradient-to-r from-orange-500 to-amber-500 hover:opacity-90 transition-all text-white shadow-lg shadow-orange-500/15"
-                        >
-                          💬 Mesaj Gönder
-                        </button>
+                          <span>İlana Git</span>
+                          <span className="group-hover:translate-x-1 transition-transform">➔</span>
+                        </a>
                       </div>
                     </div>
                   </div>
