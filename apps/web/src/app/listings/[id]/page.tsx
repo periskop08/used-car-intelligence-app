@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function ListingDetail() {
   const { id } = useParams();
+  const router = useRouter();
 
   // Data states
   const [listing, setListing] = useState<any>(null);
@@ -15,15 +17,12 @@ export default function ListingDetail() {
   const [activePhoto, setActivePhoto] = useState("");
   const [hoveredPart, setHoveredPart] = useState("");
 
-  // Lead Form States
-  const [buyerName, setBuyerName] = useState("");
-  const [buyerPhone, setBuyerPhone] = useState("");
-  const [buyerEmail, setBuyerEmail] = useState("");
-  const [message, setMessage] = useState("Merhaba, araç ile ilgileniyorum. Detaylar için görüşebilir miyiz?");
-  const [communicationGranted, setCommunicationGranted] = useState(false);
-  const [leadLoading, setLeadLoading] = useState(false);
-  const [leadSuccess, setLeadSuccess] = useState("");
-  const [leadError, setLeadError] = useState("");
+  // Messaging Modal States
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageText, setMessageText] = useState("Merhaba, araç ile ilgileniyorum. Detaylar için görüşebilir miyiz?");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSuccess, setMessageSuccess] = useState(false);
+  const [messageError, setMessageError] = useState("");
 
   // Tab State for AI Analysis Box
   const [activeAiTab, setActiveAiTab] = useState<"problems" | "recalls" | "questions" | "checklist">("problems");
@@ -57,43 +56,54 @@ export default function ListingDetail() {
       });
   }, [id]);
 
-  const handleLeadSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLeadLoading(true);
-    setLeadSuccess("");
-    setLeadError("");
+  const handleOpenMessageModal = () => {
+    const savedToken = token || localStorage.getItem("accessToken");
+    if (!savedToken) {
+      window.location.href = `/login?redirect=/listings/${id}`;
+      return;
+    }
+    setMessageSuccess(false);
+    setMessageError("");
+    setShowMessageModal(true);
+  };
 
-    fetch(`${API_URL}/listings/${id}/leads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        buyerName,
-        buyerPhone,
-        buyerEmail,
-        message,
-        communicationGranted,
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) {
-          return res.json().then((err) => {
-            throw new Error(err.message || "Talep gönderilemedi.");
-          });
-        }
-        return res.json();
-      })
-      .then(() => {
-        setLeadSuccess("Talebiniz satıcıya başarıyla iletildi! En kısa sürede dönüş yapılacaktır.");
-        setBuyerName("");
-        setBuyerPhone("");
-        setBuyerEmail("");
-        setCommunicationGranted(false);
-        setLeadLoading(false);
-      })
-      .catch((err) => {
-        setLeadError(err.message);
-        setLeadLoading(false);
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageText.trim()) return;
+
+    const savedToken = token || localStorage.getItem("accessToken");
+    if (!savedToken) {
+      window.location.href = `/login?redirect=/listings/${id}`;
+      return;
+    }
+
+    setSendingMessage(true);
+    setMessageError("");
+
+    try {
+      const res = await fetch(`${API_URL}/conversations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${savedToken}`,
+        },
+        body: JSON.stringify({
+          listingId: id,
+          firstMessage: messageText.trim(),
+        }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Mesaj gönderilirken bir hata oluştu.");
+      }
+
+      setMessageSuccess(true);
+      setSendingMessage(false);
+    } catch (err: any) {
+      setMessageError(err.message || "Mesaj gönderilemedi.");
+      setSendingMessage(false);
+    }
   };
 
   const handleToggleFavorite = () => {
@@ -511,83 +521,56 @@ export default function ListingDetail() {
 
         {/* Right Side: Lead Form & AI Report widget */}
         <div className="lg:col-span-4 flex flex-col gap-8">
-          {/* Seller Lead Contact Form */}
+          {/* Seller Contact Info Card & Message Modal Trigger */}
           <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-4 shadow-xl">
-            <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">Satıcıya Mesaj Gönder</h3>
+            <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <User className="w-4 h-4 text-orange-400" />
+              <span>Satıcı Bilgileri</span>
+            </h3>
 
-            <form onSubmit={handleLeadSubmit} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
+              {/* Seller Full Name */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Adınız Soyadınız</label>
-                <input
-                  type="text"
-                  required
-                  value={buyerName}
-                  onChange={(e) => setBuyerName(e.target.value)}
-                  placeholder="Ahmet Yılmaz"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Adı Soyadı</label>
+                <div className="bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 flex items-center gap-2">
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>
+                    {listing.seller
+                      ? `${listing.seller.firstName || ""} ${listing.seller.lastName || ""}`.trim() || listing.seller.email.split("@")[0]
+                      : "Satıcı Bilgisi Yok"}
+                  </span>
+                </div>
               </div>
 
+              {/* Seller Phone Number */}
               <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Telefon Numaranız</label>
-                <input
-                  type="text"
-                  required
-                  value={buyerPhone}
-                  onChange={(e) => setBuyerPhone(e.target.value)}
-                  placeholder="05551234567"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Telefon Numarası</label>
+                <div className="bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{listing.seller?.phone || "Telefon Belirtilmedi"}</span>
+                  </div>
+                  {listing.seller?.phone && (
+                    <a
+                      href={`tel:${listing.seller.phone}`}
+                      className="text-[10px] text-orange-400 hover:underline font-semibold"
+                    >
+                      Ara
+                    </a>
+                  )}
+                </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">E-posta Adresiniz</label>
-                <input
-                  type="email"
-                  required
-                  value={buyerEmail}
-                  onChange={(e) => setBuyerEmail(e.target.value)}
-                  placeholder="ahmet@gmail.com"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Mesajınız</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition resize-none"
-                />
-              </div>
-
-              <div className="flex items-start gap-2 cursor-pointer mt-1">
-                <input
-                  type="checkbox"
-                  required
-                  id="consentCheckbox"
-                  checked={communicationGranted}
-                  onChange={(e) => setCommunicationGranted(e.target.checked)}
-                  className="accent-orange-500 rounded border-white/10 mt-0.5"
-                />
-                <label htmlFor="consentCheckbox" className="text-[10px] text-slate-400 select-none leading-tight cursor-pointer">
-                  KVKK / İletişim izni şartlarını kabul ediyorum. Satıcı benimle paylaştığım iletişim kanalları üzerinden irtibat kurabilir.
-                </label>
-              </div>
-
-              {leadSuccess && <p className="text-xs font-bold text-emerald-400 mt-2 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">{leadSuccess}</p>}
-              {leadError && <p className="text-xs font-bold text-red-400 mt-2 bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{leadError}</p>}
-
+              {/* Send Message Button */}
               <button
-                type="submit"
-                disabled={leadLoading}
-                className="w-full mt-2 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-orange-500/10"
+                type="button"
+                onClick={handleOpenMessageModal}
+                className="w-full mt-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3.5 rounded-xl transition text-xs shadow-lg shadow-orange-500/15 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
-                {leadLoading ? "Gönderiliyor..." : "Bilgileri Satıcıya Gönder"}
+                <MessageSquare className="w-4 h-4" />
+                <span>Satıcıya Mesaj Gönder</span>
               </button>
-            </form>
+            </div>
           </div>
 
           {/* AI Intelligence widget block */}
@@ -725,6 +708,111 @@ export default function ListingDetail() {
           )}
         </div>
       </div>
+
+      {/* Send Message Modal Popup */}
+      {showMessageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#090d1a] border border-white/10 p-6 rounded-[28px] max-w-lg w-full shadow-2xl flex flex-col gap-5 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowMessageModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-200 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+              <div className="p-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-100">Satıcıya Mesaj Gönder</h3>
+                <p className="text-[11px] text-slate-400">İlan ve satıcı ile doğrudan iletişime geçin.</p>
+              </div>
+            </div>
+
+            {/* Listing Summary Card */}
+            <div className="bg-slate-900/60 border border-white/5 p-4 rounded-2xl flex items-center gap-3">
+              {activePhoto && (
+                <img src={activePhoto} alt="listing thumbnail" className="w-14 h-14 object-cover rounded-xl border border-white/10" />
+              )}
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-extrabold text-slate-200 truncate">{listing.title}</span>
+                <span className="text-xs font-black text-orange-400 mt-0.5">
+                  {new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(listing.priceAmount)}
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5">
+                  Satıcı: {listing.seller ? `${listing.seller.firstName || ""} ${listing.seller.lastName || ""}`.trim() || listing.seller.email : "Bilinmiyor"}
+                </span>
+              </div>
+            </div>
+
+            {messageSuccess ? (
+              <div className="flex flex-col items-center justify-center text-center gap-3 py-6">
+                <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+                <h4 className="text-sm font-extrabold text-slate-100">Mesajınız Gönderildi!</h4>
+                <p className="text-xs text-slate-400 max-w-xs">
+                  Mesajınız satıcıya iletildi. Satıcının yanıtlarını ve mesaj geçmişinizi Mesajlarım sayfasından takip edebilirsiniz.
+                </p>
+                <div className="flex gap-3 w-full mt-4">
+                  <button
+                    onClick={() => setShowMessageModal(false)}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3 rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Kapat
+                  </button>
+                  <button
+                    onClick={() => router.push("/dashboard/messages")}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-orange-500/15"
+                  >
+                    Mesajlarıma Git
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendMessage} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">Mesajınız</label>
+                  <textarea
+                    rows={4}
+                    required
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Merhabalar, araç hakkında detaylı bilgi alabilir miyim?"
+                    className="w-full bg-slate-950 border border-white/10 rounded-2xl p-4 text-xs text-slate-200 placeholder-slate-600 outline-none focus:border-orange-500 transition resize-none"
+                  />
+                </div>
+
+                {messageError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{messageError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowMessageModal(false)}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-slate-400 font-bold py-3.5 rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sendingMessage || !messageText.trim()}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3.5 rounded-xl text-xs transition shadow-lg shadow-orange-500/15 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{sendingMessage ? "Gönderiliyor..." : "Mesajı Gönder"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

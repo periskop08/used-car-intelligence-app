@@ -514,6 +514,17 @@ export class ListingController {
     const listing = await this.listingService['prisma'].vehicleListing.findUnique({
       where: { id },
       include: {
+        seller: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            profilePhotoUrl: true,
+            createdAt: true,
+          },
+        },
         media: {
           orderBy: { sortOrder: 'asc' },
         },
