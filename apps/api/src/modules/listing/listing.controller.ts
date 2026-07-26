@@ -87,6 +87,7 @@ export class ListingController {
     @Query('keyword') keyword?: string,
     @Query('includeDescription') includeDescription?: string,
     @Query('currency') currency?: string,
+    @Query('sellerId') sellerId?: string,
   ) {
     // Parse filters
     const filters: any = {
@@ -97,6 +98,10 @@ export class ListingController {
         },
       },
     };
+
+    if (sellerId) {
+      filters.sellerId = sellerId;
+    }
 
     if (vehicleVariantId) {
       filters.vehicleVariantId = vehicleVariantId;
@@ -548,6 +553,7 @@ export class ListingController {
     }
 
     let isFavorited = false;
+    let isSellerFavorited = false;
     if (user?.id) {
       const fav = await this.listingService['prisma'].favoriteListing.findUnique({
         where: {
@@ -558,6 +564,18 @@ export class ListingController {
         },
       });
       isFavorited = !!fav;
+
+      if (listing.sellerId) {
+        const favSeller = await this.listingService['prisma'].favoriteSeller.findUnique({
+          where: {
+            userId_sellerId: {
+              userId: user.id,
+              sellerId: listing.sellerId,
+            },
+          },
+        });
+        isSellerFavorited = !!favSeller;
+      }
     }
 
     if (listing.media) {
@@ -567,6 +585,7 @@ export class ListingController {
     return {
       ...listing,
       isFavorited,
+      isSellerFavorited,
     };
   }
 

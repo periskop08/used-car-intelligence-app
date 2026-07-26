@@ -105,27 +105,36 @@ export default function FavoriteSellersPage() {
           {sellers.map((item) => (
             <div
               key={item.id}
-              className="glass border border-white/5 rounded-3xl bg-[#090d1a]/45 backdrop-blur-md p-6 flex flex-col items-center text-center gap-4 hover:border-orange-500/20 transition duration-300"
+              className="glass border border-white/5 rounded-3xl bg-[#090d1a]/45 backdrop-blur-md p-6 flex flex-col items-center text-center gap-4 hover:border-orange-500/20 transition duration-300 shadow-xl"
             >
-              <div className="w-16 h-16 rounded-2xl overflow-hidden bg-orange-600/10 border border-orange-500/20 flex items-center justify-center font-bold text-orange-400 text-xl">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-tr from-orange-500 to-amber-500 border border-white/20 flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-orange-500/20 shrink-0">
                 {item.seller.profilePhotoUrl ? (
                   <img src={formatImageUrl(item.seller.profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  (item.seller.firstName || item.seller.email).slice(0, 2).toUpperCase()
+                  <span className="font-black text-white text-2xl tracking-tighter drop-shadow">T</span>
                 )}
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-200">{formatUserName(item.seller)}</h3>
-                <span className="text-[10px] text-slate-500 font-mono block mt-1">{item.seller.email}</span>
+                <h3 className="text-sm font-extrabold text-slate-200">{formatUserName(item.seller)}</h3>
+                <span className="text-[10px] text-slate-500 font-mono block mt-0.5">{item.seller.email}</span>
               </div>
 
-              <button
-                onClick={() => handleRemove(item.sellerId)}
-                className="w-full py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Takipten Çık
-              </button>
+              <div className="flex flex-col gap-2 w-full mt-1">
+                <a
+                  href={`/listings?sellerId=${item.sellerId}`}
+                  className="w-full py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 text-orange-400 rounded-xl text-xs font-bold transition text-center cursor-pointer"
+                >
+                  Satıcının İlanlarını Gör
+                </a>
+
+                <button
+                  onClick={() => handleRemove(item.sellerId)}
+                  className="w-full py-2 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Takipten Çık
+                </button>
+              </div>
             </div>
           ))}
         </div>

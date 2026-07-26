@@ -2,9 +2,20 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+const formatImageUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
+    const parts = url.split(".r2.dev/");
+    if (parts.length > 1) {
+      return `${API_URL}/listings/media-proxy/${parts[1]}`;
+    }
+  }
+  return url;
+};
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -16,6 +27,8 @@ export default function ListingDetail() {
   const [error, setError] = useState("");
   const [activePhoto, setActivePhoto] = useState("");
   const [hoveredPart, setHoveredPart] = useState("");
+  const [isSellerFavorited, setIsSellerFavorited] = useState(false);
+  const [togglingSellerFav, setTogglingSellerFav] = useState(false);
 
   // Messaging Modal States
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -45,6 +58,7 @@ export default function ListingDetail() {
       })
       .then((data) => {
         setListing(data);
+        setIsSellerFavorited(data.isSellerFavorited || false);
         if (data.media && data.media.length > 0) {
           setActivePhoto(data.media[0].url);
         }
@@ -55,6 +69,35 @@ export default function ListingDetail() {
         setLoading(false);
       });
   }, [id]);
+
+  const handleToggleFavoriteSeller = async () => {
+    const savedToken = token || localStorage.getItem("accessToken");
+    if (!savedToken) {
+      window.location.href = `/login?redirect=/listings/${id}`;
+      return;
+    }
+    if (!listing?.sellerId || togglingSellerFav) return;
+
+    setTogglingSellerFav(true);
+    try {
+      const res = await fetch(`${API_URL}/favorites/sellers/toggle`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${savedToken}`,
+        },
+        body: JSON.stringify({ sellerId: listing.sellerId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsSellerFavorited(data.favorited);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTogglingSellerFav(false);
+    }
+  };
 
   const handleOpenMessageModal = () => {
     const savedToken = token || localStorage.getItem("accessToken");
@@ -521,12 +564,30 @@ export default function ListingDetail() {
 
         {/* Right Side: Lead Form & AI Report widget */}
         <div className="lg:col-span-4 flex flex-col gap-8">
-          {/* Seller Contact Info Card & Message Modal Trigger */}
-          <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-4 shadow-xl">
-            <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <User className="w-4 h-4 text-orange-400" />
-              <span>Satıcı Bilgileri</span>
-            </h3>
+          {/* Seller Profile Avatar & Actions Card */}
+          <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-5 shadow-xl">
+            {/* Seller Avatar Header */}
+            <div className="flex items-center gap-4 pb-2 border-b border-white/5">
+              <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-orange-500/20 border border-white/20 shrink-0">
+                {listing.seller?.profilePhotoUrl ? (
+                  <img
+                    src={formatImageUrl(listing.seller.profilePhotoUrl)}
+                    alt="Seller Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="font-black text-white text-2xl tracking-tighter drop-shadow">T</span>
+                )}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block">İlan Sahibi</span>
+                <h3 className="text-base font-extrabold text-slate-100 truncate mt-0.5">
+                  {listing.seller
+                    ? `${listing.seller.firstName || ""} ${listing.seller.lastName || ""}`.trim() || listing.seller.email.split("@")[0]
+                    : "Satıcı Bilgisi Yok"}
+                </h3>
+              </div>
+            </div>
 
             <div className="flex flex-col gap-3">
               {/* Seller Full Name */}
@@ -570,6 +631,31 @@ export default function ListingDetail() {
                 <MessageSquare className="w-4 h-4" />
                 <span>Satıcıya Mesaj Gönder</span>
               </button>
+
+              {/* Two sub-action links */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                <a
+                  href={`/listings?sellerId=${listing.sellerId}`}
+                  className="w-full text-center py-2.5 px-3 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/5 text-slate-300 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <ListFilter className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Satıcının Tüm İlanları</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleToggleFavoriteSeller}
+                  disabled={togglingSellerFav}
+                  className={`w-full text-center py-2.5 px-3 rounded-xl border text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    isSellerFavorited
+                      ? "bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20"
+                      : "bg-white/[0.03] hover:bg-white/10 border-white/5 text-slate-300"
+                  }`}
+                >
+                  <Heart className={`w-3.5 h-3.5 ${isSellerFavorited ? "fill-rose-400 text-rose-400" : "text-slate-400"}`} />
+                  <span>{isSellerFavorited ? "Favori Satıcılarımda" : "Favori Satıcılarıma Ekle"}</span>
+                </button>
+              </div>
             </div>
           </div>
 
