@@ -218,6 +218,22 @@ export class MessageService {
     return message;
   }
 
+  async getUnreadCount(userId: string) {
+    const unreadCount = await this.prisma.message.count({
+      where: {
+        senderId: { not: userId },
+        readAt: null,
+        conversation: {
+          OR: [
+            { buyerId: userId },
+            { sellerId: userId },
+          ],
+        },
+      },
+    });
+    return { unreadCount };
+  }
+
   private sanitizeHtml(text: string): string {
     if (!text) return '';
     // Strip tags and escape < and > to prevent XSS

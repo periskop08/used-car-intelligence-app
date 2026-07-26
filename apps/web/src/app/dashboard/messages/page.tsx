@@ -48,7 +48,7 @@ export default function MessagesPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const fetchConversations = (selectId?: string) => {
+  const fetchConversations = (selectId?: string, silent: boolean = false) => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
@@ -61,7 +61,7 @@ export default function MessagesPage() {
       })
       .then((data) => {
         setConversations(data);
-        setLoading(false);
+        if (!silent) setLoading(false);
         if (selectId) {
           const updated = data.find((c: Conversation) => c.id === selectId);
           if (updated) setSelectedConversation(updated);
@@ -69,14 +69,29 @@ export default function MessagesPage() {
       })
       .catch((err) => {
         console.error(err);
-        setLoading(false);
+        if (!silent) setLoading(false);
       });
+  };
+
+  const fetchSelectedMessages = (convId: string, silent: boolean = false) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    fetch(`${API_URL}/conversations/${convId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.messages) {
+          setMessages(data.messages);
+          window.dispatchEvent(new Event("unread_messages_updated"));
+        }
+      })
+      .catch((e) => console.error(e));
   };
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
-      // Decode user ID if we have it or fetch profile
       const token = localStorage.getItem("accessToken");
       fetch(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -90,25 +105,25 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (selectedConversation) {
-      const token = localStorage.getItem("accessToken");
-      fetch(`${API_URL}/conversations/${selectedConversation.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setMessages(data.messages);
-          // Mark as read locally in sidebar conversations list
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === selectedConversation.id
-                ? { ...c, messages: c.messages.map((m) => ({ ...m, readAt: new Date().toISOString() })) }
-                : c
-            )
-          );
-        });
+      fetchSelectedMessages(selectedConversation.id);
     } else {
       setMessages([]);
     }
+  }, [selectedConversation?.id]);
+
+  // Live polling interval every 4 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+
+      fetchConversations(undefined, true);
+      if (selectedConversation?.id) {
+        fetchSelectedMessages(selectedConversation.id, true);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
   }, [selectedConversation?.id]);
 
   useEffect(() => {
@@ -137,8 +152,8 @@ export default function MessagesPage() {
         setMessages((prev) => [...prev, newMsg]);
         setNewMessageText("");
         setSending(false);
-        // Refresh conversations list to update previews
-        fetchConversations(selectedConversation.id);
+        fetchConversations(selectedConversation.id, true);
+        window.dispatchEvent(new Event("unread_messages_updated"));
       })
       .catch((err) => {
         alert(err.message);

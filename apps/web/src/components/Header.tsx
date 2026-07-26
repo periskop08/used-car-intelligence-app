@@ -4,12 +4,33 @@ import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { formatImageUrl } from "../utils/media";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function Header() {
   const pathname = usePathname();
   const [user, setUser] = useState<{ email: string; subscriptionTier: string; role?: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAccordion, setMobileAccordion] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    fetch(`${API_URL}/conversations/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (data && typeof data.unreadCount === "number") {
+          setUnreadCount(data.unreadCount);
+        }
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -20,6 +41,17 @@ export default function Header() {
         // Ignore corrupt storage
       }
     }
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 10000);
+
+    const handleUpdate = () => fetchUnreadCount();
+    window.addEventListener("unread_messages_updated", handleUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("unread_messages_updated", handleUpdate);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -137,15 +169,22 @@ export default function Header() {
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-3 bg-slate-900/60 border border-white/10 px-4 py-2 rounded-2xl hover:border-orange-500/50 transition cursor-pointer select-none"
+              className="flex items-center gap-3 bg-slate-900/60 border border-white/10 px-4 py-2 rounded-2xl hover:border-orange-500/50 transition cursor-pointer select-none relative"
             >
-              <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-600/25 border border-orange-500/30 flex items-center justify-center font-black text-orange-400 text-sm">
+              <div className="w-8 h-8 rounded-xl overflow-hidden bg-orange-600/25 border border-orange-500/30 flex items-center justify-center font-black text-orange-400 text-sm relative">
                 {(user as any).profilePhotoUrl ? (
                   <img src={formatImageUrl((user as any).profilePhotoUrl)} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   ((user as any).firstName || user.email).slice(0, 2).toUpperCase()
                 )}
               </div>
+
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-600 to-orange-500 text-white font-black text-[10px] min-w-[20px] h-[20px] px-1 rounded-full flex items-center justify-center border-2 border-[#020617] shadow-lg shadow-red-500/30 animate-pulse">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+
               <div className="flex flex-col items-start hidden sm:flex">
                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Hoş Geldiniz</span>
                 <span className="text-xs font-bold text-slate-200">
@@ -239,7 +278,14 @@ export default function Header() {
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
-                    <span>Mesajlarım</span>
+                    <div className="flex items-center gap-2">
+                      <span>Mesajlarım</span>
+                      {unreadCount > 0 && (
+                        <span className="bg-red-500/20 border border-red-500/30 text-red-400 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-slate-500">→</span>
                   </a>
 

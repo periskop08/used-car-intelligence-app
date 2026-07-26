@@ -18,6 +18,12 @@ export class MessageController {
     return this.messageService.getConversations(user.id);
   }
 
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Kullanıcının Okunmamış Mesaj Sayısını Getir' })
+  getUnreadCount(@GetUser() user: UserPayload) {
+    return this.messageService.getUnreadCount(user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Sohbet Detayını ve Mesajları Getir' })
   getConversationDetail(
