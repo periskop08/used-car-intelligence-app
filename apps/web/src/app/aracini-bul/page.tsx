@@ -132,6 +132,7 @@ export default function FindMyCarPage() {
   
   const [resultsData, setResultsData] = useState<RecommendationResult | null>(null);
   const [showFilterPanel, setShowFilterPanel] = useState<boolean>(false);
+  const [isFilterCollapsed, setIsFilterCollapsed] = useState<boolean>(false);
 
   // Filter States
   const [minPrice, setMinPrice] = useState<string>("");
@@ -294,6 +295,7 @@ export default function FindMyCarPage() {
 
   const startDiscovery = async () => {
     setGameState("loading");
+    setIsFilterCollapsed(true);
     let activeSessionId = sessionId;
     if (!activeSessionId) {
       const activeToken = token || localStorage.getItem("accessToken");
@@ -308,6 +310,7 @@ export default function FindMyCarPage() {
   const applyFilters = async () => {
     setGameState("loading");
     setShowFilterPanel(false);
+    setIsFilterCollapsed(true);
     try {
       if (!sessionId) {
         const activeToken = token || localStorage.getItem("accessToken");
@@ -661,15 +664,29 @@ export default function FindMyCarPage() {
 
         {/* SWIPING SCREEN STATE */}
         {gameState === "swiping" && currentCard && (
-          <div className="w-full flex flex-col lg:flex-row items-stretch justify-center gap-8 max-w-5xl">
+          <div className="w-full flex flex-col lg:flex-row items-start justify-center gap-8 max-w-6xl transition-all duration-300">
             
-            {/* Filter settings panel (Left/Top) */}
-            <div className="lg:w-[320px] bg-slate-900/40 border border-white/5 p-6 rounded-[28px] backdrop-blur-md shadow-2xl flex flex-col gap-6 flex-shrink-0">
+            {/* Filter settings panel (Left/Top - Collapsible Drawer) */}
+            <div
+              className={`transition-all duration-300 ease-in-out flex flex-col gap-6 flex-shrink-0 ${
+                isFilterCollapsed
+                  ? "w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-0 hidden"
+                  : "w-full lg:w-[320px] bg-slate-900/40 border border-white/5 p-6 rounded-[28px] backdrop-blur-md shadow-2xl block"
+              }`}
+            >
               <div className="flex items-center justify-between border-b border-white/5 pb-4">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-5 h-5 text-orange-400" />
                   <h3 className="font-extrabold text-slate-200">Keşif Kriterleri</h3>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsFilterCollapsed(true)}
+                  className="text-xs font-bold text-slate-400 hover:text-orange-400 transition cursor-pointer flex items-center gap-1 bg-white/5 px-2.5 py-1 rounded-xl"
+                >
+                  <span>Gizle</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Price Filter */}
@@ -772,25 +789,38 @@ export default function FindMyCarPage() {
             </div>
 
             {/* Swipe Game Container */}
-            <div className="flex-1 flex flex-col items-center">
-              {/* Progress counter */}
-              <div className="w-full max-w-sm mb-4 text-center">
-                <div className="text-[10px] font-bold text-slate-500 tracking-wider uppercase mb-1">
-                  Araç Keşif Süreci
-                </div>
-                <div className="text-xl font-black text-slate-200">
-                  {currentIndex} / {targetCount}
-                </div>
-                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div
-                    className="bg-gradient-to-r from-orange-500 to-amber-400 h-full transition-all duration-300"
-                    style={{ width: `${Math.min(100, (currentIndex / targetCount) * 100)}%` }}
-                  />
+            <div className={`flex-1 flex flex-col items-center w-full transition-all duration-300 ${isFilterCollapsed ? "max-w-2xl lg:max-w-3xl" : "max-w-xl"}`}>
+              {/* Progress counter & Filter re-open toggle */}
+              <div className="w-full mb-4 flex items-center justify-between gap-4">
+                {isFilterCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterCollapsed(false)}
+                    className="bg-slate-900/80 border border-white/10 hover:border-orange-500/40 text-orange-400 hover:text-orange-300 px-4 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg backdrop-blur-md cursor-pointer transition active:scale-95 shrink-0"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-orange-400" />
+                    <span>Kriterleri Düzenle</span>
+                  </button>
+                )}
+
+                <div className="flex-1 text-center">
+                  <div className="text-[10px] font-bold text-slate-500 tracking-wider uppercase mb-1">
+                    Araç Keşif Süreci
+                  </div>
+                  <div className="text-xl font-black text-slate-200">
+                    {currentIndex} / {targetCount}
+                  </div>
+                  <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div
+                      className="bg-gradient-to-r from-orange-500 to-amber-400 h-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, (currentIndex / targetCount) * 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Card Container */}
-              <div className="relative w-full max-w-sm h-[480px] mb-6 select-none">
+              {/* Card Container (Expanded to Tablet Dimensions when Collapsed) */}
+              <div className={`relative w-full ${isFilterCollapsed ? "max-w-md md:max-w-xl h-[520px]" : "max-w-sm h-[480px]"} mb-6 select-none transition-all duration-300`}>
                 {/* Visual stacked cards background */}
                 <div className="absolute inset-0 bg-[#090d1a]/80 border border-white/5 rounded-[28px] scale-95 translate-y-3 opacity-60 -z-10 shadow-lg pointer-events-none" />
                 <div className="absolute inset-0 bg-[#090d1a]/50 border border-white/5 rounded-[28px] scale-90 translate-y-6 opacity-30 -z-20 shadow-md pointer-events-none" />
@@ -827,7 +857,7 @@ export default function FindMyCarPage() {
                   }`}
                 >
                   {/* Photo area */}
-                  <div className="relative h-44 w-full bg-slate-950 pointer-events-none flex-none border-b border-white/5 overflow-hidden">
+                  <div className={`relative ${isFilterCollapsed ? "h-52 md:h-64" : "h-44"} w-full bg-slate-950 pointer-events-none flex-none border-b border-white/5 overflow-hidden transition-all duration-300`}>
                     <div 
                       className="absolute inset-0 bg-cover bg-center blur-xl opacity-35 scale-110 pointer-events-none"
                       style={{ backgroundImage: `url(${formatImageUrl(currentCard.imageUrl)})` }}
@@ -844,7 +874,7 @@ export default function FindMyCarPage() {
                       <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest block mb-0.5">
                         {currentCard.brand}
                       </span>
-                      <h4 className="text-lg font-black text-slate-100 leading-tight">
+                      <h4 className="text-lg md:text-xl font-black text-slate-100 leading-tight">
                         {currentCard.modelFamily}
                       </h4>
                     </div>
@@ -864,7 +894,7 @@ export default function FindMyCarPage() {
 
                   {/* Specification Details */}
                   <div className="flex-1 p-5 flex flex-col justify-between overflow-y-auto pointer-events-none">
-                    <div className="grid grid-cols-2 gap-3 text-[11px] leading-tight">
+                    <div className={`grid ${isFilterCollapsed ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-3 text-[11px] leading-tight`}>
                       <div>
                         <span className="text-slate-500 block mb-0.5">Kasa Tipi</span>
                         <span className="font-semibold text-slate-300">{translateBodyType(currentCard.bodyType)}</span>
