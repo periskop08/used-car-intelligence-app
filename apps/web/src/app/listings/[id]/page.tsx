@@ -137,6 +137,11 @@ export default function ListingDetail() {
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem("accessToken");
+          setToken("");
+          throw new Error("Oturumunuzun süresi dolmuş. Mesaj göndermek için lütfen tekrar giriş yapın.");
+        }
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Mesaj gönderilirken bir hata oluştu.");
       }
@@ -871,9 +876,23 @@ export default function ListingDetail() {
                 </div>
 
                 {messageError && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold rounded-xl flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{messageError}</span>
+                  <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold rounded-2xl flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{messageError}</span>
+                    </div>
+                    {(messageError.includes("giriş yapın") || messageError.includes("authentication token") || messageError.includes("expired")) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem("accessToken");
+                          window.location.href = `/login?redirect=/listings/${id}`;
+                        }}
+                        className="mt-1 w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 rounded-xl text-xs transition text-center cursor-pointer shadow-md shadow-orange-500/20"
+                      >
+                        Giriş Yap Sayfasına Git
+                      </button>
+                    )}
                   </div>
                 )}
 
