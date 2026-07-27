@@ -256,32 +256,45 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full max-w-[1380px] mx-auto px-4 md:px-6 py-3 flex flex-col gap-4">
-      {/* Back button & Title & Price Header (Full Width Top) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
-        <div>
-          <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
-          <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-            {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
-          </p>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
-            {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
-          </span>
-          <p className="text-[9px] text-slate-500 font-mono">KDV Dahil</p>
+    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-4 xl:gap-6">
+      
+      {/* SOL GOOGLE ADS REKLAM KOLONU (1440px ve üzeri ekranlarda görünür) */}
+      <div className="hidden 2xl:flex flex-col items-center justify-start w-[200px] xl:w-[220px] shrink-0 sticky top-16 gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
+          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
+          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sol)</span>
+          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
         </div>
       </div>
 
-      {/* 3-Column Main Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 items-start">
+      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1240px Ortalanmış) */}
+      <div className="w-full max-w-[1240px] flex flex-col gap-4 shrink-0">
         
-        {/* 1. SOL KOLON (lg:col-span-6): Görsel Galerisi (Kompakt), Açıklama, Ekspertiz */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          {/* Photo Gallery Grid */}
-          <div className="flex flex-col gap-2">
-            <div className="relative aspect-[16/10] max-h-[290px] w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
+        {/* Back button & Title & Price Header (Full Width Top) */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
+          <div>
+            <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
+            <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+              {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
+            </p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
+              {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
+            </span>
+            <p className="text-[9px] text-slate-500 font-mono">KDV Dahil</p>
+          </div>
+        </div>
+
+        {/* 3-Column Main Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 items-start">
+          
+          {/* 1. SOL KOLON (lg:col-span-6): Görsel Galerisi (Kompakt), Açıklama, Ekspertiz */}
+          <div className="lg:col-span-6 flex flex-col gap-4">
+            {/* Photo Gallery Grid */}
+            <div className="flex flex-col gap-2">
+              <div className="relative aspect-[16/10] max-h-[290px] w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
@@ -1034,6 +1047,18 @@ export default function ListingDetail() {
           </div>
         </div>
       )}
+
+      </div>
+
+      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1440px ve üzeri ekranlarda görünür) */}
+      <div className="hidden 2xl:flex flex-col items-center justify-start w-[200px] xl:w-[220px] shrink-0 sticky top-16 gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
+          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
+          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sağ)</span>
+          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
+        </div>
+      </div>
+
     </div>
   );
 }
