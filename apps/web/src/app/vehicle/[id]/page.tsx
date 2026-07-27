@@ -437,39 +437,51 @@ export default function VehicleDetail() {
   }
 
   return (
-    <div className="max-w-6xl w-full mx-auto px-6 py-12 flex flex-col gap-10">
+    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-6 min-[1600px]:gap-8">
       
-      {/* Title Header & Favorite Action */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            {vehicle.country} Spesifikasyonları
-          </span>
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white mt-3">
-            {vehicle.brand} {vehicle.model} ({vehicle.year})
-          </h1>
-          <p className="text-sm text-slate-400 mt-2">
-            {vehicle.generation} • {vehicle.bodyType} • {vehicle.engine} • {vehicle.transmission} • {vehicle.trim}
-          </p>
-        </div>
-
-        {/* Favorite Button */}
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={handleToggleFavorite}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm border transition ${
-              isFavorited
-                ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
-                : "bg-slate-900 border-white/10 text-slate-300 hover:bg-white/5"
-            }`}
-          >
-            ❤️ {isFavorited ? "Favorilerden Çıkar" : "Favorilere Ekle"}
-          </button>
-          {favoriteError && (
-            <span className="text-[10px] text-red-400 font-bold max-w-[200px] text-right mt-1">{favoriteError}</span>
-          )}
+      {/* SOL GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Sticky) */}
+      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 sticky top-16 gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
+          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
+          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sol)</span>
+          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
         </div>
       </div>
+
+      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1280px Ortalanmış) */}
+      <div className="w-full max-w-[1280px] flex flex-col gap-4 shrink-0">
+        
+        {/* Title Header & Favorite Action */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
+          <div>
+            <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+              {vehicle.country} Spesifikasyonları
+            </span>
+            <h1 className="text-lg md:text-xl font-black tracking-tight text-white mt-1">
+              {vehicle.brand} {vehicle.model} ({vehicle.year})
+            </h1>
+            <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+              {vehicle.generation} • {vehicle.bodyType} • {vehicle.engine} • {vehicle.transmission} • {vehicle.trim}
+            </p>
+          </div>
+
+          {/* Favorite Button */}
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleToggleFavorite}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border transition ${
+                isFavorited
+                  ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
+                  : "bg-slate-900 border-white/10 text-slate-300 hover:bg-white/5"
+              }`}
+            >
+              ❤️ {isFavorited ? "Favorilerden Çıkar" : "Favorilere Ekle"}
+            </button>
+            {favoriteError && (
+              <span className="text-[10px] text-red-400 font-bold max-w-[200px] text-right mt-0.5">{favoriteError}</span>
+            )}
+          </div>
+        </div>
 
       {/* Grid Layout */}
       {aiReport?.summary?.trimWarning ? (
@@ -1059,6 +1071,18 @@ export default function VehicleDetail() {
 
         </div>
       )}
+
+      </div>
+
+      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Statik, Sticky Değil) */}
+      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 static gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
+          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
+          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sağ)</span>
+          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
+        </div>
+      </div>
+
     </div>
   );
 }
