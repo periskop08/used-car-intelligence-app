@@ -280,7 +280,6 @@ export default function ListingDetail() {
             <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent block">
               {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
             </span>
-            <p className="text-[9px] text-slate-500 font-mono">KDV Dahil</p>
           </div>
 
           {/* Sağ Kolon (lg:col-span-3): Satıcı Hizalaması */}
