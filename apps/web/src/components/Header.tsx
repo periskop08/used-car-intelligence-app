@@ -72,14 +72,14 @@ export default function Header() {
   const isPaketlerActive = pathname === "/pricing" || pathname === "/#packages";
 
   return (
-    <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
+    <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
       
       {/* Left: Logo */}
       <a href="/" className="flex items-center gap-3 group/logo">
         <img 
           src="/logo.png" 
           alt="TorkScout" 
-          className="h-10 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
+          className="h-8.5 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
         />
       </a>
 

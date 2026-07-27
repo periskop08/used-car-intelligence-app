@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  font-size: 87.5%; /* 14px base scale: downscales fonts, margins, paddings, inputs & components site-wide by 2 levels */
+}
+
 :root {
   --background: #020617; /* Premium deep navy */
   --foreground: #f8fafc; /* Slate 50 */
