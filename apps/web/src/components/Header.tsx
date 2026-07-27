@@ -72,27 +72,27 @@ export default function Header() {
   const isPaketlerActive = pathname === "/pricing" || pathname === "/#packages";
 
   return (
-    <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
+    <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/85 backdrop-blur-xl px-4 md:px-8 py-2 flex items-center justify-between">
       
       {/* Left: Logo */}
-      <a href="/" className="flex items-center gap-3 group/logo">
+      <a href="/" className="flex items-center gap-2 group/logo">
         <img 
           src="/logo.png" 
           alt="TorkScout" 
-          className="h-8.5 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
+          className="h-6 md:h-7 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
         />
       </a>
 
       {/* Middle: Desktop Navigation */}
-      <nav className="hidden md:flex items-center gap-8">
+      <nav className="hidden md:flex items-center gap-6">
         
         {/* 1. Araç Sorgulama Dropdown */}
         <div className="relative group">
-          <button className={`text-sm font-semibold transition flex items-center gap-1 cursor-pointer py-1 ${
+          <button className={`text-xs font-medium transition flex items-center gap-1 cursor-pointer py-1 ${
             isSorgulamaActive ? "text-orange-500 font-bold" : "text-slate-300 hover:text-orange-500"
           }`}>
             <span>Araç Sorgulama</span>
-            <span className="text-[8px] opacity-70">▼</span>
+            <span className="text-[7px] opacity-70">▼</span>
           </button>
           <div className="absolute left-0 top-full pt-3 w-52 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-1 duration-150">
             <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 relative">

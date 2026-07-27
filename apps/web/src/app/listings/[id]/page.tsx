@@ -545,139 +545,139 @@ export default function ListingDetail() {
 
         {/* 2. ORTA KOLON (lg:col-span-3): Sahibinden Tarzı Daraltılmış Kompakt Araç Bilgileri Tablosu */}
         <div className="lg:col-span-3 flex flex-col gap-6">
-          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2 shadow-xl max-w-[270px] w-full">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
                 <span>📋 Araç Bilgileri</span>
               </h3>
-              <span className="text-[9px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded">
+              <span className="text-[9px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
                 Teknik Detaylar
               </span>
             </div>
 
             <div className="flex flex-col text-[11px]">
               {/* İlan No */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan No</span>
-                <span className="font-black text-red-400 font-mono">{listing.listingNo || listing.id.slice(0, 10).toUpperCase()}</span>
+                <span className="font-black text-red-400 font-mono text-right">{listing.listingNo || listing.id.slice(0, 10).toUpperCase()}</span>
               </div>
 
               {/* İlan Tarihi */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan Tarihi</span>
-                <span className="font-semibold text-slate-200">
+                <span className="font-semibold text-slate-200 text-right">
                   {new Date(listing.createdAt || Date.now()).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
               </div>
 
               {/* Marka */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Marka</span>
-                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.brand?.name || listing.brand || "Belirtilmedi"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.brand?.name || listing.brand || "Belirtilmedi"}</span>
               </div>
 
               {/* Seri */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Seri</span>
-                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.model?.name || listing.series || "Belirtilmedi"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.model?.name || listing.series || "Belirtilmedi"}</span>
               </div>
 
               {/* Model */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Model</span>
-                <span className="font-semibold text-slate-200 truncate max-w-[160px]" title={listing.vehicleVariant?.trim?.name || listing.model}>
+                <span className="font-semibold text-slate-200 text-right truncate" title={listing.vehicleVariant?.trim?.name || listing.model}>
                   {listing.vehicleVariant?.trim?.name || listing.vehicleVariant?.engine?.name || listing.model || "Belirtilmedi"}
                 </span>
               </div>
 
               {/* Yıl */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Yıl</span>
-                <span className="font-semibold text-slate-200">{listing.modelYear}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.modelYear}</span>
               </div>
 
               {/* Yakıt Tipi */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Yakıt Tipi</span>
-                <span className="font-semibold text-slate-200">{translateFuelType(listing.fuelType)}</span>
+                <span className="font-semibold text-slate-200 text-right">{translateFuelType(listing.fuelType)}</span>
               </div>
 
               {/* Vites */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Vites</span>
-                <span className="font-semibold text-slate-200">{translateTransmission(listing.transmission)}</span>
+                <span className="font-semibold text-slate-200 text-right">{translateTransmission(listing.transmission)}</span>
               </div>
 
               {/* Araç Durumu */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Araç Durumu</span>
-                <span className="font-semibold text-slate-200">{listing.condition || "İkinci El"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.condition || "İkinci El"}</span>
               </div>
 
               {/* KM */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">KM</span>
-                <span className="font-semibold text-slate-200">{Number(listing.kilometers).toLocaleString('tr-TR')} km</span>
+                <span className="font-semibold text-slate-200 text-right">{Number(listing.kilometers).toLocaleString('tr-TR')} km</span>
               </div>
 
               {/* Kasa Tipi */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Kasa Tipi</span>
-                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.bodyType || listing.bodyType || "Sedan"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.bodyType || listing.bodyType || "Sedan"}</span>
               </div>
 
               {/* Motor Gücü */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Gücü</span>
-                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.power || listing.enginePower || "-"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.power || listing.enginePower || "-"}</span>
               </div>
 
               {/* Motor Hacmi */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Hacmi</span>
-                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.engineCapacity || listing.engineCapacity || "-"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.engineCapacity || listing.engineCapacity || "-"}</span>
               </div>
 
               {/* Çekiş */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Çekiş</span>
-                <span className="font-semibold text-slate-200">{listing.drivetrain || "Önden Çekiş"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.drivetrain || "Önden Çekiş"}</span>
               </div>
 
               {/* Renk */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Renk</span>
-                <span className="font-semibold text-slate-200">{listing.color || "Belirtilmedi"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.color || "Belirtilmedi"}</span>
               </div>
 
               {/* Garanti */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Garanti</span>
-                <span className="font-semibold text-slate-200">{listing.warranty ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.warranty ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Ağır Hasar Kayıtlı */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Ağır Hasar Kayıtlı</span>
-                <span className="font-semibold text-slate-200">{listing.tramerAmount > 200000 || listing.heavyDamage ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.tramerAmount > 200000 || listing.heavyDamage ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Plaka / Uyruk */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Plaka / Uyruk</span>
-                <span className="font-semibold text-slate-200">{listing.plateOrigin || "Türkiye (TR) Plakalı"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.plateOrigin || "Türkiye (TR) Plakalı"}</span>
               </div>
 
               {/* Kimden */}
-              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Kimden</span>
-                <span className="font-extrabold text-red-400">{listing.sellerType === 'GALLERY' ? 'Galeriden' : 'Sahibinden'}</span>
+                <span className="font-extrabold text-red-400 text-right">{listing.sellerType === 'GALLERY' ? 'Galeriden' : 'Sahibinden'}</span>
               </div>
 
               {/* Takas */}
-              <div className="flex justify-between py-1">
+              <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1">
                 <span className="font-bold text-slate-400">Takas</span>
-                <span className="font-semibold text-slate-200">{listing.exchange ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.exchange ? "Evet" : "Hayır"}</span>
               </div>
             </div>
           </div>
