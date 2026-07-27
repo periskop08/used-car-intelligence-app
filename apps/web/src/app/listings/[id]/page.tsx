@@ -256,36 +256,36 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full max-w-[1440px] mx-auto px-4 md:px-8 py-6 flex flex-col gap-6">
+    <div className="w-full max-w-[1380px] mx-auto px-4 md:px-6 py-3 flex flex-col gap-4">
       {/* Back button & Title & Price Header (Full Width Top) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
         <div>
-          <a href="/listings" className="text-[11px] text-orange-500 hover:underline font-bold block mb-1">← İlan Listesine Dön</a>
-          <h1 className="text-xl md:text-2xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+          <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
+          <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
             {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
           </p>
         </div>
         <div className="text-right flex-shrink-0">
-          <span className="text-2xl md:text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
+          <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
             {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
           </span>
-          <p className="text-[10px] text-slate-500 font-mono">KDV Dahil</p>
+          <p className="text-[9px] text-slate-500 font-mono">KDV Dahil</p>
         </div>
       </div>
 
       {/* 3-Column Main Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 items-start">
         
-        {/* 1. SOL KOLON (lg:col-span-6): Görsel Galerisi (Büyütülmüş), Açıklama, Ekspertiz */}
-        <div className="lg:col-span-6 flex flex-col gap-6">
+        {/* 1. SOL KOLON (lg:col-span-6): Görsel Galerisi (Kompakt), Açıklama, Ekspertiz */}
+        <div className="lg:col-span-6 flex flex-col gap-4">
           {/* Photo Gallery Grid */}
-          <div className="flex flex-col gap-3">
-            <div className="relative aspect-[16/10] max-h-[420px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
+          <div className="flex flex-col gap-2">
+            <div className="relative aspect-[16/10] max-h-[290px] w-full rounded-xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
-                className={`absolute top-3 right-3 z-10 w-9 h-9 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
+                className={`absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
                   listing.isFavorited
                     ? "bg-red-500/20 text-red-500 border-red-500/40"
                     : "bg-slate-950/80 text-slate-400 border-white/10 hover:text-white"
@@ -301,7 +301,7 @@ export default function ListingDetail() {
                 className="w-full h-full object-cover"
               />
               {listing.isAiReady && (
-                <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
+                <span className="absolute top-2.5 left-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
                   ✨ AI Analizli İlan
                 </span>
               )}
@@ -309,12 +309,12 @@ export default function ListingDetail() {
 
             {/* Thumbnails list */}
             {listing.media && listing.media.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+              <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
                 {listing.media.map((img: any) => (
                   <button
                     key={img.id}
                     onClick={() => setActivePhoto(img.url)}
-                    className={`relative w-16 aspect-[4/3] rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                    className={`relative w-14 aspect-[4/3] rounded-md overflow-hidden border-2 transition shrink-0 ${
                       activePhoto === img.url ? "border-orange-500 scale-95" : "border-transparent opacity-70 hover:opacity-100"
                     }`}
                   >
@@ -327,9 +327,9 @@ export default function ListingDetail() {
 
           {/* Description */}
           {listing.description && (
-            <div className="flex flex-col gap-2">
-              <h3 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">Açıklama</h3>
-              <p className="text-slate-300 text-xs leading-relaxed whitespace-pre-line bg-slate-900/30 p-4 rounded-2xl border border-white/5">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-[11px] font-extrabold text-slate-200 uppercase tracking-wider">Açıklama</h3>
+              <p className="text-slate-300 text-xs leading-snug whitespace-pre-line bg-slate-900/30 p-3 rounded-xl border border-white/5">
                 {listing.description}
               </p>
             </div>
