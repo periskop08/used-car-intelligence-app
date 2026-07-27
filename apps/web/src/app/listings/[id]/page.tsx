@@ -715,7 +715,7 @@ export default function ListingDetail() {
 
           {/* AI Intelligence widget block (Araç Bilgileri Kartının Altına Alındı) */}
           {listing.isAiReady && vehicle ? (
-            <div className="glass p-4 rounded-2xl border border-orange-500/25 bg-orange-950/5 flex flex-col gap-3 shadow-xl relative overflow-hidden max-w-[270px] w-full">
+            <div className="glass p-4 rounded-2xl border border-orange-500/25 bg-orange-950/5 flex flex-col gap-3 shadow-xl relative overflow-hidden w-full">
               <span className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl"></span>
 
               <div>
@@ -838,7 +838,7 @@ export default function ListingDetail() {
               </div>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-2 max-w-[270px] w-full">
+            <div className="p-4 rounded-2xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-2 w-full">
               <span className="text-2xl">⏳</span>
               <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">AI Analizi Hazırlanıyor</h4>
               <p className="text-[9px] text-slate-400 leading-relaxed">
@@ -846,9 +846,57 @@ export default function ListingDetail() {
               </p>
             </div>
           )}
+
+          {/* İŞİ CEPTE ÖNERİYOR (Orta Kolona, AI Analizi Kartının Altına Alındı) */}
+          <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden">
+            <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-1">
+                  <Wrench className="w-3 h-3 text-orange-400" /> İŞİ CEPTE ÖNERİYOR
+                </span>
+                <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
+                  {listing.brand || vehicle?.brand?.name || "Bu Araç"} Markası İle Uyumlu Servisler
+                </span>
+              </div>
+              <span className="text-[8px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
+                Özel Öneri
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {mockIsiCepteRecommendations.map((shop) => (
+                <div key={shop.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex flex-col gap-2 hover:border-orange-500/30 transition">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/10 shrink-0">
+                      <img src={shop.image} alt={shop.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <h4 className="text-[11px] font-extrabold text-slate-100 truncate">{shop.name}</h4>
+                        <span className="text-[8.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">⭐ {shop.rating}</span>
+                      </div>
+                      <span className="text-[9.5px] text-orange-400 font-semibold truncate">{shop.category}</span>
+                      <span className="text-[9px] text-slate-400 truncate">📍 {shop.location} • {shop.brandSpec}</span>
+                    </div>
+                  </div>
+                  <a
+                    href={shop.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1"
+                  >
+                    <span>Servise Git</span>
+                    <span>→</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* 3. SAĞ KOLON (lg:col-span-3): Dikey Sıralı 4 Kart */}
+        {/* 3. SAĞ KOLON (lg:col-span-3): Dikey Sıralı 2 Kart */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           
           {/* 1. KART: İlan Sahibi Bilgileri Kartı */}
@@ -1001,55 +1049,8 @@ export default function ListingDetail() {
                   </div>
                 </a>
               ))}
-            </div>
           </div>
 
-          {/* 3. KART: İŞİ CEPTE ÖNERİYOR (Markaya Uygun Özel Servis / Usta Önerileri) */}
-          <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden">
-            <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
-
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-1">
-                  <Wrench className="w-3 h-3 text-orange-400" /> İŞİ CEPTE ÖNERİYOR
-                </span>
-                <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
-                  {listing.brand || vehicle?.brand?.name || "Bu Araç"} Markası İle Uyumlu Servisler
-                </span>
-              </div>
-              <span className="text-[8px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
-                Özel Öneri
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              {mockIsiCepteRecommendations.map((shop) => (
-                <div key={shop.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex flex-col gap-2 hover:border-orange-500/30 transition">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/10 shrink-0">
-                      <img src={shop.image} alt={shop.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <h4 className="text-[11px] font-extrabold text-slate-100 truncate">{shop.name}</h4>
-                        <span className="text-[8.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">⭐ {shop.rating}</span>
-                      </div>
-                      <span className="text-[9.5px] text-orange-400 font-semibold truncate">{shop.category}</span>
-                      <span className="text-[9px] text-slate-400 truncate">📍 {shop.location} • {shop.brandSpec}</span>
-                    </div>
-                  </div>
-                  <a
-                    href={shop.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1"
-                  >
-                    <span>Servise Git</span>
-                    <span>→</span>
-                  </a>
-                </div>
-              ))}
-            </div>
           </div>
 
         </div>
