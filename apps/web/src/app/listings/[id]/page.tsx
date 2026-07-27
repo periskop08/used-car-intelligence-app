@@ -256,34 +256,34 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-10">
+    <div className="w-full max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
       {/* Back button */}
       <div>
         <a href="/listings" className="text-xs text-orange-500 hover:underline font-bold">← İlan Listesine Dön</a>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Photo & Specs & Condition */}
-        <div className="lg:col-span-8 flex flex-col gap-8">
+        <div className="lg:col-span-7 flex flex-col gap-6">
           {/* Title & Price Header */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-white/5 pb-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-white/5 pb-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
+              <h1 className="text-xl md:text-2xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">
                 {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
               </p>
             </div>
-            <div className="text-right">
-              <span className="text-2xl md:text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
+            <div className="text-right flex-shrink-0">
+              <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
                 {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
               </span>
-              <p className="text-[10px] text-slate-500 mt-1 font-mono">KDV Dahil</p>
+              <p className="text-[10px] text-slate-500 font-mono">KDV Dahil</p>
             </div>
           </div>
 
           {/* Photo Gallery Grid */}
           <div className="flex flex-col gap-3">
-            <div className="relative aspect-[16/9] w-full rounded-3xl overflow-hidden bg-slate-950 border border-white/5 shadow-xl">
+            <div className="relative aspect-[16/9] max-h-[380px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/5 shadow-xl">
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
@@ -567,8 +567,146 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* Right Side: Lead Form & AI Report widget */}
-        <div className="lg:col-span-4 flex flex-col gap-8">
+        {/* Right Side: Sahibinden Spec Table & Seller Profile Card */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          {/* Sahibinden Tarzı Araç Bilgileri / Teknik Detaylar Kartı */}
+          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col gap-3 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
+                <span>📋 Araç Bilgileri</span>
+              </h3>
+              <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded">
+                Teknik Detaylar
+              </span>
+            </div>
+
+            <div className="flex flex-col text-xs">
+              {/* İlan No */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">İlan No</span>
+                <span className="font-black text-red-400 font-mono">{listing.listingNo || listing.id.slice(0, 10).toUpperCase()}</span>
+              </div>
+
+              {/* İlan Tarihi */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">İlan Tarihi</span>
+                <span className="font-semibold text-slate-200">
+                  {new Date(listing.createdAt || Date.now()).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+              </div>
+
+              {/* Marka */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Marka</span>
+                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.brand?.name || listing.brand || "Belirtilmedi"}</span>
+              </div>
+
+              {/* Seri */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Seri</span>
+                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.model?.name || listing.series || "Belirtilmedi"}</span>
+              </div>
+
+              {/* Model */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Model</span>
+                <span className="font-semibold text-slate-200 truncate max-w-[180px]" title={listing.vehicleVariant?.trim?.name || listing.model}>
+                  {listing.vehicleVariant?.trim?.name || listing.vehicleVariant?.engine?.name || listing.model || "Belirtilmedi"}
+                </span>
+              </div>
+
+              {/* Yıl */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Yıl</span>
+                <span className="font-semibold text-slate-200">{listing.modelYear}</span>
+              </div>
+
+              {/* Yakıt Tipi */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Yakıt Tipi</span>
+                <span className="font-semibold text-slate-200">{translateFuelType(listing.fuelType)}</span>
+              </div>
+
+              {/* Vites */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Vites</span>
+                <span className="font-semibold text-slate-200">{translateTransmission(listing.transmission)}</span>
+              </div>
+
+              {/* Araç Durumu */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Araç Durumu</span>
+                <span className="font-semibold text-slate-200">{listing.condition || "İkinci El"}</span>
+              </div>
+
+              {/* KM */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">KM</span>
+                <span className="font-semibold text-slate-200">{Number(listing.kilometers).toLocaleString('tr-TR')} km</span>
+              </div>
+
+              {/* Kasa Tipi */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Kasa Tipi</span>
+                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.bodyType || listing.bodyType || "Sedan"}</span>
+              </div>
+
+              {/* Motor Gücü */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Motor Gücü</span>
+                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.power || listing.enginePower || "-"}</span>
+              </div>
+
+              {/* Motor Hacmi */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Motor Hacmi</span>
+                <span className="font-semibold text-slate-200">{listing.vehicleVariant?.engineCapacity || listing.engineCapacity || "-"}</span>
+              </div>
+
+              {/* Çekiş */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Çekiş</span>
+                <span className="font-semibold text-slate-200">{listing.drivetrain || "Önden Çekiş"}</span>
+              </div>
+
+              {/* Renk */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Renk</span>
+                <span className="font-semibold text-slate-200">{listing.color || "Belirtilmedi"}</span>
+              </div>
+
+              {/* Garanti */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Garanti</span>
+                <span className="font-semibold text-slate-200">{listing.warranty ? "Evet" : "Hayır"}</span>
+              </div>
+
+              {/* Ağır Hasar Kayıtlı */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Ağır Hasar Kayıtlı</span>
+                <span className="font-semibold text-slate-200">{listing.tramerAmount > 200000 || listing.heavyDamage ? "Evet" : "Hayır"}</span>
+              </div>
+
+              {/* Plaka / Uyruk */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Plaka / Uyruk</span>
+                <span className="font-semibold text-slate-200">{listing.plateOrigin || "Türkiye (TR) Plakalı"}</span>
+              </div>
+
+              {/* Kimden */}
+              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+                <span className="font-bold text-slate-400">Kimden</span>
+                <span className="font-extrabold text-red-400">{listing.sellerType === 'GALLERY' ? 'Galeriden' : 'Sahibinden'}</span>
+              </div>
+
+              {/* Takas */}
+              <div className="flex justify-between py-1.5">
+                <span className="font-bold text-slate-400">Takas</span>
+                <span className="font-semibold text-slate-200">{listing.exchange ? "Evet" : "Hayır"}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Seller Profile Avatar & Actions Card */}
           <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-5 shadow-xl">
             {/* Seller Avatar Header */}
