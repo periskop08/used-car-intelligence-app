@@ -277,11 +277,11 @@ export default function ListingDetail() {
       {/* 3-Column Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* 1. SOL KOLON (lg:col-span-5): Görsel Galerisi, Açıklama, Ekspertiz */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        {/* 1. SOL KOLON (lg:col-span-6): Görsel Galerisi (Büyütülmüş), Açıklama, Ekspertiz */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
           {/* Photo Gallery Grid */}
           <div className="flex flex-col gap-3">
-            <div className="relative aspect-[16/10] max-h-[340px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
+            <div className="relative aspect-[16/10] max-h-[420px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
@@ -543,9 +543,9 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* 2. ORTA KOLON (lg:col-span-4): Sahibinden Tarzı Kompakt Araç Bilgileri Tablosu */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col gap-2 shadow-xl">
+        {/* 2. ORTA KOLON (lg:col-span-3): Sahibinden Tarzı Daraltılmış Kompakt Araç Bilgileri Tablosu */}
+        <div className="lg:col-span-3 flex flex-col gap-6">
+          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
                 <span>📋 Araç Bilgileri</span>
