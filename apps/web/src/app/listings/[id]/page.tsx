@@ -264,21 +264,27 @@ export default function ListingDetail() {
       {/* MERKEZ ANA İÇERİK KONTEYNERİ (1060px Ortalanmış Kompakt) */}
       <div className="w-full max-w-[1060px] flex flex-col gap-4 shrink-0">
         
-        {/* Back button & Title & Price Header (Full Width Top) */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
-          <div>
+        {/* Back button & Title & Price Header (Aligned with 3 Columns Below) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 items-end border-b border-white/10 pb-2.5">
+          {/* Sol Kolon (lg:col-span-6): Başlık ve İlan Detay Bilgileri */}
+          <div className="lg:col-span-6">
             <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
             <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
               {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
             </p>
           </div>
-          <div className="text-right flex-shrink-0">
-            <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
+
+          {/* Orta Kolon (lg:col-span-3): Fiyat (Araç Bilgileri Kartının Üstüne Alındı) */}
+          <div className="lg:col-span-3 text-left">
+            <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent block">
               {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
             </span>
             <p className="text-[9px] text-slate-500 font-mono">KDV Dahil</p>
           </div>
+
+          {/* Sağ Kolon (lg:col-span-3): Satıcı Hizalaması */}
+          <div className="hidden lg:block lg:col-span-3" />
         </div>
 
         {/* 3-Column Main Grid Layout */}
@@ -688,9 +694,143 @@ export default function ListingDetail() {
               </div>
             </div>
           </div>
+
+          {/* AI Intelligence widget block (Araç Bilgileri Kartının Altına Alındı) */}
+          {listing.isAiReady && vehicle ? (
+            <div className="glass p-4 rounded-2xl border border-orange-500/25 bg-orange-950/5 flex flex-col gap-3 shadow-xl relative overflow-hidden max-w-[270px] w-full">
+              <span className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl"></span>
+
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
+                  ✨ AI Varyant Analizi
+                </h3>
+                <p className="text-[9px] text-slate-400 mt-0.5">
+                  {vehicle.brand?.name} {vehicle.model?.name} {vehicle.year} varyant verileri
+                </p>
+              </div>
+
+              {/* Tabs selector */}
+              <div className="grid grid-cols-2 gap-1 bg-slate-950/40 p-1 rounded-xl">
+                <button
+                  onClick={() => setActiveAiTab("problems")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "problems" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sık Karşılaşılan
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("recalls")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "recalls" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Recall Kaydı
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("questions")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "questions" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sorular
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("checklist")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "checklist" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Checklist
+                </button>
+              </div>
+
+              {/* Tab Contents */}
+              <div className="bg-slate-950/20 p-3 rounded-xl border border-white/5 min-h-[160px] flex flex-col gap-2.5 text-xs">
+                {activeAiTab === "problems" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400 italic">
+                      ⚠️ Bu varyantta kullanıcılarca dile getirilmiş noktalar:
+                    </p>
+                    {vehicle.problems && vehicle.problems.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {vehicle.problems.map((p: any) => (
+                          <div key={p.id} className="flex flex-col gap-0.5 border-l-2 border-orange-500/40 pl-2">
+                            <span className="font-bold text-slate-200 text-[11px]">{p.name}</span>
+                            <span className="text-[10px] text-slate-400 leading-tight">{p.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Sık karşılaşılan bir durum bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "recalls" && (
+                  <div className="flex flex-col gap-2">
+                    {vehicle.recalls && vehicle.recalls.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {vehicle.recalls.map((r: any) => (
+                          <div key={r.id} className="flex flex-col gap-0.5 border-l-2 border-red-500/40 pl-2">
+                            <span className="font-bold text-slate-200 text-[11px]">{r.name}</span>
+                            <span className="text-[10px] text-slate-400 leading-tight">{r.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Resmi bir recall kaydı bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "questions" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400">Satıcıya sorun:</p>
+                    {vehicle.questions && vehicle.questions.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {vehicle.questions.map((q: any) => (
+                          <li key={q.id} className="text-[10px] text-slate-300 leading-tight pl-2 relative before:content-['•'] before:absolute before:left-0 before:text-orange-500">
+                            {q.question}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Özel soru bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "checklist" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400">Ekspertiz kontrol listesi:</p>
+                    {vehicle.checklists && vehicle.checklists.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {vehicle.checklists.map((c: any) => (
+                          <li key={c.id} className="text-[10px] text-slate-300 leading-tight pl-2 relative before:content-['✓'] before:absolute before:left-0 before:text-emerald-500">
+                            {c.item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Özel checklist bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-2 max-w-[270px] w-full">
+              <span className="text-2xl">⏳</span>
+              <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">AI Analizi Hazırlanıyor</h4>
+              <p className="text-[9px] text-slate-400 leading-relaxed">
+                Bu ilandaki araç için varyant eşleştirmesi veya AI analiz raporları henüz moderasyon tarafından onaylanmamış. En kısa sürede güncellenecektir.
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* 3. SAĞ KOLON (lg:col-span-3): İlan Sahibi Bilgileri & AI Analiz Kartı */}
+        {/* 3. SAĞ KOLON (lg:col-span-3): İlan Sahibi Bilgileri Kartı */}
         <div className="lg:col-span-3 flex flex-col gap-6">
           {/* Seller Profile Avatar & Actions Card */}
           <div className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
@@ -786,140 +926,6 @@ export default function ListingDetail() {
               </div>
             </div>
           </div>
-
-          {/* AI Intelligence widget block */}
-          {listing.isAiReady && vehicle ? (
-            <div className="glass p-6 rounded-3xl border border-orange-500/25 bg-orange-950/5 flex flex-col gap-4 shadow-xl relative overflow-hidden">
-              <span className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl"></span>
-
-              <div>
-                <h3 className="text-sm font-extrabold text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
-                  ✨ Bu Varyant Hakkında AI Analizi
-                </h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {vehicle.brand.name} {vehicle.model.name} {vehicle.year} varyantı için sistem verileri
-                </p>
-              </div>
-
-              {/* Tabs selector */}
-              <div className="grid grid-cols-4 gap-1 bg-slate-950/40 p-1 rounded-xl">
-                <button
-                  onClick={() => setActiveAiTab("problems")}
-                  className={`text-[9px] font-bold py-1.5 rounded-lg transition ${
-                    activeAiTab === "problems" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Sık Karşılaşılanlar
-                </button>
-                <button
-                  onClick={() => setActiveAiTab("recalls")}
-                  className={`text-[9px] font-bold py-1.5 rounded-lg transition ${
-                    activeAiTab === "recalls" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Recall
-                </button>
-                <button
-                  onClick={() => setActiveAiTab("questions")}
-                  className={`text-[9px] font-bold py-1.5 rounded-lg transition ${
-                    activeAiTab === "questions" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Sorular
-                </button>
-                <button
-                  onClick={() => setActiveAiTab("checklist")}
-                  className={`text-[9px] font-bold py-1.5 rounded-lg transition ${
-                    activeAiTab === "checklist" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Checklist
-                </button>
-              </div>
-
-              {/* Tab Contents */}
-              <div className="bg-slate-950/20 p-4 rounded-2xl border border-white/5 min-h-[220px] flex flex-col gap-4 text-xs">
-                {activeAiTab === "problems" && (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-[10px] text-slate-400 italic">
-                      ⚠️ Bu varyantta bazı kullanıcılar tarafından dile getirilmiştir. Her araçta görülmeyebilir. Satın alma öncesi kontrol önerilir.
-                    </p>
-                    {vehicle.problems && vehicle.problems.length > 0 ? (
-                      <div className="flex flex-col gap-3">
-                        {vehicle.problems.map((p: any) => (
-                          <div key={p.id} className="flex flex-col gap-1 border-l-2 border-orange-500/40 pl-3">
-                            <span className="font-bold text-slate-200 text-xs">{p.name}</span>
-                            <span className="text-[11px] text-slate-400 leading-relaxed">{p.description}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-400 italic">Bu varyanta ait bilinen sık karşılaşılan bir durum bulunmamaktadır.</span>
-                    )}
-                  </div>
-                )}
-
-                {activeAiTab === "recalls" && (
-                  <div className="flex flex-col gap-3">
-                    {vehicle.recalls && vehicle.recalls.length > 0 ? (
-                      <div className="flex flex-col gap-3">
-                        {vehicle.recalls.map((r: any) => (
-                          <div key={r.id} className="flex flex-col gap-1 border-l-2 border-red-500/40 pl-3">
-                            <span className="font-bold text-slate-200 text-xs">{r.name}</span>
-                            <span className="text-[11px] text-slate-400 leading-relaxed">{r.description}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-400 italic">Bu araç varyantı için resmi bir geri çağırma (recall) kaydı bulunmamaktadır.</span>
-                    )}
-                  </div>
-                )}
-
-                {activeAiTab === "questions" && (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-[10px] text-slate-400">Araç sahibiyle konuşurken şu soruları mutlaka sorun:</p>
-                    {vehicle.questions && vehicle.questions.length > 0 ? (
-                      <ul className="flex flex-col gap-2.5">
-                        {vehicle.questions.map((q: any) => (
-                          <li key={q.id} className="text-slate-300 leading-relaxed pl-2 relative before:content-['•'] before:absolute before:left-0 before:text-orange-500">
-                            {q.question}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-slate-400 italic">Özel satıcı sorusu bulunmamaktadır.</span>
-                    )}
-                  </div>
-                )}
-
-                {activeAiTab === "checklist" && (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-[10px] text-slate-400">Ekspertize gittiğinizde özellikle şu noktaları kontrol ettirin:</p>
-                    {vehicle.checklists && vehicle.checklists.length > 0 ? (
-                      <ul className="flex flex-col gap-2.5">
-                        {vehicle.checklists.map((c: any) => (
-                          <li key={c.id} className="text-slate-300 leading-relaxed pl-2 relative before:content-['✓'] before:absolute before:left-0 before:text-emerald-500">
-                            {c.item}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-slate-400 italic">Özel kontrol checklisti bulunmamaktadır.</span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="p-6 rounded-3xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-3">
-              <span className="text-3xl">⏳</span>
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">AI Analizi Hazırlanıyor</h4>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                Bu ilandaki araç için varyant eşleştirmesi veya AI analiz raporları henüz moderasyon tarafından onaylanmamış. En kısa sürede güncellenecektir.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
