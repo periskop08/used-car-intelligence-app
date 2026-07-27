@@ -256,38 +256,36 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
-      {/* Back button */}
-      <div>
-        <a href="/listings" className="text-xs text-orange-500 hover:underline font-bold">← İlan Listesine Dön</a>
+    <div className="w-full max-w-[1440px] mx-auto px-4 md:px-8 py-6 flex flex-col gap-6">
+      {/* Back button & Title & Price Header (Full Width Top) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+          <a href="/listings" className="text-[11px] text-orange-500 hover:underline font-bold block mb-1">← İlan Listesine Dön</a>
+          <h1 className="text-xl md:text-2xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+            {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
+          </p>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <span className="text-2xl md:text-3xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
+            {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
+          </span>
+          <p className="text-[10px] text-slate-500 font-mono">KDV Dahil</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side: Photo & Specs & Condition */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          {/* Title & Price Header */}
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-white/5 pb-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">
-                {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
-              </p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent">
-                {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
-              </span>
-              <p className="text-[10px] text-slate-500 font-mono">KDV Dahil</p>
-            </div>
-          </div>
-
+      {/* 3-Column Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* 1. SOL KOLON (lg:col-span-5): Görsel Galerisi, Açıklama, Ekspertiz */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Photo Gallery Grid */}
           <div className="flex flex-col gap-3">
-            <div className="relative aspect-[16/9] max-h-[380px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/5 shadow-xl">
+            <div className="relative aspect-[16/10] max-h-[340px] w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-xl">
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
-                className={`absolute top-4 right-4 z-10 w-10 h-10 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
+                className={`absolute top-3 right-3 z-10 w-9 h-9 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
                   listing.isFavorited
                     ? "bg-red-500/20 text-red-500 border-red-500/40"
                     : "bg-slate-950/80 text-slate-400 border-white/10 hover:text-white"
@@ -303,7 +301,7 @@ export default function ListingDetail() {
                 className="w-full h-full object-cover"
               />
               {listing.isAiReady && (
-                <span className="absolute top-4 left-4 text-xs font-bold px-3 py-1 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
+                <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
                   ✨ AI Analizli İlan
                 </span>
               )}
@@ -311,12 +309,12 @@ export default function ListingDetail() {
 
             {/* Thumbnails list */}
             {listing.media && listing.media.length > 0 && (
-              <div className="flex items-center gap-3 overflow-x-auto py-1">
+              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
                 {listing.media.map((img: any) => (
                   <button
                     key={img.id}
                     onClick={() => setActivePhoto(img.url)}
-                    className={`relative w-20 aspect-[4/3] rounded-xl overflow-hidden border-2 transition ${
+                    className={`relative w-16 aspect-[4/3] rounded-lg overflow-hidden border-2 transition shrink-0 ${
                       activePhoto === img.url ? "border-orange-500 scale-95" : "border-transparent opacity-70 hover:opacity-100"
                     }`}
                   >
@@ -327,63 +325,43 @@ export default function ListingDetail() {
             )}
           </div>
 
-          {/* Core Specs Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black">Yıl</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{listing.modelYear}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black">Kilometre</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{listing.kilometers.toLocaleString('tr-TR')} km</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black">Yakıt</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{translateFuelType(listing.fuelType)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-500 uppercase font-black">Şanzıman</span>
-              <span className="text-sm font-bold text-slate-200 mt-0.5">{translateTransmission(listing.transmission)}</span>
-            </div>
-          </div>
-
           {/* Description */}
           {listing.description && (
-            <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">Açıklama</h3>
-              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-slate-900/10 p-6 rounded-3xl border border-white/5">
+            <div className="flex flex-col gap-2">
+              <h3 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">Açıklama</h3>
+              <p className="text-slate-300 text-xs leading-relaxed whitespace-pre-line bg-slate-900/30 p-4 rounded-2xl border border-white/5">
                 {listing.description}
               </p>
             </div>
           )}
 
           {/* Condition Details (Boyalı / Değişen / Tramer) */}
-          <div className="flex flex-col gap-4 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/5 pb-3">Ekspertiz ve Boya/Değişen Durumu</h3>
+          <div className="flex flex-col gap-4 p-5 bg-slate-900/20 border border-white/5 rounded-2xl">
+            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2">Ekspertiz ve Boya/Değişen Durumu</h3>
 
             {/* Visual Car Silhouette Grid (Read-only) */}
-            <div className="flex flex-col gap-4 bg-slate-950/20 p-6 border border-white/5 rounded-3xl mt-2">
+            <div className="flex flex-col gap-3 bg-slate-950/20 p-4 border border-white/5 rounded-2xl mt-1">
               <span className="text-xs font-black text-slate-200 uppercase tracking-wider">Boyalı veya Değişen Parça Görseli</span>
               
-              <div className="flex items-center gap-4 text-[10px] font-bold mt-1">
-                <span className="flex items-center gap-1.5 text-slate-400">
-                  <span className="w-3 h-3 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
+              <div className="flex items-center gap-3 text-[10px] font-bold mt-1 flex-wrap">
+                <span className="flex items-center gap-1 text-slate-400">
+                  <span className="w-2.5 h-2.5 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
                 </span>
-                <span className="flex items-center gap-1.5 text-orange-400">
-                  <span className="w-3.5 h-3.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
+                <span className="flex items-center gap-1 text-orange-400">
+                  <span className="w-2.5 h-2.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
                 </span>
-                <span className="flex items-center gap-1.5 text-blue-400">
-                  <span className="w-3 h-3 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
+                <span className="flex items-center gap-1 text-blue-400">
+                  <span className="w-2.5 h-2.5 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
                 </span>
-                <span className="flex items-center gap-1.5 text-red-400">
-                  <span className="w-3 h-3 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
+                <span className="flex items-center gap-1 text-red-400">
+                  <span className="w-2.5 h-2.5 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mt-2">
                 {/* 1. Car Visual Silhouette (SVG - Read-only) */}
-                <div className="md:col-span-6 flex flex-col items-center gap-2">
-                  <div className="relative w-full max-w-[240px] p-4 bg-slate-950/40 border border-white/5 rounded-3xl flex justify-center shadow-xl">
+                <div className="md:col-span-6 flex flex-col items-center gap-1">
+                  <div className="relative w-full max-w-[200px] p-3 bg-slate-950/40 border border-white/5 rounded-2xl flex justify-center shadow-xl">
                     <svg viewBox="0 0 200 380" className="w-full h-auto">
                       {/* Static Tires */}
                       <rect x="23" y="55" width="14" height="32" rx="4" fill="#1e293b" />
@@ -504,45 +482,45 @@ export default function ListingDetail() {
                   </div>
                   
                   {/* Hover status label indicator */}
-                  <span className="text-[11px] font-bold text-slate-400 min-h-[16px] block text-center mt-1">
+                  <span className="text-[10px] font-bold text-slate-400 min-h-[14px] block text-center mt-1">
                     {hoveredPart ? hoveredPart : "Ekspertiz detayı için parçanın üzerine gelin"}
                   </span>
                 </div>
 
                 {/* 2. Side Lists: Summarizing current selections */}
-                <div className="md:col-span-6 grid grid-cols-1 gap-4 h-full align-top">
-                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
-                    <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
+                <div className="md:col-span-6 flex flex-col gap-3">
+                  <div className="flex flex-col gap-1 bg-slate-950/45 p-3 border border-white/5 rounded-xl">
+                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
+                    <ul className="text-[10px] text-slate-350 flex flex-col gap-1">
                       {Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
+                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-0.5 rounded text-[9px] border border-orange-500/10">
                           <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-orange-400">Lokal Boya</span>
                         </li>
                       ))}
                       {Array.isArray(listing.paintedParts) && listing.paintedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
+                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-0.5 rounded text-[9px] border border-blue-500/10">
                           <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-blue-400">Boyalı</span>
                         </li>
                       ))}
                       {(!listing.localPaintedParts || listing.localPaintedParts.length === 0) && (!listing.paintedParts || listing.paintedParts.length === 0) && (
-                        <span className="text-slate-500 font-bold text-[10px] italic">Boyalı parça yok.</span>
+                        <span className="text-slate-500 font-bold text-[9px] italic">Boyalı parça yok.</span>
                       )}
                     </ul>
                   </div>
 
-                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
-                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
-                    <ul className="text-[11px] text-slate-350 flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1 bg-slate-950/45 p-3 border border-white/5 rounded-xl">
+                    <span className="text-[9px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
+                    <ul className="text-[10px] text-slate-350 flex flex-col gap-1">
                       {Array.isArray(listing.changedParts) && listing.changedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
+                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-0.5 rounded text-[9px] border border-red-500/10">
                           <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
                           <span className="font-bold text-red-400">Değişen</span>
                         </li>
                       ))}
                       {(!listing.changedParts || listing.changedParts.length === 0) && (
-                        <span className="text-slate-500 font-bold text-[10px] italic">Değişen parça yok.</span>
+                        <span className="text-slate-500 font-bold text-[9px] italic">Değişen parça yok.</span>
                       )}
                     </ul>
                   </div>
@@ -550,45 +528,42 @@ export default function ListingDetail() {
               </div>
             </div>
 
-            <div className="border-t border-white/5 my-2"></div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/5 text-xs">
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-400">Tramer Kaydı:</span>
-                <span className="text-sm font-black text-red-400 mt-1">
+                <span className="text-[10px] font-bold text-slate-400">Tramer Kaydı:</span>
+                <span className="text-xs font-black text-red-400 mt-0.5">
                   {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasar Kaydı Yok"}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-400">Bakım Geçmişi:</span>
-                <span className="text-xs text-slate-300 mt-1">{listing.maintenanceHistory || "Belirtilmedi"}</span>
+                <span className="text-[10px] font-bold text-slate-400">Bakım Geçmişi:</span>
+                <span className="text-xs text-slate-300 mt-0.5">{listing.maintenanceHistory || "Belirtilmedi"}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Sahibinden Spec Table & Seller Profile Card */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          {/* Sahibinden Tarzı Araç Bilgileri / Teknik Detaylar Kartı */}
-          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col gap-3 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-black text-slate-100 uppercase tracking-wide flex items-center gap-2">
+        {/* 2. ORTA KOLON (lg:col-span-4): Sahibinden Tarzı Kompakt Araç Bilgileri Tablosu */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex flex-col gap-2 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
                 <span>📋 Araç Bilgileri</span>
               </h3>
-              <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded">
+              <span className="text-[9px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded">
                 Teknik Detaylar
               </span>
             </div>
 
-            <div className="flex flex-col text-xs">
+            <div className="flex flex-col text-[11px]">
               {/* İlan No */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan No</span>
                 <span className="font-black text-red-400 font-mono">{listing.listingNo || listing.id.slice(0, 10).toUpperCase()}</span>
               </div>
 
               {/* İlan Tarihi */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan Tarihi</span>
                 <span className="font-semibold text-slate-200">
                   {new Date(listing.createdAt || Date.now()).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -596,119 +571,122 @@ export default function ListingDetail() {
               </div>
 
               {/* Marka */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Marka</span>
                 <span className="font-semibold text-slate-200">{listing.vehicleVariant?.brand?.name || listing.brand || "Belirtilmedi"}</span>
               </div>
 
               {/* Seri */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Seri</span>
                 <span className="font-semibold text-slate-200">{listing.vehicleVariant?.model?.name || listing.series || "Belirtilmedi"}</span>
               </div>
 
               {/* Model */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Model</span>
-                <span className="font-semibold text-slate-200 truncate max-w-[180px]" title={listing.vehicleVariant?.trim?.name || listing.model}>
+                <span className="font-semibold text-slate-200 truncate max-w-[160px]" title={listing.vehicleVariant?.trim?.name || listing.model}>
                   {listing.vehicleVariant?.trim?.name || listing.vehicleVariant?.engine?.name || listing.model || "Belirtilmedi"}
                 </span>
               </div>
 
               {/* Yıl */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Yıl</span>
                 <span className="font-semibold text-slate-200">{listing.modelYear}</span>
               </div>
 
               {/* Yakıt Tipi */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Yakıt Tipi</span>
                 <span className="font-semibold text-slate-200">{translateFuelType(listing.fuelType)}</span>
               </div>
 
               {/* Vites */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Vites</span>
                 <span className="font-semibold text-slate-200">{translateTransmission(listing.transmission)}</span>
               </div>
 
               {/* Araç Durumu */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Araç Durumu</span>
                 <span className="font-semibold text-slate-200">{listing.condition || "İkinci El"}</span>
               </div>
 
               {/* KM */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">KM</span>
                 <span className="font-semibold text-slate-200">{Number(listing.kilometers).toLocaleString('tr-TR')} km</span>
               </div>
 
               {/* Kasa Tipi */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Kasa Tipi</span>
                 <span className="font-semibold text-slate-200">{listing.vehicleVariant?.bodyType || listing.bodyType || "Sedan"}</span>
               </div>
 
               {/* Motor Gücü */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Gücü</span>
                 <span className="font-semibold text-slate-200">{listing.vehicleVariant?.power || listing.enginePower || "-"}</span>
               </div>
 
               {/* Motor Hacmi */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Hacmi</span>
                 <span className="font-semibold text-slate-200">{listing.vehicleVariant?.engineCapacity || listing.engineCapacity || "-"}</span>
               </div>
 
               {/* Çekiş */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Çekiş</span>
                 <span className="font-semibold text-slate-200">{listing.drivetrain || "Önden Çekiş"}</span>
               </div>
 
               {/* Renk */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Renk</span>
                 <span className="font-semibold text-slate-200">{listing.color || "Belirtilmedi"}</span>
               </div>
 
               {/* Garanti */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Garanti</span>
                 <span className="font-semibold text-slate-200">{listing.warranty ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Ağır Hasar Kayıtlı */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Ağır Hasar Kayıtlı</span>
                 <span className="font-semibold text-slate-200">{listing.tramerAmount > 200000 || listing.heavyDamage ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Plaka / Uyruk */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Plaka / Uyruk</span>
                 <span className="font-semibold text-slate-200">{listing.plateOrigin || "Türkiye (TR) Plakalı"}</span>
               </div>
 
               {/* Kimden */}
-              <div className="flex justify-between py-1.5 border-b border-dashed border-white/10">
+              <div className="flex justify-between py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Kimden</span>
                 <span className="font-extrabold text-red-400">{listing.sellerType === 'GALLERY' ? 'Galeriden' : 'Sahibinden'}</span>
               </div>
 
               {/* Takas */}
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="font-bold text-slate-400">Takas</span>
                 <span className="font-semibold text-slate-200">{listing.exchange ? "Evet" : "Hayır"}</span>
               </div>
             </div>
           </div>
+        </div>
 
+        {/* 3. SAĞ KOLON (lg:col-span-3): İlan Sahibi Bilgileri & AI Analiz Kartı */}
+        <div className="lg:col-span-3 flex flex-col gap-6">
           {/* Seller Profile Avatar & Actions Card */}
-          <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-5 shadow-xl">
+          <div className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
             {/* Seller Avatar Header */}
             <div className="flex items-center gap-4 pb-2 border-b border-white/5">
               <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center font-black text-white text-2xl shadow-lg shadow-orange-500/20 border border-white/20 shrink-0">
