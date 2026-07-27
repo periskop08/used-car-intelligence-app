@@ -256,19 +256,22 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-6 min-[1600px]:gap-8">
+    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-4 xl:gap-5 min-[1600px]:gap-6">
       
-      {/* SOL GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Sticky) */}
-      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 sticky top-16 gap-3">
-        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
-          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
-          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sol)</span>
-          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
+      {/* SOL GOOGLE ADS REKLAM KOLONU (1280px ve üzeri tüm laptop/masaüstü ekranlarda görünür - Sticky) */}
+      <div className="hidden xl:flex flex-col items-center justify-start w-[160px] min-[1600px]:w-[200px] min-[1920px]:w-[280px] shrink-0 sticky top-16 gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-[#0b0f19]/90 border-2 border-dashed border-orange-500/30 flex flex-col items-center justify-center p-3 text-center shadow-xl backdrop-blur-md">
+          <div className="w-7 h-7 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-2">
+            <span className="text-xs">📢</span>
+          </div>
+          <span className="text-[10px] uppercase font-black tracking-widest text-orange-400 mb-1">Google Ads</span>
+          <span className="text-xs font-bold text-slate-200">Reklam Alanı (Sol)</span>
+          <span className="text-[9px] font-mono text-slate-400 mt-2 bg-white/5 px-2 py-0.5 rounded border border-white/5">160x600 / 300x600</span>
         </div>
       </div>
 
-      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1280px Ortalanmış) */}
-      <div className="w-full max-w-[1280px] flex flex-col gap-4 shrink-0">
+      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1060px Ortalanmış Kompakt) */}
+      <div className="w-full max-w-[1060px] flex flex-col gap-4 shrink-0">
         
         {/* Back button & Title & Price Header (Full Width Top) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
@@ -1050,12 +1053,15 @@ export default function ListingDetail() {
 
       </div>
 
-      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Statik, Sticky Değil) */}
-      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 static gap-3">
-        <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
-          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
-          <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sağ)</span>
-          <span className="text-[9px] font-mono text-slate-700 mt-2">160x600 / 300x600</span>
+      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1280px ve üzeri tüm laptop/masaüstü ekranlarda görünür - Statik) */}
+      <div className="hidden xl:flex flex-col items-center justify-start w-[160px] min-[1600px]:w-[200px] min-[1920px]:w-[280px] shrink-0 static gap-3">
+        <div className="w-full h-[600px] rounded-2xl bg-[#0b0f19]/90 border-2 border-dashed border-orange-500/30 flex flex-col items-center justify-center p-3 text-center shadow-xl backdrop-blur-md">
+          <div className="w-7 h-7 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mb-2">
+            <span className="text-xs">📢</span>
+          </div>
+          <span className="text-[10px] uppercase font-black tracking-widest text-orange-400 mb-1">Google Ads</span>
+          <span className="text-xs font-bold text-slate-200">Reklam Alanı (Sağ)</span>
+          <span className="text-[9px] font-mono text-slate-400 mt-2 bg-white/5 px-2 py-0.5 rounded border border-white/5">160x600 / 300x600</span>
         </div>
       </div>
 
