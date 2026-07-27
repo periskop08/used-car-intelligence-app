@@ -1023,7 +1023,7 @@ export default function ListingDetail() {
             {/* Scrollable vertical list (YouTube sidebar style) */}
             <div
               ref={similarListingsRef}
-              className="max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 overscroll-contain"
+              className="max-h-[770px] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 overscroll-contain"
             >
               {mockSimilarListings.map((item) => (
                 <a
