@@ -1,10 +1,28 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter } from "lucide-react";
+import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+const mockSimilarListings = [
+  { id: 'sim-1', title: 'Audi A3 Sedan 35 TFSI Sport', year: 2020, km: '89.000', location: 'İstanbul / Kadıköy', price: '1.250.000 TL', imageUrl: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-2', title: 'BMW 320i Executive M Sport', year: 2019, km: '115.000', location: 'Ankara / Çankaya', price: '1.480.000 TL', imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-3', title: 'Mercedes C200d AMG 9G-Tronic', year: 2018, km: '124.000', location: 'İzmir / Bornova', price: '1.390.000 TL', imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-4', title: 'Volkswagen Golf 1.5 TSI R-Line', year: 2021, km: '62.000', location: 'Bursa / Nilüfer', price: '1.180.000 TL', imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-5', title: 'Renault Megane 1.3 TCe Icon EDG', year: 2022, km: '45.000', location: 'Antalya / Muratpaşa', price: '985.000 TL', imageUrl: 'https://images.unsplash.com/photo-1541348263662-e082662d82da?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-6', title: 'Toyota Corolla 1.8 Hybrid Passion', year: 2020, km: '78.000', location: 'Kocaeli / İzmit', price: '1.090.000 TL', imageUrl: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-7', title: 'Honda Civic 1.5 VTEC Turbo Executive', year: 2019, km: '92.000', location: 'Adana / Seyhan', price: '1.140.000 TL', imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-8', title: 'Ford Focus 1.5 EcoBlue ST-Line', year: 2020, km: '84.000', location: 'Eskişehir / Tepebaşı', price: '1.030.000 TL', imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400&auto=format&fit=crop&q=80' },
+  { id: 'sim-9', title: 'Peugeot 308 1.2 PureTech GT', year: 2021, km: '53.000', location: 'İstanbul / Maltepe', price: '1.120.000 TL', imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&auto=format&fit=crop&q=80' },
+];
+
+const mockIsiCepteRecommendations = [
+  { id: 'isi-1', name: 'Master Auto // Uzman Özel Servis', category: 'Motor, Şanzıman & Periyodik Bakım', brandSpec: 'Marka Uzmanı', location: 'İstanbul / Maslak Sanayi', rating: '4.9', image: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' },
+  { id: 'isi-2', name: 'Özkan Garaj // Mekanik & Diagnostik', category: 'Bilgisayarlı Arıza Tespit & Elektrik', brandSpec: 'Sertifikalı Usta', location: 'İstanbul / İkitelli OSB', rating: '4.8', image: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' },
+  { id: 'isi-3', name: 'Eksper Pro // Detaylı Muayene Noktası', category: 'Boya, Kaporta & Şasi Ölçüm', brandSpec: 'Yetkili Servis Noktası', location: 'İstanbul / Bostancı Sanayi', rating: '5.0', image: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' }
+];
 
 const formatImageUrl = (url?: string) => {
   if (!url) return "";
@@ -20,6 +38,7 @@ const formatImageUrl = (url?: string) => {
 export default function ListingDetail() {
   const { id } = useParams();
   const router = useRouter();
+  const similarListingsRef = useRef<HTMLDivElement>(null);
 
   // Data states
   const [listing, setListing] = useState<any>(null);
@@ -829,9 +848,10 @@ export default function ListingDetail() {
           )}
         </div>
 
-        {/* 3. SAĞ KOLON (lg:col-span-3): İlan Sahibi Bilgileri Kartı */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
-          {/* Seller Profile Avatar & Actions Card */}
+        {/* 3. SAĞ KOLON (lg:col-span-3): Dikey Sıralı 4 Kart */}
+        <div className="lg:col-span-3 flex flex-col gap-5">
+          
+          {/* 1. KART: İlan Sahibi Bilgileri Kartı */}
           <div className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
             {/* Seller Avatar Header */}
             <div className="flex items-center gap-4 pb-2 border-b border-white/5">
@@ -925,6 +945,247 @@ export default function ListingDetail() {
               </div>
             </div>
           </div>
+
+          {/* 2. KART: Benzer İlanlar (YouTube Sağ Panel Dikey Liste Mantığı) */}
+          <div className="glass p-4 rounded-2xl border border-white/5 flex flex-col gap-3 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
+                <span>🚗 Benzer İlanlar</span>
+              </h3>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => similarListingsRef.current?.scrollBy({ top: -140, behavior: 'smooth' })}
+                  className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Yukarı Kaydır"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => similarListingsRef.current?.scrollBy({ top: 140, behavior: 'smooth' })}
+                  className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Aşağı Kaydır"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable vertical list (YouTube sidebar style) */}
+            <div
+              ref={similarListingsRef}
+              className="max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 overscroll-contain"
+            >
+              {mockSimilarListings.map((item) => (
+                <a
+                  key={item.id}
+                  href={`/listings/${id}`}
+                  className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-white/5 transition group"
+                >
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-16 h-12 rounded-lg object-cover border border-white/10 shrink-0 group-hover:scale-105 transition"
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[11px] font-extrabold text-slate-200 truncate group-hover:text-orange-400 transition">
+                      {item.title}
+                    </span>
+                    <span className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
+                      {item.year} • {item.km} km • {item.location}
+                    </span>
+                    <span className="text-[11px] font-black text-orange-400 mt-0.5">
+                      {item.price}
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. KART: AI Analizi Hazırlanıyor / AI Varyant Analizi */}
+          {listing.isAiReady && vehicle ? (
+            <div className="glass p-4 rounded-2xl border border-orange-500/25 bg-orange-950/5 flex flex-col gap-3 shadow-xl relative overflow-hidden">
+              <span className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl"></span>
+
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
+                  ✨ AI Varyant Analizi
+                </h3>
+                <p className="text-[9px] text-slate-400 mt-0.5">
+                  {vehicle.brand?.name} {vehicle.model?.name} {vehicle.year} varyant verileri
+                </p>
+              </div>
+
+              {/* Tabs selector */}
+              <div className="grid grid-cols-2 gap-1 bg-slate-950/40 p-1 rounded-xl">
+                <button
+                  onClick={() => setActiveAiTab("problems")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "problems" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sık Karşılaşılan
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("recalls")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "recalls" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Recall Kaydı
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("questions")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "questions" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sorular
+                </button>
+                <button
+                  onClick={() => setActiveAiTab("checklist")}
+                  className={`text-[9px] font-bold py-1 rounded transition ${
+                    activeAiTab === "checklist" ? "bg-orange-600 text-white" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Checklist
+                </button>
+              </div>
+
+              {/* Tab Contents */}
+              <div className="bg-slate-950/20 p-3 rounded-xl border border-white/5 min-h-[160px] flex flex-col gap-2.5 text-xs">
+                {activeAiTab === "problems" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400 italic">
+                      ⚠️ Bu varyantta kullanıcılarca dile getirilmiş noktalar:
+                    </p>
+                    {vehicle.problems && vehicle.problems.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {vehicle.problems.map((p: any) => (
+                          <div key={p.id} className="flex flex-col gap-0.5 border-l-2 border-orange-500/40 pl-2">
+                            <span className="font-bold text-slate-200 text-[11px]">{p.name}</span>
+                            <span className="text-[10px] text-slate-400 leading-tight">{p.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Sık karşılaşılan bir durum bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "recalls" && (
+                  <div className="flex flex-col gap-2">
+                    {vehicle.recalls && vehicle.recalls.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {vehicle.recalls.map((r: any) => (
+                          <div key={r.id} className="flex flex-col gap-0.5 border-l-2 border-red-500/40 pl-2">
+                            <span className="font-bold text-slate-200 text-[11px]">{r.name}</span>
+                            <span className="text-[10px] text-slate-400 leading-tight">{r.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Resmi bir recall kaydı bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "questions" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400">Satıcıya sorun:</p>
+                    {vehicle.questions && vehicle.questions.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {vehicle.questions.map((q: any) => (
+                          <li key={q.id} className="text-[10px] text-slate-300 leading-tight pl-2 relative before:content-['•'] before:absolute before:left-0 before:text-orange-500">
+                            {q.question}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Özel soru bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+
+                {activeAiTab === "checklist" && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[9px] text-slate-400">Ekspertiz kontrol listesi:</p>
+                    {vehicle.checklists && vehicle.checklists.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {vehicle.checklists.map((c: any) => (
+                          <li key={c.id} className="text-[10px] text-slate-300 leading-tight pl-2 relative before:content-['✓'] before:absolute before:left-0 before:text-emerald-500">
+                            {c.item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">Özel checklist bulunmamaktadır.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-2">
+              <span className="text-2xl">⏳</span>
+              <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">AI Analizi Hazırlanıyor</h4>
+              <p className="text-[9px] text-slate-400 leading-relaxed">
+                Bu ilandaki araç için varyant eşleştirmesi veya AI analiz raporları henüz moderasyon tarafından onaylanmamış. En kısa sürede güncellenecektir.
+              </p>
+            </div>
+          )}
+
+          {/* 4. KART: İŞİ CEPTE ÖNERİYOR (Markaya Uygun Özel Servis / Usta Önerileri) */}
+          <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden">
+            <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-1">
+                  <Wrench className="w-3 h-3 text-orange-400" /> İŞİ CEPTE ÖNERİYOR
+                </span>
+                <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
+                  {listing.brand || vehicle?.brand?.name || "Bu Araç"} Markası İle Uyumlu Servisler
+                </span>
+              </div>
+              <span className="text-[8px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
+                Özel Öneri
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {mockIsiCepteRecommendations.map((shop) => (
+                <div key={shop.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex flex-col gap-2 hover:border-orange-500/30 transition">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/10 shrink-0">
+                      <img src={shop.image} alt={shop.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <h4 className="text-[11px] font-extrabold text-slate-100 truncate">{shop.name}</h4>
+                        <span className="text-[8.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">⭐ {shop.rating}</span>
+                      </div>
+                      <span className="text-[9.5px] text-orange-400 font-semibold truncate">{shop.category}</span>
+                      <span className="text-[9px] text-slate-400 truncate">📍 {shop.location} • {shop.brandSpec}</span>
+                    </div>
+                  </div>
+                  <a
+                    href={shop.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1"
+                  >
+                    <span>Servise Git</span>
+                    <span>→</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
