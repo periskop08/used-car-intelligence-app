@@ -256,10 +256,10 @@ export default function ListingDetail() {
   const vehicle = listing.vehicleVariant;
 
   return (
-    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-4 xl:gap-6">
+    <div className="w-full min-h-screen px-2 md:px-4 py-3 flex justify-center items-start gap-6 min-[1600px]:gap-8">
       
-      {/* SOL GOOGLE ADS REKLAM KOLONU (1440px ve üzeri ekranlarda görünür) */}
-      <div className="hidden 2xl:flex flex-col items-center justify-start w-[200px] xl:w-[220px] shrink-0 sticky top-16 gap-3">
+      {/* SOL GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Sticky) */}
+      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 sticky top-16 gap-3">
         <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
           <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
           <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sol)</span>
@@ -267,8 +267,8 @@ export default function ListingDetail() {
         </div>
       </div>
 
-      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1240px Ortalanmış) */}
-      <div className="w-full max-w-[1240px] flex flex-col gap-4 shrink-0">
+      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1280px Ortalanmış) */}
+      <div className="w-full max-w-[1280px] flex flex-col gap-4 shrink-0">
         
         {/* Back button & Title & Price Header (Full Width Top) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
@@ -1050,8 +1050,8 @@ export default function ListingDetail() {
 
       </div>
 
-      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1440px ve üzeri ekranlarda görünür) */}
-      <div className="hidden 2xl:flex flex-col items-center justify-start w-[200px] xl:w-[220px] shrink-0 sticky top-16 gap-3">
+      {/* SAĞ GOOGLE ADS REKLAM KOLONU (1600px ve üzeri ekranlarda görünür - Statik, Sticky Değil) */}
+      <div className="hidden min-[1600px]:flex flex-col items-center justify-start w-[200px] min-[1920px]:w-[320px] shrink-0 static gap-3">
         <div className="w-full h-[600px] rounded-2xl bg-slate-950/40 border border-white/5 border-dashed flex flex-col items-center justify-center p-4 text-center">
           <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mb-1">Google Ads</span>
           <span className="text-xs font-medium text-slate-600">Reklam Alanı (Sağ)</span>
