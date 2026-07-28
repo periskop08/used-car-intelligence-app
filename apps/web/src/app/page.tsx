@@ -534,7 +534,7 @@ export default function Home() {
       {/* Hero Section */}
       <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-8 py-2">
         {/* Left Side: Speed Lines (Hidden on Mobile) */}
-        <div className="hidden lg:flex items-center justify-start flex-none w-80 h-[160px] opacity-80">
+        <div className="hidden lg:flex items-center justify-end flex-none w-80 h-[160px] opacity-80">
           <svg width="260" height="64" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="left-lines-grad" x1="0" y1="0" x2="1" y2="0">
@@ -550,15 +550,15 @@ export default function Home() {
         </div>
 
         {/* Center: Hero Text */}
-        <div className="text-left flex-1 max-w-2xl flex flex-col items-start justify-center gap-2 h-[160px]">
-          <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white whitespace-nowrap">
-            İlanı gör, aracı anla,{" "}
+        <div className="text-center flex-1 max-w-2xl flex flex-col items-center justify-center gap-2 h-[160px] mx-auto">
+          <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white whitespace-nowrap text-center">
+            İlanı Gör, Aracı Anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
-              doğru kararı ver.
+              Doğru Kararı Ver.
             </span>
           </h1>
-          <p className="text-slate-400 text-xs md:text-[18px] font-medium leading-relaxed max-w-2xl">
-            Araçları karşılaştırın, size uygun aracı keşfedin.
+          <p className="text-slate-400 text-xs md:text-[18px] font-medium leading-relaxed max-w-2xl text-center">
+            Araçları Karşılaştırın, Size En Uygun Aracı Keşfedin.
           </p>
         </div>
 
