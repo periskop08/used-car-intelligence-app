@@ -558,7 +558,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-slate-400 text-xs md:text-[18px] font-medium leading-relaxed max-w-2xl">
-            Araçları tanıyın, karşılaştırın ve size uygun ilanları keşfedin.
+            Araçları karşılaştırın, size uygun aracı keşfedin.
           </p>
         </div>
 
