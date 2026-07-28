@@ -209,7 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-[#020617] text-white flex flex-col">
 
       <div className="flex-1 max-w-7xl w-full mx-auto flex px-4 py-8 gap-8">
         {/* Desktop Sidebar */}

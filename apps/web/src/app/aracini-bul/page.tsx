@@ -585,7 +585,7 @@ export default function FindMyCarPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans relative overflow-hidden">
       {/* Background aesthetics */}
       <div className="absolute right-1/4 top-1/4 w-[350px] h-[350px] bg-orange-600/5 rounded-full blur-[100px] pointer-events-none -z-10" />
       <div className="absolute left-1/4 bottom-1/4 w-[400px] h-[400px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none -z-10" />

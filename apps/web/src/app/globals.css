@@ -3,39 +3,12 @@
 @tailwind utilities;
 
 html {
-  font-size: 87.5%; /* 14px base scale */
+  font-size: 87.5%; /* 14px base scale: downscales fonts, margins, paddings, inputs & components site-wide by 2 levels */
 }
 
-/* ==========================================================================
-   DESIGN TOKENS (TorqueScout Hybrid Theme Architecture)
-   ========================================================================== */
 :root {
-  /* Page Canvas Tokens (Dark Mode) */
-  --page-bg: #020617;
-  --page-surface: #020617;
-  --outside-text-primary: #f8fafc;
-  --outside-text-secondary: #cbd5e1;
-  --page-divider: rgba(255, 255, 255, 0.1);
-
-  /* Component Tokens (FIXED Dark Navy across both Dark and Light Modes) */
-  --card-bg: #0b0f19;
-  --panel-bg: #0b0f19;
-  --modal-bg: #0b0f19;
-  --sidebar-bg: #090d1a;
-  --input-bg: #0b0f19;
-  --dropdown-bg: #0b0f19;
-  --card-border: rgba(255, 255, 255, 0.12);
-  --card-text-primary: #f8fafc;
-  --card-text-secondary: #cbd5e1;
-
-  /* Brand Accent Tokens (FIXED across both modes) */
-  --accent-orange: #f97316;
-  --accent-blue: #3b82f6;
-  --success: #22c55e;
-  --danger: #ef4444;
-
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #020617; /* Premium deep navy */
+  --foreground: #f8fafc; /* Slate 50 */
 }
 
 body {
@@ -58,9 +31,10 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+/* Hide scrollbar for IE, Edge and Firefox */
 .scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 /* Custom scrollbar utility */
@@ -78,189 +52,4 @@ body {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
-}
-
-/* ==========================================================================
-   LIGHT MODE HYBRID OVERRIDES (White Canvas + Fixed Dark Navy Components)
-   ========================================================================== */
-
-html.light {
-  /* Page Canvas Tokens (Light Mode) */
-  --page-bg: #f8fafc;
-  --page-surface: #ffffff;
-  --outside-text-primary: #020617;
-  --outside-text-secondary: #334155;
-  --page-divider: rgba(0, 0, 0, 0.08);
-
-  /* Component & Brand Tokens MUST STAY FIXED in Light Mode */
-  --card-bg: #0b0f19;
-  --panel-bg: #0b0f19;
-  --modal-bg: #0b0f19;
-  --sidebar-bg: #090d1a;
-  --input-bg: #0b0f19;
-  --dropdown-bg: #0b0f19;
-  --card-border: rgba(255, 255, 255, 0.12);
-  --card-text-primary: #f8fafc;
-  --card-text-secondary: #cbd5e1;
-  --accent-orange: #f97316;
-
-  --background: #f8fafc;
-  --foreground: #020617;
-  color-scheme: light;
-}
-
-/* 1. Main Page Canvas Background: Pure White / Light Neutral */
-html.light body,
-html.light main {
-  color: #0f172a !important;
-  background: #f8fafc !important;
-  background-color: #f8fafc !important;
-}
-
-/* 2. Header & Navbar: Preserved Dark Navy Brand Header */
-html.light header {
-  background-color: rgba(2, 6, 23, 0.95) !important;
-  background: rgba(2, 6, 23, 0.95) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #f8fafc !important;
-}
-
-/* 3. Footer: Dark Navy Footer */
-html.light footer {
-  background-color: #020617 !important;
-  background: #020617 !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: #94a3b8 !important;
-}
-
-/* 4. Canvas-level Typography (Directly on white page canvas outside of cards) */
-html.light .canvas-title,
-html.light main > div > h1:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]):not([class*="from-orange"]),
-html.light main > div > div > h1:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]):not([class*="from-orange"]) {
-  color: #020617 !important;
-}
-
-html.light .canvas-subtitle,
-html.light .canvas-subtext,
-html.light main > div > p:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]),
-html.light main > div > div > p:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]) {
-  color: #334155 !important;
-}
-
-/* 5. ALL Box-Type Components (Cards, Panels, Modals, Dropdowns, Drawers, Sidebars, Popovers, Tooltips, Tables, Form Containers, AI boxes, Seller boxes, Package cards, Filter panels, etc.): FIXED DARK NAVY SURFACE in both dark and light modes */
-html.light .glass,
-html.light [class*="bg-[#"],
-html.light [class*="bg-slate-900"],
-html.light [class*="bg-slate-950"],
-html.light [class*="bg-slate-800"],
-html.light [class*="bg-black"],
-html.light form:not(.canvas-form),
-html.light input:not([type="checkbox"]):not([type="radio"]),
-html.light select,
-html.light textarea,
-html.light [role="dialog"],
-html.light [role="menu"],
-html.light table,
-html.light aside,
-html.light .box-surface {
-  background-color: #0b0f19 !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Hover state for dark navy cards in light mode */
-html.light .glass:hover,
-html.light [class*="bg-[#"]:hover,
-html.light [class*="bg-slate-900"]:hover,
-html.light [class*="bg-slate-950"]:hover {
-  background-color: #0e1424 !important;
-}
-
-/* 6. Form Inputs & Select Controls: Dark Navy Surface with Light Text */
-html.light input:not([type="checkbox"]):not([type="radio"]),
-html.light select,
-html.light textarea {
-  background-color: #0b0f19 !important;
-  color: #f8fafc !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-html.light input::placeholder,
-html.light textarea::placeholder {
-  color: #94a3b8 !important;
-  opacity: 1 !important;
-}
-
-html.light select option {
-  background-color: #0b0f19 !important;
-  color: #f8fafc !important;
-}
-
-/* 7. Card Internal Typography MUST stay white/light inside dark cards */
-html.light .glass h1:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light .glass h2:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light .glass h3:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light .glass h4:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-[#"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-[#"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-[#"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-[#"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-900"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-900"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-900"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-900"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-950"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-950"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-950"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light [class*="bg-slate-950"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
-html.light form:not(.canvas-form) h1,
-html.light form:not(.canvas-form) h2,
-html.light form:not(.canvas-form) h3,
-html.light aside h1,
-html.light aside h2,
-html.light aside h3 {
-  color: #f8fafc !important;
-}
-
-html.light .glass .text-slate-100,
-html.light .glass .text-slate-200,
-html.light .glass .text-slate-300,
-html.light .glass .text-white,
-html.light [class*="bg-[#"] .text-slate-100,
-html.light [class*="bg-[#"] .text-slate-200,
-html.light [class*="bg-[#"] .text-slate-300,
-html.light [class*="bg-[#"] .text-white,
-html.light [class*="bg-slate-900"] .text-slate-100,
-html.light [class*="bg-slate-900"] .text-slate-200,
-html.light [class*="bg-slate-900"] .text-slate-300,
-html.light [class*="bg-slate-900"] .text-white,
-html.light [class*="bg-slate-950"] .text-slate-100,
-html.light [class*="bg-slate-950"] .text-slate-200,
-html.light [class*="bg-slate-950"] .text-slate-300,
-html.light [class*="bg-slate-950"] .text-white,
-html.light form:not(.canvas-form) label,
-html.light aside label {
-  color: #f8fafc !important;
-}
-
-html.light .glass .text-slate-400,
-html.light [class*="bg-[#"] .text-slate-400,
-html.light [class*="bg-slate-900"] .text-slate-400,
-html.light [class*="bg-slate-950"] .text-slate-400 {
-  color: #cbd5e1 !important;
-}
-
-html.light .glass .text-slate-500,
-html.light [class*="bg-[#"] .text-slate-500,
-html.light [class*="bg-slate-900"] .text-slate-500,
-html.light [class*="bg-slate-950"] .text-slate-500 {
-  color: #94a3b8 !important;
-}
-
-/* 8. Primary CTA Buttons MUST ALWAYS BE ORANGE */
-html.light .bg-orange-600,
-html.light .bg-orange-500,
-html.light [class*="bg-gradient-to-r"][class*="from-orange"] {
-  background-color: #ea580c !important;
-  color: #ffffff !important;
 }
