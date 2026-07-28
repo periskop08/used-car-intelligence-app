@@ -364,11 +364,10 @@ export default function Header() {
         {/* Theme Toggle Button (☀️ Light / 🌙 Dark) */}
         <button
           onClick={toggleTheme}
-          className="px-2.5 py-1.5 rounded-xl border border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold bg-white/5"
+          className="p-2 rounded-xl border border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-white transition cursor-pointer flex items-center justify-center text-sm bg-white/5"
           title={theme === "dark" ? "Açık Temaya Geç" : "Koyu Temaya Geç"}
         >
           <span>{theme === "dark" ? "☀️" : "🌙"}</span>
-          <span className="hidden sm:inline">{theme === "dark" ? "Açık Tema" : "Koyu Tema"}</span>
         </button>
 
         {/* Mobile Hamburger Toggle Button */}
