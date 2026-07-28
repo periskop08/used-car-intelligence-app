@@ -3,12 +3,39 @@
 @tailwind utilities;
 
 html {
-  font-size: 87.5%; /* 14px base scale: downscales fonts, margins, paddings, inputs & components site-wide by 2 levels */
+  font-size: 87.5%; /* 14px base scale */
 }
 
+/* ==========================================================================
+   DESIGN TOKENS (TorqueScout Hybrid Theme Architecture)
+   ========================================================================== */
 :root {
-  --background: #020617; /* Premium deep navy */
-  --foreground: #f8fafc; /* Slate 50 */
+  /* Page Canvas Tokens (Dark Mode) */
+  --page-bg: #020617;
+  --page-surface: #020617;
+  --outside-text-primary: #f8fafc;
+  --outside-text-secondary: #cbd5e1;
+  --page-divider: rgba(255, 255, 255, 0.1);
+
+  /* Component Tokens (FIXED Dark Navy across both Dark and Light Modes) */
+  --card-bg: #0b0f19;
+  --panel-bg: #0b0f19;
+  --modal-bg: #0b0f19;
+  --sidebar-bg: #090d1a;
+  --input-bg: #0b0f19;
+  --dropdown-bg: #0b0f19;
+  --card-border: rgba(255, 255, 255, 0.12);
+  --card-text-primary: #f8fafc;
+  --card-text-secondary: #cbd5e1;
+
+  /* Brand Accent Tokens (FIXED across both modes) */
+  --accent-orange: #f97316;
+  --accent-blue: #3b82f6;
+  --success: #22c55e;
+  --danger: #ef4444;
+
+  --background: #020617;
+  --foreground: #f8fafc;
 }
 
 body {
@@ -31,10 +58,9 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
-/* Hide scrollbar for IE, Edge and Firefox */
 .scrollbar-none {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom scrollbar utility */
@@ -54,8 +80,30 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Fixed Dark Navy Cards) */
+/* ==========================================================================
+   LIGHT MODE HYBRID OVERRIDES (White Canvas + Fixed Dark Navy Components)
+   ========================================================================== */
+
 html.light {
+  /* Page Canvas Tokens (Light Mode) */
+  --page-bg: #f8fafc;
+  --page-surface: #ffffff;
+  --outside-text-primary: #020617;
+  --outside-text-secondary: #334155;
+  --page-divider: rgba(0, 0, 0, 0.08);
+
+  /* Component & Brand Tokens MUST STAY FIXED in Light Mode */
+  --card-bg: #0b0f19;
+  --panel-bg: #0b0f19;
+  --modal-bg: #0b0f19;
+  --sidebar-bg: #090d1a;
+  --input-bg: #0b0f19;
+  --dropdown-bg: #0b0f19;
+  --card-border: rgba(255, 255, 255, 0.12);
+  --card-text-primary: #f8fafc;
+  --card-text-secondary: #cbd5e1;
+  --accent-orange: #f97316;
+
   --background: #f8fafc;
   --foreground: #020617;
   color-scheme: light;
@@ -86,12 +134,16 @@ html.light footer {
 }
 
 /* 4. Canvas-level Typography (Directly on white page canvas outside of cards) */
-html.light .canvas-title {
+html.light .canvas-title,
+html.light main > div > h1:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]):not([class*="from-orange"]),
+html.light main > div > div > h1:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]):not([class*="from-orange"]) {
   color: #020617 !important;
 }
 
 html.light .canvas-subtitle,
-html.light .canvas-subtext {
+html.light .canvas-subtext,
+html.light main > div > p:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]),
+html.light main > div > div > p:not([class*="bg-"]):not(.glass *):not([class*="text-orange"]) {
   color: #334155 !important;
 }
 
@@ -205,3 +257,10 @@ html.light [class*="bg-slate-950"] .text-slate-500 {
   color: #94a3b8 !important;
 }
 
+/* 8. Primary CTA Buttons MUST ALWAYS BE ORANGE */
+html.light .bg-orange-600,
+html.light .bg-orange-500,
+html.light [class*="bg-gradient-to-r"][class*="from-orange"] {
+  background-color: #ea580c !important;
+  color: #ffffff !important;
+}
