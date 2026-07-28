@@ -54,26 +54,38 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Dark Navy Cards) */
+/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Fixed Dark Navy Cards) */
 html.light {
   --background: #f8fafc;
-  --foreground: #0f172a;
+  --foreground: #020617;
   color-scheme: light;
 }
 
-html.light body {
-  color: #0f172a;
+/* 1. Main Page Canvas Background: Pure White / Light Neutral */
+html.light body,
+html.light main {
+  color: #0f172a !important;
   background: #f8fafc !important;
   background-color: #f8fafc !important;
 }
 
-/* Header in Light Mode: Preserved Dark Navy Header */
+/* 2. Header & Navbar: Preserved Dark Navy Brand Header */
 html.light header {
+  background-color: rgba(2, 6, 23, 0.95) !important;
   background: rgba(2, 6, 23, 0.95) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #f8fafc !important;
 }
 
-/* Canvas-level typography (Text directly on white page background) */
+/* 3. Footer: Dark Navy Footer */
+html.light footer {
+  background-color: #020617 !important;
+  background: #020617 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #94a3b8 !important;
+}
+
+/* 4. Canvas-level Typography (Directly on white page canvas outside of cards) */
 html.light .canvas-title {
   color: #020617 !important;
 }
@@ -83,37 +95,113 @@ html.light .canvas-subtext {
   color: #334155 !important;
 }
 
-/* Glass, Modals, Drawers, Dropdowns & Card Containers: Fixed Dark Navy Theme */
+/* 5. ALL Box-Type Components (Cards, Panels, Modals, Dropdowns, Drawers, Sidebars, Popovers, Tooltips, Tables, Form Containers, AI boxes, Seller boxes, Package cards, Filter panels, etc.): FIXED DARK NAVY SURFACE in both dark and light modes */
 html.light .glass,
-html.light [class*="bg-[#0b0f19]"],
-html.light [class*="bg-[#070b14]"],
-html.light [class*="bg-[#090d1a]"],
-html.light .bg-slate-900,
-html.light .bg-slate-900\/60,
-html.light .bg-slate-950,
-html.light .bg-slate-950\/40,
-html.light .bg-slate-950\/20,
-html.light .bg-slate-950\/80 {
-  background-color: rgba(11, 15, 25, 0.95) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2) !important;
+html.light [class*="bg-[#"],
+html.light [class*="bg-slate-900"],
+html.light [class*="bg-slate-950"],
+html.light [class*="bg-slate-800"],
+html.light [class*="bg-black"],
+html.light form:not(.canvas-form),
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea,
+html.light [role="dialog"],
+html.light [role="menu"],
+html.light table,
+html.light aside,
+html.light .box-surface {
+  background-color: #0b0f19 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Card internal typography MUST stay white/light inside dark cards */
+/* Hover state for dark navy cards in light mode */
+html.light .glass:hover,
+html.light [class*="bg-[#"]:hover,
+html.light [class*="bg-slate-900"]:hover,
+html.light [class*="bg-slate-950"]:hover {
+  background-color: #0e1424 !important;
+}
+
+/* 6. Form Inputs & Select Controls: Dark Navy Surface with Light Text */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+html.light select option {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+}
+
+/* 7. Card Internal Typography MUST stay white/light inside dark cards */
+html.light .glass h1:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light .glass h2:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light .glass h3:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light .glass h4:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-[#"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-[#"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-[#"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-[#"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-900"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-900"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-900"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-900"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-950"] h1:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-950"] h2:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-950"] h3:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light [class*="bg-slate-950"] h4:not([class*="text-orange"]):not([class*="from-orange"]),
+html.light form:not(.canvas-form) h1,
+html.light form:not(.canvas-form) h2,
+html.light form:not(.canvas-form) h3,
+html.light aside h1,
+html.light aside h2,
+html.light aside h3 {
+  color: #f8fafc !important;
+}
+
 html.light .glass .text-slate-100,
 html.light .glass .text-slate-200,
 html.light .glass .text-slate-300,
 html.light .glass .text-white,
-html.light [class*="bg-[#0b0f19]"] .text-slate-100,
-html.light [class*="bg-[#0b0f19]"] .text-slate-200,
-html.light [class*="bg-[#0b0f19]"] .text-slate-300,
-html.light [class*="bg-[#0b0f19]"] .text-white {
-  color: inherit !important;
+html.light [class*="bg-[#"] .text-slate-100,
+html.light [class*="bg-[#"] .text-slate-200,
+html.light [class*="bg-[#"] .text-slate-300,
+html.light [class*="bg-[#"] .text-white,
+html.light [class*="bg-slate-900"] .text-slate-100,
+html.light [class*="bg-slate-900"] .text-slate-200,
+html.light [class*="bg-slate-900"] .text-slate-300,
+html.light [class*="bg-slate-900"] .text-white,
+html.light [class*="bg-slate-950"] .text-slate-100,
+html.light [class*="bg-slate-950"] .text-slate-200,
+html.light [class*="bg-slate-950"] .text-slate-300,
+html.light [class*="bg-slate-950"] .text-white,
+html.light form:not(.canvas-form) label,
+html.light aside label {
+  color: #f8fafc !important;
 }
 
-/* Footer in Light Mode */
-html.light footer {
-  background-color: #ffffff !important;
-  border-top: 1px solid #e2e8f0 !important;
-  color: #64748b !important;
+html.light .glass .text-slate-400,
+html.light [class*="bg-[#"] .text-slate-400,
+html.light [class*="bg-slate-900"] .text-slate-400,
+html.light [class*="bg-slate-950"] .text-slate-400 {
+  color: #cbd5e1 !important;
 }
+
+html.light .glass .text-slate-500,
+html.light [class*="bg-[#"] .text-slate-500,
+html.light [class*="bg-slate-900"] .text-slate-500,
+html.light [class*="bg-slate-950"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+

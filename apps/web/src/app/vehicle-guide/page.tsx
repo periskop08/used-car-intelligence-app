@@ -352,7 +352,7 @@ export default function VehicleGuidePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans overflow-hidden">
+    <div className="min-h-screen flex flex-col font-sans overflow-hidden">
 
       <main className="flex-1 flex items-center justify-center p-4 relative">
         <div 
