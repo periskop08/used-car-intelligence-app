@@ -54,7 +54,7 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Light mode root & theme overrides: White canvas background with high contrast dark cards */
+/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Dark Cards) */
 html.light {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -67,16 +67,32 @@ html.light body {
   background-color: #f8fafc !important;
 }
 
-/* Header in Light Mode: Dark Navy Header */
+/* Header in Light Mode: Preserved Dark Navy Header */
 html.light header {
   background: rgba(2, 6, 23, 0.95) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Canvas-level typography (Text directly on white page background) */
+html.light .canvas-title {
+  color: #020617 !important;
+}
+
+html.light .canvas-subtitle {
+  color: #334155 !important;
+}
+
 /* Glass & Card Containers in Light Mode: Preserved Dark Theme Cards */
-html.light .glass {
-  background: rgba(11, 15, 25, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+html.light .glass,
+html.light .bg-\[\#0b0f19\],
+html.light .bg-slate-900,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-950,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/20,
+html.light .bg-slate-950\/80 {
+  background-color: rgba(11, 15, 25, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2) !important;
 }
 

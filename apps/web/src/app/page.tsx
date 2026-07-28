@@ -551,13 +551,13 @@ export default function Home() {
 
         {/* Center: Hero Text */}
         <div className="text-center flex-1 max-w-2xl flex flex-col items-center justify-center gap-2 h-[160px] mx-auto">
-          <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white whitespace-nowrap text-center">
+          <h1 className="text-xl md:text-[38px] font-black tracking-tight leading-tight text-white canvas-title whitespace-nowrap text-center">
             İlanı Gör, Aracı Anla,{" "}
             <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
               Doğru Kararı Ver.
             </span>
           </h1>
-          <p className="text-slate-400 text-xs md:text-[18px] font-medium leading-relaxed max-w-2xl text-center">
+          <p className="text-slate-400 canvas-subtitle text-xs md:text-[18px] font-medium leading-relaxed max-w-2xl text-center">
             Araçları Karşılaştırın, Size En Uygun Aracı Keşfedin.
           </p>
         </div>
@@ -854,8 +854,8 @@ export default function Home() {
         <div className="w-full max-w-5xl flex flex-col gap-8 py-8 border-t border-white/5">
           <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-extrabold text-slate-200">Öne Çıkan İlanlar</h2>
-              <p className="text-sm text-slate-400 mt-1">Yapay zeka analizli ve ekspertiz kontrol noktaları hazır satılık araçlar.</p>
+              <h2 className="text-3xl font-extrabold text-slate-200 canvas-title">Öne Çıkan İlanlar</h2>
+              <p className="text-sm text-slate-400 canvas-subtitle mt-1">Yapay zeka analizli ve ekspertiz kontrol noktaları hazır satılık araçlar.</p>
             </div>
             <a href="/listings" className="text-xs font-bold text-orange-500 hover:text-orange-400 transition flex items-center gap-1">
               Tüm İlanları Gör →

@@ -288,8 +288,8 @@ export default function ListingDetail() {
           {/* Sol Kolon (lg:col-span-6): Başlık ve İlan Detay Bilgileri */}
           <div className="lg:col-span-6">
             <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
-            <h1 className="text-lg md:text-xl font-black text-slate-100 tracking-tight">{listing.title}</h1>
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+            <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
+            <p className="text-[11px] text-slate-400 canvas-subtitle font-bold uppercase tracking-wider mt-0.5">
               {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
             </p>
           </div>
