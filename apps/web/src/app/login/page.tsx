@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export default function Login() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const redirectTarget = searchParams.get("redirect") || "/";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +40,7 @@ export default function Login() {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("user", JSON.stringify(data.user));
         setLoading(false);
-        // Redirect back home and reload session
-        window.location.href = "/";
+        window.location.href = redirectTarget;
       })
       .catch(err => {
         setError(err.message);
@@ -96,11 +98,19 @@ export default function Login() {
 
         <div className="text-center text-xs text-slate-400">
           Hesabınız yok mu?{" "}
-          <a href="/register" className="text-orange-500 font-bold hover:underline">
+          <a href={redirectTarget !== "/" ? `/register?redirect=${encodeURIComponent(redirectTarget)}` : "/register"} className="text-orange-500 font-bold hover:underline">
             Kayıt Olun
           </a>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center p-12 text-slate-400 text-sm">Yükleniyor...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

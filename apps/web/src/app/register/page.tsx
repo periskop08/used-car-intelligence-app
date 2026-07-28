@@ -50,13 +50,17 @@ function RegisterContent() {
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("user", JSON.stringify(data.user));
         setLoading(false);
-        window.location.href = "/";
+        const redirectTarget = searchParams.get("redirect") || "/";
+        window.location.href = redirectTarget;
       })
       .catch(err => {
         setError(err.message);
         setLoading(false);
       });
   };
+
+  const redirectParam = searchParams.get("redirect");
+  const loginLink = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login";
 
   return (
     <div className="flex-1 flex items-center justify-center py-12 px-6">
@@ -121,7 +125,7 @@ function RegisterContent() {
 
         <div className="text-center text-xs text-slate-400">
           Zaten hesabınız var mı?{" "}
-          <a href="/login" className="text-orange-500 font-bold hover:underline">
+          <a href={loginLink} className="text-orange-500 font-bold hover:underline">
             Giriş Yapın
           </a>
         </div>

@@ -323,13 +323,22 @@ export default function Header() {
             )}
           </div>
         ) : (
-          <div className="hidden md:flex items-center gap-3">
-            <a href="/login" className="text-sm font-semibold text-slate-300 hover:text-white px-3 py-1.5 transition">
+          <div className="hidden md:flex items-center gap-2.5">
+            <a
+              href="/register?redirect=/listings/create"
+              className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 transition flex items-center gap-1 cursor-pointer"
+            >
+              <span>📢 Ücretsiz İlan Ver</span>
+            </a>
+            <a
+              href="/login"
+              className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 border border-white/10 hover:bg-white/5 rounded-xl transition cursor-pointer"
+            >
               Giriş Yap
             </a>
             <a
               href="/register"
-              className="text-sm font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-500/20 transition"
+              className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 border border-white/10 hover:bg-white/5 rounded-xl transition cursor-pointer"
             >
               Kayıt Ol
             </a>
@@ -493,18 +502,25 @@ export default function Header() {
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col gap-3 pt-2">
+                <div className="flex flex-col gap-2.5 pt-2">
+                  <a
+                    href="/register?redirect=/listings/create"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-xs font-bold text-white transition shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5"
+                  >
+                    <span>📢 Ücretsiz İlan Ver</span>
+                  </a>
                   <a
                     href="/login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 rounded-xl border border-white/10 text-sm font-semibold text-slate-200 hover:bg-white/5 transition"
+                    className="w-full text-center py-2.5 rounded-xl border border-white/10 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     Giriş Yap
                   </a>
                   <a
                     href="/register"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full text-center py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-sm font-bold text-white transition shadow-lg shadow-orange-500/10"
+                    className="w-full text-center py-2.5 rounded-xl border border-white/10 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition"
                   >
                     Kayıt Ol
                   </a>
