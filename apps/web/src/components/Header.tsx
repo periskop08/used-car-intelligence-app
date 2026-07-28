@@ -13,6 +13,22 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAccordion, setMobileAccordion] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const savedTheme = (localStorage.getItem("theme") as "dark" | "light") || "dark";
+    setTheme(savedTheme);
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(savedTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.classList.remove("dark", "light");
+    document.documentElement.classList.add(nextTheme);
+  };
 
   const fetchUnreadCount = () => {
     const token = localStorage.getItem("accessToken");
@@ -344,6 +360,16 @@ export default function Header() {
             </a>
           </div>
         )}
+
+        {/* Theme Toggle Button (☀️ Light / 🌙 Dark) */}
+        <button
+          onClick={toggleTheme}
+          className="px-2.5 py-1.5 rounded-xl border border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold bg-white/5"
+          title={theme === "dark" ? "Açık Temaya Geç" : "Koyu Temaya Geç"}
+        >
+          <span>{theme === "dark" ? "☀️" : "🌙"}</span>
+          <span className="hidden sm:inline">{theme === "dark" ? "Açık Tema" : "Koyu Tema"}</span>
+        </button>
 
         {/* Mobile Hamburger Toggle Button */}
         <button

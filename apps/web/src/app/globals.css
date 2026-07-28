@@ -53,3 +53,91 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Light mode root & theme overrides */
+html.light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  color-scheme: light;
+}
+
+html.light body {
+  color: #0f172a;
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+}
+
+/* Glassmorphism in Light Mode */
+html.light .glass {
+  background: #ffffff !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+}
+
+/* Header in Light Mode */
+html.light header {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+/* Dropdown menus & Modals in Light Mode */
+html.light .bg-\[\#0b0f19\]\/95,
+html.light .bg-\[\#070b14\]\/95,
+html.light .bg-\[\#090d1a\] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Cards, filters, select boxes and containers */
+html.light .bg-\[\#0b0f19\],
+html.light .bg-slate-900,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-950,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/20,
+html.light .bg-slate-950\/80 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light select,
+html.light input,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Text colors in Light Mode */
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300,
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #475569 !important;
+}
+
+/* Border overrides */
+html.light .border-white\/5,
+html.light .border-white\/10,
+html.light .border-white\/20 {
+  border-color: #cbd5e1 !important;
+}
+
+/* Footer in Light Mode */
+html.light footer {
+  background-color: #ffffff !important;
+  border-top: 1px solid #e2e8f0 !important;
+  color: #64748b !important;
+}

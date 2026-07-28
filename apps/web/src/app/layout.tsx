@@ -14,6 +14,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.classList.add(t);}else{document.documentElement.classList.add("dark");}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col">
         {/* Client Header component */}
         <Header />
