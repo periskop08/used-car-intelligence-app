@@ -556,10 +556,10 @@ export default function ComparisonPage() {
       
       {/* Title */}
       <div>
-        <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white">
+        <h1 className="text-3xl font-black text-slate-100 canvas-title flex items-center justify-center gap-3">
           ⚖️ Araç Karşılaştırma
         </h1>
-        <p className="text-sm text-slate-400 mt-2">
+        <p className="text-sm text-slate-400 canvas-subtitle mt-2">
           İki farklı aracı yan yana getirerek teknik özelliklerini ve karşılaştırmalı durum analizini inceleyin.
         </p>
       </div>

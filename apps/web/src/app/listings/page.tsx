@@ -259,8 +259,8 @@ function ListingsContent() {
     <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-8">
       {/* Title Header */}
       <div>
-        <h1 className="text-3xl font-black text-slate-200 tracking-tight">Araç İlanları</h1>
-        <p className="text-sm text-slate-400 mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kullanıcı analizleri ile ikinci el ilanları.</p>
+        <h1 className="text-3xl font-black text-slate-200 canvas-title tracking-tight">Araç İlanları</h1>
+        <p className="text-sm text-slate-400 canvas-subtitle mt-1">TorqueScout AI onaylı varyantlar ve kapsamlı kullanıcı analizleri ile ikinci el ilanları.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

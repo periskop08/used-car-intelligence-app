@@ -54,7 +54,7 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Dark Cards) */
+/* Light mode root & theme overrides: Hybrid Light Theme (White Canvas + Dark Navy Cards) */
 html.light {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -78,13 +78,16 @@ html.light .canvas-title {
   color: #020617 !important;
 }
 
-html.light .canvas-subtitle {
+html.light .canvas-subtitle,
+html.light .canvas-subtext {
   color: #334155 !important;
 }
 
-/* Glass & Card Containers in Light Mode: Preserved Dark Theme Cards */
+/* Glass, Modals, Drawers, Dropdowns & Card Containers: Fixed Dark Navy Theme */
 html.light .glass,
-html.light .bg-\[\#0b0f19\],
+html.light [class*="bg-[#0b0f19]"],
+html.light [class*="bg-[#070b14]"],
+html.light [class*="bg-[#090d1a]"],
 html.light .bg-slate-900,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-950,
@@ -94,6 +97,18 @@ html.light .bg-slate-950\/80 {
   background-color: rgba(11, 15, 25, 0.95) !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Card internal typography MUST stay white/light inside dark cards */
+html.light .glass .text-slate-100,
+html.light .glass .text-slate-200,
+html.light .glass .text-slate-300,
+html.light .glass .text-white,
+html.light [class*="bg-[#0b0f19]"] .text-slate-100,
+html.light [class*="bg-[#0b0f19]"] .text-slate-200,
+html.light [class*="bg-[#0b0f19]"] .text-slate-300,
+html.light [class*="bg-[#0b0f19]"] .text-white {
+  color: inherit !important;
 }
 
 /* Footer in Light Mode */
