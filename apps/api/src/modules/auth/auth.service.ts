@@ -1,15 +1,34 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 import { Role, SubscriptionTier } from '@prisma/client';
 
+export const ADMIN_EMAILS = [
+  'efeguven9991@gmail.com',
+  'm.efeeguven@gmail.com',
+  'burhanseckin08@gmail.com',
+];
+
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  async onModuleInit() {
+    // Automatically promote admin/founder emails to Role.ADMIN & SubscriptionTier.PROFESYONEL on startup
+    await this.prisma.user.updateMany({
+      where: {
+        email: { in: ADMIN_EMAILS, mode: 'insensitive' },
+      },
+      data: {
+        role: Role.ADMIN,
+        subscriptionTier: SubscriptionTier.PROFESYONEL,
+      },
+    }).catch(err => console.warn('Admin sync warning:', err?.message));
+  }
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -19,23 +38,23 @@ export class AuthService {
       throw new ConflictException('Email address already registered');
     }
 
-    const adminEmails = ['m.efeeguven@gmail.com', 'burhanseckin08@gmail.com'];
-    const assignedRole = adminEmails.includes(dto.email) ? Role.ADMIN : (dto.role || Role.USER);
+    const isAdmin = ADMIN_EMAILS.includes(dto.email.toLowerCase());
+    const assignedRole = isAdmin ? Role.ADMIN : (dto.role || Role.USER);
+    const assignedTier = isAdmin ? SubscriptionTier.PROFESYONEL : (dto.subscriptionTier || SubscriptionTier.TANISMA);
 
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
-        passwordHash: dto.password, // simple password storage for MVP
+        passwordHash: dto.password,
         role: assignedRole,
-        subscriptionTier: dto.subscriptionTier || SubscriptionTier.TANISMA,
+        subscriptionTier: assignedTier,
         preferredLanguageCode: 'tr',
       },
     });
 
-    // Create an initial subscription record if they chose paid tier (YETKIN or PROFESYONEL)
-    if (dto.subscriptionTier && dto.subscriptionTier !== SubscriptionTier.TANISMA && dto.subscriptionTier !== SubscriptionTier.FREE) {
+    if (assignedTier !== SubscriptionTier.TANISMA && assignedTier !== SubscriptionTier.FREE) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
-        where: { tier: dto.subscriptionTier },
+        where: { tier: assignedTier },
       });
       if (plan) {
         await this.prisma.subscription.create({
@@ -43,7 +62,7 @@ export class AuthService {
             userId: user.id,
             planId: plan.id,
             status: 'ACTIVE',
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+            expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
           },
         });
       }
@@ -69,13 +88,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const adminEmails = ['m.efeeguven@gmail.com', 'burhanseckin08@gmail.com'];
-    if (adminEmails.includes(user.email) && user.role !== Role.ADMIN) {
+    const isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
+    if (isAdmin && (user.role !== Role.ADMIN || user.subscriptionTier !== SubscriptionTier.PROFESYONEL)) {
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { role: Role.ADMIN },
+        data: {
+          role: Role.ADMIN,
+          subscriptionTier: SubscriptionTier.PROFESYONEL,
+        },
       });
       user.role = Role.ADMIN;
+      user.subscriptionTier = SubscriptionTier.PROFESYONEL;
     }
 
     const payload = { id: user.id, email: user.email, role: user.role };

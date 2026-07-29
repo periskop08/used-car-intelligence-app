@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
+import { SubscriptionTier, SubscriptionStatus, Role } from '@prisma/client';
+
+export const ADMIN_EMAILS = [
+  'efeguven9991@gmail.com',
+  'm.efeeguven@gmail.com',
+  'burhanseckin08@gmail.com',
+];
 
 @Injectable()
 export class SubscriptionService {
@@ -8,9 +14,14 @@ export class SubscriptionService {
 
   /**
    * Calculates the current active plan tier of a user by checking active database subscriptions.
-   * If no valid subscription exists or has expired, returns FREE.
+   * Admin users and founder emails automatically get PROFESYONEL tier privileges.
    */
   async getEffectiveTier(userId: string): Promise<SubscriptionTier> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user && (user.role === Role.ADMIN || ADMIN_EMAILS.includes(user.email.toLowerCase()))) {
+      return SubscriptionTier.PROFESYONEL;
+    }
+
     const activeSub = await this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -23,12 +34,12 @@ export class SubscriptionService {
         plan: true,
       },
       orderBy: {
-        createdAt: 'desc', // get latest active subscription
+        createdAt: 'desc',
       },
     });
 
     if (!activeSub || !activeSub.plan) {
-      return SubscriptionTier.FREE;
+      return user?.subscriptionTier || SubscriptionTier.TANISMA;
     }
 
     return activeSub.plan.tier;
