@@ -52,6 +52,8 @@ const PACKAGE_DETAILS: Record<string, PackageDetail> = {
     features: [
       { text: "Ayda 10 AI araç raporu" },
       { text: "Ayda 30 chatbot mesajı" },
+      { text: "Her raporda satıcıya sorulacak sorular" },
+      { text: "Her raporda ekspertiz kontrol listesi" },
       { text: "10 aktif ilan" },
       { text: "30 gün ilan yayın süresi" },
       { text: "Ayda 10 karşılaştırma" },
@@ -73,6 +75,8 @@ const PACKAGE_DETAILS: Record<string, PackageDetail> = {
     features: [
       { text: "Ayda 50 AI araç raporu" },
       { text: "Ayda 150 chatbot mesajı" },
+      { text: "Her raporda satıcıya sorulacak sorular" },
+      { text: "Her raporda ekspertiz kontrol listesi" },
       { text: "50 aktif ilan" },
       { text: "45 gün ilan yayın süresi" },
       { text: "Ayda 30 karşılaştırma" },

@@ -975,6 +975,8 @@ export default function Home() {
               <ul className="text-xs text-slate-200 flex flex-col gap-2.5">
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 AI araç raporu</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 chatbot mesajı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda satıcıya sorulacak sorular</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda ekspertiz kontrol listesi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 10 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 30 gün ilan yayın süresi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 karşılaştırma</li>
@@ -1008,6 +1010,8 @@ export default function Home() {
               <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 50 AI araç raporu</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 150 chatbot mesajı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda satıcıya sorulacak sorular</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Her raporda ekspertiz kontrol listesi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 50 aktif ilan</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 45 gün ilan yayın süresi</li>
                 <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 karşılaştırma</li>
