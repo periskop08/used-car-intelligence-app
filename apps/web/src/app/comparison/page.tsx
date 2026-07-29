@@ -499,6 +499,7 @@ export default function ComparisonPage() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
+        variantIds: matchedVariantIds,
         variant1Id: matchedVariantIds[0] || slots[0]?.matchedVariantId,
         variant2Id: matchedVariantIds[1] || slots[1]?.matchedVariantId,
         question: userQuestion,
@@ -778,22 +779,35 @@ export default function ComparisonPage() {
           </div>
 
           {/* Advantages Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            {comparisonResult.vehicles?.map((v: any, i: number) => (
-              <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
-                <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                  {v.name} Öne Çıkan Avantajları
-                </h3>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  {(comparisonResult.aiAnalysis[`advantagesV${i + 1}`] || comparisonResult.aiAnalysis.advantages?.[String(i + 1)])?.map((adv: string, idx: number) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-orange-500 font-bold">•</span>
-                      <span>{adv}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className={`grid grid-cols-1 ${
+            comparisonResult.vehicles?.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-3"
+          } gap-5 pt-2`}>
+            {comparisonResult.vehicles?.map((v: any, i: number) => {
+              const advList =
+                comparisonResult.aiAnalysis?.[`advantagesV${i + 1}`] ||
+                comparisonResult.aiAnalysis?.advantages?.[String(i + 1)] ||
+                [
+                  `${v.engine || 'Motor'} verimliliği ve performansı`,
+                  `${v.transmission || 'Şanzıman'} yapısı ve teknolojisi`,
+                  `${v.problemsCount || 0} kayıtlı kronik durum`,
+                ];
+
+              return (
+                <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
+                  <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
+                    {v.name} Öne Çıkan Avantajları
+                  </h3>
+                  <ul className="space-y-2 text-xs text-slate-300">
+                    {advList.map((adv: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-orange-500 font-bold">•</span>
+                        <span>{adv}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
 
           {/* Analysis Breakdown Sections */}

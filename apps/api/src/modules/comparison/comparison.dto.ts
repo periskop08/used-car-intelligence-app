@@ -19,13 +19,20 @@ export class CompareVehiclesDto {
 }
 
 export class ComparisonChatDto {
-  @ApiProperty({ description: '1. Araç Varyantı UUIDsi' })
-  @IsUUID()
-  variant1Id!: string;
+  @ApiProperty({ description: 'Karşılaştırılan Araç Varyant UUID dizisi (2 - 10 adet)' })
+  @IsArray()
+  @IsOptional()
+  variantIds?: string[];
 
-  @ApiProperty({ description: '2. Araç Varyantı UUIDsi' })
+  @ApiProperty({ description: '1. Araç Varyantı UUIDsi (opsiyonel)' })
   @IsUUID()
-  variant2Id!: string;
+  @IsOptional()
+  variant1Id?: string;
+
+  @ApiProperty({ description: '2. Araç Varyantı UUIDsi (opsiyonel)' })
+  @IsUUID()
+  @IsOptional()
+  variant2Id?: string;
 
   @ApiProperty({ description: 'Kullanıcının sorduğu soru' })
   @IsString()
