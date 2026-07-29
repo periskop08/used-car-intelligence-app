@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto } from './user.dto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { ListingStatus } from '@prisma/client';
@@ -34,7 +35,10 @@ export class UserService {
   private bucketName: string;
   private publicUrl: string;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionService: SubscriptionService,
+  ) {
     this.bucketName = process.env.R2_BUCKET_NAME || '';
     this.publicUrl = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '');
     this.s3Client = new S3Client({
@@ -63,6 +67,7 @@ export class UserService {
         displayNamePreference: true,
         notificationSettings: true,
         subscriptionTier: true,
+        role: true,
         createdAt: true,
         isActive: true,
       },
@@ -72,6 +77,8 @@ export class UserService {
       throw new NotFoundException('Kullanıcı bulunamadı veya pasif durumda.');
     }
 
+    const effectiveTier = await this.subscriptionService.getEffectiveTier(userId);
+
     // Merge default notification settings if empty
     const settings = user.notificationSettings
       ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...(user.notificationSettings as any) }
@@ -79,6 +86,7 @@ export class UserService {
 
     return {
       ...user,
+      subscriptionTier: effectiveTier,
       notificationSettings: settings,
     };
   }

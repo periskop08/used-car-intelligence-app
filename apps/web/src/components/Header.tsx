@@ -58,6 +58,24 @@ export default function Header() {
       }
     }
 
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      fetch(`${API_URL}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => (res.ok ? res.json() : null))
+        .then(freshUser => {
+          if (freshUser) {
+            setUser(prev => {
+              const updated = { ...prev, ...freshUser };
+              localStorage.setItem("user", JSON.stringify(updated));
+              return updated;
+            });
+          }
+        })
+        .catch(() => null);
+    }
+
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 10000);
 
