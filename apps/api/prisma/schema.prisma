@@ -212,6 +212,7 @@ model User {
   notificationSettings   Json?
   isActive               Boolean           @default(true)
 
+  buyerPurchases         BuyerPackagePurchase[]
   subscriptions      Subscription[]
   reviews            UserReview[]
   favorites          FavoriteVehicle[]
@@ -1696,6 +1697,31 @@ model VehicleDiscoveryAnalyticsEvent {
   @@index([eventType, createdAt])
   @@index([userId, createdAt])
 }
+
+enum BuyerPackageCode {
+  ALICI_MINI
+  ALICI_PLUS
+  ALICI_MAX
+}
+
+model BuyerPackagePurchase {
+  id                   String           @id @default(uuid())
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageCode          BuyerPackageCode
+  price                Int
+  aiReportLimit        Int
+  aiReportUsed         Int              @default(0)
+  chatbotMessageLimit  Int
+  chatbotMessageUsed   Int              @default(0)
+  validityDays         Int
+  expiresAt            DateTime
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([userId, expiresAt])
+}
+
 
 
 

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import BuyerPackagesSection from "../components/BuyerPackagesSection";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -1027,6 +1028,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* One-Time Buyer Packages Section */}
+      <BuyerPackagesSection />
 
       {/* Nasıl Çalışır Section - Moved below Packages */}
       <div className="w-full max-w-5xl flex flex-col gap-8 items-center py-8 border-t border-white/5 mt-8">
