@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ComparisonService } from './comparison.service';
 import { CompareVehiclesDto } from './comparison.dto';
@@ -21,10 +21,16 @@ export class ComparisonController {
   @Post()
   @ApiOperation({ summary: 'İki Araç Varyantını Karşılaştır' })
   @ApiResponse({ status: 201, description: 'Araçlar karşılaştırıldı ve geçmişe kaydedildi.' })
-  compare(
+  async compare(
     @GetUser() user: UserPayload,
     @Body() dto: CompareVehiclesDto,
   ) {
-    return this.comparisonService.compare(user.id, dto);
+    try {
+      return await this.comparisonService.compare(user.id, dto);
+    } catch (err: any) {
+      if (err instanceof BadRequestException) throw err;
+      console.error('Comparison endpoint error:', err?.message || err);
+      throw new BadRequestException(err?.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+    }
   }
 }
