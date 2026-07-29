@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ComparisonService } from './comparison.service';
-import { CompareVehiclesDto } from './comparison.dto';
+import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 
@@ -18,6 +18,13 @@ export class ComparisonController {
     return this.comparisonService.getComparisonHistory(user.id);
   }
 
+  @Get('quota')
+  @ApiOperation({ summary: 'Kullanıcının Kalan Chatbot Mesaj Hakkını Al' })
+  async getQuota(@GetUser() user: UserPayload) {
+    const remainingChatbotMessages = await this.comparisonService.getUserChatbotQuota(user.id);
+    return { remainingChatbotMessages };
+  }
+
   @Post()
   @ApiOperation({ summary: 'İki Araç Varyantını Karşılaştır' })
   @ApiResponse({ status: 201, description: 'Araçlar karşılaştırıldı ve geçmişe kaydedildi.' })
@@ -31,6 +38,22 @@ export class ComparisonController {
       if (err instanceof BadRequestException) throw err;
       console.error('Comparison endpoint error:', err?.message || err);
       throw new BadRequestException(err?.message || 'Karşılaştırma işlemi gerçekleştirilemedi.');
+    }
+  }
+
+  @Post('chat')
+  @ApiOperation({ summary: 'Karşılaştırma AI Chatbotuna Soru Sor' })
+  @ApiResponse({ status: 201, description: 'Yapay zeka chatbot soruyu yanıtladı.' })
+  async chat(
+    @GetUser() user: UserPayload,
+    @Body() dto: ComparisonChatDto,
+  ) {
+    try {
+      return await this.comparisonService.chat(user.id, dto);
+    } catch (err: any) {
+      if (err instanceof BadRequestException) throw err;
+      console.error('Comparison chat endpoint error:', err?.message || err);
+      throw new BadRequestException(err?.message || 'Chatbot yanıtı oluşturulamadı.');
     }
   }
 }

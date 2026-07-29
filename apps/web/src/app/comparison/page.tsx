@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -43,6 +44,31 @@ export default function ComparisonPage() {
   const [comparisonResult, setComparisonResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Chatbot & Quota states
+  const reportStartRef = React.useRef<HTMLDivElement>(null);
+  const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "assistant"; text: string }>>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+
+  // Fetch initial remaining chatbot messages quota on load
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      fetch(`${API_URL}/comparisons/quota`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (typeof data.remainingChatbotMessages === "number") {
+            setRemainingQuota(data.remainingChatbotMessages);
+          }
+        })
+        .catch(() => null);
+    }
+  }, []);
 
   // Vehicle 1 Selection states
   const [models1, setModels1] = useState<any[]>([]);
@@ -543,11 +569,77 @@ export default function ComparisonPage() {
       })
       .then(data => {
         setComparisonResult(data);
+        if (typeof data.remainingChatbotMessages === "number") {
+          setRemainingQuota(data.remainingChatbotMessages);
+        }
+        if (data.aiAnalysis?.conversationalAdvice) {
+          setChatMessages([{ sender: "assistant", text: data.aiAnalysis.conversationalAdvice }]);
+        }
         setLoading(false);
+
+        // Auto-scroll to report start so user notices report is generated
+        setTimeout(() => {
+          reportStartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 200);
       })
       .catch(err => {
         setError(err.message);
         setLoading(false);
+      });
+  };
+
+  // Send Chat Message Handler
+  const handleSendChatMessage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    if (remainingQuota !== null && remainingQuota <= 0) {
+      setShowQuotaModal(true);
+      return;
+    }
+
+    const userQuestion = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { sender: "user", text: userQuestion }]);
+    setChatLoading(true);
+
+    const token = localStorage.getItem("accessToken");
+    fetch(`${API_URL}/comparisons/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        variant1Id: matchedVariantId1,
+        variant2Id: matchedVariantId2,
+        question: userQuestion,
+      }),
+    })
+      .then(res => {
+        if (!res.ok) {
+          if (res.status === 429) {
+            setShowQuotaModal(true);
+            throw new Error("Chatbot mesaj kotanız doldu.");
+          }
+          return res.json().then(err => {
+            throw new Error(err.message || "Mesaj gönderilemedi.");
+          });
+        }
+        return res.json();
+      })
+      .then(data => {
+        setChatMessages(prev => [...prev, { sender: "assistant", text: data.response }]);
+        if (typeof data.remainingChatbotMessages === "number") {
+          setRemainingQuota(data.remainingChatbotMessages);
+        }
+        setChatLoading(false);
+      })
+      .catch(err => {
+        if (err.message !== "Chatbot mesaj kotanız doldu.") {
+          setChatMessages(prev => [...prev, { sender: "assistant", text: `⚠️ ${err.message}` }]);
+        }
+        setChatLoading(false);
       });
   };
 
@@ -816,7 +908,7 @@ export default function ComparisonPage() {
 
       {/* AI Comparison Chatbot Verdict Card */}
       {comparisonResult && comparisonResult.aiAnalysis && (
-        <div className="glass p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
+        <div ref={reportStartRef} className="glass p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-white/10 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-xl">
@@ -922,32 +1014,99 @@ export default function ComparisonPage() {
         </div>
       )}
 
-      {/* Interactive First-Person AI Chatbot Experience */}
-      {comparisonResult && comparisonResult.aiAnalysis && comparisonResult.aiAnalysis.conversationalAdvice && (
-        <div className="glass p-6 md:p-8 rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#0c1222] via-[#090d1a] to-[#05070f] shadow-2xl relative overflow-hidden space-y-5">
-          <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/20">
-                💬
+      {/* Interactive AI Chatbot Conversation & Message Input */}
+      {comparisonResult && comparisonResult.aiAnalysis && (
+        <div className="glass p-6 md:p-8 rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#0c1222] via-[#090d1a] to-[#05070f] shadow-2xl space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/20">
+                  💬
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[#090d1a] rounded-full"></span>
               </div>
-              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[#090d1a] rounded-full"></span>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-100">
+                  TorqueScout AI Asistanı
+                </h3>
+                <p className="text-xs text-slate-400">Seçtiğin iki araç hakkında aklına takılan tüm soruları canlı olarak sorabilirsin.</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
-                <span>TorqueScout AI Asistanının Tavsiyesi</span>
-                <span className="text-[10px] font-mono bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-md">
-                  Birinci Ağızdan Sohbet
-                </span>
-              </h3>
-              <p className="text-xs text-slate-400">Teknik veriler ve sürüş dinamikleri ışığında doğrudan senin için yazılmış kişisel mesaj</p>
+
+            {/* Dynamic Chatbot Message Quota Counter Badge */}
+            <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-3.5 py-1.5 rounded-xl text-xs font-mono">
+              <span className="text-orange-400 font-bold">💬 Kalan Chatbot Hakkı:</span>
+              <span className="text-white font-black">
+                {remainingQuota === 999
+                  ? "Sınırsız (Admin)"
+                  : remainingQuota !== null
+                  ? `${remainingQuota} Mesaj`
+                  : "..."}
+              </span>
             </div>
           </div>
 
-          <div className="bg-slate-900/80 border border-white/5 p-5 md:p-6 rounded-2xl text-xs md:text-sm text-slate-200 leading-relaxed font-sans space-y-3">
-            {comparisonResult.aiAnalysis.conversationalAdvice.split('\n\n').map((paragraph: string, idx: number) => (
-              <p key={idx}>{paragraph}</p>
+          {/* Chat Messages History Stream */}
+          <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+            {chatMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex gap-3 text-xs md:text-sm ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {msg.sender === "assistant" && (
+                  <div className="w-8 h-8 rounded-xl bg-orange-600/30 border border-orange-500/40 flex items-center justify-center text-base shrink-0">
+                    🤖
+                  </div>
+                )}
+                <div
+                  className={`p-4 rounded-2xl max-w-xl leading-relaxed whitespace-pre-wrap ${
+                    msg.sender === "user"
+                      ? "bg-orange-600 text-white rounded-br-none shadow-lg shadow-orange-500/10"
+                      : "bg-slate-900/90 border border-white/10 text-slate-200 rounded-bl-none"
+                  }`}
+                >
+                  {msg.text}
+                </div>
+                {msg.sender === "user" && (
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-xs shrink-0 font-bold text-slate-300">
+                    Sen
+                  </div>
+                )}
+              </div>
             ))}
+
+            {chatLoading && (
+              <div className="flex items-center gap-3 text-xs text-orange-400 animate-pulse">
+                <div className="w-8 h-8 rounded-xl bg-orange-600/30 border border-orange-500/40 flex items-center justify-center text-base shrink-0">
+                  🤖
+                </div>
+                <div className="bg-slate-900/90 border border-white/10 p-3 rounded-2xl rounded-bl-none text-slate-300">
+                  TorqueScout AI düşünce ve yanıtı hazırlıyor...
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Interactive Chat Message Input Form */}
+          <form onSubmit={handleSendChatMessage} className="flex gap-2 pt-2 border-t border-white/10">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              placeholder="Bu iki araç hakkında aklına takılan soruyu sor... (Örn: Hangisinin yedek parçası ve bakımı daha ucuz?)"
+              disabled={chatLoading}
+              className="flex-1 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3.5 text-xs text-slate-100 outline-none focus:border-orange-500/50 transition placeholder:text-slate-500"
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim() || chatLoading}
+              className="bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-bold px-6 py-3.5 rounded-2xl text-xs transition flex items-center gap-2 cursor-pointer shadow-lg shadow-orange-500/20 shrink-0"
+            >
+              {chatLoading ? "Yanıtlanıyor..." : "Gönder ➔"}
+            </button>
+          </form>
         </div>
       )}
 
@@ -1000,6 +1159,12 @@ export default function ComparisonPage() {
           </div>
         </div>
       )}
+
+      {/* Quota Exhaustion Modal */}
+      <QuotaExhaustionModal
+        isOpen={showQuotaModal}
+        onClose={() => setShowQuotaModal(false)}
+      />
 
     </div>
   );

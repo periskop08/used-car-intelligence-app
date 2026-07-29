@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
-import { CompareVehiclesDto } from './comparison.dto';
-import { FeatureKey, ApprovalStatus } from '@prisma/client';
+import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
+import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -30,6 +30,52 @@ export class ComparisonService {
     }).catch(() => []);
   }
 
+  async getUserChatbotQuota(userId: string): Promise<number> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email))) {
+      return 999;
+    }
+
+    // Active Buyer Purchases credits
+    const activePurchases = await this.prisma.buyerPackagePurchase.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+    }).catch(() => []);
+
+    let buyerCredits = 0;
+    activePurchases.forEach(p => {
+      buyerCredits += Math.max(0, p.chatbotMessageLimit - p.chatbotMessageUsed);
+    });
+
+    // Monthly tier limit
+    const activeSub = await this.prisma.subscription.findFirst({
+      where: { userId, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+    }).catch(() => null);
+
+    const tier = activeSub?.plan?.tier || SubscriptionTier.TANISMA;
+    const tierLimit = tier === SubscriptionTier.PROFESYONEL ? 150 : tier === SubscriptionTier.YETKIN ? 30 : 3;
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const usage = await this.prisma.featureUsage.findUnique({
+      where: {
+        userId_featureKey_periodType_periodStart: {
+          userId,
+          featureKey: FeatureKey.AI_CHAT,
+          periodType: UsagePeriodType.DAILY,
+          periodStart: startOfDay,
+        },
+      },
+    }).catch(() => null);
+
+    const used = usage?.count || 0;
+    const monthlyRemaining = Math.max(0, tierLimit - used);
+
+    return monthlyRemaining + buyerCredits;
+  }
+
   async compare(userId: string, dto: CompareVehiclesDto) {
     if (dto.variant1Id === dto.variant2Id) {
       throw new BadRequestException('Aynı araç varyantını kendisiyle karşılaştıramazsınız.');
@@ -37,11 +83,11 @@ export class ComparisonService {
 
     const cacheKey = [dto.variant1Id, dto.variant2Id].sort().join('_');
 
-    // 1. Safe DB Cache lookup (graceful fallback if table not yet migrated)
+    // 1. Safe DB Cache lookup
     const cachedReport = await this.prisma.aiVehicleComparisonCache.findUnique({
       where: { cacheKey },
     }).catch((err) => {
-      console.warn('Cache lookup warning (table may not exist yet):', err?.message);
+      console.warn('Cache lookup warning:', err?.message);
       return null;
     });
 
@@ -100,15 +146,12 @@ export class ComparisonService {
     if (cachedReport) {
       aiAnalysis = cachedReport.analysisJson;
     } else {
-      // Feature Limit Check (graceful fallback if quota logic errors out)
       await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON).catch((err) => {
         console.warn('Feature limit check warning:', err?.message);
       });
 
-      // Generate AI Comparison Report with OpenAI -> Gemini -> Synthesis fallback
       aiAnalysis = await this.generateAiComparison(variant1, variant2, v1FullName, v2FullName);
 
-      // Safe Save to Cache Table
       await this.prisma.aiVehicleComparisonCache.create({
         data: {
           variant1Id: dto.variant1Id,
@@ -122,7 +165,6 @@ export class ComparisonService {
       });
     }
 
-    // Safe Save user comparison history log
     await this.prisma.vehicleComparison.create({
       data: {
         userId,
@@ -131,8 +173,11 @@ export class ComparisonService {
       },
     }).catch(() => null);
 
+    const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
+
     return {
       isCached: !!cachedReport,
+      remainingChatbotMessages,
       vehicle1: {
         id: variant1.id,
         name: v1FullName,
@@ -168,6 +213,102 @@ export class ComparisonService {
     };
   }
 
+  async chat(userId: string, dto: ComparisonChatDto) {
+    if (!dto.question || !dto.question.trim()) {
+      throw new BadRequestException('Lütfen sormak istediğiniz soruyu yazın.');
+    }
+
+    // Deduct 1 Chatbot credit
+    await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
+
+    const variant1 = await this.prisma.vehicleVariant.findUnique({
+      where: { id: dto.variant1Id },
+      include: { brand: true, model: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
+    });
+
+    const variant2 = await this.prisma.vehicleVariant.findUnique({
+      where: { id: dto.variant2Id },
+      include: { brand: true, model: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
+    });
+
+    if (!variant1 || !variant2) {
+      throw new BadRequestException('Karşılaştırılan araçlar bulunamadı.');
+    }
+
+    const v1Name = `${variant1.brand.name} ${variant1.model.name} ${variant1.year} (${variant1.trim.name})`;
+    const v2Name = `${variant2.brand.name} ${variant2.model.name} ${variant2.year} (${variant2.trim.name})`;
+
+    const prompt = `Sen TorqueScout AI Asistanısın. Kullanıcı şu iki aracı kıyaslıyor:
+1. Araç: ${v1Name} (Motor: ${variant1.engine.code}, Şanzıman: ${variant1.transmission.name}, Yakıt: ${variant1.fuelType}, Kronik Sorun Sayısı: ${variant1.problems.length})
+2. Araç: ${v2Name} (Motor: ${variant2.engine.code}, Şanzıman: ${variant2.transmission.name}, Yakıt: ${variant2.fuelType}, Kronik Sorun Sayısı: ${variant2.problems.length})
+
+Kullanıcının sorduğu detaylı takip sorusu: "${dto.question}"
+
+Lütfen samimi, doğrudan kullanıcının karşısındaymış gibi konuşarak net, teknik açıdan doğru ve yönlendirici yanıt ver. Yanıtın Türkçe ve 2-3 paragrafı geçmeyen uzunlukta olsun.`;
+
+    let reply = '';
+
+    if (this.openai) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'Sen samimi, bilgili ve yardımsever TorqueScout otomotiv danışmanısın.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.5,
+        });
+
+        reply = response.choices[0]?.message?.content || '';
+      } catch (err: any) {
+        console.warn('OpenAI comparison chat failed, switching to Gemini:', err?.message || err);
+      }
+    }
+
+    if (!reply) {
+      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
+      if (geminiApiKey) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+          const res = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          }
+        } catch (err: any) {
+          console.warn('Gemini chat failed:', err?.message || err);
+        }
+      }
+    }
+
+    if (!reply) {
+      reply = `${v1Name} ve ${v2Name} modelleri kıyaslandığında, sorduğun "${dto.question}" başlığı altında motor karakteri ve şanzıman verimliliği öne çıkmaktadır. Sürüş alışkanlıklarına ve periyodik bakım disiplinine dikkat etmeni öneririm.`;
+    }
+
+    await this.prisma.aiChatLog.create({
+      data: {
+        userId,
+        variantId: variant1.id,
+        prompt: dto.question,
+        response: reply,
+      },
+    }).catch(() => null);
+
+    const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
+
+    return {
+      response: reply,
+      remainingChatbotMessages,
+    };
+  }
+
   private async generateAiComparison(v1: any, v2: any, v1Name: string, v2Name: string): Promise<any> {
     const prompt = `Aşağıdaki iki aracı karşılaştıran detaylı ve tarafsız bir otomotiv analiz raporu oluştur.
 Araç 1: ${v1Name} (Motor: ${v1.engine.code}, Şanzıman: ${v1.transmission.name}, Yakıt: ${v1.fuelType}, Kronik Sorun Sayısı: ${v1.problems.length})
@@ -177,7 +318,7 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 {
   "verdict": "Net sonuç ve kazanan araç tavsiyesi (2-3 cümle)",
   "recommendedVehicle": "${v1Name}" veya "${v2Name}" veya "Eşit",
-  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan 1. ağızdan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. (Örn: 'Selam dostum! Senin için bu iki harika aracı en ince ayrıntısına kadar kıyasladım...')",
+  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. (Örn: 'Selam dostum! Senin için bu iki harika aracı en ince ayrıntısına kadar kıyasladım...')",
   "advantagesV1": ["Araç 1'in öne çıkan 3 ana avantajı"],
   "advantagesV2": ["Araç 2'nin öne çıkan 3 ana avantajı"],
   "performanceAnalysis": "Motor gücü, şanzıman uyumu ve yakıt tüketimi kıyaslaması",
@@ -189,7 +330,6 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
   }
 }`;
 
-    // Provider 1: OpenAI
     if (this.openai) {
       try {
         const response = await this.openai.chat.completions.create({
@@ -211,7 +351,6 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
       }
     }
 
-    // Provider 2: Google Gemini API (Automatic Fallback)
     const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
     if (geminiApiKey) {
       try {
@@ -247,7 +386,6 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
       }
     }
 
-    // Provider 3: Structured synthesis fallback (Ensures 0 server errors)
     const v1BetterPerformance = (v1.specs?.specs?.['topSpeed'] || 0) >= (v2.specs?.specs?.['topSpeed'] || 0);
     const winnerName = v1.problems.length <= v2.problems.length ? v1Name : v2Name;
 
