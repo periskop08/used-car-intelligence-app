@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 
@@ -33,12 +33,76 @@ const displayBodyType = (body: string) => {
   }
 };
 
+interface SlotData {
+  id: number;
+  selectedBrand: string;
+  selectedModel: string;
+  selectedYear: string;
+  selectedBodyType: string;
+  selectedEngine: string;
+  selectedFuelType: string;
+  selectedTransmission: string;
+  selectedTrim: string;
+  matchedVariantId: string | null;
+
+  models: any[];
+  years: number[];
+  bodyTypes: string[];
+  engines: string[];
+  fuelTypes: string[];
+  transmissions: string[];
+  trims: string[];
+
+  loadingModels: boolean;
+  loadingYears: boolean;
+  loadingBodyTypes: boolean;
+  loadingEngines: boolean;
+  loadingFuels: boolean;
+  loadingTransmissions: boolean;
+  loadingTrims: boolean;
+}
+
+const createEmptySlot = (id: number): SlotData => ({
+  id,
+  selectedBrand: "",
+  selectedModel: "",
+  selectedYear: "",
+  selectedBodyType: "",
+  selectedEngine: "",
+  selectedFuelType: "",
+  selectedTransmission: "",
+  selectedTrim: "",
+  matchedVariantId: null,
+
+  models: [],
+  years: [],
+  bodyTypes: [],
+  engines: [],
+  fuelTypes: [],
+  transmissions: [],
+  trims: [],
+
+  loadingModels: false,
+  loadingYears: false,
+  loadingBodyTypes: false,
+  loadingEngines: false,
+  loadingFuels: false,
+  loadingTransmissions: false,
+  loadingTrims: false,
+});
+
 export default function ComparisonPage() {
   const router = useRouter();
 
   // Brands list (shared)
   const [brands, setBrands] = useState<any[]>([]);
-  const [loadingBrands, setLoadingBrands] = useState(false);
+
+  // User tier & limit
+  const [userTier, setUserTier] = useState<string>("TANISMA");
+  const [vehicleLimit, setVehicleLimit] = useState<number>(2);
+
+  // Slots state (dynamically sized)
+  const [slots, setSlots] = useState<SlotData[]>([createEmptySlot(1), createEmptySlot(2)]);
 
   // Result comparison state
   const [comparisonResult, setComparisonResult] = useState<any>(null);
@@ -46,15 +110,22 @@ export default function ComparisonPage() {
   const [loading, setLoading] = useState(false);
 
   // Chatbot & Quota states
-  const reportStartRef = React.useRef<HTMLDivElement>(null);
+  const reportStartRef = useRef<HTMLDivElement>(null);
   const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<Array<{ sender: "user" | "assistant"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
-  // Fetch initial remaining chatbot messages quota on load
+  // Fetch initial brands and user quota/tier
   useEffect(() => {
+    fetch(`${API_URL}/vehicles/brands`)
+      .then(res => res.json())
+      .then(data => {
+        setBrands(Array.isArray(data) ? data : []);
+      })
+      .catch(() => null);
+
     const token = localStorage.getItem("accessToken");
     if (token) {
       fetch(`${API_URL}/comparisons/quota`, {
@@ -70,469 +141,245 @@ export default function ComparisonPage() {
     }
   }, []);
 
-  // Vehicle 1 Selection states
-  const [models1, setModels1] = useState<any[]>([]);
-  const [years1, setYears1] = useState<number[]>([]);
-  const [bodyTypes1, setBodyTypes1] = useState<string[]>([]);
-  const [engines1, setEngines1] = useState<string[]>([]);
-  const [fuelTypes1, setFuelTypes1] = useState<string[]>([]);
-  const [transmissions1, setTransmissions1] = useState<string[]>([]);
-  const [trims1, setTrims1] = useState<string[]>([]);
+  // Update slots when user limit changes
+  const setLimitAndInitSlots = (limit: number, tierName: string) => {
+    setVehicleLimit(limit);
+    setUserTier(tierName);
+    setSlots(prev => {
+      if (prev.length === limit) return prev;
+      const newSlots: SlotData[] = [];
+      for (let i = 1; i <= limit; i++) {
+        newSlots.push(prev[i - 1] || createEmptySlot(i));
+      }
+      return newSlots;
+    });
+  };
 
-  const [selectedBrand1, setSelectedBrand1] = useState("");
-  const [selectedModel1, setSelectedModel1] = useState("");
-  const [selectedYear1, setSelectedYear1] = useState("");
-  const [selectedBodyType1, setSelectedBodyType1] = useState("");
-  const [selectedEngine1, setSelectedEngine1] = useState("");
-  const [selectedFuelType1, setSelectedFuelType1] = useState("");
-  const [selectedTransmission1, setSelectedTransmission1] = useState("");
-  const [selectedTrim1, setSelectedTrim1] = useState("");
-  const [matchedVariantId1, setMatchedVariantId1] = useState<string | null>(null);
+  // Helper to update single slot state
+  const updateSlot = (index: number, patch: Partial<SlotData>) => {
+    setSlots(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
 
-  const [loadingModels1, setLoadingModels1] = useState(false);
-  const [loadingYears1, setLoadingYears1] = useState(false);
-  const [loadingBodyTypes1, setLoadingBodyTypes1] = useState(false);
-  const [loadingEngines1, setLoadingEngines1] = useState(false);
-  const [loadingFuels1, setLoadingFuels1] = useState(false);
-  const [loadingTransmissions1, setLoadingTransmissions1] = useState(false);
-  const [loadingTrims1, setLoadingTrims1] = useState(false);
-  const [loadingMatch1, setLoadingMatch1] = useState(false);
-
-  // Vehicle 2 Selection states
-  const [models2, setModels2] = useState<any[]>([]);
-  const [years2, setYears2] = useState<number[]>([]);
-  const [bodyTypes2, setBodyTypes2] = useState<string[]>([]);
-  const [engines2, setEngines2] = useState<string[]>([]);
-  const [fuelTypes2, setFuelTypes2] = useState<string[]>([]);
-  const [transmissions2, setTransmissions2] = useState<string[]>([]);
-  const [trims2, setTrims2] = useState<string[]>([]);
-
-  const [selectedBrand2, setSelectedBrand2] = useState("");
-  const [selectedModel2, setSelectedModel2] = useState("");
-  const [selectedYear2, setSelectedYear2] = useState("");
-  const [selectedBodyType2, setSelectedBodyType2] = useState("");
-  const [selectedEngine2, setSelectedEngine2] = useState("");
-  const [selectedFuelType2, setSelectedFuelType2] = useState("");
-  const [selectedTransmission2, setSelectedTransmission2] = useState("");
-  const [selectedTrim2, setSelectedTrim2] = useState("");
-  const [matchedVariantId2, setMatchedVariantId2] = useState<string | null>(null);
-
-  const [loadingModels2, setLoadingModels2] = useState(false);
-  const [loadingYears2, setLoadingYears2] = useState(false);
-  const [loadingBodyTypes2, setLoadingBodyTypes2] = useState(false);
-  const [loadingEngines2, setLoadingEngines2] = useState(false);
-  const [loadingFuels2, setLoadingFuels2] = useState(false);
-  const [loadingTransmissions2, setLoadingTransmissions2] = useState(false);
-  const [loadingTrims2, setLoadingTrims2] = useState(false);
-  const [loadingMatch2, setLoadingMatch2] = useState(false);
-
-  // Fetch brands on load
-  useEffect(() => {
-    setLoadingBrands(true);
-    fetch(`${API_URL}/vehicles/brands`)
-      .then(res => res.json())
-      .then(data => {
-        setBrands(Array.isArray(data) ? data : []);
-        setLoadingBrands(false);
-      })
-      .catch(() => setLoadingBrands(false));
-  }, []);
-
-  // --- VEHICLE 1 CASCADE EFFECTS ---
-
-  const handleBrand1Change = (brandId: string) => {
-    setSelectedBrand1(brandId);
-    setSelectedModel1("");
-    setSelectedYear1("");
-    setSelectedBodyType1("");
-    setSelectedEngine1("");
-    setSelectedFuelType1("");
-    setSelectedTransmission1("");
-    setSelectedTrim1("");
-    setModels1([]);
-    setYears1([]);
-    setBodyTypes1([]);
-    setEngines1([]);
-    setFuelTypes1([]);
-    setTransmissions1([]);
-    setTrims1([]);
-    setMatchedVariantId1(null);
+  // Slot cascade handlers
+  const handleBrandChange = (index: number, brandId: string) => {
+    updateSlot(index, {
+      selectedBrand: brandId,
+      selectedModel: "",
+      selectedYear: "",
+      selectedBodyType: "",
+      selectedEngine: "",
+      selectedFuelType: "",
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      models: [],
+      years: [],
+      bodyTypes: [],
+      engines: [],
+      fuelTypes: [],
+      transmissions: [],
+      trims: [],
+      loadingModels: !!brandId,
+    });
 
     if (!brandId) return;
-    setLoadingModels1(true);
-    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
+
+    fetch(`${API_URL}/vehicles/brands/${brandId}/models`)
       .then(res => res.json())
       .then(data => {
-        setModels1(Array.isArray(data) ? data : []);
-        setLoadingModels1(false);
+        updateSlot(index, { models: Array.isArray(data) ? data : [], loadingModels: false });
       })
-      .catch(() => setLoadingModels1(false));
+      .catch(() => updateSlot(index, { loadingModels: false }));
   };
 
-  const handleModel1Change = (modelId: string) => {
-    setSelectedModel1(modelId);
-    setSelectedYear1("");
-    setSelectedBodyType1("");
-    setSelectedEngine1("");
-    setSelectedFuelType1("");
-    setSelectedTransmission1("");
-    setSelectedTrim1("");
-    setYears1([]);
-    setBodyTypes1([]);
-    setEngines1([]);
-    setFuelTypes1([]);
-    setTransmissions1([]);
-    setTrims1([]);
-    setMatchedVariantId1(null);
+  const handleModelChange = (index: number, modelId: string) => {
+    updateSlot(index, {
+      selectedModel: modelId,
+      selectedYear: "",
+      selectedBodyType: "",
+      selectedEngine: "",
+      selectedFuelType: "",
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      years: [],
+      bodyTypes: [],
+      engines: [],
+      fuelTypes: [],
+      transmissions: [],
+      trims: [],
+      loadingYears: !!modelId,
+    });
 
     if (!modelId) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === modelId)?.name;
-    if (!brandName || !modelName) return;
 
-    setLoadingYears1(true);
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`)
+    fetch(`${API_URL}/vehicles/models/${modelId}/years`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => parseInt(item.value));
-          setYears1(list);
-          if (list.length === 1) {
-            setSelectedYear1(list[0].toString());
-          }
-        }
-        setLoadingYears1(false);
+      .then(data => {
+        updateSlot(index, { years: Array.isArray(data) ? data : [], loadingYears: false });
       })
-      .catch(() => setLoadingYears1(false));
+      .catch(() => updateSlot(index, { loadingYears: false }));
   };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleYearChange = (index: number, yearVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedYear: yearVal,
+      selectedBodyType: "",
+      selectedEngine: "",
+      selectedFuelType: "",
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      bodyTypes: [],
+      engines: [],
+      fuelTypes: [],
+      transmissions: [],
+      trims: [],
+      loadingBodyTypes: !!yearVal,
+    });
 
-    setLoadingBodyTypes1(true);
-    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${selectedYear1}`)
+    if (!yearVal || !slot.selectedModel) return;
+
+    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${yearVal}/body-types`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value.toUpperCase());
-          setBodyTypes1(list);
-          if (list.length === 1) {
-            setSelectedBodyType1(list[0]);
-          }
-        }
-        setLoadingBodyTypes1(false);
+      .then(data => {
+        updateSlot(index, { bodyTypes: Array.isArray(data) ? data : [], loadingBodyTypes: false });
       })
-      .catch(() => setLoadingBodyTypes1(false));
-  }, [selectedYear1, selectedBrand1, selectedModel1, brands, models1]);
+      .catch(() => updateSlot(index, { loadingBodyTypes: false }));
+  };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1 || !selectedBodyType1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleBodyTypeChange = (index: number, bodyVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedBodyType: bodyVal,
+      selectedEngine: "",
+      selectedFuelType: "",
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      engines: [],
+      fuelTypes: [],
+      transmissions: [],
+      trims: [],
+      loadingEngines: !!bodyVal,
+    });
 
-    setLoadingEngines1(true);
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType1)}&year=${selectedYear1}`)
+    if (!bodyVal || !slot.selectedModel || !slot.selectedYear) return;
+
+    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${bodyVal}/engines`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setEngines1(list);
-          if (list.length === 1) {
-            setSelectedEngine1(list[0]);
-          }
-        }
-        setLoadingEngines1(false);
+      .then(data => {
+        updateSlot(index, { engines: Array.isArray(data) ? data : [], loadingEngines: false });
       })
-      .catch(() => setLoadingEngines1(false));
-  }, [selectedBodyType1, selectedBrand1, selectedModel1, selectedYear1, brands, models1]);
+      .catch(() => updateSlot(index, { loadingEngines: false }));
+  };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1 || !selectedBodyType1 || !selectedEngine1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleEngineChange = (index: number, engineVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedEngine: engineVal,
+      selectedFuelType: "",
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      fuelTypes: [],
+      transmissions: [],
+      trims: [],
+      loadingFuels: !!engineVal,
+    });
 
-    setLoadingFuels1(true);
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType1)}&year=${selectedYear1}&engineVersion=${encodeURIComponent(selectedEngine1)}`)
+    if (!engineVal || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+
+    const encodedEng = encodeURIComponent(engineVal);
+    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setFuelTypes1(list);
-          if (list.length === 1) {
-            setSelectedFuelType1(list[0]);
-          }
-        }
-        setLoadingFuels1(false);
+      .then(data => {
+        updateSlot(index, { fuelTypes: Array.isArray(data) ? data : [], loadingFuels: false });
       })
-      .catch(() => setLoadingFuels1(false));
-  }, [selectedEngine1, selectedBrand1, selectedModel1, selectedYear1, selectedBodyType1, brands, models1]);
+      .catch(() => updateSlot(index, { loadingFuels: false }));
+  };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1 || !selectedBodyType1 || !selectedFuelType1 || !selectedEngine1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleFuelTypeChange = (index: number, fuelVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedFuelType: fuelVal,
+      selectedTransmission: "",
+      selectedTrim: "",
+      matchedVariantId: null,
+      transmissions: [],
+      trims: [],
+      loadingTransmissions: !!fuelVal,
+    });
 
-    setLoadingTransmissions1(true);
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType1)}&year=${selectedYear1}&engineVersion=${encodeURIComponent(selectedEngine1)}&fuelType=${encodeURIComponent(selectedFuelType1)}`)
+    if (!fuelVal || !slot.selectedEngine || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+
+    const encodedEng = encodeURIComponent(slot.selectedEngine);
+    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types/${fuelVal}/transmissions`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setTransmissions1(list);
-          if (list.length === 1) {
-            setSelectedTransmission1(list[0]);
-          }
-        }
-        setLoadingTransmissions1(false);
+      .then(data => {
+        updateSlot(index, { transmissions: Array.isArray(data) ? data : [], loadingTransmissions: false });
       })
-      .catch(() => setLoadingTransmissions1(false));
-  }, [selectedFuelType1, selectedEngine1, selectedBrand1, selectedModel1, selectedYear1, selectedBodyType1, brands, models1]);
+      .catch(() => updateSlot(index, { loadingTransmissions: false }));
+  };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1 || !selectedBodyType1 || !selectedFuelType1 || !selectedEngine1 || !selectedTransmission1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleTransmissionChange = (index: number, transVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedTransmission: transVal,
+      selectedTrim: "",
+      matchedVariantId: null,
+      trims: [],
+      loadingTrims: !!transVal,
+    });
 
-    setLoadingTrims1(true);
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType1)}&year=${selectedYear1}&engineVersion=${encodeURIComponent(selectedEngine1)}&fuelType=${encodeURIComponent(selectedFuelType1)}&transmissionType=${encodeURIComponent(selectedTransmission1)}`)
+    if (!transVal || !slot.selectedFuelType || !slot.selectedEngine || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+
+    const encodedEng = encodeURIComponent(slot.selectedEngine);
+    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types/${slot.selectedFuelType}/transmissions/${transVal}/trims`)
       .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const raw = res.data.map((item: any) => item.value);
-          const list = raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim()));
-          setTrims1(list);
-          if (list.length === 1) {
-            setSelectedTrim1(list[0]);
-          }
-        }
-        setLoadingTrims1(false);
+      .then(data => {
+        updateSlot(index, { trims: Array.isArray(data) ? data : [], loadingTrims: false });
       })
-      .catch(() => setLoadingTrims1(false));
-  }, [selectedTransmission1, selectedFuelType1, selectedEngine1, selectedBrand1, selectedModel1, selectedYear1, selectedBodyType1, brands, models1]);
+      .catch(() => updateSlot(index, { loadingTrims: false }));
+  };
 
-  useEffect(() => {
-    if (!selectedBrand1 || !selectedModel1 || !selectedYear1 || !selectedBodyType1 || !selectedFuelType1 || !selectedEngine1 || !selectedTransmission1 || !selectedTrim1) return;
-    const brandName = brands.find(b => b.id === selectedBrand1)?.name;
-    const modelName = models1.find(m => m.id === selectedModel1)?.name;
-    if (!brandName || !modelName) return;
+  const handleTrimChange = (index: number, trimVal: string) => {
+    const slot = slots[index];
+    updateSlot(index, {
+      selectedTrim: trimVal,
+      matchedVariantId: null,
+    });
 
-    setLoadingMatch1(true);
-    fetch(`${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType1)}&year=${selectedYear1}&engineVersion=${encodeURIComponent(selectedEngine1)}&fuelType=${encodeURIComponent(selectedFuelType1)}&trimPackage=${encodeURIComponent(selectedTrim1)}&transmissionType=${encodeURIComponent(selectedTransmission1)}`)
+    if (!trimVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType || !slot.selectedTransmission) return;
+
+    const queryParams = new URLSearchParams({
+      brandId: slot.selectedBrand,
+      modelId: slot.selectedModel,
+      year: slot.selectedYear,
+      bodyType: slot.selectedBodyType,
+      engineCode: slot.selectedEngine,
+      fuelType: slot.selectedFuelType,
+      transmissionName: slot.selectedTransmission,
+      trimName: trimVal,
+    });
+
+    fetch(`${API_URL}/vehicles/find-variant?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && res.variantId) {
-          setMatchedVariantId1(res.variantId);
+          updateSlot(index, { matchedVariantId: res.variantId });
         }
-        setLoadingMatch1(false);
       })
-      .catch(() => setLoadingMatch1(false));
-  }, [selectedTrim1, selectedTransmission1, selectedFuelType1, selectedEngine1, selectedBrand1, selectedModel1, selectedYear1, selectedBodyType1, brands, models1]);
-
-
-  // --- VEHICLE 2 CASCADE EFFECTS ---
-
-  const handleBrand2Change = (brandId: string) => {
-    setSelectedBrand2(brandId);
-    setSelectedModel2("");
-    setSelectedYear2("");
-    setSelectedBodyType2("");
-    setSelectedEngine2("");
-    setSelectedFuelType2("");
-    setSelectedTransmission2("");
-    setSelectedTrim2("");
-    setModels2([]);
-    setYears2([]);
-    setBodyTypes2([]);
-    setEngines2([]);
-    setFuelTypes2([]);
-    setTransmissions2([]);
-    setTrims2([]);
-    setMatchedVariantId2(null);
-
-    if (!brandId) return;
-    setLoadingModels2(true);
-    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
-      .then(res => res.json())
-      .then(data => {
-        setModels2(Array.isArray(data) ? data : []);
-        setLoadingModels2(false);
-      })
-      .catch(() => setLoadingModels2(false));
+      .catch(() => null);
   };
 
-  const handleModel2Change = (modelId: string) => {
-    setSelectedModel2(modelId);
-    setSelectedYear2("");
-    setSelectedBodyType2("");
-    setSelectedEngine2("");
-    setSelectedFuelType2("");
-    setSelectedTransmission2("");
-    setSelectedTrim2("");
-    setYears2([]);
-    setBodyTypes2([]);
-    setEngines2([]);
-    setFuelTypes2([]);
-    setTransmissions2([]);
-    setTrims2([]);
-    setMatchedVariantId2(null);
-
-    if (!modelId) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === modelId)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingYears2(true);
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => parseInt(item.value));
-          setYears2(list);
-          if (list.length === 1) {
-            setSelectedYear2(list[0].toString());
-          }
-        }
-        setLoadingYears2(false);
-      })
-      .catch(() => setLoadingYears2(false));
-  };
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingBodyTypes2(true);
-    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${selectedYear2}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value.toUpperCase());
-          setBodyTypes2(list);
-          if (list.length === 1) {
-            setSelectedBodyType2(list[0]);
-          }
-        }
-        setLoadingBodyTypes2(false);
-      })
-      .catch(() => setLoadingBodyTypes2(false));
-  }, [selectedYear2, selectedBrand2, selectedModel2, brands, models2]);
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2 || !selectedBodyType2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingEngines2(true);
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType2)}&year=${selectedYear2}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setEngines2(list);
-          if (list.length === 1) {
-            setSelectedEngine2(list[0]);
-          }
-        }
-        setLoadingEngines2(false);
-      })
-      .catch(() => setLoadingEngines2(false));
-  }, [selectedBodyType2, selectedBrand2, selectedModel2, selectedYear2, brands, models2]);
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2 || !selectedBodyType2 || !selectedEngine2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingFuels2(true);
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType2)}&year=${selectedYear2}&engineVersion=${encodeURIComponent(selectedEngine2)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setFuelTypes2(list);
-          if (list.length === 1) {
-            setSelectedFuelType2(list[0]);
-          }
-        }
-        setLoadingFuels2(false);
-      })
-      .catch(() => setLoadingFuels2(false));
-  }, [selectedEngine2, selectedBrand2, selectedModel2, selectedYear2, selectedBodyType2, brands, models2]);
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2 || !selectedBodyType2 || !selectedFuelType2 || !selectedEngine2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingTransmissions2(true);
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType2)}&year=${selectedYear2}&engineVersion=${encodeURIComponent(selectedEngine2)}&fuelType=${encodeURIComponent(selectedFuelType2)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setTransmissions2(list);
-          if (list.length === 1) {
-            setSelectedTransmission2(list[0]);
-          }
-        }
-        setLoadingTransmissions2(false);
-      })
-      .catch(() => setLoadingTransmissions2(false));
-  }, [selectedFuelType2, selectedEngine2, selectedBrand2, selectedModel2, selectedYear2, selectedBodyType2, brands, models2]);
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2 || !selectedBodyType2 || !selectedFuelType2 || !selectedEngine2 || !selectedTransmission2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingTrims2(true);
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType2)}&year=${selectedYear2}&engineVersion=${encodeURIComponent(selectedEngine2)}&fuelType=${encodeURIComponent(selectedFuelType2)}&transmissionType=${encodeURIComponent(selectedTransmission2)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const raw = res.data.map((item: any) => item.value);
-          const list = raw.filter((t: string) => t && !['bilmiyorum', 'yok', 'none', 'null'].includes(t.toLowerCase().trim()));
-          setTrims2(list);
-          if (list.length === 1) {
-            setSelectedTrim2(list[0]);
-          }
-        }
-        setLoadingTrims2(false);
-      })
-      .catch(() => setLoadingTrims2(false));
-  }, [selectedTransmission2, selectedFuelType2, selectedEngine2, selectedBrand2, selectedModel2, selectedYear2, selectedBodyType2, brands, models2]);
-
-  useEffect(() => {
-    if (!selectedBrand2 || !selectedModel2 || !selectedYear2 || !selectedBodyType2 || !selectedFuelType2 || !selectedEngine2 || !selectedTransmission2 || !selectedTrim2) return;
-    const brandName = brands.find(b => b.id === selectedBrand2)?.name;
-    const modelName = models2.find(m => m.id === selectedModel2)?.name;
-    if (!brandName || !modelName) return;
-
-    setLoadingMatch2(true);
-    fetch(`${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType2)}&year=${selectedYear2}&engineVersion=${encodeURIComponent(selectedEngine2)}&fuelType=${encodeURIComponent(selectedFuelType2)}&trimPackage=${encodeURIComponent(selectedTrim2)}&transmissionType=${encodeURIComponent(selectedTransmission2)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && res.variantId) {
-          setMatchedVariantId2(res.variantId);
-        }
-        setLoadingMatch2(false);
-      })
-      .catch(() => setLoadingMatch2(false));
-  }, [selectedTrim2, selectedTransmission2, selectedFuelType2, selectedEngine2, selectedBrand2, selectedModel2, selectedYear2, selectedBodyType2, brands, models2]);
-
+  // Collect filled matched variant IDs
+  const matchedVariantIds = slots.map(s => s.matchedVariantId).filter((id): id is string => !!id);
 
   // Submit Compare API
   const handleCompare = () => {
@@ -542,7 +389,7 @@ export default function ComparisonPage() {
       return;
     }
 
-    if (!matchedVariantId1 || !matchedVariantId2) return;
+    if (matchedVariantIds.length < 2) return;
 
     setLoading(true);
     setError("");
@@ -555,8 +402,7 @@ export default function ComparisonPage() {
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
-        variant1Id: matchedVariantId1,
-        variant2Id: matchedVariantId2,
+        variantIds: matchedVariantIds,
       }),
     })
       .then(res => {
@@ -572,12 +418,15 @@ export default function ComparisonPage() {
         if (typeof data.remainingChatbotMessages === "number") {
           setRemainingQuota(data.remainingChatbotMessages);
         }
+        if (data.userLimit && data.userTier) {
+          setLimitAndInitSlots(data.userLimit, data.userTier);
+        }
         if (data.aiAnalysis?.conversationalAdvice) {
           setChatMessages([{ sender: "assistant", text: data.aiAnalysis.conversationalAdvice }]);
         }
         setLoading(false);
 
-        // Auto-scroll to report start so user notices report is generated
+        // Auto-scroll to report start
         setTimeout(() => {
           reportStartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 200);
@@ -611,8 +460,8 @@ export default function ComparisonPage() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        variant1Id: matchedVariantId1,
-        variant2Id: matchedVariantId2,
+        variant1Id: matchedVariantIds[0] || slots[0]?.matchedVariantId,
+        variant2Id: matchedVariantIds[1] || slots[1]?.matchedVariantId,
         question: userQuestion,
       }),
     })
@@ -643,246 +492,191 @@ export default function ComparisonPage() {
       });
   };
 
+  // Grid styling for slots container based on vehicleLimit
+  const getSlotColumnClass = (slotIndex: number) => {
+    if (vehicleLimit === 2) {
+      return "col-span-1";
+    }
+
+    if (vehicleLimit === 5) {
+      // Yetkin Layout (3 top + 2 bottom centered)
+      if (slotIndex === 1) return "md:col-span-2";
+      if (slotIndex === 2) return "md:col-span-2";
+      if (slotIndex === 3) return "md:col-span-2";
+      if (slotIndex === 4) return "md:col-span-2 md:col-start-2";
+      if (slotIndex === 5) return "md:col-span-2 md:col-start-4";
+    }
+
+    if (vehicleLimit === 10) {
+      // Profesyonel Layout (3 + 3 + 3 + 1 centered)
+      if (slotIndex >= 1 && slotIndex <= 9) {
+        return "md:col-span-2";
+      }
+      if (slotIndex === 10) {
+        return "md:col-span-2 md:col-start-3"; // Center 10th slot
+      }
+    }
+
+    return "col-span-1";
+  };
+
   return (
-    <div className="max-w-6xl w-full mx-auto px-6 py-12 flex flex-col gap-10">
+    <div className="max-w-6xl w-full mx-auto px-4 md:px-6 py-10 flex flex-col gap-8">
       
-      {/* Title */}
-      <div>
-        <h1 className="text-3xl font-black text-slate-100 canvas-title flex items-center justify-center gap-3">
+      {/* Title & Subscription Tier Badge */}
+      <div className="text-center space-y-3">
+        {vehicleLimit > 2 && (
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-xs font-mono font-bold text-orange-400">
+            <span>{userTier === "PROFESYONEL" ? "⭐ Profesyonel Paket" : "Yetkin Paket"}</span>
+            <span>•</span>
+            <span>{vehicleLimit} araç karşılaştırma</span>
+          </div>
+        )}
+
+        <h1 className="text-3xl md:text-4xl font-black text-slate-100 canvas-title flex items-center justify-center gap-3">
           ⚖️ Araç Karşılaştırma
         </h1>
-        <p className="text-sm text-slate-400 canvas-subtitle mt-2">
-          İki farklı aracı yan yana getirerek teknik özelliklerini ve karşılaştırmalı durum analizini inceleyin.
+        <p className="text-xs md:text-sm text-slate-400 canvas-subtitle max-w-xl mx-auto">
+          Araçları yan yana getirerek teknik özelliklerini ve yapay zekâ destekli durum analizini inceleyin.
         </p>
       </div>
 
-      {/* Selectors grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {/* Vehicle 1 Selector */}
-        <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-orange-500">1. Araç Seçimi</h2>
-          <div className="flex flex-col gap-3">
-            {/* Brand */}
-            <select
-              value={selectedBrand1}
-              onChange={e => handleBrand1Change(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
+      {/* Dynamic Selectors Grid */}
+      <div className={`grid grid-cols-1 ${
+        vehicleLimit === 2 ? "md:grid-cols-2 gap-6 md:gap-8" : "md:grid-cols-6 gap-4 md:gap-5"
+      }`}>
+        {slots.map((slot, index) => {
+          const isCompact10 = vehicleLimit === 10;
+          return (
+            <div
+              key={slot.id}
+              className={`glass p-4 md:p-5 rounded-2xl flex flex-col gap-3.5 border border-white/10 ${getSlotColumnClass(
+                slot.id
+              )}`}
             >
-              <option value="">Marka Seçiniz...</option>
-              {brands.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-500 flex items-center justify-between">
+                <span>{slot.id}. ARAÇ SEÇİMİ</span>
+                {slot.matchedVariantId && (
+                  <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono">
+                    ✓ Hazır
+                  </span>
+                )}
+              </h2>
 
-            {/* Model */}
-            <select
-              value={selectedModel1}
-              onChange={e => handleModel1Change(e.target.value)}
-              disabled={!selectedBrand1 || loadingModels1}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">Model Ailesi Seçiniz...</option>
-              {models1.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
+              {/* Responsive Dropdown Grid */}
+              <div className={`grid ${isCompact10 ? "grid-cols-1 md:grid-cols-2 gap-2.5" : "grid-cols-1 gap-3"}`}>
+                {/* Brand */}
+                <select
+                  value={slot.selectedBrand}
+                  onChange={e => handleBrandChange(index, e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition"
+                >
+                  <option value="">Marka Seçiniz...</option>
+                  {brands.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
 
-            {/* Year */}
-            <select
-              value={selectedYear1}
-              onChange={e => setSelectedYear1(e.target.value)}
-              disabled={!selectedModel1 || loadingYears1 || years1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingYears1 ? "Yükleniyor..." : "Yıl Seçiniz..."}</option>
-              {years1.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+                {/* Model */}
+                <select
+                  value={slot.selectedModel}
+                  onChange={e => handleModelChange(index, e.target.value)}
+                  disabled={!slot.selectedBrand || slot.loadingModels}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingModels ? "Yükleniyor..." : "Model Ailesi Seçiniz..."}</option>
+                  {slot.models.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
 
-            {/* Body Type */}
-            <select
-              value={selectedBodyType1}
-              onChange={e => setSelectedBodyType1(e.target.value)}
-              disabled={!selectedYear1 || loadingBodyTypes1 || bodyTypes1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingBodyTypes1 ? "Yükleniyor..." : "Kasa Tipi Seçiniz..."}</option>
-              {bodyTypes1.map(b => (
-                <option key={b} value={b}>{displayBodyType(b)}</option>
-              ))}
-            </select>
+                {/* Year */}
+                <select
+                  value={slot.selectedYear}
+                  onChange={e => handleYearChange(index, e.target.value)}
+                  disabled={!slot.selectedModel || slot.loadingYears || slot.years.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingYears ? "Yükleniyor..." : "Yıl Seçiniz..."}</option>
+                  {slot.years.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
 
-            {/* Engine */}
-            <select
-              value={selectedEngine1}
-              onChange={e => setSelectedEngine1(e.target.value)}
-              disabled={!selectedBodyType1 || loadingEngines1 || engines1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingEngines1 ? "Yükleniyor..." : "Motor / Versiyon Seçiniz..."}</option>
-              {engines1.map(eng => (
-                <option key={eng} value={eng}>{eng}</option>
-              ))}
-            </select>
+                {/* Body Type */}
+                <select
+                  value={slot.selectedBodyType}
+                  onChange={e => handleBodyTypeChange(index, e.target.value)}
+                  disabled={!slot.selectedYear || slot.loadingBodyTypes || slot.bodyTypes.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : "Kasa Tipi Seçiniz..."}</option>
+                  {slot.bodyTypes.map(b => (
+                    <option key={b} value={b}>{displayBodyType(b)}</option>
+                  ))}
+                </select>
 
-            {/* Fuel Type */}
-            <select
-              value={selectedFuelType1}
-              onChange={e => setSelectedFuelType1(e.target.value)}
-              disabled={!selectedEngine1 || loadingFuels1 || fuelTypes1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingFuels1 ? "Yükleniyor..." : "Yakıt Türü Seçiniz..."}</option>
-              {fuelTypes1.map(fuel => (
-                <option key={fuel} value={fuel}>{displayFuelType(fuel)}</option>
-              ))}
-            </select>
+                {/* Engine */}
+                <select
+                  value={slot.selectedEngine}
+                  onChange={e => handleEngineChange(index, e.target.value)}
+                  disabled={!slot.selectedBodyType || slot.loadingEngines || slot.engines.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingEngines ? "Yükleniyor..." : "Motor / Versiyon Seçiniz..."}</option>
+                  {slot.engines.map(eng => (
+                    <option key={eng} value={eng}>{eng}</option>
+                  ))}
+                </select>
 
-            {/* Transmission */}
-            <select
-              value={selectedTransmission1}
-              onChange={e => setSelectedTransmission1(e.target.value)}
-              disabled={!selectedFuelType1 || loadingTransmissions1 || transmissions1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingTransmissions1 ? "Yükleniyor..." : "Şanzıman Tipi Seçiniz..."}</option>
-              {transmissions1.map(trans => (
-                <option key={trans} value={trans}>{trans}</option>
-              ))}
-            </select>
+                {/* Fuel Type */}
+                <select
+                  value={slot.selectedFuelType}
+                  onChange={e => handleFuelTypeChange(index, e.target.value)}
+                  disabled={!slot.selectedEngine || slot.loadingFuels || slot.fuelTypes.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingFuels ? "Yükleniyor..." : "Yakıt Türü Seçiniz..."}</option>
+                  {slot.fuelTypes.map(fuel => (
+                    <option key={fuel} value={fuel}>{displayFuelType(fuel)}</option>
+                  ))}
+                </select>
 
-            {/* Trim */}
-            <select
-              value={selectedTrim1}
-              onChange={e => setSelectedTrim1(e.target.value)}
-              disabled={!selectedTransmission1 || loadingTrims1 || trims1.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingTrims1 ? "Yükleniyor..." : "Donanım Paketi Seçiniz..."}</option>
-              {trims1.map(trim => (
-                <option key={trim} value={trim}>{trim}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+                {/* Transmission */}
+                <select
+                  value={slot.selectedTransmission}
+                  onChange={e => handleTransmissionChange(index, e.target.value)}
+                  disabled={!slot.selectedFuelType || slot.loadingTransmissions || slot.transmissions.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingTransmissions ? "Yükleniyor..." : "Şanzıman Tipi Seçiniz..."}</option>
+                  {slot.transmissions.map(trans => (
+                    <option key={trans} value={trans}>{trans}</option>
+                  ))}
+                </select>
 
-        {/* Vehicle 2 Selector */}
-        <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-orange-500">2. Araç Seçimi</h2>
-          <div className="flex flex-col gap-3">
-            {/* Brand */}
-            <select
-              value={selectedBrand2}
-              onChange={e => handleBrand2Change(e.target.value)}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">Marka Seçiniz...</option>
-              {brands.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-
-            {/* Model */}
-            <select
-              value={selectedModel2}
-              onChange={e => handleModel2Change(e.target.value)}
-              disabled={!selectedBrand2 || loadingModels2}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">Model Ailesi Seçiniz...</option>
-              {models2.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-
-            {/* Year */}
-            <select
-              value={selectedYear2}
-              onChange={e => setSelectedYear2(e.target.value)}
-              disabled={!selectedModel2 || loadingYears2 || years2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingYears2 ? "Yükleniyor..." : "Yıl Seçiniz..."}</option>
-              {years2.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-
-            {/* Body Type */}
-            <select
-              value={selectedBodyType2}
-              onChange={e => setSelectedBodyType2(e.target.value)}
-              disabled={!selectedYear2 || loadingBodyTypes2 || bodyTypes2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingBodyTypes2 ? "Yükleniyor..." : "Kasa Tipi Seçiniz..."}</option>
-              {bodyTypes2.map(b => (
-                <option key={b} value={b}>{displayBodyType(b)}</option>
-              ))}
-            </select>
-
-            {/* Engine */}
-            <select
-              value={selectedEngine2}
-              onChange={e => setSelectedEngine2(e.target.value)}
-              disabled={!selectedBodyType2 || loadingEngines2 || engines2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingEngines2 ? "Yükleniyor..." : "Motor / Versiyon Seçiniz..."}</option>
-              {engines2.map(eng => (
-                <option key={eng} value={eng}>{eng}</option>
-              ))}
-            </select>
-
-            {/* Fuel Type */}
-            <select
-              value={selectedFuelType2}
-              onChange={e => setSelectedFuelType2(e.target.value)}
-              disabled={!selectedEngine2 || loadingFuels2 || fuelTypes2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingFuels2 ? "Yükleniyor..." : "Yakıt Türü Seçiniz..."}</option>
-              {fuelTypes2.map(fuel => (
-                <option key={fuel} value={fuel}>{displayFuelType(fuel)}</option>
-              ))}
-            </select>
-
-            {/* Transmission */}
-            <select
-              value={selectedTransmission2}
-              onChange={e => setSelectedTransmission2(e.target.value)}
-              disabled={!selectedFuelType2 || loadingTransmissions2 || transmissions2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingTransmissions2 ? "Yükleniyor..." : "Şanzıman Tipi Seçiniz..."}</option>
-              {transmissions2.map(trans => (
-                <option key={trans} value={trans}>{trans}</option>
-              ))}
-            </select>
-
-            {/* Trim */}
-            <select
-              value={selectedTrim2}
-              onChange={e => setSelectedTrim2(e.target.value)}
-              disabled={!selectedTransmission2 || loadingTrims2 || trims2.length === 0}
-              className="bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-slate-200 outline-none"
-            >
-              <option value="">{loadingTrims2 ? "Yükleniyor..." : "Donanım Paketi Seçiniz..."}</option>
-              {trims2.map(trim => (
-                <option key={trim} value={trim}>{trim}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
+                {/* Trim */}
+                <select
+                  value={slot.selectedTrim}
+                  onChange={e => handleTrimChange(index, e.target.value)}
+                  disabled={!slot.selectedTransmission || slot.loadingTrims || slot.trims.length === 0}
+                  className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
+                >
+                  <option value="">{slot.loadingTrims ? "Yükleniyor..." : "Donanım Paketi Seçiniz..."}</option>
+                  {slot.trims.map(trim => (
+                    <option key={trim} value={trim}>{trim}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Compare action button */}
       <button
         onClick={handleCompare}
-        disabled={!matchedVariantId1 || !matchedVariantId2 || loading}
+        disabled={matchedVariantIds.length < 2 || loading}
         className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
       >
         {loading ? "🤖 Yapay Zekâ Araçları Kıyaslıyor..." : "Seçili Araçları Karşılaştır"}
@@ -894,7 +688,7 @@ export default function ComparisonPage() {
           <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
           <h3 className="text-lg font-bold text-slate-100">🤖 Yapay Zekâ Araçları Kıyaslıyor...</h3>
           <p className="text-xs text-slate-400 max-w-md">
-            TorqueScout AI botu iki aracın teknik verilerini, motor karakterini ve kronik durumlarını analiz ederek tavsiye raporunu hazırlıyor.
+            TorqueScout AI botu seçtiğin araçların teknik verilerini, motor karakterini ve kronik durumlarını analiz ederek tavsiye raporunu hazırlıyor.
           </p>
         </div>
       )}
@@ -908,7 +702,7 @@ export default function ComparisonPage() {
 
       {/* AI Comparison Chatbot Verdict Card */}
       {comparisonResult && comparisonResult.aiAnalysis && (
-        <div ref={reportStartRef} className="glass p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
+        <div ref={reportStartRef} className="glass p-6 md:p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-2 border-b border-white/10 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-xl">
@@ -944,37 +738,23 @@ export default function ComparisonPage() {
             </p>
           </div>
 
-          {/* Advantages Side by Side Grid */}
+          {/* Advantages Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            {/* V1 Advantages */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
-              <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                {comparisonResult.vehicle1.name} Öne Çıkan Avantajları
-              </h3>
-              <ul className="space-y-2 text-xs text-slate-300">
-                {comparisonResult.aiAnalysis.advantagesV1?.map((adv: string, idx: number) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-orange-500 font-bold">•</span>
-                    <span>{adv}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* V2 Advantages */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-blue-500/20 space-y-3">
-              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
-                {comparisonResult.vehicle2.name} Öne Çıkan Avantajları
-              </h3>
-              <ul className="space-y-2 text-xs text-slate-300">
-                {comparisonResult.aiAnalysis.advantagesV2?.map((adv: string, idx: number) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold">•</span>
-                    <span>{adv}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {comparisonResult.vehicles?.map((v: any, i: number) => (
+              <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
+                <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
+                  {v.name} Öne Çıkan Avantajları
+                </h3>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  {(comparisonResult.aiAnalysis[`advantagesV${i + 1}`] || comparisonResult.aiAnalysis.advantages?.[String(i + 1)])?.map((adv: string, idx: number) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-orange-500 font-bold">•</span>
+                      <span>{adv}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
           {/* Analysis Breakdown Sections */}
@@ -1029,7 +809,7 @@ export default function ComparisonPage() {
                 <h3 className="text-base font-extrabold text-slate-100">
                   TorqueScout AI Asistanı
                 </h3>
-                <p className="text-xs text-slate-400">Seçtiğin iki araç hakkında aklına takılan tüm soruları canlı olarak sorabilirsin.</p>
+                <p className="text-xs text-slate-400">Seçtiğin araçlar hakkında aklına takılan tüm soruları canlı olarak sorabilirsin.</p>
               </div>
             </div>
 
@@ -1095,7 +875,7 @@ export default function ComparisonPage() {
               type="text"
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
-              placeholder="Bu iki araç hakkında aklına takılan soruyu sor... (Örn: Hangisinin yedek parçası ve bakımı daha ucuz?)"
+              placeholder="Bu araçlar hakkında aklına takılan soruyu sor... (Örn: Hangisinin yedek parçası ve bakımı daha ucuz?)"
               disabled={chatLoading}
               className="flex-1 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3.5 text-xs text-slate-100 outline-none focus:border-orange-500/50 transition placeholder:text-slate-500"
             />
@@ -1110,52 +890,93 @@ export default function ComparisonPage() {
         </div>
       )}
 
-      {/* Side by side technical spec result display */}
-      {comparisonResult && (
-        <div className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
+      {/* Side by Side / Multi-Vehicle Technical Spec Result Display */}
+      {comparisonResult && comparisonResult.vehicles && (
+        <div className="glass p-6 md:p-8 rounded-3xl flex flex-col gap-6 shadow-2xl overflow-hidden">
           <h2 className="text-xl font-extrabold text-slate-200 border-b border-white/5 pb-3">📊 Detaylı Teknik Özellik Karşılaştırması</h2>
           
-          <div className="grid grid-cols-3 gap-4 text-center items-center mt-2">
-            
-            {/* Header titles */}
-            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider text-left">Parametre</div>
-            <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl font-bold text-sm text-orange-400">
-              {comparisonResult.vehicle1.name}
-            </div>
-            <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl font-bold text-sm text-blue-400">
-              {comparisonResult.vehicle2.name}
-            </div>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-center border-collapse min-w-[600px]">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="p-3 text-slate-500 text-xs font-bold uppercase tracking-wider text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur w-44">
+                    Parametre
+                  </th>
+                  {comparisonResult.vehicles.map((v: any, idx: number) => (
+                    <th key={v.id || idx} className="p-3">
+                      <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl font-bold text-xs md:text-sm text-orange-400">
+                        {v.name}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs text-slate-300">
+                {/* Engine */}
+                <tr>
+                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Motor Seçeneği</td>
+                  {comparisonResult.vehicles.map((v: any) => (
+                    <td key={v.id} className="p-3">{v.engine}</td>
+                  ))}
+                </tr>
 
-            {/* Spec lines */}
-            <div className="text-slate-400 text-xs font-semibold text-left">Motor Seçeneği</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle1.engine}</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle2.engine}</div>
+                {/* Transmission */}
+                <tr>
+                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Şanzıman Tipi</td>
+                  {comparisonResult.vehicles.map((v: any) => (
+                    <td key={v.id} className="p-3">{v.transmission}</td>
+                  ))}
+                </tr>
 
-            <div className="text-slate-400 text-xs font-semibold text-left">Şanzıman Tipi</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle1.transmission}</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle2.transmission}</div>
+                {/* Fuel Type */}
+                <tr>
+                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Yakıt Türü</td>
+                  {comparisonResult.vehicles.map((v: any) => (
+                    <td key={v.id} className="p-3">{displayFuelType(v.fuelType)}</td>
+                  ))}
+                </tr>
 
-            <div className="text-slate-400 text-xs font-semibold text-left">Donanım Paketi</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle1.trim}</div>
-            <div className="text-xs text-slate-300">{comparisonResult.vehicle2.trim}</div>
+                {/* Trim */}
+                <tr>
+                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Donanım Paketi</td>
+                  {comparisonResult.vehicles.map((v: any) => (
+                    <td key={v.id} className="p-3">{v.trim}</td>
+                  ))}
+                </tr>
 
-            {/* Specs compare */}
-            {Object.keys(comparisonResult.specComparison).map((key) => {
-              const spec = comparisonResult.specComparison[key];
-              return (
-                <React.Fragment key={key}>
-                  <div className="text-slate-400 text-xs font-semibold text-left">{spec.label}</div>
-                  <div className="text-xs text-slate-200 font-bold">{spec.v1}</div>
-                  <div className="text-xs text-slate-200 font-bold">{spec.v2}</div>
-                </React.Fragment>
-              );
-            })}
+                {/* Dynamic Specs */}
+                {Object.keys(comparisonResult.specComparison || {}).map((key) => {
+                  const specObj = comparisonResult.specComparison[key];
+                  return (
+                    <tr key={key}>
+                      <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">
+                        {specObj.label}
+                      </td>
+                      {comparisonResult.vehicles.map((v: any, idx: number) => {
+                        const val = Array.isArray(specObj.values) ? specObj.values[idx] : (idx === 0 ? specObj.v1 : specObj.v2);
+                        return (
+                          <td key={v.id || idx} className="p-3 font-bold text-slate-200">
+                            {val || "-"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
 
-            {/* Problems compared */}
-            <div className="text-slate-400 text-xs font-semibold text-left">Sık Karşılaşılan Durumlar</div>
-            <div className="text-xs text-red-400 font-bold">{comparisonResult.vehicle1.problemsCount} Adet</div>
-            <div className="text-xs text-red-400 font-bold">{comparisonResult.vehicle2.problemsCount} Adet</div>
-
+                {/* Problems count */}
+                <tr>
+                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">
+                    Sık Karşılaşılan Durumlar
+                  </td>
+                  {comparisonResult.vehicles.map((v: any) => (
+                    <td key={v.id} className="p-3 font-bold text-red-400">
+                      {v.problemsCount} Adet
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
 import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
 import OpenAI from 'openai';
@@ -12,6 +13,7 @@ export class ComparisonService {
   constructor(
     private prisma: PrismaService,
     private featureLimitService: FeatureLimitService,
+    private subscriptionService: SubscriptionService,
   ) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
@@ -36,7 +38,6 @@ export class ComparisonService {
       return 999;
     }
 
-    // Active Buyer Purchases credits
     const activePurchases = await this.prisma.buyerPackagePurchase.findMany({
       where: { userId, expiresAt: { gt: new Date() } },
     }).catch(() => []);
@@ -46,7 +47,6 @@ export class ComparisonService {
       buyerCredits += Math.max(0, p.chatbotMessageLimit - p.chatbotMessageUsed);
     });
 
-    // Monthly tier limit
     const activeSub = await this.prisma.subscription.findFirst({
       where: { userId, status: 'ACTIVE', expiresAt: { gt: new Date() } },
       include: { plan: true },
@@ -77,13 +77,33 @@ export class ComparisonService {
   }
 
   async compare(userId: string, dto: CompareVehiclesDto) {
-    if (dto.variant1Id === dto.variant2Id) {
-      throw new BadRequestException('Aynı araç varyantını kendisiyle karşılaştıramazsınız.');
+    // 1. Extract requested variant IDs array
+    let requestedIds: string[] = [];
+    if (dto.variantIds && Array.isArray(dto.variantIds) && dto.variantIds.length > 0) {
+      requestedIds = Array.from(new Set(dto.variantIds.filter(Boolean)));
+    } else if (dto.variant1Id && dto.variant2Id) {
+      requestedIds = Array.from(new Set([dto.variant1Id, dto.variant2Id].filter(Boolean)));
     }
 
-    const cacheKey = [dto.variant1Id, dto.variant2Id].sort().join('_');
+    if (requestedIds.length < 2) {
+      throw new BadRequestException('Karşılaştırma yapmak için en az 2 adet farklı araç seçmelisiniz.');
+    }
 
-    // 1. Safe DB Cache lookup
+    // 2. Determine max allowed vehicles for user tier
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const tier = await this.subscriptionService.getEffectiveTier(userId);
+
+    const maxAllowed = (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email)))
+      ? 10
+      : tier === SubscriptionTier.PROFESYONEL ? 10 : tier === SubscriptionTier.YETKIN ? 5 : 2;
+
+    if (requestedIds.length > maxAllowed) {
+      throw new BadRequestException(`${tier} paketiniz ile tek seferde en fazla ${maxAllowed} araç karşılaştırabilirsiniz.`);
+    }
+
+    const cacheKey = requestedIds.slice().sort().join('_');
+
+    // 3. Safe DB Cache lookup
     const cachedReport = await this.prisma.aiVehicleComparisonCache.findUnique({
       where: { cacheKey },
     }).catch((err) => {
@@ -91,9 +111,9 @@ export class ComparisonService {
       return null;
     });
 
-    // 2. Fetch both approved variants
-    const variant1 = await this.prisma.vehicleVariant.findUnique({
-      where: { id: dto.variant1Id },
+    // 4. Fetch all requested variants in order
+    const variantsRaw = await this.prisma.vehicleVariant.findMany({
+      where: { id: { in: requestedIds }, status: ApprovalStatus.APPROVED },
       include: {
         brand: true,
         model: true,
@@ -106,40 +126,14 @@ export class ComparisonService {
       },
     });
 
-    const variant2 = await this.prisma.vehicleVariant.findUnique({
-      where: { id: dto.variant2Id },
-      include: {
-        brand: true,
-        model: true,
-        generation: true,
-        engine: true,
-        transmission: true,
-        trim: true,
-        specs: true,
-        problems: { where: { status: ApprovalStatus.APPROVED } },
-      },
-    });
+    // Map to retain exact order of requestedIds
+    const variants = requestedIds
+      .map(id => variantsRaw.find(v => v.id === id))
+      .filter((v): v is NonNullable<typeof v> => !!v);
 
-    if (!variant1 || variant1.status !== ApprovalStatus.APPROVED || !variant2 || variant2.status !== ApprovalStatus.APPROVED) {
+    if (variants.length < 2) {
       throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
     }
-
-    const isInvalid = (v: any) =>
-      !v.brand?.name ||
-      !v.model?.name ||
-      !v.year ||
-      !v.bodyType ||
-      !v.engine?.code ||
-      !v.fuelType ||
-      !v.transmission?.name ||
-      !v.trim?.name;
-
-    if (isInvalid(variant1) || isInvalid(variant2)) {
-      throw new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.');
-    }
-
-    const v1FullName = `${variant1.brand.name} ${variant1.model.name} ${variant1.year} (${variant1.trim.name})`;
-    const v2FullName = `${variant2.brand.name} ${variant2.model.name} ${variant2.year} (${variant2.trim.name})`;
 
     let aiAnalysis: any;
 
@@ -150,12 +144,12 @@ export class ComparisonService {
         console.warn('Feature limit check warning:', err?.message);
       });
 
-      aiAnalysis = await this.generateAiComparison(variant1, variant2, v1FullName, v2FullName);
+      aiAnalysis = await this.generateAiComparisonMulti(variants);
 
       await this.prisma.aiVehicleComparisonCache.create({
         data: {
-          variant1Id: dto.variant1Id,
-          variant2Id: dto.variant2Id,
+          variant1Id: variants[0].id,
+          variant2Id: variants[1].id,
           cacheKey,
           verdict: aiAnalysis?.verdict || '',
           analysisJson: aiAnalysis,
@@ -165,50 +159,52 @@ export class ComparisonService {
       });
     }
 
+    // Save history log
     await this.prisma.vehicleComparison.create({
       data: {
         userId,
-        variant1Id: dto.variant1Id,
-        variant2Id: dto.variant2Id,
+        variant1Id: variants[0].id,
+        variant2Id: variants[1].id,
       },
     }).catch(() => null);
 
     const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
+    const formattedVehicles = variants.map((v, idx) => {
+      const vSpecs: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
+      const fullName = `${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name})`;
+      return {
+        id: v.id,
+        slotIndex: idx + 1,
+        name: fullName,
+        brand: v.brand.name,
+        model: v.model.name,
+        year: v.year,
+        trim: v.trim.name,
+        engine: v.engine.code,
+        transmission: v.transmission.name,
+        fuelType: v.fuelType,
+        specs: vSpecs,
+        problemsCount: v.problems.length,
+      };
+    });
+
     return {
       isCached: !!cachedReport,
       remainingChatbotMessages,
-      vehicle1: {
-        id: variant1.id,
-        name: v1FullName,
-        brand: variant1.brand.name,
-        model: variant1.model.name,
-        year: variant1.year,
-        trim: variant1.trim.name,
-        engine: variant1.engine.code,
-        transmission: variant1.transmission.name,
-        specs: variant1.specs?.specs || {},
-        problemsCount: variant1.problems.length,
-      },
-      vehicle2: {
-        id: variant2.id,
-        name: v2FullName,
-        brand: variant2.brand.name,
-        model: variant2.model.name,
-        year: variant2.year,
-        trim: variant2.trim.name,
-        engine: variant2.engine.code,
-        transmission: variant2.transmission.name,
-        specs: variant2.specs?.specs || {},
-        problemsCount: variant2.problems.length,
-      },
+      userLimit: maxAllowed,
+      userTier: tier,
+      vehicles: formattedVehicles,
+      // Backward compatibility fields
+      vehicle1: formattedVehicles[0],
+      vehicle2: formattedVehicles[1],
       aiAnalysis,
       specComparison: {
-        topSpeed: { label: 'Maks Hız (km/h)', v1: variant1.specs?.specs?.['topSpeed'] || '-', v2: variant2.specs?.specs?.['topSpeed'] || '-' },
-        acceleration: { label: '0-100 Hızlanma (sn)', v1: variant1.specs?.specs?.['acceleration0to100'] || '-', v2: variant2.specs?.specs?.['acceleration0to100'] || '-' },
-        fuel: { label: 'Ort. Yakıt Tüketimi (lt)', v1: variant1.specs?.specs?.['averageFuelConsumption'] || '-', v2: variant2.specs?.specs?.['averageFuelConsumption'] || '-' },
-        luggage: { label: 'Bagaj Hacmi (lt)', v1: variant1.specs?.specs?.['luggageCapacity'] || '-', v2: variant2.specs?.specs?.['luggageCapacity'] || '-' },
-        weight: { label: 'Ağırlık (kg)', v1: variant1.specs?.specs?.['weight'] || '-', v2: variant2.specs?.specs?.['weight'] || '-' },
+        topSpeed: { label: 'Maks Hız (km/h)', values: formattedVehicles.map(v => v.specs['topSpeed'] || '-'), v1: formattedVehicles[0]?.specs['topSpeed'] || '-', v2: formattedVehicles[1]?.specs['topSpeed'] || '-' },
+        acceleration: { label: '0-100 Hızlanma (sn)', values: formattedVehicles.map(v => v.specs['acceleration0to100'] || '-'), v1: formattedVehicles[0]?.specs['acceleration0to100'] || '-', v2: formattedVehicles[1]?.specs['acceleration0to100'] || '-' },
+        fuel: { label: 'Ort. Yakıt Tüketimi (lt)', values: formattedVehicles.map(v => v.specs['averageFuelConsumption'] || '-'), v1: formattedVehicles[0]?.specs['averageFuelConsumption'] || '-', v2: formattedVehicles[1]?.specs['averageFuelConsumption'] || '-' },
+        luggage: { label: 'Bagaj Hacmi (lt)', values: formattedVehicles.map(v => v.specs['luggageCapacity'] || '-'), v1: formattedVehicles[0]?.specs['luggageCapacity'] || '-', v2: formattedVehicles[1]?.specs['luggageCapacity'] || '-' },
+        weight: { label: 'Ağırlık (kg)', values: formattedVehicles.map(v => v.specs['weight'] || '-'), v1: formattedVehicles[0]?.specs['weight'] || '-', v2: formattedVehicles[1]?.specs['weight'] || '-' },
       },
     };
   }
@@ -218,10 +214,8 @@ export class ComparisonService {
       throw new BadRequestException('Lütfen sormak istediğiniz soruyu yazın.');
     }
 
-    // 1. Deduct 1 Chatbot credit
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
 
-    // 2. Fetch variants with full specs, problems and recalls
     const variant1 = await this.prisma.vehicleVariant.findUnique({
       where: { id: dto.variant1Id },
       include: {
@@ -368,19 +362,27 @@ Talimatlar:
     };
   }
 
-  private async generateAiComparison(v1: any, v2: any, v1Name: string, v2Name: string): Promise<any> {
-    const prompt = `Aşağıdaki iki aracı karşılaştıran detaylı ve tarafsız bir otomotiv analiz raporu oluştur.
-Araç 1: ${v1Name} (Motor: ${v1.engine.code}, Şanzıman: ${v1.transmission.name}, Yakıt: ${v1.fuelType}, Kronik Sorun Sayısı: ${v1.problems.length})
-Araç 2: ${v2Name} (Motor: ${v2.engine.code}, Şanzıman: ${v2.transmission.name}, Yakıt: ${v2.fuelType}, Kronik Sorun Sayısı: ${v2.problems.length})
+  private async generateAiComparisonMulti(variants: any[]): Promise<any> {
+    const v1 = variants[0];
+    const v2 = variants[1];
+    const v1Name = `${v1.brand.name} ${v1.model.name} ${v1.year} (${v1.trim.name})`;
+    const v2Name = `${v2.brand.name} ${v2.model.name} ${v2.year} (${v2.trim.name})`;
+
+    const summaries = variants.map((v, i) =>
+      `Araç ${i + 1}: ${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name}) [Motor: ${v.engine.code}, Şanzıman: ${v.transmission.name}, Yakıt: ${v.fuelType}, Kronik Sorun Sayısı: ${v.problems.length}]`
+    ).join('\n');
+
+    const prompt = `Aşağıdaki ${variants.length} adet aracı karşılaştıran detaylı ve tarafsız bir otomotiv analiz raporu oluştur:
+${summaries}
 
 Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 {
-  "verdict": "Net sonuç ve kazanan araç tavsiyesi (2-3 cümle)",
-  "recommendedVehicle": "${v1Name}" veya "${v2Name}" veya "Eşit",
-  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. (Örn: 'Selam dostum! Senin için bu iki harika aracı en ince ayrıntısına kadar kıyasladım...')",
-  "advantagesV1": ["Araç 1'in öne çıkan 3 ana avantajı"],
-  "advantagesV2": ["Araç 2'nin öne çıkan 3 ana avantajı"],
-  "performanceAnalysis": "Motor gücü, şanzıman uyumu ve yakıt tüketimi kıyaslaması",
+  "verdict": "Net sonuç ve kazanan/öne çıkan araç tavsiyesi (2-3 cümle)",
+  "recommendedVehicle": "Öne çıkan araç adı",
+  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni.",
+  "advantagesV1": ["1. Aracın öne çıkan 3 ana avantajı"],
+  "advantagesV2": ["2. Aracın öne çıkan 3 ana avantajı"],
+  "performanceAnalysis": "Motor güçleri, şanzıman uyumu ve yakıt tüketimi kıyaslaması",
   "reliabilityAnalysis": "Kronik arızalar, bakım maliyeti ve sanayi riskleri kıyaslaması",
   "resaleAnalysis": "İkinci el piyasası, likidite ve değer koruma kıyaslaması",
   "recommendations": {
@@ -394,7 +396,7 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
         const response = await this.openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Kullanıcıyla samimi, uzman bir dille birebir konuşarak rehberlik eden otomotiv uzmanısın. Yalnızca geçerli JSON dön.' },
+            { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Yalnızca geçerli JSON dön.' },
             { role: 'user', content: prompt },
           ],
           response_format: { type: 'json_object' },
@@ -418,14 +420,8 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-            },
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' },
           }),
         });
 
@@ -436,38 +432,34 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
             const jsonText = text.replace(/```json\n?|\n?```/g, '').trim();
             return JSON.parse(jsonText);
           }
-        } else {
-          const errText = await res.text();
-          console.warn('Gemini API returned error response:', res.status, errText);
         }
       } catch (err: any) {
-        console.warn('Gemini API call failed, switching to fallback synthesis:', err?.message || err);
+        console.warn('Gemini API call failed:', err?.message || err);
       }
     }
 
-    const v1BetterPerformance = (v1.specs?.specs?.['topSpeed'] || 0) >= (v2.specs?.specs?.['topSpeed'] || 0);
     const winnerName = v1.problems.length <= v2.problems.length ? v1Name : v2Name;
 
     return {
-      verdict: `Yapay zeka analizimize göre; ${winnerName}, kronik risk dengesi ve kullanım ekonomisi açısından bir adım önde değerlendirilmiştir.`,
+      verdict: `Yapay zeka analizimize göre; ${winnerName}, kronik risk dengesi ve kullanım ekonomisi açısından önde değerlendirilmiştir.`,
       recommendedVehicle: winnerName,
-      conversationalAdvice: `Selam dostum! Senin için ${v1Name} ve ${v2Name} modellerini en ince detaylarına kadar karşılaştırdım.\n\nİki aracı teknik ve kronik açıdan masaya yatırdığımda; ${v1Name} modeli ${v1.engine.code} motoru ve ${v1.transmission.name} şanzıman kombinasyonu ile ${v1BetterPerformance ? 'daha dinamik bir sürüş ve tork' : 'dengeli bir şehir içi karakteri'} sunuyor. Veritabanımızda kayıtlı ${v1.problems.length} kronik durum bulunuyor.\n\nBuna karşılık ${v2Name} modeli ise ${v2.fuelType} yapısı ve ${v2.problems.length} kronik durum kaydıyla özellikle işletme maliyetine önem veren sürücüler için oldukça cazip bir alternatif. Karar verirken günlük kullanım mesafeni ve yıllık servis bütçeni göz önünde bulundurmanı öneririm!`,
+      conversationalAdvice: `Selam dostum! Seçtiğin ${variants.length} adet aracı en ince detaylarına kadar karşılaştırdım.\n\nAraçları teknik ve kronik açıdan masaya yatırdığımda; ${v1Name} ve ${v2Name} başta olmak üzere her modelin kendine has avantajları bulunmaktadır.\n\nKarar verirken günlük kullanım mesafeni ve yıllık servis bütçeni göz önünde bulundurmanı öneririm!`,
       advantagesV1: [
-        `${v1.engine.code} motor performansı ve tork karakteri`,
-        `${v1.transmission.name} şanzıman tipi`,
-        `${v1.problems.length} kayıtlı kronik kontrol noktası`,
+        `${v1.engine.code} motor performansı`,
+        `${v1.transmission.name} şanzıman yapısı`,
+        `${v1.problems.length} kayıtlı kronik durum`,
       ],
       advantagesV2: [
         `${v2.engine.code} motor verimliliği`,
         `${v2.transmission.name} şanzıman teknolojisi`,
-        `${v2.problems.length} kayıtlı kronik kontrol noktası`,
+        `${v2.problems.length} kayıtlı kronik durum`,
       ],
-      performanceAnalysis: `${v1Name} modeli ${v1.engine.code} motoru ile ${v1BetterPerformance ? 'daha yüksek sürüş dinamiği' : 'dengeli güç'} sunarken, ${v2Name} ${v2.fuelType} yapısıyla yakıt verimliliğine odaklanmaktadır.`,
-      reliabilityAnalysis: `${v1Name} için veritabanımızda ${v1.problems.length} adet onaylı kronik arıza kaydı bulunurken, ${v2Name} için ${v2.problems.length} adet kayıt bulunmaktadır. Şanzıman ve motor periyodik bakımları kritik önem taşır.`,
-      resaleAnalysis: `İki araç da Türkiye ikinci el pazarında yüksek likiditeye sahip segmentlerde yer almakta olup, orijinal bakımlı ve düşük kilometreli örnekleri değerini korumaktadır.`,
+      performanceAnalysis: `Seçilen araçların motor tork eğrileri ve yakıt tüketim verileri kullanım amacına göre farklılaşmaktadır.`,
+      reliabilityAnalysis: `Veritabanımızdaki kronik arıza kayıtları ve kullanıcı şikayetleri karşılaştırılmıştır.`,
+      resaleAnalysis: `Araçlar Türkiye ikinci el piyasasında tercih edilen segmentlerde yer almaktadır.`,
       recommendations: {
-        cityAndEconomy: `Düşük yakıt tüketimi ve pratik şehir içi kullanım için ${v1.fuelType === 'DIESEL' || v1.fuelType === 'HYBRID' ? v1Name : v2Name} daha uygundur.`,
-        familyAndComfort: `Sürüş konforu ve geniş kullanım hacmi arayanlar için ${v1Name} öne çıkmaktadır.`,
+        cityAndEconomy: `Düşük kullanım maliyetli ve pratik araçlar şehir içi kullanım için öne çıkmaktadır.`,
+        familyAndComfort: `Sürüş konforu ve geniş bagaj hacmine sahip modeller uzun yol için uygundur.`,
       },
     };
   }
