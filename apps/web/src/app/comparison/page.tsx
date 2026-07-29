@@ -92,14 +92,31 @@ export default function ComparisonPage() {
 
   // Fetch initial brands and user quota/tier
   useEffect(() => {
-    fetch(`${API_URL}/vehicle-filters/brands`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          setBrands(res.data.map((b: any) => b.value));
-        }
-      })
-      .catch(() => null);
+    const loadBrands = () => {
+      fetch(`${API_URL}/vehicle-filters/brands`)
+        .then(res => res.json())
+        .then(res => {
+          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+            setBrands(res.data.map((b: any) => b.value));
+          } else {
+            fetch(`${API_URL}/vehicles/brands`)
+              .then(r => r.json())
+              .then(bData => {
+                if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
+              })
+              .catch(() => null);
+          }
+        })
+        .catch(() => {
+          fetch(`${API_URL}/vehicles/brands`)
+            .then(r => r.json())
+            .then(bData => {
+              if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
+            })
+            .catch(() => null);
+        });
+    };
+    loadBrands();
 
     // Immediately check localStorage user state for instant 10/5 slots render
     const storedUserStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;

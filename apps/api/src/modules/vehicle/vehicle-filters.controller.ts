@@ -71,16 +71,13 @@ export class VehicleFiltersController {
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
   async getBrands() {
-    const variants = await this.prisma.vehicleVariant.findMany({
-      where: { status: 'APPROVED', year: { gte: 2000 } },
-      select: { brand: { select: { name: true } } },
+    const brands = await this.prisma.brand.findMany({
+      orderBy: { name: 'asc' },
+      select: { name: true },
     });
-    // Distinct brands in memory
-    const brandsSet = new Set(variants.map(v => v.brand.name));
-    const sortedBrands = Array.from(brandsSet).sort();
     return {
       success: true,
-      data: sortedBrands.map(name => ({ label: name, value: name })),
+      data: brands.map(b => ({ label: b.name, value: b.name })),
     };
   }
 
@@ -91,15 +88,14 @@ export class VehicleFiltersController {
     if (!brand) {
       throw new BadRequestException('brand query parametresi gereklidir.');
     }
-    const variants = await this.prisma.vehicleVariant.findMany({
+    const models = await this.prisma.model.findMany({
       where: {
-        status: 'APPROVED',
-        year: { gte: 2000 },
         brand: { name: { equals: brand, mode: 'insensitive' } },
       },
-      select: { model: { select: { name: true } } },
+      select: { name: true },
+      orderBy: { name: 'asc' },
     });
-    const modelsSet = new Set(variants.map(v => v.model.name));
+    const modelsSet = new Set(models.map(m => m.name));
     const sortedModels = Array.from(modelsSet).sort();
     return {
       success: true,
