@@ -177,6 +177,7 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 {
   "verdict": "Net sonuç ve kazanan araç tavsiyesi (2-3 cümle)",
   "recommendedVehicle": "${v1Name}" veya "${v2Name}" veya "Eşit",
+  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan 1. ağızdan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. (Örn: 'Selam dostum! Senin için bu iki harika aracı en ince ayrıntısına kadar kıyasladım...')",
   "advantagesV1": ["Araç 1'in öne çıkan 3 ana avantajı"],
   "advantagesV2": ["Araç 2'nin öne çıkan 3 ana avantajı"],
   "performanceAnalysis": "Motor gücü, şanzıman uyumu ve yakıt tüketimi kıyaslaması",
@@ -194,7 +195,7 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
         const response = await this.openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'Sen uzman bir otomotiv mühendisi ve ikinci el araç danışmanısın. Yalnızca geçerli JSON dön.' },
+            { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Kullanıcıyla samimi, uzman bir dille birebir konuşarak rehberlik eden otomotiv uzmanısın. Yalnızca geçerli JSON dön.' },
             { role: 'user', content: prompt },
           ],
           response_format: { type: 'json_object' },
@@ -253,6 +254,7 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
     return {
       verdict: `Yapay zeka analizimize göre; ${winnerName}, kronik risk dengesi ve kullanım ekonomisi açısından bir adım önde değerlendirilmiştir.`,
       recommendedVehicle: winnerName,
+      conversationalAdvice: `Selam dostum! Senin için ${v1Name} ve ${v2Name} modellerini en ince detaylarına kadar karşılaştırdım.\n\nİki aracı teknik ve kronik açıdan masaya yatırdığımda; ${v1Name} modeli ${v1.engine.code} motoru ve ${v1.transmission.name} şanzıman kombinasyonu ile ${v1BetterPerformance ? 'daha dinamik bir sürüş ve tork' : 'dengeli bir şehir içi karakteri'} sunuyor. Veritabanımızda kayıtlı ${v1.problems.length} kronik durum bulunuyor.\n\nBuna karşılık ${v2Name} modeli ise ${v2.fuelType} yapısı ve ${v2.problems.length} kronik durum kaydıyla özellikle işletme maliyetine önem veren sürücüler için oldukça cazip bir alternatif. Karar verirken günlük kullanım mesafeni ve yıllık servis bütçeni göz önünde bulundurmanı öneririm!`,
       advantagesV1: [
         `${v1.engine.code} motor performansı ve tork karakteri`,
         `${v1.transmission.name} şanzıman tipi`,

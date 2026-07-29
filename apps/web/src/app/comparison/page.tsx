@@ -922,6 +922,35 @@ export default function ComparisonPage() {
         </div>
       )}
 
+      {/* Interactive First-Person AI Chatbot Experience */}
+      {comparisonResult && comparisonResult.aiAnalysis && comparisonResult.aiAnalysis.conversationalAdvice && (
+        <div className="glass p-6 md:p-8 rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#0c1222] via-[#090d1a] to-[#05070f] shadow-2xl relative overflow-hidden space-y-5">
+          <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/20">
+                💬
+              </div>
+              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[#090d1a] rounded-full"></span>
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+                <span>TorqueScout AI Asistanının Tavsiyesi</span>
+                <span className="text-[10px] font-mono bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-md">
+                  Birinci Ağızdan Sohbet
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">Teknik veriler ve sürüş dinamikleri ışığında doğrudan senin için yazılmış kişisel mesaj</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/80 border border-white/5 p-5 md:p-6 rounded-2xl text-xs md:text-sm text-slate-200 leading-relaxed font-sans space-y-3">
+            {comparisonResult.aiAnalysis.conversationalAdvice.split('\n\n').map((paragraph: string, idx: number) => (
+              <p key={idx}>{paragraph}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Side by side technical spec result display */}
       {comparisonResult && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
