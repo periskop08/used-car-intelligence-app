@@ -18,33 +18,41 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Automatically promote admin/founder emails to Role.ADMIN & SubscriptionTier.PROFESYONEL on startup
-    await this.prisma.user.updateMany({
-      where: {
-        email: { in: ADMIN_EMAILS, mode: 'insensitive' },
-      },
-      data: {
-        role: Role.ADMIN,
-        subscriptionTier: SubscriptionTier.PROFESYONEL,
-      },
-    }).catch(err => console.warn('Admin sync warning:', err?.message));
+    try {
+      const users = await this.prisma.user.findMany({
+        select: { id: true, email: true, role: true, subscriptionTier: true },
+      });
+      const adminUsers = users.filter(u => ADMIN_EMAILS.includes(u.email.toLowerCase()));
+      for (const u of adminUsers) {
+        if (u.role !== Role.ADMIN || u.subscriptionTier !== SubscriptionTier.PROFESYONEL) {
+          await this.prisma.user.update({
+            where: { id: u.id },
+            data: { role: Role.ADMIN, subscriptionTier: SubscriptionTier.PROFESYONEL },
+          }).catch(() => null);
+        }
+      }
+    } catch (err: any) {
+      console.warn('Admin user sync warning:', err?.message);
+    }
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+    }).catch(() => null);
+
     if (existing) {
-      throw new ConflictException('Email address already registered');
+      throw new ConflictException('Bu e-posta adresi zaten kayıtlı.');
     }
 
-    const isAdmin = ADMIN_EMAILS.includes(dto.email.toLowerCase());
+    const isAdmin = ADMIN_EMAILS.includes(cleanEmail);
     const assignedRole = isAdmin ? Role.ADMIN : (dto.role || Role.USER);
     const assignedTier = isAdmin ? SubscriptionTier.PROFESYONEL : (dto.subscriptionTier || SubscriptionTier.TANISMA);
 
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: cleanEmail,
         passwordHash: dto.password,
         role: assignedRole,
         subscriptionTier: assignedTier,
@@ -55,7 +63,8 @@ export class AuthService implements OnModuleInit {
     if (assignedTier !== SubscriptionTier.TANISMA && assignedTier !== SubscriptionTier.FREE) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
         where: { tier: assignedTier },
-      });
+      }).catch(() => null);
+
       if (plan) {
         await this.prisma.subscription.create({
           data: {
@@ -64,7 +73,7 @@ export class AuthService implements OnModuleInit {
             status: 'ACTIVE',
             expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
           },
-        });
+        }).catch(() => null);
       }
     }
 
@@ -81,11 +90,19 @@ export class AuthService implements OnModuleInit {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const cleanEmail = dto.email ? dto.email.trim().toLowerCase() : '';
+    
+    // Find user safely
+    const users = await this.prisma.user.findMany({
+      where: {
+        email: { equals: cleanEmail, mode: 'insensitive' },
+      },
+    }).catch(() => []);
+
+    const user = users[0] || await this.prisma.user.findUnique({ where: { email: cleanEmail } }).catch(() => null);
+
     if (!user || user.passwordHash !== dto.password) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('E-posta adresi veya şifre hatalı.');
     }
 
     const isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
@@ -96,7 +113,7 @@ export class AuthService implements OnModuleInit {
           role: Role.ADMIN,
           subscriptionTier: SubscriptionTier.PROFESYONEL,
         },
-      });
+      }).catch(() => null);
       user.role = Role.ADMIN;
       user.subscriptionTier = SubscriptionTier.PROFESYONEL;
     }
