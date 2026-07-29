@@ -6,33 +6,6 @@ import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-const displayFuelType = (fuel: string) => {
-  switch (fuel) {
-    case "PETROL": return "Benzin";
-    case "DIESEL": return "Dizel";
-    case "LPG": return "LPG";
-    case "HYBRID": return "Hibrit";
-    case "PLUG_IN_HYBRID": return "Plug-in Hibrit";
-    case "ELECTRIC": return "Elektrik";
-    default: return fuel || "Diğer";
-  }
-};
-
-const displayBodyType = (body: string) => {
-  switch (body) {
-    case "SEDAN": return "Sedan";
-    case "HATCHBACK": return "Hatchback";
-    case "CONVERTIBLE": return "Cabrio";
-    case "COUPE": return "Coupe";
-    case "SUV": return "SUV";
-    case "WAGON": return "Station Wagon";
-    case "PICKUP": return "Pickup";
-    case "VAN": return "Van";
-    case "MINIVAN": return "Minivan";
-    default: return body || "Diğer";
-  }
-};
-
 interface SlotData {
   id: number;
   selectedBrand: string;
@@ -45,8 +18,8 @@ interface SlotData {
   selectedTrim: string;
   matchedVariantId: string | null;
 
-  models: any[];
-  years: number[];
+  models: string[];
+  years: string[];
   bodyTypes: string[];
   engines: string[];
   fuelTypes: string[];
@@ -94,8 +67,8 @@ const createEmptySlot = (id: number): SlotData => ({
 export default function ComparisonPage() {
   const router = useRouter();
 
-  // Brands list (shared)
-  const [brands, setBrands] = useState<any[]>([]);
+  // Brands list (string values e.g. "Audi", "BMW")
+  const [brands, setBrands] = useState<string[]>([]);
 
   // User tier & limit
   const [userTier, setUserTier] = useState<string>("TANISMA");
@@ -119,10 +92,12 @@ export default function ComparisonPage() {
 
   // Fetch initial brands and user quota/tier
   useEffect(() => {
-    fetch(`${API_URL}/vehicles/brands`)
+    fetch(`${API_URL}/vehicle-filters/brands`)
       .then(res => res.json())
-      .then(data => {
-        setBrands(Array.isArray(data) ? data : []);
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          setBrands(res.data.map((b: any) => b.value));
+        }
       })
       .catch(() => null);
 
@@ -180,10 +155,10 @@ export default function ComparisonPage() {
     });
   };
 
-  // Slot cascade handlers
-  const handleBrandChange = (index: number, brandId: string) => {
+  // Slot cascade handlers using /vehicle-filters/ endpoints
+  const handleBrandChange = (index: number, brandName: string) => {
     updateSlot(index, {
-      selectedBrand: brandId,
+      selectedBrand: brandName,
       selectedModel: "",
       selectedYear: "",
       selectedBodyType: "",
@@ -199,22 +174,27 @@ export default function ComparisonPage() {
       fuelTypes: [],
       transmissions: [],
       trims: [],
-      loadingModels: !!brandId,
+      loadingModels: !!brandName,
     });
 
-    if (!brandId) return;
+    if (!brandName) return;
 
-    fetch(`${API_URL}/vehicles/brands/${brandId}/models`)
+    fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brandName)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { models: Array.isArray(data) ? data : [], loadingModels: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { models: res.data.map((m: any) => m.value), loadingModels: false });
+        } else {
+          updateSlot(index, { loadingModels: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingModels: false }));
   };
 
-  const handleModelChange = (index: number, modelId: string) => {
+  const handleModelChange = (index: number, modelName: string) => {
+    const slot = slots[index];
     updateSlot(index, {
-      selectedModel: modelId,
+      selectedModel: modelName,
       selectedYear: "",
       selectedBodyType: "",
       selectedEngine: "",
@@ -228,15 +208,19 @@ export default function ComparisonPage() {
       fuelTypes: [],
       transmissions: [],
       trims: [],
-      loadingYears: !!modelId,
+      loadingYears: !!modelName,
     });
 
-    if (!modelId) return;
+    if (!modelName || !slot.selectedBrand) return;
 
-    fetch(`${API_URL}/vehicles/models/${modelId}/years`)
+    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(modelName)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { years: Array.isArray(data) ? data : [], loadingYears: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { years: res.data.map((y: any) => y.value), loadingYears: false });
+        } else {
+          updateSlot(index, { loadingYears: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingYears: false }));
   };
@@ -259,12 +243,16 @@ export default function ComparisonPage() {
       loadingBodyTypes: !!yearVal,
     });
 
-    if (!yearVal || !slot.selectedModel) return;
+    if (!yearVal || !slot.selectedBrand || !slot.selectedModel) return;
 
-    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${yearVal}/body-types`)
+    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { bodyTypes: Array.isArray(data) ? data : [], loadingBodyTypes: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { bodyTypes: res.data.map((b: any) => b.value), loadingBodyTypes: false });
+        } else {
+          updateSlot(index, { loadingBodyTypes: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingBodyTypes: false }));
   };
@@ -285,12 +273,16 @@ export default function ComparisonPage() {
       loadingEngines: !!bodyVal,
     });
 
-    if (!bodyVal || !slot.selectedModel || !slot.selectedYear) return;
+    if (!bodyVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear) return;
 
-    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${bodyVal}/engines`)
+    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { engines: Array.isArray(data) ? data : [], loadingEngines: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { engines: res.data.map((e: any) => e.value), loadingEngines: false });
+        } else {
+          updateSlot(index, { loadingEngines: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingEngines: false }));
   };
@@ -309,13 +301,16 @@ export default function ComparisonPage() {
       loadingFuels: !!engineVal,
     });
 
-    if (!engineVal || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+    if (!engineVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
 
-    const encodedEng = encodeURIComponent(engineVal);
-    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types`)
+    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { fuelTypes: Array.isArray(data) ? data : [], loadingFuels: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { fuelTypes: res.data.map((f: any) => f.value), loadingFuels: false });
+        } else {
+          updateSlot(index, { loadingFuels: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingFuels: false }));
   };
@@ -332,13 +327,16 @@ export default function ComparisonPage() {
       loadingTransmissions: !!fuelVal,
     });
 
-    if (!fuelVal || !slot.selectedEngine || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+    if (!fuelVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine) return;
 
-    const encodedEng = encodeURIComponent(slot.selectedEngine);
-    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types/${fuelVal}/transmissions`)
+    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { transmissions: Array.isArray(data) ? data : [], loadingTransmissions: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { transmissions: res.data.map((t: any) => t.value), loadingTransmissions: false });
+        } else {
+          updateSlot(index, { loadingTransmissions: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingTransmissions: false }));
   };
@@ -353,13 +351,16 @@ export default function ComparisonPage() {
       loadingTrims: !!transVal,
     });
 
-    if (!transVal || !slot.selectedFuelType || !slot.selectedEngine || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+    if (!transVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType) return;
 
-    const encodedEng = encodeURIComponent(slot.selectedEngine);
-    fetch(`${API_URL}/vehicles/models/${slot.selectedModel}/years/${slot.selectedYear}/body-types/${slot.selectedBodyType}/engines/${encodedEng}/fuel-types/${slot.selectedFuelType}/transmissions/${transVal}/trims`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmission=${encodeURIComponent(transVal)}`)
       .then(res => res.json())
-      .then(data => {
-        updateSlot(index, { trims: Array.isArray(data) ? data : [], loadingTrims: false });
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { trims: res.data.map((tr: any) => tr.value), loadingTrims: false });
+        } else {
+          updateSlot(index, { loadingTrims: false });
+        }
       })
       .catch(() => updateSlot(index, { loadingTrims: false }));
   };
@@ -374,17 +375,17 @@ export default function ComparisonPage() {
     if (!trimVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType || !slot.selectedTransmission) return;
 
     const queryParams = new URLSearchParams({
-      brandId: slot.selectedBrand,
-      modelId: slot.selectedModel,
+      brand: slot.selectedBrand,
+      model: slot.selectedModel,
       year: slot.selectedYear,
       bodyType: slot.selectedBodyType,
-      engineCode: slot.selectedEngine,
+      engine: slot.selectedEngine,
       fuelType: slot.selectedFuelType,
-      transmissionName: slot.selectedTransmission,
-      trimName: trimVal,
+      transmission: slot.selectedTransmission,
+      trim: trimVal,
     });
 
-    fetch(`${API_URL}/vehicles/find-variant?${queryParams.toString()}`)
+    fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && res.variantId) {
@@ -589,7 +590,7 @@ export default function ComparisonPage() {
                 >
                   <option value="">Marka Seçiniz...</option>
                   {brands.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
+                    <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
 
@@ -602,7 +603,7 @@ export default function ComparisonPage() {
                 >
                   <option value="">{slot.loadingModels ? "Yükleniyor..." : "Model Ailesi Seçiniz..."}</option>
                   {slot.models.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
 
@@ -628,7 +629,7 @@ export default function ComparisonPage() {
                 >
                   <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : "Kasa Tipi Seçiniz..."}</option>
                   {slot.bodyTypes.map(b => (
-                    <option key={b} value={b}>{displayBodyType(b)}</option>
+                    <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
 
@@ -654,7 +655,7 @@ export default function ComparisonPage() {
                 >
                   <option value="">{slot.loadingFuels ? "Yükleniyor..." : "Yakıt Türü Seçiniz..."}</option>
                   {slot.fuelTypes.map(fuel => (
-                    <option key={fuel} value={fuel}>{displayFuelType(fuel)}</option>
+                    <option key={fuel} value={fuel}>{fuel}</option>
                   ))}
                 </select>
 
@@ -948,7 +949,7 @@ export default function ComparisonPage() {
                 <tr>
                   <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Yakıt Türü</td>
                   {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3">{displayFuelType(v.fuelType)}</td>
+                    <td key={v.id} className="p-3">{v.fuelType}</td>
                   ))}
                 </tr>
 
