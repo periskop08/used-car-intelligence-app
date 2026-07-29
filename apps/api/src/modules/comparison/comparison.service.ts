@@ -118,7 +118,7 @@ export class ComparisonService {
       throw new BadRequestException(`${tier} paketiniz ile tek seferde en fazla ${maxAllowed} araç karşılaştırabilirsiniz.`);
     }
 
-    const cacheKey = requestedIds.slice().sort().join('_');
+    const cacheKey = 'v3_' + requestedIds.slice().sort().join('_');
 
     // 3. Safe DB Cache lookup
     const cachedReport = await this.prisma.aiVehicleComparisonCache.findUnique({
@@ -399,13 +399,16 @@ KRİTİK TALİMATLAR (KESİNLİKLE UYULMASI GEREKEN SIKI KURALLAR):
 3. "advantagesV" alanlarına araçların GERÇEK teknik üstünlüklerini (örn: yüksek motor gücü, serilik, düşük yakıt tüketimi, geniş bagaj, 4x4 çekiş vb.) yaz.
 4. "risksV" alanlarına araçların GERÇEK risk ve dezavantajlarını yaz (örn: DSG mekatronik arızası riski, yüksek şehir içi yakıt tüketimi, kronik yağ yakma problemi, parçalarının pahalı/zor bulunması vb.). Asla kronik arızaları avantaj olarak yazma!
 5. "verdict" alanında hangi aracın NEDEN kazandığını net ve rakamsal verilerle (HP, yakıt, kronik risk dengesi) gerekçelendir.
-6. "conversationalAdvice" kısmında samimi bir otomotiv uzmanı gibi seçilen TÜM ${variants.length} araca değinerek detaylı tavsiyede bulun.
+6. "conversationalAdvice" alanında TorqueScout AI Asistanı olarak 3 PARAGRAFLIK detaylı ve samimi bir yol haritası sun:
+   - 1. Paragraf: Seçilen TÜM ${variants.length} araca tek tek değin. Her birinin neden tercih edilebileceğini (iyi yönleri) ve ne zaman/neden riskli olabileceğini (kötü yönleri) somut motor/kronik detaylarıyla anlat.
+   - 2. Paragraf (Kullanıcı Arayışına Göre Karar Rehberi): Şehir içi ekonomi arayanlar hangi aracı, yüksek performans arayanlar hangi aracı, arıza riski istemeyenler hangi aracı seçmeli gerekçeleriyle açıkla.
+   - 3. Paragraf (AI Tercihi & Karar): TorqueScout AI olarak toplam verimlilik, kronik risk dengesi ve 2. el piyasa hızı açısından 1. sıraya koyduğun aracı açıkça belirt, ancak nihai kararı bütçe ve beklentilerine göre kullanıcıya bırak.
 
 Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 {
   "verdict": "Net sonuç ve gerekçeli kazanan tavsiyesi (2-3 cümle, somut rakam ve nedenlerle)",
   "recommendedVehicle": "Öne çıkan kazanan aracın tam adı",
-  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. Seçilen TÜM ${variants.length} araca tek tek değin.",
+  "conversationalAdvice": "TorqueScout AI Asistanı olarak 3 paragraflık detaylı yol haritası. Seçilen TÜM ${variants.length} aracın iyi/kötü yönlerini, kullanıcı amacına göre hangi aracın seçilmesi gerektiğini anlat ve kendi AI tercihini açıkla.",
   ${advantagesSchema},
   ${risksSchema},
   "performanceAnalysis": "Araçların motor güçleri, torkları, şanzıman tepkileri ve 0-100 acceleration kıyaslaması (Somut rakamlar ver)",
@@ -492,12 +495,22 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
       fallbackRisks[`risksV${i + 1}`] = rks.slice(0, 2);
     });
 
+    const vehicleAdviceList = variants.map(v => {
+      const specs: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
+      const cons = specs.averageFuelConsumption ? `${specs.averageFuelConsumption} L/100km tüketimi` : 'motor performansı';
+      const probCount = v.problems?.length || 0;
+      const probText = probCount > 0 ? `${probCount} kayıtlı kronik durum` : 'düşük arıza kaydı';
+      return `• ${v.brand.name} ${v.model.name} (${v.year}): ${v.engine?.code || 'Motor'}, ${v.transmission?.name || 'Şanzıman'} ile ${cons} sunarken, ${probText} ile dikkat gerektiriyor.`;
+    }).join('\n');
+
     const winnerName = `${variants[0].brand.name} ${variants[0].model.name} ${variants[0].year}`;
+
+    const conversationalAdvice = `Selam dostum! Seçtiğin ${variants.length} adet aracı tüm teknik verileri ve kronik durumlarıyla detaylıca karşılaştırdım:\n\n${vehicleAdviceList}\n\n🎯 **Kullanım Amacına Göre Karar Rehberi:**\n- **Şehir İçi & Tüketim Ekonomisi:** Yakıt maliyetini en düşükte tutmak istiyorsan, en düşük fabrika tüketim değerine sahip pratik modeli tercih etmelisin.\n- **Performans & Uzun Yol:** Yüksek tork ve şanzıman verimliliği arıyorsan daha güçlü motor seçeneğine yönelmelisin.\n- **Mekanik Dayanıklılık:** En az kronik arıza kaydına sahip modeli tercih ederek sanayi masraflarını minimize edebilirsin.\n\n🤖 **TorqueScout AI Tercihi:**\nBenim toplam verimlilik, kronik arıza dengesi ve ikinci el piyasa hızı açısından birinci sıraya koyduğum araç **${winnerName}**. Ancak unutma, en doğru karar senin günlük kullanım mesafene ve bütçene uyan modeldir!`;
 
     return {
       verdict: `TorqueScout teknik analizine göre; ${winnerName}, motor verimliliği ve düşük kronik arıza riski dengesiyle öne çıkmaktadır.`,
       recommendedVehicle: winnerName,
-      conversationalAdvice: `Selam dostum! Seçtiğin ${variants.length} adet aracı en ince detaylarına kadar karşılaştırdım.\n\nAraçları masaya yatırdığımda; ${variants.map(v => `${v.brand.name} ${v.model.name}`).join(', ')} modellerinin her birinin kendine özgü güçlü yönleri ve dikkat edilmesi gereken noktaları bulunmaktadır.\n\nAlım kararı vermeden önce bütçene ve kullanım amacına en uygun olan seçeneği değerlendirmeni öneririm.`,
+      conversationalAdvice,
       ...fallbackAdvantages,
       ...fallbackRisks,
       performanceAnalysis: `Seçilen araçlar arasında motor güçleri ve şanzıman tepkileri belirgin farklılık göstermektedir.`,
