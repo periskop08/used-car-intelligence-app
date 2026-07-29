@@ -370,11 +370,16 @@ export default function ComparisonPage() {
 
     if (!transVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType) return;
 
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmission=${encodeURIComponent(transVal)}`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { trims: res.data.map((tr: any) => tr.value), loadingTrims: false });
+          const trimOptions = res.data.map((tr: any) => tr.value);
+          updateSlot(index, {
+            trims: trimOptions,
+            loadingTrims: false,
+            matchedVariantId: res.autoVariantId || null,
+          });
         } else {
           updateSlot(index, { loadingTrims: false });
         }
