@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
 import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
+import { getFuelTypeTr } from './vehicle-filters.controller';
 
 
 
@@ -226,7 +227,7 @@ export class VehicleService {
       year: variant.year,
       bodyType: variant.generation.bodyType,
       engine: variant.engine.code,
-      fuelType: variant.engine.fuelType,
+      fuelType: getFuelTypeTr(variant.engine?.fuelType || variant.fuelType),
       transmission: variant.transmission.name,
       trim: variant.trim.name,
       country: variant.country.name,

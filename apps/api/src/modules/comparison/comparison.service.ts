@@ -5,6 +5,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
 import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
 import OpenAI from 'openai';
+import { getFuelTypeTr } from '../vehicle/vehicle-filters.controller';
 
 @Injectable()
 export class ComparisonService {
@@ -199,7 +200,7 @@ export class ComparisonService {
         trim: v.trim.name,
         engine: v.engine.code,
         transmission: v.transmission.name,
-        fuelType: v.fuelType,
+        fuelType: getFuelTypeTr(v.fuelType),
         specs: vSpecs,
         problemsCount: v.problems.length,
       };
@@ -276,7 +277,7 @@ export class ComparisonService {
       return `${i + 1}. ARAÇ: ${v.year} ${v.brand.name} ${v.model.name} (${v.trim.name})
 - Motor Seçeneği: ${v.engine?.code || 'Belirtilmedi'}
 - Şanzıman Tipi: ${v.transmission?.name || 'Belirtilmedi'}
-- Yakıt Türü: ${v.fuelType}
+- Yakıt Türü: ${getFuelTypeTr(v.fuelType)}
 - Ortalama Yakıt Tüketimi: ${specs.averageFuelConsumption ? specs.averageFuelConsumption + ' L/100km' : 'Veri yok'}
 - 0-100 km/h Hızlanma: ${specs.acceleration0to100 ? specs.acceleration0to100 + ' saniye' : 'Veri yok'}
 - Maksimum Hız: ${specs.topSpeed ? specs.topSpeed + ' km/h' : 'Veri yok'}
@@ -373,7 +374,7 @@ KATI TALİMATLAR:
       return `ARAÇ ${i + 1}: ${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name})
 - Motor: ${v.engine?.code || 'Belirtilmedi'}
 - Şanzıman: ${v.transmission?.name || 'Belirtilmedi'}
-- Yakıt Türü: ${v.fuelType}
+- Yakıt Türü: ${getFuelTypeTr(v.fuelType)}
 - Ortalama Yakıt Tüketimi: ${specs.averageFuelConsumption ? specs.averageFuelConsumption + ' L/100km' : 'Veri yok'}
 - 0-100 km/h Hızlanma: ${specs.acceleration0to100 ? specs.acceleration0to100 + ' saniye' : 'Veri yok'}
 - Maksimum Hız: ${specs.topSpeed ? specs.topSpeed + ' km/h' : 'Veri yok'}

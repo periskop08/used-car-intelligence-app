@@ -222,3 +222,14 @@ export interface AiReportOutput {
   buyability_score: number;
   final_decision: FinalDecision;
 }
+
+export function formatFuelType(fuelType: string | null | undefined): string {
+  if (!fuelType) return 'Benzin';
+  const u = fuelType.toString().toUpperCase().trim();
+  if (u === 'PETROL' || u === 'BENZIN') return 'Benzin';
+  if (u === 'DIESEL' || u === 'DIZEL') return 'Dizel';
+  if (u === 'HYBRID' || u === 'PLUG_IN_HYBRID' || u === 'HIBRIT') return 'Hibrit';
+  if (u === 'ELECTRIC' || u === 'ELEKTRIK') return 'Elektrik';
+  if (u === 'LPG' || u.includes('LPG')) return 'LPG & Benzin';
+  return 'Benzin';
+}
