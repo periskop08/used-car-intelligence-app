@@ -76,6 +76,22 @@ export class ComparisonService {
     return monthlyRemaining + buyerCredits;
   }
 
+  async getUserTierAndLimit(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const tier = await this.subscriptionService.getEffectiveTier(userId);
+    const maxAllowed = (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase())))
+      ? 10
+      : tier === SubscriptionTier.PROFESYONEL ? 10 : tier === SubscriptionTier.YETKIN ? 5 : 2;
+
+    const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
+
+    return {
+      userTier: tier,
+      userLimit: maxAllowed,
+      remainingChatbotMessages,
+    };
+  }
+
   async compare(userId: string, dto: CompareVehiclesDto) {
     // 1. Extract requested variant IDs array
     let requestedIds: string[] = [];

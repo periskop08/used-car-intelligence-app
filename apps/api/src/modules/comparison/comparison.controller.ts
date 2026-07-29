@@ -19,14 +19,13 @@ export class ComparisonController {
   }
 
   @Get('quota')
-  @ApiOperation({ summary: 'Kullanıcının Kalan Chatbot Mesaj Hakkını Al' })
+  @ApiOperation({ summary: 'Kullanıcının Kalan Chatbot Hakkını ve Paket Araç Limitini Al' })
   async getQuota(@GetUser() user: UserPayload) {
-    const remainingChatbotMessages = await this.comparisonService.getUserChatbotQuota(user.id);
-    return { remainingChatbotMessages };
+    return this.comparisonService.getUserTierAndLimit(user.id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'İki Araç Varyantını Karşılaştır' })
+  @ApiOperation({ summary: 'Araç Varyantlarını Karşılaştır' })
   @ApiResponse({ status: 201, description: 'Araçlar karşılaştırıldı ve geçmişe kaydedildi.' })
   async compare(
     @GetUser() user: UserPayload,

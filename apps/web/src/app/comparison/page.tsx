@@ -126,7 +126,20 @@ export default function ComparisonPage() {
       })
       .catch(() => null);
 
-    const token = localStorage.getItem("accessToken");
+    // Immediately check localStorage user state for instant 10/5 slots render
+    const storedUserStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    if (storedUserStr) {
+      try {
+        const u = JSON.parse(storedUserStr);
+        if (u.role === "ADMIN" || u.subscriptionTier === "PROFESYONEL") {
+          setLimitAndInitSlots(10, "PROFESYONEL");
+        } else if (u.subscriptionTier === "YETKIN") {
+          setLimitAndInitSlots(5, "YETKIN");
+        }
+      } catch (e) {}
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (token) {
       fetch(`${API_URL}/comparisons/quota`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -135,6 +148,9 @@ export default function ComparisonPage() {
         .then(data => {
           if (typeof data.remainingChatbotMessages === "number") {
             setRemainingQuota(data.remainingChatbotMessages);
+          }
+          if (data.userLimit && data.userTier) {
+            setLimitAndInitSlots(data.userLimit, data.userTier);
           }
         })
         .catch(() => null);
