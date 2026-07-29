@@ -218,78 +218,137 @@ export class ComparisonService {
       throw new BadRequestException('Lütfen sormak istediğiniz soruyu yazın.');
     }
 
-    // Deduct 1 Chatbot credit
+    // 1. Deduct 1 Chatbot credit
     await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
 
+    // 2. Fetch variants with full specs, problems and recalls
     const variant1 = await this.prisma.vehicleVariant.findUnique({
       where: { id: dto.variant1Id },
-      include: { brand: true, model: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+        specs: true,
+        problems: { where: { status: ApprovalStatus.APPROVED } },
+        recalls: { where: { status: ApprovalStatus.APPROVED } },
+      },
     });
 
     const variant2 = await this.prisma.vehicleVariant.findUnique({
       where: { id: dto.variant2Id },
-      include: { brand: true, model: true, engine: true, transmission: true, trim: true, specs: true, problems: { where: { status: ApprovalStatus.APPROVED } } },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+        specs: true,
+        problems: { where: { status: ApprovalStatus.APPROVED } },
+        recalls: { where: { status: ApprovalStatus.APPROVED } },
+      },
     });
 
     if (!variant1 || !variant2) {
       throw new BadRequestException('Karşılaştırılan araçlar bulunamadı.');
     }
 
-    const v1Name = `${variant1.brand.name} ${variant1.model.name} ${variant1.year} (${variant1.trim.name})`;
-    const v2Name = `${variant2.brand.name} ${variant2.model.name} ${variant2.year} (${variant2.trim.name})`;
+    const v1Specs: Record<string, any> = (variant1.specs?.specs as Record<string, any>) || {};
+    const v2Specs: Record<string, any> = (variant2.specs?.specs as Record<string, any>) || {};
 
-    const prompt = `Sen TorqueScout AI Asistanısın. Kullanıcı şu iki aracı kıyaslıyor:
-1. Araç: ${v1Name} (Motor: ${variant1.engine.code}, Şanzıman: ${variant1.transmission.name}, Yakıt: ${variant1.fuelType}, Kronik Sorun Sayısı: ${variant1.problems.length})
-2. Araç: ${v2Name} (Motor: ${variant2.engine.code}, Şanzıman: ${variant2.transmission.name}, Yakıt: ${variant2.fuelType}, Kronik Sorun Sayısı: ${variant2.problems.length})
+    const v1ProblemsText = variant1.problems
+      .map((p: any) => `- ${p.title}: ${p.description} (Risk Seviyesi: ${p.riskLevel})`)
+      .join('\n') || 'Kayıtlı kritik kronik sorun yok.';
+    const v2ProblemsText = variant2.problems
+      .map((p: any) => `- ${p.title}: ${p.description} (Risk Seviyesi: ${p.riskLevel})`)
+      .join('\n') || 'Kayıtlı kritik kronik sorun yok.';
 
-Kullanıcının sorduğu detaylı takip sorusu: "${dto.question}"
+    const systemPrompt = `Sen TorqueScout'ın uzman otomotiv danışmanı ve yapay zeka araç karşılaştırma chatbotusun.
+Kullanıcı şu iki aracı kıyaslıyor ve sana özel bir takip sorusu sordu:
 
-Lütfen samimi, doğrudan kullanıcının karşısındaymış gibi konuşarak net, teknik açıdan doğru ve yönlendirici yanıt ver. Yanıtın Türkçe ve 2-3 paragrafı geçmeyen uzunlukta olsun.`;
+1. ARAÇ: ${variant1.year} ${variant1.brand.name} ${variant1.model.name} (${variant1.trim.name})
+- Motor: ${variant1.engine?.code || 'Belirtilmedi'}
+- Şanzıman: ${variant1.transmission?.name || 'Belirtilmedi'}
+- Yakıt Türü: ${variant1.fuelType}
+- Ortalama Yakıt Tüketimi: ${v1Specs.averageFuelConsumption || 'Belirtilmedi'} lt/100km
+- 0-100 Hızlanma: ${v1Specs.acceleration0to100 || 'Belirtilmedi'} saniye
+- Maksimum Hız: ${v1Specs.topSpeed || 'Belirtilmedi'} km/s
+- Bagaj Hacmi: ${v1Specs.luggageCapacity || 'Belirtilmedi'} litre
+- Boş Ağırlık: ${v1Specs.weight || 'Belirtilmedi'} kg
+- Onaylı Kronik Sorunlar (${variant1.problems.length} Adet):
+${v1ProblemsText}
 
-    let reply = '';
+2. ARAÇ: ${variant2.year} ${variant2.brand.name} ${variant2.model.name} (${variant2.trim.name})
+- Motor: ${variant2.engine?.code || 'Belirtilmedi'}
+- Şanzıman: ${variant2.transmission?.name || 'Belirtilmedi'}
+- Yakıt Türü: ${variant2.fuelType}
+- Ortalama Yakıt Tüketimi: ${v2Specs.averageFuelConsumption || 'Belirtilmedi'} lt/100km
+- 0-100 Hızlanma: ${v2Specs.acceleration0to100 || 'Belirtilmedi'} saniye
+- Maksimum Hız: ${v2Specs.topSpeed || 'Belirtilmedi'} km/s
+- Bagaj Hacmi: ${v2Specs.luggageCapacity || 'Belirtilmedi'} litre
+- Boş Ağırlık: ${v2Specs.weight || 'Belirtilmedi'} kg
+- Onaylı Kronik Sorunlar (${variant2.problems.length} Adet):
+${v2ProblemsText}
 
-    if (this.openai) {
+Talimatlar:
+1. Kullanıcının sorusunu doğrudan bu teknik veriler, fabrika yakıt tüketimi değerleri, motor tork farkları ve kronik sorunlar ışığında karşılaştırmalı olarak yanıtla.
+2. Örneğin kullanıcı "hangisi daha az yakıyor" diyorsa, araçların yakıt türlerini, motor hacimlerini ve yukarıdaki tüketim verilerini kıyaslayarak net, somut ve rakamsal bilgi ver.
+3. Yanıtın son derece bilgili, samimi, tarafsız ve Türkçe olsun. Jenerik veya taslak kalıp cümleler kullanma!`;
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
+
+    let response = '';
+
+    if (apiKey) {
       try {
-        const response = await this.openai.chat.completions.create({
+        const openai = new OpenAI({ apiKey });
+        const aiRes = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'Sen samimi, bilgili ve yardımsever TorqueScout otomotiv danışmanısın.' },
-            { role: 'user', content: prompt },
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: dto.question },
           ],
           temperature: 0.5,
         });
 
-        reply = response.choices[0]?.message?.content || '';
+        response = aiRes.choices[0]?.message?.content || '';
       } catch (err: any) {
-        console.warn('OpenAI comparison chat failed, switching to Gemini:', err?.message || err);
+        console.error('OpenAI comparison chat failed:', err?.message);
       }
     }
 
-    if (!reply) {
-      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
-      if (geminiApiKey) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-          const res = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-            }),
-          });
+    if (!response && geminiApiKey) {
+      try {
+        const geminiOpenai = new OpenAI({
+          apiKey: geminiApiKey,
+          baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        });
+        const aiRes = await geminiOpenai.chat.completions.create({
+          model: 'gemini-flash-latest',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: dto.question },
+          ],
+          temperature: 0.5,
+        });
 
-          if (res.ok) {
-            const data = await res.json();
-            reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          }
-        } catch (err: any) {
-          console.warn('Gemini chat failed:', err?.message || err);
-        }
+        response = aiRes.choices[0]?.message?.content || '';
+      } catch (err: any) {
+        console.error('Gemini OpenAI-compatible comparison chat failed:', err?.message);
       }
     }
 
-    if (!reply) {
-      reply = `${v1Name} ve ${v2Name} modelleri kıyaslandığında, sorduğun "${dto.question}" başlığı altında motor karakteri ve şanzıman verimliliği öne çıkmaktadır. Sürüş alışkanlıklarına ve periyodik bakım disiplinine dikkat etmeni öneririm.`;
+    if (!response) {
+      const v1Name = `${variant1.brand.name} ${variant1.model.name}`;
+      const v2Name = `${variant2.brand.name} ${variant2.model.name}`;
+      const v1Cons = v1Specs.averageFuelConsumption ? `${v1Specs.averageFuelConsumption} lt/100km` : 'verisi girilmemiş';
+      const v2Cons = v2Specs.averageFuelConsumption ? `${v2Specs.averageFuelConsumption} lt/100km` : 'verisi girilmemiş';
+
+      response = `${v1Name} (${v1Cons}) ve ${v2Name} (${v2Cons}) modelleri kıyaslandığında; ${variant1.fuelType} motorlu ${v1Name} ile ${variant2.fuelType} motorlu ${v2Name} arasında şanzıman verimliliği ve yakıt tüketim farkı bulunmaktadır. Şehir içi dur-kalk kullanımında sürüş tarzı ve motor hacmi belirleyici olacaktır.`;
     }
 
     await this.prisma.aiChatLog.create({
@@ -297,14 +356,14 @@ Lütfen samimi, doğrudan kullanıcının karşısındaymış gibi konuşarak ne
         userId,
         variantId: variant1.id,
         prompt: dto.question,
-        response: reply,
+        response,
       },
     }).catch(() => null);
 
     const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
     return {
-      response: reply,
+      response,
       remainingChatbotMessages,
     };
   }
