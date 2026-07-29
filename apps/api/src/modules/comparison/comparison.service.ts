@@ -270,31 +270,32 @@ export class ComparisonService {
     const vehicleDescriptions = variants.map((v, i) => {
       const specs: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
       const problemsText = v.problems
-        .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
-        .join('\n') || 'Kayıtlı kritik kronik sorun yok.';
+        .map((p: any) => `- ${p.title}: ${p.description || ''} (Risk Seviyesi: ${p.riskLevel})`)
+        .join('\n') || 'Kayıtlı kritik kronik arıza bulunmuyor.';
 
       return `${i + 1}. ARAÇ: ${v.year} ${v.brand.name} ${v.model.name} (${v.trim.name})
-- Motor: ${v.engine?.code || 'Belirtilmedi'}
-- Şanzıman: ${v.transmission?.name || 'Belirtilmedi'}
+- Motor Seçeneği: ${v.engine?.code || 'Belirtilmedi'}
+- Şanzıman Tipi: ${v.transmission?.name || 'Belirtilmedi'}
 - Yakıt Türü: ${v.fuelType}
-- Ortalama Yakıt Tüketimi: ${specs.averageFuelConsumption || 'Belirtilmedi'} lt/100km
-- 0-100 Hızlanma: ${specs.acceleration0to100 || 'Belirtilmedi'} saniye
-- Maksimum Hız: ${specs.topSpeed || 'Belirtilmedi'} km/s
-- Bagaj Hacmi: ${specs.luggageCapacity || 'Belirtilmedi'} litre
-- Boş Ağırlık: ${specs.weight || 'Belirtilmedi'} kg
+- Ortalama Yakıt Tüketimi: ${specs.averageFuelConsumption ? specs.averageFuelConsumption + ' L/100km' : 'Veri yok'}
+- 0-100 km/h Hızlanma: ${specs.acceleration0to100 ? specs.acceleration0to100 + ' saniye' : 'Veri yok'}
+- Maksimum Hız: ${specs.topSpeed ? specs.topSpeed + ' km/h' : 'Veri yok'}
+- Bagaj Hacmi: ${specs.luggageCapacity ? specs.luggageCapacity + ' Litre' : 'Veri yok'}
+- Boş Ağırlık: ${specs.weight ? specs.weight + ' kg' : 'Veri yok'}
 - Onaylı Kronik Sorunlar (${v.problems.length} Adet):
 ${problemsText}`;
     }).join('\n\n');
 
-    const systemPrompt = `Sen TorqueScout'ın uzman otomotiv danışmanı ve yapay zeka araç karşılaştırma chatbotusun.
+    const systemPrompt = `Sen Türkiye'nin 1 numaralı otomotiv istihbarat platformu TorqueScout'ın uzman otomotiv danışmanı ve yapay zeka araç karşılaştırma chatbotusun.
 Kullanıcı şu ${variants.length} adet aracı kıyaslıyor ve sana özel bir takip sorusu sordu:
 
 ${vehicleDescriptions}
 
-Talimatlar:
-1. Kullanıcının sorusunu doğrudan yukarıdaki teknik veriler, fabrika yakıt tüketimi değerleri, motor tork farkları ve kronik sorunlar ışığında karşılaştırmalı olarak yanıtla.
-2. Seçilen TÜM ${variants.length} ARACA mutlaka yanıtında değin ve sorulan soruya bu araçların her birini kapsayacak şekilde net, somut ve rakamsal bilgi vererek cevap ver.
-3. Yanıtın son derece bilgili, samimi, tarafsız ve Türkçe olsun. Jenerik veya taslak kalıp cümleler kullanma!`;
+KATI TALİMATLAR:
+1. Kullanıcının sorusunu doğrudan yukarıdaki teknik veriler (HP, tork, 0-100 sn, yakıt tüketimi litresi), şanzıman yapısı ve kronik arızalar ışığında karşılaştırmalı olarak yanıtla.
+2. Seçilen TÜM ${variants.length} ARACA mutlaka yanıtında yer ver. Hiçbir aracı atlamadan sorulan soruya bu araçların her birini kıyaslayarak cevap ver.
+3. Asla jenerik kalıp cümleler kullanma! Somut rakamlar, fabrika verileri ve gerçek kronik risk başlıkları ver.
+4. Yanıtın son derece bilgili, samimi, tarafsız ve akıcı Türkçe olsun.`;
 
     const apiKey = process.env.OPENAI_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
@@ -342,7 +343,7 @@ Talimatlar:
 
     if (!response) {
       const summaryNames = variants.map(v => `${v.brand.name} ${v.model.name}`).join(', ');
-      response = `Seçtiğiniz ${variants.length} araç (${summaryNames}) kıyaslandığında; motor hacimleri, yakıt tüketimleri ve şanzıman verimlilikleri kullanım amacınıza göre farklılık gösterir. Şehir içi pratiklik veya uzun yol konforu kriterlerinize göre en uygun modeli belirleyebilirsiniz.`;
+      response = `Seçtiğiniz ${variants.length} araç (${summaryNames}) kıyaslandığında; motor güçleri, yakıt tüketimleri ve şanzıman verimlilikleri kullanım amacınıza göre farklılık gösterir. Şehir içi pratiklik veya uzun yol konforu kriterlerinize göre en uygun modeli belirleyebilirsiniz.`;
     }
 
     await this.prisma.aiChatLog.create({
@@ -363,27 +364,55 @@ Talimatlar:
   }
 
   private async generateAiComparisonMulti(variants: any[]): Promise<any> {
-    const vehicleSummaries = variants.map((v, i) =>
-      `${i + 1}. ARAÇ: ${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name}) [Motor: ${v.engine.code}, Şanzıman: ${v.transmission.name}, Yakıt: ${v.fuelType}, Kronik Sorun Sayısı: ${v.problems.length}]`
-    ).join('\n');
+    const fullVehicleDetails = variants.map((v, i) => {
+      const specs: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
+      const problemsList = v.problems && v.problems.length > 0
+        ? v.problems.map((p: any) => `  * ${p.title} (${p.riskLevel} Risk): ${p.description || ''}`).join('\n')
+        : '  * Kayıtlı onaylı kronik arıza/problem bulunmuyor (0 Arıza).';
 
-    const advantagesKeys = variants.map((_, i) => `"advantagesV${i + 1}": ["1. Öne çıkan avantaj", "2. Öne çıkan avantaj", "3. Öne çıkan avantaj"]`).join(',\n  ');
+      return `ARAÇ ${i + 1}: ${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name})
+- Motor: ${v.engine?.code || 'Belirtilmedi'}
+- Şanzıman: ${v.transmission?.name || 'Belirtilmedi'}
+- Yakıt Türü: ${v.fuelType}
+- Ortalama Yakıt Tüketimi: ${specs.averageFuelConsumption ? specs.averageFuelConsumption + ' L/100km' : 'Veri yok'}
+- 0-100 km/h Hızlanma: ${specs.acceleration0to100 ? specs.acceleration0to100 + ' saniye' : 'Veri yok'}
+- Maksimum Hız: ${specs.topSpeed ? specs.topSpeed + ' km/h' : 'Veri yok'}
+- Bagaj Hacmi: ${specs.luggageCapacity ? specs.luggageCapacity + ' Litre' : 'Veri yok'}
+- Boş Ağırlık: ${specs.weight ? specs.weight + ' kg' : 'Veri yok'}
+- Onaylı Kronik Sorunlar (${v.problems.length} Adet):
+${problemsList}`;
+    }).join('\n\n');
 
-    const prompt = `Aşağıdaki ${variants.length} adet aracı karşılaştıran detaylı ve tarafsız bir otomotiv analiz raporu oluştur:
-${vehicleSummaries}
+    const advantagesSchema = variants.map((_, i) => `"advantagesV${i + 1}": ["1. Somut teknik veya piyasa avantajı", "2. Somut avantaj", "3. Somut avantaj"]`).join(',\n  ');
+    const risksSchema = variants.map((_, i) => `"risksV${i + 1}": ["1. Somut teknik/kronik risk veya dezavantaj", "2. Somut risk veya dezavantaj"]`).join(',\n  ');
+
+    const prompt = `Sen Türkiye'nin en gelişmiş otomotiv istihbarat sistemi TorqueScout'ın kıdemli otomotiv uzmanı ve yapay zeka analistisin.
+Aşağıda teknik detayları, motor güçleri, fabrika yakıt tüketimleri ve gerçek kronik arıza kayıtları verilen ${variants.length} adet aracı derinlemesine kıyaslayan kapsamlı ve veriye dayalı bir karşılaştırma raporu oluştur.
+
+ARAÇ VERİLERİ:
+${fullVehicleDetails}
+
+KRİTİK TALİMATLAR (KESİNLİKLE UYULMASI GEREKEN SIKI KURALLAR):
+1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR! (Örn: "Motor tork eğrileri kullanım amacına göre farklılaşmaktadır" veya "kronik arıza kayıtları karşılaştırılmıştır" gibi hiçbir bilgi içermeyen süslü kalıp cümleler ASLA KULLANILAMAZ).
+2. RAPORDAKİ HER PARAGRAF VE MADDENİN BİR KARŞILIĞI VE RAKAMSAL/TEKNİK DAYANAĞI OLMALIDIR (Örn: HP, Tork, 0-100 sn, yakıt tüketim litresi, kronik arıza başlığı, ikinci el piyasa likiditesi).
+3. "advantagesV" alanlarına araçların GERÇEK teknik üstünlüklerini (örn: yüksek motor gücü, serilik, düşük yakıt tüketimi, geniş bagaj, 4x4 çekiş vb.) yaz.
+4. "risksV" alanlarına araçların GERÇEK risk ve dezavantajlarını yaz (örn: DSG mekatronik arızası riski, yüksek şehir içi yakıt tüketimi, kronik yağ yakma problemi, parçalarının pahalı/zor bulunması vb.). Asla kronik arızaları avantaj olarak yazma!
+5. "verdict" alanında hangi aracın NEDEN kazandığını net ve rakamsal verilerle (HP, yakıt, kronik risk dengesi) gerekçelendir.
+6. "conversationalAdvice" kısmında samimi bir otomotiv uzmanı gibi seçilen TÜM ${variants.length} araca değinerek detaylı tavsiyede bulun.
 
 Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 {
-  "verdict": "Net sonuç ve kazanan/öne çıkan araç tavsiyesi (2-3 cümle)",
-  "recommendedVehicle": "Öne çıkan araç adı",
-  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. Seçilen TÜM ${variants.length} araca değinerek karşılaştır.",
-  ${advantagesKeys},
-  "performanceAnalysis": "Seçilen tüm araçların motor güçleri, şanzıman uyumu ve yakıt tüketimi kıyaslaması",
-  "reliabilityAnalysis": "Seçilen tüm araçların kronik arızaları, bakım maliyeti ve sanayi riskleri kıyaslaması",
-  "resaleAnalysis": "Seçilen tüm araçların ikinci el piyasası, likidite ve değer koruma kıyaslaması",
+  "verdict": "Net sonuç ve gerekçeli kazanan tavsiyesi (2-3 cümle, somut rakam ve nedenlerle)",
+  "recommendedVehicle": "Öne çıkan kazanan aracın tam adı",
+  "conversationalAdvice": "TorqueScout AI Asistanı olarak doğrudan kullanıcının karşısındaymış gibi konuşan samimi, teknik açıdan zengin ve rehberlik eden 2-3 paragraflık konuşma metni. Seçilen TÜM ${variants.length} araca tek tek değin.",
+  ${advantagesSchema},
+  ${risksSchema},
+  "performanceAnalysis": "Araçların motor güçleri, torkları, şanzıman tepkileri ve 0-100 acceleration kıyaslaması (Somut rakamlar ver)",
+  "reliabilityAnalysis": "Araçların kronik arızaları, parçalarının sanayi maliyetleri ve arıza risk seviyelerinin kıyaslaması",
+  "resaleAnalysis": "Araçların Türkiye ikinci el piyasasındaki likiditesi, piyasa hızı ve değer koruma kıyaslaması",
   "recommendations": {
-    "cityAndEconomy": "Şehir içi ve düşük kullanım maliyeti arayanlar için tavsiye",
-    "familyAndComfort": "Uzun yol ve aile kullanımı arayanlar için tavsiye"
+    "cityAndEconomy": "Şehir içi ve düşük kullanım maliyeti arayanlar için en uygun aracın gerekçeli tavsiyesi",
+    "familyAndComfort": "Uzun yol ve aile kullanımı arayanlar için en uygun aracın gerekçeli tavsiyesi"
   }
 }`;
 
@@ -436,27 +465,46 @@ Lütfen SADECE aşağıdaki JSON formatında yanıt ver:
 
     // Fallback generator for N vehicles
     const fallbackAdvantages: Record<string, string[]> = {};
+    const fallbackRisks: Record<string, string[]> = {};
+
     variants.forEach((v, i) => {
-      fallbackAdvantages[`advantagesV${i + 1}`] = [
-        `${v.engine.code} motor verimliliği ve performansı`,
-        `${v.transmission.name} şanzıman teknolojisi`,
-        `${v.problems.length} kayıtlı onaylı kronik durum`,
-      ];
+      const specs: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
+      const advs: string[] = [];
+      if (v.engine?.code) advs.push(`${v.engine.code} motor seçeneği ve performansı`);
+      if (specs.averageFuelConsumption) advs.push(`Ortalama ${specs.averageFuelConsumption} L/100km yakıt tüketimi`);
+      if (specs.luggageCapacity) advs.push(`${specs.luggageCapacity} Litre bagaj hacmi sunumu`);
+      if (advs.length < 3) advs.push(`${v.transmission?.name || 'Şanzıman'} sürüş uyumu`);
+      fallbackAdvantages[`advantagesV${i + 1}`] = advs.slice(0, 3);
+
+      const rks: string[] = [];
+      if (v.problems && v.problems.length > 0) {
+        v.problems.slice(0, 2).forEach((p: any) => {
+          rks.push(`${p.title} (${p.riskLevel} Risk)`);
+        });
+      }
+      if (rks.length < 2 && specs.averageFuelConsumption && Number(specs.averageFuelConsumption) > 8) {
+        rks.push(`Yüksek şehir içi yakıt tüketim maliyeti (${specs.averageFuelConsumption} L/100km)`);
+      }
+      if (rks.length < 2) {
+        rks.push(`Sanayi bakım ve periyodik servis bütçesine dikkat edilmelidir.`);
+      }
+      fallbackRisks[`risksV${i + 1}`] = rks.slice(0, 2);
     });
 
     const winnerName = `${variants[0].brand.name} ${variants[0].model.name} ${variants[0].year}`;
 
     return {
-      verdict: `Yapay zeka analizimize göre; ${winnerName}, kronik risk dengesi ve kullanım ekonomisi açısından önde değerlendirilmiştir.`,
+      verdict: `TorqueScout teknik analizine göre; ${winnerName}, motor verimliliği ve düşük kronik arıza riski dengesiyle öne çıkmaktadır.`,
       recommendedVehicle: winnerName,
-      conversationalAdvice: `Selam dostum! Seçtiğin ${variants.length} adet aracı en ince detaylarına kadar karşılaştırdım.\n\nAraçları teknik ve kronik açıdan masaya yatırdığımda; ${variants.map(v => `${v.brand.name} ${v.model.name}`).join(', ')} modellerinin her birinin kendine has avantajları bulunmaktadır.\n\nKarar verirken günlük kullanım mesafeni ve yıllık servis bütçeni göz önünde bulundurmanı öneririm!`,
+      conversationalAdvice: `Selam dostum! Seçtiğin ${variants.length} adet aracı en ince detaylarına kadar karşılaştırdım.\n\nAraçları masaya yatırdığımda; ${variants.map(v => `${v.brand.name} ${v.model.name}`).join(', ')} modellerinin her birinin kendine özgü güçlü yönleri ve dikkat edilmesi gereken noktaları bulunmaktadır.\n\nAlım kararı vermeden önce bütçene ve kullanım amacına en uygun olan seçeneği değerlendirmeni öneririm.`,
       ...fallbackAdvantages,
-      performanceAnalysis: `Seçilen ${variants.length} aracın motor tork eğrileri ve yakıt tüketim verileri kullanım amacına göre farklılaşmaktadır.`,
-      reliabilityAnalysis: `Veritabanımızdaki kronik arıza kayıtları ve kullanıcı şikayetleri karşılaştırılmıştır.`,
-      resaleAnalysis: `Araçlar Türkiye ikinci el piyasasında tercih edilen segmentlerde yer almaktadır.`,
+      ...fallbackRisks,
+      performanceAnalysis: `Seçilen araçlar arasında motor güçleri ve şanzıman tepkileri belirgin farklılık göstermektedir.`,
+      reliabilityAnalysis: `Veritabanımızdaki kronik arıza kayıtları incelendiğinde servis ve mekanik risk dengesi değişmektedir.`,
+      resaleAnalysis: `Türkiye ikinci el piyasasında araçların likidite ve satış hızları segmentlerine göre ayrışmaktadır.`,
       recommendations: {
-        cityAndEconomy: `Düşük kullanım maliyetli ve pratik araçlar şehir içi kullanım için öne çıkmaktadır.`,
-        familyAndComfort: `Sürüş konforu ve geniş bagaj hacmine sahip modeller uzun yol için uygundur.`,
+        cityAndEconomy: `Düşük yakıt tüketimli ve pratik boyutlu modeller şehir içi kullanım için daha elverişlidir.`,
+        familyAndComfort: `Geniş iç hacim ve bagaj kapasitesine sahip olan modeller uzun yol seyahatlerinde daha konforludur.`,
       },
     };
   }

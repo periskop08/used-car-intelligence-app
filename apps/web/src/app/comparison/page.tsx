@@ -778,7 +778,7 @@ export default function ComparisonPage() {
             </p>
           </div>
 
-          {/* Advantages Grid */}
+          {/* Advantages & Risks Cards for Each Vehicle */}
           <div className={`grid grid-cols-1 ${
             comparisonResult.vehicles?.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-3"
           } gap-5 pt-2`}>
@@ -787,24 +787,56 @@ export default function ComparisonPage() {
                 comparisonResult.aiAnalysis?.[`advantagesV${i + 1}`] ||
                 comparisonResult.aiAnalysis?.advantages?.[String(i + 1)] ||
                 [
-                  `${v.engine || 'Motor'} verimliliği ve performansı`,
-                  `${v.transmission || 'Şanzıman'} yapısı ve teknolojisi`,
-                  `${v.problemsCount || 0} kayıtlı kronik durum`,
+                  `${v.engine || 'Motor'} seçeneği ve performansı`,
+                  `${v.transmission || 'Şanzıman'} sürüş uyumu`,
+                  `${v.fuelType || 'Yakıt'} verimliliği`,
+                ];
+
+              const riskList =
+                comparisonResult.aiAnalysis?.[`risksV${i + 1}`] ||
+                comparisonResult.aiAnalysis?.risks?.[String(i + 1)] ||
+                [
+                  `${v.problemsCount || 0} kayıtlı onaylı kronik durum`,
+                  `Sanayi bakım ve periyodik servis bütçesi kontrol edilmeli`,
                 ];
 
               return (
-                <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
-                  <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                    {v.name} Öne Çıkan Avantajları
-                  </h3>
-                  <ul className="space-y-2 text-xs text-slate-300">
-                    {advList.map((adv: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-orange-500 font-bold">•</span>
-                        <span>{adv}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 flex flex-col gap-4">
+                  <div className="border-b border-white/10 pb-2">
+                    <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">
+                      {v.name}
+                    </h3>
+                  </div>
+
+                  {/* Advantages */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
+                      <span>✓</span> Öne Çıkan Avantajları
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-slate-300">
+                      {advList.map((adv: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-green-400 font-bold">•</span>
+                          <span>{adv}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Risks / Points to Watch */}
+                  <div className="space-y-2 pt-2 border-t border-white/5">
+                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                      <span>⚠️</span> Dikkat Edilmesi Gerekenler & Riskler
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-slate-300">
+                      {riskList.map((rsk: string, idx: number) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-amber-400 font-bold">•</span>
+                          <span>{rsk}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               );
             })}
