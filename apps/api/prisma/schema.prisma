@@ -1722,6 +1722,20 @@ model BuyerPackagePurchase {
   @@index([userId, expiresAt])
 }
 
+model AiVehicleComparisonCache {
+  id           String   @id @default(uuid())
+  variant1Id   String
+  variant2Id   String
+  cacheKey     String   @unique
+  verdict      String
+  analysisJson Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cacheKey])
+}
+
+
 
 
 

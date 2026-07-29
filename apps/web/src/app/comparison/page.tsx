@@ -791,10 +791,21 @@ export default function ComparisonPage() {
       <button
         onClick={handleCompare}
         disabled={!matchedVariantId1 || !matchedVariantId2 || loading}
-        className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm"
+        className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
       >
-        {loading ? "Karşılaştırılıyor..." : "Seçili Araçları Karşılaştır"}
+        {loading ? "🤖 Yapay Zekâ Araçları Kıyaslıyor..." : "Seçili Araçları Karşılaştır"}
       </button>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="glass p-8 rounded-3xl flex flex-col items-center justify-center gap-4 text-center border border-orange-500/20 bg-orange-950/10 shadow-2xl animate-pulse">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <h3 className="text-lg font-bold text-slate-100">🤖 Yapay Zekâ Araçları Kıyaslıyor...</h3>
+          <p className="text-xs text-slate-400 max-w-md">
+            TorqueScout AI botu iki aracın teknik verilerini, motor karakterini ve kronik durumlarını analiz ederek tavsiye raporunu hazırlıyor.
+          </p>
+        </div>
+      )}
 
       {/* Error alert */}
       {error && (
@@ -803,10 +814,118 @@ export default function ComparisonPage() {
         </div>
       )}
 
-      {/* Side by side result display */}
+      {/* AI Comparison Chatbot Verdict Card */}
+      {comparisonResult && comparisonResult.aiAnalysis && (
+        <div className="glass p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-xl">
+                🤖
+              </div>
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-100">Yapay Zekâ Karşılaştırma & Tavsiye Raporu</h2>
+                <p className="text-xs text-slate-400">TorqueScout Chatbot Analiz Sonucu</p>
+              </div>
+            </div>
+
+            <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
+              comparisonResult.isCached
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+            }`}>
+              {comparisonResult.isCached ? "⚡ Hazır Önbellek Yanıtı (0.01s)" : "✨ Canlı AI Analizi"}
+            </span>
+          </div>
+
+          {/* Verdict Box */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-orange-950/40 to-slate-900 border border-orange-500/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-black text-orange-400 uppercase tracking-widest">🏆 Özet Karar & Tavsiye Edilen Araç</span>
+              {comparisonResult.aiAnalysis.recommendedVehicle && (
+                <span className="text-xs font-bold text-white bg-orange-600 px-3 py-1 rounded-full shadow">
+                  {comparisonResult.aiAnalysis.recommendedVehicle}
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-semibold text-slate-100 leading-relaxed">
+              {comparisonResult.aiAnalysis.verdict}
+            </p>
+          </div>
+
+          {/* Advantages Side by Side Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {/* V1 Advantages */}
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-orange-500/20 space-y-3">
+              <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">
+                {comparisonResult.vehicle1.name} Öne Çıkan Avantajları
+              </h3>
+              <ul className="space-y-2 text-xs text-slate-300">
+                {comparisonResult.aiAnalysis.advantagesV1?.map((adv: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>{adv}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* V2 Advantages */}
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-blue-500/20 space-y-3">
+              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                {comparisonResult.vehicle2.name} Öne Çıkan Avantajları
+              </h3>
+              <ul className="space-y-2 text-xs text-slate-300">
+                {comparisonResult.aiAnalysis.advantagesV2?.map((adv: string, idx: number) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <span>{adv}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Analysis Breakdown Sections */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+              <span className="text-sm">⚡</span>
+              <h4 className="text-xs font-bold text-slate-200">Motor & Performans</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.performanceAnalysis}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+              <span className="text-sm">🛠️</span>
+              <h4 className="text-xs font-bold text-slate-200">Güvenilirlik & Kronik Risk</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.reliabilityAnalysis}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+              <span className="text-sm">💰</span>
+              <h4 className="text-xs font-bold text-slate-200">İkinci El & Değer Koruma</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.resaleAnalysis}</p>
+            </div>
+          </div>
+
+          {/* Scenario Recommendations */}
+          {comparisonResult.aiAnalysis.recommendations && (
+            <div className="border-t border-white/10 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Şehir İçi & Kullanım Ekonomisi</span>
+                <p className="text-slate-300">{comparisonResult.aiAnalysis.recommendations.cityAndEconomy}</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Aile & Uzun Yol Konforu</span>
+                <p className="text-slate-300">{comparisonResult.aiAnalysis.recommendations.familyAndComfort}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Side by side technical spec result display */}
       {comparisonResult && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl">
-          <h2 className="text-xl font-extrabold text-slate-200 border-b border-white/5 pb-3">📊 Karşılaştırma Sonuçları</h2>
+          <h2 className="text-xl font-extrabold text-slate-200 border-b border-white/5 pb-3">📊 Detaylı Teknik Özellik Karşılaştırması</h2>
           
           <div className="grid grid-cols-3 gap-4 text-center items-center mt-2">
             
