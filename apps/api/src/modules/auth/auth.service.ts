@@ -27,13 +27,13 @@ export class AuthService {
         email: dto.email,
         passwordHash: dto.password, // simple password storage for MVP
         role: assignedRole,
-        subscriptionTier: dto.subscriptionTier || SubscriptionTier.FREE,
+        subscriptionTier: dto.subscriptionTier || SubscriptionTier.TANISMA,
         preferredLanguageCode: 'tr',
       },
     });
 
-    // Create an initial subscription record if they chose Standard/Pro
-    if (dto.subscriptionTier && dto.subscriptionTier !== SubscriptionTier.FREE) {
+    // Create an initial subscription record if they chose paid tier (YETKIN or PROFESYONEL)
+    if (dto.subscriptionTier && dto.subscriptionTier !== SubscriptionTier.TANISMA && dto.subscriptionTier !== SubscriptionTier.FREE) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
         where: { tier: dto.subscriptionTier },
       });

@@ -232,13 +232,13 @@ export default function Header() {
                   <div className="px-3 py-2.5 border-b border-white/5 mb-1 flex flex-col">
                     <span className="text-xs text-slate-400 truncate font-semibold">{user.email}</span>
                     <span className={`text-[9px] w-fit mt-1 px-1.5 py-0.5 rounded font-mono font-bold ${
-                      user.subscriptionTier === 'PREMIUM' 
+                      user.subscriptionTier === 'PROFESYONEL' || user.subscriptionTier === 'PREMIUM'
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                        : user.subscriptionTier === 'STANDARD'
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                        : 'bg-slate-800 text-slate-400'
+                        : user.subscriptionTier === 'YETKIN' || user.subscriptionTier === 'STANDARD'
+                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                        : 'bg-slate-800 text-slate-300 border border-white/10'
                     }`}>
-                      {user.subscriptionTier}
+                      {user.subscriptionTier === 'TANISMA' ? 'TANIŞMA' : user.subscriptionTier === 'YETKIN' ? 'YETKİN' : user.subscriptionTier === 'PROFESYONEL' ? 'PROFESYONEL' : user.subscriptionTier}
                     </span>
                   </div>
 

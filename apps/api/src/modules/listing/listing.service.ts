@@ -14,11 +14,14 @@ export class ListingService {
 
   getQuotaForTier(tier: SubscriptionTier): number {
     switch (tier) {
+      case SubscriptionTier.TANISMA:
       case SubscriptionTier.FREE:
         const rawQuota = process.env.FREE_LISTING_QUOTA;
         return rawQuota ? parseInt(rawQuota, 10) : 1;
+      case SubscriptionTier.YETKIN:
       case SubscriptionTier.STANDARD:
         return 10;
+      case SubscriptionTier.PROFESYONEL:
       case SubscriptionTier.PRO:
       case SubscriptionTier.PREMIUM:
         return 50;

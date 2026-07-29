@@ -73,7 +73,9 @@ export default function RightsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-white/5">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Mevcut Paket</span>
-            <div className="text-sm font-black text-slate-200">{quota?.tier || "FREE"}</div>
+            <div className="text-sm font-black text-slate-200">
+              {quota?.tier === "PROFESYONEL" || quota?.tier === "PREMIUM" ? "PROFESYONEL" : quota?.tier === "YETKIN" || quota?.tier === "STANDARD" ? "YETKİN" : "TANIŞMA"}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -99,7 +101,7 @@ export default function RightsPage() {
             <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 text-xs font-bold text-slate-300">
               <span>İlanın Yayında Kalma Süresi</span>
               <span className="text-slate-200">
-                {quota?.tier === "PREMIUM" ? "45 Gün" : "30 Gün"}
+                {quota?.tier === "PROFESYONEL" || quota?.tier === "PREMIUM" ? "45 Gün" : "30 Gün"}
               </span>
             </div>
             <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 text-xs font-bold text-slate-300">
@@ -109,7 +111,7 @@ export default function RightsPage() {
           </div>
         </div>
 
-        {quota?.tier !== "PREMIUM" && (
+        {quota?.tier !== "PROFESYONEL" && quota?.tier !== "PREMIUM" && (
           <div className="border-t border-white/5 pt-6 flex justify-end">
             <a
               href="/#packages"

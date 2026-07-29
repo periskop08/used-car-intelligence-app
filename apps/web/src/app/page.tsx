@@ -920,68 +920,109 @@ export default function Home() {
       <div id="packages" className="w-full max-w-5xl flex flex-col gap-8 items-center py-8 border-t border-white/5">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold text-slate-200">Abonelik Paketleri</h2>
-          <p className="text-sm text-slate-400 mt-1">İhtiyacınıza uygun paketi seçerek yapay zeka ve ilan yayınlama sınırlarınızı yönetin.</p>
+          <p className="text-sm text-slate-400 mt-1">İhtiyacınıza uygun paketi seçin; araç araştırma, yapay zekâ ve ilan yönetimi haklarınızı genişletin.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-4">
-          {/* Free Card */}
-          <div className="border border-white/5 bg-slate-950/20 p-8 rounded-3xl flex flex-col justify-between gap-6">
-            <div>
-              <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold">FREE</span>
-              <h3 className="text-xl font-bold text-slate-200 mt-2">Ücretsiz Başlangıç</h3>
-              <p className="text-2xl font-black text-white mt-1">0 TL <span className="text-xs text-slate-500">/ ömür boyu</span></p>
-              <p className="text-xs text-slate-400 mt-2">Temel satın alma analizleri ve tekil ilan yayınlama denemeleri için.</p>
-              <div className="border-t border-white/5 my-4"></div>
-              <ul className="text-xs text-slate-400 flex flex-col gap-2">
-                <li>• Günlük 5 Yapay Zeka Mesaj Sınırı</li>
-                <li>• Maksimum 1 Aktif İlan Yayını</li>
-                <li>• 30 Gün İlan Yayın Süresi</li>
-                <li>❌ Satıcı Soruları & Checklistler Kapalı</li>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-4 items-stretch">
+          {/* 1. Tanışma Card */}
+          <div className="border border-white/10 bg-slate-950/40 p-8 rounded-3xl flex flex-col justify-between gap-6">
+            <div className="flex flex-col gap-4">
+              <div>
+                <span className="text-xs bg-slate-800 text-slate-300 border border-white/10 px-2.5 py-1 rounded font-mono font-bold">TANIŞMA</span>
+                <h3 className="text-xl font-bold text-slate-200 mt-3">Tanışma Paketi</h3>
+                <p className="text-2xl font-black text-white mt-1">0 TL <span className="text-xs text-slate-500 font-normal">/ aylık</span></p>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">TorqueScout’ı tanımak, araç araştırmak ve ilk ilanını ücretsiz yayınlamak isteyenler için.</p>
+              </div>
+
+              <div className="border-t border-white/10 my-1" />
+
+              <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 AI araç raporu</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 chatbot mesajı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 1 aktif ilan</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 30 gün ilan yayın süresi</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 3 karşılaştırma</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 2 araç</li>
               </ul>
             </div>
-            <a href="/register" className="border border-white/10 text-center py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 transition">
-              Ücretsiz Kaydol
+
+            <a
+              href="/register?tier=TANISMA"
+              className="w-full mt-auto border border-white/10 text-center py-3 rounded-2xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition"
+            >
+              Ücretsiz Başla
             </a>
           </div>
 
-          {/* Standard Card */}
-          <div className="border border-orange-500/30 bg-orange-950/5 p-8 rounded-3xl flex flex-col justify-between gap-6 relative">
-            <span className="absolute -top-3 right-6 text-[10px] bg-orange-600 text-white font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Popüler</span>
-            <div>
-              <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-mono font-bold">STANDARD</span>
-              <h3 className="text-xl font-bold text-slate-200 mt-2">Standart Paket</h3>
-              <p className="text-2xl font-black text-white mt-1">349 TL <span className="text-xs text-slate-500">/ aylık</span></p>
-              <p className="text-xs text-slate-400 mt-2">Araç satın alım veya satış aşamasında olan aktif kullanıcılar için ideal.</p>
-              <div className="border-t border-orange-500/10 my-4"></div>
-              <ul className="text-xs text-slate-400 flex flex-col gap-2">
-                <li className="text-slate-300">• Günlük 10 Yapay Zeka Mesaj Hakkı</li>
-                <li className="text-slate-300">• Maksimum 10 Aktif İlan Yayını</li>
-                <li className="text-slate-300">• 30 Gün İlan Yayın Süresi</li>
-                <li className="text-slate-300">• Satıcı Soruları & Checklistler Açık</li>
+          {/* 2. Yetkin Card (Center Featured) */}
+          <div className="border border-orange-500/40 bg-orange-950/10 p-8 rounded-3xl flex flex-col justify-between gap-6 relative shadow-xl shadow-orange-500/5">
+            <span className="absolute -top-3 right-6 text-[10px] bg-orange-600 text-white font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow">
+              EN ÇOK TERCİH EDİLEN
+            </span>
+            <div className="flex flex-col gap-4">
+              <div>
+                <span className="text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2.5 py-1 rounded font-mono font-bold">YETKİN</span>
+                <h3 className="text-xl font-bold text-slate-200 mt-3">Yetkin Paket</h3>
+                <p className="text-2xl font-black text-white mt-1">499 TL <span className="text-xs text-slate-500 font-normal">/ aylık</span></p>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">Daha fazla araç araştıran, gelişmiş karşılaştırma kullanan ve birden fazla ilan yayınlayan aktif kullanıcılar için.</p>
+              </div>
+
+              <div className="border-t border-orange-500/20 my-1" />
+
+              <span className="text-[11px] font-bold text-orange-400">Tanışma paketindeki tüm özellikler, ayrıca:</span>
+
+              <ul className="text-xs text-slate-200 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 AI araç raporu</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 chatbot mesajı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 10 aktif ilan</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 30 gün ilan yayın süresi</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 10 karşılaştırma</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 5 araç</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 1 vitrin hakkı</li>
               </ul>
             </div>
-            <a href="/register?tier=STANDARD" className="bg-orange-600 text-center py-2.5 rounded-xl text-xs font-bold text-white hover:bg-orange-500 transition">
-              Standart Paket Satın Al
+
+            <a
+              href="/register?tier=YETKIN"
+              className="w-full mt-auto bg-orange-600 hover:bg-orange-500 text-center py-3.5 rounded-2xl text-xs font-bold text-white transition shadow-lg shadow-orange-500/20"
+            >
+              Yetkin Paketi Al
             </a>
           </div>
 
-          {/* Premium Card */}
-          <div className="border border-white/5 bg-slate-950/20 p-8 rounded-3xl flex flex-col justify-between gap-6">
-            <div>
-              <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-mono font-bold">PREMIUM</span>
-              <h3 className="text-xl font-bold text-slate-200 mt-2">Premium Paket</h3>
-              <p className="text-2xl font-black text-white mt-1">899 TL <span className="text-xs text-slate-500">/ aylık</span></p>
-              <p className="text-xs text-slate-400 mt-2">Galeri, ekspertiz firmaları ve otomotiv profesyonelleri için.</p>
-              <div className="border-t border-white/5 my-4"></div>
-              <ul className="text-xs text-slate-400 flex flex-col gap-2">
-                <li>• Günlük 100 Yapay Zeka Mesaj Hakkı</li>
-                <li>• Maksimum 50 Aktif İlan Yayını</li>
-                <li>• 45 Gün İlan Yayın Süresi</li>
-                <li>• Satıcı Soruları & Tüm Checklistler Açık</li>
+          {/* 3. Profesyonel Card */}
+          <div className="border border-white/10 bg-slate-950/40 p-8 rounded-3xl flex flex-col justify-between gap-6">
+            <div className="flex flex-col gap-4">
+              <div>
+                <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded font-mono font-bold">PROFESYONEL</span>
+                <h3 className="text-xl font-bold text-slate-200 mt-3">Profesyonel Paket</h3>
+                <p className="text-2xl font-black text-white mt-1">1.499 TL <span className="text-xs text-slate-500 font-normal">/ aylık</span></p>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">Galeriler, kurumsal satıcılar ve yüksek hacimli ilan yönetimi yapan ekipler için.</p>
+              </div>
+
+              <div className="border-t border-white/10 my-1" />
+
+              <span className="text-[11px] font-bold text-amber-400">Yetkin paketindeki tüm özellikler, ayrıca:</span>
+
+              <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 50 AI araç raporu</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 150 chatbot mesajı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 50 aktif ilan</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> 45 gün ilan yayın süresi</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 30 karşılaştırma</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Karşılaştırma başına 10 araç</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Ayda 5 vitrin hakkı</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Kurumsal satıcı profili</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Öncelikli destek</li>
+                <li className="flex items-center gap-2"><span className="text-orange-500 font-bold">•</span> Çoklu kullanıcı ve ekip erişimi</li>
               </ul>
             </div>
-            <a href="/register?tier=PREMIUM" className="border border-white/10 text-center py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 transition">
-              Premium Paket Satın Al
+
+            <a
+              href="/register?tier=PROFESYONEL"
+              className="w-full mt-auto border border-white/10 hover:border-orange-500/50 hover:bg-orange-500/10 text-center py-3 rounded-2xl text-xs font-bold text-slate-200 hover:text-orange-400 transition"
+            >
+              Profesyonel Paketi Al
             </a>
           </div>
         </div>

@@ -15,64 +15,72 @@ interface PackageDetail {
   period: string;
   description: string;
   ctaText: string;
-  features: Array<{ text: string; included: boolean }>;
+  cumulativeText?: string;
+  features: Array<{ text: string }>;
 }
 
 const PACKAGE_DETAILS: Record<string, PackageDetail> = {
-  FREE: {
-    code: "FREE",
-    name: "Ücretsiz Başlangıç",
-    badge: "FREE",
+  TANISMA: {
+    code: "TANISMA",
+    name: "Tanışma Paketi",
+    badge: "TANIŞMA",
     badgeStyle: "bg-slate-800 text-slate-300 border border-white/10",
     price: "0 TL",
-    period: "/ ömür boyu",
-    description: "Temel araç incelemeleri ve tekil ilan yayınlama denemeleri için ideal başlangıç paketi.",
-    ctaText: "Ücretsiz Kayıt Ol",
-    features: [
-      { text: "Günlük 5 Yapay Zeka Mesaj Hakkı", included: true },
-      { text: "Maksimum 1 Aktif İlan Yayını", included: true },
-      { text: "30 Gün İlan Yayın Süresi", included: true },
-      { text: "Temel Araç Spesifikasyon Sorgulama", included: true },
-      { text: "Satıcı Soruları & Ekspertiz Checklistler", included: false },
-      { text: "Öncelikli Müşteri Desteği", included: false },
-    ],
-  },
-  STANDARD: {
-    code: "STANDARD",
-    name: "Standart Paket",
-    badge: "STANDARD",
-    badgeStyle: "bg-orange-500/20 text-orange-400 border border-orange-500/30",
-    popularTag: "En Popüler",
-    price: "349 TL",
     period: "/ aylık",
-    description: "Araç satın alma veya satış aşamasında olan aktif bireysel kullanıcılar için.",
-    ctaText: "Standard Pakete Geç ve Kayıt Ol",
+    description: "TorqueScout’ı tanımak, araç araştırmak ve ilk ilanını ücretsiz yayınlamak isteyenler için.",
+    ctaText: "Ücretsiz Başla",
     features: [
-      { text: "Günlük 10 Yapay Zeka Mesaj Hakkı", included: true },
-      { text: "Maksimum 10 Aktif İlan Yayını", included: true },
-      { text: "30 Gün İlan Yayın Süresi", included: true },
-      { text: "Temel Araç Spesifikasyon Sorgulama", included: true },
-      { text: "Satıcı Soruları & Ekspertiz Checklistler Açık", included: true },
-      { text: "Gelişmiş Yapay Zeka Risk Analiz Raporu", included: true },
+      { text: "Ayda 3 AI araç raporu" },
+      { text: "Ayda 3 chatbot mesajı" },
+      { text: "1 aktif ilan" },
+      { text: "30 gün ilan yayın süresi" },
+      { text: "Ayda 3 karşılaştırma" },
+      { text: "Karşılaştırma başına 2 araç" },
     ],
   },
-  PREMIUM: {
-    code: "PREMIUM",
-    name: "Premium Paket",
-    badge: "PREMIUM",
+  YETKIN: {
+    code: "YETKIN",
+    name: "Yetkin Paket",
+    badge: "YETKİN",
+    badgeStyle: "bg-orange-500/20 text-orange-400 border border-orange-500/30",
+    popularTag: "En Çok Tercih Edilen",
+    price: "499 TL",
+    period: "/ aylık",
+    description: "Daha fazla araç araştıran, gelişmiş karşılaştırma kullanan ve birden fazla ilan yayınlayan aktif kullanıcılar için.",
+    ctaText: "Yetkin Paketi Al ve Kayıt Ol",
+    cumulativeText: "Tanışma paketindeki tüm özellikler, ayrıca:",
+    features: [
+      { text: "Ayda 10 AI araç raporu" },
+      { text: "Ayda 30 chatbot mesajı" },
+      { text: "10 aktif ilan" },
+      { text: "30 gün ilan yayın süresi" },
+      { text: "Ayda 10 karşılaştırma" },
+      { text: "Karşılaştırma başına 5 araç" },
+      { text: "Ayda 1 vitrin hakkı" },
+    ],
+  },
+  PROFESYONEL: {
+    code: "PROFESYONEL",
+    name: "Profesyonel Paket",
+    badge: "PROFESYONEL",
     badgeStyle: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
     popularTag: "Profesyonel",
-    price: "899 TL",
+    price: "1.499 TL",
     period: "/ aylık",
-    description: "Galeri, ekspertiz firmaları ve otomotiv profesyonelleri için kapsamlı çözüm paketi.",
-    ctaText: "Premium Pakete Geç ve Kayıt Ol",
+    description: "Galeriler, kurumsal satıcılar ve yüksek hacimli ilan yönetimi yapan ekipler için.",
+    ctaText: "Profesyonel Paketi Al ve Kayıt Ol",
+    cumulativeText: "Yetkin paketindeki tüm özellikler, ayrıca:",
     features: [
-      { text: "Günlük 100 Yapay Zeka Mesaj Hakkı", included: true },
-      { text: "Maksimum 50 Aktif İlan Yayını", included: true },
-      { text: "45 Gün İlan Yayın Süresi", included: true },
-      { text: "Satıcı Soruları & Tüm Checklistler Açık", included: true },
-      { text: "Sınırsız Yapay Zeka Varyant Karşılaştırma", included: true },
-      { text: "VIP Müşteri Temsilcisi & 7/24 Öncelikli Destek", included: true },
+      { text: "Ayda 50 AI araç raporu" },
+      { text: "Ayda 150 chatbot mesajı" },
+      { text: "50 aktif ilan" },
+      { text: "45 gün ilan yayın süresi" },
+      { text: "Ayda 30 karşılaştırma" },
+      { text: "Karşılaştırma başına 10 araç" },
+      { text: "Ayda 5 vitrin hakkı" },
+      { text: "Kurumsal satıcı profili" },
+      { text: "Öncelikli destek" },
+      { text: "Çoklu kullanıcı ve ekip erişimi" },
     ],
   },
 };
@@ -83,18 +91,20 @@ function RegisterContent() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tier, setTier] = useState("FREE");
+  const [tier, setTier] = useState("TANISMA");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const urlTier = searchParams.get("tier")?.toUpperCase();
-    if (urlTier && PACKAGE_DETAILS[urlTier]) {
-      setTier(urlTier);
+    const rawTier = searchParams.get("tier")?.toUpperCase();
+    if (rawTier) {
+      if (rawTier === "FREE" || rawTier === "TANISMA") setTier("TANISMA");
+      else if (rawTier === "STANDARD" || rawTier === "YETKIN") setTier("YETKIN");
+      else if (rawTier === "PREMIUM" || rawTier === "PROFESYONEL") setTier("PROFESYONEL");
     }
   }, [searchParams]);
 
-  const activePackage = PACKAGE_DETAILS[tier] || PACKAGE_DETAILS.FREE;
+  const activePackage = PACKAGE_DETAILS[tier] || PACKAGE_DETAILS.TANISMA;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +138,7 @@ function RegisterContent() {
         const redirectTarget = searchParams.get("redirect");
         if (redirectTarget) {
           window.location.href = redirectTarget;
-        } else if (tier === "STANDARD" || tier === "PREMIUM") {
+        } else if (tier === "YETKIN" || tier === "PROFESYONEL") {
           window.location.href = "/dashboard/subscription?registeredTier=" + tier;
         } else {
           window.location.href = "/";
@@ -199,9 +209,9 @@ function RegisterContent() {
                   onChange={(e) => setTier(e.target.value)}
                   className="bg-slate-900 border border-orange-500/50 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition font-medium"
                 >
-                  <option value="FREE">FREE (Ücretsiz)</option>
-                  <option value="STANDARD">STANDARD (349 TL / Ay)</option>
-                  <option value="PREMIUM">PREMIUM (899 TL / Ay)</option>
+                  <option value="TANISMA">Tanışma Paketi (0 TL / Ay)</option>
+                  <option value="YETKIN">Yetkin Paket (499 TL / Ay)</option>
+                  <option value="PROFESYONEL">Profesyonel Paket (1.499 TL / Ay)</option>
                 </select>
               </div>
 
@@ -262,16 +272,17 @@ function RegisterContent() {
 
             {/* Features Checklist */}
             <div className="flex flex-col gap-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paket Özellikleri & Hakları</span>
+              {activePackage.cumulativeText && (
+                <span className="text-[11px] font-bold text-orange-400">
+                  {activePackage.cumulativeText}
+                </span>
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paket Hakları & Kotaları</span>
               <ul className="flex flex-col gap-2.5">
                 {activePackage.features.map((feat, idx) => (
                   <li key={idx} className="flex items-start gap-2.5 text-xs leading-relaxed">
-                    {feat.included ? (
-                      <span className="text-orange-500 font-bold flex-shrink-0 mt-0.5">✔</span>
-                    ) : (
-                      <span className="text-slate-600 font-bold flex-shrink-0 mt-0.5">✖</span>
-                    )}
-                    <span className={feat.included ? "text-slate-200 font-medium" : "text-slate-500"}>
+                    <span className="text-orange-500 font-bold flex-shrink-0 mt-0.5">•</span>
+                    <span className="text-slate-200 font-medium">
                       {feat.text}
                     </span>
                   </li>
