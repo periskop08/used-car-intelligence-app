@@ -4,8 +4,11 @@ import { ComparisonService } from './comparison.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { PrismaService } from '../../prisma.service';
+import { ResearchModule } from '../research/research.module';
+import { VehicleModule } from '../vehicle/vehicle.module';
 
 @Module({
+  imports: [ResearchModule, VehicleModule],
   controllers: [ComparisonController],
   providers: [ComparisonService, FeatureLimitService, SubscriptionService, PrismaService],
 })
