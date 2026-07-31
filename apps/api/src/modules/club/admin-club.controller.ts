@@ -10,7 +10,10 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ClubService } from './club.service';
 import {
   CreateClubPostDto,
@@ -81,6 +84,13 @@ export class AdminClubController {
   // ==========================
   // ADMIN ONLY ROUTES
   // ==========================
+
+  @Post('media/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadMedia(@UploadedFile() file: any, @Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.uploadPostMedia(file, req.user.id);
+  }
 
   @Post('posts')
   async createPost(@Body() dto: CreateClubPostDto, @Req() req: any) {

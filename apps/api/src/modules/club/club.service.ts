@@ -4,8 +4,10 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { R2Service } from '../listing/r2.service';
 import {
   CreateClubPostDto,
   UpdateClubPostDto,
@@ -31,7 +33,12 @@ export interface UserPackageBadge {
 
 @Injectable()
 export class ClubService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ClubService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private r2Service: R2Service,
+  ) {}
 
   // ==========================================
   // PACKAGE & ROLE HELPERS
@@ -388,33 +395,57 @@ export class ClubService {
   // ADMIN & MODERATOR ENDPOINTS
   // ==========================================
 
-  async createPost(adminId: string, dto: CreateClubPostDto) {
-    const post = await this.prisma.clubPost.create({
-      data: {
-        authorId: adminId,
-        title: dto.title,
-        content: dto.content,
-        status: ClubPostStatus.PUBLISHED,
-        commentsEnabled: dto.commentsEnabled ?? true,
-        isPinned: dto.isPinned ?? false,
-        pinnedOrder: dto.pinnedOrder ?? null,
-        publishedAt: new Date(),
-      },
-    });
-
-    if (dto.mediaUrls && dto.mediaUrls.length > 0) {
-      await this.prisma.clubPostMedia.createMany({
-        data: dto.mediaUrls.map((url, idx) => ({
-          postId: post.id,
-          mediaUrl: url,
-          sortOrder: idx,
-          uploadedById: adminId,
-          status: 'ATTACHED' as any,
-        })),
-      });
+  async uploadPostMedia(file: any, userId: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Lütfen geçerli bir görsel dosyası seçin.');
     }
 
-    return this.getPostDetail(post.id, adminId);
+    try {
+      const uploadResult = await this.r2Service.uploadImage(file.buffer, 'club');
+      return { url: uploadResult.url };
+    } catch (err) {
+      this.logger.warn('R2 Service upload failed or unconfigured, returning data URL fallback', err);
+      const mime = file.mimetype || 'image/jpeg';
+      const base64 = file.buffer.toString('base64');
+      const dataUrl = `data:${mime};base64,${base64}`;
+      return { url: dataUrl };
+    }
+  }
+
+  async createPost(adminId: string, dto: CreateClubPostDto) {
+    try {
+      const post = await this.prisma.clubPost.create({
+        data: {
+          authorId: adminId,
+          title: dto.title || null,
+          content: dto.content,
+          status: ClubPostStatus.PUBLISHED,
+          commentsEnabled: dto.commentsEnabled ?? true,
+          isPinned: dto.isPinned ?? false,
+          pinnedOrder: dto.pinnedOrder ?? null,
+          publishedAt: new Date(),
+        },
+      });
+
+      if (dto.mediaUrls && dto.mediaUrls.length > 0) {
+        await this.prisma.clubPostMedia.createMany({
+          data: dto.mediaUrls.map((url, idx) => ({
+            postId: post.id,
+            mediaUrl: url,
+            sortOrder: idx,
+            uploadedById: adminId,
+            status: 'ATTACHED' as any,
+          })),
+        });
+      }
+
+      return await this.getPostDetail(post.id, adminId);
+    } catch (error: any) {
+      this.logger.error('Error creating Club post:', error);
+      throw new BadRequestException(
+        error?.message || 'Gönderi kaydedilirken hata oluştu. Lütfen veritabanı bağlantınızı ve parametreleri kontrol edin.'
+      );
+    }
   }
 
   async updatePost(postId: string, dto: UpdateClubPostDto) {

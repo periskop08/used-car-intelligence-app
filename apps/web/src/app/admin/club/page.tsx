@@ -59,11 +59,53 @@ export default function AdminClubPage() {
     }
   };
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !token) return;
+
+    if (mediaUrls.length >= 10) {
+      alert("Gönderi başına en fazla 10 fotoğraf yüklenebilir.");
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API_URL}/admin/club/media/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          setMediaUrls((prev) => [...prev, data.url]);
+        }
+      } else {
+        const err = await res.json();
+        alert(err.message || "Fotoğraf yüklenemedi.");
+      }
+    } catch (err) {
+      alert("Fotoğraf yükleme sırasında bir hata oluştu.");
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleAddMediaUrl = () => {
     const url = mediaUrlInput.trim();
     if (!url) return;
     if (mediaUrls.length >= 10) {
-      alert("Gönderi başına en fazla 10 görsel eklenebilir.");
+      alert("Gönderi başına en fazla 10 fotoğraf yüklenebilir.");
       return;
     }
     setMediaUrls((prev) => [...prev, url]);
@@ -103,7 +145,7 @@ export default function AdminClubPage() {
         fetchStats(token);
         setTimeout(() => setPostSuccess(null), 4000);
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({ message: "Gönderi kaydedilemedi." }));
         alert(err.message || "Gönderi yayınlanamadı.");
       }
     } catch (e) {
@@ -221,33 +263,58 @@ export default function AdminClubPage() {
                 />
               </div>
 
-              {/* Photo Upload URL Input */}
-              <div className="space-y-2">
-                <label className="font-bold text-slate-300">Fotoğraf Yükle (Maks 10 Fotoğraf)</label>
-                <div className="flex gap-2">
+              {/* Photo Upload File Picker & Input */}
+              <div className="space-y-3">
+                <label className="font-bold text-slate-300 block">Fotoğraf Ekle (Maks 10 Fotoğraf)</label>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage || mediaUrls.length >= 10}
+                    className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <span>📷</span>
+                    <span>{uploadingImage ? "Fotoğraf Yükleniyor..." : "Cihazımdan Fotoğraf Seç / Yükle"}</span>
+                  </button>
+                </div>
+
+                {/* Optional URL Add */}
+                <div className="flex gap-2 pt-1">
                   <input
                     type="text"
-                    placeholder="Görsel URL veya medya bağlantısı yapıştırın..."
+                    placeholder="Veya harici Görsel URL yapıştırın..."
                     value={mediaUrlInput}
                     onChange={(e) => setMediaUrlInput(e.target.value)}
-                    className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none"
+                    className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none"
                   />
                   <button
+                    type="button"
                     onClick={handleAddMediaUrl}
-                    className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs border border-white/10 cursor-pointer"
+                    className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-xl text-xs border border-white/10 cursor-pointer"
                   >
                     Ekle
                   </button>
                 </div>
 
+                {/* Uploaded Photos Preview List */}
                 {mediaUrls.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                     {mediaUrls.map((url, idx) => (
-                      <div key={idx} className="bg-slate-950 border border-white/10 p-2 rounded-xl flex items-center gap-2">
-                        <span className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">{url}</span>
+                      <div key={idx} className="relative group bg-slate-950 border border-white/10 rounded-xl overflow-hidden h-24">
+                        <img src={url} alt="Upload preview" className="w-full h-full object-cover" />
                         <button
+                          type="button"
                           onClick={() => handleRemoveMediaUrl(idx)}
-                          className="text-red-400 font-bold hover:text-red-300 text-xs"
+                          className="absolute top-1 right-1 bg-red-600/90 text-white w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shadow hover:bg-red-500 cursor-pointer"
                         >
                           ✕
                         </button>
