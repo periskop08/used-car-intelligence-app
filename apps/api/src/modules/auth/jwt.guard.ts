@@ -29,8 +29,13 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('User no longer exists in the system');
       }
 
-      // Attach payload to request object
-      request['user'] = payload;
+      // Attach complete user object to request
+      request['user'] = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        subscriptionTier: user.subscriptionTier,
+      };
     } catch (err) {
       if (err instanceof UnauthorizedException) {
         throw err;
@@ -41,8 +46,21 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    const authHeader = request.headers.authorization || (request.headers as any)['x-access-token'];
+    if (authHeader && typeof authHeader === 'string') {
+      const parts = authHeader.split(' ');
+      if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+        return parts[1].trim();
+      }
+      if (parts.length === 1 && parts[0].length > 10 && !parts[0].includes(' ')) {
+        return parts[0].trim();
+      }
+    }
+    const queryToken = request.query?.token || request.query?.accessToken;
+    if (queryToken && typeof queryToken === 'string') {
+      return queryToken.trim();
+    }
+    return undefined;
   }
 }
 
@@ -68,7 +86,12 @@ export class OptionalJwtAuthGuard implements CanActivate {
         where: { id: payload.id },
       });
       if (user) {
-        request['user'] = payload;
+        request['user'] = {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          subscriptionTier: user.subscriptionTier,
+        };
       }
     } catch (err) {
       // Don't fail if optional auth fails
@@ -77,7 +100,20 @@ export class OptionalJwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    const authHeader = request.headers.authorization || (request.headers as any)['x-access-token'];
+    if (authHeader && typeof authHeader === 'string') {
+      const parts = authHeader.split(' ');
+      if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+        return parts[1].trim();
+      }
+      if (parts.length === 1 && parts[0].length > 10 && !parts[0].includes(' ')) {
+        return parts[0].trim();
+      }
+    }
+    const queryToken = request.query?.token || request.query?.accessToken;
+    if (queryToken && typeof queryToken === 'string') {
+      return queryToken.trim();
+    }
+    return undefined;
   }
 }
