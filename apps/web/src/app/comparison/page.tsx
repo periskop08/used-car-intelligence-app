@@ -7,17 +7,13 @@ import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 import { ComparisonModeNotice } from "./components/ComparisonModeNotice";
 import { RecallComparison } from "./components/RecallComparison";
 import { ContextualDataWarning } from "./components/ContextualDataWarning";
-import { VehicleHighlights } from "./components/VehicleHighlights";
-import DecisionSummary from "./components/DecisionSummary";
+import { ComparisonVehicleCards } from "./components/ComparisonVehicleCards";
 import ScenarioCards from "./components/ScenarioCards";
-import NarrativeAdvice from "./components/NarrativeAdvice";
-import VehicleVerdictGrid from "./components/VehicleVerdictGrid";
 import RiskComparison from "./components/RiskComparison";
-import OwnershipComparison from "./components/OwnershipComparison";
-import DecisionMatrix from "./components/DecisionMatrix";
 import PrePurchaseChecks from "./components/PrePurchaseChecks";
 import TechnicalComparisonTable from "./components/TechnicalComparisonTable";
 import ComparisonChatbot from "./components/ComparisonChatbot";
+import { adaptLegacyComparisonResult } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -797,32 +793,12 @@ export default function ComparisonPage() {
         })}
       </div>
 
-      {/* Priority Selector & Compare Action Button */}
-      <div className="flex flex-col md:flex-row items-center gap-4">
-        <div className="w-full md:w-64 bg-slate-900 border border-white/10 p-3 rounded-2xl flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Karşılaştırma Önceliğiniz</label>
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="bg-transparent text-xs text-white outline-none font-semibold cursor-pointer"
-          >
-            <option value="BALANCED" className="bg-slate-900">Dengeli Genel Kullanım</option>
-            <option value="FUEL_ECONOMY" className="bg-slate-900">Yakıt Ekonomisi & Düşük Tüketim</option>
-            <option value="COMFORT" className="bg-slate-900">Konfor & Kabin Sessizliği</option>
-            <option value="PERFORMANCE" className="bg-slate-900">Performans & Motor Gücü</option>
-            <option value="HANDLING" className="bg-slate-900">Yol Tutuş & Sürüş Dinamiği</option>
-            <option value="LOW_MAINTENANCE" className="bg-slate-900">Düşük Bakım & Sanayi Masrafı</option>
-            <option value="FAMILY" className="bg-slate-900">Aile Kullanımı & Geniş Bagaj</option>
-            <option value="CITY_USE" className="bg-slate-900">Şehir İçi Kullanım & Kolay Park</option>
-            <option value="HIGHWAY" className="bg-slate-900">Uzun Yol Sürüşü</option>
-            <option value="RESALE_VALUE" className="bg-slate-900">İkinci El Değer Koruma</option>
-          </select>
-        </div>
-
+      {/* Compare Action Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-4">
         <button
           onClick={handleCompare}
           disabled={matchedVariantIds.length < 2 || loading}
-          className="flex-1 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
+          className="flex-1 w-full bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
         >
           {loading ? "🤖 TorqueScout AI Derin Karşılaştırmayı Hazırlıyor..." : `Seçili ${matchedVariantIds.length} Aracı Karşılaştır`}
         </button>
@@ -830,7 +806,7 @@ export default function ComparisonPage() {
         {slots.some(s => s.selectedBrand) && (
           <button
             onClick={handleResetSelections}
-            className="px-4 py-4 bg-slate-900 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-white/10 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0"
+            className="w-full sm:w-auto px-5 py-4 bg-slate-900 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-white/10 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0"
             title="Tüm araç seçimlerini sıfırla"
           >
             🔄 Seçimleri Temizle
@@ -856,52 +832,41 @@ export default function ComparisonPage() {
         </div>
       )}
 
-      {/* 10-Section Decision UI Result Screen */}
+      {/* Streamlined Decision Result Screen */}
       {comparisonResult?.comparisonResult && (
         <div ref={reportStartRef} className="space-y-8 animate-fadeIn">
-          {/* Comparison Mode Notice */}
-          <ComparisonModeNotice generationMode={comparisonResult.comparisonResult.generationMode} />
+          {/* Fallback Notice (Only if generationMode is FALLBACK) */}
+          {comparisonResult.comparisonResult.generationMode === "FALLBACK" && (
+            <ComparisonModeNotice generationMode={comparisonResult.comparisonResult.generationMode} />
+          )}
 
-          {/* Section 1: Executive Summary */}
-          <DecisionSummary
-            headline={comparisonResult.comparisonResult.headline}
-            executiveSummary={comparisonResult.comparisonResult.executiveSummary}
-            generationMode={comparisonResult.comparisonResult.generationMode}
-            overallRecommendation={comparisonResult.comparisonResult.overallRecommendation}
+          {/* Section 1: Unified Vehicle Cards (1 Card Per Selected Vehicle!) */}
+          <ComparisonVehicleCards
+            cards={adaptLegacyComparisonResult(comparisonResult.comparisonResult)}
           />
 
-          {/* Section 2: Vehicle Highlights (Every selected car gets a card!) */}
-          <VehicleHighlights highlights={comparisonResult.comparisonResult.vehicleHighlights} />
-
-          {/* Section 2: Quick Scenario Cards */}
+          {/* Section 2: Quick Scenario Category Winners */}
           <ScenarioCards scenarios={comparisonResult.comparisonResult.scenarioRecommendations} />
 
-          {/* Section 3: Narrative Advice */}
-          <NarrativeAdvice narrativeRecommendation={comparisonResult.comparisonResult.narrativeRecommendation} />
+          {/* Section 3: Chronic Risks (Rendered ONLY if verified chronic risks exist) */}
+          {comparisonResult.comparisonResult.riskComparison?.items &&
+            comparisonResult.comparisonResult.riskComparison.items.length > 0 && (
+              <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
+            )}
 
-          {/* Section 4: Decision Matrix */}
-          <DecisionMatrix matrix={comparisonResult.comparisonResult.decisionMatrix} />
+          {/* Section 4: Recalls (Rendered ONLY if recalls exist) */}
+          {comparisonResult.comparisonResult.recallComparison &&
+            comparisonResult.comparisonResult.recallComparison.length > 0 && (
+              <RecallComparison recalls={comparisonResult.comparisonResult.recallComparison} />
+            )}
 
-          {/* Section 5: Vehicle Verdict Grid */}
-          <VehicleVerdictGrid verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
-
-          {/* Section 6: Risk Comparison */}
-          <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
-
-          {/* Section 7: Recall Comparison */}
-          <RecallComparison recalls={comparisonResult.comparisonResult.recallComparison} />
-
-          {/* Section 8: Ownership Comparison & Contextual Warnings */}
-          <OwnershipComparison ownershipCostComparison={comparisonResult.comparisonResult.ownershipCostComparison} />
-          <ContextualDataWarning warnings={comparisonResult.comparisonResult.dataWarnings} section="OWNERSHIP" />
-
-          {/* Section 9: Pre-Purchase Checks */}
+          {/* Section 5: Pre-Purchase Inspection Checks (Accordion) */}
           <PrePurchaseChecks verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
 
-          {/* Section 10: Technical Comparison Table */}
+          {/* Section 6: Detailed Technical Specs Table (Accordion) */}
           <TechnicalComparisonTable vehicles={comparisonResult.vehicles || []} />
 
-          {/* Section 11: Context-Aware Live AI Chatbot */}
+          {/* Section 7: Context-Aware Live AI Chatbot */}
           <ComparisonChatbot
             variantIds={matchedVariantIds}
             vehicleNames={(comparisonResult.vehicles || []).map((v: any) => v.name)}

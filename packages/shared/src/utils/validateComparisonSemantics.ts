@@ -31,23 +31,36 @@ export function validateComparisonSemantics(
   const errors: string[] = [];
   const profileIds = new Set(profiles.map(p => p.vehicleId));
 
-  // 1. All vehicles covered in verdicts
+  // 1. All vehicles covered in verdicts or vehicleCards
+  const cardsVehicleIds = new Set((result.vehicleCards || []).map(c => c.vehicleId));
   const verdictVehicleIds = new Set((result.vehicleVerdicts || []).map(v => v.vehicleId));
-  const allVehiclesCovered = profiles.every(p => verdictVehicleIds.has(p.vehicleId));
+  const allVehiclesCovered = profiles.every(p => cardsVehicleIds.has(p.vehicleId) || verdictVehicleIds.has(p.vehicleId));
   if (!allVehiclesCovered) {
-    errors.push('Seçilen araçların tamamı vehicleVerdicts içinde bulunmuyor.');
+    errors.push('Seçilen araçların tamamı vehicleCards veya vehicleVerdicts içinde bulunmuyor.');
   }
 
-  // 2. All verdicts complete
-  const allVehicleVerdictsComplete = (result.vehicleVerdicts || []).every(v => 
-    !!v.characterSummary &&
-    Array.isArray(v.gains) && v.gains.length >= 1 &&
-    Array.isArray(v.compromises) && v.compromises.length >= 1 &&
-    Array.isArray(v.bestFor) && v.bestFor.length >= 1 &&
-    Array.isArray(v.notIdealFor) && v.notIdealFor.length >= 1
-  );
+  // Check vehicleCards count equals profiles count
+  if (result.vehicleCards && result.vehicleCards.length !== profiles.length) {
+    errors.push(`Üretilen kart sayısı (${result.vehicleCards.length}) seçili araç sayısı (${profiles.length}) ile eşleşmiyor.`);
+  }
+
+  // 2. All verdicts / cards complete
+  const allVehicleVerdictsComplete = (result.vehicleCards && result.vehicleCards.length > 0)
+    ? result.vehicleCards.every(c =>
+        Array.isArray(c.strengths) && c.strengths.length >= 1 &&
+        Array.isArray(c.cautions) && c.cautions.length >= 1 &&
+        Array.isArray(c.bestFor) && c.bestFor.length >= 1 &&
+        Array.isArray(c.notIdealFor) && c.notIdealFor.length >= 1
+      )
+    : (result.vehicleVerdicts || []).every(v => 
+        !!v.characterSummary &&
+        Array.isArray(v.gains) && v.gains.length >= 1 &&
+        Array.isArray(v.compromises) && v.compromises.length >= 1 &&
+        Array.isArray(v.bestFor) && v.bestFor.length >= 1 &&
+        Array.isArray(v.notIdealFor) && v.notIdealFor.length >= 1
+      );
   if (!allVehicleVerdictsComplete) {
-    errors.push('Araç karakter kartlarında gains, compromises, bestFor veya notIdealFor alanları eksik.');
+    errors.push('Araç kartlarında güçlü yönler, dikkat noktaları, uygun veya uygun olmayan profiller eksik.');
   }
 
   // 3. Minimum narrative length met

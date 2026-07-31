@@ -13,6 +13,7 @@ import {
   ComparisonPriority,
   ComparisonVehicleProfile,
   VehicleComparisonResult,
+  ComparisonVehicleCard,
   ScenarioScore,
   DataWarning,
   RiskComparisonItem,
@@ -639,6 +640,40 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
 
     const lowestFuelVehicle = sortedByConsumption[0] || profiles[0];
 
+    const cards: ComparisonVehicleCard[] = profiles.map((p) => ({
+      vehicleId: p.vehicleId,
+      vehicleName: p.displayName,
+      identity: {
+        year: p.identity.year,
+        engine: p.identity.engineCode,
+        transmission: p.identity.transmission,
+        trim: p.identity.trim,
+      },
+      characterSummary: `${p.identity.brand} ${p.identity.model} (${p.identity.year}) - ${p.identity.engineCode || 'Motor'}, ${p.identity.transmission || 'Şanzıman'}`,
+      strengths: [
+        p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi` : 'Yakıt ekonomisi',
+        p.practicality.bootLitres ? `${p.practicality.bootLitres} Litre bagaj hacmi` : 'Geniş bagaj alanı',
+      ],
+      cautions: [
+        p.reliability.problems.length > 0
+          ? `${p.reliability.problems.length} adet onaylı kronik arıza riski (${p.reliability.problems.map(prob => prob.title).join(', ')})`
+          : 'Yaş ve motor kilometresine bağlı genel bakım hassasiyeti',
+      ],
+      bestFor: ['Günlük kullanım', 'Teknik verimlilik arayanlar'],
+      notIdealFor: ['Aşırı performans beklentisi olanlar'],
+      criticalRisks: p.reliability.problems.map(prob => ({
+        title: prob.title,
+        severity: prob.severity,
+        shortExplanation: prob.inspectionHint || 'Ekspertiz kontrolü önerilir.',
+      })),
+      prePurchaseChecks: p.inspectionChecklist.slice(0, 2),
+      supportingFacts: [
+        `Model Yılı: ${p.identity.year}`,
+        p.performance.horsepower ? `Motor Gücü: ${p.performance.horsepower} HP` : `Motor: ${p.identity.engineCode || 'Standart'}`,
+      ],
+      evidenceConfidence: 'HIGH' as const,
+    }));
+
     const highlights = profiles.map(p => ({
       vehicleId: p.vehicleId,
       vehicleName: p.displayName,
@@ -706,7 +741,7 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       sourceDataVersion,
       selectedPriority: priority,
       headline: `${profiles.length} Araç Doğrulanmış Teknik Veri Karşılaştırması`,
-      executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.\n\nAraçların yakıt tüketimleri, bagaj hacimleri ve model yılları kullanım ihtiyacınıza göre belirleyici rol oynar.`,
+      executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.`,
       overallRecommendation: {
         vehicleId: lowestFuelVehicle.vehicleId,
         vehicleName: lowestFuelVehicle.displayName,
@@ -714,6 +749,7 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
         reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış düşük yakıt tüketimi (${lowestFuelVehicle.efficiency.combinedConsumption || 'Standart'} L/100km) ile yakıt tasarrufu odağında öne çıkmaktadır.`,
         confidence: 'HIGH',
       },
+      vehicleCards: cards,
       vehicleHighlights: highlights,
       scenarioRecommendations: [
         {

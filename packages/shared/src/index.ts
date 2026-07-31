@@ -432,6 +432,30 @@ export interface DecisionMatrixRow {
   insufficientData?: boolean;
 }
 
+export interface ComparisonVehicleCard {
+  vehicleId: string;
+  vehicleName: string;
+  identity: {
+    year?: number;
+    engine?: string;
+    transmission?: string;
+    trim?: string;
+  };
+  characterSummary?: string;
+  strengths: string[];
+  cautions: string[];
+  bestFor: string[];
+  notIdealFor: string[];
+  criticalRisks?: {
+    title: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    shortExplanation?: string;
+  }[];
+  prePurchaseChecks: string[];
+  supportingFacts: string[];
+  evidenceConfidence: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
 export interface VehicleHighlight {
   vehicleId: string;
   vehicleName: string;
@@ -465,6 +489,7 @@ export interface VehicleComparisonResult {
     reasoning: string;
     confidence: 'LOW' | 'MEDIUM' | 'HIGH';
   };
+  vehicleCards?: ComparisonVehicleCard[];
   vehicleHighlights?: VehicleHighlight[];
   scenarioRecommendations: ScenarioRecommendation[];
   vehicleVerdicts: VehicleVerdict[];
@@ -487,6 +512,44 @@ export interface VehicleComparisonResult {
   decisionMatrix: DecisionMatrixRow[];
   finalDecisionGuide: FinalDecisionGuideRow[];
   dataWarnings: DataWarning[];
+}
+
+/**
+ * Adapter for backward compatibility with legacy comparison results in DB cache.
+ * Converts legacy vehicleHighlights + vehicleVerdicts into unified ComparisonVehicleCard format.
+ */
+export function adaptLegacyComparisonResult(result: VehicleComparisonResult): ComparisonVehicleCard[] {
+  if (result.vehicleCards && result.vehicleCards.length > 0) {
+    return result.vehicleCards;
+  }
+
+  const verdictsMap = new Map((result.vehicleVerdicts || []).map(v => [v.vehicleId, v]));
+  const highlightsMap = new Map((result.vehicleHighlights || []).map(h => [h.vehicleId, h]));
+  const legacyKeys = Array.from(verdictsMap.keys()).concat(Array.from(highlightsMap.keys()));
+  const allIds = Array.from(new Set(legacyKeys));
+
+  return allIds.map(id => {
+    const v = verdictsMap.get(id);
+    const h = highlightsMap.get(id);
+
+    return {
+      vehicleId: id,
+      vehicleName: v?.vehicleName || h?.vehicleName || 'Araç',
+      identity: {},
+      characterSummary: v?.characterSummary,
+      strengths: v?.gains || h?.strengths || ['Teknik verimlilik'],
+      cautions: v?.compromises || h?.cautions || ['Düzenli bakım hassasiyeti'],
+      bestFor: v?.bestFor || ['Günlük kullanım'],
+      notIdealFor: v?.notIdealFor || ['Aşırı performans beklentisi'],
+      criticalRisks: (v?.criticalRisks || []).map(title => ({
+        title,
+        severity: 'MEDIUM' as const,
+      })),
+      prePurchaseChecks: (v?.prePurchaseChecks || []).slice(0, 2),
+      supportingFacts: h?.supportingFacts || [],
+      evidenceConfidence: 'HIGH' as const,
+    };
+  });
 }
 
 export const SCENARIO_SCORING_CONFIG = {
