@@ -173,9 +173,8 @@ export default function ComparisonPage() {
         if (draft.selectedPriority) {
           setSelectedPriority(draft.selectedPriority);
         }
-        const ids = (draft.slots || []).map((s: any) => s.matchedVariantId).filter(Boolean);
-        if (ids.length >= 2 && token) {
-          executeComparisonWithIds(ids, draft.selectedPriority || "BALANCED");
+        if (draft.comparisonResult) {
+          setComparisonResult(draft.comparisonResult);
         }
       } catch (e) {
         console.warn("Draft restore failed:", e);
@@ -202,6 +201,14 @@ export default function ComparisonPage() {
     setSlots(prev => {
       const next = [...prev];
       next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  const clearSingleSlot = (index: number) => {
+    setSlots(prev => {
+      const next = [...prev];
+      next[index] = createEmptySlot(prev[index].id);
       return next;
     });
   };
@@ -661,11 +668,22 @@ export default function ComparisonPage() {
             >
               <h2 className="text-xs font-bold uppercase tracking-wider text-orange-500 flex items-center justify-between">
                 <span>{slot.id}. ARAÇ SEÇİMİ</span>
-                {slot.matchedVariantId && (
-                  <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono">
-                    ✓ Hazır
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {slot.matchedVariantId && (
+                    <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono">
+                      ✓ Hazır
+                    </span>
+                  )}
+                  {slot.selectedBrand && (
+                    <button
+                      onClick={() => clearSingleSlot(index)}
+                      className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
+                      title="Bu aracın seçimini temizle"
+                    >
+                      ✕ Temizle
+                    </button>
+                  )}
+                </div>
               </h2>
 
               {/* Responsive Dropdown Grid */}
