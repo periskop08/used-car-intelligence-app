@@ -159,6 +159,26 @@ export default function ComparisonPage() {
         })
         .catch(() => null);
     }
+
+    // Auto-restore saved draft on initial page load / refresh
+    const savedDraftStr = typeof window !== "undefined" ? localStorage.getItem("torquescout_comparison_draft_v1") : null;
+    if (savedDraftStr) {
+      try {
+        const draft = JSON.parse(savedDraftStr);
+        if (Array.isArray(draft.slots) && draft.slots.length >= 2) {
+          setSlots(draft.slots);
+        }
+        if (draft.selectedPriority) {
+          setSelectedPriority(draft.selectedPriority);
+        }
+        const ids = (draft.slots || []).map((s: any) => s.matchedVariantId).filter(Boolean);
+        if (ids.length >= 2 && token) {
+          executeComparisonWithIds(ids, draft.selectedPriority || "BALANCED");
+        }
+      } catch (e) {
+        console.warn("Draft restore failed:", e);
+      }
+    }
   }, []);
 
   // Update slots when user limit changes
@@ -431,22 +451,31 @@ export default function ComparisonPage() {
 
   const [selectedPriority, setSelectedPriority] = useState<string>("BALANCED");
 
+  // Auto-save draft to localStorage whenever slots or selectedPriority change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasAnySelection = slots.some(s => s.selectedBrand);
+    if (hasAnySelection) {
+      const draft = {
+        slots,
+        selectedPriority,
+        savedAt: Date.now(),
+      };
+      try {
+        localStorage.setItem("torquescout_comparison_draft_v1", JSON.stringify(draft));
+      } catch (e) {}
+    }
+  }, [slots, selectedPriority]);
+
   // Collect filled matched variant IDs
   const matchedVariantIds = slots.map(s => s.matchedVariantId).filter((id): id is string => !!id);
 
-  // Submit Compare API
-  const handleCompare = () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    if (matchedVariantIds.length < 2) return;
+  const executeComparisonWithIds = (variantIds: string[], priority: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token || variantIds.length < 2) return;
 
     setLoading(true);
     setError("");
-    setComparisonResult(null);
 
     const idempotencyKey = typeof window !== "undefined" && window.crypto && window.crypto.randomUUID
       ? window.crypto.randomUUID()
@@ -459,9 +488,9 @@ export default function ComparisonPage() {
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
-        variantIds: matchedVariantIds,
+        variantIds,
         idempotencyKey,
-        selectedPriority,
+        selectedPriority: priority,
       }),
     })
       .then(res => {
@@ -480,20 +509,34 @@ export default function ComparisonPage() {
         if (data.userLimit && data.userTier) {
           setLimitAndInitSlots(data.userLimit, data.userTier);
         }
-        if (data.aiAnalysis?.conversationalAdvice) {
-          setChatMessages([{ sender: "assistant", text: data.aiAnalysis.conversationalAdvice }]);
-        }
         setLoading(false);
-
-        // Auto-scroll to report start
-        setTimeout(() => {
-          reportStartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 200);
       })
       .catch(err => {
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  // Submit Compare API
+  const handleCompare = () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    if (matchedVariantIds.length < 2) return;
+    executeComparisonWithIds(matchedVariantIds, selectedPriority);
+  };
+
+  // Clear / Reset selections
+  const handleResetSelections = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("torquescout_comparison_draft_v1");
+    }
+    setComparisonResult(null);
+    setError("");
+    setSlots(prev => prev.map(s => createEmptySlot(s.id)));
   };
 
   // Send Chat Message Handler
@@ -733,33 +776,6 @@ export default function ComparisonPage() {
         })}
       </div>
 
-      {/* Compare action button */}
-      <button
-        onClick={handleCompare}
-        disabled={matchedVariantIds.length < 2 || loading}
-        className="w-full bg-gradient-to-r from-orange-600 to-amber-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
-      >
-        {loading ? "🤖 Yapay Zekâ Araçları Kıyaslıyor..." : "Seçili Araçları Karşılaştır"}
-      </button>
-
-      {/* Loading state */}
-      {loading && (
-        <div className="glass p-8 rounded-3xl flex flex-col items-center justify-center gap-4 text-center border border-orange-500/20 bg-orange-950/10 shadow-2xl animate-pulse">
-          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-          <h3 className="text-lg font-bold text-slate-100">🤖 Yapay Zekâ Araçları Kıyaslıyor...</h3>
-          <p className="text-xs text-slate-400 max-w-md">
-            TorqueScout AI botu seçtiğin araçların teknik verilerini, motor karakterini ve kronik durumlarını analiz ederek tavsiye raporunu hazırlıyor.
-          </p>
-        </div>
-      )}
-
-      {/* Error alert */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold text-center">
-          ⚠️ {error}
-        </div>
-      )}
-
       {/* Priority Selector & Compare Action Button */}
       <div className="flex flex-col md:flex-row items-center gap-4">
         <div className="w-full md:w-64 bg-slate-900 border border-white/10 p-3 rounded-2xl flex flex-col gap-1">
@@ -789,6 +805,16 @@ export default function ComparisonPage() {
         >
           {loading ? "🤖 TorqueScout AI Derin Karşılaştırmayı Hazırlıyor..." : `Seçili ${matchedVariantIds.length} Aracı Karşılaştır`}
         </button>
+
+        {slots.some(s => s.selectedBrand) && (
+          <button
+            onClick={handleResetSelections}
+            className="px-4 py-4 bg-slate-900 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-white/10 rounded-2xl text-xs font-bold transition cursor-pointer shrink-0"
+            title="Tüm araç seçimlerini sıfırla"
+          >
+            🔄 Seçimleri Temizle
+          </button>
+        )}
       </div>
 
       {/* Loading state */}
