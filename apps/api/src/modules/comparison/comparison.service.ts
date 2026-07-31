@@ -639,6 +639,23 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
 
     const lowestFuelVehicle = sortedByConsumption[0] || profiles[0];
 
+    const highlights = profiles.map(p => ({
+      vehicleId: p.vehicleId,
+      vehicleName: p.displayName,
+      strengths: [
+        p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi` : 'Standart yakıt verimliliği',
+        p.practicality.bootLitres ? `${p.practicality.bootLitres} Litre bagaj hacmi` : 'Geniş kullanım alanı',
+      ],
+      cautions: [
+        p.reliability.problems.length > 0 ? `${p.reliability.problems.length} adet onaylı kronik arıza kaydı` : 'Düzenli periyodik bakım hassasiyeti',
+      ],
+      supportingFacts: [
+        `Model Yılı: ${p.identity.year}`,
+        p.performance.horsepower ? `Güç: ${p.performance.horsepower} HP` : `Motor: ${p.identity.engineCode || 'Standart'}`,
+      ],
+      confidence: 'HIGH' as const,
+    }));
+
     const verdicts = profiles.map((p) => ({
       vehicleId: p.vehicleId,
       vehicleName: p.displayName,
@@ -688,15 +705,16 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
       selectedPriority: priority,
-      headline: `${profiles.length} Araç Doğrulanmış Teknik Veri ve Risk Karşılaştırması`,
-      executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.\n\nAraçların motor verimlilikleri, şanzıman tepkileri ve servis arıza riskleri kullanım amacınıza göre farklılık gösterir.`,
+      headline: `${profiles.length} Araç Doğrulanmış Teknik Veri Karşılaştırması`,
+      executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.\n\nAraçların yakıt tüketimleri, bagaj hacimleri ve model yılları kullanım ihtiyacınıza göre belirleyici rol oynar.`,
       overallRecommendation: {
         vehicleId: lowestFuelVehicle.vehicleId,
         vehicleName: lowestFuelVehicle.displayName,
-        label: 'En Dengeli Seçenek',
-        reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış düşük yakıt tüketimi (${lowestFuelVehicle.efficiency.combinedConsumption || 'Standart'} L/100km) ve teknik verimlilik dengesiyle öne çıkmaktadır.`,
+        label: 'Kullanım Önceliğine Göre Değişiyor',
+        reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış düşük yakıt tüketimi (${lowestFuelVehicle.efficiency.combinedConsumption || 'Standart'} L/100km) ile yakıt tasarrufu odağında öne çıkmaktadır.`,
         confidence: 'HIGH',
       },
+      vehicleHighlights: highlights,
       scenarioRecommendations: [
         {
           scenarioKey: 'FUEL_ECONOMY',
@@ -709,17 +727,21 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       ],
       vehicleVerdicts: verdicts,
       riskComparison: {
-        narrative: `Veritabanımızdaki onaylı kronik arıza kayıtları incelenmiştir. Araçların mekanik durumları ve bakım geçmişleri ekspertiz esnasında kontrol edilmelidir.`,
+        narrative: riskItems.length > 0
+          ? `Veritabanımızdaki onaylı kronik arıza kayıtları detaylandırılmıştır. Ekspertiz esnasında listelenen kontroller mutlaka yapılmalıdır.`
+          : `Bu araçlar için veritabanında onaylanmış kronik arıza kaydı bulunmamaktadır. Bu durum araçların tamamen risksiz olduğu anlamına gelmez.`,
         items: riskItems,
         lowestRiskVehicleId: profiles[0].vehicleId,
       },
       recallComparison: recallItems,
       ownershipCostComparison: {
-        narrative: 'Yakıt tüketimleri ve periyodik servis bütçeleri araçların motor hacimlerine ve yakıt türlerine göre değişmektedir.',
+        title: 'Yakıt Maliyeti Karşılaştırması',
+        narrative: `Yakıt maliyetinde ${lowestFuelVehicle.displayName} (${lowestFuelVehicle.efficiency.combinedConsumption || 'Düşük'} L/100km) diğer araçlara göre daha avantajlıdır. Ancak periyodik bakım, parça fiyatları ve değer kaybı konusunda veritabanında yeterli doğrulanmış kayıt bulunmadığı için kesin toplam sahiplik sıralaması yapılamamıştır.`,
         lowestEstimatedCostVehicleId: lowestFuelVehicle.vehicleId,
         confidence: 'HIGH',
+        insufficientDataForTotalRanking: true,
       },
-      narrativeRecommendation: `Açık konuşmak gerekirse; bu ${profiles.length} araç arasında karar verirken önceliğinizi belirlemeniz önemlidir. Düşük yakıt maliyeti ve şehir içi pratiklik arıyorsanız **${lowestFuelVehicle.displayName}** daha rasyonel bir seçim olacaktır. Unutmayın, en doğru araç bütçenize ve kullanım mesafenize en uyan modeldir!`,
+      narrativeRecommendation: `Açık konuşmak gerekirse; bu ${profiles.length} araç arasında seçim yaparken önceliğinizi belirlemeniz önemlidir.\n\nSizin için en öncelikli konu düşük yakıt gideriyse **${lowestFuelVehicle.displayName}** daha rasyonel bir seçim olacaktır. Daha yeni model yılı arıyorsanız **${profiles[0].displayName}** tercih edilebilir.\n\nSatın almadan önce araçların mekanik durumlarını ekspertizde kontrol ettirmeyi unutmayın!`,
       decisionMatrix: [
         {
           criterion: 'Düşük Yakıt & Tüketim Ekonomisi',
@@ -732,14 +754,7 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
           criterion: 'Model Yılı & Yenilik',
           winnerVehicleIds: [profiles[0].vehicleId],
           winnerNames: [profiles[0].displayName],
-          reason: 'Güncel model yılı ve donanım',
-          confidence: 'HIGH',
-        },
-        {
-          criterion: 'Mekanik Risk Dengesi',
-          winnerVehicleIds: [profiles[0].vehicleId],
-          winnerNames: [profiles[0].displayName],
-          reason: 'Onaylı arıza kayıt düzeyi',
+          reason: 'Güncel model yılı',
           confidence: 'HIGH',
         },
       ],
@@ -747,13 +762,13 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
         {
           priority: 'Genel Dengeli Kullanım',
           recommendedVehicleName: lowestFuelVehicle.displayName,
-          explanation: 'Verimlilik ve arıza riski dengesi en yüksek seçenek',
+          explanation: 'Verimlilik ve teknik veriler açısından dengeli seçenek',
         },
       ],
       dataWarnings: [
         {
-          section: 'GENERAL',
-          message: 'Bu değerlendirme doğrulanmış teknik veriler ve kayıtlı riskler üzerinden hazırlanmıştır. Gelişmiş AI yorumu geçici olarak kullanılamıyor.',
+          section: 'OWNERSHIP',
+          message: 'Bakım ve parça maliyeti verileri yetersiz olduğu için yalnızca doğrulanmış yakıt tüketimleri kıyaslanmıştır.',
           severity: 'INFO',
         },
       ],

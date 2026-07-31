@@ -7,6 +7,7 @@ import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 import { ComparisonModeNotice } from "./components/ComparisonModeNotice";
 import { RecallComparison } from "./components/RecallComparison";
 import { ContextualDataWarning } from "./components/ContextualDataWarning";
+import { VehicleHighlights } from "./components/VehicleHighlights";
 import DecisionSummary from "./components/DecisionSummary";
 import ScenarioCards from "./components/ScenarioCards";
 import NarrativeAdvice from "./components/NarrativeAdvice";
@@ -868,6 +869,9 @@ export default function ComparisonPage() {
             generationMode={comparisonResult.comparisonResult.generationMode}
             overallRecommendation={comparisonResult.comparisonResult.overallRecommendation}
           />
+
+          {/* Section 2: Vehicle Highlights (Every selected car gets a card!) */}
+          <VehicleHighlights highlights={comparisonResult.comparisonResult.vehicleHighlights} />
 
           {/* Section 2: Quick Scenario Cards */}
           <ScenarioCards scenarios={comparisonResult.comparisonResult.scenarioRecommendations} />

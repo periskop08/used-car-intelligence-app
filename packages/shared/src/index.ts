@@ -432,6 +432,15 @@ export interface DecisionMatrixRow {
   insufficientData?: boolean;
 }
 
+export interface VehicleHighlight {
+  vehicleId: string;
+  vehicleName: string;
+  strengths: string[];
+  cautions: string[];
+  supportingFacts: string[];
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
 export interface FinalDecisionGuideRow {
   priority: string;
   recommendedVehicleName: string;
@@ -452,10 +461,11 @@ export interface VehicleComparisonResult {
   overallRecommendation: {
     vehicleId?: string;
     vehicleName?: string;
-    label: string;
+    label: 'En Dengeli Seçenek' | 'Kullanım Önceliğine Göre Değişiyor' | 'Net Kazanan İçin Yeterli Veri Yok';
     reasoning: string;
     confidence: 'LOW' | 'MEDIUM' | 'HIGH';
   };
+  vehicleHighlights?: VehicleHighlight[];
   scenarioRecommendations: ScenarioRecommendation[];
   vehicleVerdicts: VehicleVerdict[];
   riskComparison: {
@@ -466,10 +476,12 @@ export interface VehicleComparisonResult {
   };
   recallComparison?: RecallComparisonItem[];
   ownershipCostComparison: {
+    title?: 'Sahiplik ve Bakım Maliyeti Karşılaştırması' | 'Yakıt Maliyeti Karşılaştırması';
     narrative: string;
     lowestEstimatedCostVehicleId?: string;
     highestEstimatedCostVehicleId?: string;
     confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+    insufficientDataForTotalRanking?: boolean;
   };
   narrativeRecommendation: string;
   decisionMatrix: DecisionMatrixRow[];
