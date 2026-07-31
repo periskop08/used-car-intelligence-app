@@ -5,6 +5,7 @@ import React from "react";
 interface Props {
   headline?: string;
   executiveSummary?: string;
+  generationMode?: "AI" | "FALLBACK";
   overallRecommendation?: {
     vehicleId?: string;
     vehicleName?: string;
@@ -23,9 +24,10 @@ const renderMarkdownText = (text: string) => {
   ));
 };
 
-export default function DecisionSummary({ headline, executiveSummary, overallRecommendation }: Props) {
+export default function DecisionSummary({ headline, executiveSummary, generationMode, overallRecommendation }: Props) {
   const badgeText = overallRecommendation?.label || "Kullanım Önceliğine Göre Değişiyor";
   const winnerName = overallRecommendation?.vehicleName || "";
+  const isFallback = generationMode === "FALLBACK";
 
   return (
     <div className="bg-gradient-to-r from-orange-950/40 via-slate-900/80 to-slate-900/60 border border-orange-500/30 p-6 md:p-8 rounded-3xl space-y-6 shadow-2xl relative overflow-hidden">
@@ -35,7 +37,7 @@ export default function DecisionSummary({ headline, executiveSummary, overallRec
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest bg-orange-500/10 px-2.5 py-1 rounded-full border border-orange-500/20">
-            TorqueScout Karar Özeti
+            {isFallback ? "Doğrulanmış Verilere Dayalı Karar Özeti" : "TorqueScout Karar Özeti"}
           </span>
           <h2 className="text-xl md:text-2xl font-black text-white tracking-tight mt-2">
             {headline || "Detaylı Araç Karşılaştırma Analizi"}
@@ -58,15 +60,11 @@ export default function DecisionSummary({ headline, executiveSummary, overallRec
         {renderMarkdownText(executiveSummary || "")}
       </div>
 
-      {/* Overall Recommendation Box */}
+      {/* Recommendation Reasoning callout */}
       {overallRecommendation?.reasoning && (
-        <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex flex-col gap-1.5">
-          <span className="text-[10px] font-extrabold text-orange-300 uppercase tracking-wider flex items-center gap-1.5">
-            <span>⚡</span> AI Analist Sonuç Gerekçesi
-          </span>
-          <p className="text-xs text-slate-200 font-medium leading-relaxed">
-            {overallRecommendation.reasoning}
-          </p>
+        <div className="bg-slate-950/70 p-4 rounded-2xl border border-orange-500/20 text-xs text-orange-300 font-medium leading-relaxed">
+          💡 <span className="font-bold">{isFallback ? "Teknik Veri Sonuç Gerekçesi: " : "AI Karar Gerekçesi: "}</span>
+          {overallRecommendation.reasoning}
         </div>
       )}
     </div>

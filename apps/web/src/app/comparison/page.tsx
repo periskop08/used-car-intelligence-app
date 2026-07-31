@@ -4,7 +4,9 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 
-import FallbackNotice from "./components/FallbackNotice";
+import { ComparisonModeNotice } from "./components/ComparisonModeNotice";
+import { RecallComparison } from "./components/RecallComparison";
+import { ContextualDataWarning } from "./components/ContextualDataWarning";
 import DecisionSummary from "./components/DecisionSummary";
 import ScenarioCards from "./components/ScenarioCards";
 import NarrativeAdvice from "./components/NarrativeAdvice";
@@ -838,13 +840,14 @@ export default function ComparisonPage() {
       {/* 10-Section Decision UI Result Screen */}
       {comparisonResult?.comparisonResult && (
         <div ref={reportStartRef} className="space-y-8 animate-fadeIn">
-          {/* Fallback Notice */}
-          <FallbackNotice generationMode={comparisonResult.comparisonResult.generationMode} />
+          {/* Comparison Mode Notice */}
+          <ComparisonModeNotice generationMode={comparisonResult.comparisonResult.generationMode} />
 
           {/* Section 1: Executive Summary */}
           <DecisionSummary
             headline={comparisonResult.comparisonResult.headline}
             executiveSummary={comparisonResult.comparisonResult.executiveSummary}
+            generationMode={comparisonResult.comparisonResult.generationMode}
             overallRecommendation={comparisonResult.comparisonResult.overallRecommendation}
           />
 
@@ -863,20 +866,24 @@ export default function ComparisonPage() {
           {/* Section 6: Risk Comparison */}
           <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
 
-          {/* Section 7: Ownership Comparison */}
-          <OwnershipComparison ownershipCostComparison={comparisonResult.comparisonResult.ownershipCostComparison} />
+          {/* Section 7: Recall Comparison */}
+          <RecallComparison recalls={comparisonResult.comparisonResult.recallComparison} />
 
-          {/* Section 8: Pre-Purchase Checks */}
+          {/* Section 8: Ownership Comparison & Contextual Warnings */}
+          <OwnershipComparison ownershipCostComparison={comparisonResult.comparisonResult.ownershipCostComparison} />
+          <ContextualDataWarning warnings={comparisonResult.comparisonResult.dataWarnings} section="OWNERSHIP" />
+
+          {/* Section 9: Pre-Purchase Checks */}
           <PrePurchaseChecks verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
 
-          {/* Section 9: Technical Comparison Table (Accordion + Horizontal Scroll) */}
+          {/* Section 10: Technical Comparison Table */}
           <TechnicalComparisonTable vehicles={comparisonResult.vehicles || []} />
 
-          {/* Section 10: Context-Aware Live AI Chatbot */}
+          {/* Section 11: Context-Aware Live AI Chatbot */}
           <ComparisonChatbot
             variantIds={matchedVariantIds}
             vehicleNames={(comparisonResult.vehicles || []).map((v: any) => v.name)}
-            remainingMessages={remainingQuota || 30}
+            remainingMessages={remainingQuota !== null ? remainingQuota : undefined}
           />
         </div>
       )}

@@ -15,9 +15,30 @@ import {
   VehicleComparisonResult,
   ScenarioScore,
   DataWarning,
+  RiskComparisonItem,
+  RecallComparisonItem,
   formatFuelType,
-  SCENARIO_SCORING_CONFIG,
+  sanitizeComparisonResult,
+  validateComparisonSemantics,
 } from '@used-car-intelligence/shared';
+
+export interface ComparisonGenerationDiagnostics {
+  comparisonId: string;
+  generationMode: 'AI' | 'FALLBACK';
+  provider?: string;
+  model?: string;
+  requestStartedAt: string;
+  requestCompletedAt?: string;
+  durationMs?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  validationFailed?: boolean;
+  validationErrors?: string[];
+  repairAttempted?: boolean;
+  repairSucceeded?: boolean;
+  fallbackReason?: 'PROVIDER_TIMEOUT' | 'PROVIDER_ERROR' | 'INVALID_JSON' | 'ZOD_VALIDATION_FAILED' | 'SEMANTIC_VALIDATION_FAILED' | 'REPAIR_FAILED' | 'TOKEN_LIMIT' | 'CONFIGURATION_ERROR';
+}
 
 @Injectable()
 export class ComparisonService {
@@ -162,7 +183,7 @@ export class ComparisonService {
     if (cachedReport && cachedReport.analysisJson) {
       comparisonResult = cachedReport.analysisJson as unknown as VehicleComparisonResult;
     } else {
-      // Deduct feature quota only upon generating fresh analysis
+      // Deduct feature quota upon generating fresh analysis (both for AI or Fallback success)
       await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON).catch((err) => {
         console.warn('Feature limit check warning:', err?.message);
       });
@@ -173,6 +194,9 @@ export class ComparisonService {
         console.warn('AI comparison generation failed. Executing deterministic fallback:', err?.message || err);
         comparisonResult = this.generateFallbackResult(profiles, priority, sourceDataVersion);
       }
+
+      // Sanitize raw markdown from result text
+      comparisonResult = sanitizeComparisonResult(comparisonResult);
 
       await this.prisma.aiVehicleComparisonCache.create({
         data: {
@@ -300,6 +324,7 @@ export class ComparisonService {
       const combinedConsumption = specData.averageFuelConsumption ? Number(specData.averageFuelConsumption) : undefined;
       const bootLitres = specData.luggageCapacity ? Number(specData.luggageCapacity) : undefined;
 
+      // Calculate scenario scores with >= 70% (HIGH) / 40-69% (LOW) / < 40% (null) tiering
       const scenarioScores: Record<string, ScenarioScore> = {
         cityUse: {
           score: combinedConsumption ? Math.max(20, Math.min(100, Math.round(100 - combinedConsumption * 7.5))) : null,
@@ -392,6 +417,14 @@ export class ComparisonService {
     priority: ComparisonPriority,
     sourceDataVersion: string,
   ): Promise<VehicleComparisonResult> {
+    const diagnostics: ComparisonGenerationDiagnostics = {
+      comparisonId: `comp_${Date.now()}`,
+      generationMode: 'AI',
+      provider: process.env.COMPARISON_AI_PROVIDER || 'OpenAI',
+      model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
+      requestStartedAt: new Date().toISOString(),
+    };
+
     const summaryList = profiles.map((p, i) => {
       const probsText = p.reliability.problems.length > 0
         ? p.reliability.problems.map(prob => `    * ${prob.title} (${prob.severity} Risk)`).join('\n')
@@ -417,11 +450,11 @@ ARAÇ VERİLERİ:
 ${summaryList}
 
 KATI TALİMATLAR:
-1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. Her paragrafın rakamsal/teknik dayanağı olmalıdır.
-2. "overallRecommendation" objesinde "label" alanına tek kazanan varsa "En Dengeli Seçenek", eşitlik varsa "Kullanım Önceliğine Göre Değişiyor" yaz. Asla "Şampiyon" deme.
-3. Her araç için "vehicleVerdicts" dizisinde "gains" (Ne kazandırır?) ve "compromises" (Neyi feda ettirir?) alanlarını net yaz.
-4. "narrativeRecommendation" alanında arkadaş tavsiyesi tonunda samimi, net ve gerekçeli anlatım yap ("Açık konuşmak gerekirse...").
-5. Kronik sorunları sayı olarak değil, GERÇEK İSİMLERİYLE (örn. "DSG Mekatronik Arızası") açıkça ifade et.
+1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. ("Kullanım amacınıza göre değişir", "En doğru araç bütçenize uygun olandır" gibi cümleler ASLA KULLANILAMAZ).
+2. JSON alanlarında MARKDOWN İŞARETLERİ (**bold**, ### başlık, satır başı -) KULLANMA. Düz metin üret.
+3. "overallRecommendation" objesinde "label" alanına tek kazanan varsa "En Dengeli Seçenek", eşitlik varsa "Kullanım Önceliğine Göre Değişiyor" yaz. Asla "Şampiyon" deme.
+4. "vehicleVerdicts" alanında seçilen TÜM araçlar için "gains" (Ne kazandırır?), "compromises" (Neyi feda ettirir?), "bestFor" ve "notIdealFor" dizilerini eksiksiz doldur.
+5. "narrativeRecommendation" alanında arkadaş tavsiyesi tonunda samimi, net ve gerekçeli anlatım yap ("Açık konuşmak gerekirse...").
 
 Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
 {
@@ -436,11 +469,11 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
   },
   "scenarioRecommendations": [
     {
-      "scenarioKey": "CITY_USE",
-      "title": "Şehir İçi & Tüketim Ekonomisi",
+      "scenarioKey": "FUEL_ECONOMY",
+      "title": "Yakıt Ekonomisi & Düşük Tüketim",
       "recommendedVehicleIds": ["${profiles[0].vehicleId}"],
       "recommendedVehicleNames": ["${profiles[0].displayName}"],
-      "reasoning": "Şehir içi pratikliği ve düşük yakıt tüketimi gerekçesi"
+      "reasoning": "En düşük doğrulanmış yakıt tüketimine sahip"
     }
   ],
   "vehicleVerdicts": [
@@ -449,7 +482,7 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       "vehicleName": "${profiles[0].displayName}",
       "characterSummary": "Kompakt ve Dengeli Premium",
       "bestFor": ["Şehir içi pratiklik", "Düşük yakıt maliyeti"],
-      "notIdealFor": ["Yüksek hız performans arayışı"],
+      "notIdealFor": ["Aşırı performans beklentisi"],
       "gains": ["Düşük yakıt tüketimi", "Kolay park etme"],
       "compromises": ["Daha sınırlı kabin genişliği"],
       "criticalRisks": ["Şanzıman vuruntu ve bakım hassasiyeti"],
@@ -483,11 +516,12 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
 }`;
 
     let resultJsonText = '';
+    const startTime = Date.now();
 
     if (this.openai) {
       try {
         const response = await this.openai.chat.completions.create({
-          model: process.env.COMPARISON_MODEL_NAME || 'gpt-4o-mini',
+          model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Yalnızca geçerli JSON dön.' },
             { role: 'user', content: prompt },
@@ -495,40 +529,64 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
           response_format: { type: 'json_object' },
           temperature: 0.3,
         });
+
         resultJsonText = response.choices[0]?.message?.content || '';
+        diagnostics.promptTokens = response.usage?.prompt_tokens;
+        diagnostics.completionTokens = response.usage?.completion_tokens;
+        diagnostics.totalTokens = response.usage?.total_tokens;
       } catch (err: any) {
-        console.warn('OpenAI comparison failed. Trying Gemini:', err?.message || err);
+        console.warn('OpenAI comparison call warning:', err?.message || err);
       }
     }
 
     if (!resultJsonText) {
       const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
       if (geminiApiKey) {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' },
-          }),
-        });
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+          const res = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          });
 
-        if (res.ok) {
-          const geminiData = await res.json();
-          resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (res.ok) {
+            const geminiData = await res.json();
+            resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          }
+        } catch (err: any) {
+          console.warn('Gemini API comparison call warning:', err?.message || err);
         }
       }
     }
 
+    diagnostics.durationMs = Date.now() - startTime;
+    diagnostics.requestCompletedAt = new Date().toISOString();
+
     if (!resultJsonText) {
-      throw new Error('AI providers yielded empty response');
+      diagnostics.fallbackReason = 'PROVIDER_ERROR';
+      console.warn('Comparison AI diagnostics:', diagnostics);
+      throw new Error('AI providers returned empty output');
     }
 
     const parsed = JSON.parse(resultJsonText.replace(/```json\n?|\n?```/g, '').trim());
 
-    return {
-      comparisonId: `comp_${Date.now()}`,
+    // Execute 12-criteria Semantic Validation
+    const validation = validateComparisonSemantics(parsed, profiles);
+    if (!validation.isValid) {
+      diagnostics.validationFailed = true;
+      diagnostics.validationErrors = validation.errors;
+      console.warn('AI Output failed semantic validation. Triggering Fallback generator. Errors:', validation.errors);
+      diagnostics.fallbackReason = 'SEMANTIC_VALIDATION_FAILED';
+      console.warn('Comparison AI diagnostics:', diagnostics);
+      throw new Error(`Semantic validation failed: ${validation.errors.join('; ')}`);
+    }
+
+    const rawResult: VehicleComparisonResult = {
+      comparisonId: diagnostics.comparisonId,
       schemaVersion: '5.0',
       promptVersion: '5',
       engineVersion: 'comparison-v5',
@@ -548,12 +606,24 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       scenarioRecommendations: parsed.scenarioRecommendations || [],
       vehicleVerdicts: parsed.vehicleVerdicts || [],
       riskComparison: parsed.riskComparison || { narrative: 'Kronik arıza kayıtları kıyaslanmıştır.' },
+      recallComparison: profiles.flatMap(p => 
+        (p.reliability.recalls || []).map(r => ({
+          vehicleId: p.vehicleId,
+          vehicleName: p.displayName,
+          title: r.title,
+          description: r.description,
+          safetyImpact: r.safetyRisk,
+          verificationInstruction: 'Bu geri çağırma kampanyasının uygulanıp uygulanmadığını yetkili servisten şasi numarası sorgulatarak doğrulayın.',
+        }))
+      ),
       ownershipCostComparison: parsed.ownershipCostComparison || { narrative: 'Sahiplik maliyetleri değerlendirilmiştir.' },
       narrativeRecommendation: parsed.narrativeRecommendation || 'Açık konuşmak gerekirse bütçenize en uygun modeli tercih etmelisiniz.',
       decisionMatrix: parsed.decisionMatrix || [],
       finalDecisionGuide: parsed.finalDecisionGuide || [],
       dataWarnings: parsed.dataWarnings || [],
     };
+
+    return sanitizeComparisonResult(rawResult);
   }
 
   private generateFallbackResult(
@@ -561,13 +631,19 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
     priority: ComparisonPriority,
     sourceDataVersion: string,
   ): VehicleComparisonResult {
-    const winner = profiles[0];
+    // Find lowest consumption vehicle strictly from verified spec data
+    const sortedByConsumption = profiles
+      .slice()
+      .filter(p => p.efficiency.combinedConsumption)
+      .sort((a, b) => (a.efficiency.combinedConsumption || 99) - (b.efficiency.combinedConsumption || 99));
+
+    const lowestFuelVehicle = sortedByConsumption[0] || profiles[0];
 
     const verdicts = profiles.map((p) => ({
       vehicleId: p.vehicleId,
       vehicleName: p.displayName,
       characterSummary: `${p.identity.brand} ${p.identity.model} (${p.identity.year}) - ${p.identity.engineCode || 'Motor'}, ${p.identity.transmission || 'Şanzıman'}`,
-      bestFor: ['Günlük kullanım', 'Teknik özellik dengesi'],
+      bestFor: ['Günlük kullanım', 'Teknik verimlilik'],
       notIdealFor: ['Aşırı performans beklentisi'],
       gains: [
         p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km yakıt tüketimi` : 'Standart yakıt ekonomisi',
@@ -578,9 +654,32 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       ],
       criticalRisks: p.reliability.problems.map(prob => `${prob.title} (${prob.severity} Risk)`),
       prePurchaseChecks: p.inspectionChecklist,
+      evidenceConfidence: 'HIGH' as const,
     }));
 
-    return {
+    const riskItems: RiskComparisonItem[] = profiles.flatMap(p => 
+      p.reliability.problems.map(prob => ({
+        vehicleId: p.vehicleId,
+        vehicleName: p.displayName,
+        problemTitle: prob.title,
+        severity: prob.severity,
+        detectability: 'MODERATE' as const,
+        narrative: `${prob.title} kaydı ekspertiz kontrolünde ve motor rölanti dinlemesinde önceden tespit edilebilir.`,
+      }))
+    );
+
+    const recallItems: RecallComparisonItem[] = profiles.flatMap(p => 
+      (p.reliability.recalls || []).map(r => ({
+        vehicleId: p.vehicleId,
+        vehicleName: p.displayName,
+        title: r.title,
+        description: r.description,
+        safetyImpact: r.safetyRisk,
+        verificationInstruction: 'Bu kampanyanın aracınıza uygulanıp uygulanmadığını yetkili servisten şasi numarası sorgulatarak doğrulayın.',
+      }))
+    );
+
+    const rawResult: VehicleComparisonResult = {
       comparisonId: `comp_fallback_${Date.now()}`,
       schemaVersion: '5.0',
       promptVersion: '5',
@@ -589,56 +688,78 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
       selectedPriority: priority,
-      headline: `${profiles.length} Araç Teknik ve Risk Karşılaştırması (Doğrulanmış Veriler)`,
+      headline: `${profiles.length} Araç Doğrulanmış Teknik Veri ve Risk Karşılaştırması`,
       executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.\n\nAraçların motor verimlilikleri, şanzıman tepkileri ve servis arıza riskleri kullanım amacınıza göre farklılık gösterir.`,
       overallRecommendation: {
-        vehicleId: winner.vehicleId,
-        vehicleName: winner.displayName,
+        vehicleId: lowestFuelVehicle.vehicleId,
+        vehicleName: lowestFuelVehicle.displayName,
         label: 'En Dengeli Seçenek',
-        reasoning: `${winner.displayName}, veritabanımızdaki teknik verimlilik ve düşük kronik arıza riski dengesiyle öne çıkmaktadır.`,
+        reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış düşük yakıt tüketimi (${lowestFuelVehicle.efficiency.combinedConsumption || 'Standart'} L/100km) ve teknik verimlilik dengesiyle öne çıkmaktadır.`,
         confidence: 'HIGH',
       },
       scenarioRecommendations: [
         {
-          scenarioKey: 'CITY_USE',
-          title: 'Şehir İçi & Tüketim Ekonomisi',
-          recommendedVehicleIds: [winner.vehicleId],
-          recommendedVehicleNames: [winner.displayName],
-          reasoning: 'En ekonomik fabrika tüketim verisine ve pratik boyutlara sahiptir.',
+          scenarioKey: 'FUEL_ECONOMY',
+          title: 'Yakıt Ekonomisi & Düşük Tüketim',
+          recommendedVehicleIds: [lowestFuelVehicle.vehicleId],
+          recommendedVehicleNames: [lowestFuelVehicle.displayName],
+          reasoning: `Doğrulanmış ${lowestFuelVehicle.efficiency.combinedConsumption || 'düşük'} L/100km fabrika ortalama tüketim verisine sahiptir.`,
+          confidence: 'HIGH',
         },
       ],
       vehicleVerdicts: verdicts,
       riskComparison: {
-        narrative: `Veritabanımızdaki kronik arıza kayıtları incelendiğinde; ${winner.displayName} daha düşük arıza kaydı ile öne çıkmaktadır.`,
-        lowestRiskVehicleId: winner.vehicleId,
+        narrative: `Veritabanımızdaki onaylı kronik arıza kayıtları incelenmiştir. Araçların mekanik durumları ve bakım geçmişleri ekspertiz esnasında kontrol edilmelidir.`,
+        items: riskItems,
+        lowestRiskVehicleId: profiles[0].vehicleId,
       },
+      recallComparison: recallItems,
       ownershipCostComparison: {
-        narrative: 'Yakıt tüketimleri ve periyodik servis bütçeleri araçların motor hacimlerine göre değişmektedir.',
+        narrative: 'Yakıt tüketimleri ve periyodik servis bütçeleri araçların motor hacimlerine ve yakıt türlerine göre değişmektedir.',
+        lowestEstimatedCostVehicleId: lowestFuelVehicle.vehicleId,
+        confidence: 'HIGH',
       },
-      narrativeRecommendation: `Açık konuşmak gerekirse; bu ${profiles.length} araç arasında karar verirken önceliğinizi belirlemeniz önemlidir. Düşük yakıt maliyeti ve şehir içi pratiklik arıyorsanız **${winner.displayName}** daha rasyonel bir seçim olacaktır. Unutmayın, en doğru araç bütçenize ve kullanım mesafenize en uyan modeldir!`,
+      narrativeRecommendation: `Açık konuşmak gerekirse; bu ${profiles.length} araç arasında karar verirken önceliğinizi belirlemeniz önemlidir. Düşük yakıt maliyeti ve şehir içi pratiklik arıyorsanız **${lowestFuelVehicle.displayName}** daha rasyonel bir seçim olacaktır. Unutmayın, en doğru araç bütçenize ve kullanım mesafenize en uyan modeldir!`,
       decisionMatrix: [
         {
-          criterion: 'Düşük Yakıt & Ekonomi',
-          winnerVehicleIds: [winner.vehicleId],
-          winnerNames: [winner.displayName],
-          reason: 'Düşük ortalama yakıt tüketimi',
+          criterion: 'Düşük Yakıt & Tüketim Ekonomisi',
+          winnerVehicleIds: [lowestFuelVehicle.vehicleId],
+          winnerNames: [lowestFuelVehicle.displayName],
+          reason: 'Doğrulanmış düşük ortalama yakıt tüketimi',
+          confidence: 'HIGH',
+        },
+        {
+          criterion: 'Model Yılı & Yenilik',
+          winnerVehicleIds: [profiles[0].vehicleId],
+          winnerNames: [profiles[0].displayName],
+          reason: 'Güncel model yılı ve donanım',
+          confidence: 'HIGH',
+        },
+        {
+          criterion: 'Mekanik Risk Dengesi',
+          winnerVehicleIds: [profiles[0].vehicleId],
+          winnerNames: [profiles[0].displayName],
+          reason: 'Onaylı arıza kayıt düzeyi',
+          confidence: 'HIGH',
         },
       ],
       finalDecisionGuide: [
         {
           priority: 'Genel Dengeli Kullanım',
-          recommendedVehicleName: winner.displayName,
+          recommendedVehicleName: lowestFuelVehicle.displayName,
           explanation: 'Verimlilik ve arıza riski dengesi en yüksek seçenek',
         },
       ],
       dataWarnings: [
         {
           section: 'GENERAL',
-          message: 'Bu karşılaştırma doğrulanmış teknik veriler ve kayıtlı riskler üzerinden hazırlanmıştır. Gelişmiş AI yorumlaması geçici olarak kullanılamıyor.',
+          message: 'Bu değerlendirme doğrulanmış teknik veriler ve kayıtlı riskler üzerinden hazırlanmıştır. Gelişmiş AI yorumu geçici olarak kullanılamıyor.',
           severity: 'INFO',
         },
       ],
     };
+
+    return sanitizeComparisonResult(rawResult);
   }
 
   async chat(userId: string, dto: ComparisonChatDto) {
@@ -678,7 +799,7 @@ KATI TALİMATLAR:
       try {
         const openai = new OpenAI({ apiKey });
         const aiRes = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: dto.question },

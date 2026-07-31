@@ -356,12 +356,57 @@ export interface ComparisonVehicleProfile {
   calculatedScenarioScores?: Record<string, ScenarioScore>;
 }
 
+export interface ComparisonQualityCheck {
+  allVehiclesCovered: boolean;
+  allVehicleVerdictsComplete: boolean;
+  minimumNarrativeLengthMet: boolean;
+  noUnsupportedWinner: boolean;
+  noTechnicalContradiction: boolean;
+  noUnsupportedOwnershipClaim: boolean;
+  noUnsupportedResaleClaim: boolean;
+  noRiskCountBasedConclusion: boolean;
+  noGenericSummary: boolean;
+  noRawMarkdown: boolean;
+  scenarioCoverageValid: boolean;
+  riskNarrativeValid: boolean;
+}
+
+export interface RiskComparisonItem {
+  vehicleId: string;
+  vehicleName: string;
+  problemTitle: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  frequency?: string;
+  estimatedCostMin?: number;
+  estimatedCostMax?: number;
+  typicalMileageFrom?: number;
+  typicalMileageTo?: number;
+  evidenceConfidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+  detectability: 'EASY' | 'MODERATE' | 'DIFFICULT' | 'UNKNOWN';
+  narrative: string;
+}
+
+export interface RecallComparisonItem {
+  vehicleId: string;
+  vehicleName: string;
+  campaignCode?: string;
+  title: string;
+  description: string;
+  safetyImpact?: string;
+  affectedYears?: string;
+  verificationInstruction: string;
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
 export interface ScenarioRecommendation {
   scenarioKey: string;
   title: string;
   recommendedVehicleIds: string[];
   recommendedVehicleNames: string[];
   reasoning: string;
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+  supportingFacts?: string[];
+  missingInputs?: string[];
   caveat?: string;
 }
 
@@ -375,6 +420,7 @@ export interface VehicleVerdict {
   compromises: string[];
   criticalRisks: string[];
   prePurchaseChecks: string[];
+  evidenceConfidence?: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
 export interface DecisionMatrixRow {
@@ -382,6 +428,8 @@ export interface DecisionMatrixRow {
   winnerVehicleIds: string[];
   winnerNames: string[];
   reason: string;
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+  insufficientData?: boolean;
 }
 
 export interface FinalDecisionGuideRow {
@@ -412,13 +460,16 @@ export interface VehicleComparisonResult {
   vehicleVerdicts: VehicleVerdict[];
   riskComparison: {
     narrative: string;
+    items?: RiskComparisonItem[];
     lowestRiskVehicleId?: string;
     highestRiskVehicleId?: string;
   };
+  recallComparison?: RecallComparisonItem[];
   ownershipCostComparison: {
     narrative: string;
     lowestEstimatedCostVehicleId?: string;
     highestEstimatedCostVehicleId?: string;
+    confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
   };
   narrativeRecommendation: string;
   decisionMatrix: DecisionMatrixRow[];
@@ -462,4 +513,7 @@ export const SCENARIO_SCORING_CONFIG = {
     minInputsPct: 0.40,
   },
 };
+
+export * from './utils/sanitizeComparisonText';
+export * from './utils/validateComparisonSemantics';
 

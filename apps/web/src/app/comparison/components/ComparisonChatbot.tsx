@@ -16,7 +16,13 @@ const quickChips = [
   "İkinci elde hangisi daha kolay satılır?",
 ];
 
-export default function ComparisonChatbot({ variantIds, vehicleNames, remainingMessages = 30 }: Props) {
+export default function ComparisonChatbot({ variantIds, vehicleNames, remainingMessages }: Props) {
+  const isUnlimited = remainingMessages === 999;
+  const quotaLabel = isUnlimited
+    ? "Sınırsız Hak"
+    : typeof remainingMessages === "number"
+    ? `Kalan ${remainingMessages} Soru Hakkı`
+    : "Sohbet Asistanı";
   const [messages, setMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
     {
       sender: "ai",
@@ -78,8 +84,8 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
             </span>
           </div>
         </div>
-        <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
-          Kalan Hak: {remainingMessages}
+        <span className="text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-full border border-orange-500/20">
+          {quotaLabel}
         </span>
       </div>
 
