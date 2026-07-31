@@ -129,7 +129,13 @@ function RegisterContent() {
       .then((res) => {
         if (!res.ok) {
           return res.json().then((err) => {
-            throw new Error(err.message || "Kayıt başarısız.");
+            const rawMsg = err?.message;
+            const displayMsg = Array.isArray(rawMsg)
+              ? rawMsg.join(", ")
+              : typeof rawMsg === "string"
+              ? rawMsg
+              : "Kayıt başarısız. Lütfen bilgilerinizi kontrol edin.";
+            throw new Error(displayMsg);
           });
         }
         return res.json();

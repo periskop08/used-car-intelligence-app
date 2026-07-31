@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, OnModuleInit } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
@@ -8,6 +8,7 @@ export const ADMIN_EMAILS = [
   'efeguven9991@gmail.com',
   'm.efeeguven@gmail.com',
   'burhanseckin08@gmail.com',
+  'burhanseckin08@icloud.com',
 ];
 
 @Injectable()
@@ -37,28 +38,45 @@ export class AuthService implements OnModuleInit {
   }
 
   async register(dto: RegisterDto) {
-    const cleanEmail = dto.email.trim().toLowerCase();
+    const cleanEmail = dto.email ? dto.email.trim().toLowerCase() : '';
+    if (!cleanEmail) {
+      throw new BadRequestException('Lütfen geçerli bir e-posta adresi girin.');
+    }
+
     const existing = await this.prisma.user.findFirst({
-      where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+      where: {
+        OR: [
+          { email: { equals: cleanEmail, mode: 'insensitive' } },
+          { email: cleanEmail },
+        ],
+      },
     }).catch(() => null);
 
     if (existing) {
-      throw new ConflictException('Bu e-posta adresi zaten kayıtlı.');
+      throw new ConflictException('Bu e-posta adresi zaten kayıtlı. Lütfen Giriş Yapın.');
     }
 
     const isAdmin = ADMIN_EMAILS.includes(cleanEmail);
     const assignedRole = isAdmin ? Role.ADMIN : (dto.role || Role.USER);
     const assignedTier = isAdmin ? SubscriptionTier.PROFESYONEL : (dto.subscriptionTier || SubscriptionTier.TANISMA);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: cleanEmail,
-        passwordHash: dto.password,
-        role: assignedRole,
-        subscriptionTier: assignedTier,
-        preferredLanguageCode: 'tr',
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: cleanEmail,
+          passwordHash: dto.password,
+          role: assignedRole,
+          subscriptionTier: assignedTier,
+          preferredLanguageCode: 'tr',
+        },
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        throw new ConflictException('Bu e-posta adresi zaten kayıtlı. Lütfen Giriş Yapın.');
+      }
+      throw new BadRequestException('Kayıt oluşturulurken bir hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+    }
 
     if (assignedTier !== SubscriptionTier.TANISMA && assignedTier !== SubscriptionTier.FREE) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
