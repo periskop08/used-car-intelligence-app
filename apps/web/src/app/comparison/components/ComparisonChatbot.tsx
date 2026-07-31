@@ -35,9 +35,15 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
     setLoading(true);
 
     try {
-      const res = await fetch("/api/comparison/chat", {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
+      const res = await fetch(`${API_URL}/comparisons/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ variantIds, question: query }),
       });
 
@@ -45,7 +51,11 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
         const data = await res.json();
         setMessages((prev) => [...prev, { sender: "ai", text: data.response || "Yanıt alınamadı." }]);
       } else {
-        setMessages((prev) => [...prev, { sender: "ai", text: "Üzgünüm, şu an bağlantı kurulamadı." }]);
+        const errData = await res.json().catch(() => null);
+        setMessages((prev) => [
+          ...prev,
+          { sender: "ai", text: errData?.message || "Üzgünüm, şu an bağlantı kurulamadı." },
+        ]);
       }
     } catch {
       setMessages((prev) => [...prev, { sender: "ai", text: "Bir hata oluştu. Lütfen tekrar deneyin." }]);
