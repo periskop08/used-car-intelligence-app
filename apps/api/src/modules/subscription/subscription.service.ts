@@ -63,10 +63,24 @@ export class SubscriptionService {
     return userRank >= subRank ? userTier : subTier;
   }
 
-  async getSubscriptionSummary(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+  async getSubscriptionSummary(userId?: string) {
+    const user = userId ? await this.prisma.user.findUnique({ where: { id: userId } }).catch(() => null) : null;
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı.');
+      return {
+        tier: SubscriptionTier.TANISMA,
+        tierName: 'Tanışma Paketi',
+        isUnlimited: false,
+        rights: {
+          aiReports: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+          aiChat: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+          activeListings: { totalLimit: 1, used: 0, remaining: 1, isUnlimited: false },
+          listingDurationDays: 30,
+          comparisons: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+          maxVehiclesPerComparison: 2,
+          vitrinListings: { totalLimit: 0, used: 0, remaining: 0, isUnlimited: false },
+        },
+        activePurchases: [],
+      };
     }
 
     const isAdmin = user.role === Role.ADMIN || ADMIN_EMAILS.includes(user.email.toLowerCase());

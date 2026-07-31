@@ -31,12 +31,25 @@ export default function QuotaBadge({ feature, label, showDetails = true, classNa
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading || !summary) return null;
+  const defaultSummary = {
+    tierName: "Tanışma Paketi",
+    isUnlimited: false,
+    rights: {
+      comparisons: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+      aiReports: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+      aiChat: { totalLimit: 3, used: 0, remaining: 3, isUnlimited: false },
+      activeListings: { totalLimit: 1, used: 0, remaining: 1, isUnlimited: false },
+      maxVehiclesPerComparison: 2,
+      listingDurationDays: 30,
+    },
+  };
 
-  const isUnlimited = summary.isUnlimited || summary.rights?.[feature]?.isUnlimited;
-  const right = summary.rights?.[feature];
-  const remaining = right?.remaining ?? 0;
-  const total = right?.totalLimit ?? 0;
+  const activeSummary = summary || defaultSummary;
+
+  const isUnlimited = activeSummary.isUnlimited || activeSummary.rights?.[feature]?.isUnlimited;
+  const right = activeSummary.rights?.[feature];
+  const remaining = right?.remaining ?? 3;
+  const total = right?.totalLimit ?? 3;
   const used = right?.used ?? 0;
 
   const featureLabels: Record<string, { name: string; icon: string }> = {
@@ -61,16 +74,16 @@ export default function QuotaBadge({ feature, label, showDetails = true, classNa
           <div className="flex items-center gap-2">
             <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider">{titleName}</h4>
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/10">
-              {summary.tierName}
+              {activeSummary.tierName}
             </span>
           </div>
           {showDetails && (
             <p className="text-[11px] text-slate-400 mt-0.5">
               {feature === "comparisons" && (
-                <>Karşılaştırma başına maksimum <strong className="text-slate-200">{summary.rights.maxVehiclesPerComparison} araç</strong> ekleyebilirsiniz.</>
+                <>Karşılaştırma başına maksimum <strong className="text-slate-200">{activeSummary.rights?.maxVehiclesPerComparison || 2} araç</strong> ekleyebilirsiniz.</>
               )}
               {feature === "activeListings" && (
-                <>İlan yayın süreniz <strong className="text-slate-200">{summary.rights.listingDurationDays} gün</strong>dür.</>
+                <>İlan yayın süreniz <strong className="text-slate-200">{activeSummary.rights?.listingDurationDays || 30} gün</strong>dür.</>
               )}
               {feature === "aiReports" && (
                 <>Araç alım sürecinde detaylı teknik ve kronik risk analizi üretir.</>
