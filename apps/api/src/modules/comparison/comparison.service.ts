@@ -814,6 +814,10 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
   }
 
   async chat(userId: string, dto: ComparisonChatDto) {
+    if (userId) {
+      await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
+    }
+
     let requestedIds: string[] = [];
     if (dto.variantIds && Array.isArray(dto.variantIds) && dto.variantIds.length > 0) {
       requestedIds = Array.from(new Set(dto.variantIds.filter(Boolean)));
@@ -838,8 +842,25 @@ ${vehicleDescriptions}
 KATI TALİMATLAR:
 1. Kullanıcının sorusunu doğrudan yukarıdaki teknik veriler ve kronik arızalar ışığında karşılaştırmalı olarak yanıtla.
 2. Seçilen TÜM ${profiles.length} araç hakkında bilgi ver.
-3. Yanıtın son derece bilgili, samimi, tarafsız ve akıcı Türkçe olsun.
-4. İlk açılışta karşılaştırmayı aynen tekrarlama. Kullanıcının yıllık kilometresini veya özel önceliğini öğrenip ona rehberlik et.`;
+3. KESİNLİKLE SOHBET GEÇMİŞİNE DİKKAT ET VE TEKRARA DÜŞME!
+4. KULLANICI ÖNCEKİ MESAJLARDA VEYA ŞU ANKİ MESAJINDA YILLIK KİLOMETRESİNİ, KULLANIM TARZINI (ŞEHİR İÇİ / UZUN YOL) VEYA SÜRÜŞ BÜTÇESİNİ BELİRTTİYSE, TEKRAR KİLOMETRE VEYA KULLANIM TARZI SORMA! Doğrudan verilen bilgiye göre kesin kararını ve tavsiyeni ver.
+5. Yanıtın son derece bilgili, samimi, tarafsız ve akıcı Türkçe olsun.`;
+
+    const historyMessages: any[] = [];
+    if (dto.history && Array.isArray(dto.history)) {
+      for (const msg of dto.history.slice(-6)) {
+        const role = msg.sender === 'user' ? 'user' : 'assistant';
+        if (msg.text && typeof msg.text === 'string') {
+          historyMessages.push({ role, content: msg.text });
+        }
+      }
+    }
+
+    const fullMessages = [
+      { role: 'system', content: systemPrompt },
+      ...historyMessages,
+      { role: 'user', content: dto.question },
+    ];
 
     const apiKey = process.env.OPENAI_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
@@ -851,10 +872,7 @@ KATI TALİMATLAR:
         const openai = new OpenAI({ apiKey });
         const aiRes = await openai.chat.completions.create({
           model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: dto.question },
-          ],
+          messages: fullMessages,
           temperature: 0.5,
         });
 
@@ -872,10 +890,7 @@ KATI TALİMATLAR:
         });
         const aiRes = await geminiOpenai.chat.completions.create({
           model: 'gemini-flash-latest',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: dto.question },
-          ],
+          messages: fullMessages,
           temperature: 0.5,
         });
 
@@ -892,7 +907,7 @@ KATI TALİMATLAR:
 
     await this.prisma.aiChatLog.create({
       data: {
-        userId,
+        userId: userId || 'GUEST',
         variantId: profiles[0].vehicleId,
         prompt: dto.question,
         response,

@@ -28,6 +28,14 @@ export class CompareVehiclesDto {
   selectedPriority?: string;
 }
 
+export class ComparisonChatMessageDto {
+  @IsString()
+  sender!: string;
+
+  @IsString()
+  text!: string;
+}
+
 export class ComparisonChatDto {
   @ApiProperty({ description: 'Karşılaştırılan Araç Varyant UUID dizisi (2 - 10 adet)' })
   @IsArray()
@@ -48,4 +56,9 @@ export class ComparisonChatDto {
   @IsString()
   @IsNotEmpty()
   question!: string;
+
+  @ApiProperty({ description: 'Önceki konuşma geçmişi (konu tekrarını önlemek için)', required: false })
+  @IsArray()
+  @IsOptional()
+  history?: ComparisonChatMessageDto[];
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 interface Props {
   variantIds: string[];
@@ -17,12 +17,19 @@ const quickChips = [
 ];
 
 export default function ComparisonChatbot({ variantIds, vehicleNames, remainingMessages }: Props) {
-  const isUnlimited = remainingMessages === 999;
+  const [quotaCount, setQuotaCount] = useState<number | undefined>(remainingMessages);
+
+  useEffect(() => {
+    setQuotaCount(remainingMessages);
+  }, [remainingMessages]);
+
+  const isUnlimited = quotaCount === 999;
   const quotaLabel = isUnlimited
     ? "Sınırsız Hak"
-    : typeof remainingMessages === "number"
-    ? `Kalan ${remainingMessages} Soru Hakkı`
+    : typeof quotaCount === "number"
+    ? `Kalan ${quotaCount} Soru Hakkı`
     : "Sohbet Asistanı";
+
   const [messages, setMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
     {
       sender: "ai",
@@ -32,17 +39,38 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
   const handleSend = async (questionText?: string) => {
     const query = questionText || input.trim();
     if (!query || loading) return;
 
+    if (typeof quotaCount === "number" && quotaCount <= 0 && !isUnlimited) {
+      alert("AI Chatbot mesaj hakkınız dolmuştur. Yeni mesaj hakkı için paketinizi yükseltebilirsiniz.");
+      return;
+    }
+
+    const newMessages = [...messages, { sender: "user" as const, text: query }];
     setInput("");
-    setMessages((prev) => [...prev, { sender: "user", text: query }]);
+    setMessages(newMessages);
     setLoading(true);
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
       const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
+      const historyPayload = newMessages.map((m) => ({
+        sender: m.sender,
+        text: m.text,
+      }));
 
       const res = await fetch(`${API_URL}/comparisons/chat`, {
         method: "POST",
@@ -50,17 +78,25 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ variantIds, question: query }),
+        body: JSON.stringify({
+          variantIds,
+          question: query,
+          history: historyPayload,
+        }),
       });
 
       if (res.ok) {
         const data = await res.json();
         setMessages((prev) => [...prev, { sender: "ai", text: data.response || "Yanıt alınamadı." }]);
+
+        if (typeof data.remainingChatbotMessages === "number") {
+          setQuotaCount(data.remainingChatbotMessages);
+        }
       } else {
         const errData = await res.json().catch(() => null);
         setMessages((prev) => [
           ...prev,
-          { sender: "ai", text: errData?.message || "Üzgünüm, şu an bağlantı kurulamadı." },
+          { sender: "ai", text: errData?.message || "Üzgünüm, şu an bağlantı kurulamadı veya mesaj hakkınız doldu." },
         ]);
       }
     } catch {
@@ -90,7 +126,7 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
       </div>
 
       {/* Messages Window */}
-      <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-80 overflow-y-auto pr-2 scroll-smooth">
         {messages.map((m, idx) => (
           <div
             key={idx}
@@ -114,6 +150,7 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Quick Chips */}
@@ -122,7 +159,7 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
           <button
             key={idx}
             onClick={() => handleSend(chip)}
-            className="text-[10px] bg-slate-950 hover:bg-orange-500/20 text-slate-300 hover:text-orange-300 px-2.5 py-1 rounded-full border border-white/10 transition"
+            className="text-[10px] bg-slate-950 hover:bg-orange-500/20 text-slate-300 hover:text-orange-300 px-2.5 py-1 rounded-full border border-white/10 transition cursor-pointer"
           >
             {chip}
           </button>
@@ -142,7 +179,7 @@ export default function ComparisonChatbot({ variantIds, vehicleNames, remainingM
         <button
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
-          className="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition"
+          className="bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition cursor-pointer"
         >
           Gönder
         </button>
