@@ -4,6 +4,18 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import QuotaExhaustionModal from "@/components/QuotaExhaustionModal";
 
+import FallbackNotice from "./components/FallbackNotice";
+import DecisionSummary from "./components/DecisionSummary";
+import ScenarioCards from "./components/ScenarioCards";
+import NarrativeAdvice from "./components/NarrativeAdvice";
+import VehicleVerdictGrid from "./components/VehicleVerdictGrid";
+import RiskComparison from "./components/RiskComparison";
+import OwnershipComparison from "./components/OwnershipComparison";
+import DecisionMatrix from "./components/DecisionMatrix";
+import PrePurchaseChecks from "./components/PrePurchaseChecks";
+import TechnicalComparisonTable from "./components/TechnicalComparisonTable";
+import ComparisonChatbot from "./components/ComparisonChatbot";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface SlotData {
@@ -417,6 +429,8 @@ export default function ComparisonPage() {
       .catch(() => null);
   };
 
+  const [selectedPriority, setSelectedPriority] = useState<string>("BALANCED");
+
   // Collect filled matched variant IDs
   const matchedVariantIds = slots.map(s => s.matchedVariantId).filter((id): id is string => !!id);
 
@@ -434,6 +448,10 @@ export default function ComparisonPage() {
     setError("");
     setComparisonResult(null);
 
+    const idempotencyKey = typeof window !== "undefined" && window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `key_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
     fetch(`${API_URL}/comparisons`, {
       method: "POST",
       headers: {
@@ -442,6 +460,8 @@ export default function ComparisonPage() {
       },
       body: JSON.stringify({
         variantIds: matchedVariantIds,
+        idempotencyKey,
+        selectedPriority,
       }),
     })
       .then(res => {
@@ -740,329 +760,98 @@ export default function ComparisonPage() {
         </div>
       )}
 
-      {/* AI Comparison Chatbot Verdict Card */}
-      {comparisonResult && comparisonResult.aiAnalysis && (
-        <div ref={reportStartRef} className="glass p-6 md:p-8 rounded-3xl border border-orange-500/30 bg-[#090d1a]/95 backdrop-blur-xl shadow-2xl space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-xl">
-                🤖
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-100">Yapay Zekâ Karşılaştırma & Tavsiye Raporu</h2>
-                <p className="text-xs text-slate-400">TorqueScout Chatbot Analiz Sonucu</p>
-              </div>
-            </div>
+      {/* Priority Selector & Compare Action Button */}
+      <div className="flex flex-col md:flex-row items-center gap-4">
+        <div className="w-full md:w-64 bg-slate-900 border border-white/10 p-3 rounded-2xl flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Karşılaştırma Önceliğiniz</label>
+          <select
+            value={selectedPriority}
+            onChange={(e) => setSelectedPriority(e.target.value)}
+            className="bg-transparent text-xs text-white outline-none font-semibold cursor-pointer"
+          >
+            <option value="BALANCED" className="bg-slate-900">Dengeli Genel Kullanım</option>
+            <option value="FUEL_ECONOMY" className="bg-slate-900">Yakıt Ekonomisi & Düşük Tüketim</option>
+            <option value="COMFORT" className="bg-slate-900">Konfor & Kabin Sessizliği</option>
+            <option value="PERFORMANCE" className="bg-slate-900">Performans & Motor Gücü</option>
+            <option value="HANDLING" className="bg-slate-900">Yol Tutuş & Sürüş Dinamiği</option>
+            <option value="LOW_MAINTENANCE" className="bg-slate-900">Düşük Bakım & Sanayi Masrafı</option>
+            <option value="FAMILY" className="bg-slate-900">Aile Kullanımı & Geniş Bagaj</option>
+            <option value="CITY_USE" className="bg-slate-900">Şehir İçi Kullanım & Kolay Park</option>
+            <option value="HIGHWAY" className="bg-slate-900">Uzun Yol Sürüşü</option>
+            <option value="RESALE_VALUE" className="bg-slate-900">İkinci El Değer Koruma</option>
+          </select>
+        </div>
 
-            <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full ${
-              comparisonResult.isCached
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-            }`}>
-              {comparisonResult.isCached ? "⚡ Hazır Önbellek Yanıtı (0.01s)" : "✨ Canlı AI Analizi"}
-            </span>
-          </div>
+        <button
+          onClick={handleCompare}
+          disabled={matchedVariantIds.length < 2 || loading}
+          className="flex-1 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl transition text-center text-sm cursor-pointer"
+        >
+          {loading ? "🤖 TorqueScout AI Derin Karşılaştırmayı Hazırlıyor..." : `Seçili ${matchedVariantIds.length} Aracı Karşılaştır`}
+        </button>
+      </div>
 
-          {/* Verdict Box */}
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-orange-950/40 to-slate-900 border border-orange-500/30 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-black text-orange-400 uppercase tracking-widest">🏆 Özet Karar & Tavsiye Edilen Araç</span>
-              {comparisonResult.aiAnalysis.recommendedVehicle && (
-                <span className="text-xs font-bold text-white bg-orange-600 px-3 py-1 rounded-full shadow">
-                  {comparisonResult.aiAnalysis.recommendedVehicle}
-                </span>
-              )}
-            </div>
-            <p className="text-sm font-semibold text-slate-100 leading-relaxed">
-              {comparisonResult.aiAnalysis.verdict}
-            </p>
-          </div>
-
-          {/* Advantages & Risks Cards for Each Vehicle */}
-          <div className={`grid grid-cols-1 ${
-            comparisonResult.vehicles?.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-3"
-          } gap-5 pt-2`}>
-            {comparisonResult.vehicles?.map((v: any, i: number) => {
-              const advList =
-                comparisonResult.aiAnalysis?.[`advantagesV${i + 1}`] ||
-                comparisonResult.aiAnalysis?.advantages?.[String(i + 1)] ||
-                [
-                  `${v.engine || 'Motor'} seçeneği ve performansı`,
-                  `${v.transmission || 'Şanzıman'} sürüş uyumu`,
-                  `${v.fuelType || 'Yakıt'} verimliliği`,
-                ];
-
-              const riskList =
-                comparisonResult.aiAnalysis?.[`risksV${i + 1}`] ||
-                comparisonResult.aiAnalysis?.risks?.[String(i + 1)] ||
-                [
-                  `${v.problemsCount || 0} kayıtlı onaylı kronik durum`,
-                  `Sanayi bakım ve periyodik servis bütçesi kontrol edilmeli`,
-                ];
-
-              return (
-                <div key={v.id || i} className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 flex flex-col gap-4">
-                  <div className="border-b border-white/10 pb-2">
-                    <h3 className="text-xs font-black text-slate-100 uppercase tracking-wider">
-                      {v.name}
-                    </h3>
-                  </div>
-
-                  {/* Advantages */}
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
-                      <span>✓</span> Öne Çıkan Avantajları
-                    </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
-                      {advList.map((adv: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-green-400 font-bold">•</span>
-                          <span>{adv}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Risks / Points to Watch */}
-                  <div className="space-y-2 pt-2 border-t border-white/5">
-                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                      <span>⚠️</span> Dikkat Edilmesi Gerekenler & Riskler
-                    </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
-                      {riskList.map((rsk: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-amber-400 font-bold">•</span>
-                          <span>{rsk}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Analysis Breakdown Sections */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
-              <span className="text-sm">⚡</span>
-              <h4 className="text-xs font-bold text-slate-200">Motor & Performans</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.performanceAnalysis}</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
-              <span className="text-sm">🛠️</span>
-              <h4 className="text-xs font-bold text-slate-200">Güvenilirlik & Kronik Risk</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.reliabilityAnalysis}</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
-              <span className="text-sm">💰</span>
-              <h4 className="text-xs font-bold text-slate-200">İkinci El & Değer Koruma</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">{comparisonResult.aiAnalysis.resaleAnalysis}</p>
-            </div>
-          </div>
-
-          {/* Scenario Recommendations */}
-          {comparisonResult.aiAnalysis.recommendations && (
-            <div className="border-t border-white/10 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Şehir İçi & Kullanım Ekonomisi</span>
-                <p className="text-slate-300">{comparisonResult.aiAnalysis.recommendations.cityAndEconomy}</p>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/5 text-xs space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Aile & Uzun Yol Konforu</span>
-                <p className="text-slate-300">{comparisonResult.aiAnalysis.recommendations.familyAndComfort}</p>
-              </div>
-            </div>
-          )}
+      {/* Loading state */}
+      {loading && (
+        <div className="glass p-8 rounded-3xl flex flex-col items-center justify-center gap-4 text-center border border-orange-500/20 bg-orange-950/10 shadow-2xl animate-pulse">
+          <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <h3 className="text-lg font-bold text-slate-100">🤖 Yapay Zekâ Raporları Çapraz Analiz Ediyor...</h3>
+          <p className="text-xs text-slate-400 max-w-md">
+            TorqueScout AI botu seçtiğin araçların teknik verilerini, motor karakterini ve onaylı kronik arıza durumlarını analiz ederek karar raporunu hazırlıyor.
+          </p>
         </div>
       )}
 
-      {/* Interactive AI Chatbot Conversation & Message Input */}
-      {comparisonResult && comparisonResult.aiAnalysis && (
-        <div className="glass p-6 md:p-8 rounded-3xl border border-orange-500/40 bg-gradient-to-br from-[#0c1222] via-[#090d1a] to-[#05070f] shadow-2xl space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-3 border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/20">
-                  💬
-                </div>
-                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-[#090d1a] rounded-full"></span>
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-100">
-                  TorqueScout AI Asistanı
-                </h3>
-                <p className="text-xs text-slate-400">Seçtiğin araçlar hakkında aklına takılan tüm soruları canlı olarak sorabilirsin.</p>
-              </div>
-            </div>
-
-            {/* Dynamic Chatbot Message Quota Counter Badge */}
-            <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 px-3.5 py-1.5 rounded-xl text-xs font-mono">
-              <span className="text-orange-400 font-bold">💬 Kalan Chatbot Hakkı:</span>
-              <span className="text-white font-black">
-                {remainingQuota === 999
-                  ? "Sınırsız (Admin)"
-                  : remainingQuota !== null
-                  ? `${remainingQuota} Mesaj`
-                  : "..."}
-              </span>
-            </div>
-          </div>
-
-          {/* Chat Messages History Stream */}
-          <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
-            {chatMessages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex gap-3 text-xs md:text-sm ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {msg.sender === "assistant" && (
-                  <div className="w-8 h-8 rounded-xl bg-orange-600/30 border border-orange-500/40 flex items-center justify-center text-base shrink-0">
-                    🤖
-                  </div>
-                )}
-                <div
-                  className={`p-4 rounded-2xl max-w-xl leading-relaxed whitespace-pre-wrap ${
-                    msg.sender === "user"
-                      ? "bg-orange-600 text-white rounded-br-none shadow-lg shadow-orange-500/10"
-                      : "bg-slate-900/90 border border-white/10 text-slate-200 rounded-bl-none"
-                  }`}
-                >
-                  {msg.text}
-                </div>
-                {msg.sender === "user" && (
-                  <div className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-xs shrink-0 font-bold text-slate-300">
-                    Sen
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {chatLoading && (
-              <div className="flex items-center gap-3 text-xs text-orange-400 animate-pulse">
-                <div className="w-8 h-8 rounded-xl bg-orange-600/30 border border-orange-500/40 flex items-center justify-center text-base shrink-0">
-                  🤖
-                </div>
-                <div className="bg-slate-900/90 border border-white/10 p-3 rounded-2xl rounded-bl-none text-slate-300">
-                  TorqueScout AI düşünce ve yanıtı hazırlıyor...
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Interactive Chat Message Input Form */}
-          <form onSubmit={handleSendChatMessage} className="flex gap-2 pt-2 border-t border-white/10">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              placeholder="Bu araçlar hakkında aklına takılan soruyu sor... (Örn: Hangisinin yedek parçası ve bakımı daha ucuz?)"
-              disabled={chatLoading}
-              className="flex-1 bg-slate-900/90 border border-white/10 rounded-2xl px-4 py-3.5 text-xs text-slate-100 outline-none focus:border-orange-500/50 transition placeholder:text-slate-500"
-            />
-            <button
-              type="submit"
-              disabled={!chatInput.trim() || chatLoading}
-              className="bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-bold px-6 py-3.5 rounded-2xl text-xs transition flex items-center gap-2 cursor-pointer shadow-lg shadow-orange-500/20 shrink-0"
-            >
-              {chatLoading ? "Yanıtlanıyor..." : "Gönder ➔"}
-            </button>
-          </form>
+      {/* Error alert */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold text-center">
+          ⚠️ {error}
         </div>
       )}
 
-      {/* Side by Side / Multi-Vehicle Technical Spec Result Display */}
-      {comparisonResult && comparisonResult.vehicles && (
-        <div className="glass p-6 md:p-8 rounded-3xl flex flex-col gap-6 shadow-2xl overflow-hidden">
-          <h2 className="text-xl font-extrabold text-slate-200 border-b border-white/5 pb-3">📊 Detaylı Teknik Özellik Karşılaştırması</h2>
-          
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-center border-collapse min-w-[600px]">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="p-3 text-slate-500 text-xs font-bold uppercase tracking-wider text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur w-44">
-                    Parametre
-                  </th>
-                  {comparisonResult.vehicles.map((v: any, idx: number) => (
-                    <th key={v.id || idx} className="p-3">
-                      <div className="bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl font-bold text-xs md:text-sm text-orange-400">
-                        {v.name}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-xs text-slate-300">
-                {/* Engine */}
-                <tr>
-                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Motor Seçeneği</td>
-                  {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3">{v.engine}</td>
-                  ))}
-                </tr>
+      {/* 10-Section Decision UI Result Screen */}
+      {comparisonResult?.comparisonResult && (
+        <div ref={reportStartRef} className="space-y-8 animate-fadeIn">
+          {/* Fallback Notice */}
+          <FallbackNotice generationMode={comparisonResult.comparisonResult.generationMode} />
 
-                {/* Transmission */}
-                <tr>
-                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Şanzıman Tipi</td>
-                  {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3">{v.transmission}</td>
-                  ))}
-                </tr>
+          {/* Section 1: Executive Summary */}
+          <DecisionSummary
+            headline={comparisonResult.comparisonResult.headline}
+            executiveSummary={comparisonResult.comparisonResult.executiveSummary}
+            overallRecommendation={comparisonResult.comparisonResult.overallRecommendation}
+          />
 
-                {/* Fuel Type */}
-                <tr>
-                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Yakıt Türü</td>
-                  {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3">{v.fuelType}</td>
-                  ))}
-                </tr>
+          {/* Section 2: Quick Scenario Cards */}
+          <ScenarioCards scenarios={comparisonResult.comparisonResult.scenarioRecommendations} />
 
-                {/* Trim */}
-                <tr>
-                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">Donanım Paketi</td>
-                  {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3">{v.trim}</td>
-                  ))}
-                </tr>
+          {/* Section 3: Narrative Advice */}
+          <NarrativeAdvice narrativeRecommendation={comparisonResult.comparisonResult.narrativeRecommendation} />
 
-                {/* Dynamic Specs */}
-                {Object.keys(comparisonResult.specComparison || {}).map((key) => {
-                  const specObj = comparisonResult.specComparison[key];
-                  return (
-                    <tr key={key}>
-                      <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">
-                        {specObj.label}
-                      </td>
-                      {comparisonResult.vehicles.map((v: any, idx: number) => {
-                        const val = Array.isArray(specObj.values) ? specObj.values[idx] : (idx === 0 ? specObj.v1 : specObj.v2);
-                        return (
-                          <td key={v.id || idx} className="p-3 font-bold text-slate-200">
-                            {val || "-"}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+          {/* Section 4: Decision Matrix */}
+          <DecisionMatrix matrix={comparisonResult.comparisonResult.decisionMatrix} />
 
-                {/* Problems count */}
-                <tr>
-                  <td className="p-3 font-semibold text-slate-400 text-left sticky left-0 bg-[#0b0f19]/90 backdrop-blur">
-                    Sık Karşılaşılan Durumlar
-                  </td>
-                  {comparisonResult.vehicles.map((v: any) => (
-                    <td key={v.id} className="p-3 font-bold text-red-400">
-                      {v.problemsCount} Adet
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* Section 5: Vehicle Verdict Grid */}
+          <VehicleVerdictGrid verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
+
+          {/* Section 6: Risk Comparison */}
+          <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
+
+          {/* Section 7: Ownership Comparison */}
+          <OwnershipComparison ownershipCostComparison={comparisonResult.comparisonResult.ownershipCostComparison} />
+
+          {/* Section 8: Pre-Purchase Checks */}
+          <PrePurchaseChecks verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
+
+          {/* Section 9: Technical Comparison Table (Accordion + Horizontal Scroll) */}
+          <TechnicalComparisonTable vehicles={comparisonResult.vehicles || []} />
+
+          {/* Section 10: Context-Aware Live AI Chatbot */}
+          <ComparisonChatbot
+            variantIds={matchedVariantIds}
+            vehicleNames={(comparisonResult.vehicles || []).map((v: any) => v.name)}
+            remainingMessages={remainingQuota || 30}
+          />
         </div>
       )}
 

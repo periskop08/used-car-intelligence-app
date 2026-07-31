@@ -233,3 +233,233 @@ export function formatFuelType(fuelType: string | null | undefined): string {
   if (u === 'LPG' || u.includes('LPG')) return 'LPG & Benzin';
   return 'Benzin';
 }
+
+// ----------------------------------------------------
+// TorqueScout Advanced AI Comparison Engine (v5.0) Types
+// ----------------------------------------------------
+
+export type ComparisonPriority =
+  | 'BALANCED'
+  | 'FUEL_ECONOMY'
+  | 'COMFORT'
+  | 'PERFORMANCE'
+  | 'HANDLING'
+  | 'LOW_MAINTENANCE'
+  | 'FAMILY'
+  | 'CITY_USE'
+  | 'HIGHWAY'
+  | 'RESALE_VALUE';
+
+export interface ScenarioScore {
+  score: number | null;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  positiveFactors: string[];
+  negativeFactors: string[];
+  missingInputs: string[];
+}
+
+export interface DataWarning {
+  vehicleId?: string;
+  section: 'TECHNICAL' | 'RELIABILITY' | 'OWNERSHIP' | 'RESALE' | 'COMFORT' | 'GENERAL';
+  message: string;
+  severity: 'INFO' | 'WARNING';
+}
+
+export interface ComparisonProblem {
+  title: string;
+  affectedComponent?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  frequency?: 'RARE' | 'OCCASIONAL' | 'COMMON' | 'VERY_COMMON';
+  estimatedCostMin?: number;
+  estimatedCostMax?: number;
+  typicalMileageFrom?: number;
+  typicalMileageTo?: number;
+  preventiveAction?: string;
+  inspectionHint?: string;
+  confidence?: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface ComparisonRecall {
+  title: string;
+  description: string;
+  safetyRisk?: string;
+  remedy?: string;
+}
+
+export interface ComparisonVehicleProfile {
+  vehicleId: string;
+  displayName: string;
+  identity: {
+    brand: string;
+    model: string;
+    generation?: string;
+    year: number;
+    bodyType?: string;
+    engine?: string;
+    engineCode?: string;
+    transmission?: string;
+    transmissionCode?: string;
+    fuelType?: string;
+    trim?: string;
+    drivetrain?: string;
+    market?: string;
+  };
+  performance: {
+    horsepower?: number;
+    torqueNm?: number;
+    zeroToHundred?: number;
+    topSpeed?: number;
+    drivingCharacter?: string;
+  };
+  efficiency: {
+    combinedConsumption?: number;
+    cityConsumption?: number;
+    highwayConsumption?: number;
+    fuelEconomySummary?: string;
+  };
+  practicality: {
+    bootLitres?: number;
+    rearSeatSpace?: string;
+    cityUsability?: string;
+    familyUsability?: string;
+    parkingEase?: string;
+  };
+  comfortAndHandling: {
+    rideComfort?: number;
+    handling?: number;
+    cabinNoise?: number;
+    longDistanceComfort?: number;
+    badWeatherConfidence?: number;
+    summary?: string;
+  };
+  ownership: {
+    routineMaintenanceCost?: number;
+    partsCost?: number;
+    serviceAvailability?: number;
+    resaleDemand?: number;
+    depreciationRisk?: number;
+    ownershipSummary?: string;
+  };
+  reliability: {
+    buyabilityScore?: number;
+    riskScore?: number;
+    problems: ComparisonProblem[];
+    recalls?: ComparisonRecall[];
+    reliabilitySummary?: string;
+  };
+  sellerQuestions: string[];
+  inspectionChecklist: string[];
+  evidenceQuality?: {
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    missingFields: string[];
+  };
+  calculatedScenarioScores?: Record<string, ScenarioScore>;
+}
+
+export interface ScenarioRecommendation {
+  scenarioKey: string;
+  title: string;
+  recommendedVehicleIds: string[];
+  recommendedVehicleNames: string[];
+  reasoning: string;
+  caveat?: string;
+}
+
+export interface VehicleVerdict {
+  vehicleId: string;
+  vehicleName: string;
+  characterSummary: string;
+  bestFor: string[];
+  notIdealFor: string[];
+  gains: string[];
+  compromises: string[];
+  criticalRisks: string[];
+  prePurchaseChecks: string[];
+}
+
+export interface DecisionMatrixRow {
+  criterion: string;
+  winnerVehicleIds: string[];
+  winnerNames: string[];
+  reason: string;
+}
+
+export interface FinalDecisionGuideRow {
+  priority: string;
+  recommendedVehicleName: string;
+  explanation: string;
+}
+
+export interface VehicleComparisonResult {
+  comparisonId: string;
+  schemaVersion: '5.0';
+  promptVersion: '5';
+  engineVersion: 'comparison-v5';
+  generationMode: 'AI' | 'FALLBACK';
+  generatedAt: string;
+  sourceDataVersion: string;
+  selectedPriority: ComparisonPriority;
+  headline: string;
+  executiveSummary: string;
+  overallRecommendation: {
+    vehicleId?: string;
+    vehicleName?: string;
+    label: string;
+    reasoning: string;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  };
+  scenarioRecommendations: ScenarioRecommendation[];
+  vehicleVerdicts: VehicleVerdict[];
+  riskComparison: {
+    narrative: string;
+    lowestRiskVehicleId?: string;
+    highestRiskVehicleId?: string;
+  };
+  ownershipCostComparison: {
+    narrative: string;
+    lowestEstimatedCostVehicleId?: string;
+    highestEstimatedCostVehicleId?: string;
+  };
+  narrativeRecommendation: string;
+  decisionMatrix: DecisionMatrixRow[];
+  finalDecisionGuide: FinalDecisionGuideRow[];
+  dataWarnings: DataWarning[];
+}
+
+export const SCENARIO_SCORING_CONFIG = {
+  cityUse: {
+    weights: {
+      combinedConsumption: 0.35,
+      bootLitres: 0.15,
+      horsepower: 0.10,
+      zeroToHundred: 0.10,
+      riskScore: 0.30,
+    },
+    minInputsPct: 0.40, // >= 40% returns score, >= 70% HIGH confidence
+  },
+  highwayUse: {
+    weights: {
+      horsepower: 0.30,
+      torqueNm: 0.20,
+      zeroToHundred: 0.20,
+      combinedConsumption: 0.15,
+      bootLitres: 0.15,
+    },
+    minInputsPct: 0.40,
+  },
+  fuelEconomy: {
+    weights: {
+      combinedConsumption: 0.80,
+      horsepower: 0.20,
+    },
+    minInputsPct: 0.40,
+  },
+  reliability: {
+    weights: {
+      riskScore: 0.70,
+      buyabilityScore: 0.30,
+    },
+    minInputsPct: 0.40,
+  },
+};
+

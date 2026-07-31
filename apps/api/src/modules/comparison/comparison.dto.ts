@@ -16,6 +16,16 @@ export class CompareVehiclesDto {
   @IsUUID()
   @IsOptional()
   variant2Id?: string;
+
+  @ApiProperty({ description: 'Aynı isteğin tekrarlanmasını önleyen benzersiz Idempotency UUID anahtarı' })
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string;
+
+  @ApiProperty({ description: 'Kullanıcının karşılaştırma önceliği (örn: BALANCED, FUEL_ECONOMY, COMFORT vb.)' })
+  @IsString()
+  @IsOptional()
+  selectedPriority?: string;
 }
 
 export class ComparisonChatDto {
