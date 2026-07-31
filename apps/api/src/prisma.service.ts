@@ -16,6 +16,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   private async ensureClubTablesExist() {
     const sqlStatements = [
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'TANISMA';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'YETKIN';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'PROFESYONEL';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'FREE';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'STANDARD';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'PREMIUM';`,
+      `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'PRO';`,
+
       `DO $$ 
       BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ClubPostStatus') THEN

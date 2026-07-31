@@ -75,7 +75,30 @@ export class AuthService implements OnModuleInit {
       if (err.code === 'P2002') {
         throw new ConflictException('Bu e-posta adresi zaten kayıtlı. Lütfen Giriş Yapın.');
       }
-      throw new BadRequestException('Kayıt oluşturulurken bir hata oluştu: ' + (err?.message || 'Bilinmeyen hata'));
+
+      // Fallback for legacy PostgreSQL enum "SubscriptionTier" values
+      const fallbackTier =
+        assignedTier === SubscriptionTier.TANISMA
+          ? SubscriptionTier.FREE
+          : assignedTier === SubscriptionTier.YETKIN
+          ? SubscriptionTier.STANDARD
+          : assignedTier === SubscriptionTier.PROFESYONEL
+          ? SubscriptionTier.PREMIUM
+          : SubscriptionTier.FREE;
+
+      try {
+        user = await this.prisma.user.create({
+          data: {
+            email: cleanEmail,
+            passwordHash: dto.password,
+            role: assignedRole,
+            subscriptionTier: fallbackTier,
+            preferredLanguageCode: 'tr',
+          },
+        });
+      } catch (fallbackErr: any) {
+        throw new BadRequestException('Kayıt oluşturulurken bir hata oluştu: ' + (fallbackErr?.message || err?.message || 'Bilinmeyen hata'));
+      }
     }
 
     if (assignedTier !== SubscriptionTier.TANISMA && assignedTier !== SubscriptionTier.FREE) {
