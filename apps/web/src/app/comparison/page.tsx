@@ -12,6 +12,7 @@ import ScenarioCards from "./components/ScenarioCards";
 import RiskComparison from "./components/RiskComparison";
 import PrePurchaseChecks from "./components/PrePurchaseChecks";
 import TechnicalComparisonTable from "./components/TechnicalComparisonTable";
+import QuotaBadge from "@/components/QuotaBadge";
 import ComparisonChatbot from "./components/ComparisonChatbot";
 import { adaptLegacyComparisonResult } from "@used-car-intelligence/shared";
 
@@ -649,6 +650,9 @@ export default function ComparisonPage() {
           Araçları yan yana getirerek teknik özelliklerini ve yapay zekâ destekli durum analizini inceleyin.
         </p>
       </div>
+
+      {/* Quota Banner */}
+      <QuotaBadge feature="comparisons" />
 
       {/* Dynamic Selectors Grid */}
       <div className={`grid grid-cols-1 ${

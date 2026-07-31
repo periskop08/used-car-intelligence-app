@@ -11,6 +11,8 @@ const PAINTED_COMPONENTS = [
   "LEFT_FRONT_FENDER", "LEFT_REAR_FENDER", "RIGHT_FRONT_FENDER", "RIGHT_REAR_FENDER"
 ];
 
+import QuotaBadge from "@/components/QuotaBadge";
+
 export default function CreateListing() {
   const router = useRouter();
 
@@ -375,6 +377,8 @@ export default function CreateListing() {
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-12 flex flex-col gap-8">
+      <QuotaBadge feature="activeListings" />
+
       {/* Step Indicator Header */}
       <div className="flex flex-col gap-3">
         <h1 className="text-2xl font-black text-slate-200">Araç İlanı Ekle</h1>
