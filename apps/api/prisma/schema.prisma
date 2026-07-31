@@ -230,6 +230,16 @@ model User {
   conversationsAsSeller  Conversation[]            @relation("SellerConversations")
   sentMessages           Message[]
 
+  clubPosts                   ClubPost[]                @relation("ClubPostAuthor")
+  clubPostMediaUploaded       ClubPostMedia[]           @relation("ClubMediaUploadedBy")
+  clubComments                ClubComment[]             @relation("ClubCommentAuthor")
+  clubModeratorAssignments    ClubModeratorAssignment[] @relation("ClubModeratorUser")
+  clubModeratorsAssigned      ClubModeratorAssignment[] @relation("ClubModeratorAssignedBy")
+  clubRestrictions            ClubRestriction[]         @relation("ClubRestrictedUser")
+  clubRestrictionsCreated     ClubRestriction[]         @relation("ClubRestrictionCreatedBy")
+  clubModerationLogs          ClubModerationLog[]       @relation("ClubModerationActor")
+  clubPostLikes               ClubPostLike[]            @relation("ClubLikedByUser")
+
   preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
   createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
   approvedVariants   VehicleVariant[]          @relation("VariantApprovedBy")
@@ -1320,21 +1330,30 @@ model SavedSearch {
   @@index([userId])
 }
 
-model Conversation {
-  id            String         @id @default(uuid())
-  listingId     String
-  buyerId       String
-  sellerId      String
-  lastMessageAt DateTime       @default(now())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+enum ConversationContextType {
+  LISTING
+  CLUB_ADMIN
+  SUPPORT
+}
 
-  listing       VehicleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  buyer         User           @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
-  seller        User           @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
-  messages      Message[]
+model Conversation {
+  id              String                  @id @default(uuid())
+  contextType     ConversationContextType @default(LISTING)
+  contextEntityId String?
+  listingId       String?
+  buyerId         String
+  sellerId        String
+  lastMessageAt   DateTime                @default(now())
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  listing         VehicleListing?         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer           User                    @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller          User                    @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages        Message[]
 
   @@unique([listingId, buyerId, sellerId])
+  @@index([contextType])
   @@index([buyerId])
   @@index([sellerId])
 }
@@ -1733,6 +1752,152 @@ model AiVehicleComparisonCache {
   updatedAt    DateTime @updatedAt
 
   @@index([cacheKey])
+}
+
+enum ClubPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ClubCommentStatus {
+  VISIBLE
+  HIDDEN
+  PENDING_REVIEW
+  DELETED
+}
+
+enum ClubRestrictionType {
+  MUTE
+  BAN
+}
+
+enum ClubMediaStatus {
+  TEMP
+  ATTACHED
+  DELETED
+}
+
+model ClubPost {
+  id              String         @id @default(uuid())
+  authorId        String
+  title           String?
+  content         String
+  status          ClubPostStatus @default(DRAFT)
+  commentsEnabled Boolean        @default(true)
+  isPinned        Boolean        @default(false)
+  pinnedOrder     Int?
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  author          User           @relation("ClubPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  media           ClubPostMedia[]
+  comments        ClubComment[]
+  likes           ClubPostLike[]
+
+  @@index([status, isPinned, pinnedOrder, publishedAt])
+  @@index([authorId])
+}
+
+model ClubPostMedia {
+  id           String          @id @default(uuid())
+  postId       String?
+  mediaType    String          @default("IMAGE")
+  mediaUrl     String
+  thumbnailUrl String?
+  sortOrder    Int             @default(0)
+  status       ClubMediaStatus @default(TEMP)
+  uploadedById String
+  expiresAt    DateTime?
+  createdAt    DateTime        @default(now())
+
+  post         ClubPost?       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  uploadedBy   User            @relation("ClubMediaUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([postId, sortOrder])
+  @@index([status, expiresAt])
+}
+
+model ClubComment {
+  id        String            @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  status    ClubCommentStatus @default(VISIBLE)
+  editedAt  DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  deletedAt DateTime?
+
+  post      ClubPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User              @relation("ClubCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, status, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model ClubModeratorAssignment {
+  id                String    @id @default(uuid())
+  userId            String
+  assignedByAdminId String
+  assignedAt        DateTime  @default(now())
+  revokedByAdminId  String?
+  revokedAt         DateTime?
+
+  user            User      @relation("ClubModeratorUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedByAdmin User      @relation("ClubModeratorAssignedBy", fields: [assignedByAdminId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model ClubRestriction {
+  id          String              @id @default(uuid())
+  userId      String
+  type        ClubRestrictionType
+  reason      String
+  startsAt    DateTime            @default(now())
+  expiresAt   DateTime?
+  createdById String
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime            @default(now())
+
+  user        User                @relation("ClubRestrictedUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy   User                @relation("ClubRestrictionCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, revokedAt, expiresAt])
+}
+
+model ClubModerationLog {
+  id           String   @id @default(uuid())
+  actorId      String
+  actorRole    String
+  actionType   String
+  targetUserId String?
+  postId       String?
+  commentId    String?
+  reason       String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  actor        User     @relation("ClubModerationActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model ClubPostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      ClubPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation("ClubLikedByUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
 }
 
 

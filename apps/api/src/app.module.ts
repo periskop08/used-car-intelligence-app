@@ -17,6 +17,7 @@ import { SavedSearchModule } from './modules/saved-search/saved-search.module';
 import { MessageModule } from './modules/message/message.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { VehicleDiscoveryModule } from './modules/vehicle-discovery/vehicle-discovery.module';
+import { ClubModule } from './modules/club/club.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { VehicleDiscoveryModule } from './modules/vehicle-discovery/vehicle-disc
     MessageModule,
     FeedbackModule,
     VehicleDiscoveryModule,
+    ClubModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

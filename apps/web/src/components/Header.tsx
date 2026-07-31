@@ -193,6 +193,13 @@ export default function Header() {
           Paketler
         </a>
 
+        {/* 5. Tork Scout Club */}
+        <a href="/club" className={`text-sm font-semibold transition flex items-center gap-1 ${
+          pathname.startsWith("/club") ? "text-orange-500 font-bold border-b-2 border-orange-500 pb-0.5" : "text-slate-300 hover:text-orange-500"
+        }`}>
+          <span>Tork Scout Club</span>
+        </a>
+
       </nav>
 
       {/* Right side area: profile or login */}
