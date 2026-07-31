@@ -5,11 +5,17 @@ import { ValidationPipe } from '@nestjs/common';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
+import { json, urlencoded } from 'express';
+
 // Load root level environment variables
 dotenv.config({ path: path.join(__dirname, '../../../../.env') });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Increase payload limit for photo uploads & base64 content
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Configure CORS
   app.enableCors({

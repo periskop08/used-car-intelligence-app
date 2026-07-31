@@ -404,11 +404,20 @@ export class ClubService {
       const uploadResult = await this.r2Service.uploadImage(file.buffer, 'club');
       return { url: uploadResult.url };
     } catch (err) {
-      this.logger.warn('R2 Service upload failed or unconfigured, returning data URL fallback', err);
-      const mime = file.mimetype || 'image/jpeg';
-      const base64 = file.buffer.toString('base64');
-      const dataUrl = `data:${mime};base64,${base64}`;
-      return { url: dataUrl };
+      this.logger.warn('R2 Service upload failed or unconfigured, returning optimized data URL fallback', err);
+      try {
+        const sharp = require('sharp');
+        const optimizedBuffer = await sharp(file.buffer)
+          .resize(1200, null, { withoutEnlargement: true, fit: 'inside' })
+          .webp({ quality: 75 })
+          .toBuffer();
+        const base64 = optimizedBuffer.toString('base64');
+        return { url: `data:image/webp;base64,${base64}` };
+      } catch (sharpErr) {
+        const mime = file.mimetype || 'image/jpeg';
+        const base64 = file.buffer.toString('base64');
+        return { url: `data:${mime};base64,${base64}` };
+      }
     }
   }
 
