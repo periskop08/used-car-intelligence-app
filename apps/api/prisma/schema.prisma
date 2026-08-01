@@ -117,6 +117,7 @@ enum TransmissionType {
 enum FeatureKey {
   AI_CHAT
   VEHICLE_COMPARISON
+  AI_REPORT
 }
 
 enum UsagePeriodType {

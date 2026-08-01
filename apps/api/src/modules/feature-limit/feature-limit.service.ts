@@ -118,6 +118,46 @@ export class FeatureLimitService {
         });
       }
 
+      if (featureKey === FeatureKey.AI_REPORT) {
+        const epochStart = new Date(0);
+        const usage = await tx.featureUsage.upsert({
+          where: {
+            userId_featureKey_periodType_periodStart: {
+              userId,
+              featureKey,
+              periodType: UsagePeriodType.LIFETIME,
+              periodStart: epochStart,
+            },
+          },
+          update: {},
+          create: {
+            userId,
+            featureKey,
+            periodType: UsagePeriodType.LIFETIME,
+            periodStart: epochStart,
+            count: 0,
+          },
+        });
+
+        const activeSub = await tx.subscription.findFirst({
+          where: { userId, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+          include: { plan: true },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        const tier = activeSub?.plan?.tier || user.subscriptionTier || SubscriptionTier.TANISMA;
+        const baseLimit = tier === SubscriptionTier.PROFESYONEL ? 50 : tier === SubscriptionTier.YETKIN ? 10 : 3;
+
+        if (usage.count >= baseLimit) {
+          throw new HttpException('AI Araç Raporu alma kotanız dolmuştur. Paketinizi yükseltebilirsiniz.', HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        await tx.featureUsage.update({
+          where: { id: usage.id },
+          data: { count: usage.count + 1 },
+        });
+      }
+
       if (featureKey === FeatureKey.VEHICLE_COMPARISON) {
         const config = limits.vehicleComparison;
         if (config.limit === null) return; // Unlimited

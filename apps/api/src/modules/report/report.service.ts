@@ -25,7 +25,7 @@ export class ReportService {
     }
 
     // 1. Transaction-safe limit check & usage increment
-    await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
+    await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_REPORT);
 
     // 2. Fetch variant with relations
     const variant = await this.prisma.vehicleVariant.findUnique({

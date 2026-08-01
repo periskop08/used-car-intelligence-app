@@ -23,6 +23,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'STANDARD';`,
       `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'PREMIUM';`,
       `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'PRO';`,
+      `ALTER TYPE "FeatureKey" ADD VALUE IF NOT EXISTS 'AI_REPORT';`,
 
       `DO $$ 
       BEGIN

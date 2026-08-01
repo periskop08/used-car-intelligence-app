@@ -150,7 +150,7 @@ export class SubscriptionService {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const [aiChatUsage, comparisonUsage, activeListingsCount] = await Promise.all([
+    const [aiChatUsage, comparisonUsage, aiReportUsage, activeListingsCount] = await Promise.all([
       this.prisma.featureUsage.findUnique({
         where: {
           userId_featureKey_periodType_periodStart: {
@@ -171,6 +171,16 @@ export class SubscriptionService {
           },
         },
       }).catch(() => null),
+      this.prisma.featureUsage.findUnique({
+        where: {
+          userId_featureKey_periodType_periodStart: {
+            userId,
+            featureKey: FeatureKey.AI_REPORT,
+            periodType: UsagePeriodType.LIFETIME,
+            periodStart: new Date(0),
+          },
+        },
+      }).catch(() => null),
       this.prisma.vehicleListing.count({
         where: { sellerId: userId, status: 'ACTIVE' },
       }).catch(() => 0),
@@ -178,11 +188,12 @@ export class SubscriptionService {
 
     const usedAiChat = aiChatUsage?.count || 0;
     const usedComparisons = comparisonUsage?.count || 0;
+    const usedAiReports = aiReportUsage?.count || 0;
 
     const remainingAiChat = Math.max(0, baseAiChat - usedAiChat) + extraChatMessages;
     const remainingComparisons = Math.max(0, baseComparisons - usedComparisons);
     const remainingActiveListings = Math.max(0, baseActiveListings - activeListingsCount);
-    const remainingAiReports = Math.max(0, baseAiReports) + extraAiReports;
+    const remainingAiReports = Math.max(0, (baseAiReports + extraAiReports) - usedAiReports);
 
     return {
       tier: effectiveTier,
@@ -191,7 +202,7 @@ export class SubscriptionService {
       rights: {
         aiReports: {
           totalLimit: baseAiReports + extraAiReports,
-          used: 0,
+          used: usedAiReports,
           remaining: remainingAiReports,
           isUnlimited: false,
         },
