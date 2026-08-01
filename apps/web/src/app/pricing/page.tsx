@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Header from "@/components/Header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -72,12 +71,10 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070913] text-slate-100 selection:bg-orange-500 selection:text-white flex flex-col justify-between">
-      <Header />
-
-      <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-16">
+    <div className="w-full bg-[#060813] text-slate-100 selection:bg-orange-500 selection:text-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto space-y-16">
         {/* Page Hero Section */}
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
+        <div className="text-center space-y-4 max-w-3xl mx-auto pt-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold">
             <span>💎</span> TorqueScout Üyelik Paketleri
           </div>
@@ -377,7 +374,7 @@ export default function PricingPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
