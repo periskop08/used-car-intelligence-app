@@ -21,6 +21,7 @@ import {
   MuteUserDto,
   BanUserDto,
   AdminDirectMessageDto,
+  UpdateClubSettingsDto,
 } from './club.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Role } from '@prisma/client';
@@ -154,6 +155,86 @@ export class AdminClubController {
   ) {
     this.verifyAdminOnly(req);
     return this.clubService.sendAdminDirectMessage(userId, req.user.id, dto);
+  }
+
+  @Get('dashboard')
+  async getDashboardData(@Req() req: any) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.getAdminDashboardData();
+  }
+
+  @Get('posts')
+  async getPosts(@Query('status') status: string, @Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.getAdminPosts(status);
+  }
+
+  @Get('comments')
+  async getComments(
+    @Query('status') status: string,
+    @Query('customerNo') customerNo: string,
+    @Req() req: any,
+  ) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.getAdminComments(status, customerNo);
+  }
+
+  @Get('moderators')
+  async getModerators(@Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.getAdminModerators();
+  }
+
+  @Get('restrictions')
+  async getRestrictions(
+    @Query('type') type: string,
+    @Query('status') status: string,
+    @Req() req: any,
+  ) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.getAdminRestrictions(type, status);
+  }
+
+  @Get('users/search')
+  async searchUsers(@Query('q') query: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    const isModerator = role === 'MODERATOR';
+    return this.clubService.searchUsers(query, isModerator);
+  }
+
+  @Get('users/:customerNo')
+  async getClubUserProfile(@Param('customerNo') customerNo: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    const isModerator = role === 'MODERATOR';
+    return this.clubService.getClubUserProfile(customerNo, isModerator);
+  }
+
+  @Get('conversations')
+  async getConversations(@Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.getClubAdminConversations();
+  }
+
+  @Get('reports')
+  async getReports(
+    @Query('section') section: string,
+    @Query('range') range: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminOnly(req);
+    return this.clubService.getClubReports(section, range);
+  }
+
+  @Get('settings')
+  async getSettings(@Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.getClubSettings();
+  }
+
+  @Patch('settings')
+  async updateSettings(@Body() dto: UpdateClubSettingsDto, @Req() req: any) {
+    this.verifyAdminOnly(req);
+    return this.clubService.updateClubSettings(dto);
   }
 
   @Get('stats')

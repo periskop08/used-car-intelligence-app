@@ -105,3 +105,59 @@ export class ReorderPinnedPostsDto {
   @IsString({ each: true })
   postIds: string[];
 }
+
+export type ClubDashboardStatKey =
+  | 'TOTAL_POSTS'
+  | 'PUBLISHED_POSTS'
+  | 'TOTAL_COMMENTS'
+  | 'PENDING_COMMENTS'
+  | 'ACTIVE_MODERATORS'
+  | 'ACTIVE_MUTES'
+  | 'ACTIVE_BANS';
+
+export interface ClubDashboardStat {
+  key: ClubDashboardStatKey;
+  label: string;
+  value: number;
+  secondaryText?: string;
+  trend?: {
+    value: number;
+    direction: 'UP' | 'DOWN' | 'FLAT';
+    period: string;
+  };
+  severity?: 'NORMAL' | 'INFO' | 'WARNING' | 'CRITICAL';
+}
+
+export class UpdateClubSettingsDto {
+  @IsOptional()
+  @IsString()
+  rulesText?: string;
+
+  @IsOptional()
+  @IsString()
+  supportUrl?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  @Max(3000)
+  commentCharLimit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(60)
+  commentRateLimitSeconds?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  dailyCommentLimit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  maxImagesPerPost?: number;
+}
