@@ -21,6 +21,45 @@ interface PostGroup {
     hidden: number;
     deleted: number;
   };
+  commentsList?: any[];
+}
+
+function normalizeCommentGroups(data: any): PostGroup[] {
+  if (!data || !Array.isArray(data)) return [];
+
+  // Case A: Data is already grouped by post ({ post: {...}, counts: {...} })
+  if (data.length > 0 && data[0]?.post && data[0]?.counts) {
+    return data.filter((g) => g && g.post && g.post.id);
+  }
+
+  // Case B: Data is a flat array of comments ([{ id, content, post: { id, title } }])
+  const groupMap: Record<string, PostGroup & { commentsList: any[] }> = {};
+
+  for (const c of data) {
+    if (!c) continue;
+    const pId = c.post?.id || c.postId || "general";
+    const pTitle = c.post?.title || "Genel Topluluk Gönderisi";
+    const pStatus = c.post?.status || "PUBLISHED";
+    const pDate = c.post?.createdAt || c.createdAt;
+
+    if (!groupMap[pId]) {
+      groupMap[pId] = {
+        post: { id: pId, title: pTitle, status: pStatus, createdAt: pDate },
+        counts: { total: 0, visible: 0, pendingReview: 0, hidden: 0, deleted: 0 },
+        commentsList: [],
+      };
+    }
+
+    groupMap[pId].counts.total++;
+    if (c.status === "VISIBLE") groupMap[pId].counts.visible++;
+    else if (c.status === "PENDING_REVIEW") groupMap[pId].counts.pendingReview++;
+    else if (c.status === "HIDDEN") groupMap[pId].counts.hidden++;
+    else if (c.status === "DELETED") groupMap[pId].counts.deleted++;
+
+    groupMap[pId].commentsList.push(c);
+  }
+
+  return Object.values(groupMap);
 }
 
 export default function AdminClubCommentsPage() {
@@ -48,7 +87,7 @@ export default function AdminClubCommentsPage() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (!res.ok && res.status === 404) {
+      if (!res.ok) {
         res = await fetch(
           `${API_URL}/admin/club/comments/groups?status=${encodeURIComponent(statusFilter)}`,
           {
@@ -56,11 +95,43 @@ export default function AdminClubCommentsPage() {
           }
         );
       }
+      if (!res.ok) {
+        res = await fetch(
+          `${API_URL}/api/admin/club/comments?status=${encodeURIComponent(statusFilter)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+      if (!res.ok) {
+        res = await fetch(
+          `${API_URL}/admin/club/comments?status=${encodeURIComponent(statusFilter)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
       if (res.ok) {
         const data = await res.json();
-        setGroups(data);
+        const normalized = normalizeCommentGroups(data);
+        setGroups(normalized);
+
+        // Pre-populate postCommentsMap if normalized groups contain inline commentsList
+        const initialCommentsMap: Record<string, any[]> = {};
+        normalized.forEach((g) => {
+          if (g.commentsList && g.commentsList.length > 0) {
+            initialCommentsMap[g.post.id] = g.commentsList;
+          }
+        });
+        if (Object.keys(initialCommentsMap).length > 0) {
+          setPostCommentsMap((prev) => ({ ...initialCommentsMap, ...prev }));
+        }
+      } else {
+        setGroups([]);
       }
     } catch (e) {
+      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -82,7 +153,7 @@ export default function AdminClubCommentsPage() {
     next.add(postId);
     setExpandedPostIds(next);
 
-    if (!postCommentsMap[postId]) {
+    if (!postCommentsMap[postId] || postCommentsMap[postId].length === 0) {
       fetchCommentsForPost(postId);
     }
   };
@@ -99,7 +170,7 @@ export default function AdminClubCommentsPage() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (!res.ok && res.status === 404) {
+      if (!res.ok) {
         res = await fetch(
           `${API_URL}/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
           {
@@ -109,7 +180,8 @@ export default function AdminClubCommentsPage() {
       }
       if (res.ok) {
         const data = await res.json();
-        setPostCommentsMap((prev) => ({ ...prev, [postId]: data.comments || [] }));
+        const list = Array.isArray(data) ? data : Array.isArray(data?.comments) ? data.comments : [];
+        setPostCommentsMap((prev) => ({ ...prev, [postId]: list }));
       }
     } catch (e) {
     } finally {
@@ -130,7 +202,7 @@ export default function AdminClubCommentsPage() {
         },
         body: action === "hide" ? JSON.stringify({ reason: "Moderasyon kararı" }) : undefined,
       });
-      if (!res.ok && res.status === 404) {
+      if (!res.ok) {
         res = await fetch(`${API_URL}/admin/club/comments/${commentId}/${action}`, {
           method: "POST",
           headers: {
@@ -174,7 +246,7 @@ export default function AdminClubCommentsPage() {
           targetStatus,
         }),
       });
-      if (!res.ok && res.status === 404) {
+      if (!res.ok) {
         res = await fetch(`${API_URL}/admin/club/comments/bulk-status`, {
           method: "POST",
           headers: {
@@ -190,7 +262,6 @@ export default function AdminClubCommentsPage() {
       if (res.ok) {
         setSelectedCommentIds(new Set());
         fetchGroups();
-        // Refresh open accordions
         expandedPostIds.forEach((pId) => fetchCommentsForPost(pId));
       }
     } catch (e) {
@@ -280,6 +351,7 @@ export default function AdminClubCommentsPage() {
       ) : (
         <div className="space-y-4">
           {groups.map((grp) => {
+            if (!grp || !grp.post) return null;
             const isExpanded = expandedPostIds.has(grp.post.id);
             const comments = postCommentsMap[grp.post.id] || [];
             const isCommentsLoading = loadingCommentsMap[grp.post.id];
@@ -298,15 +370,15 @@ export default function AdminClubCommentsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-white">{grp.post.title || "Başlıksız Gönderi"}</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
-                        {grp.post.status}
+                        {grp.post.status || "PUBLISHED"}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                      <span>Toplam: {grp.counts.total}</span>
-                      <span className="text-emerald-400">Görünür: {grp.counts.visible}</span>
-                      <span className="text-amber-400">İncelemede: {grp.counts.pendingReview}</span>
-                      <span className="text-rose-400">Gizli: {grp.counts.hidden}</span>
+                      <span>Toplam: {grp.counts?.total ?? 0}</span>
+                      <span className="text-emerald-400">Görünür: {grp.counts?.visible ?? 0}</span>
+                      <span className="text-amber-400">İncelemede: {grp.counts?.pendingReview ?? 0}</span>
+                      <span className="text-rose-400">Gizli: {grp.counts?.hidden ?? 0}</span>
                     </div>
                   </div>
 
@@ -326,75 +398,79 @@ export default function AdminClubCommentsPage() {
                     ) : comments.length === 0 ? (
                       <p className="text-xs text-slate-500 italic py-2">Bu gönderide filtrenize uyan yorum yok.</p>
                     ) : (
-                      comments.map((c) => (
-                        <div
-                          key={c.id}
-                          className="p-3.5 rounded-xl border border-white/5 bg-slate-900/80 flex flex-col sm:flex-row items-start justify-between gap-4"
-                        >
-                          <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedCommentIds.has(c.id)}
-                              onChange={() => toggleSelectComment(c.id)}
-                              className="mt-1 rounded border-white/20 text-orange-500 focus:ring-orange-500"
-                            />
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-white">{c.authorFormatted}</span>
-                                {c.badge && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                    {c.badge}
+                      comments.map((c) => {
+                        if (!c) return null;
+                        const authorDisplay = c.authorFormatted || c.author?.firstName || "Topluluk Üyesi";
+                        return (
+                          <div
+                            key={c.id}
+                            className="p-3.5 rounded-xl border border-white/5 bg-slate-900/80 flex flex-col sm:flex-row items-start justify-between gap-4"
+                          >
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedCommentIds.has(c.id)}
+                                onChange={() => toggleSelectComment(c.id)}
+                                className="mt-1 rounded border-white/20 text-orange-500 focus:ring-orange-500"
+                              />
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-white">{authorDisplay}</span>
+                                  {c.badge && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                      {c.badge}
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                                      c.status === "VISIBLE"
+                                        ? "bg-emerald-500/20 text-emerald-400"
+                                        : c.status === "PENDING_REVIEW"
+                                        ? "bg-amber-500/20 text-amber-400"
+                                        : "bg-rose-500/20 text-rose-400"
+                                    }`}
+                                  >
+                                    {c.status}
                                   </span>
-                                )}
-                                <span
-                                  className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                                    c.status === "VISIBLE"
-                                      ? "bg-emerald-500/20 text-emerald-400"
-                                      : c.status === "PENDING_REVIEW"
-                                      ? "bg-amber-500/20 text-amber-400"
-                                      : "bg-rose-500/20 text-rose-400"
-                                  }`}
-                                >
-                                  {c.status}
+                                </div>
+                                <p className="text-xs text-slate-200">{c.content}</p>
+                                <span className="text-[10px] font-mono text-slate-500 block">
+                                  {c.createdAt ? new Date(c.createdAt).toLocaleString("tr-TR") : ""}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-200">{c.content}</p>
-                              <span className="text-[10px] font-mono text-slate-500 block">
-                                {new Date(c.createdAt).toLocaleString("tr-TR")}
-                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 self-end sm:self-center">
+                              {c.status === "VISIBLE" && (
+                                <button
+                                  onClick={() => handleAction(c.id, "review", grp.post.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold hover:bg-amber-500/30 transition"
+                                >
+                                  İncelemeye Al
+                                </button>
+                              )}
+
+                              {c.status === "PENDING_REVIEW" && (
+                                <button
+                                  onClick={() => handleAction(c.id, "restore", grp.post.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 transition"
+                                >
+                                  İncelemeden Kaldır
+                                </button>
+                              )}
+
+                              {c.status !== "HIDDEN" && (
+                                <button
+                                  onClick={() => handleAction(c.id, "hide", grp.post.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold hover:bg-rose-500/30 transition"
+                                >
+                                  Gizle
+                                </button>
+                              )}
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-1.5 self-end sm:self-center">
-                            {c.status === "VISIBLE" && (
-                              <button
-                                onClick={() => handleAction(c.id, "review", grp.post.id)}
-                                className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold hover:bg-amber-500/30 transition"
-                              >
-                                İncelemeye Al
-                              </button>
-                            )}
-
-                            {c.status === "PENDING_REVIEW" && (
-                              <button
-                                onClick={() => handleAction(c.id, "restore", grp.post.id)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 transition"
-                              >
-                                İncelemeden Kaldır
-                              </button>
-                            )}
-
-                            {c.status !== "HIDDEN" && (
-                              <button
-                                onClick={() => handleAction(c.id, "hide", grp.post.id)}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold hover:bg-rose-500/30 transition"
-                              >
-                                Gizle
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}
