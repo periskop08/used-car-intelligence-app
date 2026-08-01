@@ -980,6 +980,9 @@ export default function VehicleDetail() {
 
           {/* AI Chat Box (Custom Question Box) */}
           <div className="glass p-6 rounded-3xl flex flex-col gap-4 shadow-2xl border border-white/5 bg-slate-900/40">
+            {/* AI Chat Quota Badge */}
+            <QuotaBadge feature="aiChat" showDetails={false} />
+
             <div className="flex items-center gap-2 border-b border-white/5 pb-3">
               <span className="text-xl">💬</span>
               <div className="flex flex-col">
