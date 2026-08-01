@@ -22,6 +22,10 @@ import {
   BanUserDto,
   AdminDirectMessageDto,
   UpdateClubSettingsDto,
+  BulkCommentStatusDto,
+  BulkAssignModeratorDto,
+  BulkAdminMessageDto,
+  GetAdminUsersQueryDto,
 } from './club.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Role } from '@prisma/client';
@@ -278,5 +282,64 @@ export class AdminClubController {
     await this.verifyAdminOnly(req);
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
     return this.clubService.getModerationLogs(parsedLimit);
+  }
+
+  // ==========================
+  // V3.1 EXTENDED ENDPOINTS
+  // ==========================
+
+  @Post('restrictions/:restrictionId/revoke')
+  async revokeRestriction(@Param('restrictionId') restrictionId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.revokeRestriction(restrictionId, req.user.id, role);
+  }
+
+  @Get('comments/groups')
+  async getCommentGroups(@Query('status') status: string, @Req() req: any) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.getCommentGroups(status);
+  }
+
+  @Get('posts/:postId/comments')
+  async getPostComments(
+    @Param('postId') postId: string,
+    @Query('status') status: string,
+    @Query('cursor') cursor: string,
+    @Query('limit') limit: string,
+    @Req() req: any,
+  ) {
+    await this.verifyModeratorOrAdmin(req);
+    const parsedLimit = limit ? parseInt(limit, 10) : 25;
+    return this.clubService.getPostComments(postId, status, cursor, parsedLimit);
+  }
+
+  @Post('comments/bulk-status')
+  async bulkUpdateCommentStatus(@Body() dto: BulkCommentStatusDto, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.bulkUpdateCommentStatus(dto.commentIds, dto.targetStatus as any, req.user.id, role);
+  }
+
+  @Get('users')
+  async getAdminUsersList(@Query() query: GetAdminUsersQueryDto, @Req() req: any) {
+    await this.verifyModeratorOrAdmin(req);
+    return this.clubService.getAdminUsersList(query);
+  }
+
+  @Post('moderators/bulk-assign')
+  async bulkAssignModerators(@Body() dto: BulkAssignModeratorDto, @Req() req: any) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.bulkAssignModerators(dto.userIds, req.user.id);
+  }
+
+  @Post('messages/bulk')
+  async sendBulkAdminMessage(@Body() dto: BulkAdminMessageDto, @Req() req: any) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.sendBulkAdminMessage(dto.userIds, req.user.id, dto.content, dto.sendNotification);
+  }
+
+  @Get('messages/bulk/:jobId')
+  async getBulkMessageJobStatus(@Param('jobId') jobId: string, @Req() req: any) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.getBulkMessageJobStatus(jobId);
   }
 }

@@ -161,3 +161,64 @@ export class UpdateClubSettingsDto {
   @Max(10)
   maxImagesPerPost?: number;
 }
+
+export class BulkCommentStatusDto {
+  @IsArray()
+  @IsString({ each: true })
+  commentIds: string[];
+
+  @IsEnum(['VISIBLE', 'HIDDEN', 'PENDING_REVIEW'])
+  targetStatus: 'VISIBLE' | 'HIDDEN' | 'PENDING_REVIEW';
+}
+
+export class BulkAssignModeratorDto {
+  @IsArray()
+  @IsString({ each: true })
+  userIds: string[];
+}
+
+export class BulkAdminMessageDto {
+  @IsArray()
+  @IsString({ each: true })
+  userIds: string[];
+
+  @IsString()
+  @MinLength(1)
+  content: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sendNotification?: boolean;
+}
+
+export class GetAdminUsersQueryDto {
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  sort?: 'CREATED_AT_ASC' | 'CREATED_AT_DESC';
+
+  @IsOptional()
+  @IsString()
+  package?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}

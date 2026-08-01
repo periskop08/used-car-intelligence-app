@@ -1117,4 +1117,419 @@ export class ClubService {
       },
     });
   }
+
+  // ==========================================
+  // V3.1 EXTENDED OPERATIONS & BULK SERVICES
+  // ==========================================
+
+  async revokeRestriction(restrictionId: string, actorId: string, actorRole: string) {
+    const restriction = await this.prisma.clubRestriction.findUnique({
+      where: { id: restrictionId },
+    });
+
+    if (!restriction) {
+      throw new NotFoundException('Kısıtlama kaydı bulunamadı.');
+    }
+
+    if (restriction.revokedAt) {
+      return restriction; // Idempotent handling
+    }
+
+    if (restriction.type === ClubRestrictionType.BAN && actorRole !== 'ADMIN') {
+      throw new ForbiddenException('Club yasağını yalnızca yöneticiler kaldırabilir.');
+    }
+
+    const updated = await this.prisma.clubRestriction.update({
+      where: { id: restrictionId },
+      data: {
+        revokedAt: new Date(),
+        revokedById: actorId,
+      },
+    });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId,
+        actorRole,
+        actionType: restriction.type === ClubRestrictionType.BAN ? 'BAN_REVOKED' : 'MUTE_REVOKED',
+        targetUserId: restriction.userId,
+        reason: 'Yönetici tarafından kaldırıldı',
+      },
+    });
+
+    return updated;
+  }
+
+  async getCommentGroups(status?: string) {
+    const whereComment: any = { deletedAt: null };
+    if (status && status !== 'ALL') {
+      whereComment.status = status as ClubCommentStatus;
+    }
+
+    // Find distinct postIds with comments
+    const posts = await this.prisma.clubPost.findMany({
+      where: {
+        deletedAt: null,
+        comments: { some: whereComment },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        publishedAt: true,
+        createdAt: true,
+      },
+    });
+
+    // Fetch counts per post
+    const result = await Promise.all(
+      posts.map(async (post) => {
+        const [total, visible, pendingReview, hidden, deleted] = await Promise.all([
+          this.prisma.clubComment.count({ where: { postId: post.id, deletedAt: null } }),
+          this.prisma.clubComment.count({ where: { postId: post.id, status: ClubCommentStatus.VISIBLE, deletedAt: null } }),
+          this.prisma.clubComment.count({ where: { postId: post.id, status: ClubCommentStatus.PENDING_REVIEW, deletedAt: null } }),
+          this.prisma.clubComment.count({ where: { postId: post.id, status: ClubCommentStatus.HIDDEN, deletedAt: null } }),
+          this.prisma.clubComment.count({ where: { postId: post.id, status: ClubCommentStatus.DELETED } }),
+        ]);
+
+        return {
+          post,
+          counts: {
+            total,
+            visible,
+            pendingReview,
+            hidden,
+            deleted,
+          },
+        };
+      })
+    );
+
+    return result;
+  }
+
+  async getPostComments(postId: string, status?: string, cursor?: string, limit: number = 25) {
+    const where: any = { postId, deletedAt: null };
+    if (status && status !== 'ALL') {
+      where.status = status as ClubCommentStatus;
+    }
+
+    const comments = await this.prisma.clubComment.findMany({
+      where,
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: { select: { id: true, firstName: true, lastName: true, username: true, email: true, subscriptionTier: true } },
+      },
+    });
+
+    let nextCursor: string | undefined = undefined;
+    if (comments.length > limit) {
+      const nextItem = comments.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    return {
+      comments: comments.map(c => ({
+        ...c,
+        authorFormatted: formatUserDisplayName(c.author),
+        badge: this.resolveUserPackageBadge(c.author),
+      })),
+      nextCursor,
+    };
+  }
+
+  async bulkUpdateCommentStatus(commentIds: string[], targetStatus: ClubCommentStatus, actorId: string, actorRole: string) {
+    if (!commentIds || commentIds.length === 0) return { updatedCount: 0 };
+
+    const validComments = await this.prisma.clubComment.findMany({
+      where: { id: { in: commentIds }, deletedAt: null },
+      select: { id: true, status: true, authorId: true, postId: true },
+    });
+
+    let count = 0;
+    for (const c of validComments) {
+      if (c.status === targetStatus) continue;
+
+      await this.prisma.clubComment.update({
+        where: { id: c.id },
+        data: { status: targetStatus },
+      });
+
+      await this.prisma.clubModerationLog.create({
+        data: {
+          actorId,
+          actorRole,
+          actionType: `COMMENT_STATUS_${targetStatus}`,
+          targetUserId: c.authorId,
+          commentId: c.id,
+          postId: c.postId,
+        },
+      });
+
+      count++;
+    }
+
+    return { updatedCount: count };
+  }
+
+  async getAdminUsersList(query: any) {
+    const limit = query.limit ? parseInt(query.limit, 10) : 25;
+    const sortOrder = query.sort === 'CREATED_AT_DESC' ? 'desc' : 'asc';
+
+    const where: any = {};
+    if (query.search && query.search.trim()) {
+      const clean = query.search.trim().toLowerCase();
+      where.OR = [
+        { firstName: { contains: clean, mode: 'insensitive' } },
+        { lastName: { contains: clean, mode: 'insensitive' } },
+        { username: { contains: clean, mode: 'insensitive' } },
+        { email: { contains: clean, mode: 'insensitive' } },
+      ];
+    }
+    if (query.package) {
+      where.subscriptionTier = query.package;
+    }
+    if (query.role) {
+      where.role = query.role;
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      orderBy: { createdAt: sortOrder },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        email: true,
+        role: true,
+        subscriptionTier: true,
+        createdAt: true,
+        isActive: true,
+        _count: {
+          select: { clubComments: true },
+        },
+      },
+    });
+
+    let nextCursor: string | undefined = undefined;
+    if (users.length > limit) {
+      const nextItem = users.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    // Attach active restrictions for each user
+    const usersWithStats = await Promise.all(
+      users.map(async (u) => {
+        const activeRestrictions = await this.prisma.clubRestriction.findMany({
+          where: { userId: u.id, revokedAt: null },
+        });
+
+        const isMuted = activeRestrictions.some(r => r.type === ClubRestrictionType.MUTE);
+        const isBanned = activeRestrictions.some(r => r.type === ClubRestrictionType.BAN);
+
+        return {
+          id: u.id,
+          customerNo: formatCustomerNo(u),
+          displayName: formatUserDisplayName(u),
+          email: u.email,
+          role: u.role,
+          subscriptionTier: u.subscriptionTier,
+          badge: this.resolveUserPackageBadge(u),
+          createdAt: u.createdAt,
+          isActive: u.isActive,
+          commentCount: u._count.clubComments,
+          isMuted,
+          isBanned,
+          activeRestrictions,
+        };
+      })
+    );
+
+    return {
+      users: usersWithStats,
+      nextCursor,
+    };
+  }
+
+  async bulkAssignModerators(userIds: string[], adminId: string) {
+    if (!userIds || userIds.length === 0) {
+      return { requested: 0, assigned: 0, failed: 0, failures: [] };
+    }
+
+    const failures: { userId: string; reason: string }[] = [];
+    let assigned = 0;
+
+    for (const uId of userIds) {
+      const activeMod = await this.prisma.clubModeratorAssignment.findFirst({
+        where: { userId: uId, revokedAt: null },
+      });
+      if (activeMod) {
+        failures.push({ userId: uId, reason: 'ALREADY_MODERATOR' });
+        continue;
+      }
+
+      const activeBan = await this.prisma.clubRestriction.findFirst({
+        where: { userId: uId, type: ClubRestrictionType.BAN, revokedAt: null },
+      });
+      if (activeBan) {
+        failures.push({ userId: uId, reason: 'USER_BANNED' });
+        continue;
+      }
+
+      await this.prisma.clubModeratorAssignment.create({
+        data: {
+          userId: uId,
+          assignedByAdminId: adminId,
+        },
+      });
+
+      await this.prisma.clubModerationLog.create({
+        data: {
+          actorId: adminId,
+          actorRole: 'ADMIN',
+          actionType: 'MODERATOR_ASSIGNED',
+          targetUserId: uId,
+        },
+      });
+
+      assigned++;
+    }
+
+    return {
+      requested: userIds.length,
+      assigned,
+      failed: failures.length,
+      failures,
+    };
+  }
+
+  async sendBulkAdminMessage(userIds: string[], adminId: string, content: string, sendNotification: boolean = true) {
+    if (!userIds || userIds.length === 0) {
+      throw new BadRequestException('Alıcı listesi boş olamaz.');
+    }
+
+    const job = await (this.prisma as any).clubBulkMessageJob.create({
+      data: {
+        createdByAdminId: adminId,
+        content,
+        sendNotification,
+        recipientCount: userIds.length,
+        status: 'PROCESSING',
+        startedAt: new Date(),
+      },
+    });
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const targetUserId of userIds) {
+      try {
+        let conv = await this.prisma.conversation.findFirst({
+          where: {
+            contextType: ConversationContextType.CLUB_ADMIN,
+            buyerId: targetUserId,
+            sellerId: adminId,
+          },
+        });
+
+        if (!conv) {
+          conv = await this.prisma.conversation.create({
+            data: {
+              contextType: ConversationContextType.CLUB_ADMIN,
+              buyerId: targetUserId,
+              sellerId: adminId,
+            },
+          });
+        }
+
+        const msg = await this.prisma.message.create({
+          data: {
+            conversationId: conv.id,
+            senderId: adminId,
+            body: content,
+          },
+        });
+
+        await this.prisma.conversation.update({
+          where: { id: conv.id },
+          data: { lastMessageAt: new Date() },
+        });
+
+        await (this.prisma as any).clubBulkMessageRecipient.create({
+          data: {
+            jobId: job.id,
+            userId: targetUserId,
+            conversationId: conv.id,
+            status: 'SENT',
+            processedAt: new Date(),
+          },
+        });
+
+        successCount++;
+      } catch (err: any) {
+        failureCount++;
+        await (this.prisma as any).clubBulkMessageRecipient.create({
+          data: {
+            jobId: job.id,
+            userId: targetUserId,
+            status: 'FAILED',
+            errorCode: err.message || 'UNKNOWN_ERROR',
+            processedAt: new Date(),
+          },
+        });
+      }
+    }
+
+    const finalStatus = failureCount === 0 ? 'COMPLETED' : successCount === 0 ? 'FAILED' : 'PARTIALLY_FAILED';
+
+    const updatedJob = await (this.prisma as any).clubBulkMessageJob.update({
+      where: { id: job.id },
+      data: {
+        status: finalStatus,
+        successCount,
+        failureCount,
+        completedAt: new Date(),
+      },
+    });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId: adminId,
+        actorRole: 'ADMIN',
+        actionType: 'BULK_MESSAGE_SENT',
+        reason: `Toplu mesaj gönderildi: ${successCount} başarılı, ${failureCount} başarısız`,
+      },
+    });
+
+    return updatedJob;
+  }
+
+  async getBulkMessageJobStatus(jobId: string) {
+    const job = await (this.prisma as any).clubBulkMessageJob.findUnique({
+      where: { id: jobId },
+      include: {
+        recipients: {
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true, username: true } },
+          },
+        },
+      },
+    });
+
+    if (!job) throw new NotFoundException('Toplu mesaj işi bulunamadı.');
+
+    return {
+      ...job,
+      recipients: job.recipients.map((r: any) => ({
+        ...r,
+        userFormatted: formatUserDisplayName(r.user),
+      })),
+    };
+  }
 }

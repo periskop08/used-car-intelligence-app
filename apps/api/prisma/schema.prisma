@@ -240,6 +240,8 @@ model User {
   clubRestrictionsCreated     ClubRestriction[]         @relation("ClubRestrictionCreatedBy")
   clubModerationLogs          ClubModerationLog[]       @relation("ClubModerationActor")
   clubPostLikes               ClubPostLike[]            @relation("ClubLikedByUser")
+  bulkMessageJobsCreated      ClubBulkMessageJob[]      @relation("BulkMessageJobAdmin")
+  bulkMessageRecipients       ClubBulkMessageRecipient[] @relation("BulkMessageRecipientUser")
 
   preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
   createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
@@ -1899,6 +1901,42 @@ model ClubPostLike {
   user      User     @relation("ClubLikedByUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
+}
+
+model ClubBulkMessageJob {
+  id               String   @id @default(cuid())
+  createdByAdminId String
+  content          String
+  sendNotification Boolean  @default(true)
+  recipientCount   Int
+  successCount     Int      @default(0)
+  failureCount     Int      @default(0)
+  status           String   // PENDING | PROCESSING | COMPLETED | PARTIALLY_FAILED | FAILED
+  createdAt        DateTime @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  recipients       ClubBulkMessageRecipient[]
+  createdBy        User     @relation("BulkMessageJobAdmin", fields: [createdByAdminId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([createdByAdminId])
+}
+
+model ClubBulkMessageRecipient {
+  id             String    @id @default(cuid())
+  jobId          String
+  userId         String
+  conversationId String?
+  status         String    // PENDING | SENT | FAILED
+  errorCode      String?
+  processedAt    DateTime?
+
+  job            ClubBulkMessageJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user           User               @relation("BulkMessageRecipientUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([userId])
 }
 
 
