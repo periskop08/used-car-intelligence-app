@@ -587,6 +587,13 @@ export default function UnifiedAdminPage() {
         >
           💬 Geri Bildirimler ({feedbacks.length})
         </button>
+        <a
+          href="/admin/reports"
+          className="px-4 py-2 font-bold text-sm transition-all rounded-t-xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 text-orange-400 border-t border-x border-orange-500/30 hover:from-orange-500/30 hover:to-amber-500/30 shadow-lg shadow-orange-500/10 flex items-center gap-1.5"
+        >
+          <span>📊</span>
+          <span>TORK SCOUT RAPORLAR</span>
+        </a>
       </div>
 
       {/* TAB CONTENT: Listings Moderation */}

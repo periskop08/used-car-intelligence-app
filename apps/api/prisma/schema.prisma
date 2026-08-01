@@ -242,6 +242,8 @@ model User {
   clubPostLikes               ClubPostLike[]            @relation("ClubLikedByUser")
   bulkMessageJobsCreated      ClubBulkMessageJob[]      @relation("BulkMessageJobAdmin")
   bulkMessageRecipients       ClubBulkMessageRecipient[] @relation("BulkMessageRecipientUser")
+  analyticsEvents             AnalyticsEvent[]          @relation("UserAnalyticsEvents")
+  reportExportJobs            ReportExportJob[]         @relation("ReportExportJobUser")
 
   preferredCountry   Country?                  @relation("UserPreferredCountry", fields: [preferredCountryId], references: [id])
   createdVariants    VehicleVariant[]          @relation("VariantCreatedBy")
@@ -1937,6 +1939,225 @@ model ClubBulkMessageRecipient {
 
   @@index([jobId])
   @@index([userId])
+}
+
+// ==========================================
+// TORK SCOUT RAPORLAR BI & ANALYTICS MODELS
+// ==========================================
+
+enum AnalyticsEventType {
+  USER_REGISTERED
+  USER_LOGGED_IN
+  USER_PROFILE_COMPLETED
+  USER_ACCOUNT_DELETED
+  USER_SUSPENDED
+  SESSION_STARTED
+  VEHICLE_SEARCHED
+  AI_REPORT_REQUESTED
+  AI_REPORT_COMPLETED
+  AI_REPORT_FAILED
+  AI_REPORT_FALLBACK_USED
+  AI_REPORT_REPAIR_ATTEMPTED
+  AI_REPORT_REPAIR_COMPLETED
+  AI_REPORT_QUOTA_EXHAUSTED
+  CHATBOT_MESSAGE_SENT
+  CHATBOT_RESPONSE_COMPLETED
+  CHATBOT_RESPONSE_FAILED
+  CHATBOT_QUOTA_EXHAUSTED
+  COMPARISON_CREATED
+  COMPARISON_VIEWED
+  COMPARISON_FAILED
+  COMPARISON_FALLBACK_USED
+  COMPARISON_RESULT_SECTION_OPENED
+  LISTING_CREATED
+  LISTING_VIEWED
+  LISTING_FAVORITED
+  LISTING_CONTACTED
+  LISTING_PHONE_REVEALED
+  LISTING_SHARED
+  LISTING_EXPIRED
+  LISTING_REACTIVATED
+  LISTING_REJECTED
+  LISTING_STATUS_CHANGED
+  LISTING_MESSAGE_STARTED
+  PACKAGE_PAGE_VIEWED
+  PACKAGE_PURCHASED
+  CHECKOUT_STARTED
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  PAYMENT_REFUNDED
+  SUBSCRIPTION_STARTED
+  SUBSCRIPTION_RENEWED
+  SUBSCRIPTION_UPGRADED
+  SUBSCRIPTION_DOWNGRADED
+  SUBSCRIPTION_CANCELLED
+  SUBSCRIPTION_EXPIRED
+  SHOWCASE_ACTIVATED
+  SHOWCASE_EXPIRED
+  CLUB_VIEWED
+  CLUB_COMMENT_CREATED
+  CLUB_COMMENT_HIDDEN
+  CLUB_COMMENT_REVIEWED
+  CLUB_USER_MUTED
+  CLUB_USER_UNMUTED
+  CLUB_USER_BANNED
+  CLUB_USER_UNBANNED
+  CLUB_MODERATOR_ASSIGNED
+  CLUB_MODERATOR_REVOKED
+  ENCYCLOPEDIA_CARD_VIEWED
+  ENCYCLOPEDIA_CARD_SKIPPED
+  VEHICLE_DISCOVERY_SESSION_STARTED
+  VEHICLE_DISCOVERY_SWIPED
+  VEHICLE_DISCOVERY_RECOMMENDATION_VIEWED
+  MESSAGE_CONVERSATION_CREATED
+  MESSAGE_SENT
+  MESSAGE_REPLIED
+  MESSAGE_READ
+  SUPPORT_TICKET_CREATED
+  ADMIN_REPORT_VIEWED
+  REPORT_EXPORT_REQUESTED
+  REPORT_EXPORT_COMPLETED
+  UNAUTHORIZED_ACCESS_ATTEMPT
+  RATE_LIMIT_TRIGGERED
+}
+
+enum AnalyticsOutboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD_LETTER
+}
+
+enum AnalyticsMetricValueType {
+  COUNT
+  MONEY
+  DECIMAL
+  PERCENTAGE
+  DURATION_MS
+}
+
+enum ReportExportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model AnalyticsOutbox {
+  id            String                @id @default(cuid())
+  eventId       String                @unique
+  eventType     AnalyticsEventType
+  payload       Json
+  status        AnalyticsOutboxStatus @default(PENDING)
+  attemptCount  Int                   @default(0)
+  nextAttemptAt DateTime?
+  lockedAt      DateTime?
+  lockedBy      String?
+  errorCode     String?
+  createdAt     DateTime              @default(now())
+  processedAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+}
+
+model AnalyticsEvent {
+  id              String             @id @default(cuid())
+  eventId         String             @unique @default(cuid())
+  idempotencyKey  String?            @unique
+  eventType       AnalyticsEventType
+  userId          String?
+  anonymousId     String?
+  sessionId       String?
+  requestId       String?
+  correlationId   String?
+  entityId        String?
+  metadata        Json?
+  metadataVersion Int                @default(1)
+  device          String?
+  platform        String?
+  appVersion      String?
+  source          String?
+  country         String?
+  city            String?
+  language        String?
+  utmSource       String?
+  utmCampaign     String?
+  utmMedium       String?
+  occurredAt      DateTime
+  receivedAt      DateTime           @default(now())
+
+  user            User?              @relation("UserAnalyticsEvents", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([occurredAt])
+}
+
+model DailyAnalyticsAggregate {
+  id           String                   @id @default(cuid())
+  date         DateTime                 @db.Date
+  category     String
+  metric       String
+  dimensionKey String                   @default("ALL")
+  dimensions   Json?
+  valueType    AnalyticsMetricValueType @default(COUNT)
+  numericValue Decimal                  @default(0) @db.Decimal(24, 6)
+  countValue   BigInt                   @default(0)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@unique([date, category, metric, dimensionKey])
+  @@index([category, metric, date])
+}
+
+model ReportExportJob {
+  id              String                @id @default(cuid())
+  requestedById   String
+  reportType      String
+  format          String
+  filters         Json
+  status          ReportExportJobStatus @default(PENDING)
+  progressPercent Int                   @default(0)
+  rowCount        Int?
+  fileName        String?
+  storageKey      String?
+  mimeType        String?
+  fileSizeBytes   BigInt?
+  fileUrl         String?
+  errorCode       String?
+  failureReason   String?
+  expiresAt       DateTime?
+  startedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  completedAt     DateTime?
+
+  requestedBy     User                  @relation("ReportExportJobUser", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([requestedById])
+  @@index([status, createdAt])
+}
+
+model AdSpendRecord {
+  id                 String   @id @default(cuid())
+  date               DateTime @db.Date
+  channel            String
+  externalAccountId  String?
+  externalCampaignId String?
+  campaignName       String
+  spendAmount        Decimal  @db.Decimal(18, 4)
+  currency           String   @default("TRY")
+  impressions        Int      @default(0)
+  clicks             Int      @default(0)
+  source             String   @default("MANUAL_IMPORT")
+  importBatchId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([date, channel, externalAccountId, externalCampaignId])
+  @@index([date, channel])
 }
 
 

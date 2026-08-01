@@ -591,4 +591,5 @@ export const SCENARIO_SCORING_CONFIG = {
 
 export * from './utils/sanitizeComparisonText';
 export * from './utils/validateComparisonSemantics';
+export * from './types/reports';
 
