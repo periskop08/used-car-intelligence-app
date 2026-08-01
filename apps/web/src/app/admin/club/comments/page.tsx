@@ -418,7 +418,7 @@ export default function AdminClubCommentsPage() {
                                   <span className="text-xs font-bold text-white">{authorDisplay}</span>
                                   {c.badge && (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                      {c.badge}
+                                      {typeof c.badge === "object" ? c.badge.label || c.badge.code : c.badge}
                                     </span>
                                   )}
                                   <span

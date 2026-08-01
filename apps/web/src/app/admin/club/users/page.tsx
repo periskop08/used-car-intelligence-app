@@ -199,7 +199,7 @@ export default function AdminClubUsersPage() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {u.badge && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                            {u.badge}
+                            {typeof u.badge === "object" ? u.badge.label || u.badge.code : u.badge}
                           </span>
                         )}
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
