@@ -149,7 +149,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       `ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "contextType" "ConversationContextType" NOT NULL DEFAULT 'LISTING';`,
       `ALTER TABLE "Conversation" ADD COLUMN IF NOT EXISTS "contextEntityId" TEXT;`,
       `ALTER TABLE "Conversation" ALTER COLUMN "listingId" DROP NOT NULL;`,
-      `DELETE FROM "FeatureUsage" WHERE "featureKey" = 'AI_CHAT';`,
+      `DELETE FROM "FeatureUsage";`,
     ];
 
     for (const stmt of sqlStatements) {
