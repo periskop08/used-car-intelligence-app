@@ -1122,13 +1122,20 @@ export class ClubService {
   // V3.1 EXTENDED OPERATIONS & BULK SERVICES
   // ==========================================
 
-  async revokeRestriction(restrictionId: string, actorId: string, actorRole: string) {
-    const restriction = await this.prisma.clubRestriction.findUnique({
-      where: { id: restrictionId },
+  async revokeRestriction(targetId: string, actorId: string, actorRole: string) {
+    let restriction = await this.prisma.clubRestriction.findUnique({
+      where: { id: targetId },
     });
 
     if (!restriction) {
-      throw new NotFoundException('Kısıtlama kaydı bulunamadı.');
+      restriction = await this.prisma.clubRestriction.findFirst({
+        where: { userId: targetId, revokedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (!restriction) {
+      return { success: true, message: 'Aktif kısıtlama bulunamadı veya zaten kaldırıldı.' };
     }
 
     if (restriction.revokedAt) {
@@ -1140,7 +1147,7 @@ export class ClubService {
     }
 
     const updated = await this.prisma.clubRestriction.update({
-      where: { id: restrictionId },
+      where: { id: restriction.id },
       data: {
         revokedAt: new Date(),
         revokedById: actorId,

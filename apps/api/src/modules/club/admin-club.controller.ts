@@ -294,6 +294,24 @@ export class AdminClubController {
     return this.clubService.revokeRestriction(restrictionId, req.user.id, role);
   }
 
+  @Post('restrictions/:restrictionId/unmute')
+  async unmuteRestriction(@Param('restrictionId') restrictionId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.revokeRestriction(restrictionId, req.user.id, role);
+  }
+
+  @Post('restrictions/:restrictionId/unban')
+  async unbanRestriction(@Param('restrictionId') restrictionId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.revokeRestriction(restrictionId, req.user.id, role);
+  }
+
+  @Post('users/:userId/unmute')
+  async unmuteUser(@Param('userId') userId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.revokeRestriction(userId, req.user.id, role);
+  }
+
   @Get('comments/groups')
   async getCommentGroups(@Query('status') status: string, @Req() req: any) {
     await this.verifyModeratorOrAdmin(req);

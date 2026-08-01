@@ -55,23 +55,31 @@ export default function AdminClubRestrictionsPage() {
     if (!token) return;
 
     setActing(true);
+    const endpointsToTry = [
+      `${API_URL}/api/admin/club/restrictions/${modalItem.id}/revoke`,
+      `${API_URL}/admin/club/restrictions/${modalItem.id}/revoke`,
+      `${API_URL}/api/admin/club/users/${modalItem.userId}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
+      `${API_URL}/admin/club/users/${modalItem.userId}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
+      `${API_URL}/api/admin/club/restrictions/${modalItem.id}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
+      `${API_URL}/admin/club/restrictions/${modalItem.id}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
+    ];
+
     try {
-      let res = await fetch(`${API_URL}/api/admin/club/restrictions/${modalItem.id}/revoke`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${API_URL}/admin/club/restrictions/${modalItem.id}/revoke`, {
+      let res: Response | null = null;
+      for (const endpoint of endpointsToTry) {
+        res = await fetch(endpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.ok || res.status !== 404) break;
       }
-      if (res.ok) {
+
+      if (res && res.ok) {
         setModalItem(null);
         fetchRestrictions();
       } else {
-        const err = await res.json();
-        alert(err.message || "İşlem gerçekleştirilemedi.");
+        const err = res ? await res.json().catch(() => ({})) : {};
+        alert(err.message || "Kısıtlama kaldırma işlemi gerçekleştirilemedi.");
       }
     } catch (e) {
       alert("Hata oluştu.");
