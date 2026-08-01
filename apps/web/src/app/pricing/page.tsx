@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import BuyerPackagesSection from "@/components/BuyerPackagesSection";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -292,65 +293,7 @@ export default function PricingPage() {
         </div>
 
         {/* 2. One-time Add-on Packages */}
-        <div className="space-y-6 pt-6 border-t border-white/10">
-          <div className="text-center space-y-1">
-            <h2 className="text-xl sm:text-2xl font-black text-white">Ek Alıcı Paketleri (Tek Seferlik Kredi)</h2>
-            <p className="text-xs text-slate-400">Abonelik paketinize ek olarak alabileceğiniz süresiz ek sorgulama hakları.</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl border border-white/10 bg-slate-900/40 space-y-4 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                  EK SORGULAMA
-                </span>
-                <h3 className="text-base font-black text-white mt-2">Analiz & Rapor Paketi</h3>
-                <p className="text-xs text-slate-400 mt-1">3 Ek AI Araç Analiz Raporu + 10 Ek Karşılaştırma</p>
-                <div className="text-2xl font-black text-white mt-3">149 TL</div>
-              </div>
-              <Link
-                href="/dashboard/subscription"
-                className="w-full py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:bg-white/5 transition text-center block"
-              >
-                Kredi Ekle
-              </Link>
-            </div>
-
-            <div className="p-6 rounded-2xl border border-white/10 bg-slate-900/40 space-y-4 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  CHATBOT KREDİSİ
-                </span>
-                <h3 className="text-base font-black text-white mt-2">Ekspertiz Chatbot Paketi</h3>
-                <p className="text-xs text-slate-400 mt-1">30 Ek AI Chatbot Sorusu</p>
-                <div className="text-2xl font-black text-white mt-3">99 TL</div>
-              </div>
-              <Link
-                href="/dashboard/subscription"
-                className="w-full py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:bg-white/5 transition text-center block"
-              >
-                Kredi Ekle
-              </Link>
-            </div>
-
-            <div className="p-6 rounded-2xl border border-white/10 bg-slate-900/40 space-y-4 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  İLAN ÖN ÇIKARMA
-                </span>
-                <h3 className="text-base font-black text-white mt-2">Vitrin İlan Paketi</h3>
-                <p className="text-xs text-slate-400 mt-1">1 Ek Vitrin İlanı (14 Gün Süreli Ön Çıkarma)</p>
-                <div className="text-2xl font-black text-white mt-3">199 TL</div>
-              </div>
-              <Link
-                href="/dashboard/subscription"
-                className="w-full py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:bg-white/5 transition text-center block"
-              >
-                Kredi Ekle
-              </Link>
-            </div>
-          </div>
-        </div>
+        <BuyerPackagesSection />
 
         {/* FAQ Section */}
         <div className="p-8 rounded-3xl border border-white/10 bg-slate-900/40 space-y-6">
