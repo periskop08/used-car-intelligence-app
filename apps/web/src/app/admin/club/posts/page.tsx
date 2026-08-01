@@ -18,12 +18,20 @@ export default function AdminClubPostsPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(
+      let res = await fetch(
         `${API_URL}/api/admin/club/posts?status=${encodeURIComponent(statusFilter)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (!res.ok && res.status === 404) {
+        res = await fetch(
+          `${API_URL}/admin/club/posts?status=${encodeURIComponent(statusFilter)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
       if (res.ok) {
         const data = await res.json();
         setPosts(data);

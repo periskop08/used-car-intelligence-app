@@ -26,7 +26,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { Role } from '@prisma/client';
 
-@Controller('admin/club')
+@Controller(['admin/club', 'api/admin/club'])
 @UseGuards(JwtAuthGuard)
 export class AdminClubController {
   constructor(private readonly clubService: ClubService) {}

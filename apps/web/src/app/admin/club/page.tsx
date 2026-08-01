@@ -20,9 +20,14 @@ export default function AdminClubOverviewPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/club/dashboard`, {
+      let res = await fetch(`${API_URL}/api/admin/club/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${API_URL}/admin/club/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
       if (res.ok) {
         const data = await res.json();
         setDashboardData(data);
