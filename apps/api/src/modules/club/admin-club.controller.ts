@@ -32,7 +32,21 @@ export class AdminClubController {
   constructor(private readonly clubService: ClubService) {}
 
   private async verifyModeratorOrAdmin(req: any) {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    const email = req.user?.email;
+    const ADMIN_EMAILS = [
+      'efeguven9991@gmail.com',
+      'm.efeeguven@gmail.com',
+      'burhanseckin08@gmail.com',
+      'burhanseckin08@icloud.com',
+    ];
+    if (
+      req.user?.role === Role.ADMIN ||
+      req.user?.role === Role.SUPER_ADMIN ||
+      (email && ADMIN_EMAILS.includes(email.toLowerCase()))
+    ) {
+      return 'ADMIN';
+    }
     const role = await this.clubService.getUserClubRole(userId);
     if (role !== 'ADMIN' && role !== 'MODERATOR') {
       throw new ForbiddenException('Bu işlem için moderatör veya admin yetkisi gereklidir.');
@@ -40,8 +54,24 @@ export class AdminClubController {
     return role;
   }
 
-  private verifyAdminOnly(req: any) {
-    if (req.user.role !== Role.ADMIN && req.user.role !== Role.SUPER_ADMIN) {
+  private async verifyAdminOnly(req: any) {
+    const userId = req.user?.id;
+    const email = req.user?.email;
+    const ADMIN_EMAILS = [
+      'efeguven9991@gmail.com',
+      'm.efeeguven@gmail.com',
+      'burhanseckin08@gmail.com',
+      'burhanseckin08@icloud.com',
+    ];
+    if (
+      req.user?.role === Role.ADMIN ||
+      req.user?.role === Role.SUPER_ADMIN ||
+      (email && ADMIN_EMAILS.includes(email.toLowerCase()))
+    ) {
+      return;
+    }
+    const role = await this.clubService.getUserClubRole(userId);
+    if (role !== 'ADMIN') {
       throw new ForbiddenException('Bu işlem yalnızca yöneticiler (Admin) tarafından yapılabilir.');
     }
   }
@@ -89,61 +119,61 @@ export class AdminClubController {
   @Post('media/upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadMedia(@UploadedFile() file: any, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.uploadPostMedia(file, req.user.id);
   }
 
   @Post('posts')
   async createPost(@Body() dto: CreateClubPostDto, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.createPost(req.user.id, dto);
   }
 
   @Patch('posts/:postId')
   async updatePost(@Param('postId') postId: string, @Body() dto: UpdateClubPostDto, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.updatePost(postId, dto);
   }
 
   @Post('posts/:postId/publish')
   async publishPost(@Param('postId') postId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.publishPost(postId);
   }
 
   @Post('posts/:postId/archive')
   async archivePost(@Param('postId') postId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.archivePost(postId);
   }
 
   @Patch('posts/:postId/comments-toggle')
   async toggleComments(@Param('postId') postId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.togglePostComments(postId);
   }
 
   @Post('users/:userId/ban')
   async banUser(@Param('userId') userId: string, @Body() dto: BanUserDto, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.banUser(userId, req.user.id, dto.reason);
   }
 
   @Post('users/:userId/unban')
   async unbanUser(@Param('userId') userId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.unbanUser(userId, req.user.id);
   }
 
   @Post('moderators/:userId')
   async assignModerator(@Param('userId') userId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.assignModerator(userId, req.user.id);
   }
 
   @Delete('moderators/:userId')
   async revokeModerator(@Param('userId') userId: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.revokeModerator(userId, req.user.id);
   }
 
@@ -153,7 +183,7 @@ export class AdminClubController {
     @Body() dto: AdminDirectMessageDto,
     @Req() req: any,
   ) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.sendAdminDirectMessage(userId, req.user.id, dto);
   }
 
@@ -165,7 +195,7 @@ export class AdminClubController {
 
   @Get('posts')
   async getPosts(@Query('status') status: string, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyModeratorOrAdmin(req);
     return this.clubService.getAdminPosts(status);
   }
 
@@ -181,7 +211,7 @@ export class AdminClubController {
 
   @Get('moderators')
   async getModerators(@Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.getAdminModerators();
   }
 
@@ -211,7 +241,7 @@ export class AdminClubController {
 
   @Get('conversations')
   async getConversations(@Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.getClubAdminConversations();
   }
 
@@ -221,31 +251,31 @@ export class AdminClubController {
     @Query('range') range: string,
     @Req() req: any,
   ) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.getClubReports(section, range);
   }
 
   @Get('settings')
   async getSettings(@Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.getClubSettings();
   }
 
   @Patch('settings')
   async updateSettings(@Body() dto: UpdateClubSettingsDto, @Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.updateClubSettings(dto);
   }
 
   @Get('stats')
   async getStats(@Req() req: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     return this.clubService.getAdminStats();
   }
 
   @Get('moderation-log')
   async getModerationLogs(@Query('limit') limit?: string, @Req() req?: any) {
-    this.verifyAdminOnly(req);
+    await this.verifyAdminOnly(req);
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
     return this.clubService.getModerationLogs(parsedLimit);
   }

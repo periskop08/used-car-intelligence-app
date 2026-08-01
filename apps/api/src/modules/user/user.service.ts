@@ -84,8 +84,23 @@ export class UserService {
       ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...(user.notificationSettings as any) }
       : DEFAULT_NOTIFICATION_SETTINGS;
 
+    const ADMIN_EMAILS = [
+      'efeguven9991@gmail.com',
+      'm.efeeguven@gmail.com',
+      'burhanseckin08@gmail.com',
+      'burhanseckin08@icloud.com',
+    ];
+
+    const effectiveRole =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      (user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()))
+        ? 'ADMIN'
+        : user.role;
+
     return {
       ...user,
+      role: effectiveRole as any,
       subscriptionTier: effectiveTier,
       notificationSettings: settings,
     };
