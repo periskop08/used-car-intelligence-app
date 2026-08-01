@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import QuotaBadge from "@/components/QuotaBadge";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -476,6 +477,9 @@ export default function VehicleDetail() {
             )}
           </div>
         </div>
+
+      {/* Quota Badge Header */}
+      <QuotaBadge feature="aiReports" className="mb-6" />
 
       {/* Grid Layout */}
       {aiReport?.summary?.trimWarning ? (

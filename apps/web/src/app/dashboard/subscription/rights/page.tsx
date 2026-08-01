@@ -108,7 +108,8 @@ export default function RightsPage() {
           const used = itemData.used || 0;
           const total = itemData.totalLimit || 0;
           const remaining = itemData.remaining || 0;
-          const percent = itemUnlimited ? 0 : total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 100;
+          const isNotIncluded = !itemUnlimited && total === 0;
+          const percent = itemUnlimited || isNotIncluded ? 0 : Math.min(100, Math.round((used / total) * 100));
 
           return (
             <div
@@ -116,7 +117,7 @@ export default function RightsPage() {
               className="glass border border-white/10 p-6 rounded-3xl bg-slate-900/60 backdrop-blur-md space-y-4 hover:border-white/20 transition flex flex-col justify-between shadow-xl"
             >
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl p-2 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400">
                       {item.icon}
@@ -127,6 +128,10 @@ export default function RightsPage() {
                   {itemUnlimited ? (
                     <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-full font-mono">
                       ✨ Sınırsız
+                    </span>
+                  ) : isNotIncluded ? (
+                    <span className="px-3 py-1 bg-slate-800/80 border border-white/10 text-slate-400 text-xs font-bold rounded-full font-mono">
+                      Pakette Yok
                     </span>
                   ) : (
                     <span
@@ -147,14 +152,18 @@ export default function RightsPage() {
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <div className="flex justify-between items-center text-[11px] font-bold text-slate-300">
                     <span>Kullanım Oranı</span>
-                    <span className="text-slate-200">
-                      {used} / {total} {item.unit} (%{percent})
+                    <span className={isNotIncluded ? "text-slate-500" : "text-slate-200"}>
+                      {used} / {total} {item.unit} ({isNotIncluded ? "Paket Dışı" : `%${percent}`})
                     </span>
                   </div>
                   <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-white/10">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
-                        percent >= 90 ? "bg-red-500" : "bg-gradient-to-r from-orange-600 to-orange-400"
+                        isNotIncluded
+                          ? "bg-slate-800"
+                          : percent >= 90
+                          ? "bg-red-500"
+                          : "bg-gradient-to-r from-orange-600 to-orange-400"
                       }`}
                       style={{ width: `${percent}%` }}
                     />
