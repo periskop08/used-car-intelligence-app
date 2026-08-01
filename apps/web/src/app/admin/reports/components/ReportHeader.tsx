@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import { fetchReportApi } from '@/utils/apiConfig';
 
 interface ReportHeaderProps {
   title: string;
@@ -36,13 +37,8 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
     setIsExporting(true);
     setExportStatus('Dışa aktarma başlatılıyor...');
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/reports/exports', {
+      const res = await fetchReportApi('/admin/reports/exports', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
-        },
         body: JSON.stringify({
           reportType,
           format: exportFormat,
@@ -56,9 +52,7 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
 
       // Poll status
       setTimeout(async () => {
-        const downloadRes = await fetch(`/api/admin/reports/exports/${data.id}/download`, {
-          headers: { Authorization: token ? `Bearer ${token}` : '' },
-        });
+        const downloadRes = await fetchReportApi(`/admin/reports/exports/${data.id}/download`);
         if (downloadRes.ok) {
           const blob = await downloadRes.blob();
           const url = window.URL.createObjectURL(blob);

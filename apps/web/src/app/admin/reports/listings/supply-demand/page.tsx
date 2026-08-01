@@ -3,15 +3,14 @@ import React, { useEffect, useState } from 'react';
 import { ReportHeader } from '../../components/ReportHeader';
 import { ReportSidebar } from '../../components/ReportSidebar';
 
+import { fetchReportApi } from '@/utils/apiConfig';
+
 export default function ListingSupplyDemandPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch('/api/admin/reports/listings/supply-demand', {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi('/admin/reports/listings/supply-demand')
       .then((res) => res.json())
       .then((d) => {
         setData(d);

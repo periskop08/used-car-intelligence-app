@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import { ReportHeader } from '../../components/ReportHeader';
 import { ReportSidebar } from '../../components/ReportSidebar';
 
+import { fetchReportApi } from '@/utils/apiConfig';
+
 export default function UserDetailPage() {
   const params = useParams();
   const customerNo = params?.customerNo as string;
@@ -14,10 +16,7 @@ export default function UserDetailPage() {
 
   useEffect(() => {
     if (!customerNo) return;
-    const token = localStorage.getItem('token');
-    fetch(`/api/admin/reports/users/${encodeURIComponent(customerNo)}`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi(`/admin/reports/users/${encodeURIComponent(customerNo)}`)
       .then((res) => {
         if (!res.ok) throw new Error('Kullanıcı detay verisi alınamadı');
         return res.json();

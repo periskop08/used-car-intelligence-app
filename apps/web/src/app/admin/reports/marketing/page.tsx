@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ReportHeader } from '../components/ReportHeader';
 import { ReportSidebar } from '../components/ReportSidebar';
 import { ReportKpiCard } from '../components/ReportKpiCard';
+import { fetchReportApi } from '@/utils/apiConfig';
 
 export default function MarketingReportsPage() {
   const [data, setData] = useState<any>(null);
@@ -11,10 +12,7 @@ export default function MarketingReportsPage() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const fetchMarketing = () => {
-    const token = localStorage.getItem('token');
-    fetch('/api/admin/reports/marketing', {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi('/admin/reports/marketing')
       .then((res) => res.json())
       .then((d) => {
         setData(d);
@@ -29,13 +27,8 @@ export default function MarketingReportsPage() {
   const handleImportAdSpend = async () => {
     try {
       const parsed = JSON.parse(importJson);
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/reports/marketing/ad-spend/import', {
+      const res = await fetchReportApi('/admin/reports/marketing/ad-spend/import', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
-        },
         body: JSON.stringify({ records: Array.isArray(parsed) ? parsed : [parsed] }),
       });
       if (!res.ok) throw new Error('Aktarım başarısız');

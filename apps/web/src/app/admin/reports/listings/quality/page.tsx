@@ -4,15 +4,14 @@ import { ReportHeader } from '../../components/ReportHeader';
 import { ReportSidebar } from '../../components/ReportSidebar';
 import { ReportKpiCard } from '../../components/ReportKpiCard';
 
+import { fetchReportApi } from '@/utils/apiConfig';
+
 export default function ListingQualityPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch('/api/admin/reports/listings/quality', {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi('/admin/reports/listings/quality')
       .then((res) => res.json())
       .then((d) => {
         setData(d);

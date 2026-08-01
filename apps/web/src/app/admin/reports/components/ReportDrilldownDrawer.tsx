@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { CustomerReference } from './CustomerReference';
+import { fetchReportApi } from '@/utils/apiConfig';
 
 interface ReportDrilldownDrawerProps {
   drilldownKey: string | null;
@@ -22,11 +23,8 @@ export const ReportDrilldownDrawer: React.FC<ReportDrilldownDrawerProps> = ({
     setLoading(true);
     setError(null);
 
-    const token = localStorage.getItem('token');
     const query = new URLSearchParams(params).toString();
-    fetch(`/api/admin/reports/drilldowns/${drilldownKey}?${query}`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi(`/admin/reports/drilldowns/${drilldownKey}?${query}`)
       .then((res) => {
         if (!res.ok) throw new Error('Drill-down verisi alınamadı');
         return res.json();

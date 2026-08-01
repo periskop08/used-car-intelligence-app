@@ -4,6 +4,7 @@ import { ReportHeader } from './components/ReportHeader';
 import { ReportSidebar } from './components/ReportSidebar';
 import { ReportKpiCard } from './components/ReportKpiCard';
 import { ReportDrilldownDrawer } from './components/ReportDrilldownDrawer';
+import { fetchReportApi } from '@/utils/apiConfig';
 
 export default function ReportsOverviewPage() {
   const [data, setData] = useState<any>(null);
@@ -14,12 +15,9 @@ export default function ReportsOverviewPage() {
 
   const fetchOverview = (filters: any = {}) => {
     setLoading(true);
-    const token = localStorage.getItem('token');
     const query = new URLSearchParams(filters).toString();
 
-    fetch(`/api/admin/reports/overview?${query}`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi(`/admin/reports/overview?${query}`)
       .then((res) => {
         if (!res.ok) throw new Error('Yönetici raporları yüklenemedi.');
         return res.json();

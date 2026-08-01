@@ -4,15 +4,14 @@ import { ReportHeader } from '../../components/ReportHeader';
 import { ReportSidebar } from '../../components/ReportSidebar';
 import { ReportKpiCard } from '../../components/ReportKpiCard';
 
+import { fetchReportApi } from '@/utils/apiConfig';
+
 export default function FinanceOneTimePackagesPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch('/api/admin/reports/finance/one-time-packages', {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi('/admin/reports/finance/one-time-packages')
       .then((res) => res.json())
       .then((d) => {
         setData(d);

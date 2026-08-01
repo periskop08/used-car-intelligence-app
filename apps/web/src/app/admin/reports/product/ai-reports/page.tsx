@@ -5,16 +5,15 @@ import { ReportSidebar } from '../../components/ReportSidebar';
 import { ReportKpiCard } from '../../components/ReportKpiCard';
 import { ReportDrilldownDrawer } from '../../components/ReportDrilldownDrawer';
 
+import { fetchReportApi } from '@/utils/apiConfig';
+
 export default function ProductAiReportsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [drilldownKey, setDrilldownKey] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch('/api/admin/reports/product/ai-reports', {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-    })
+    fetchReportApi('/admin/reports/product/ai-reports')
       .then((res) => res.json())
       .then((d) => {
         setData(d);
