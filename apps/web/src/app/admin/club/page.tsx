@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import ClubStatsGrid, { ClubDashboardStat } from "./components/ClubStatsGrid";
+import ClubStatsGrid from "./components/ClubStatsGrid";
 import PendingCommentsTable from "./components/PendingCommentsTable";
 import RecentPostsTable from "./components/RecentPostsTable";
 import ActiveRestrictionsCard from "./components/ActiveRestrictionsCard";
@@ -37,44 +37,55 @@ export default function AdminClubOverviewPage() {
     fetchDashboardData();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="p-12 text-center text-slate-400">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-orange-500 mx-auto mb-3"></div>
-        <p className="text-xs font-bold">Genel Bakış Verileri Yükleniyor...</p>
-      </div>
-    );
-  }
+  const defaultStats = [
+    { key: "TOTAL_POSTS", label: "Toplam Gönderi", value: dashboardData?.stats?.[0]?.value ?? 0, secondaryText: "0 yayında · 0 taslak", severity: "NORMAL" },
+    { key: "PUBLISHED_POSTS", label: "Yayındaki Gönderi", value: dashboardData?.stats?.[1]?.value ?? 0, secondaryText: "Topluluğa açık gönderiler", severity: "INFO" },
+    { key: "TOTAL_COMMENTS", label: "Toplam Yorum", value: dashboardData?.stats?.[2]?.value ?? 0, secondaryText: "Bugün 0 yorum", severity: "NORMAL" },
+    { key: "PENDING_COMMENTS", label: "İncelemede Bekleyen", value: dashboardData?.stats?.[3]?.value ?? 0, secondaryText: "Bekleyen inceleme yok", severity: "NORMAL" },
+    { key: "ACTIVE_MODERATORS", label: "Aktif Moderatör", value: dashboardData?.stats?.[4]?.value ?? 0, secondaryText: "Yetkilendirilmiş moderatörler", severity: "NORMAL" },
+    { key: "ACTIVE_MUTES", label: "Geçici Susturulan", value: dashboardData?.stats?.[5]?.value ?? 0, secondaryText: "Süre kısıtlaması olan üyeler", severity: "NORMAL" },
+    { key: "ACTIVE_BANS", label: "Yasaklı Kullanıcı", value: dashboardData?.stats?.[6]?.value ?? 0, secondaryText: "Aktif ban yok", severity: "NORMAL" },
+  ];
+
+  const statsToRender = dashboardData?.stats?.length ? dashboardData.stats : defaultStats;
 
   return (
-    <div className="space-y-8">
-      {/* Top Search Bar */}
-      <div className="p-4 rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl">
-        <label className="text-xs font-bold text-slate-400 mb-2 block">
+    <div className="space-y-6">
+      {/* 1. 7 Clickable KPI Cards */}
+      <ClubStatsGrid stats={statsToRender as any} />
+
+      {/* 2. Compact User Search Bar */}
+      <div className="p-3.5 rounded-xl border border-white/10 bg-slate-900/60 backdrop-blur-xl">
+        <label className="text-[11px] font-bold text-slate-400 mb-1.5 block">
           🔍 Hızlı Kullanıcı ve Müşteri Numarası Arama:
         </label>
         <ClubUserSearch />
       </div>
 
-      {/* KPI Stats Grid */}
-      {dashboardData?.stats && <ClubStatsGrid stats={dashboardData.stats} />}
-
-      {/* Pending Comments Table */}
-      <PendingCommentsTable
-        comments={dashboardData?.pendingComments || []}
-        onRefresh={fetchDashboardData}
-      />
-
-      {/* Main Operational Tables Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <RecentPostsTable posts={dashboardData?.recentPosts || []} />
-        <ActiveRestrictionsCard restrictions={dashboardData?.activeRestrictions || []} />
+      {/* 3. Upper Operation Row (%52 / %48) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6">
+          <PendingCommentsTable
+            comments={dashboardData?.pendingComments || []}
+            onRefresh={fetchDashboardData}
+          />
+        </div>
+        <div className="lg:col-span-6">
+          <RecentPostsTable posts={dashboardData?.recentPosts || []} />
+        </div>
       </div>
 
-      {/* Analytics and Audit Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <ClubEngagementSummary summary={dashboardData?.engagementSummary} />
-        <RecentClubActivity activities={dashboardData?.recentActivity || []} />
+      {/* 4. Lower Operation Row (%32 / %28 / %40) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4">
+          <ActiveRestrictionsCard restrictions={dashboardData?.activeRestrictions || []} />
+        </div>
+        <div className="lg:col-span-3">
+          <RecentClubActivity activities={dashboardData?.recentActivity || []} />
+        </div>
+        <div className="lg:col-span-5">
+          <ClubEngagementSummary summary={dashboardData?.engagementSummary} />
+        </div>
       </div>
     </div>
   );

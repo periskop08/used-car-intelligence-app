@@ -73,7 +73,7 @@ export default function AdminClubLayout({ children }: { children: React.ReactNod
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-black text-white tracking-tight">Tork Scout Club</h1>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                  Operasyon ve Yönetim Merkezi v2
+                  Operasyon ve Yönetim Merkezi v3
                 </span>
               </div>
               <p className="text-xs text-slate-400">
