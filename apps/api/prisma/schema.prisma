@@ -916,11 +916,15 @@ model AuditLog {
 enum ListingStatus {
   DRAFT
   PENDING_REVIEW
+  DETAILED_REVIEW
+  REVISION_REQUIRED
   ACTIVE
   PASSIVE
   SOLD
   EXPIRED
   REJECTED
+  REPORTED
+  DELETED
   ARCHIVED
 }
 
@@ -2160,6 +2164,52 @@ model AdSpendRecord {
   @@index([date, channel])
 }
 
+model ListingModerationAction {
+  id                 String   @id @default(cuid())
+  listingId          String
+  sellerId           String
+  actorAdminId       String
+  actionType         String
+  previousStatus     String
+  newStatus          String
+  reasonCode         String?
+  sellerMessage      String?
+  internalNote       String?
+  affectedFields     Json?
+  affectedMediaIds   Json?
+  allowResubmission  Boolean  @default(true)
+  emailStatus        String?
+  notificationStatus String?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+
+  @@index([listingId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([actorAdminId, createdAt])
+}
+
+model ListingModerationReason {
+  id                   String   @id @default(cuid())
+  code                 String   @unique
+  actionType           String
+  title                String
+  defaultSellerMessage String?
+  requiresSellerNote   Boolean  @default(true)
+  allowsResubmission   Boolean  @default(true)
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model ListingModerationLock {
+  id        String   @id @default(cuid())
+  listingId String   @unique
+  adminId   String
+  adminName String
+  lockedAt  DateTime @default(now())
+  expiresAt DateTime
+}
 
 
 

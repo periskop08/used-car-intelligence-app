@@ -19,6 +19,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { VehicleDiscoveryModule } from './modules/vehicle-discovery/vehicle-discovery.module';
 import { ClubModule } from './modules/club/club.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ListingModerationModule } from './modules/listing-moderation/listing-moderation.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     VehicleDiscoveryModule,
     ClubModule,
     ReportsModule,
+    ListingModerationModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

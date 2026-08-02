@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SellerBasedListingModeration } from "./components/SellerBasedListingModeration";
 
 const PART_LABELS: Record<string, string> = {
   FRONT_BUMPER: "Ön Tampon",
@@ -596,135 +597,8 @@ export default function UnifiedAdminPage() {
         </a>
       </div>
 
-      {/* TAB CONTENT: Listings Moderation */}
-      {activeTab === "listings" && (
-        <div className="flex flex-col gap-6">
-          {listingsLoading ? (
-            <div className="text-center py-12 text-slate-400">İlan verileri yükleniyor...</div>
-          ) : listings.length === 0 ? (
-            <p className="text-slate-400 italic text-center py-12">Sistemde onay bekleyen veya aktif ilan bulunmuyor.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-6">
-              {listings.map((listing) => (
-                <div key={listing.id} className="p-6 bg-slate-900/20 border border-white/5 rounded-3xl flex flex-col gap-4">
-                  {/* Summary */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-3">
-                    <div>
-                      <h4 className="font-extrabold text-slate-200 text-sm">{listing.title}</h4>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Satıcı: <strong className="text-slate-300">{listing.seller?.email}</strong> • Şehir: {listing.city} • Varyant ID: {listing.vehicleVariantId || "Manuel Varyant Girişi"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
-                        listing.status === "ACTIVE"
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : listing.status === "PENDING_REVIEW"
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                          : "bg-slate-800 text-slate-450"
-                      }`}>
-                        {listing.status}
-                      </span>
-                      <span className="text-sm font-black text-orange-400">
-                        {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Body Content */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-slate-300">
-                    <div className="flex flex-col gap-1 bg-slate-950/20 p-4 rounded-2xl border border-white/5">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase">Teknik Detaylar</span>
-                      <span>Model Yılı: {listing.modelYear}</span>
-                      <span>KM: {listing.kilometers.toLocaleString('tr-TR')} km</span>
-                      <span>Yakıt: {translateFuelType(listing.fuelType)}</span>
-                      <span>Şanzıman: {translateTransmission(listing.transmission)}</span>
-                    </div>
-
-                    <div className="flex flex-col gap-1 bg-slate-950/20 p-4 rounded-2xl border border-white/5">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase">Hasar & Tramer</span>
-                      <span>Hasar Tutarı: {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasarsız"}</span>
-                      <span>Gerekçe/Not: {listing.damageRecord || "Yok"}</span>
-                      <span>Boyalı Parçalar: {listing.paintedParts?.length > 0 ? listing.paintedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
-                      <span>Lokal Boyalı: {listing.localPaintedParts?.length > 0 ? listing.localPaintedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
-                      <span>Değişen Parçalar: {listing.changedParts?.length > 0 ? listing.changedParts.map((p: string) => PART_LABELS[p] || p).join(', ') : "Yok"}</span>
-                    </div>
-
-                    <div className="flex flex-col justify-center gap-2">
-                      {listing.status === "PENDING_REVIEW" && (
-                        <>
-                          <button
-                            disabled={actionLoading}
-                            onClick={() => handleUpdateStatus(listing.id, "ACTIVE")}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl transition text-xs"
-                          >
-                            İlanı Onayla (Yayına Al)
-                          </button>
-                          <button
-                            disabled={actionLoading}
-                            onClick={() => handleUpdateStatus(listing.id, "REJECTED")}
-                            className="bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-xl transition text-xs"
-                          >
-                            Reddet
-                          </button>
-                        </>
-                      )}
-                      {listing.status === "ACTIVE" && (
-                        <button
-                          disabled={actionLoading}
-                          onClick={() => handleUpdateStatus(listing.id, "PASSIVE")}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold py-2.5 rounded-xl transition text-xs"
-                        >
-                          Pasife Al
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Media gallery with moderation */}
-                  <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Yüklenen Fotoğraflar & Moderasyon</span>
-                    {listing.media && listing.media.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        {listing.media.map((img: any) => (
-                          <div key={img.id} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/10 group">
-                            <img src={img.url} alt="listing attachment" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition p-2">
-                              <button
-                                onClick={() => handleUpdateMediaModeration(listing.id, img.id, "APPROVED")}
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 rounded text-[9px] transition"
-                              >
-                                Onay
-                              </button>
-                              <button
-                                onClick={() => handleUpdateMediaModeration(listing.id, img.id, "REJECTED")}
-                                className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-[9px] transition"
-                              >
-                                Red
-                              </button>
-                            </div>
-                            <span className={`absolute bottom-2 left-2 text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                              img.moderationStatus === "APPROVED"
-                                ? "bg-emerald-600 text-white"
-                                : img.moderationStatus === "REJECTED"
-                                ? "bg-red-600 text-white"
-                                : "bg-amber-500 text-black"
-                            }`}>
-                              {img.moderationStatus}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-slate-500 italic">İlanda görsel bulunmuyor.</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* TAB CONTENT: Seller-Based Listing Moderation & Approval Operations Center */}
+      {activeTab === "listings" && <SellerBasedListingModeration />}
 
       {/* TAB CONTENT: Research Jobs */}
       {activeTab === "jobs" && (

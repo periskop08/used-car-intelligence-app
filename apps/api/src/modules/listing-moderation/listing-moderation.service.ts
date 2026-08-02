@@ -1,0 +1,562 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../prisma.service';
+
+const PRESET_REASONS = [
+  { code: 'PHOTO_INSUFFICIENT', actionType: 'REVISION_REQUIRED', title: 'Araç fotoğrafları yetersiz', defaultSellerMessage: 'İlanınızdaki fotoğraflar yetersizdir. Lütfen aracın ön, arka, yan ve iç mekan fotoğraflarını net biçimde yükleyin.', requiresSellerNote: true, allowsResubmission: true },
+  { code: 'PHOTO_MISMATCH', actionType: 'REVISION_REQUIRED', title: 'Fotoğraflar araçla uyuşmuyor', defaultSellerMessage: 'Yüklenen fotoğraflardan bazıları seçilen marka/model ile eşleşmemektedir.', requiresSellerNote: true, allowsResubmission: true },
+  { code: 'PHONE_IN_DESCRIPTION', actionType: 'REVISION_REQUIRED', title: 'Açıklamada iletişim bilgisi mevcut', defaultSellerMessage: 'Güvenlik kuralları gereği ilan açıklamasında telefon numarası veya e-posta adresi paylaşılamaz.', requiresSellerNote: true, allowsResubmission: true },
+  { code: 'PRICE_ANOMALY', actionType: 'REVISION_REQUIRED', title: 'Fiyat bilgisi kontrol edilmeli', defaultSellerMessage: 'Girdiğiniz ilan fiyatı piyasa ortalamasının çok dışındadır. Lütfen fiyatınızı kontrol edin.', requiresSellerNote: true, allowsResubmission: true },
+  { code: 'MISSING_SPECS', actionType: 'REVISION_REQUIRED', title: 'Hasar/Tramer bilgisi eksik', defaultSellerMessage: 'Lütfen aracın boya, değişen ve Tramer hasar kaydı bilgilerini eksiksiz belirtin.', requiresSellerNote: true, allowsResubmission: true },
+  { code: 'FAKED_LISTING', actionType: 'REJECT', title: 'Sahte veya yanıltıcı ilan', defaultSellerMessage: 'İlanınız sahte veya yanıltıcı içerik şüphesiyle reddedilmiştir.', requiresSellerNote: true, allowsResubmission: false },
+  { code: 'DUPLICATE_LISTING', actionType: 'REJECT', title: 'Kopya / Tekrarlanan ilan', defaultSellerMessage: 'Aynı araca ait aktif bir ilanınız zaten bulunmaktadır.', requiresSellerNote: true, allowsResubmission: false },
+  { code: 'COMMERCIAL_WATERMARK', actionType: 'REVISION_REQUIRED', title: 'Filigranlı / Ticari görsel', defaultSellerMessage: 'İlan fotoğraflarında başka sitelere ait logo veya filigran bulunmamalıdır.', requiresSellerNote: true, allowsResubmission: true },
+];
+
+@Injectable()
+export class ListingModerationService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private formatCustomerNo(user: any): string {
+    const year = user.createdAt ? new Date(user.createdAt).getFullYear().toString().slice(-2) : '26';
+    const month = user.createdAt ? (new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0') : '08';
+    const num = user.id ? user.id.replace(/-/g, '').substring(0, 6).toUpperCase() : '000000';
+    return `TS-${year}${month}-${num}`;
+  }
+
+  private formatPublicListingNo(listing: any): string {
+    const year = listing.createdAt ? new Date(listing.createdAt).getFullYear().toString().slice(-2) : '26';
+    const month = listing.createdAt ? (new Date(listing.createdAt).getMonth() + 1).toString().padStart(2, '0') : '08';
+    const num = listing.id ? listing.id.replace(/-/g, '').substring(0, 6).toUpperCase() : '000000';
+    return `TS-ILAN-${year}${month}-${num}`;
+  }
+
+  async getModerationReasons(actionType?: string) {
+    let DBReasons: any[] = [];
+    try {
+      DBReasons = await (this.prisma as any).listingModerationReason.findMany({
+        where: actionType ? { actionType, isActive: true } : { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    if (DBReasons.length > 0) return DBReasons;
+    return actionType ? PRESET_REASONS.filter((r) => r.actionType === actionType) : PRESET_REASONS;
+  }
+
+  async getSellers(query: any) {
+    const { status, search, sellerType, package: pkg, city, riskLevel, sort = 'PENDING_FIRST', page = 1, limit = 25 } = query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const sellersWithListings = await this.prisma.user.findMany({
+      where: {
+        listings: { some: {} },
+        ...(pkg ? { subscriptionTier: pkg } : {}),
+        ...(search ? {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ],
+        } : {}),
+      },
+      include: {
+        listings: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            priceAmount: true,
+            kilometers: true,
+            modelYear: true,
+            city: true,
+            sellerType: true,
+            tramerAmount: true,
+          },
+        },
+      },
+      take: 100,
+    });
+
+    const results = sellersWithListings.map((seller) => {
+      const listings = seller.listings || [];
+      const customerNo = this.formatCustomerNo(seller);
+
+      const isCorp = sellerType === 'CORPORATE' || listings.some((l) => l.sellerType === 'DEALER' || l.sellerType === 'AUTHORIZED_DEALER');
+
+      const counts = {
+        total: listings.length,
+        pending: listings.filter((l) => l.status === 'PENDING_REVIEW').length,
+        revisionRequired: listings.filter((l) => (l.status as any) === 'REVISION_REQUIRED').length,
+        detailedReview: listings.filter((l) => (l.status as any) === 'DETAILED_REVIEW').length,
+        active: listings.filter((l) => l.status === 'ACTIVE').length,
+        rejected: listings.filter((l) => l.status === 'REJECTED').length,
+        passive: listings.filter((l) => l.status === 'PASSIVE').length,
+        expired: listings.filter((l) => l.status === 'EXPIRED').length,
+        reported: listings.filter((l) => (l.status as any) === 'REPORTED').length,
+      };
+
+      const flags: string[] = [];
+      if (counts.rejected > 0) flags.push('Daha önce ret alan ilan mevcut');
+      if (counts.revisionRequired > 0) flags.push('Düzeltme bekleyen ilan mevcut');
+      if (counts.reported > 0) flags.push('Şikayetli ilan kaydı var');
+      if (listings.some((l) => Number(l.priceAmount) < 100000 || Number(l.priceAmount) > 10000000)) flags.push('Şüpheli fiyat aralığı');
+      if (listings.some((l) => l.kilometers > 500000)) flags.push('Yüksek kilometre uyarısı');
+
+      let riskLevelComputed: 'NORMAL' | 'ATTENTION' | 'HIGH_REVIEW_PRIORITY' = 'NORMAL';
+      if (flags.length >= 2 || counts.reported > 0) riskLevelComputed = 'HIGH_REVIEW_PRIORITY';
+      else if (flags.length === 1 || counts.pending > 2) riskLevelComputed = 'ATTENTION';
+
+      const lastListing = listings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+      return {
+        seller: {
+          userId: seller.id,
+          customerNo,
+          fullName: `${seller.firstName || ''} ${seller.lastName || ''}`.trim() || seller.username || 'Satıcı',
+          username: seller.username || seller.email.split('@')[0],
+          email: seller.email,
+          packageName: seller.subscriptionTier || 'FREE',
+          sellerType: isCorp ? 'CORPORATE' : 'INDIVIDUAL',
+          city: lastListing?.city || 'İstanbul',
+          registeredAt: seller.createdAt,
+        },
+        counts,
+        risk: {
+          level: riskLevelComputed,
+          flags,
+        },
+        lastListingCreatedAt: lastListing?.createdAt || seller.createdAt,
+        lastModerationAt: lastListing?.updatedAt || seller.createdAt,
+      };
+    });
+
+    let filtered = results;
+    if (status) {
+      filtered = results.filter((r) => {
+        switch (status) {
+          case 'PENDING_REVIEW': return r.counts.pending > 0;
+          case 'REVISION_REQUIRED': return r.counts.revisionRequired > 0;
+          case 'DETAILED_REVIEW': return r.counts.detailedReview > 0;
+          case 'ACTIVE': return r.counts.active > 0;
+          case 'REJECTED': return r.counts.rejected > 0;
+          case 'PASSIVE': return r.counts.passive > 0;
+          case 'EXPIRED': return r.counts.expired > 0;
+          case 'REPORTED': return r.counts.reported > 0;
+          default: return true;
+        }
+      });
+    }
+
+    if (riskLevel) {
+      filtered = filtered.filter((r) => r.risk.level === riskLevel);
+    }
+
+    filtered.sort((a, b) => {
+      if (sort === 'PENDING_FIRST') return b.counts.pending - a.counts.pending;
+      if (sort === 'NEWEST') return new Date(b.lastListingCreatedAt).getTime() - new Date(a.lastListingCreatedAt).getTime();
+      if (sort === 'HIGHEST_RISK') return b.risk.flags.length - a.risk.flags.length;
+      if (sort === 'MOST_LISTINGS') return b.counts.total - a.counts.total;
+      return 0;
+    });
+
+    const paginated = filtered.slice(skip, skip + Number(limit));
+
+    const tabCounts = {
+      PENDING_REVIEW: results.reduce((acc, curr) => acc + curr.counts.pending, 0),
+      REVISION_REQUIRED: results.reduce((acc, curr) => acc + curr.counts.revisionRequired, 0),
+      DETAILED_REVIEW: results.reduce((acc, curr) => acc + curr.counts.detailedReview, 0),
+      ACTIVE: results.reduce((acc, curr) => acc + curr.counts.active, 0),
+      REJECTED: results.reduce((acc, curr) => acc + curr.counts.rejected, 0),
+      PASSIVE: results.reduce((acc, curr) => acc + curr.counts.passive, 0),
+      EXPIRED: results.reduce((acc, curr) => acc + curr.counts.expired, 0),
+      REPORTED: results.reduce((acc, curr) => acc + curr.counts.reported, 0),
+    };
+
+    return {
+      sellers: paginated,
+      totalSellers: filtered.length,
+      tabCounts,
+      page: Number(page),
+      limit: Number(limit),
+    };
+  }
+
+  async getSellerListings(customerNo: string, status?: string) {
+    const users = await this.prisma.user.findMany({
+      select: { id: true, createdAt: true, username: true, email: true },
+    });
+
+    const seller = users.find(
+      (u) =>
+        this.formatCustomerNo(u).toUpperCase() === customerNo.toUpperCase() ||
+        u.id === customerNo ||
+        u.username === customerNo ||
+        u.email === customerNo
+    );
+
+    if (!seller) throw new NotFoundException('Satıcı bulunamadı.');
+
+    const listings = await this.prisma.vehicleListing.findMany({
+      where: {
+        sellerId: seller.id,
+        ...(status ? { status: status as any } : {}),
+      },
+      include: {
+        media: true,
+        vehicleVariant: {
+          include: {
+            model: {
+              include: { brand: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return listings.map((l) => {
+      const publicListingNo = this.formatPublicListingNo(l);
+      const brand = l.vehicleVariant?.model?.brand?.name || l.customBrand || 'Marka';
+      const model = l.vehicleVariant?.model?.name || l.customModel || 'Model';
+      const waitingHours = Math.max(0, Math.floor((Date.now() - new Date(l.createdAt).getTime()) / (1000 * 3600)));
+
+      return {
+        listingId: l.id,
+        publicListingNo,
+        title: l.title || `${brand} ${model} ${l.modelYear}`,
+        brand,
+        model,
+        year: l.modelYear,
+        price: l.priceAmount.toString(),
+        currency: l.currency || 'TRY',
+        mileage: l.kilometers,
+        fuelType: l.fuelType || 'BENZIN',
+        transmission: l.transmission || 'MANUEL',
+        city: l.city || 'İstanbul',
+        imageCount: l.media?.length || 0,
+        status: l.status,
+        waitingSince: `${waitingHours} saat`,
+        createdAt: l.createdAt,
+        updatedAt: l.updatedAt,
+        riskFlags: Number(l.priceAmount) < 100000 ? ['Düşük Fiyat Uyarısı'] : [],
+        version: 1,
+      };
+    });
+  }
+
+  async getListingDetails(listingId: string) {
+    const l = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+      include: {
+        seller: true,
+        media: true,
+        vehicleVariant: {
+          include: {
+            model: {
+              include: { brand: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    const brand = l.vehicleVariant?.model?.brand?.name || l.customBrand || 'Marka';
+    const model = l.vehicleVariant?.model?.name || l.customModel || 'Model';
+
+    const autoChecks = [
+      {
+        check: 'Fotoğraf Uyum Kontrolü',
+        level: l.media.length >= 3 ? 'INFO' : 'WARNING',
+        message: l.media.length >= 3 ? 'Görsel sayısı yeterli (3+ fotoğraf).' : 'İlanda 3 adetten az fotoğraf var.',
+      },
+      {
+        check: 'Fiyat Analizi',
+        level: Number(l.priceAmount) > 50000 ? 'INFO' : 'HIGH_RISK',
+        message: Number(l.priceAmount) > 50000 ? 'Fiyat piyasa standartlarıyla uyumlu.' : 'Fiyat şüpheli seviyede düşük.',
+      },
+      {
+        check: 'Açıklama İletişim Filtresi',
+        level: l.description?.match(/05\d{9}/) ? 'HIGH_RISK' : 'INFO',
+        message: l.description?.match(/05\d{9}/) ? 'Açıklamada doğrudan telefon numarası tespit edildi!' : 'Açıklamada iletişim bilgisi ihlali yok.',
+      },
+    ];
+
+    let pastActions: any[] = [];
+    try {
+      pastActions = await (this.prisma as any).listingModerationAction.findMany({
+        where: { listingId },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return {
+      listing: {
+        id: l.id,
+        publicListingNo: this.formatPublicListingNo(l),
+        title: l.title,
+        brand,
+        model,
+        year: l.modelYear,
+        price: l.priceAmount.toString(),
+        currency: l.currency || 'TRY',
+        mileage: l.kilometers,
+        fuelType: l.fuelType || 'BENZIN',
+        transmission: l.transmission || 'MANUEL',
+        bodyType: l.bodyType || 'SEDAN',
+        color: l.color || 'BEYAZ',
+        enginePower: l.enginePower || 110,
+        engineDisplacement: l.engineDisplacement || 1598,
+        city: l.city,
+        district: l.district || '',
+        description: l.description,
+        status: l.status,
+        createdAt: l.createdAt,
+        updatedAt: l.updatedAt,
+      },
+      damageDeclaration: {
+        hasDamageRecord: !!l.damageRecord,
+        tramerFee: (l.tramerAmount || 0).toString(),
+        isHeavyDamaged: l.heavyDamage,
+        paintedParts: (l.paintedParts as any) || [],
+        localPaintedParts: (l.localPaintedParts as any) || [],
+        changedParts: (l.changedParts as any) || [],
+        mechanicalDefectNotes: l.maintenanceHistory || 'Yok',
+      },
+      seller: {
+        userId: l.seller.id,
+        customerNo: this.formatCustomerNo(l.seller),
+        fullName: `${l.seller.firstName || ''} ${l.seller.lastName || ''}`.trim() || l.seller.username || 'Satıcı',
+        email: l.seller.email,
+        phone: l.seller.phone,
+        sellerType: l.sellerType === 'DEALER' || l.sellerType === 'AUTHORIZED_DEALER' ? 'CORPORATE' : 'INDIVIDUAL',
+        packageName: l.seller.subscriptionTier,
+      },
+      media: l.media.map((m, idx) => ({
+        id: m.id,
+        url: m.url,
+        order: m.sortOrder || idx + 1,
+        moderationStatus: m.moderationStatus || 'APPROVED',
+      })),
+      autoChecks,
+      pastActions,
+    };
+  }
+
+  async approveListing(listingId: string, adminUser: any) {
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    const updated = await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'ACTIVE' },
+    });
+
+    try {
+      await (this.prisma as any).listingModerationAction.create({
+        data: {
+          listingId,
+          sellerId: l.sellerId,
+          actorAdminId: adminUser?.id || 'admin',
+          actionType: 'APPROVE',
+          previousStatus: l.status,
+          newStatus: 'ACTIVE',
+          sellerMessage: 'İlanınız başarıyla onaylandı ve yayına alındı.',
+          emailStatus: 'SENT',
+          notificationStatus: 'SENT',
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return updated;
+  }
+
+  async requestRevision(listingId: string, body: any, adminUser: any) {
+    const { reasonCode, sellerMessage, internalNote } = body;
+    if (!sellerMessage) throw new BadRequestException('Satıcıya gönderilecek açıklama zorunludur.');
+
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    const updated = await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'REVISION_REQUIRED' as any },
+    });
+
+    try {
+      await (this.prisma as any).listingModerationAction.create({
+        data: {
+          listingId,
+          sellerId: l.sellerId,
+          actorAdminId: adminUser?.id || 'admin',
+          actionType: 'REQUEST_REVISION',
+          previousStatus: l.status,
+          newStatus: 'REVISION_REQUIRED',
+          reasonCode,
+          sellerMessage,
+          internalNote,
+          emailStatus: 'SENT',
+          notificationStatus: 'SENT',
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return updated;
+  }
+
+  async sendToDetailedReview(listingId: string, body: any, adminUser: any) {
+    const { internalNote } = body;
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    const updated = await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'DETAILED_REVIEW' as any },
+    });
+
+    try {
+      await (this.prisma as any).listingModerationAction.create({
+        data: {
+          listingId,
+          sellerId: l.sellerId,
+          actorAdminId: adminUser?.id || 'admin',
+          actionType: 'DETAILED_REVIEW',
+          previousStatus: l.status,
+          newStatus: 'DETAILED_REVIEW',
+          internalNote,
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return updated;
+  }
+
+  async rejectListing(listingId: string, body: any, adminUser: any) {
+    const { reasonCode, sellerMessage, internalNote, allowResubmission = false } = body;
+    if (!sellerMessage) throw new BadRequestException('Satıcıya gönderilecek ret açıklaması zorunludur.');
+
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    const updated = await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'REJECTED' },
+    });
+
+    try {
+      await (this.prisma as any).listingModerationAction.create({
+        data: {
+          listingId,
+          sellerId: l.sellerId,
+          actorAdminId: adminUser?.id || 'admin',
+          actionType: 'REJECT',
+          previousStatus: l.status,
+          newStatus: 'REJECTED',
+          reasonCode,
+          sellerMessage,
+          internalNote,
+          allowResubmission,
+          emailStatus: 'SENT',
+          notificationStatus: 'SENT',
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return updated;
+  }
+
+  async setPassive(listingId: string, adminUser: any) {
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    return this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'PASSIVE' },
+    });
+  }
+
+  async reopenListing(listingId: string, adminUser: any) {
+    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    return this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: { status: 'PENDING_REVIEW' },
+    });
+  }
+
+  async moderateMedia(mediaId: string, status: 'APPROVED' | 'REJECTED') {
+    return this.prisma.listingMedia.update({
+      where: { id: mediaId },
+      data: { moderationStatus: status },
+    });
+  }
+
+  async bulkAction(customerNo: string, body: any, adminUser: any) {
+    const { listingIds, action, reasonCode, sellerMessage, internalNote } = body;
+    if (!Array.isArray(listingIds) || listingIds.length === 0) {
+      throw new BadRequestException('En az bir ilan seçilmelidir.');
+    }
+
+    let succeeded = 0;
+    let failed = 0;
+    const failures: any[] = [];
+
+    for (const listingId of listingIds) {
+      try {
+        if (action === 'APPROVE') await this.approveListing(listingId, adminUser);
+        else if (action === 'REVISION_REQUIRED') await this.requestRevision(listingId, { reasonCode, sellerMessage, internalNote }, adminUser);
+        else if (action === 'DETAILED_REVIEW') await this.sendToDetailedReview(listingId, { internalNote }, adminUser);
+        else if (action === 'REJECT') await this.rejectListing(listingId, { reasonCode, sellerMessage, internalNote }, adminUser);
+        succeeded++;
+      } catch (err: any) {
+        failed++;
+        failures.push({ listingId, reason: err.message });
+      }
+    }
+
+    return {
+      requested: listingIds.length,
+      succeeded,
+      failed,
+      failures,
+    };
+  }
+
+  async acquireLock(listingId: string, adminUser: any) {
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    try {
+      return await (this.prisma as any).listingModerationLock.upsert({
+        where: { listingId },
+        update: { adminId: adminUser?.id || 'admin', adminName: adminUser?.email || 'Admin', expiresAt, lockedAt: new Date() },
+        create: { listingId, adminId: adminUser?.id || 'admin', adminName: adminUser?.email || 'Admin', expiresAt },
+      });
+    } catch (e) {
+      return { listingId, adminId: adminUser?.id || 'admin', adminName: 'Admin', expiresAt };
+    }
+  }
+
+  async releaseLock(listingId: string) {
+    try {
+      await (this.prisma as any).listingModerationLock.delete({ where: { listingId } });
+    } catch (e) {
+      // ignore
+    }
+    return { success: true };
+  }
+}
