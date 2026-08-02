@@ -20,6 +20,7 @@ import { VehicleDiscoveryModule } from './modules/vehicle-discovery/vehicle-disc
 import { ClubModule } from './modules/club/club.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ListingModerationModule } from './modules/listing-moderation/listing-moderation.module';
+import { ListingAiModule } from './modules/listing-ai/listing-ai.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ListingModerationModule } from './modules/listing-moderation/listing-mo
     ClubModule,
     ReportsModule,
     ListingModerationModule,
+    ListingAiModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

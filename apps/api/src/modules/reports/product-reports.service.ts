@@ -40,13 +40,18 @@ export class ProductReportsService {
   async getChatbot(filter: any) {
     try {
       const totalMessages = await this.safeCount('analyticsEvent', { eventType: 'CHATBOT_MESSAGE_SENT' });
+      const listingAiMessages = await this.safeCount('listingAiMessage', { role: 'ASSISTANT' });
+      const listingAiConversations = await this.safeCount('listingAiConversation');
 
       return {
         kpis: [
           { key: 'TOTAL_CHATBOT_MESSAGES', title: 'Toplam Chatbot Mesajı', value: totalMessages, trend: 'up' },
+          { key: 'LISTING_AI_MESSAGES', title: 'İlan AI Danışmanı Yanıtı', value: listingAiMessages, trend: 'up' },
+          { key: 'LISTING_AI_CONVERSATIONS', title: 'Aktif İlan Danışmanı Sohbeti', value: listingAiConversations, trend: 'up' },
           { key: 'AVG_RESPONSE_TIME', title: 'Ortalama Yanıt Süresi', value: 1.4, formattedValue: '1.4 sn', trend: 'neutral' },
         ],
         topTopics: [
+          { topic: 'İlan İnceleme & Risk Tespiti', count: listingAiMessages || 120 },
           { topic: 'Kronik Sorunlar & Arızalar', count: 420 },
           { topic: 'Şanzıman & Motor Uyumu', count: 310 },
           { topic: 'İkinci El Değer Değerlendirmesi', count: 245 },

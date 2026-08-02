@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
+import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -838,13 +839,7 @@ export default function ListingDetail() {
               </div>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl border border-white/5 bg-slate-900/10 text-center flex flex-col gap-2 w-full">
-              <span className="text-2xl">⏳</span>
-              <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">AI Analizi Hazırlanıyor</h4>
-              <p className="text-[9px] text-slate-400 leading-relaxed">
-                Bu ilandaki araç için varyant eşleştirmesi veya AI analiz raporları henüz moderasyon tarafından onaylanmamış. En kısa sürede güncellenecektir.
-              </p>
-            </div>
+          <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.publicListingNo} />
           )}
 
           {/* İŞİ CEPTE ÖNERİYOR (Orta Kolona, AI Analizi Kartının Altına Alındı) */}
