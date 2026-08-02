@@ -1,7 +1,12 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('accessToken') || localStorage.getItem('token') || null;
+}
+
 export async function fetchReportApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -10,13 +15,13 @@ export async function fetchReportApi(endpoint: string, options: RequestInit = {}
 
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  // Try with /api/admin/reports prefix first
-  let targetUrl = `${API_URL}/api${cleanEndpoint}`;
+  // Try direct route first since NestJS controller uses @Controller('admin/reports')
+  let targetUrl = `${API_URL}${cleanEndpoint}`;
   let res = await fetch(targetUrl, { ...options, headers });
 
-  // Fallback to direct URL without extra /api if 404
+  // Fallback to /api prefix if 404
   if (!res.ok && res.status === 404) {
-    targetUrl = `${API_URL}${cleanEndpoint}`;
+    targetUrl = `${API_URL}/api${cleanEndpoint}`;
     res = await fetch(targetUrl, { ...options, headers });
   }
 
