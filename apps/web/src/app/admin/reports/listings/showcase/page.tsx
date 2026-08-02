@@ -26,7 +26,7 @@ export default function ListingShowcasePage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <ReportHeader title="Vitrin Lift & Öne Çıkarma Performansı" subtitle="Vitrine çıkartılan ilanların ekstra tıklanma, favorilenme ve dönüşüm çarpanları." />
+      <ReportHeader title="Vitrin Etkisi & Öne Çıkarma Performansı" subtitle="Vitrine çıkartılan ilanların ekstra tıklanma, favorilenme ve dönüşüm çarpanları." />
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <ReportSidebar />
         <main className="flex-1 space-y-8 w-full">

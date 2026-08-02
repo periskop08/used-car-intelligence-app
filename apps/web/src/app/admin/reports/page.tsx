@@ -45,8 +45,8 @@ export default function ReportsOverviewPage() {
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8">
       <ReportHeader
-        title="Executive Overview (Yönetici Özeti)"
-        subtitle="TorqueScout platform genişliği, kullanıcı büyümesi, gelir ve AI sağlık metriklerinin anlık özeti."
+        title="Yönetici Özeti"
+        subtitle="Platform büyümesi, kullanıcı aktivitesi, gelir, ürün kullanımı ve sistem sağlığının genel görünümü."
         reportType="EXECUTIVE_OVERVIEW"
         onFilterChange={fetchOverview}
       />

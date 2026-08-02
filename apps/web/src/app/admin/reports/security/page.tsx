@@ -26,7 +26,7 @@ export default function SecurityReportsPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <ReportHeader title="Güvenlik Audit & Rate-Limit Logları" subtitle="Yetkisiz erişim denemeleri, rate-limit ikazları ve askıya alınan şüpheli hesaplar." />
+      <ReportHeader title="Yönetim ve Güvenlik Kayıtları" subtitle="Yetkisiz erişim denemeleri, rate-limit ikazları ve askıya alınan şüpheli hesaplar." />
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <ReportSidebar />
         <main className="flex-1 space-y-8 w-full">

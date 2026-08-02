@@ -26,7 +26,7 @@ export default function ProductChatbotPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <ReportHeader title="Gemini Chatbot Kullanım Analitiği" subtitle="Toplam mesajlaşma hacmi, ortalama yanıt süreleri ve en popüler soru konuları." />
+      <ReportHeader title="Chatbot Kullanım Analitiği" subtitle="Toplam mesajlaşma hacmi, ortalama yanıt süreleri ve en popüler soru konuları." />
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <ReportSidebar />
         <main className="flex-1 space-y-8 w-full">
