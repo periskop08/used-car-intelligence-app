@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Sparkles, Zap, Lock, RefreshCw, Send, AlertTriangle } from "lucide-react";
 
 export interface ListingAiAdvisorCardProps {
   listingId: string;
@@ -46,9 +47,29 @@ export default function ListingAiAdvisorCard({
     "Bu araç şehir içi kullanım için uygun mu?",
   ];
 
-  const fetchConversation = async () => {
+  const fetchQuota = async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/listings/${listingId}/ai-chat/quota`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuota(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch quota", e);
+    }
+  };
+
+  const fetchConversation = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      fetchQuota();
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/api/listings/${listingId}/ai-conversation`, {
@@ -57,18 +78,22 @@ export default function ListingAiAdvisorCard({
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
-        setQuota(data.quota || null);
+        if (data.quota) setQuota(data.quota);
         if (data.messages && data.messages.length > 0) {
           setIsOpen(true);
         }
+      } else {
+        fetchQuota();
       }
     } catch (e) {
       console.error("Failed to fetch AI conversation", e);
+      fetchQuota();
     }
   };
 
   useEffect(() => {
     fetchConversation();
+    fetchQuota();
   }, [listingId]);
 
   useEffect(() => {
@@ -100,6 +125,8 @@ export default function ListingAiAdvisorCard({
       });
 
       if (res.ok) {
+        const data = await res.json();
+        if (data.quota) setQuota(data.quota);
         await fetchConversation();
       } else {
         const err = await res.json();
@@ -125,7 +152,6 @@ export default function ListingAiAdvisorCard({
     if (!textToSend) setInputMessage("");
     setLoading(true);
 
-    // Optimistic user message append
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: "USER",
@@ -151,7 +177,7 @@ export default function ListingAiAdvisorCard({
 
       if (res.ok) {
         const data = await res.json();
-        setQuota(data.quota);
+        if (data.quota) setQuota(data.quota);
         const assistantMsg: ChatMessage = {
           id: data.messageId,
           role: "ASSISTANT",
@@ -163,7 +189,6 @@ export default function ListingAiAdvisorCard({
       } else {
         const err = await res.json();
         alert(err.message || "Mesaj gönderilemedi.");
-        // Re-fetch to clean up optimistic state
         await fetchConversation();
       }
     } catch (e) {
@@ -176,68 +201,86 @@ export default function ListingAiAdvisorCard({
   const isQuotaExhausted = Boolean(quota && !quota.unlimited && (quota.remaining ?? 0) <= 0);
 
   return (
-    <div className="glass p-5 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-4 shadow-xl relative overflow-hidden">
-      <span className="absolute -top-10 -right-10 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl pointer-events-none" />
+    <div className="w-full my-6 glass p-6 sm:p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-r from-[#0b0f19] via-[#0d1222] to-orange-950/20 shadow-2xl flex flex-col gap-6 relative overflow-hidden">
+      {/* Background Decorative Glow */}
+      <span className="absolute -top-16 -right-16 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+      <span className="absolute -bottom-16 -left-16 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Card Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
-        <div className="flex flex-col">
-          <span className="text-xs font-black text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
-            🤖 TorqueScout İlan Danışmanı
-          </span>
-          <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
-            Bu danışman yalnızca bu ilandaki teknik veriler, satıcı açıklaması ve ekspertiz/boya-değişen beyanları üzerinden değerlendirme yapar.
-          </span>
+      {/* Card Header & Dynamic Quota Badge */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black text-orange-400 uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-orange-400 animate-pulse" />
+              TorqueScout İlan Danışmanı
+            </span>
+            <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 uppercase tracking-wider">
+              İlan Bağlamlı AI
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            Bu danışman yalnızca açık ilanın teknik verileri, satıcı açıklaması ve ekspertiz/boya-değişen beyanlarını analiz eder.
+          </p>
         </div>
 
-        {/* Quota Badge */}
+        {/* Dynamic AI Chatbot Quota Badge */}
         {quota && (
-          <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-slate-900 border border-white/10 text-orange-300 shrink-0">
-            {quota.unlimited ? "Sınırsız" : `Kalan ${quota.remaining} / ${quota.limit}`}
-          </span>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-orange-500/30 shadow-lg shrink-0">
+            <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-bounce" />
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                AI Chatbot Mesaj Hakkı
+              </span>
+              <span className="text-xs font-mono font-black text-orange-300">
+                {quota.unlimited
+                  ? "Sınırsız (Admin)"
+                  : `Kalan: ${quota.remaining} / ${quota.limit} Mesaj`}
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Card Disclaimer Notice */}
-      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 text-[10px] text-slate-400 leading-relaxed flex items-start gap-2">
-        <span className="text-orange-400 font-bold shrink-0">ℹ️</span>
+      {/* Disclaimer Notice */}
+      <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/5 text-xs text-slate-400 leading-relaxed flex items-start gap-2.5">
+        <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
         <div>
-          Bu değerlendirme ilan sahibi tarafından girilen veriler üzerinden hazırlanır. Bağımsız ekspertiz ve fiziksel kontrol yerine geçmez. Modelin genel kronik raporu için{" "}
-          <Link href="/aracini-bul" className="text-orange-400 underline font-semibold hover:text-orange-300">
+          Bu değerlendirme ilan sahibi tarafından beyan edilen veriler üzerinden hazırlanır. Bağımsız ekspertiz ve fiziksel kontrol yerine geçmez. Aracın genel kronik raporunu incelemek için{" "}
+          <Link href="/aracini-bul" className="text-orange-400 underline font-bold hover:text-orange-300">
             Araç Sorgulama
           </Link>{" "}
           bölümüne gidin.
         </div>
       </div>
 
-      {/* Closed State: Initial Call Button */}
+      {/* Closed State: Call to Action Button */}
       {!isOpen && (
         <button
           type="button"
           onClick={handleStartInitialAnalysis}
-          className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
         >
-          <span>🤖</span>
-          <span>Bu İlanı AI ile Değerlendir</span>
+          <Sparkles className="w-5 h-5 text-white" />
+          <span>Bu İlanı AI ile Değerlendir & Risk Raporu Al</span>
         </button>
       )}
 
-      {/* Open State: Interactive Chat Area */}
+      {/* Open State: Full Chatbot Section */}
       {isOpen && (
-        <div className="space-y-4 pt-1">
+        <div className="space-y-5 pt-1">
           {/* Quick Question Chips */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Hazır Sorular:
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              💡 Önerilen Hızlı Sorular:
             </span>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {quickQuestions.map((q, idx) => (
                 <button
                   key={idx}
                   type="button"
                   disabled={Boolean(loading || isQuotaExhausted)}
                   onClick={() => handleSendMessage(q)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-white/10 text-[11px] text-slate-300 hover:text-white disabled:opacity-40 transition"
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-xs text-slate-300 hover:text-white disabled:opacity-40 transition font-medium cursor-pointer"
                 >
                   {q}
                 </button>
@@ -246,11 +289,11 @@ export default function ListingAiAdvisorCard({
           </div>
 
           {/* Messages Feed */}
-          <div className="max-h-96 overflow-y-auto space-y-3 p-3 rounded-xl bg-slate-950/90 border border-white/10">
+          <div className="max-h-[500px] overflow-y-auto space-y-4 p-4 sm:p-6 rounded-2xl bg-slate-950/95 border border-white/10 scrollbar-thin scrollbar-thumb-white/10">
             {initializing && (
-              <div className="p-4 text-center text-xs text-slate-400 animate-pulse flex items-center justify-center gap-2">
+              <div className="p-6 text-center text-xs text-slate-400 animate-pulse flex items-center justify-center gap-2.5">
                 <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                İlan verileri analiz ediliyor...
+                İlan verileri detaylı analiz ediliyor, lütfen bekleyin...
               </div>
             )}
 
@@ -259,7 +302,7 @@ export default function ListingAiAdvisorCard({
                 return (
                   <div
                     key={msg.id}
-                    className="p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[11px] text-center font-bold"
+                    className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs text-center font-bold"
                   >
                     {msg.content}
                   </div>
@@ -273,7 +316,7 @@ export default function ListingAiAdvisorCard({
                   key={msg.id}
                   className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
                 >
-                  <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-slate-400">
+                  <div className="flex items-center gap-2 mb-1 text-[11px] font-bold text-slate-400">
                     <span>{isUser ? "Siz" : "🤖 TorqueScout İlan Danışmanı"}</span>
                     <span>•</span>
                     <span>
@@ -285,7 +328,7 @@ export default function ListingAiAdvisorCard({
                   </div>
 
                   <div
-                    className={`max-w-[90%] p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+                    className={`max-w-[88%] p-4 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-line ${
                       isUser
                         ? "bg-orange-500 text-white rounded-br-none shadow-md shadow-orange-500/10 font-medium"
                         : "bg-slate-900 text-slate-200 border border-white/10 rounded-bl-none"
@@ -298,22 +341,25 @@ export default function ListingAiAdvisorCard({
             })}
 
             {loading && (
-              <div className="flex items-center gap-2 p-3 text-xs text-slate-400 font-medium">
-                <span className="w-3.5 h-3.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                Danışman yanıt yazıyor...
+              <div className="flex items-center gap-2.5 p-4 text-xs text-slate-400 font-medium">
+                <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                Danışman yanıt hazırlıyor...
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Bar */}
+          {/* Input Bar or Quota Exhausted Warning */}
           {isQuotaExhausted ? (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between text-xs text-rose-300">
-              <span>⚠️ Chatbot kullanım hakkınız doldu.</span>
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-rose-300 font-medium">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>Chatbot mesaj kullanım hakkınız doldu. Yeni mesaj göndermek için paketinizi yükseltebilirsiniz.</span>
+              </div>
               <Link
                 href="/pricing"
-                className="px-3 py-1.5 rounded-lg bg-rose-500 text-white font-bold hover:bg-rose-400 transition"
+                className="px-4 py-2 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-400 transition shrink-0"
               >
                 Paketleri İncele
               </Link>
@@ -324,22 +370,23 @@ export default function ListingAiAdvisorCard({
                 e.preventDefault();
                 handleSendMessage();
               }}
-              className="flex items-center gap-2"
+              className="flex items-center gap-3"
             >
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Bu ilan hakkında bir soru sorun (Örn: Bu aracın en büyük riski ne?)..."
+                placeholder="Bu ilan hakkında bir soru sorun (Örn: İlandaki en büyük risk nedir?)..."
                 disabled={loading || initializing}
-                className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition"
+                className="flex-1 px-4 py-3.5 bg-slate-950 border border-white/10 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition"
               />
               <button
                 type="submit"
                 disabled={loading || initializing || !inputMessage.trim()}
-                className="px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition"
+                className="px-6 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white font-bold text-xs sm:text-sm shadow-lg shadow-orange-500/20 transition flex items-center gap-2 cursor-pointer shrink-0"
               >
-                Gönder
+                <Send className="w-4 h-4" />
+                <span>Gönder</span>
               </button>
             </form>
           )}

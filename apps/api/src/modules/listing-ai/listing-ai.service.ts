@@ -20,68 +20,74 @@ export class ListingAiService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    try {
-      await this.prisma.$executeRawUnsafe(`
-        DO $$ BEGIN
-            CREATE TYPE "AiQuotaFeature" AS ENUM ('GENERAL_CHATBOT', 'COMPARISON_CHATBOT', 'LISTING_AI_ADVISOR');
-        EXCEPTION WHEN duplicate_object THEN null; END $$;
+    const statements = [
+      `DO $$ BEGIN
+          CREATE TYPE "AiQuotaFeature" AS ENUM ('GENERAL_CHATBOT', 'COMPARISON_CHATBOT', 'LISTING_AI_ADVISOR');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;`,
 
-        DO $$ BEGIN
-            CREATE TYPE "AiQuotaUsageStatus" AS ENUM ('RESERVED', 'CONSUMED', 'RELEASED');
-        EXCEPTION WHEN duplicate_object THEN null; END $$;
+      `DO $$ BEGIN
+          CREATE TYPE "AiQuotaUsageStatus" AS ENUM ('RESERVED', 'CONSUMED', 'RELEASED');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;`,
 
-        DO $$ BEGIN
-            CREATE TYPE "ListingAiMessageType" AS ENUM ('USER_MESSAGE', 'ASSISTANT_RESPONSE', 'INITIAL_ANALYSIS', 'CONTEXT_SEPARATOR', 'SCOPE_REDIRECT', 'SAFE_FALLBACK');
-        EXCEPTION WHEN duplicate_object THEN null; END $$;
+      `DO $$ BEGIN
+          CREATE TYPE "ListingAiMessageType" AS ENUM ('USER_MESSAGE', 'ASSISTANT_RESPONSE', 'INITIAL_ANALYSIS', 'CONTEXT_SEPARATOR', 'SCOPE_REDIRECT', 'SAFE_FALLBACK');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;`,
 
-        CREATE TABLE IF NOT EXISTS "ListingAiConversation" (
-          "id" TEXT NOT NULL,
-          "listingId" TEXT NOT NULL,
-          "userId" TEXT NOT NULL,
-          "activeContextHash" TEXT NOT NULL,
-          "lastContextChangedAt" TIMESTAMP(3),
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "archivedAt" TIMESTAMP(3),
-          CONSTRAINT "ListingAiConversation_pkey" PRIMARY KEY ("id")
-        );
-        CREATE UNIQUE INDEX IF NOT EXISTS "ListingAiConversation_listingId_userId_key" 
-        ON "ListingAiConversation"("listingId", "userId");
+      `CREATE TABLE IF NOT EXISTS "ListingAiConversation" (
+        "id" TEXT NOT NULL,
+        "listingId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "activeContextHash" TEXT NOT NULL,
+        "lastContextChangedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "archivedAt" TIMESTAMP(3),
+        CONSTRAINT "ListingAiConversation_pkey" PRIMARY KEY ("id")
+      );`,
 
-        CREATE TABLE IF NOT EXISTS "AiQuotaUsage" (
-          "id" TEXT NOT NULL,
-          "userId" TEXT NOT NULL,
-          "feature" "AiQuotaFeature" NOT NULL DEFAULT 'LISTING_AI_ADVISOR'::"AiQuotaFeature",
-          "referenceId" TEXT,
-          "idempotencyKey" TEXT NOT NULL,
-          "assistantMessageId" TEXT,
-          "status" "AiQuotaUsageStatus" NOT NULL DEFAULT 'RESERVED'::"AiQuotaUsageStatus",
-          "amount" INTEGER NOT NULL DEFAULT 1,
-          "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "consumedAt" TIMESTAMP(3),
-          "releasedAt" TIMESTAMP(3),
-          "expiresAt" TIMESTAMP(3) NOT NULL,
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "AiQuotaUsage_pkey" PRIMARY KEY ("id")
-        );
-        CREATE UNIQUE INDEX IF NOT EXISTS "AiQuotaUsage_idempotencyKey_key" 
-        ON "AiQuotaUsage"("idempotencyKey");
+      `CREATE UNIQUE INDEX IF NOT EXISTS "ListingAiConversation_listingId_userId_key" 
+      ON "ListingAiConversation"("listingId", "userId");`,
 
-        CREATE TABLE IF NOT EXISTS "ListingAiMessage" (
-          "id" TEXT NOT NULL,
-          "conversationId" TEXT NOT NULL,
-          "role" TEXT NOT NULL,
-          "messageType" "ListingAiMessageType" NOT NULL DEFAULT 'USER_MESSAGE'::"ListingAiMessageType",
-          "content" TEXT NOT NULL,
-          "quotaUsageId" TEXT,
-          "listingVersion" INTEGER,
-          "contextHash" TEXT,
-          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "ListingAiMessage_pkey" PRIMARY KEY ("id")
-        );
-      `);
-    } catch (e: any) {
-      this.logger.error(`ListingAi tables readiness error: ${e?.message || e}`);
+      `CREATE TABLE IF NOT EXISTS "AiQuotaUsage" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "feature" "AiQuotaFeature" NOT NULL DEFAULT 'LISTING_AI_ADVISOR'::"AiQuotaFeature",
+        "referenceId" TEXT,
+        "idempotencyKey" TEXT NOT NULL,
+        "assistantMessageId" TEXT,
+        "status" "AiQuotaUsageStatus" NOT NULL DEFAULT 'RESERVED'::"AiQuotaUsageStatus",
+        "amount" INTEGER NOT NULL DEFAULT 1,
+        "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "consumedAt" TIMESTAMP(3),
+        "releasedAt" TIMESTAMP(3),
+        "expiresAt" TIMESTAMP(3) NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AiQuotaUsage_pkey" PRIMARY KEY ("id")
+      );`,
+
+      `CREATE UNIQUE INDEX IF NOT EXISTS "AiQuotaUsage_idempotencyKey_key" 
+      ON "AiQuotaUsage"("idempotencyKey");`,
+
+      `CREATE TABLE IF NOT EXISTS "ListingAiMessage" (
+        "id" TEXT NOT NULL,
+        "conversationId" TEXT NOT NULL,
+        "role" TEXT NOT NULL,
+        "messageType" "ListingAiMessageType" NOT NULL DEFAULT 'USER_MESSAGE'::"ListingAiMessageType",
+        "content" TEXT NOT NULL,
+        "quotaUsageId" TEXT,
+        "listingVersion" INTEGER,
+        "contextHash" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ListingAiMessage_pkey" PRIMARY KEY ("id")
+      );`,
+    ];
+
+    for (const stmt of statements) {
+      try {
+        await this.prisma.$executeRawUnsafe(stmt);
+      } catch (e: any) {
+        this.logger.debug(`Table/Enum statement execution note: ${e?.message || e}`);
+      }
     }
   }
 

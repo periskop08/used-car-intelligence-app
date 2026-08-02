@@ -25,6 +25,8 @@ export class AnalyticsAggregationService implements OnModuleInit {
           "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "DailyAnalyticsAggregate_pkey" PRIMARY KEY ("id")
         );
+      `);
+      await this.prisma.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "DailyAnalyticsAggregate_date_category_metric_dimensionKey_key"
         ON "DailyAnalyticsAggregate"("date", "category", "metric", "dimensionKey");
       `);
