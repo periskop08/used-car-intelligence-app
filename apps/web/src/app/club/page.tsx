@@ -58,6 +58,34 @@ interface ClubComment {
   };
 }
 
+function groupCommentsByThread(flatComments: ClubComment[]) {
+  const commentMap = new Map<string, ClubComment>();
+  flatComments.forEach((c) => commentMap.set(c.id, c));
+
+  const parentComments: ClubComment[] = [];
+  const repliesMap: Record<string, ClubComment[]> = {};
+
+  flatComments.forEach((c) => {
+    if (!c.replyReference || !c.replyReference.commentId || !commentMap.has(c.replyReference.commentId)) {
+      parentComments.push(c);
+    } else {
+      let rootParentId = c.replyReference.commentId;
+      let curr = commentMap.get(rootParentId);
+      while (curr && curr.replyReference && curr.replyReference.commentId && commentMap.has(curr.replyReference.commentId)) {
+        rootParentId = curr.replyReference.commentId;
+        curr = commentMap.get(rootParentId);
+      }
+
+      if (!repliesMap[rootParentId]) {
+        repliesMap[rootParentId] = [];
+      }
+      repliesMap[rootParentId].push(c);
+    }
+  });
+
+  return { parentComments, repliesMap };
+}
+
 function ClubPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -588,101 +616,158 @@ function ClubPageContent() {
                           </div>
                         )}
 
-                        {/* Flat Chronological Comment List */}
-                        <div className="space-y-3">
-                          {comments.length === 0 ? (
-                            <p className="text-xs text-slate-500 text-center py-3">İlk yorumu siz yapın.</p>
-                          ) : (
-                            comments.map((c) => (
-                              <div
-                                id={`club-comment-${c.id}`}
-                                key={c.id}
-                                className="club-comment-card bg-slate-950/70 border border-white/5 p-3.5 rounded-2xl space-y-2 text-xs transition-all"
-                              >
-                                {/* Target Comment Reply Reference Bar */}
-                                {c.replyReference && (
-                                  <div
-                                    onClick={() => handleScrollToComment(c.replyReference!.commentId)}
-                                    className="text-[11px] text-slate-400 bg-slate-900/80 p-2 rounded-xl border border-white/5 cursor-pointer hover:border-orange-500/30 transition flex items-center gap-1.5 mb-1.5 select-none"
-                                  >
-                                    <span className="text-orange-400 font-bold">↩</span>
-                                    <span>
-                                      <strong className="text-slate-200">{c.replyReference.author.displayName}</strong> adlı kullanıcının yorumuna yanıt
-                                    </span>
-                                    {c.replyReference.preview && (
-                                      <span className="text-slate-500 italic truncate max-w-xs">
-                                        “{c.replyReference.preview}”
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
+                        {/* Threaded Nested Comment List */}
+                        <div className="space-y-4">
+                          {(() => {
+                            const { parentComments, repliesMap } = groupCommentsByThread(comments);
+                            if (comments.length === 0) {
+                              return <p className="text-xs text-slate-500 text-center py-3">İlk yorumu siz yapın.</p>;
+                            }
 
-                                {/* Comment Header */}
-                                <div className="flex items-center justify-between">
-                                  <div
-                                    onClick={() => setSelectedUser(c.author)}
-                                    className="flex items-center gap-2 cursor-pointer group"
-                                  >
-                                    <div className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-300">
-                                      {c.author.displayName.slice(0, 2).toUpperCase()}
+                            return parentComments.map((parent) => {
+                              const parentReplies = repliesMap[parent.id] || [];
+
+                              return (
+                                <div
+                                  id={`club-comment-${parent.id}`}
+                                  key={parent.id}
+                                  className="club-comment-card bg-slate-950/70 border border-white/5 p-4 rounded-2xl space-y-3 text-xs transition-all"
+                                >
+                                  {/* Parent Comment Header & Content */}
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <div
+                                        onClick={() => setSelectedUser(parent.author)}
+                                        className="flex items-center gap-2 cursor-pointer group"
+                                      >
+                                        <div className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-300">
+                                          {parent.author.displayName.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <span className="font-bold text-slate-200 group-hover:text-orange-400 transition">
+                                          {parent.author.displayName}
+                                        </span>
+
+                                        {/* Dynamic Package Badge */}
+                                        <span
+                                          className={`text-[9px] px-2 py-0.5 rounded font-bold ${
+                                            parent.author.packageBadge?.code === "YETKIN"
+                                              ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                                              : parent.author.packageBadge?.code === "PROFESYONEL"
+                                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                              : "bg-slate-800 text-slate-300 border border-white/10"
+                                          }`}
+                                        >
+                                          {parent.author.packageBadge?.label || "Tanışma"}
+                                        </span>
+
+                                        {/* Role Badges */}
+                                        {parent.author.clubRole === "ADMIN" && (
+                                          <span className="text-[9px] bg-orange-500 text-slate-950 font-black px-1.5 py-0.5 rounded">
+                                            YÖNETİCİ
+                                          </span>
+                                        )}
+                                        {parent.author.clubRole === "MODERATOR" && (
+                                          <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold px-1.5 py-0.5 rounded">
+                                            MOD
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <span className="text-[10px] text-slate-500">
+                                        {new Date(parent.createdAt).toLocaleTimeString("tr-TR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                        {parent.editedAt && " (Düzenlendi)"}
+                                      </span>
                                     </div>
-                                    <span className="font-bold text-slate-200 group-hover:text-orange-400 transition">
-                                      {c.author.displayName}
-                                    </span>
 
-                                    {/* Dynamic Package Badge */}
-                                    <span
-                                      className={`text-[9px] px-2 py-0.5 rounded font-bold ${
-                                        c.author.packageBadge?.code === "YETKIN"
-                                          ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                                          : c.author.packageBadge?.code === "PROFESYONEL"
-                                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                          : "bg-slate-800 text-slate-300 border border-white/10"
-                                      }`}
-                                    >
-                                      {c.author.packageBadge?.label || "Tanışma"}
-                                    </span>
+                                    <p className="text-slate-300 leading-normal pl-8 text-xs sm:text-sm">{parent.content}</p>
 
-                                    {/* Role Badges */}
-                                    {c.author.clubRole === "ADMIN" && (
-                                      <span className="text-[9px] bg-orange-500 text-slate-950 font-black px-1.5 py-0.5 rounded">
-                                        YÖNETİCİ
-                                      </span>
-                                    )}
-                                    {c.author.clubRole === "MODERATOR" && (
-                                      <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold px-1.5 py-0.5 rounded">
-                                        MOD
-                                      </span>
-                                    )}
+                                    <div className="pl-8 pt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartReply(post.id, parent)}
+                                        className="text-[11px] text-slate-400 hover:text-orange-400 font-bold flex items-center gap-1 transition"
+                                      >
+                                        <span>↩</span>
+                                        <span>Yanıtla</span>
+                                      </button>
+                                    </div>
                                   </div>
 
-                                  <span className="text-[10px] text-slate-500">
-                                    {new Date(c.createdAt).toLocaleTimeString("tr-TR", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                    {c.editedAt && " (Düzenlendi)"}
-                                  </span>
-                                </div>
+                                  {/* NESTED REPLIES CONTAINER (Directly Inside Parent Comment Box) */}
+                                  {parentReplies.length > 0 && (
+                                    <div className="mt-3 pl-3 sm:pl-4 border-l-2 border-orange-500/40 space-y-2.5 pt-1">
+                                      {parentReplies.map((r) => (
+                                        <div
+                                          id={`club-comment-${r.id}`}
+                                          key={r.id}
+                                          className="club-comment-card bg-slate-900/80 p-3 rounded-xl border border-white/5 space-y-2 text-xs transition-all"
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div
+                                              onClick={() => setSelectedUser(r.author)}
+                                              className="flex items-center gap-2 cursor-pointer group"
+                                            >
+                                              <div className="w-5 h-5 rounded bg-slate-800 flex items-center justify-center font-bold text-[9px] text-slate-300">
+                                                {r.author.displayName.slice(0, 2).toUpperCase()}
+                                              </div>
+                                              <span className="font-bold text-slate-200 group-hover:text-orange-400 transition text-[11px]">
+                                                {r.author.displayName}
+                                              </span>
 
-                                {/* Comment Text */}
-                                <p className="text-slate-300 leading-normal pl-8">{c.content}</p>
+                                              <span
+                                                className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${
+                                                  r.author.packageBadge?.code === "YETKIN"
+                                                    ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                                                    : r.author.packageBadge?.code === "PROFESYONEL"
+                                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                                    : "bg-slate-800 text-slate-300 border border-white/10"
+                                                }`}
+                                              >
+                                                {r.author.packageBadge?.label || "Tanışma"}
+                                              </span>
 
-                                {/* Direct Reply Action Button */}
-                                <div className="pl-8 pt-1 flex items-center justify-between">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartReply(post.id, c)}
-                                    aria-label={`${c.author.displayName} adlı kullanıcıya yanıt ver`}
-                                    className="text-[11px] text-slate-400 hover:text-orange-400 font-bold flex items-center gap-1 transition"
-                                  >
-                                    <span>↩</span>
-                                    <span>Yanıtla</span>
-                                  </button>
+                                              {r.author.clubRole === "ADMIN" && (
+                                                <span className="text-[8px] bg-orange-500 text-slate-950 font-black px-1 py-0.5 rounded">
+                                                  YÖNETİCİ
+                                                </span>
+                                              )}
+                                              {r.author.clubRole === "MODERATOR" && (
+                                                <span className="text-[8px] bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold px-1 py-0.5 rounded">
+                                                  MOD
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] text-slate-500">
+                                              {new Date(r.createdAt).toLocaleTimeString("tr-TR", {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                            </span>
+                                          </div>
+
+                                          <p className="text-slate-300 leading-normal pl-7 text-xs">{r.content}</p>
+
+                                          <div className="pl-7 pt-0.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleStartReply(post.id, r)}
+                                              className="text-[10px] text-slate-400 hover:text-orange-400 font-bold flex items-center gap-1 transition"
+                                            >
+                                              <span>↩</span>
+                                              <span>Yanıtla</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))
-                          )}
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     )}
