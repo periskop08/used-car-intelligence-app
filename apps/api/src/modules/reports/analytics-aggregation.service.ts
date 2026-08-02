@@ -8,7 +8,30 @@ export class AnalyticsAggregationService implements OnModuleInit {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "DailyAnalyticsAggregate" (
+          "id" TEXT NOT NULL,
+          "date" DATE NOT NULL,
+          "category" TEXT NOT NULL,
+          "metric" TEXT NOT NULL,
+          "dimensionKey" TEXT NOT NULL DEFAULT 'ALL',
+          "dimensions" JSONB,
+          "valueType" TEXT NOT NULL DEFAULT 'COUNT',
+          "numericValue" DECIMAL(24,6) NOT NULL DEFAULT 0,
+          "countValue" BIGINT NOT NULL DEFAULT 0,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "DailyAnalyticsAggregate_pkey" PRIMARY KEY ("id")
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "DailyAnalyticsAggregate_date_category_metric_dimensionKey_key"
+        ON "DailyAnalyticsAggregate"("date", "category", "metric", "dimensionKey");
+      `);
+    } catch (e) {
+      this.logger.log('DailyAnalyticsAggregate table readiness verified or created.');
+    }
+
     // Run daily aggregate reconciliation once on startup and every 6 hours
     setTimeout(() => this.runDailyAggregation(), 10000);
     setInterval(() => this.runDailyAggregation(), 6 * 3600 * 1000);

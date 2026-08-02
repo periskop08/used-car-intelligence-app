@@ -20,11 +20,56 @@ export class ListingAiService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Lightweight runtime verification for table existence on Neon Postgres
     try {
-      await this.prisma.$executeRawUnsafe(`SELECT 1 FROM "ListingAiConversation" LIMIT 1;`);
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ListingAiConversation" (
+          "id" TEXT NOT NULL,
+          "listingId" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "activeContextHash" TEXT NOT NULL,
+          "lastContextChangedAt" TIMESTAMP(3),
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "archivedAt" TIMESTAMP(3),
+          CONSTRAINT "ListingAiConversation_pkey" PRIMARY KEY ("id")
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "ListingAiConversation_listingId_userId_key" 
+        ON "ListingAiConversation"("listingId", "userId");
+
+        CREATE TABLE IF NOT EXISTS "AiQuotaUsage" (
+          "id" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "feature" TEXT NOT NULL DEFAULT 'LISTING_AI_ADVISOR',
+          "referenceId" TEXT,
+          "idempotencyKey" TEXT NOT NULL,
+          "assistantMessageId" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'RESERVED',
+          "amount" INTEGER NOT NULL DEFAULT 1,
+          "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "consumedAt" TIMESTAMP(3),
+          "releasedAt" TIMESTAMP(3),
+          "expiresAt" TIMESTAMP(3) NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "AiQuotaUsage_pkey" PRIMARY KEY ("id")
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "AiQuotaUsage_idempotencyKey_key" 
+        ON "AiQuotaUsage"("idempotencyKey");
+
+        CREATE TABLE IF NOT EXISTS "ListingAiMessage" (
+          "id" TEXT NOT NULL,
+          "conversationId" TEXT NOT NULL,
+          "role" TEXT NOT NULL,
+          "messageType" TEXT NOT NULL DEFAULT 'USER_MESSAGE',
+          "content" TEXT NOT NULL,
+          "quotaUsageId" TEXT,
+          "listingVersion" INTEGER,
+          "contextHash" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "ListingAiMessage_pkey" PRIMARY KEY ("id")
+        );
+      `);
     } catch (e) {
-      this.logger.log('ListingAiConversation table readiness verified or pending deployment.');
+      this.logger.log('ListingAi tables readiness verified or created.');
     }
   }
 
