@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -8,20 +8,8 @@ import {
   ChevronRight,
   ShieldAlert,
   CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Clock,
   Eye,
   FileText,
-  User,
-  Image as ImageIcon,
-  Car,
-  DollarSign,
-  Filter,
-  ArrowUpDown,
-  Lock,
-  MessageSquare,
-  Sparkles,
 } from 'lucide-react';
 import { fetchReportApi } from '@/utils/apiConfig';
 
@@ -116,9 +104,6 @@ export const SellerBasedListingModeration: React.FC = () => {
   const [listingDetails, setListingDetails] = useState<Record<string, any>>({});
   const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({});
 
-  // Selection & Bulk actions
-  const [selectedListings, setSelectedListings] = useState<Record<string, boolean>>({});
-
   // Action Modals State
   const [activeModal, setActiveModal] = useState<{
     type: 'REVISION' | 'REJECT' | 'PREVIEW';
@@ -160,6 +145,8 @@ export const SellerBasedListingModeration: React.FC = () => {
   };
 
   useEffect(() => {
+    setSellerListings({});
+    setExpandedSellers({});
     fetchSellersList();
   }, [activeStatus, sellerType, riskLevel, sort]);
 
@@ -173,6 +160,8 @@ export const SellerBasedListingModeration: React.FC = () => {
 
   // Handle Tab Switch
   const handleTabSwitch = (statusKey: string) => {
+    setSellerListings({});
+    setExpandedSellers({});
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'listings');
     params.set('status', statusKey);
@@ -239,7 +228,7 @@ export const SellerBasedListingModeration: React.FC = () => {
         body: JSON.stringify({ internalNote: 'Admin tarafından detaylı incelemeye sevk edildi.' }),
       });
       if (!res.ok) throw new Error('İncelemeye sevk başarısız');
-      fetchSellersList();
+      handleTabSwitch('DETAILED_REVIEW');
     } catch (e: any) {
       alert(e.message);
     }
@@ -465,9 +454,19 @@ export const SellerBasedListingModeration: React.FC = () => {
                           {item.counts.revisionRequired} Düzeltme
                         </span>
                       )}
+                      {item.counts.detailedReview > 0 && (
+                        <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30">
+                          {item.counts.detailedReview} İncelemede
+                        </span>
+                      )}
                       {item.counts.active > 0 && (
                         <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold">
                           {item.counts.active} Aktif
+                        </span>
+                      )}
+                      {item.counts.rejected > 0 && (
+                        <span className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-400 font-bold">
+                          {item.counts.rejected} Reddedilen
                         </span>
                       )}
                     </div>
@@ -528,11 +527,11 @@ export const SellerBasedListingModeration: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Listing Quick Action Buttons */}
+                              {/* Listing Action Buttons */}
                               <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                   onClick={() => openModal('PREVIEW', listing, item.seller.customerNo)}
-                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1 transition"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Önizle</span>
@@ -540,7 +539,7 @@ export const SellerBasedListingModeration: React.FC = () => {
 
                                 <button
                                   onClick={() => toggleListingDetails(listing.listingId)}
-                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-orange-400 rounded-lg text-xs font-bold flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-orange-400 rounded-lg text-xs font-bold flex items-center gap-1 transition"
                                 >
                                   <FileText className="w-3.5 h-3.5" />
                                   <span>{isDetailsExpanded ? 'Kapat' : 'Detayı Aç'}</span>
@@ -548,21 +547,28 @@ export const SellerBasedListingModeration: React.FC = () => {
 
                                 <button
                                   onClick={() => handleApprove(listing.listingId, item.seller.customerNo)}
-                                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold"
+                                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold transition"
                                 >
                                   Onayla
                                 </button>
 
                                 <button
+                                  onClick={() => handleSendToDetailedReview(listing.listingId, item.seller.customerNo)}
+                                  className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg text-xs font-bold transition"
+                                >
+                                  Detaylı İncele
+                                </button>
+
+                                <button
                                   onClick={() => openModal('REVISION', listing, item.seller.customerNo)}
-                                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-bold"
+                                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-bold transition"
                                 >
                                   Düzeltme İste
                                 </button>
 
                                 <button
                                   onClick={() => openModal('REJECT', listing, item.seller.customerNo)}
-                                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold"
+                                  className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition"
                                 >
                                   Reddet
                                 </button>

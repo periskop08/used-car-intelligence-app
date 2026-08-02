@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
 const PRESET_REASONS = [
@@ -13,8 +13,79 @@ const PRESET_REASONS = [
 ];
 
 @Injectable()
-export class ListingModerationService {
+export class ListingModerationService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    const valuesToAdd = ['DETAILED_REVIEW', 'REVISION_REQUIRED', 'REPORTED', 'DELETED'];
+    for (const val of valuesToAdd) {
+      try {
+        await this.prisma.$executeRawUnsafe(`ALTER TYPE "ListingStatus" ADD VALUE '${val}'`);
+      } catch (e) {
+        // enum value already exists or harmless
+      }
+    }
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ListingModerationAction" (
+          "id" TEXT NOT NULL,
+          "listingId" TEXT NOT NULL,
+          "sellerId" TEXT NOT NULL,
+          "actorAdminId" TEXT NOT NULL,
+          "actionType" TEXT NOT NULL,
+          "previousStatus" TEXT NOT NULL,
+          "newStatus" TEXT NOT NULL,
+          "reasonCode" TEXT,
+          "sellerMessage" TEXT,
+          "internalNote" TEXT,
+          "affectedFields" JSONB,
+          "affectedMediaIds" JSONB,
+          "allowResubmission" BOOLEAN NOT NULL DEFAULT true,
+          "emailStatus" TEXT,
+          "notificationStatus" TEXT,
+          "metadata" JSONB,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "ListingModerationAction_pkey" PRIMARY KEY ("id")
+        );
+      `);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ListingModerationReason" (
+          "id" TEXT NOT NULL,
+          "code" TEXT NOT NULL,
+          "actionType" TEXT NOT NULL,
+          "title" TEXT NOT NULL,
+          "defaultSellerMessage" TEXT,
+          "requiresSellerNote" BOOLEAN NOT NULL DEFAULT true,
+          "allowsResubmission" BOOLEAN NOT NULL DEFAULT true,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "sortOrder" INTEGER NOT NULL DEFAULT 0,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "ListingModerationReason_pkey" PRIMARY KEY ("id"),
+          CONSTRAINT "ListingModerationReason_code_key" UNIQUE ("code")
+        );
+      `);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ListingModerationLock" (
+          "id" TEXT NOT NULL,
+          "listingId" TEXT NOT NULL,
+          "adminId" TEXT NOT NULL,
+          "adminName" TEXT NOT NULL,
+          "lockedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "expiresAt" TIMESTAMP(3) NOT NULL,
+          CONSTRAINT "ListingModerationLock_pkey" PRIMARY KEY ("id"),
+          CONSTRAINT "ListingModerationLock_listingId_key" UNIQUE ("listingId")
+        );
+      `);
+    } catch (e) {}
+  }
 
   private formatCustomerNo(user: any): string {
     const year = user.createdAt ? new Date(user.createdAt).getFullYear().toString().slice(-2) : '26';
@@ -46,7 +117,7 @@ export class ListingModerationService {
   }
 
   async getSellers(query: any) {
-    const { status, search, sellerType, package: pkg, city, riskLevel, sort = 'PENDING_FIRST', page = 1, limit = 25 } = query;
+    const { status, search, sellerType, package: pkg, riskLevel, sort = 'PENDING_FIRST', page = 1, limit = 25 } = query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const sellersWithListings = await this.prisma.user.findMany({
@@ -401,9 +472,9 @@ export class ListingModerationService {
           actionType: 'REQUEST_REVISION',
           previousStatus: l.status,
           newStatus: 'REVISION_REQUIRED',
-          reasonCode,
-          sellerMessage,
-          internalNote,
+          reasonCode: reasonCode || null,
+          sellerMessage: sellerMessage || null,
+          internalNote: internalNote || null,
           emailStatus: 'SENT',
           notificationStatus: 'SENT',
         },
@@ -416,7 +487,7 @@ export class ListingModerationService {
   }
 
   async sendToDetailedReview(listingId: string, body: any, adminUser: any) {
-    const { internalNote } = body;
+    const { internalNote } = body || {};
     const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
     if (!l) throw new NotFoundException('İlan bulunamadı.');
 
@@ -434,7 +505,7 @@ export class ListingModerationService {
           actionType: 'DETAILED_REVIEW',
           previousStatus: l.status,
           newStatus: 'DETAILED_REVIEW',
-          internalNote,
+          internalNote: internalNote || 'Admin tarafından detaylı incelemeye sevk edildi.',
         },
       });
     } catch (e) {
@@ -465,9 +536,9 @@ export class ListingModerationService {
           actionType: 'REJECT',
           previousStatus: l.status,
           newStatus: 'REJECTED',
-          reasonCode,
-          sellerMessage,
-          internalNote,
+          reasonCode: reasonCode || null,
+          sellerMessage: sellerMessage || null,
+          internalNote: internalNote || null,
           allowResubmission,
           emailStatus: 'SENT',
           notificationStatus: 'SENT',
