@@ -15,21 +15,22 @@ export default function ReportsOverviewPage() {
 
   const fetchOverview = (filters: any = {}) => {
     setLoading(true);
+    setError(null);
     const query = new URLSearchParams(filters).toString();
 
     fetchReportApi(`/admin/reports/overview?${query}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Yönetici raporları yüklenemedi.');
+        if (!res.ok) throw new Error(`Yönetici raporları yüklenemedi (HTTP ${res.status})`);
         return res.json();
       })
       .then((d) => {
+        if (d?.statusCode >= 400) throw new Error(d.message || 'Yönetici yetkisi gerekiyor.');
         setData(d);
-        setLoading(false);
       })
-      .catch((e) => {
-        setError(e.message);
-        setLoading(false);
-      });
+      .catch((e: any) => {
+        setError(e.message || 'Bir hata oluştu.');
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function ReportsOverviewPage() {
           )}
 
           {error && (
-            <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 font-bold text-xs">
+            <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 font-bold text-xs">
               {error}
             </div>
           )}
@@ -69,62 +70,68 @@ export default function ReportsOverviewPage() {
           {data && (
             <>
               {/* Executive KPIs Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {data.kpis.map((kpi: any) => (
-                  <ReportKpiCard
-                    key={kpi.key}
-                    title={kpi.title}
-                    value={kpi.value}
-                    formattedValue={kpi.formattedValue}
-                    changePercentage={kpi.changePercentage}
-                    trend={kpi.trend}
-                    alertLevel={kpi.alertLevel}
-                    drilldownKey={kpi.drilldownKey}
-                    drilldownParams={kpi.drilldownParams}
-                    onDrilldownClick={handleDrilldown}
-                  />
-                ))}
-              </div>
+              {Array.isArray(data.kpis) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {data.kpis.map((kpi: any) => (
+                    <ReportKpiCard
+                      key={kpi.key}
+                      title={kpi.title}
+                      value={kpi.value}
+                      formattedValue={kpi.formattedValue}
+                      changePercentage={kpi.changePercentage}
+                      trend={kpi.trend}
+                      alertLevel={kpi.alertLevel}
+                      drilldownKey={kpi.drilldownKey}
+                      drilldownParams={kpi.drilldownParams}
+                      onDrilldownClick={handleDrilldown}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Breakdown Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Package Breakdown */}
-                <div className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-200">Paket Dağılımı & Abone Yapısı</h3>
-                  <div className="space-y-3 font-mono text-xs">
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-slate-400">Tanışma (Ücretsiz)</span>
-                      <strong className="text-slate-200">{data.packageDistribution.tanismaUsers}</strong>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-orange-400 font-bold">Yetkin (Standard)</span>
-                      <strong className="text-orange-400">{data.packageDistribution.yetkinUsers}</strong>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-purple-400 font-bold">Profesyonel (Pro)</span>
-                      <strong className="text-purple-400">{data.packageDistribution.profesyonelUsers}</strong>
+                {data.packageDistribution && (
+                  <div className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-200">Paket Dağılımı & Abone Yapısı</h3>
+                    <div className="space-y-3 font-mono text-xs">
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-slate-400">Tanışma (Ücretsiz)</span>
+                        <strong className="text-slate-200">{data.packageDistribution.tanismaUsers || 0}</strong>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-orange-400 font-bold">Yetkin (Standard)</span>
+                        <strong className="text-orange-400">{data.packageDistribution.yetkinUsers || 0}</strong>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-purple-400 font-bold">Profesyonel (Pro)</span>
+                        <strong className="text-purple-400">{data.packageDistribution.profesyonelUsers || 0}</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Financial Summary */}
-                <div className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-200">Finansal & Marj Özeti</h3>
-                  <div className="space-y-3 font-mono text-xs">
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-slate-400">MRR (Aylık Düzenli)</span>
-                      <strong className="text-emerald-400">₺{data.financialSummary.mrr.toLocaleString('tr-TR')}</strong>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-slate-400">ARR (Yıllık Düzenli)</span>
-                      <strong className="text-emerald-400">₺{data.financialSummary.arr.toLocaleString('tr-TR')}</strong>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
-                      <span className="text-slate-400">Tahmini Brüt Marj</span>
-                      <strong className="text-amber-400">%{data.financialSummary.grossMarginPct}</strong>
+                {data.financialSummary && (
+                  <div className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-200">Finansal & Marj Özeti</h3>
+                    <div className="space-y-3 font-mono text-xs">
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-slate-400">MRR (Aylık Düzenli)</span>
+                        <strong className="text-emerald-400">₺{(data.financialSummary.mrr || 0).toLocaleString('tr-TR')}</strong>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-slate-400">ARR (Yıllık Düzenli)</span>
+                        <strong className="text-emerald-400">₺{(data.financialSummary.arr || 0).toLocaleString('tr-TR')}</strong>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-white/5">
+                        <span className="text-slate-400">Tahmini Brüt Marj</span>
+                        <strong className="text-amber-400">%{data.financialSummary.grossMarginPct || 0}</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </>
           )}
