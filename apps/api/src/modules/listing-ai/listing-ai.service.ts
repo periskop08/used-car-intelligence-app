@@ -22,6 +22,18 @@ export class ListingAiService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.prisma.$executeRawUnsafe(`
+        DO $$ BEGIN
+            CREATE TYPE "AiQuotaFeature" AS ENUM ('GENERAL_CHATBOT', 'COMPARISON_CHATBOT', 'LISTING_AI_ADVISOR');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+        DO $$ BEGIN
+            CREATE TYPE "AiQuotaUsageStatus" AS ENUM ('RESERVED', 'CONSUMED', 'RELEASED');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+        DO $$ BEGIN
+            CREATE TYPE "ListingAiMessageType" AS ENUM ('USER_MESSAGE', 'ASSISTANT_RESPONSE', 'INITIAL_ANALYSIS', 'CONTEXT_SEPARATOR', 'SCOPE_REDIRECT', 'SAFE_FALLBACK');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
+
         CREATE TABLE IF NOT EXISTS "ListingAiConversation" (
           "id" TEXT NOT NULL,
           "listingId" TEXT NOT NULL,
@@ -39,11 +51,11 @@ export class ListingAiService implements OnModuleInit {
         CREATE TABLE IF NOT EXISTS "AiQuotaUsage" (
           "id" TEXT NOT NULL,
           "userId" TEXT NOT NULL,
-          "feature" TEXT NOT NULL DEFAULT 'LISTING_AI_ADVISOR',
+          "feature" "AiQuotaFeature" NOT NULL DEFAULT 'LISTING_AI_ADVISOR'::"AiQuotaFeature",
           "referenceId" TEXT,
           "idempotencyKey" TEXT NOT NULL,
           "assistantMessageId" TEXT,
-          "status" TEXT NOT NULL DEFAULT 'RESERVED',
+          "status" "AiQuotaUsageStatus" NOT NULL DEFAULT 'RESERVED'::"AiQuotaUsageStatus",
           "amount" INTEGER NOT NULL DEFAULT 1,
           "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "consumedAt" TIMESTAMP(3),
@@ -59,7 +71,7 @@ export class ListingAiService implements OnModuleInit {
           "id" TEXT NOT NULL,
           "conversationId" TEXT NOT NULL,
           "role" TEXT NOT NULL,
-          "messageType" TEXT NOT NULL DEFAULT 'USER_MESSAGE',
+          "messageType" "ListingAiMessageType" NOT NULL DEFAULT 'USER_MESSAGE'::"ListingAiMessageType",
           "content" TEXT NOT NULL,
           "quotaUsageId" TEXT,
           "listingVersion" INTEGER,
@@ -68,8 +80,8 @@ export class ListingAiService implements OnModuleInit {
           CONSTRAINT "ListingAiMessage_pkey" PRIMARY KEY ("id")
         );
       `);
-    } catch (e) {
-      this.logger.log('ListingAi tables readiness verified or created.');
+    } catch (e: any) {
+      this.logger.error(`ListingAi tables readiness error: ${e?.message || e}`);
     }
   }
 

@@ -93,7 +93,7 @@ export class ListingAiContextBuilderService {
     const mileage = listing.kilometers;
     const fuel = listing.fuelType || listing.vehicleVariant?.engine?.fuelType || undefined;
     const transmission = listing.transmission || listing.vehicleVariant?.transmission?.type || listing.customTransmission || undefined;
-    const bodyType = listing.bodyType || listing.vehicleVariant?.generation?.bodyType || undefined;
+    const bodyType = listing.bodyType || listing.vehicleVariant?.bodyType || undefined;
 
     // Detect Missing Fields
     const missingFields: string[] = [];

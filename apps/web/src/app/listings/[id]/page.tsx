@@ -838,9 +838,7 @@ export default function ListingDetail() {
                 )}
               </div>
             </div>
-          ) : (
-          <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.publicListingNo} />
-          )}
+          ) : null}
 
           {/* İŞİ CEPTE ÖNERİYOR (Orta Kolona, AI Analizi Kartının Altına Alındı) */}
           <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden">
@@ -1049,6 +1047,11 @@ export default function ListingDetail() {
           </div>
 
         </div>
+      </div>
+
+      {/* 4. ALT DİKDÖRTGEN BÖLÜM: TorqueScout İlan Danışmanı (Tam Genişlikli Form Yapısı) */}
+      <div className="max-w-7xl mx-auto px-4 pb-8">
+        <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.publicListingNo} />
       </div>
 
       {/* Send Message Modal Popup */}
