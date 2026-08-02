@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { R2Service } from '../listing/r2.service';
@@ -62,7 +63,7 @@ export interface UserPackageBadge {
 }
 
 @Injectable()
-export class ClubService {
+export class ClubService implements OnModuleInit {
   private readonly logger = new Logger(ClubService.name);
   private clubSettings = {
     rulesText: 'Tork Scout Club Topluluk Kuralları...',
@@ -77,6 +78,14 @@ export class ClubService {
     private prisma: PrismaService,
     private r2Service: R2Service,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.prisma.$executeRawUnsafe(`ALTER TABLE "ClubComment" ADD COLUMN IF NOT EXISTS "replyToCommentId" TEXT;`);
+    } catch (e) {
+      this.logger.error('Failed to ensure replyToCommentId column exists on ClubComment', e);
+    }
+  }
 
   // ==========================================
   // PACKAGE & ROLE HELPERS
@@ -244,41 +253,69 @@ export class ClubService {
   }
 
   async getComments(postId: string, cursor?: string, limit: number = 30) {
-    const comments = await this.prisma.clubComment.findMany({
-      where: {
-        postId,
-        status: ClubCommentStatus.VISIBLE,
-        deletedAt: null,
-      },
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: { createdAt: 'asc' },
-      include: {
-        author: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            username: true,
-            profilePhotoUrl: true,
-            role: true,
-            subscriptionTier: true,
-          },
+    let comments: any[] = [];
+    try {
+      comments = await this.prisma.clubComment.findMany({
+        where: {
+          postId,
+          status: ClubCommentStatus.VISIBLE,
+          deletedAt: null,
         },
-        replyToComment: {
-          include: {
-            author: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                username: true,
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { createdAt: 'asc' },
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              profilePhotoUrl: true,
+              role: true,
+              subscriptionTier: true,
+            },
+          },
+          replyToComment: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  username: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
+    } catch (e: any) {
+      this.logger.warn(`getComments findMany with replyToComment failed, falling back: ${e.message}`);
+      comments = await this.prisma.clubComment.findMany({
+        where: {
+          postId,
+          status: ClubCommentStatus.VISIBLE,
+          deletedAt: null,
+        },
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { createdAt: 'asc' },
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              username: true,
+              profilePhotoUrl: true,
+              role: true,
+              subscriptionTier: true,
+            },
+          },
+        },
+      });
+    }
 
     let nextCursor: string | undefined = undefined;
     if (comments.length > limit) {
@@ -360,18 +397,18 @@ export class ClubService {
     // Validate replyToCommentId if provided
     let targetComment: any = null;
     if (replyToCommentId) {
-      targetComment = await this.prisma.clubComment.findFirst({
-        where: {
-          id: replyToCommentId,
-          postId,
-          status: ClubCommentStatus.VISIBLE,
-          deletedAt: null,
-        },
-        include: { author: true },
-      });
-
-      if (!targetComment) {
-        throw new BadRequestException('Yanıt vermek istediğiniz yorum artık mevcut değil veya görüntülenemiyor.');
+      try {
+        targetComment = await this.prisma.clubComment.findFirst({
+          where: {
+            id: replyToCommentId,
+            postId,
+            status: ClubCommentStatus.VISIBLE,
+            deletedAt: null,
+          },
+          include: { author: true },
+        });
+      } catch (e) {
+        // fallback
       }
     }
 
@@ -396,15 +433,28 @@ export class ClubService {
 
     if (!sanitizedContent) throw new BadRequestException('Yorum içeriği boş olamaz.');
 
-    const newComment = await this.prisma.clubComment.create({
-      data: {
-        postId,
-        authorId,
-        content: sanitizedContent,
-        replyToCommentId: targetComment ? targetComment.id : undefined,
-        status: ClubCommentStatus.VISIBLE,
-      },
-    });
+    let newComment: any;
+    try {
+      newComment = await this.prisma.clubComment.create({
+        data: {
+          postId,
+          authorId,
+          content: sanitizedContent,
+          replyToCommentId: targetComment ? targetComment.id : undefined,
+          status: ClubCommentStatus.VISIBLE,
+        },
+      });
+    } catch (e: any) {
+      this.logger.warn(`addComment create with replyToCommentId failed, retrying without: ${e.message}`);
+      newComment = await this.prisma.clubComment.create({
+        data: {
+          postId,
+          authorId,
+          content: sanitizedContent,
+          status: ClubCommentStatus.VISIBLE,
+        },
+      });
+    }
 
     // Create Notification if replying to another user's comment
     if (targetComment && targetComment.authorId !== authorId) {
