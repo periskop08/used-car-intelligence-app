@@ -65,6 +65,10 @@ export class CreateClubCommentDto {
   @MinLength(1)
   @MaxLength(1000)
   content: string;
+
+  @IsOptional()
+  @IsString()
+  replyToCommentId?: string;
 }
 
 export class UpdateClubCommentDto {

@@ -265,6 +265,18 @@ export class ClubService {
             subscriptionTier: true,
           },
         },
+        replyToComment: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -274,11 +286,38 @@ export class ClubService {
       nextCursor = nextItem?.id;
     }
 
-    // Attach package badges and role tags to each author
+    // Attach package badges, role tags, and replyReference to each comment
     const formattedComments = await Promise.all(
       comments.map(async c => {
         const clubRole = await this.getUserClubRole(c.author.id);
         const pkgBadge = this.resolveUserPackageBadge(c.author);
+
+        let replyReference: any = undefined;
+        if (c.replyToCommentId) {
+          if (!c.replyToComment || c.replyToComment.status !== ClubCommentStatus.VISIBLE || c.replyToComment.deletedAt) {
+            replyReference = {
+              commentId: c.replyToCommentId,
+              author: { displayName: 'Kullanıcı' },
+              preview: 'Bu yorum artık görüntülenemiyor',
+              availability: 'UNAVAILABLE',
+            };
+          } else {
+            const targetAuthorName =
+              c.replyToComment.author?.username ||
+              `${c.replyToComment.author?.firstName || ''} ${c.replyToComment.author?.lastName || ''}`.trim() ||
+              'Üye';
+            const previewText =
+              c.replyToComment.content.length > 100
+                ? c.replyToComment.content.substring(0, 100) + '…'
+                : c.replyToComment.content;
+            replyReference = {
+              commentId: c.replyToComment.id,
+              author: { displayName: targetAuthorName },
+              preview: previewText,
+              availability: 'AVAILABLE',
+            };
+          }
+        }
 
         return {
           id: c.id,
@@ -293,6 +332,7 @@ export class ClubService {
             packageBadge: pkgBadge,
             clubRole,
           },
+          replyReference,
         };
       })
     );
@@ -300,7 +340,7 @@ export class ClubService {
     return { comments: formattedComments, nextCursor };
   }
 
-  async addComment(postId: string, authorId: string, content: string) {
+  async addComment(postId: string, authorId: string, content: string, replyToCommentId?: string) {
     const { isBanned, isMuted, activeRestriction } = await this.checkUserRestriction(authorId);
     if (isBanned || isMuted) {
       throw new ForbiddenException(
@@ -316,6 +356,24 @@ export class ClubService {
 
     if (!post) throw new NotFoundException('Gönderi bulunamadı.');
     if (!post.commentsEnabled) throw new BadRequestException('Bu gönderi için yorumlar kapatılmıştır.');
+
+    // Validate replyToCommentId if provided
+    let targetComment: any = null;
+    if (replyToCommentId) {
+      targetComment = await this.prisma.clubComment.findFirst({
+        where: {
+          id: replyToCommentId,
+          postId,
+          status: ClubCommentStatus.VISIBLE,
+          deletedAt: null,
+        },
+        include: { author: true },
+      });
+
+      if (!targetComment) {
+        throw new BadRequestException('Yanıt vermek istediğiniz yorum artık mevcut değil veya görüntülenemiyor.');
+      }
+    }
 
     // Rate Limit Check: 1 comment per 10s per user
     const lastComment = await this.prisma.clubComment.findFirst({
@@ -338,14 +396,41 @@ export class ClubService {
 
     if (!sanitizedContent) throw new BadRequestException('Yorum içeriği boş olamaz.');
 
-    return this.prisma.clubComment.create({
+    const newComment = await this.prisma.clubComment.create({
       data: {
         postId,
         authorId,
         content: sanitizedContent,
+        replyToCommentId: targetComment ? targetComment.id : undefined,
         status: ClubCommentStatus.VISIBLE,
       },
     });
+
+    // Create Notification if replying to another user's comment
+    if (targetComment && targetComment.authorId !== authorId) {
+      try {
+        const authorUser = await this.prisma.user.findUnique({ where: { id: authorId } });
+        const authorName = authorUser?.username || `${authorUser?.firstName || ''} ${authorUser?.lastName || ''}`.trim() || 'Bir üye';
+        const postTitle = post.title || 'gönderi';
+
+        await (this.prisma as any).analyticsEvent.create({
+          data: {
+            eventType: 'CLUB_COMMENT_REPLY_NOTIFICATION_CREATED',
+            userId: targetComment.authorId,
+            metadata: {
+              postId,
+              commentId: newComment.id,
+              replyToCommentId: targetComment.id,
+              message: `${authorName}, “${postTitle}” paylaşımındaki yorumunuza yanıt verdi.`,
+            },
+          },
+        });
+      } catch (e) {
+        // Notification creation error should not fail comment creation
+      }
+    }
+
+    return newComment;
   }
 
   async editComment(commentId: string, userId: string, newContent: string) {

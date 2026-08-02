@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -50,10 +50,18 @@ interface ClubComment {
   createdAt: string;
   editedAt?: string;
   author: CommentAuthor;
+  replyReference?: {
+    commentId: string;
+    author: { displayName: string };
+    preview?: string;
+    availability: "AVAILABLE" | "DELETED" | "HIDDEN" | "UNAVAILABLE";
+  };
 }
 
-export default function ClubPage() {
+function ClubPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +74,11 @@ export default function ClubPage() {
   const [commentsMap, setCommentsMap] = useState<Record<string, ClubComment[]>>({});
   const [commentInput, setCommentInput] = useState<Record<string, string>>({});
   const [commentSubmitting, setCommentSubmitting] = useState(false);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
+
+  // Reply Mode Target per post
+  const [replyTargetMap, setReplyTargetMap] = useState<
+    Record<string, { commentId: string; displayName: string; preview?: string } | null>
+  >({});
 
   // Popover & Admin DM states
   const [selectedUser, setSelectedUser] = useState<CommentAuthor | null>(null);
@@ -94,6 +105,23 @@ export default function ClubPage() {
     fetchClubPosts(savedToken);
     fetchPinnedPosts(savedToken);
   }, []);
+
+  // Handle URL parameters for scrolling to post or comment
+  useEffect(() => {
+    const targetPostId = searchParams?.get("post");
+    const targetCommentId = searchParams?.get("comment");
+
+    if (targetPostId && posts.length > 0) {
+      setOpenCommentsPostId(targetPostId);
+      fetchComments(targetPostId);
+      setTimeout(() => {
+        handleScrollToPost(targetPostId);
+        if (targetCommentId) {
+          setTimeout(() => handleScrollToComment(targetCommentId), 400);
+        }
+      }, 300);
+    }
+  }, [searchParams, posts]);
 
   const fetchClubPosts = async (authToken: string) => {
     setLoading(true);
@@ -157,9 +185,58 @@ export default function ClubPage() {
     }
   };
 
+  // Reply mode handlers
+  const handleStartReply = (postId: string, comment: ClubComment) => {
+    setReplyTargetMap((prev) => ({
+      ...prev,
+      [postId]: {
+        commentId: comment.id,
+        displayName: comment.author.displayName,
+        preview: comment.content,
+      },
+    }));
+
+    setTimeout(() => {
+      const el = document.getElementById(`comment-input-${postId}`);
+      el?.focus();
+    }, 100);
+  };
+
+  const handleCancelReply = (postId: string) => {
+    setReplyTargetMap((prev) => ({ ...prev, [postId]: null }));
+  };
+
+  // Scroll to target comment and highlight
+  const handleScrollToComment = (commentId: string) => {
+    const el = document.getElementById(`club-comment-${commentId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("club-comment-highlight");
+      void el.offsetWidth; // trigger reflow
+      el.classList.add("club-comment-highlight");
+      setTimeout(() => el.classList.remove("club-comment-highlight"), 2000);
+    }
+  };
+
+  // Scroll to target post and apply 3-pulse orange glow animation
+  const handleScrollToPost = (postId: string) => {
+    const el = document.getElementById(`club-post-${postId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("club-pinned-post-highlight");
+      void el.offsetWidth; // trigger reflow for restartable animation
+      el.classList.add("club-pinned-post-highlight");
+      setTimeout(() => el.classList.remove("club-pinned-post-highlight"), 2000);
+    } else {
+      router.push(`/club?post=${postId}`);
+    }
+  };
+
   const handleAddComment = async (postId: string) => {
     const content = commentInput[postId]?.trim();
     if (!content || !token || commentSubmitting) return;
+
+    const replyTarget = replyTargetMap[postId];
 
     setCommentSubmitting(true);
     try {
@@ -169,12 +246,19 @@ export default function ClubPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          replyToCommentId: replyTarget ? replyTarget.commentId : undefined,
+        }),
       });
 
       if (res.ok) {
         setCommentInput((prev) => ({ ...prev, [postId]: "" }));
+        setReplyTargetMap((prev) => ({ ...prev, [postId]: null }));
         fetchComments(postId);
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + 1 } : p))
+        );
       } else {
         const err = await res.json();
         alert(err.message || "Yorum gönderilemedi.");
@@ -235,20 +319,6 @@ export default function ClubPage() {
     } catch (e) {
       alert("Hata oluştu.");
     }
-  };
-
-  const handleHideComment = async (commentId: string, postId: string) => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_URL}/admin/club/comments/${commentId}/hide`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        fetchComments(postId);
-        setSelectedUser(null);
-      }
-    } catch (e) {}
   };
 
   const handleMuteUser = async (targetUserId: string) => {
@@ -342,7 +412,7 @@ export default function ClubPage() {
             </p>
           </div>
 
-          {/* Admin Management Navigation Button (Visible ONLY to Admin) */}
+          {/* Admin Management Navigation Button */}
           {(currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") && (
             <Link
               href="/admin/club"
@@ -362,7 +432,7 @@ export default function ClubPage() {
 
         {/* Main Content Layout (Left Feed + Right Sidebar) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Admin Post Feed */}
+          {/* Left Column: Post Feed */}
           <div className="lg:col-span-2 space-y-6">
             {loading ? (
               <div className="bg-slate-900/60 border border-white/10 p-12 rounded-3xl text-center animate-pulse space-y-3">
@@ -379,11 +449,13 @@ export default function ClubPage() {
               posts.map((post) => {
                 const isOpenComments = openCommentsPostId === post.id;
                 const comments = commentsMap[post.id] || [];
+                const replyTarget = replyTargetMap[post.id];
 
                 return (
-                  <div
+                  <article
+                    id={`club-post-${post.id}`}
                     key={post.id}
-                    className="bg-slate-900/90 border border-white/10 rounded-3xl p-6 md:p-7 space-y-5 shadow-xl hover:border-orange-500/20 transition"
+                    className="club-post-card bg-slate-900/90 border border-white/10 rounded-3xl p-6 md:p-7 space-y-5 shadow-xl hover:border-orange-500/20 transition"
                   >
                     {/* Post Author Bar */}
                     <div className="flex items-center justify-between border-b border-white/5 pb-4">
@@ -469,12 +541,31 @@ export default function ClubPage() {
                     {/* Expanded Comments Section */}
                     {isOpenComments && (
                       <div className="pt-4 border-t border-white/10 space-y-4 animate-fadeIn">
-                        {/* Comment Input */}
+                        {/* Reply Mode Active Banner */}
+                        {replyTarget && (
+                          <div className="bg-orange-500/10 border border-orange-500/30 px-3.5 py-2 rounded-xl flex items-center justify-between text-xs text-orange-400 font-bold">
+                            <span>↩ {replyTarget.displayName} adlı kullanıcıya yanıt veriyorsunuz</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelReply(post.id)}
+                              className="text-slate-400 hover:text-white text-xs font-bold transition"
+                            >
+                              İptal ×
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Comment Input Form */}
                         {post.commentsEnabled ? (
                           <div className="flex gap-2">
                             <input
+                              id={`comment-input-${post.id}`}
                               type="text"
-                              placeholder="Yorumunuzu yazın... (Max 1000 karakter)"
+                              placeholder={
+                                replyTarget
+                                  ? `${replyTarget.displayName}’e yanıtınızı yazın...`
+                                  : "Yorumunuzu yazın... (Max 1000 karakter)"
+                              }
                               maxLength={1000}
                               value={commentInput[post.id] || ""}
                               onChange={(e) =>
@@ -488,7 +579,7 @@ export default function ClubPage() {
                               disabled={commentSubmitting || !commentInput[post.id]?.trim()}
                               className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer shrink-0"
                             >
-                              Yorum Yap
+                              {replyTarget ? "Yanıtla" : "Yorum Yap"}
                             </button>
                           </div>
                         ) : (
@@ -497,16 +588,36 @@ export default function ClubPage() {
                           </div>
                         )}
 
-                        {/* Comment List */}
+                        {/* Flat Chronological Comment List */}
                         <div className="space-y-3">
                           {comments.length === 0 ? (
                             <p className="text-xs text-slate-500 text-center py-3">İlk yorumu siz yapın.</p>
                           ) : (
                             comments.map((c) => (
                               <div
+                                id={`club-comment-${c.id}`}
                                 key={c.id}
-                                className="bg-slate-950/70 border border-white/5 p-3.5 rounded-2xl space-y-2 text-xs"
+                                className="club-comment-card bg-slate-950/70 border border-white/5 p-3.5 rounded-2xl space-y-2 text-xs transition-all"
                               >
+                                {/* Target Comment Reply Reference Bar */}
+                                {c.replyReference && (
+                                  <div
+                                    onClick={() => handleScrollToComment(c.replyReference!.commentId)}
+                                    className="text-[11px] text-slate-400 bg-slate-900/80 p-2 rounded-xl border border-white/5 cursor-pointer hover:border-orange-500/30 transition flex items-center gap-1.5 mb-1.5 select-none"
+                                  >
+                                    <span className="text-orange-400 font-bold">↩</span>
+                                    <span>
+                                      <strong className="text-slate-200">{c.replyReference.author.displayName}</strong> adlı kullanıcının yorumuna yanıt
+                                    </span>
+                                    {c.replyReference.preview && (
+                                      <span className="text-slate-500 italic truncate max-w-xs">
+                                        “{c.replyReference.preview}”
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Comment Header */}
                                 <div className="flex items-center justify-between">
                                   <div
                                     onClick={() => setSelectedUser(c.author)}
@@ -522,14 +633,14 @@ export default function ClubPage() {
                                     {/* Dynamic Package Badge */}
                                     <span
                                       className={`text-[9px] px-2 py-0.5 rounded font-bold ${
-                                        c.author.packageBadge.code === "YETKIN"
+                                        c.author.packageBadge?.code === "YETKIN"
                                           ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                                          : c.author.packageBadge.code === "PROFESYONEL"
+                                          : c.author.packageBadge?.code === "PROFESYONEL"
                                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                                           : "bg-slate-800 text-slate-300 border border-white/10"
                                       }`}
                                     >
-                                      {c.author.packageBadge.label}
+                                      {c.author.packageBadge?.label || "Tanışma"}
                                     </span>
 
                                     {/* Role Badges */}
@@ -554,14 +665,28 @@ export default function ClubPage() {
                                   </span>
                                 </div>
 
+                                {/* Comment Text */}
                                 <p className="text-slate-300 leading-normal pl-8">{c.content}</p>
+
+                                {/* Direct Reply Action Button */}
+                                <div className="pl-8 pt-1 flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartReply(post.id, c)}
+                                    aria-label={`${c.author.displayName} adlı kullanıcıya yanıt ver`}
+                                    className="text-[11px] text-slate-400 hover:text-orange-400 font-bold flex items-center gap-1 transition"
+                                  >
+                                    <span>↩</span>
+                                    <span>Yanıtla</span>
+                                  </button>
+                                </div>
                               </div>
                             ))
                           )}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </article>
                 );
               })
             )}
@@ -569,7 +694,7 @@ export default function ClubPage() {
 
           {/* Right Column: Pinned Posts, Community Rules, Support */}
           <div className="space-y-6">
-            {/* Pinned Posts Card */}
+            {/* Clickable Pinned Posts Sidebar Card */}
             {pinnedPosts.length > 0 && (
               <div className="bg-slate-900/90 border border-white/10 p-5 rounded-3xl space-y-4 shadow-xl">
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
@@ -577,12 +702,20 @@ export default function ClubPage() {
                 </h3>
                 <div className="space-y-3">
                   {pinnedPosts.map((p) => (
-                    <div key={p.id} className="bg-slate-950/70 p-3 rounded-2xl border border-white/5 space-y-1">
-                      <h4 className="text-xs font-bold text-white line-clamp-1">{p.title || p.content}</h4>
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleScrollToPost(p.id)}
+                      aria-label={`${p.title || p.content} sabitlenmiş gönderisine git`}
+                      className="w-full text-left bg-slate-950/70 hover:bg-slate-800/80 p-3.5 rounded-2xl border border-white/5 hover:border-orange-500/40 transition cursor-pointer group space-y-1 block"
+                    >
+                      <h4 className="text-xs font-bold text-white group-hover:text-orange-400 transition line-clamp-2">
+                        {p.title || p.content}
+                      </h4>
                       <span className="text-[10px] text-slate-400 block">
                         {new Date(p.publishedAt).toLocaleDateString("tr-TR")}
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -649,7 +782,7 @@ export default function ClubPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Paket:</span>
-                <span className="font-bold text-orange-400">{selectedUser.packageBadge.label}</span>
+                <span className="font-bold text-orange-400">{selectedUser.packageBadge?.label || "Tanışma"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400">Rol:</span>
@@ -657,7 +790,7 @@ export default function ClubPage() {
               </div>
             </div>
 
-            {/* Admin Action Buttons (Visible ONLY to Admin) */}
+            {/* Admin Action Buttons */}
             {(currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN") && (
               <div className="pt-3 border-t border-white/10 space-y-2">
                 <button
@@ -711,5 +844,13 @@ export default function ClubPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ClubPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-slate-400">Yükleniyor...</div>}>
+      <ClubPageContent />
+    </Suspense>
   );
 }

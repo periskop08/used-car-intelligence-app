@@ -57,7 +57,7 @@ export class ClubController {
     @Body() dto: CreateClubCommentDto,
     @Req() req: any,
   ) {
-    return this.clubService.addComment(postId, req.user.id, dto.content);
+    return this.clubService.addComment(postId, req.user.id, dto.content, dto.replyToCommentId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1830,21 +1830,27 @@ model ClubPostMedia {
 }
 
 model ClubComment {
-  id        String            @id @default(uuid())
-  postId    String
-  authorId  String
-  content   String
-  status    ClubCommentStatus @default(VISIBLE)
-  editedAt  DateTime?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  deletedAt DateTime?
+  id               String            @id @default(uuid())
+  postId           String
+  authorId         String
+  content          String
+  status           ClubCommentStatus @default(VISIBLE)
 
-  post      ClubPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User              @relation("ClubCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  replyToCommentId String?
+  replyToComment   ClubComment?      @relation("ClubCommentReplies", fields: [replyToCommentId], references: [id], onDelete: SetNull)
+  replies          ClubComment[]     @relation("ClubCommentReplies")
+
+  editedAt         DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  post             ClubPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User              @relation("ClubCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([postId, status, createdAt])
   @@index([authorId, createdAt])
+  @@index([replyToCommentId])
 }
 
 model ClubModeratorAssignment {
