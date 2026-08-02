@@ -151,6 +151,28 @@ export class AdminClubController {
     return this.clubService.archivePost(postId);
   }
 
+  @Post('polls/:pollId/close')
+  async closePoll(@Param('pollId') pollId: string, @Req() req: any) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.closePoll(pollId, req.user.id);
+  }
+
+  @Patch('polls/:pollId/end-time')
+  async extendPollEndTime(
+    @Param('pollId') pollId: string,
+    @Body('endsAt') endsAt: string,
+    @Req() req: any,
+  ) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.extendPollEndTime(pollId, endsAt, req.user.id);
+  }
+
+  @Post('polls/:pollId/export')
+  async exportPollResults(@Param('pollId') pollId: string, @Req() req: any) {
+    await this.verifyAdminOnly(req);
+    return this.clubService.exportPollResults(pollId);
+  }
+
   @Patch('posts/:postId/comments-toggle')
   async toggleComments(@Param('postId') postId: string, @Req() req: any) {
     await this.verifyAdminOnly(req);

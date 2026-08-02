@@ -4,6 +4,8 @@ import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import PollCard, { PollData } from "./components/PollCard";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface PostMedia {
@@ -33,6 +35,7 @@ interface ClubPost {
   likeCount: number;
   isLiked?: boolean;
   commentsEnabled: boolean;
+  poll?: PollData;
 }
 
 interface CommentAuthor {
@@ -541,6 +544,9 @@ function ClubPageContent() {
                         ))}
                       </div>
                     )}
+
+                    {/* Optional Poll Widget */}
+                    {post.poll && <PollCard poll={post.poll} />}
 
                     {/* Post Actions Bar */}
                     <div className="flex items-center justify-between border-t border-white/5 pt-4 text-xs text-slate-400">

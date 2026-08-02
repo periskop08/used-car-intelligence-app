@@ -82,9 +82,83 @@ export class ClubService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.prisma.$executeRawUnsafe(`ALTER TABLE "ClubComment" ADD COLUMN IF NOT EXISTS "replyToCommentId" TEXT;`);
-    } catch (e) {
-      this.logger.error('Failed to ensure replyToCommentId column exists on ClubComment', e);
-    }
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`CREATE TYPE "ClubPollSelectionType" AS ENUM ('SINGLE', 'MULTIPLE');`);
+    } catch (e) {}
+    try {
+      await this.prisma.$executeRawUnsafe(`CREATE TYPE "ClubPollResultVisibility" AS ENUM ('ALWAYS', 'AFTER_VOTE', 'AFTER_END', 'ADMIN_ONLY');`);
+    } catch (e) {}
+    try {
+      await this.prisma.$executeRawUnsafe(`CREATE TYPE "ClubPollStatus" AS ENUM ('DRAFT', 'SCHEDULED', 'ACTIVE', 'CLOSED', 'ARCHIVED');`);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ClubPoll" (
+          "id" TEXT NOT NULL,
+          "postId" TEXT NOT NULL,
+          "question" TEXT NOT NULL,
+          "selectionType" "ClubPollSelectionType" NOT NULL DEFAULT 'SINGLE',
+          "maxSelections" INTEGER,
+          "resultVisibility" "ClubPollResultVisibility" NOT NULL DEFAULT 'AFTER_VOTE',
+          "status" "ClubPollStatus" NOT NULL DEFAULT 'DRAFT',
+          "startsAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "endsAt" TIMESTAMP(3),
+          "closedAt" TIMESTAMP(3),
+          "closedByAdminId" TEXT,
+          "notifyParticipantsOnClose" BOOLEAN NOT NULL DEFAULT false,
+          "version" INTEGER NOT NULL DEFAULT 1,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          "deletedAt" TIMESTAMP(3),
+          CONSTRAINT "ClubPoll_pkey" PRIMARY KEY ("id"),
+          CONSTRAINT "ClubPoll_postId_key" UNIQUE ("postId")
+        );
+      `);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ClubPollOption" (
+          "id" TEXT NOT NULL,
+          "pollId" TEXT NOT NULL,
+          "text" TEXT NOT NULL,
+          "normalizedText" TEXT NOT NULL,
+          "sortOrder" INTEGER NOT NULL DEFAULT 0,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          "deletedAt" TIMESTAMP(3),
+          CONSTRAINT "ClubPollOption_pkey" PRIMARY KEY ("id")
+        );
+      `);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ClubPollVote" (
+          "id" TEXT NOT NULL,
+          "pollId" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          CONSTRAINT "ClubPollVote_pkey" PRIMARY KEY ("id")
+        );
+      `);
+    } catch (e) {}
+
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ClubPollVoteSelection" (
+          "id" TEXT NOT NULL,
+          "voteId" TEXT NOT NULL,
+          "optionId" TEXT NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "ClubPollVoteSelection_pkey" PRIMARY KEY ("id")
+        );
+      `);
+    } catch (e) {}
   }
 
   // ==========================================
@@ -215,12 +289,20 @@ export class ClubService implements OnModuleInit {
       likedPostIds = new Set(likes.map(l => l.postId));
     }
 
-    const formattedPosts = posts.map(p => ({
-      ...p,
-      isLiked: likedPostIds.has(p.id),
-      commentCount: p._count.comments,
-      likeCount: p._count.likes,
-    }));
+    const userRole = userId ? await this.getUserClubRole(userId) : undefined;
+
+    const formattedPosts = await Promise.all(
+      posts.map(async (p) => {
+        const poll = await this.formatPollForUserByPostId(p.id, userId, userRole);
+        return {
+          ...p,
+          isLiked: likedPostIds.has(p.id),
+          commentCount: p._count.comments,
+          likeCount: p._count.likes,
+          poll,
+        };
+      })
+    );
 
     return { posts: formattedPosts, nextCursor };
   }
@@ -249,7 +331,10 @@ export class ClubService implements OnModuleInit {
       isLiked = !!like;
     }
 
-    return { ...post, isLiked, commentCount: post._count.comments, likeCount: post._count.likes };
+    const userRole = userId ? await this.getUserClubRole(userId) : undefined;
+    const poll = await this.formatPollForUserByPostId(postId, userId, userRole);
+
+    return { ...post, isLiked, commentCount: post._count.comments, likeCount: post._count.likes, poll };
   }
 
   async getComments(postId: string, cursor?: string, limit: number = 30) {
@@ -565,6 +650,306 @@ export class ClubService implements OnModuleInit {
   }
 
   // ==========================================
+  // POLL SERVICE HELPERS & ACTIONS
+  // ==========================================
+
+  async formatPollForUserByPostId(postId: string, userId?: string, userRole?: string) {
+    let poll: any;
+    try {
+      poll = await (this.prisma as any).clubPoll.findFirst({
+        where: { postId, deletedAt: null },
+      });
+    } catch (e) {
+      return null;
+    }
+
+    if (!poll) return null;
+    return this.formatPollForUser(poll.id, userId, userRole);
+  }
+
+  async formatPollForUser(pollId: string, userId?: string, userRole?: string) {
+    let poll: any;
+    try {
+      poll = await (this.prisma as any).clubPoll.findUnique({
+        where: { id: pollId },
+        include: {
+          options: { orderBy: { sortOrder: 'asc' } },
+          votes: userId ? { where: { userId }, include: { selections: true } } : false,
+        },
+      });
+    } catch (e) {
+      return null;
+    }
+
+    if (!poll || poll.deletedAt) return null;
+
+    const now = new Date();
+    const isOpen = !poll.closedAt && poll.startsAt <= now && (!poll.endsAt || poll.endsAt > now);
+
+    let currentUserVote: any = undefined;
+    if (userId && poll.votes && poll.votes.length > 0) {
+      const userVoteRecord = poll.votes[0];
+      currentUserVote = {
+        voteId: userVoteRecord.id,
+        optionIds: userVoteRecord.selections.map((s: any) => s.optionId),
+        updatedAt: userVoteRecord.updatedAt,
+      };
+    }
+
+    const hasVoted = !!currentUserVote && currentUserVote.optionIds.length > 0;
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+
+    let resultsVisible = false;
+    if (isAdmin || poll.resultVisibility === 'ALWAYS') {
+      resultsVisible = true;
+    } else if (poll.resultVisibility === 'AFTER_VOTE' && hasVoted) {
+      resultsVisible = true;
+    } else if (poll.resultVisibility === 'AFTER_END' && !isOpen) {
+      resultsVisible = true;
+    }
+
+    let participantCount: number | undefined = undefined;
+    let totalSelectionCount: number | undefined = undefined;
+    let optionStats: Record<string, number> = {};
+
+    if (resultsVisible) {
+      try {
+        const allVotes = await (this.prisma as any).clubPollVote.findMany({
+          where: { pollId: poll.id },
+          include: { selections: true },
+        });
+
+        participantCount = allVotes.length;
+        totalSelectionCount = 0;
+
+        allVotes.forEach((v: any) => {
+          v.selections.forEach((sel: any) => {
+            totalSelectionCount = (totalSelectionCount || 0) + 1;
+            optionStats[sel.optionId] = (optionStats[sel.optionId] || 0) + 1;
+          });
+        });
+      } catch (e) {
+        participantCount = 0;
+        totalSelectionCount = 0;
+      }
+    }
+
+    const formattedOptions = poll.options.map((opt: any) => {
+      const isSelected = currentUserVote?.optionIds.includes(opt.id) || false;
+      let voteCount: number | undefined = undefined;
+      let percentage: number | undefined = undefined;
+
+      if (resultsVisible) {
+        voteCount = optionStats[opt.id] || 0;
+        if (participantCount && participantCount > 0) {
+          percentage = Math.round((voteCount / participantCount) * 100);
+        } else {
+          percentage = 0;
+        }
+      }
+
+      return {
+        optionId: opt.id,
+        text: opt.text,
+        sortOrder: opt.sortOrder,
+        selectedByCurrentUser: isSelected,
+        ...(resultsVisible ? { voteCount, percentage } : {}),
+      };
+    });
+
+    return {
+      pollId: poll.id,
+      postId: poll.postId,
+      question: poll.question,
+      selectionType: poll.selectionType,
+      maxSelections: poll.maxSelections || 1,
+      resultVisibility: poll.resultVisibility,
+      status: poll.status,
+      startsAt: poll.startsAt,
+      endsAt: poll.endsAt,
+      closedAt: poll.closedAt,
+      isOpen,
+      canVote: isOpen && !!userId,
+      canChangeVote: isOpen && hasVoted,
+      canWithdrawVote: isOpen && hasVoted,
+      resultsVisible,
+      ...(resultsVisible ? { participantCount, totalSelectionCount } : {}),
+      options: formattedOptions,
+      currentUserVote,
+    };
+  }
+
+  async castVote(pollId: string, userId: string, optionIds: string[]) {
+    if (!Array.isArray(optionIds) || optionIds.length === 0) {
+      throw new BadRequestException('En az bir seçenek seçilmelidir.');
+    }
+
+    const { isBanned } = await this.checkUserRestriction(userId);
+    if (isBanned) {
+      throw new ForbiddenException('Club erişim kısıtlamanız bulunmaktadır.');
+    }
+
+    const poll = await (this.prisma as any).clubPoll.findUnique({
+      where: { id: pollId },
+      include: { options: true },
+    });
+
+    if (!poll || poll.deletedAt) throw new NotFoundException('Anket bulunamadı.');
+
+    const now = new Date();
+    const isOpen = !poll.closedAt && poll.startsAt <= now && (!poll.endsAt || poll.endsAt > now);
+    if (!isOpen) {
+      throw new ConflictException('Bu anket sona erdi. Artık oy kullanamaz veya oyunuzu değiştiremezsiniz.');
+    }
+
+    if (poll.selectionType === 'SINGLE' && optionIds.length > 1) {
+      throw new BadRequestException('Bu anket için yalnızca 1 seçenek seçebilirsiniz.');
+    }
+    if (poll.selectionType === 'MULTIPLE' && poll.maxSelections && optionIds.length > poll.maxSelections) {
+      throw new BadRequestException(`Bu anket için en fazla ${poll.maxSelections} seçenek seçebilirsiniz.`);
+    }
+
+    const validOptionIds = new Set(poll.options.map((o: any) => o.id));
+    for (const id of optionIds) {
+      if (!validOptionIds.has(id)) {
+        throw new BadRequestException('Seçilen seçeneklerden bazıları bu ankete ait değil.');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      let voteRecord = await (tx as any).clubPollVote.findFirst({
+        where: { pollId, userId },
+      });
+
+      if (!voteRecord) {
+        voteRecord = await (tx as any).clubPollVote.create({
+          data: { pollId, userId },
+        });
+      } else {
+        await (tx as any).clubPollVote.update({
+          where: { id: voteRecord.id },
+          data: { updatedAt: new Date() },
+        });
+      }
+
+      await (tx as any).clubPollVoteSelection.deleteMany({
+        where: { voteId: voteRecord.id },
+      });
+
+      await (tx as any).clubPollVoteSelection.createMany({
+        data: optionIds.map((optId) => ({
+          voteId: voteRecord.id,
+          optionId: optId,
+        })),
+      });
+    });
+
+    try {
+      await (this.prisma as any).analyticsEvent.create({
+        data: {
+          eventType: 'CLUB_POLL_VOTED',
+          userId,
+          metadata: { pollId, postId: poll.postId, selectionCount: optionIds.length },
+        },
+      });
+    } catch (e) {}
+
+    const userRole = await this.getUserClubRole(userId);
+    return this.formatPollForUser(pollId, userId, userRole);
+  }
+
+  async withdrawVote(pollId: string, userId: string) {
+    const poll = await (this.prisma as any).clubPoll.findUnique({ where: { id: pollId } });
+    if (!poll || poll.deletedAt) throw new NotFoundException('Anket bulunamadı.');
+
+    const now = new Date();
+    const isOpen = !poll.closedAt && poll.startsAt <= now && (!poll.endsAt || poll.endsAt > now);
+    if (!isOpen) {
+      throw new BadRequestException('Süresi dolmuş anketlerde oy geri çekilemez.');
+    }
+
+    const voteRecord = await (this.prisma as any).clubPollVote.findFirst({
+      where: { pollId, userId },
+    });
+
+    if (voteRecord) {
+      await (this.prisma as any).clubPollVoteSelection.deleteMany({
+        where: { voteId: voteRecord.id },
+      });
+      await (this.prisma as any).clubPollVote.delete({
+        where: { id: voteRecord.id },
+      });
+    }
+
+    const userRole = await this.getUserClubRole(userId);
+    return this.formatPollForUser(pollId, userId, userRole);
+  }
+
+  async getPollResults(pollId: string, userId?: string) {
+    const userRole = userId ? await this.getUserClubRole(userId) : undefined;
+    return this.formatPollForUser(pollId, userId, userRole);
+  }
+
+  async closePoll(pollId: string, adminId: string) {
+    const poll = await (this.prisma as any).clubPoll.findUnique({ where: { id: pollId } });
+    if (!poll) throw new NotFoundException('Anket bulunamadı.');
+
+    return (this.prisma as any).clubPoll.update({
+      where: { id: pollId },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+        closedByAdminId: adminId,
+      },
+    });
+  }
+
+  async extendPollEndTime(pollId: string, endsAtStr: string, adminId: string) {
+    const poll = await (this.prisma as any).clubPoll.findUnique({ where: { id: pollId } });
+    if (!poll) throw new NotFoundException('Anket bulunamadı.');
+
+    const newEndsAt = new Date(endsAtStr);
+    if (isNaN(newEndsAt.getTime()) || newEndsAt <= new Date()) {
+      throw new BadRequestException('Bitiş tarihi geçerli ve gelecekte olmalıdır.');
+    }
+
+    return (this.prisma as any).clubPoll.update({
+      where: { id: pollId },
+      data: {
+        endsAt: newEndsAt,
+        status: 'ACTIVE',
+        closedAt: null,
+      },
+    });
+  }
+
+  async exportPollResults(pollId: string) {
+    const poll = await (this.prisma as any).clubPoll.findUnique({
+      where: { id: pollId },
+      include: { options: true, votes: { include: { selections: true } } },
+    });
+
+    if (!poll) throw new NotFoundException('Anket bulunamadı.');
+
+    const totalParticipants = poll.votes.length;
+    const optionCounts: Record<string, number> = {};
+    poll.votes.forEach((v: any) => {
+      v.selections.forEach((s: any) => {
+        optionCounts[s.optionId] = (optionCounts[s.optionId] || 0) + 1;
+      });
+    });
+
+    let csvContent = 'Anket Sorusu,Seçenek Metni,Oy Sayısı,Katılımcı Yüzdesi,Toplam Katılımcı\n';
+    poll.options.forEach((opt: any) => {
+      const count = optionCounts[opt.id] || 0;
+      const pct = totalParticipants > 0 ? Math.round((count / totalParticipants) * 100) : 0;
+      csvContent += `"${poll.question.replace(/"/g, '""')}","${opt.text.replace(/"/g, '""')}",${count},%${pct},${totalParticipants}\n`;
+    });
+
+    return { csv: csvContent, filename: `poll-results-${pollId}.csv` };
+  }
+
+  // ==========================================
   // ADMIN & MODERATOR ENDPOINTS
   // ==========================================
 
@@ -596,36 +981,87 @@ export class ClubService implements OnModuleInit {
 
   async createPost(adminId: string, dto: CreateClubPostDto) {
     try {
-      const post = await this.prisma.clubPost.create({
-        data: {
-          authorId: adminId,
-          title: dto.title || null,
-          content: dto.content,
-          status: ClubPostStatus.PUBLISHED,
-          commentsEnabled: dto.commentsEnabled ?? true,
-          isPinned: dto.isPinned ?? false,
-          pinnedOrder: dto.pinnedOrder ?? null,
-          publishedAt: new Date(),
-        },
-      });
+      const { title, content, mediaUrls, commentsEnabled, isPinned, pinnedOrder, poll } = dto;
 
-      if (dto.mediaUrls && dto.mediaUrls.length > 0) {
-        await this.prisma.clubPostMedia.createMany({
-          data: dto.mediaUrls.map((url, idx) => ({
-            postId: post.id,
-            mediaUrl: url,
-            sortOrder: idx,
-            uploadedById: adminId,
-            status: 'ATTACHED' as any,
-          })),
-        });
+      const hasTitle = !!title?.trim();
+      const hasContent = !!content?.trim();
+      const hasMedia = Array.isArray(mediaUrls) && mediaUrls.length > 0;
+      const hasPoll = !!poll && !!poll.question?.trim() && Array.isArray(poll.options) && poll.options.length >= 2;
+
+      if (!hasTitle && !hasContent && !hasMedia && !hasPoll) {
+        throw new BadRequestException('Gönderi yayınlamak için başlık, içerik, fotoğraf veya anket alanlarından en az birini doldurmalısınız.');
       }
 
-      return await this.getPostDetail(post.id, adminId);
+      const result = await this.prisma.$transaction(async (tx) => {
+        const newPost = await tx.clubPost.create({
+          data: {
+            authorId: adminId,
+            title: title || null,
+            content: content || '',
+            status: ClubPostStatus.PUBLISHED,
+            commentsEnabled: commentsEnabled ?? true,
+            isPinned: isPinned ?? false,
+            pinnedOrder: pinnedOrder ?? null,
+            publishedAt: new Date(),
+          },
+        });
+
+        if (hasMedia) {
+          await tx.clubPostMedia.createMany({
+            data: mediaUrls!.map((url, idx) => ({
+              postId: newPost.id,
+              mediaUrl: url,
+              sortOrder: idx,
+              uploadedById: adminId,
+              status: 'ATTACHED' as any,
+            })),
+          });
+        }
+
+        if (hasPoll) {
+          const cleanQuestion = poll!.question.trim();
+          const cleanOptions = poll!.options.map((o) => o.trim()).filter(Boolean);
+          if (cleanOptions.length < 2 || cleanOptions.length > 10) {
+            throw new BadRequestException('Anket için en az 2, en fazla 10 geçerli seçenek girilmelidir.');
+          }
+
+          const selectionType = poll!.selectionType || 'SINGLE';
+          const maxSelections = selectionType === 'MULTIPLE' ? Math.min(poll!.maxSelections || cleanOptions.length, cleanOptions.length) : 1;
+          const resultVisibility = poll!.resultVisibility || 'AFTER_VOTE';
+          const endsAt = poll!.endsAt ? new Date(poll!.endsAt) : null;
+
+          const createdPoll = await (tx as any).clubPoll.create({
+            data: {
+              postId: newPost.id,
+              question: cleanQuestion,
+              selectionType,
+              maxSelections,
+              resultVisibility,
+              status: 'ACTIVE',
+              startsAt: new Date(),
+              endsAt,
+              notifyParticipantsOnClose: poll!.notifyParticipantsOnClose ?? false,
+            },
+          });
+
+          await (tx as any).clubPollOption.createMany({
+            data: cleanOptions.map((optText, idx) => ({
+              pollId: createdPoll.id,
+              text: optText,
+              normalizedText: optText.toLowerCase(),
+              sortOrder: idx,
+            })),
+          });
+        }
+
+        return newPost;
+      });
+
+      return await this.getPostDetail(result.id, adminId);
     } catch (error: any) {
       this.logger.error('Error creating Club post:', error);
       throw new BadRequestException(
-        error?.message || 'Gönderi kaydedilirken hata oluştu. Lütfen veritabanı bağlantınızı ve parametreleri kontrol edin.'
+        error?.message || 'Gönderi kaydedilirken hata oluştu.'
       );
     }
   }

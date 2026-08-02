@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   Param,
@@ -11,7 +12,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { ClubService } from './club.service';
-import { CreateClubCommentDto, UpdateClubCommentDto } from './club.dto';
+import {
+  CreateClubCommentDto,
+  UpdateClubCommentDto,
+  CastPollVoteDto,
+  UpdatePollEndTimeDto,
+} from './club.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
 @Controller('club')
@@ -81,5 +87,31 @@ export class ClubController {
   @Post('posts/:postId/like')
   async toggleLike(@Param('postId') postId: string, @Req() req: any) {
     return this.clubService.togglePostLike(postId, req.user.id);
+  }
+
+  // ==========================================
+  // POLL ENDPOINTS
+  // ==========================================
+
+  @UseGuards(JwtAuthGuard)
+  @Put('polls/:pollId/my-vote')
+  async castVote(
+    @Param('pollId') pollId: string,
+    @Body() dto: CastPollVoteDto,
+    @Req() req: any,
+  ) {
+    return this.clubService.castVote(pollId, req.user.id, dto.optionIds);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('polls/:pollId/my-vote')
+  async withdrawVote(@Param('pollId') pollId: string, @Req() req: any) {
+    return this.clubService.withdrawVote(pollId, req.user.id);
+  }
+
+  @Get('polls/:pollId/results')
+  async getPollResults(@Param('pollId') pollId: string, @Req() req?: any) {
+    const userId = req?.user?.id;
+    return this.clubService.getPollResults(pollId, userId);
   }
 }

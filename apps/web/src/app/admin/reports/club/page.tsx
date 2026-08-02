@@ -40,6 +40,8 @@ function ClubReportsContent() {
         return 'Club İçerik Performansı';
       case 'moderation':
         return 'Club Moderasyon Analitiği';
+      case 'polls':
+        return 'Club Anket ve Oylama Analitiği';
       case 'engagement':
       default:
         return 'Club Kullanım ve Etkileşim';
@@ -50,16 +52,16 @@ function ClubReportsContent() {
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8">
       <ReportHeader
         title={getViewTitle()}
-        subtitle="Club topluluk etkileşimleri, gönderi performansları, aktif mute/ban ve moderasyon kayıtları."
+        subtitle="Club topluluk etkileşimleri, anket performansları, aktif mute/ban ve moderasyon kayıtları."
       />
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <ReportSidebar />
         <main className="flex-1 space-y-8 w-full">
           {/* Sub-View Tabs */}
-          <div className="flex border-b border-white/10 gap-2 pb-2 text-xs font-bold font-mono">
+          <div className="flex border-b border-white/10 gap-2 pb-2 text-xs font-bold font-mono overflow-x-auto">
             <button
               onClick={() => handleTabChange('engagement')}
-              className={`px-4 py-2 rounded-xl transition-all ${
+              className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                 currentView === 'engagement'
                   ? 'bg-orange-500 text-white shadow-md'
                   : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -69,7 +71,7 @@ function ClubReportsContent() {
             </button>
             <button
               onClick={() => handleTabChange('content')}
-              className={`px-4 py-2 rounded-xl transition-all ${
+              className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                 currentView === 'content'
                   ? 'bg-orange-500 text-white shadow-md'
                   : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -78,8 +80,18 @@ function ClubReportsContent() {
               İçerik Performansı
             </button>
             <button
+              onClick={() => handleTabChange('polls')}
+              className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
+                currentView === 'polls'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              📊 Anket Analitiği
+            </button>
+            <button
               onClick={() => handleTabChange('moderation')}
-              className={`px-4 py-2 rounded-xl transition-all ${
+              className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                 currentView === 'moderation'
                   ? 'bg-orange-500 text-white shadow-md'
                   : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'

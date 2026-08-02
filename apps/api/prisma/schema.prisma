@@ -262,6 +262,7 @@ model User {
   preferenceSwipes   UserVehiclePreferenceSwipe[]
   preferenceProfiles UserVehiclePreferenceProfile[]
   discoverySessions  VehicleDiscoverySession[]
+  clubPollVotes      ClubPollVote[]
 }
 
 model SubscriptionPlan {
@@ -1805,9 +1806,102 @@ model ClubPost {
   media           ClubPostMedia[]
   comments        ClubComment[]
   likes           ClubPostLike[]
+  poll            ClubPoll?
 
   @@index([status, isPinned, pinnedOrder, publishedAt])
   @@index([authorId])
+}
+
+enum ClubPollSelectionType {
+  SINGLE
+  MULTIPLE
+}
+
+enum ClubPollResultVisibility {
+  ALWAYS
+  AFTER_VOTE
+  AFTER_END
+  ADMIN_ONLY
+}
+
+enum ClubPollStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+model ClubPoll {
+  id                         String                     @id @default(uuid())
+  postId                     String                     @unique
+  question                   String
+  selectionType              ClubPollSelectionType      @default(SINGLE)
+  maxSelections              Int?
+  resultVisibility           ClubPollResultVisibility   @default(AFTER_VOTE)
+  status                     ClubPollStatus             @default(DRAFT)
+  startsAt                   DateTime                   @default(now())
+  endsAt                     DateTime?
+  closedAt                   DateTime?
+  closedByAdminId            String?
+  notifyParticipantsOnClose  Boolean                    @default(false)
+  version                    Int                        @default(1)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  deletedAt                  DateTime?
+
+  post                       ClubPost                   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  options                    ClubPollOption[]
+  votes                      ClubPollVote[]
+
+  @@index([status, startsAt, endsAt])
+  @@index([postId])
+}
+
+model ClubPollOption {
+  id             String                  @id @default(uuid())
+  pollId         String
+  text           String
+  normalizedText String
+  sortOrder      Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+
+  poll           ClubPoll                @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  selections     ClubPollVoteSelection[]
+
+  @@unique([pollId, normalizedText])
+  @@index([pollId, sortOrder])
+}
+
+model ClubPollVote {
+  id          String                  @id @default(uuid())
+  pollId      String
+  userId      String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  poll        ClubPoll                @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  selections  ClubPollVoteSelection[]
+
+  @@unique([pollId, userId])
+  @@index([userId, createdAt])
+  @@index([pollId, updatedAt])
+}
+
+model ClubPollVoteSelection {
+  id        String         @id @default(uuid())
+  voteId    String
+  optionId  String
+  createdAt DateTime       @default(now())
+
+  vote      ClubPollVote   @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  option    ClubPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([voteId, optionId])
+  @@index([optionId])
 }
 
 model ClubPostMedia {

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PollCreationFields, { PollFormData } from "../../components/PollCreationFields";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -17,6 +18,18 @@ export default function NewClubPostPage() {
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [pollData, setPollData] = useState<PollFormData>({
+    enabled: false,
+    question: "",
+    options: ["", ""],
+    selectionType: "SINGLE",
+    maxSelections: 1,
+    resultVisibility: "AFTER_VOTE",
+    durationType: "UNLIMITED",
+    customEndsAt: "",
+    notifyParticipantsOnClose: false,
+  });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,9 +74,26 @@ export default function NewClubPostPage() {
   };
 
   const handleSubmit = async (publish: boolean) => {
-    if (!postContent.trim()) {
-      alert("Lütfen gönderi içeriğini girin.");
+    const hasContent = !!postContent.trim();
+    const hasTitle = !!postTitle.trim();
+    const hasMedia = mediaUrls.length > 0;
+    const hasPoll = pollData.enabled && !!pollData.question.trim();
+
+    if (!hasContent && !hasTitle && !hasMedia && !hasPoll) {
+      alert("Lütfen gönderi başlığı, metni, fotoğraf veya anket alanlarından en az birini doldurun.");
       return;
+    }
+
+    if (pollData.enabled) {
+      if (!pollData.question.trim()) {
+        alert("Lütfen anket sorusunu girin.");
+        return;
+      }
+      const validOpts = pollData.options.map((o) => o.trim()).filter(Boolean);
+      if (validOpts.length < 2) {
+        alert("Anket için en az 2 geçerli seçenek girmelisiniz.");
+        return;
+      }
     }
 
     const token = localStorage.getItem("accessToken");
@@ -71,6 +101,49 @@ export default function NewClubPostPage() {
 
     setSubmitting(true);
     try {
+      let pollPayload = undefined;
+      if (pollData.enabled) {
+        const validOpts = pollData.options.map((o) => o.trim()).filter(Boolean);
+
+        let calculatedEndsAt: string | undefined = undefined;
+        if (pollData.durationType === "CUSTOM") {
+          calculatedEndsAt = pollData.customEndsAt || undefined;
+        } else if (pollData.durationType !== "UNLIMITED") {
+          const now = new Date();
+          switch (pollData.durationType) {
+            case "1H":
+              now.setHours(now.getHours() + 1);
+              break;
+            case "6H":
+              now.setHours(now.getHours() + 6);
+              break;
+            case "12H":
+              now.setHours(now.getHours() + 12);
+              break;
+            case "1D":
+              now.setDate(now.getDate() + 1);
+              break;
+            case "3D":
+              now.setDate(now.getDate() + 3);
+              break;
+            case "7D":
+              now.setDate(now.getDate() + 7);
+              break;
+          }
+          calculatedEndsAt = now.toISOString();
+        }
+
+        pollPayload = {
+          question: pollData.question.trim(),
+          options: validOpts,
+          selectionType: pollData.selectionType,
+          maxSelections: pollData.selectionType === "MULTIPLE" ? pollData.maxSelections : 1,
+          resultVisibility: pollData.resultVisibility,
+          endsAt: calculatedEndsAt,
+          notifyParticipantsOnClose: pollData.notifyParticipantsOnClose,
+        };
+      }
+
       const res = await fetch(`${API_URL}/api/admin/club/posts`, {
         method: "POST",
         headers: {
@@ -83,12 +156,13 @@ export default function NewClubPostPage() {
           mediaUrls,
           isPinned,
           commentsEnabled,
+          poll: pollPayload,
         }),
       });
 
       if (res.ok) {
         const post = await res.json();
-        if (publish) {
+        if (publish && post.status !== "PUBLISHED") {
           await fetch(`${API_URL}/api/admin/club/posts/${post.id}/publish`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -113,7 +187,7 @@ export default function NewClubPostPage() {
         <div>
           <h2 className="text-xl font-black text-white">Yeni Ana Gönderi Oluştur</h2>
           <p className="text-xs text-slate-400">
-            Tork Scout Club üyelerine duyuru, rehber veya içerik paylaşın.
+            Tork Scout Club üyelerine duyuru, rehber, içerik veya anket paylaşın.
           </p>
         </div>
         <Link
@@ -137,12 +211,12 @@ export default function NewClubPostPage() {
         </div>
 
         <div>
-          <label className="text-xs font-bold text-slate-300 block mb-2">Gönderi İçeriği (*Zorunlu):</label>
+          <label className="text-xs font-bold text-slate-300 block mb-2">Gönderi İçeriği (Opsiyonel):</label>
           <textarea
-            rows={8}
+            rows={6}
             value={postContent}
             onChange={(e) => setPostContent(e.target.value)}
-            placeholder="Gönderi metnini detaylı şekilde yazın..."
+            placeholder="Gönderi metnini yazın (Sadece anket yayınlayacaksanız boş bırakabilirsiniz)..."
             className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition resize-y"
           />
         </div>
@@ -191,6 +265,9 @@ export default function NewClubPostPage() {
             )}
           </div>
         </div>
+
+        {/* Poll Fields Component */}
+        <PollCreationFields value={pollData} onChange={setPollData} />
 
         {/* Options Row */}
         <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">

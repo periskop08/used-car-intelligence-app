@@ -11,14 +11,61 @@ import {
   Max,
 } from 'class-validator';
 
+import { ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateClubPollDto {
+  @IsString()
+  @MinLength(5)
+  @MaxLength(300)
+  question: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  options: string[];
+
+  @IsOptional()
+  @IsEnum(['SINGLE', 'MULTIPLE'])
+  selectionType?: 'SINGLE' | 'MULTIPLE';
+
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  @Max(10)
+  maxSelections?: number;
+
+  @IsOptional()
+  @IsEnum(['ALWAYS', 'AFTER_VOTE', 'AFTER_END', 'ADMIN_ONLY'])
+  resultVisibility?: 'ALWAYS' | 'AFTER_VOTE' | 'AFTER_END' | 'ADMIN_ONLY';
+
+  @IsOptional()
+  @IsString()
+  endsAt?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  notifyParticipantsOnClose?: boolean;
+}
+
+export class CastPollVoteDto {
+  @IsArray()
+  @IsString({ each: true })
+  optionIds: string[];
+}
+
+export class UpdatePollEndTimeDto {
+  @IsString()
+  endsAt: string;
+}
+
 export class CreateClubPostDto {
   @IsOptional()
   @IsString()
   title?: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(3)
-  content: string;
+  content?: string;
 
   @IsOptional()
   @IsArray()
@@ -36,6 +83,11 @@ export class CreateClubPostDto {
   @IsOptional()
   @IsInt()
   pinnedOrder?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateClubPollDto)
+  poll?: CreateClubPollDto;
 }
 
 export class UpdateClubPostDto {
