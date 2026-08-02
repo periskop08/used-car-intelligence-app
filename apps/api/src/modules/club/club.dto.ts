@@ -30,7 +30,7 @@ export class CreateClubPollDto {
 
   @IsOptional()
   @IsInt()
-  @Min(2)
+  @Min(1)
   @Max(10)
   maxSelections?: number;
 
