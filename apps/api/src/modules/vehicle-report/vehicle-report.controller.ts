@@ -1,35 +1,39 @@
 import { Controller, Post, Get, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { VehicleReportService } from './vehicle-report.service';
-import { CreateVehicleReportDto, RefreshVehicleReportDto } from './vehicle-report.dto';
-import { JwtAuthGuard } from '../auth/jwt.guard';
+import { CreateVehicleReportDto } from './vehicle-report.dto';
+import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
 
 @Controller('vehicle-reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(OptionalJwtAuthGuard)
 export class VehicleReportController {
   constructor(private readonly reportService: VehicleReportService) {}
 
+  private getUserId(req: any): string {
+    return req.user?.id || (req.headers['x-guest-token'] as string) || 'guest_user';
+  }
+
   @Post()
   async createReport(@Request() req: any, @Body() dto: CreateVehicleReportDto) {
-    return this.reportService.createVehicleReport(req.user.id, dto);
+    return this.reportService.createVehicleReport(this.getUserId(req), dto);
   }
 
   @Get(':reportId')
   async getReport(@Request() req: any, @Param('reportId') reportId: string) {
-    return this.reportService.getReportById(req.user.id, reportId);
+    return this.reportService.getReportById(this.getUserId(req), reportId);
   }
 
   @Get('by-variant/:variantId/current')
   async getCurrentVariantReport(@Request() req: any, @Param('variantId') variantId: string) {
-    return this.reportService.getCurrentVariantReport(req.user.id, variantId);
+    return this.reportService.getCurrentVariantReport(this.getUserId(req), variantId);
   }
 
   @Get('by-listing/:listingId/current')
   async getCurrentListingReport(@Request() req: any, @Param('listingId') listingId: string) {
-    return this.reportService.getCurrentListingReport(req.user.id, listingId);
+    return this.reportService.getCurrentListingReport(this.getUserId(req), listingId);
   }
 
   @Post(':reportId/upgrade-version')
   async upgradeReportVersion(@Request() req: any, @Param('reportId') reportId: string) {
-    return this.reportService.upgradeReportVersion(req.user.id, reportId);
+    return this.reportService.upgradeReportVersion(this.getUserId(req), reportId);
   }
 }

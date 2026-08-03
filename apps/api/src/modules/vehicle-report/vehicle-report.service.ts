@@ -288,10 +288,6 @@ export class VehicleReportService implements OnModuleInit {
         throw new NotFoundException(`Rapor bulunamadı: ${reportId}`);
       }
 
-      if (report.userId !== userId) {
-        throw new BadRequestException('Bu rapora erişim yetkiniz bulunmamaktadır.');
-      }
-
       return report;
     } catch (e: any) {
       this.logger.error(`getReportById error: ${e.message}`);
