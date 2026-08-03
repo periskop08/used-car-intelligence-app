@@ -89,11 +89,14 @@ export default function ListingAiAdvisorCard({
       });
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        const msgList = data.messages || [];
+        setMessages(msgList);
         if (data.quota) setQuota(data.quota);
-        if (data.messages && data.messages.length > 0) {
+        if (msgList.length > 0) {
           setIsOpen(true);
           setShowQuickQuestions(false);
+        } else {
+          setIsOpen(false);
         }
       } else {
         fetchQuota();

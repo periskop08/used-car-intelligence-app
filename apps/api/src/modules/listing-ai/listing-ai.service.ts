@@ -103,6 +103,8 @@ export class ListingAiService implements OnModuleInit {
       },
     });
 
+    const quota = await this.quotaService.getQuota(userId);
+
     if (!conversation) {
       conversation = await this.prisma.listingAiConversation.create({
         data: {
@@ -112,6 +114,15 @@ export class ListingAiService implements OnModuleInit {
         },
         include: { messages: true },
       });
+    } else if (conversation.archivedAt) {
+      // Conversation was cleared/deleted: return empty message list
+      return {
+        conversationId: conversation.id,
+        listingId,
+        activeContextHash: context.contextHash,
+        messages: [],
+        quota,
+      };
     } else if (conversation.activeContextHash !== context.contextHash) {
       // Context has changed (listing updated by seller)
       await this.prisma.$transaction([
@@ -139,13 +150,11 @@ export class ListingAiService implements OnModuleInit {
       });
     }
 
-    const quota = await this.quotaService.getQuota(userId);
-
     return {
       conversationId: conversation!.id,
       listingId,
       activeContextHash: context.contextHash,
-      messages: conversation!.messages.map((m) => ({
+      messages: (conversation!.messages || []).map((m) => ({
         id: m.id,
         role: m.role,
         messageType: m.messageType,
@@ -164,7 +173,13 @@ export class ListingAiService implements OnModuleInit {
     const context = await this.contextBuilderService.buildContext(listingId);
     const { conversationId } = await this.getConversation(listingId, userId);
 
-    // Check Cache: Return existing initial analysis for same contextHash if already generated
+    // If conversation was archived, un-archive it for fresh start
+    await this.prisma.listingAiConversation.update({
+      where: { id: conversationId },
+      data: { archivedAt: null, activeContextHash: context.contextHash },
+    });
+
+    // Check Cache: Return existing initial analysis for same contextHash if already generated and not cleared
     const existingAnalysis = await this.prisma.listingAiMessage.findFirst({
       where: {
         conversationId,
@@ -244,6 +259,12 @@ export class ListingAiService implements OnModuleInit {
   ): Promise<ListingAiChatResponseDto> {
     const context = await this.contextBuilderService.buildContext(listingId);
     const { conversationId } = await this.getConversation(listingId, userId);
+
+    // Un-archive if previously archived
+    await this.prisma.listingAiConversation.update({
+      where: { id: conversationId },
+      data: { archivedAt: null, activeContextHash: context.contextHash },
+    });
 
     // 1. Check Idempotency Key
     const existingUsage = await this.prisma.aiQuotaUsage.findUnique({
@@ -380,9 +401,18 @@ export class ListingAiService implements OnModuleInit {
     });
 
     if (conversation) {
+      // 1. Delete all messages of this conversation
+      await this.prisma.listingAiMessage.deleteMany({
+        where: { conversationId: conversation.id },
+      });
+
+      // 2. Mark conversation archived and reset activeContextHash
       await this.prisma.listingAiConversation.update({
         where: { id: conversation.id },
-        data: { archivedAt: new Date() },
+        data: {
+          archivedAt: new Date(),
+          activeContextHash: '',
+        },
       });
     }
 
