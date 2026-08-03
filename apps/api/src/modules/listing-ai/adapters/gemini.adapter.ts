@@ -24,7 +24,7 @@ export class GeminiAdapter implements AiProviderAdapter {
 
     if (apiKey) {
       // Models to try in sequence
-      const models = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const models = ['gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-flash-latest'];
 
       for (const model of models) {
         try {
