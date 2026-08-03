@@ -17,28 +17,22 @@ export class VehicleReportCacheService {
     if (mode === 'LISTING_REPORT' && listingId) {
       return this.prisma.generatedVehicleReport.findFirst({
         where: {
-          userId,
           mode: 'LISTING_REPORT',
           listingId,
-          contextHash,
-          reportVersion,
           status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
         },
-        orderBy: { generatedAt: 'desc' },
+        orderBy: { completedAt: 'desc' },
       });
     }
 
     if (variantId) {
       return this.prisma.generatedVehicleReport.findFirst({
         where: {
-          userId,
           mode: 'VEHICLE_REPORT',
           variantId,
-          contextHash,
-          reportVersion,
           status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
         },
-        orderBy: { generatedAt: 'desc' },
+        orderBy: { completedAt: 'desc' },
       });
     }
 

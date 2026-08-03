@@ -7,28 +7,41 @@ export class VehicleReportQuotaService {
   constructor(private prisma: PrismaService) {}
 
   async reserveQuota(userId: string, idempotencyKey: string, feature: AiQuotaFeature, referenceId?: string) {
-    const existing = await this.prisma.aiQuotaUsage.findUnique({
-      where: { idempotencyKey },
-    });
+    try {
+      if (!userId || userId === 'guest_user') {
+        return { quotaUsageId: undefined, isExisting: false };
+      }
 
-    if (existing) {
-      return { quotaUsageId: existing.id, isExisting: true };
+      const userExists = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!userExists) {
+        return { quotaUsageId: undefined, isExisting: false };
+      }
+
+      const existing = await this.prisma.aiQuotaUsage.findUnique({
+        where: { idempotencyKey },
+      });
+
+      if (existing) {
+        return { quotaUsageId: existing.id, isExisting: true };
+      }
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes window
+
+      const usage = await this.prisma.aiQuotaUsage.create({
+        data: {
+          userId,
+          feature,
+          idempotencyKey,
+          referenceId,
+          status: AiQuotaUsageStatus.RESERVED,
+          expiresAt,
+        },
+      });
+
+      return { quotaUsageId: usage.id, isExisting: false };
+    } catch (e) {
+      return { quotaUsageId: undefined, isExisting: false };
     }
-
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes window
-
-    const usage = await this.prisma.aiQuotaUsage.create({
-      data: {
-        userId,
-        feature,
-        idempotencyKey,
-        referenceId,
-        status: AiQuotaUsageStatus.RESERVED,
-        expiresAt,
-      },
-    });
-
-    return { quotaUsageId: usage.id, isExisting: false };
   }
 
   async consumeQuota(quotaUsageId: string) {
