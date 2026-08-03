@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { GenerateReportDto, AskChatDto } from './report.dto';
-import { FeatureKey, ApprovalStatus, FinalDecision, DataCoverage, PriorityLevel, ResearchScope } from '@prisma/client';
+import { FeatureKey, ApprovalStatus, PriorityLevel, ResearchScope } from '@prisma/client';
 import { AiReportGeneratorService } from '../research/ai-report-generator.service';
 import { CoverageService } from '../research/coverage.service';
 import { ResearchService } from '../research/research.service';
@@ -85,26 +85,12 @@ export class ReportService {
           PriorityLevel.HIGH,
         );
         await this.researchService.processNextJob();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to trigger or process research job in generateReport:', err.message);
       }
     }
 
-    // 4. Count APPROVED related entities (problems, recalls, checklists)
-    const approvedProblemsCount = await this.prisma.commonProblem.count({
-      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
-    });
-    const approvedRecallsCount = await this.prisma.recall.count({
-      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
-    });
-    const approvedChecklistsCount = await this.prisma.inspectionChecklistItem.count({
-      where: { variantId: dto.variantId, status: ApprovalStatus.APPROVED },
-    });
-
-    const totalApprovedCount = approvedProblemsCount + approvedRecallsCount + approvedChecklistsCount;
-
-
-    // 5. Generate and cache report if approved data exists
+    // 4. Generate and cache report
     const report = await this.reportGenerator.generateReportCache(dto.variantId, lang);
     return report;
   }
@@ -135,83 +121,110 @@ export class ReportService {
       throw new NotFoundException('Araç varyantı bulunamadı veya onaylanmış durumda değil.');
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    let response = '';
+    const geminiApiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_AI_API_KEY ||
+      process.env.GOOGLE_API_KEY;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
 
-    if (!apiKey && !geminiApiKey) {
-      // Dynamic fallback mock if key not set
-      const problemNames = variant.problems.map(p => p.title).join(', ');
-      response = `Bu araç (${variant.brand.name} ${variant.model.name} ${variant.generation?.name || ''}) için onaylanmış sorunlar arasında ${
-        problemNames || 'herhangi bir kritik kronik sorun bulunmamaktadır'
-      }. Detaylı bilgi için teknik raporu inceleyebilirsiniz.`;
-    } else {
-      let openai: OpenAI;
-      let modelName = 'gpt-4o-mini';
+    const problemsText = variant.problems
+      .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
+      .join('\n');
+    const recallsText = variant.recalls
+      .map((r: any) => `- ${r.title}: ${r.description}`)
+      .join('\n');
 
-      if (apiKey) {
-        openai = new OpenAI({ apiKey });
-        modelName = 'gpt-4o-mini';
-      } else {
-        openai = new OpenAI({
-          apiKey: geminiApiKey,
-          baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-        });
-        modelName = 'gemini-flash-latest';
-      }
-
-      const problemsText = variant.problems
-        .map((p: any) => `- ${p.title}: ${p.description} (Risk: ${p.riskLevel})`)
-        .join('\n');
-      const recallsText = variant.recalls
-        .map((r: any) => `- ${r.title}: ${r.description}`)
-        .join('\n');
-
-      const systemPrompt = `You are an expert car buying assistant and AI vehicle advisor.
+    const systemPrompt = `You are an expert car buying assistant and AI vehicle advisor for TorqueScout.
 The user is asking a question about a specific vehicle: ${variant.year} ${variant.brand.name} ${variant.model.name} (${variant.engine?.code || ''}, ${variant.transmission?.name || ''}).
 
-Here are the approved chronic problems for this vehicle:
-${problemsText || 'No major chronic problems recorded.'}
+Approved chronic problems for this vehicle:
+${problemsText || 'No major chronic problems recorded in verified database.'}
 
-Here are the approved recalls:
-${recallsText || 'No recalls recorded.'}
+Approved recalls for this vehicle:
+${recallsText || 'No official recalls recorded in verified database.'}
 
-Answer the user's question accurately based on this data. Do not hallucinate external issues that contradict this data. Always answer in Turkish, and keep your tone helpful, informative, and objective. Keep it concise but detailed enough to answer their question.`;
+Answer the user's question accurately based on automotive facts and this data. Always answer in Turkish, and keep your tone helpful, informative, and objective.`;
 
+    let response = '';
+
+    // 1. TRY GEMINI MULTI-MODEL FALLBACK FIRST
+    if (geminiApiKey) {
+      const geminiModels = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const fullPrompt = `${systemPrompt}\n\nKullanıcı Sorusu: ${dto.question}`;
+
+      for (const model of geminiModels) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: fullPrompt }] }],
+              generationConfig: { temperature: 0.4, maxOutputTokens: 2500 },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text && text.trim().length > 10) {
+              response = text.trim();
+              break;
+            }
+          }
+        } catch (e: any) {
+          console.warn(`Gemini model ${model} failed in ReportService: ${e?.message}`);
+        }
+      }
+    }
+
+    // 2. TRY OPENAI IF GEMINI DID NOT RETURN A RESPONSE
+    if (!response && openaiApiKey) {
       try {
+        const openai = new OpenAI({ apiKey: openaiApiKey });
         const aiResponse = await openai.chat.completions.create({
-          model: modelName,
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: dto.question }
+            { role: 'user', content: dto.question },
           ],
           temperature: 0.7,
         });
 
-        response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
-      } catch (err: any) {
-        if (apiKey && geminiApiKey) {
-          console.error(`OpenAI chat failed: ${err.message}. Trying Gemini fallback...`);
-          try {
-            const geminiOpenai = new OpenAI({
-              apiKey: geminiApiKey,
-              baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-            });
-            const aiResponse = await geminiOpenai.chat.completions.create({
-              model: 'gemini-flash-latest',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: dto.question }
-              ],
-              temperature: 0.7,
-            });
-            response = aiResponse.choices[0]?.message?.content || 'Yanıt oluşturulamadı.';
-          } catch (geminiErr: any) {
-            response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}. Gemini hatası: ${geminiErr.message}`;
-          }
-        } else {
-          response = `Yapay zeka yanıtı oluşturulurken hata meydana geldi: ${err.message}`;
+        if (aiResponse.choices[0]?.message?.content) {
+          response = aiResponse.choices[0].message.content.trim();
         }
+      } catch (err: any) {
+        console.warn(`OpenAI failed in ReportService: ${err?.message}`);
+      }
+    }
+
+    // 3. SMART AUTOMOTIVE FALLBACK (If AI APIs are rate limited or unavailable)
+    if (!response) {
+      const qLower = dto.question.toLowerCase();
+      const carTitle = `${variant.year} ${variant.brand.name} ${variant.model.name}`;
+      const transName = variant.transmission?.name || 'Şanzıman';
+
+      if (qLower.includes('şanzıman') || qLower.includes('vites') || qLower.includes('baskı balata') || qLower.includes('şanzımanı')) {
+        response = `### ⚙️ ${carTitle} Şanzıman ve Aktarma Değerlendirmesi\n\n` +
+          `**${transName}** yapısına sahip bu araç için veritabanımızdaki veriler ve mekanik standartlar:\n\n` +
+          `• **Şanzıman Karakteri:** ${transName} günlük ve şehir içi kullanımlarda performans beklentilerini karşılar.\n` +
+          `• **Bakım Hassasiyeti:** Periyodik şanzıman yağı değişimleri ve baskı balata / kavramanın zamanında kontrol edilmesi uzun vadede şanzıman sağlığını korur.\n` +
+          `• **Kronik Sorun Kayıtları:** Veritabanımızda bu model için onaylanmış ${variant.problems.length} adet kronik kayıt yer almaktadır.\n\n` +
+          `*Alım öncesi ekspertizde vitesteki geçiş pürüzsüzlüğü ve kavramanın kavrama noktası mutlaka kontrol ettirilmelidir.*`;
+      } else if (qLower.includes('kronik') || qLower.includes('problem') || qLower.includes('arıza') || qLower.includes('sorun')) {
+        const problemList = variant.problems.map((p) => `• **${p.title}** (${p.riskLevel} Risk): ${p.description}`).join('\n');
+        response = `### 🔍 ${carTitle} Kronik Sorun & Arıza Analizi\n\n` +
+          (problemList
+            ? `TorqueScout doğrulanmış veritabanında bu araç için kaydedilmiş kronik sorunlar:\n\n${problemList}\n\n`
+            : `✓ Bu araç kombinasyonu için veritabanımızda henüz yüksek riskli kritik bir kronik arıza kaydı bildirilmemiştir.\n\n`) +
+          `*Araştırmalarımız düzenli olarak güncellenmekte olup alım öncesi bağımsız mekanik ekspertizi yaptırmanız tavsiye edilir.*`;
+      } else {
+        response = `### 🤖 ${carTitle} AI Danışman Değerlendirmesi\n\n` +
+          `**${carTitle}** aracı için sorunuz incelenmiştir:\n\n` +
+          `• **Araç Bilgisi:** ${variant.year} Model ${variant.brand.name} ${variant.model.name} (${variant.engine?.code || ''}, ${transName})\n` +
+          `• **Doğrulanmış Kayıtlar:** Veritabanımızda bu araca ait ${variant.problems.length} adet kronik sorun ve ${variant.recalls.length} adet resmi geri çağırma kaydı bulunmaktadır.\n\n` +
+          `Detaylı kronik arıza, bakım maliyetleri ve satın alınabilirlik skorunu görmek için aracın **Teknik Rapor** sekmesini inceleyebilirsiniz.`;
       }
     }
 
