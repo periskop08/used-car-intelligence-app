@@ -23,8 +23,9 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
     setInterval(() => {
       this.processNextJobs().catch((err) => {
         this.logger.error(`Error in VehicleReportJobWorker loop: ${err.message}`);
+        this.isProcessing = false;
       });
-    }, 3000);
+    }, 10000);
   }
 
   async processNextJobs() {
