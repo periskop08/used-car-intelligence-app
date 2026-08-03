@@ -265,6 +265,7 @@ model User {
   clubPollVotes      ClubPollVote[]
   listingAiConversations ListingAiConversation[]
   aiQuotaUsages          AiQuotaUsage[]
+  generatedVehicleReports GeneratedVehicleReport[]
   assignedFeedbacks      Feedback[]                @relation("AssignedFeedbackAdmin")
 }
 
@@ -2365,7 +2366,130 @@ enum AiQuotaFeature {
   GENERAL_CHATBOT
   COMPARISON_CHATBOT
   LISTING_AI_ADVISOR
+  VEHICLE_REPORT
+  LISTING_REPORT
 }
+
+enum VehicleReportMode {
+  VEHICLE_REPORT
+  LISTING_REPORT
+}
+
+enum VehicleReportStatus {
+  QUEUED
+  GENERATING
+  VALIDATING
+  REPAIRING
+  COMPLETED
+  SAFE_FALLBACK
+  FAILED
+  ARCHIVED
+}
+
+enum VehicleReportJobStatus {
+  QUEUED
+  GENERATING
+  VALIDATING
+  REPAIRING
+  COMPLETED
+  SAFE_FALLBACK
+  FAILED
+  CANCELLED
+}
+
+model GeneratedVehicleReport {
+  id                 String                  @id @default(cuid())
+  userId             String
+  mode               VehicleReportMode
+  variantId          String?
+  listingId          String?
+
+  contextHash        String
+  vehicleContextHash String
+  listingContextHash String?
+
+  reportVersion      String                  @default("v1.0")
+  promptVersion      String?
+  schemaVersion      Int                     @default(1)
+
+  status             VehicleReportStatus     @default(QUEUED)
+  reportData         Json?
+
+  quotaUsageId       String?
+  idempotencyKey     String
+
+  provider           String?
+  modelName          String?
+  tokenInput         Int?
+  tokenOutput        Int?
+  generationMs       Int?
+  repairAttempted    Boolean                 @default(false)
+  fallbackReason     String?
+
+  staleReasons       Json?
+  lastRefreshReason  String?
+
+  generatedAt        DateTime                @default(now())
+  completedAt        DateTime?
+  updatedAt          DateTime                @updatedAt
+  archivedAt         DateTime?
+
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job                VehicleReportResearchJob?
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, mode, generatedAt])
+  @@index([userId, variantId, vehicleContextHash, reportVersion])
+  @@index([userId, listingId, contextHash, reportVersion])
+  @@index([userId, mode, variantId, contextHash, status])
+}
+
+model VehicleReportResearchJob {
+  id               String                 @id @default(cuid())
+  reportId         String                 @unique
+  userId           String
+  mode             VehicleReportMode
+  status           VehicleReportJobStatus @default(QUEUED)
+
+  contextHash      String
+  priority         Int                    @default(0)
+  attemptCount     Int                    @default(0)
+  maxAttempts      Int                    @default(3)
+
+  lockedBy         String?
+  lockedAt         DateTime?
+  heartbeatAt      DateTime?
+  lockExpiresAt    DateTime?
+  nextAttemptAt    DateTime?
+
+  lastErrorCode    String?
+  lastErrorMessage String?
+
+  createdAt        DateTime               @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  updatedAt        DateTime               @updatedAt
+
+  report           GeneratedVehicleReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt, priority, createdAt])
+  @@index([lockExpiresAt])
+  @@index([userId, mode, contextHash, status])
+}
+
+model VehicleReportGenerationLock {
+  id          String            @id @default(cuid())
+  lockKey     String            @unique
+  reportId    String
+  userId      String
+  mode        VehicleReportMode
+  contextHash String
+  expiresAt   DateTime
+  createdAt   DateTime          @default(now())
+
+  @@index([expiresAt])
+}
+
 
 enum AiQuotaUsageStatus {
   RESERVED

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
-import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
+import ListingIntelligencePanel from "../components/ListingIntelligencePanel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -1049,9 +1049,9 @@ export default function ListingDetail() {
         </div>
       </div>
 
-      {/* 4. ALT DİKDÖRTGEN BÖLÜM: TorqueScout İlan Danışmanı (Tam Genişlikli Form Yapısı) */}
+      {/* 4. ALT DİKDÖRTGEN BÖLÜM: TorqueScout İlan Zekası Panel (Rapor + Chatbot Sekmeleri) */}
       <div className="max-w-7xl mx-auto px-4 pb-8">
-        <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.publicListingNo} />
+        <ListingIntelligencePanel listingId={listing.id} />
       </div>
 
       {/* Send Message Modal Popup */}

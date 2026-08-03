@@ -21,6 +21,7 @@ import { ClubModule } from './modules/club/club.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ListingModerationModule } from './modules/listing-moderation/listing-moderation.module';
 import { ListingAiModule } from './modules/listing-ai/listing-ai.module';
+import { VehicleReportModule } from './modules/vehicle-report/vehicle-report.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ListingAiModule } from './modules/listing-ai/listing-ai.module';
     ReportsModule,
     ListingModerationModule,
     ListingAiModule,
+    VehicleReportModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],
