@@ -294,13 +294,13 @@ export default function ListingAiAdvisorCard({
   };
 
   return (
-    <div className="w-full my-6 glass p-6 sm:p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-r from-[#0b0f19] via-[#0d1222] to-orange-950/20 shadow-2xl flex flex-col gap-5 relative overflow-hidden">
+    <div id="listing-ai-advisor-card" className="w-full my-8 scroll-mt-24 glass p-6 sm:p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-r from-[#0b0f19] via-[#0d1222] to-orange-950/20 shadow-2xl flex flex-col gap-5 relative">
       {/* Background Decorative Glow */}
       <span className="absolute -top-16 -right-16 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
       <span className="absolute -bottom-16 -left-16 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* ZONE 1: FIXED HEADER & QUOTA BAR (Never Scrolls) */}
-      <div className="flex-shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      {/* ZONE 1: FIXED HEADER & QUOTA BAR (Never Truncated or Scrolled Away) */}
+      <div className="flex-shrink-0 relative z-20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black text-orange-400 uppercase tracking-widest flex items-center gap-2">

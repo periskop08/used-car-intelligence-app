@@ -11,11 +11,10 @@ export class GeminiAdapter implements AiProviderAdapter {
     userMessage: string,
     contextJson: any,
   ): Promise<AiProviderResponse> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
-
-    if (!apiKey) {
-      throw new Error('Gemini API key is unconfigured');
-    }
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_AI_API_KEY ||
+      process.env.GOOGLE_API_KEY;
 
     const fullPrompt = `${systemPrompt}\n\n--- LISTING_CONTEXT (JSON) ---\n${JSON.stringify(
       contextJson,
@@ -23,43 +22,89 @@ export class GeminiAdapter implements AiProviderAdapter {
       2,
     )}\n\n--- KULLANICI MESAJI ---\n${userMessage}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    if (apiKey) {
+      // Models to try in sequence
+      const models = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: fullPrompt }],
+      for (const model of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [{ text: fullPrompt }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 1500,
+              },
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (candidateText && candidateText.trim().length > 10) {
+              return {
+                answer: candidateText.trim(),
+                rawResponse: data,
+                providerName: `${this.providerName} (${model})`,
+                tokenCount: data?.usageMetadata?.totalTokenCount || 0,
+              };
+            }
+          } else {
+            const errText = await response.text();
+            this.logger.warn(`Gemini model ${model} HTTP Error ${response.status}: ${errText}`);
+          }
+        } catch (err: any) {
+          this.logger.warn(`Gemini model ${model} call failed: ${err?.message || err}`);
+        }
+      }
+    }
+
+    // Try OpenAI fallback if OPENAI_API_KEY is available
+    const openAiApiKey = process.env.OPENAI_API_KEY;
+    if (openAiApiKey) {
+      try {
+        const url = 'https://api.openai.com/v1/chat/completions';
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${openAiApiKey}`,
           },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1200,
-        },
-      }),
-    });
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: fullPrompt },
+            ],
+            temperature: 0.3,
+            max_tokens: 1500,
+          }),
+        });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      this.logger.error(`Gemini API HTTP Error ${response.status}: ${errText}`);
-      throw new Error(`Gemini API error: ${response.status}`);
+        if (response.ok) {
+          const data = await response.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (content && content.trim().length > 10) {
+            return {
+              answer: content.trim(),
+              rawResponse: data,
+              providerName: 'OpenAI (gpt-4o-mini)',
+              tokenCount: data?.usage?.total_tokens || 0,
+            };
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(`OpenAI fallback in GeminiAdapter failed: ${e?.message || e}`);
+      }
     }
 
-    const data = await response.json();
-    const candidateText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!candidateText) {
-      throw new Error('Gemini API returned empty response candidates');
-    }
-
-    return {
-      answer: candidateText.trim(),
-      rawResponse: data,
-      providerName: this.providerName,
-      tokenCount: data?.usageMetadata?.totalTokenCount || 0,
-    };
+    throw new Error('All Gemini & OpenAI API endpoints failed or keys unconfigured.');
   }
 }
