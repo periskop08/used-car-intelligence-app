@@ -265,6 +265,7 @@ model User {
   clubPollVotes      ClubPollVote[]
   listingAiConversations ListingAiConversation[]
   aiQuotaUsages          AiQuotaUsage[]
+  assignedFeedbacks      Feedback[]                @relation("AssignedFeedbackAdmin")
 }
 
 model SubscriptionPlan {
@@ -1385,8 +1386,33 @@ model Message {
   @@index([conversationId])
 }
 
+enum FeedbackSource {
+  CLUB
+  LISTING_DETAIL
+  LISTING_MODERATION
+  VEHICLE_SEARCH
+  VEHICLE_COMPARISON
+  LISTING_AI_ADVISOR
+  CHATBOT
+  PAYMENT
+  MESSAGING
+  ACCOUNT
+  TECHNICAL_SUPPORT
+  OTHER
+}
+
 enum FeedbackCategory {
-  GENERAL_SUGGESTION
+  CLUB_MUTE_APPEAL
+  CLUB_BAN_APPEAL
+  COMMENT_MODERATION
+  LISTING_REJECT_APPEAL
+  LISTING_TECHNICAL
+  AI_RESPONSE_COMPLAINT
+  PAYMENT_PACKAGE
+  ACCOUNT_ACCESS
+  MESSAGING_ISSUE
+  GENERAL_TECHNICAL
+  SUGGESTION
   BUG_REPORT
   VEHICLE_QUERY_AI_REPORT
   INCORRECT_VEHICLE_DATA
@@ -1400,12 +1426,16 @@ enum FeedbackCategory {
   FIND_MY_CAR
   DESIGN_USABILITY
   SECURITY_SUSPICIOUS_ACTIVITY
+  GENERAL_SUGGESTION
   OTHER
 }
 
 enum FeedbackStatus {
   NEW
   IN_REVIEW
+  WAITING_USER_INFO
+  ASSIGNED
+  ACTION_TAKEN
   RESOLVED
   REJECTED
   ARCHIVED
@@ -1419,19 +1449,36 @@ enum FeedbackPriority {
 }
 
 model Feedback {
-  id              String           @id @default(uuid())
-  userId          String
-  subjectCategory FeedbackCategory
-  message         String           @db.Text
-  status          FeedbackStatus   @default(NEW)
-  priority        FeedbackPriority @default(NORMAL)
-  attachmentUrl   String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                  String           @id @default(uuid())
+  ticketNo            String?          @unique
+  userId              String
+  source              FeedbackSource   @default(OTHER)
+  subjectCategory     FeedbackCategory
+  referenceType       String?
+  referenceId         String?
+  message             String           @db.Text
+  status              FeedbackStatus   @default(NEW)
+  priority            FeedbackPriority @default(NORMAL)
+  attachmentUrl       String?
+  assignedAdminId     String?
+  assignedAdminName   String?
+  internalNote        String?          @db.Text
+  userResponse        String?          @db.Text
+  userResponseSentAt  DateTime?
+  userResponseSentBy  String?
+  userResponseChannel String?
+  auditTimeline       Json?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAdmin       User?            @relation("AssignedFeedbackAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([status])
+  @@index([source])
+  @@index([subjectCategory])
+  @@index([assignedAdminId])
 }
 
 enum SwipeAction {
