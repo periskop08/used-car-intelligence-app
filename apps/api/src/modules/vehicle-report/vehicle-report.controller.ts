@@ -27,4 +27,9 @@ export class VehicleReportController {
   async getCurrentListingReport(@Request() req: any, @Param('listingId') listingId: string) {
     return this.reportService.getCurrentListingReport(req.user.id, listingId);
   }
+
+  @Post(':reportId/upgrade-version')
+  async upgradeReportVersion(@Request() req: any, @Param('reportId') reportId: string) {
+    return this.reportService.upgradeReportVersion(req.user.id, reportId);
+  }
 }

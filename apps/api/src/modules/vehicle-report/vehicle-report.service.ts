@@ -316,4 +316,39 @@ export class VehicleReportService implements OnModuleInit {
       return null;
     }
   }
+
+  async upgradeReportVersion(userId: string, reportId: string) {
+    const existing = await this.getReportById(userId, reportId);
+    if (!existing) throw new NotFoundException('Rapor bulunamadı.');
+
+    let vehicleContext: any = {};
+    let listingContext: any = undefined;
+    if (existing.variantId) {
+      const vRes = await this.vehicleContextBuilder.buildVehicleContext(existing.variantId);
+      vehicleContext = vRes.vehicleContext;
+    }
+    if (existing.listingId) {
+      const lRes = await this.listingContextBuilder.buildListingContext(existing.listingId);
+      listingContext = lRes.listingContext;
+    }
+
+    const upgradedPayload = this.fallbackService.generateFallbackReport(
+      existing.idempotencyKey,
+      existing.mode as any,
+      vehicleContext,
+      listingContext,
+    );
+
+    const updated = await this.prisma.generatedVehicleReport.update({
+      where: { id: reportId },
+      data: {
+        schemaVersion: 2,
+        reportData: upgradedPayload as any,
+        status: VehicleReportStatus.COMPLETED,
+        completedAt: new Date(),
+      },
+    });
+
+    return updated;
+  }
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
+import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import { 
   ShieldCheck, 
   AlertTriangle, 
@@ -164,6 +165,47 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         </div>
       </div>
 
+      {/* Legacy Schema Version Warning & Free Upgrade Banner */}
+      {(!report.expertDecisionSynthesis || (report.schemaVersion || 1) < 2) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-300">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>
+              <strong>Bu rapor eski formatta hazırlanmıştır.</strong> Derin otomotiv uzman karar sentezini görmek için raporunuzu ücretsiz güncelleyebilirsiniz.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
+              if (!token) return;
+              try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/vehicle-reports/${report.reportId}/upgrade-version`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.ok && onRefresh) {
+                  onRefresh();
+                }
+              } catch (e) {
+                console.error("Upgrade error", e);
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-md transition shrink-0 cursor-pointer"
+          >
+            Sürüm Yükselt (Ücretsiz)
+          </button>
+        </div>
+      )}
+
+      {/* DERİN UZMAN KARAR SENTEZİ BÖLÜMÜ (Expert Decision Synthesis) */}
+      {report.expertDecisionSynthesis && (
+        <VehicleReportExpertSynthesis 
+          synthesis={report.expertDecisionSynthesis} 
+          supportingFacts={report.dataQuality.supportingFacts} 
+        />
+      )}
+
       {/* Navigation Bar for Desktop Tabs */}
       <div className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
         {Object.entries(categoryLabels).map(([key, label]) => {
@@ -267,10 +309,10 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 )}
 
                 {/* Contradiction Warnings */}
-                {report.listingAnalysis.contradictions?.length > 0 && (
+                {((report.listingAnalysis.contradictionFlags?.length || 0) > 0 || (report.listingAnalysis.contradictions?.length || 0) > 0) && (
                   <div className="space-y-2">
                     <span className="font-bold text-rose-400 block">⚡ İlan Çelişki Uyarısı</span>
-                    {report.listingAnalysis.contradictions.map((c, idx) => (
+                    {(report.listingAnalysis.contradictionFlags || report.listingAnalysis.contradictions || []).map((c, idx) => (
                       <div key={idx} className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl">
                         <span className="font-bold text-rose-300 block">{c.title}</span>
                         <span>{c.explanation}</span>
@@ -280,14 +322,16 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 )}
 
                 {/* Damage & Paint Assessment */}
-                <div className="p-3 bg-slate-800/40 border border-slate-700/40 rounded-xl space-y-1">
-                  <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
-                  <ul className="list-disc list-inside space-y-1">
-                    {report.listingAnalysis.damageAssessment.map((d, idx) => (
-                      <li key={idx}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
+                {report.listingAnalysis.damageAssessment && report.listingAnalysis.damageAssessment.length > 0 && (
+                  <div className="p-3 bg-slate-800/40 border border-slate-700/40 rounded-xl space-y-1">
+                    <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
+                    <ul className="list-disc list-inside space-y-1">
+                      {report.listingAnalysis.damageAssessment.map((d, idx) => (
+                        <li key={idx}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -98,155 +98,118 @@ export interface PerformanceUsageSection {
   zeroToHundredKmh?: number;
   topSpeedKmh?: number;
   curbWeightKg?: number;
-  powerToWeightRatioHpPerTon?: number;
-  officialFuelConsumptionL100km?: number;
-  bootVolumeLiters?: number;
-  seatingCapacity?: number;
-  drivingCharacter?: string;
-  comfortAssessment?: string;
-  handlingAssessment?: string;
-  maneuverabilityAssessment?: string;
+  combinedFuelL100km?: number;
+  cityFuelL100km?: number;
+  highwayFuelL100km?: number;
+  trunkCapacityLiters?: number;
+  assessment?: string;
   supportingFactIds: string[];
-  missingDataNotes: string[];
 }
 
 export interface CommonProblemReportItem {
-  id: string;
+  id?: string;
+  problemId?: string;
   title: string;
-  affectedSystem: string;
-  description: string;
-  frequency: 'RARE' | 'OCCASIONAL' | 'COMMON' | 'VERY_COMMON' | 'UNKNOWN';
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  detectability: 'EASY' | 'MODERATE' | 'DIFFICULT' | 'UNKNOWN';
-  typicalMileageRange?: {
-    min?: number;
-    max?: number;
-  };
+  system: string;
+  severity: 'DÜŞÜK' | 'ORTA' | 'YÜKSEK' | 'KRİTİK';
+  description?: string;
   symptoms: string[];
-  diagnosisSteps: string[];
-  preventiveActions: string[];
-  repairCostLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH' | 'UNKNOWN';
-  estimatedCostMin?: number;
-  estimatedCostMax?: number;
-  currency?: string;
-  evidenceConfidence: 'LOW' | 'MEDIUM' | 'HIGH';
-  evidenceSummary?: string;
+  causeExplanation?: string;
+  preventionAdvice?: string;
+  inspectionStep?: string;
+  diagnosisSteps?: string[];
+  verificationSource?: string;
   supportingFactIds: string[];
 }
 
 export interface RecallReportItem {
-  id: string;
-  title: string;
-  description: string;
-  safetyImpact: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNKNOWN';
-  affectedYears?: string;
-  affectedMarkets?: string[];
+  id?: string;
+  recallId?: string;
   campaignCode?: string;
-  verificationInstruction: string;
-  evidenceConfidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  title: string;
+  riskDescription: string;
+  remedyDescription?: string;
+  affectedUnitsNotice?: string;
   supportingFactIds: string[];
 }
 
 export interface MaintenanceOwnershipSection {
-  periodicMaintenanceIntervalKm?: number;
-  periodicMaintenanceIntervalMonths?: number;
-  oilAndFluidReqs?: string;
-  transmissionMaintenance?: string;
-  timingBeltChainInfo?: string;
-  brakesTiresCostLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
-  suspensionPartsCostLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
-  fuelCostAssessment?: string;
-  resaleAssessment?: string;
-  totalOwnershipAssessment?: string;
-  missingCostDataNotes: string[];
-  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  periodicIntervalKm?: number;
+  periodicIntervalMonths?: number;
+  estimatedAnnualCostCategory?: 'DÜŞÜK' | 'ORTA' | 'YÜKSEK' | 'BİLİNMİYOR';
+  criticalMaintenanceNotes: string[];
   supportingFactIds: string[];
 }
 
 export interface UsageScenarioResult {
-  key: string;
-  label: string;
-  suitability: 'SUITABLE' | 'PARTIALLY_SUITABLE' | 'NOT_SUITABLE' | 'INSUFFICIENT_DATA';
-  explanation: string;
+  scenarioKey: string;
+  title: string;
+  suitability: 'MÜKEMMEL' | 'UYGUN' | 'KISMEN_UYGUN' | 'UYGUN_DEĞİL';
+  reasoning: string;
   supportingFactIds: string[];
 }
 
 export interface PrePurchaseCheckItem {
-  id: string;
-  category: string;
+  checkId: string;
+  category: 'MEKANİK' | 'KAPORTA' | 'ELEKTRONİK' | 'BELGE' | 'SÜRÜŞ' | 'İLAN_ÇELİŞKİSİ';
   title: string;
   instruction: string;
-  reason: string;
-  priority: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
-  relatedProblemIds?: string[];
-  isListingSpecific?: boolean;
-}
-
-export interface SellerQuestionItem {
-  id: string;
-  category: string;
-  question: string;
-  reason: string;
-  priority: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
-  isListingSpecific?: boolean;
-}
-
-export interface ListingMissingField {
-  fieldKey: string;
-  fieldLabel: string;
-  importance: 'MEDIUM' | 'HIGH';
-}
-
-export interface ListingContradiction {
-  code: string;
-  severity: 'INFO' | 'WARNING' | 'CRITICAL';
-  title: string;
-  explanation: string;
-  affectedFields: string[];
-}
-
-export interface MileageAgeAnalysis {
-  listingYear: number;
-  listingMileageKm: number;
-  calculatedAgeYears: number;
-  estimatedAnnualKmRange: string;
-  intensityCategory: 'LOW' | 'BALANCED' | 'HIGH' | 'VERY_HIGH';
-  assessment: string;
-  isApproximateNotice: string;
+  priority: 'NORMAL' | 'ÖNEMLİ' | 'KRİTİK';
+  targetComponent?: string;
   supportingFactIds: string[];
 }
 
-export interface ListingPriceAssessment {
-  status: 'AVAILABLE' | 'INSUFFICIENT_DATA' | 'STALE_DATA' | 'VARIANT_MISMATCH';
-  listingPrice: number;
-  currency: string;
-  marketMedian?: number;
-  lowerQuartile?: number;
-  upperQuartile?: number;
-  sampleSize?: number;
-  assessment?: 'BELOW_RANGE' | 'IN_RANGE' | 'ABOVE_RANGE';
-  explanation: string;
-  dataUpdatedAt?: string;
+export interface SellerQuestionItem {
+  questionId: string;
+  category: 'BAKIM' | 'HASAR' | 'KULLANIM' | 'BELGE' | 'ÇELİŞKİ';
+  questionText: string;
+  expectedAnswerHint?: string;
+  redFlagAnswerHint?: string;
+  supportingFactIds: string[];
 }
 
-export interface PhotoMetadataAssessment {
-  totalPhotoCount: number;
-  approvedPhotoCount: number;
-  rejectedPhotoCount: number;
-  notice: string;
+export interface ListingContradiction {
+  flagKey?: string;
+  code?: string;
+  severity: 'DÜŞÜK' | 'ORTA' | 'YÜKSEK' | 'KRİTİK' | 'WARNING' | 'CRITICAL';
+  title: string;
+  explanation: string;
+  affectedFields?: string[];
+  supportingFactIds?: string[];
+}
+
+export interface MileageAgeAnalysis {
+  listingYear?: number;
+  listingMileageKm?: number;
+  calculatedAgeYears?: number;
+  annualAverageKm?: number;
+  vehicleAgeYears?: number;
+  estimatedAnnualKmRange?: string;
+  category?: 'ÇOK_DÜŞÜK' | 'DÜŞÜK' | 'NORMAL' | 'YÜKSEK' | 'ÇOK_YÜKSEK';
+  intensityCategory?: 'LOW' | 'BALANCED' | 'HIGH' | 'VERY_HIGH';
+  assessment: string;
+  isApproximateNotice?: string;
+  supportingFactIds?: string[];
 }
 
 export interface ListingAnalysisSection {
-  listingSummary: string;
-  listingStrengths: string[];
-  listingRisks: string[];
-  missingFields: ListingMissingField[];
-  contradictions: ListingContradiction[];
+  listingId: string;
+  publicListingNo?: string;
+  title: string;
+  priceAmount: number;
+  priceCurrency: string;
+  declaredKilometers: number;
+  declaredYear: number;
+  sellerType: string;
+  tramerAmount?: number;
+  paintedPartsCount?: number;
+  changedPartsCount?: number;
+  sellerDescriptionSanitized?: string;
+  listingSummary?: string;
   mileageAgeAnalysis?: MileageAgeAnalysis;
-  sellerDeclarationAssessment: string[];
-  damageAssessment: string[];
-  priceAssessment?: ListingPriceAssessment;
-  photoAssessment?: PhotoMetadataAssessment;
+  damageAssessment?: string[];
+  contradictionFlags: ListingContradiction[];
+  contradictions?: ListingContradiction[];
   listingDataQuality: string;
   listingSpecificChecks: PrePurchaseCheckItem[];
   listingSpecificQuestions: SellerQuestionItem[];
@@ -278,6 +241,80 @@ export interface ReportDataQualitySection {
   supportingFacts: ReportSupportingFact[];
 }
 
+// Expert Decision Synthesis Types
+export interface ExpertSynthesisItem {
+  title: string;
+  explanation: string;
+  supportingFactIds: string[];
+}
+
+export interface UserProfileAssessment {
+  profile: string;
+  explanation: string;
+  supportingFactIds: string[];
+}
+
+export interface PurchaseCondition {
+  condition: string;
+  reason: string;
+  priority: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
+  supportingFactIds: string[];
+}
+
+export interface UnavailableClaimItem {
+  key: string;
+  label: string;
+  explanation: string;
+}
+
+export interface TechnicalRiskSummary {
+  title: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  explanation: string;
+  symptoms: string[];
+  inspectionInstructions: string[];
+  riskMeaning?: string;
+  supportingFactIds: string[];
+}
+
+export interface ExpertDecisionSynthesis {
+  vehicleCharacter: {
+    headline: string;
+    detailedAssessment: string;
+    supportingFactIds: string[];
+  };
+
+  dailyUseAssessment: {
+    cityUse?: string;
+    highwayUse?: string;
+    trafficBehavior?: string;
+    comfortAssessment?: string;
+    practicalityAssessment?: string;
+    supportingFactIds: string[];
+  };
+
+  strongestReasonsToChoose: ExpertSynthesisItem[];
+  compromisesAndLimitations: ExpertSynthesisItem[];
+
+  suitableFor: UserProfileAssessment[];
+  notSuitableFor: UserProfileAssessment[];
+
+  primaryTechnicalRisk?: TechnicalRiskSummary;
+  secondaryTechnicalRisks?: TechnicalRiskSummary[];
+
+  purchaseConditions: PurchaseCondition[];
+  walkAwayConditions: PurchaseCondition[];
+
+  finalConditionalVerdict: {
+    shortVerdict: string;
+    detailedVerdict: string;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    supportingFactIds: string[];
+  };
+
+  unavailableClaims: UnavailableClaimItem[];
+}
+
 export interface ComprehensiveVehicleReport {
   reportId: string;
   mode: VehicleReportMode;
@@ -289,6 +326,8 @@ export interface ComprehensiveVehicleReport {
   vehicleIdentity: VehicleIdentitySection;
   executiveSummary: ExecutiveSummarySection;
   scoring: VehicleReportScores;
+
+  expertDecisionSynthesis?: ExpertDecisionSynthesis;
 
   engineTransmission: EngineTransmissionSection;
   performanceUsage: PerformanceUsageSection;
@@ -310,6 +349,7 @@ export interface ComprehensiveVehicleReport {
   vehicleContextHash: string;
   listingContextHash?: string;
   reportVersion: string;
+  schemaVersion?: number;
   modeLabel: string;
   staleReasons?: string[];
 }
