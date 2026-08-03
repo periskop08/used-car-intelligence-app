@@ -34,8 +34,8 @@ export class OpenAiAdapter implements AiProviderAdapter {
       body: JSON.stringify({
         model: process.env.LISTING_AI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: fullPrompt }],
-        temperature: 0.2,
-        max_tokens: 1200,
+        temperature: 0.3,
+        max_tokens: 3500,
       }),
     });
 

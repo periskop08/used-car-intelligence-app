@@ -40,7 +40,7 @@ export class GeminiAdapter implements AiProviderAdapter {
               ],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 1500,
+                maxOutputTokens: 3500,
               },
             }),
           });
@@ -84,7 +84,7 @@ export class GeminiAdapter implements AiProviderAdapter {
               { role: 'user', content: fullPrompt },
             ],
             temperature: 0.3,
-            max_tokens: 1500,
+            max_tokens: 3500,
           }),
         });
 
