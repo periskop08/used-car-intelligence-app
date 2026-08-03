@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { AiReportGeneratorService } from '../research/ai-report-generator.service';
 import * as crypto from 'crypto';
 
 export interface ListingAiContextWarning {
@@ -51,6 +52,15 @@ export interface ListingAiContext {
     serviceHistoryDeclared?: string;
     inspectionDeclared?: string;
   };
+  verifiedDatabaseVehicleReport?: {
+    reportId?: string;
+    riskScore?: number;
+    buyabilityScore?: number;
+    biggestRisks?: any;
+    sellerQuestions?: any;
+    inspectionChecklist?: any;
+    summary?: any;
+  };
   knownDatabaseProblems?: Array<{ title: string; description: string; riskLevel?: string }>;
   knownDatabaseRecalls?: Array<{ title: string; description: string }>;
   sellerDescriptionFormatted?: string;
@@ -65,7 +75,12 @@ export interface ListingAiContext {
 
 @Injectable()
 export class ListingAiContextBuilderService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ListingAiContextBuilderService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private aiReportGeneratorService: AiReportGeneratorService,
+  ) {}
 
   async buildContext(listingId: string): Promise<ListingAiContext> {
     const listing = await this.prisma.vehicleListing.findUnique({
@@ -80,7 +95,7 @@ export class ListingAiContextBuilderService {
             transmission: true,
             trim: true,
             problems: { where: { status: 'APPROVED' } },
-            recalls: true,
+            recalls: { where: { status: 'APPROVED' } },
           },
         },
         media: { select: { id: true } },
@@ -102,7 +117,43 @@ export class ListingAiContextBuilderService {
     // Fetch Database Problems & Recalls
     let knownDatabaseProblems: Array<{ title: string; description: string; riskLevel?: string }> = [];
     let knownDatabaseRecalls: Array<{ title: string; description: string }> = [];
+    let verifiedDatabaseVehicleReport: any = null;
 
+    // 1. Check or Generate Verified DB Report Cache for Variant
+    if (listing.vehicleVariantId) {
+      try {
+        let existingReport = await this.prisma.aiVehicleReport.findUnique({
+          where: {
+            variantId_languageCode: {
+              variantId: listing.vehicleVariantId,
+              languageCode: 'tr',
+            },
+          },
+        });
+
+        // Auto-generate report in database if missing
+        if (!existingReport) {
+          this.logger.log(`No DB report cache for variant ${listing.vehicleVariantId}. Auto-generating report cache in database...`);
+          existingReport = await this.aiReportGeneratorService.generateReportCache(listing.vehicleVariantId, 'tr');
+        }
+
+        if (existingReport) {
+          verifiedDatabaseVehicleReport = {
+            reportId: existingReport.id,
+            riskScore: existingReport.riskScore,
+            buyabilityScore: existingReport.buyabilityScore,
+            biggestRisks: existingReport.biggestRisks,
+            sellerQuestions: existingReport.sellerQuestions,
+            inspectionChecklist: existingReport.inspectionChecklist,
+            summary: existingReport.summary,
+          };
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to fetch or generate DB report cache: ${err?.message || err}`);
+      }
+    }
+
+    // 2. Fetch Variant Problems if available
     if (listing.vehicleVariant?.problems && listing.vehicleVariant.problems.length > 0) {
       knownDatabaseProblems = listing.vehicleVariant.problems.map((p) => ({
         title: p.title,
@@ -117,7 +168,7 @@ export class ListingAiContextBuilderService {
       }));
     }
 
-    // Fallback: If no variant linked, search database by brand/model for chronic problems
+    // 3. Fallback: Search DB by Brand/Model if custom model
     if (knownDatabaseProblems.length === 0 && (model || brand)) {
       try {
         const matchingProblems = await this.prisma.commonProblem.findMany({
@@ -201,6 +252,7 @@ export class ListingAiContextBuilderService {
       missingFields: missingFields.sort(),
       description: safeDescription.trim(),
       updatedAt: listing.updatedAt.toISOString(),
+      reportId: verifiedDatabaseVehicleReport?.reportId || '',
     };
 
     const sortedKeysJson = JSON.stringify(canonicalObject, Object.keys(canonicalObject).sort());
@@ -236,6 +288,7 @@ export class ListingAiContextBuilderService {
         heavyDamageDeclared: listing.heavyDamage,
         warrantyDeclared: listing.hasWarranty,
       },
+      verifiedDatabaseVehicleReport,
       knownDatabaseProblems,
       knownDatabaseRecalls,
       sellerDescriptionFormatted,

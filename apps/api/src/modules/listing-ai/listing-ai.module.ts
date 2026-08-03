@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { ResearchModule } from '../research/research.module';
 import { ListingAiController } from './listing-ai.controller';
 import { ListingAiService } from './listing-ai.service';
 import { ListingAiContextBuilderService } from './listing-ai-context-builder.service';
@@ -12,6 +13,7 @@ import { OpenAiAdapter } from './adapters/openai.adapter';
 import { SafeFallbackAdapter } from './adapters/safe-fallback.adapter';
 
 @Module({
+  imports: [ResearchModule],
   controllers: [ListingAiController],
   providers: [
     PrismaService,
