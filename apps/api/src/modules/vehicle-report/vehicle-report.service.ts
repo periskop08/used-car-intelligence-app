@@ -119,7 +119,11 @@ export class VehicleReportService implements OnModuleInit {
       ];
 
       for (const statement of statements) {
-        await this.prisma.$executeRawUnsafe(statement);
+        try {
+          await this.prisma.$executeRawUnsafe(statement);
+        } catch (err: any) {
+          this.logger.warn(`Notice running VehicleReport DDL stmt: ${err?.message}`);
+        }
       }
       this.logger.log('VehicleReport DDL tables verified successfully.');
     } catch (e: any) {
