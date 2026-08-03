@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import QuotaBadge from "@/components/QuotaBadge";
+import VehicleReportShell from "../../vehicle-report/components/VehicleReportShell";
+import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -160,12 +162,69 @@ export default function VehicleDetail() {
     }
   }, []);
 
+  // Structured Vehicle Report State (New Engine)
+  const [structuredReport, setStructuredReport] = useState<ComprehensiveVehicleReport | null>(null);
+  const [loadingStructuredReport, setLoadingStructuredReport] = useState<boolean>(false);
+
+  const fetchStructuredReport = async () => {
+    if (!variantId) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    setLoadingStructuredReport(true);
+    try {
+      const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.reportData) {
+          setStructuredReport(data.reportData);
+          setLoadingStructuredReport(false);
+          return;
+        }
+      }
+
+      const genRes = await fetch(`${API_URL}/vehicle-reports`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          mode: "VEHICLE_REPORT",
+          variantId,
+          idempotencyKey: `vr_${variantId}_${Date.now()}`,
+        }),
+      });
+      if (genRes.ok) {
+        const genData = await genRes.json();
+        if (genData && genData.reportId) {
+          const detailRes = await fetch(`${API_URL}/vehicle-reports/${genData.reportId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            if (detailData && detailData.reportData) {
+              setStructuredReport(detailData.reportData);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Fetch structured vehicle report error", e);
+    } finally {
+      setLoadingStructuredReport(false);
+    }
+  };
+
   useEffect(() => {
     if (variantId) {
       fetchVehicleDetails(variantId);
       // Automatically load the AI report on page mount if logged in
       const token = localStorage.getItem("accessToken");
       if (token) {
+        fetchStructuredReport();
         handleGenerateReport(false);
       }
     }
@@ -509,184 +568,27 @@ export default function VehicleDetail() {
         {/* Specs, Problems & Reviews Column */}
         <div className="lg:col-span-2 flex flex-col gap-8">
           
-          {/* AI Report Card (Google AI Overview Style) */}
-          <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-6 rounded-3xl flex flex-col gap-5 shadow-orange-500/5 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
-            
-            <div className="flex items-center justify-between border-b border-white/5 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">✨</span>
-                <h2 className="text-sm font-black text-slate-100 uppercase tracking-wider">Yapay Zeka Genel Değerlendirmesi</h2>
-              </div>
-              <span className="text-[9px] bg-orange-600/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
-                Google AI Overview Modu
-              </span>
+          {/* AI Report Card (TorqueScout Vehicle Report Shell) */}
+          {structuredReport ? (
+            <VehicleReportShell 
+              report={structuredReport} 
+              onRefresh={fetchStructuredReport} 
+              isRefreshing={loadingStructuredReport} 
+            />
+          ) : (
+            <div className="bg-slate-900/60 border border-slate-800 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4">
+              <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                Bu araç hakkında karar odaklı, avantajları, dezavantajları ve kronik sorunları kapsayan detaylı TorqueScout AI Uzman Karar Sentezi raporunu oluşturun.
+              </p>
+              <button
+                onClick={fetchStructuredReport}
+                disabled={loadingStructuredReport}
+                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl transition text-sm shadow-lg shadow-orange-500/20"
+              >
+                {loadingStructuredReport ? "Rapor Oluşturuluyor..." : "Araç AI Raporunu Oluştur"}
+              </button>
             </div>
-
-            {reportError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold">
-                ⚠️ {reportError}
-              </div>
-            )}
-
-            {countdown !== null ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center gap-5">
-                <div className="relative flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
-                  <div className="absolute text-lg font-black text-orange-500">{countdown}</div>
-                </div>
-                <div className="flex flex-col gap-2 max-w-md">
-                  <h3 className="text-sm font-bold text-slate-200 animate-pulse">Yapay Zeka Analizi Hazırlanıyor...</h3>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Bu araç varyantı platformda ilk defa analiz ediliyor. Web taraması, kronik hata arşivleri ve geri çağırma listeleri taranıyor. Lütfen bekleyin, raporunuz hazırlanıyor...
-                  </p>
-                </div>
-                {/* Road and Driving Car Animation */}
-                <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
-                  <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
-                      style={{ width: `${((30 - countdown) / 30) * 100}%` }}
-                    ></div>
-                  </div>
-                  <div 
-                    className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
-                    style={{ 
-                      left: `calc(${((30 - countdown) / 30) * 100}% - 14px)`,
-                      transform: 'scaleX(-1)'
-                    }}
-                  >
-                    🚗
-                  </div>
-                </div>
-              </div>
-            ) : !aiReport ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
-                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                  Bu araç hakkında karar odaklı, avantajları, dezavantajları ve sık karşılaşılan durumları taranmış yapay zeka analiz raporunu derleyin.
-                </p>
-                <button
-                  onClick={() => handleGenerateReport(false)}
-                  disabled={generatingReport}
-                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl transition text-center text-sm"
-                >
-                  {generatingReport ? "Rapor Oluşturuluyor..." : "AI Raporu Oluştur"}
-                </button>
-              </div>
-            ) : aiReport.finalDecision === 'INSUFFICIENT_DATA' ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center gap-4">
-                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl max-w-md">
-                  <span className="text-2xl mb-2 block">⚠️</span>
-                  <span className="text-xs font-bold text-amber-400 block mb-1">Analiz Tamamlanamadı</span>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Yapay zekamız web taramalarını tamamladı ancak bu araç varyantına dair yeterli miktarda doğrulanmış kronik hata veya servis kaydı bulamadı. Tekrar denemek için güncelleyebilirsiniz.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleGenerateReport(true)}
-                  disabled={generatingReport}
-                  className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-xl transition text-center text-xs"
-                >
-                  {generatingReport ? "Yenileniyor..." : "Yeniden Analiz Et"}
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-5">
-                {/* Trim Package Compatibility Warning */}
-                {aiReport.summary.trimWarning && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-start gap-3">
-                    <span className="text-xl">⚠️</span>
-                    <div className="flex-1">
-                      <span className="font-bold text-amber-400 block mb-1 text-xs">Donanım Paketi Uyumsuzluğu Uyarısı:</span>
-                      <p className="text-[11px] text-slate-300 leading-relaxed">
-                        {aiReport.summary.trimWarning}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Score indicators */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-center">
-                    <span className="text-[10px] text-emerald-500 font-bold block mb-0.5">ALINABİLİRLİK</span>
-                    <span className="text-2xl font-black text-emerald-400">
-                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.buyabilityScore}`}
-                    </span>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-center">
-                    <span className="text-[10px] text-red-500 font-bold block mb-0.5">RİSK KATSAYISI</span>
-                    <span className="text-2xl font-black text-red-400">
-                      {aiReport.finalDecision === 'INSUFFICIENT_DATA' ? 'N/A' : `%${aiReport.riskScore}`}
-                    </span>
-                  </div>
-                  <div className="bg-slate-900/60 border border-white/5 p-4 rounded-2xl text-center flex flex-col justify-center h-full">
-                    <span className="text-[10px] text-slate-400 font-bold block mb-0.5">FİNAL KARAR</span>
-                    <span className={`text-xs font-black px-2 py-1 rounded font-mono border ${
-                      aiReport.finalDecision === 'BUY' 
-                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
-                        : aiReport.finalDecision === 'BUY_CAREFULLY' 
-                        ? 'bg-blue-500/20 border-blue-500/30 text-blue-400' 
-                        : aiReport.finalDecision === 'RISKY' 
-                        ? 'bg-amber-500/20 border-amber-500/30 text-amber-400' 
-                        : aiReport.finalDecision === 'AVOID' 
-                        ? 'bg-red-500/20 border-red-500/30 text-red-400' 
-                        : 'bg-slate-800 border-white/10 text-slate-400'
-                    }`}>
-                      {aiReport.finalDecision === 'BUY' 
-                        ? 'ALINIR' 
-                        : aiReport.finalDecision === 'BUY_CAREFULLY' 
-                        ? 'KONTROLLÜ ALINIR' 
-                        : aiReport.finalDecision === 'RISKY' 
-                        ? 'RİSKLİ' 
-                        : aiReport.finalDecision === 'AVOID' 
-                        ? 'ÖNERİLMEZ' 
-                        : 'VERİ YETERSİZ'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Score Explanations Legend */}
-                <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 text-[11px] text-slate-400 leading-relaxed">
-                  <span className="font-bold text-slate-300 block mb-1">💡 Skorlar Nasıl Yorumlanmalı?</span>
-                  <p className="mb-1">
-                    Yapay zekamız, bu araca ait onaylanmış durum sıklığı, yedek parça maliyetleri ve servis bültenlerine dayanarak iki ana kriter hesaplar:
-                  </p>
-                  <ul className="list-disc pl-4 flex flex-col gap-1 mt-1 text-[10px]">
-                    <li><strong>Alınabilirlik Oranı:</strong> Aracın genel sorunsuzluk seviyesi ve piyasadaki tercih edilebilirlik tavsiyesidir. Yüksek olması iyidir.</li>
-                    <li><strong>Risk Katsayısı:</strong> Aracın size uzun vadede açabileceği ağır arıza olasılığını ve maliyet risklerini temsil eder. Düşük olması iyidir.</li>
-                  </ul>
-                </div>
-
-                {/* Structured Markdown comments */}
-                <div className="flex flex-col gap-4 text-xs text-slate-300">
-                  <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 flex flex-col gap-3">
-                    {renderMarkdown(aiReport.summary.summary)}
-                  </div>
-                  
-                  {aiReport.summary.shouldBuyComment && (
-                    <div className="bg-orange-500/[0.03] border border-orange-500/10 p-4 rounded-2xl flex items-start gap-3">
-                      <span className="text-lg">💡</span>
-                      <div className="flex-1">
-                        <span className="font-bold text-orange-400 block mb-1">Satın Alma Tavsiyesi ve Karar Gerekçesi:</span>
-                        {renderMarkdown(aiReport.summary.shouldBuyComment)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Regenerate Action */}
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={() => handleGenerateReport(true)}
-                    disabled={generatingReport}
-                    className="bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl transition text-center text-xs"
-                  >
-                    {generatingReport ? "Yenileniyor..." : "Analizi Güncelle"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Tech Specs */}
           <div className="glass p-6 rounded-2xl flex flex-col gap-4">

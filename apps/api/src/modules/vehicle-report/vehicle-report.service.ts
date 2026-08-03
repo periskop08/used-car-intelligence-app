@@ -162,6 +162,22 @@ export class VehicleReportService implements OnModuleInit {
       vehicleContext = vRes.vehicleContext;
       vehicleContextHash = vRes.vehicleContextHash;
 
+      // Check DB for existing vehicle report for this variant to reuse vehicle insights
+      try {
+        const existingVariantReport = await this.prisma.generatedVehicleReport.findFirst({
+          where: {
+            variantId: variantId!,
+            status: { in: [VehicleReportStatus.COMPLETED, VehicleReportStatus.SAFE_FALLBACK] },
+          },
+          orderBy: { completedAt: 'desc' },
+        });
+        if (existingVariantReport && existingVariantReport.reportData) {
+          vehicleContext.existingReportData = existingVariantReport.reportData;
+        }
+      } catch (dbErr) {
+        this.logger.warn(`Existing variant report lookup notice: ${dbErr}`);
+      }
+
       const fullContextHash = crypto
         .createHash('sha256')
         .update(`${vehicleContextHash}_${listingContextHash || ''}`)

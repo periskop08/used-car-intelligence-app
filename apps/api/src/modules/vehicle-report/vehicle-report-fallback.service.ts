@@ -343,6 +343,28 @@ export class VehicleReportFallbackService {
         disclaimer: 'Bu rapor TorqueScout doğrulanmış veritabanı kayıtları esas alınarak üretilmiştir.',
         supportingFacts,
       },
+
+      listingAnalysis: mode === 'LISTING_REPORT' && listingContext ? {
+        listingId: listingContext.listingId,
+        publicListingNo: listingContext.publicListingNo,
+        title: listingContext.title || carTitle,
+        priceAmount: listingContext.priceAmount || 0,
+        priceCurrency: listingContext.priceCurrency || 'TRY',
+        declaredKilometers: listingContext.kilometers || 0,
+        declaredYear: listingContext.modelYear || 0,
+        sellerType: listingContext.sellerType || 'Bireysel',
+        tramerAmount: listingContext.tramerAmount,
+        paintedPartsCount: listingContext.paintedParts?.length || 0,
+        changedPartsCount: listingContext.changedParts?.length || 0,
+        sellerDescriptionSanitized: listingContext.sellerDescriptionWrapped,
+        listingSummary: `İlandaki ${listingContext.modelYear || ''} ${carTitle} (${listingContext.kilometers?.toLocaleString('tr-TR')} km) aracı veritabanı kayıtları ve ilan parametreleriyle incelenmiştir.`,
+        mileageAgeAnalysis: mileageAnalysis,
+        contradictionFlags: contradictions,
+        contradictions,
+        listingDataQuality: 'YÜKSEK',
+        listingSpecificChecks: [],
+        listingSpecificQuestions: [],
+      } : undefined,
     };
   }
 }
