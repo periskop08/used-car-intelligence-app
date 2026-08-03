@@ -44,10 +44,6 @@ export class ListingAiQuotaService {
       user?.role === Role.SUPER_ADMIN ||
       (user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
 
-    if (isUnlimited) {
-      return { unlimited: true };
-    }
-
     const tier = user?.subscriptionTier || SubscriptionTier.FREE;
     let limit = 3;
     switch (tier) {
@@ -67,9 +63,20 @@ export class ListingAiQuotaService {
         break;
     }
 
+    if (isUnlimited) {
+      return {
+        unlimited: true,
+        limit,
+        reportQuota: { limit, used: 0, remaining: 999999 },
+        chatbotQuota: { limit, used: 0, remaining: 999999 },
+        used: 0,
+        remaining: 999999,
+      };
+    }
+
     await this.cleanupStaleReservations();
 
-    const used = await this.prisma.aiQuotaUsage.count({
+    const reportUsed = await this.prisma.aiQuotaUsage.count({
       where: {
         userId,
         feature: AiQuotaFeature.LISTING_AI_ADVISOR,
@@ -77,17 +84,33 @@ export class ListingAiQuotaService {
       },
     });
 
-    const remaining = Math.max(0, limit - used);
+    const chatbotUsed = await this.prisma.aiQuotaUsage.count({
+      where: {
+        userId,
+        feature: AiQuotaFeature.GENERAL_CHATBOT,
+        status: { in: [AiQuotaUsageStatus.CONSUMED, AiQuotaUsageStatus.RESERVED] },
+      },
+    });
 
     return {
       unlimited: false,
       limit,
-      used,
-      remaining,
+      reportQuota: {
+        limit,
+        used: reportUsed,
+        remaining: Math.max(0, limit - reportUsed),
+      },
+      chatbotQuota: {
+        limit,
+        used: chatbotUsed,
+        remaining: Math.max(0, limit - chatbotUsed),
+      },
+      used: reportUsed,
+      remaining: Math.max(0, limit - reportUsed),
     };
   }
 
-  async reserveQuota(userId: string, idempotencyKey: string, referenceId?: string) {
+  async reserveQuota(userId: string, idempotencyKey: string, referenceId?: string, feature: AiQuotaFeature = AiQuotaFeature.LISTING_AI_ADVISOR) {
     await this.cleanupStaleReservations();
 
     // Check if idempotencyKey already exists
@@ -99,36 +122,41 @@ export class ListingAiQuotaService {
       return {
         reserved: true,
         quotaUsageId: existing.id,
-        existing,
       };
     }
 
-    const quotaInfo = await this.getQuota(userId);
-    if (!quotaInfo.unlimited && quotaInfo.remaining! <= 0) {
-      throw new ForbiddenException({
-        statusCode: 403,
-        code: 'QUOTA_EXHAUSTED',
-        message: 'Chatbot kullanım hakkınız doldu. Lütfen paketinizi yükseltin.',
-      });
+    const quota = await this.getQuota(userId);
+    if (!quota.unlimited) {
+      const remaining = feature === AiQuotaFeature.GENERAL_CHATBOT 
+        ? quota.chatbotQuota.remaining 
+        : quota.reportQuota.remaining;
+
+      if (remaining <= 0) {
+        throw new ForbiddenException(
+          feature === AiQuotaFeature.GENERAL_CHATBOT
+            ? 'AI Chatbot mesaj hakkınız dolmuştur. Lütfen paketinizi yükseltin.'
+            : 'Araç Raporu alma hakkınız dolmuştur. Lütfen paketinizi yükseltin.'
+        );
+      }
     }
 
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min reservation expiration
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins TTL
 
-    const reservation = await this.prisma.aiQuotaUsage.create({
+    const reserved = await this.prisma.aiQuotaUsage.create({
       data: {
         userId,
-        feature: AiQuotaFeature.LISTING_AI_ADVISOR,
-        referenceId,
+        feature,
         idempotencyKey,
+        referenceId,
         status: AiQuotaUsageStatus.RESERVED,
+        amount: 1,
         expiresAt,
       },
     });
 
     return {
       reserved: true,
-      quotaUsageId: reservation.id,
-      reservation,
+      quotaUsageId: reserved.id,
     };
   }
 
@@ -139,11 +167,11 @@ export class ListingAiQuotaService {
         data: {
           status: AiQuotaUsageStatus.CONSUMED,
           consumedAt: new Date(),
-          assistantMessageId: assistantMessageId || null,
+          assistantMessageId,
         },
       });
     } catch (e: any) {
-      this.logger.error(`Failed to consume quota usage ${quotaUsageId}`, e);
+      this.logger.error(`Failed to consume quota ID ${quotaUsageId}`, e);
     }
   }
 
@@ -157,7 +185,7 @@ export class ListingAiQuotaService {
         },
       });
     } catch (e: any) {
-      this.logger.error(`Failed to release quota usage ${quotaUsageId}`, e);
+      this.logger.error(`Failed to release quota ID ${quotaUsageId}`, e);
     }
   }
 }

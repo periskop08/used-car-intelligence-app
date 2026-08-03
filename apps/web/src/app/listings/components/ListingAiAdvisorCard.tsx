@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Sparkles, Zap, Lock, Send, AlertTriangle, Trash2, ThumbsUp, ThumbsDown, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, Zap, Lock, Send, AlertTriangle, Trash2, ThumbsUp, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, FileText, MessageSquare } from "lucide-react";
 
 export interface ListingAiAdvisorCardProps {
   listingId: string;
@@ -18,11 +18,19 @@ interface ChatMessage {
   feedback?: "UP" | "DOWN" | null;
 }
 
+interface QuotaDetail {
+  limit?: number;
+  used?: number;
+  remaining?: number;
+}
+
 interface QuotaInfo {
   unlimited: boolean;
   limit?: number;
   used?: number;
   remaining?: number;
+  reportQuota?: QuotaDetail;
+  chatbotQuota?: QuotaDetail;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -34,6 +42,7 @@ export default function ListingAiAdvisorCard({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [quota, setQuota] = useState<QuotaInfo | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [activeMode, setActiveMode] = useState<"REPORT" | "CHAT">("REPORT");
   const [showQuickQuestions, setShowQuickQuestions] = useState(true);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -104,17 +113,19 @@ export default function ListingAiAdvisorCard({
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, activeMode]);
 
-  const handleStartInitialAnalysis = async () => {
+  // Action 1: Get Full Vehicle Report
+  const handleGetReport = async () => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
-      alert("AI Danışmanını kullanabilmek için lütfen giriş yapın.");
+      alert("Araç Raporu alabilmek için lütfen giriş yapın.");
       window.location.href = `/login?redirect=/listings/${listingId}`;
       return;
     }
 
     setIsOpen(true);
+    setActiveMode("REPORT");
     setInitializing(true);
 
     try {
@@ -134,12 +145,28 @@ export default function ListingAiAdvisorCard({
         await fetchConversation();
       } else {
         const err = await res.json();
-        alert(err.message || "Değerlendirme başlatılamadı.");
+        alert(err.message || "Değerlendirme raporu alınamadı.");
       }
     } catch (e) {
       alert("Sunucu ile iletişim hatası.");
     } finally {
       setInitializing(false);
+    }
+  };
+
+  // Action 2: Open Chatbot Session
+  const handleStartChat = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      alert("AI Chatbot ile konuşabilmek için lütfen giriş yapın.");
+      window.location.href = `/login?redirect=/listings/${listingId}`;
+      return;
+    }
+
+    setIsOpen(true);
+    setActiveMode("CHAT");
+    if (messages.length === 0) {
+      await handleGetReport();
     }
   };
 
@@ -155,6 +182,7 @@ export default function ListingAiAdvisorCard({
 
     if (!textToSend) setInputMessage("");
     setLoading(true);
+    setActiveMode("CHAT");
     setShowQuickQuestions(false);
 
     const tempUserMsg: ChatMessage = {
@@ -204,19 +232,21 @@ export default function ListingAiAdvisorCard({
   };
 
   const handleClearConversation = async () => {
-    if (!confirm("Sohbet geçmişinizi temizlemek istediğinize emin misiniz?")) return;
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
+    if (!confirm("Sohbet geçmişini silmek istediğinize emin misiniz?")) return;
+
     try {
-      await fetch(`${API_URL}/api/listings/${listingId}/ai-conversation`, {
+      const res = await fetch(`${API_URL}/api/listings/${listingId}/ai-conversation`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      setMessages([]);
-      setIsOpen(false);
-      setShowQuickQuestions(true);
-      fetchQuota();
+      if (res.ok) {
+        setMessages([]);
+        setIsOpen(false);
+        fetchQuota();
+      }
     } catch (e) {
       alert("Sohbet temizlenemedi.");
     }
@@ -226,7 +256,11 @@ export default function ListingAiAdvisorCard({
     setFeedbacks((prev) => ({ ...prev, [msgId]: type }));
   };
 
-  const isQuotaExhausted = Boolean(quota && !quota.unlimited && (quota.remaining ?? 0) <= 0);
+  const isChatbotQuotaExhausted = Boolean(
+    quota &&
+      !quota.unlimited &&
+      (quota.chatbotQuota ? quota.chatbotQuota.remaining! <= 0 : quota.remaining! <= 0)
+  );
 
   // Clean Markdown Renderer
   const renderFormattedMarkdown = (text: string) => {
@@ -293,14 +327,17 @@ export default function ListingAiAdvisorCard({
     });
   };
 
+  const reportRemaining = quota?.reportQuota ? quota.reportQuota.remaining : quota?.remaining;
+  const chatbotRemaining = quota?.chatbotQuota ? quota.chatbotQuota.remaining : quota?.remaining;
+
   return (
     <div id="listing-ai-advisor-card" className="w-full my-8 scroll-mt-24 glass p-6 sm:p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-r from-[#0b0f19] via-[#0d1222] to-orange-950/20 shadow-2xl flex flex-col gap-5 relative">
       {/* Background Decorative Glow */}
       <span className="absolute -top-16 -right-16 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
       <span className="absolute -bottom-16 -left-16 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* ZONE 1: FIXED HEADER & QUOTA BAR (Never Truncated or Scrolled Away) */}
-      <div className="flex-shrink-0 relative z-20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      {/* ZONE 1: FIXED HEADER & QUOTA BADGES */}
+      <div className="flex-shrink-0 relative z-20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black text-orange-400 uppercase tracking-widest flex items-center gap-2">
@@ -316,22 +353,36 @@ export default function ListingAiAdvisorCard({
           </p>
         </div>
 
-        {/* Dynamic AI Chatbot Quota Badge & Controls */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Dynamic Dual Quota Badges */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           {quota && (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 border border-orange-500/30 shadow-lg">
-              <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-bounce" />
-              <div className="flex flex-col">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                  AI Chatbot Mesaj Hakkı
-                </span>
-                <span className="text-xs font-mono font-black text-orange-300">
-                  {quota.unlimited
-                    ? "Sınırsız (Admin)"
-                    : `Kalan: ${quota.remaining} / ${quota.limit} Mesaj`}
-                </span>
+            <>
+              {/* Report Quota Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-amber-500/30 shadow-md">
+                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">
+                    Araç Raporu Hakkı
+                  </span>
+                  <span className="text-[11px] font-mono font-black text-amber-300">
+                    {quota.unlimited ? "Sınırsız" : `Kalan: ${reportRemaining}`}
+                  </span>
+                </div>
               </div>
-            </div>
+
+              {/* Chatbot Quota Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-orange-500/30 shadow-md">
+                <MessageSquare className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">
+                    AI Chatbot Hakkı
+                  </span>
+                  <span className="text-[11px] font-mono font-black text-orange-300">
+                    {quota.unlimited ? "Sınırsız" : `Kalan: ${chatbotRemaining}`}
+                  </span>
+                </div>
+              </div>
+            </>
           )}
 
           {isOpen && messages.length > 0 && (
@@ -339,7 +390,7 @@ export default function ListingAiAdvisorCard({
               type="button"
               onClick={handleClearConversation}
               title="Sohbet geçmişini temizle"
-              className="p-2.5 rounded-2xl bg-slate-900/80 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+              className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -359,58 +410,102 @@ export default function ListingAiAdvisorCard({
         </div>
       </div>
 
-      {/* Closed State: Initial Action Button */}
+      {/* Closed State: Two Side-by-Side Action Buttons */}
       {!isOpen && (
-        <button
-          type="button"
-          onClick={handleStartInitialAnalysis}
-          className="flex-shrink-0 w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
-        >
-          <Sparkles className="w-5 h-5 text-white" />
-          <span>Bu İlanı AI ile Değerlendir & Risk Raporu Al</span>
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 flex-shrink-0 pt-1">
+          {/* Left Button: Rapor Al */}
+          <button
+            type="button"
+            onClick={handleGetReport}
+            className="py-4 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
+          >
+            <FileText className="w-4.5 h-4.5 text-white shrink-0" />
+            <span>📄 Bu Araç İçin Rapor Al</span>
+          </button>
+
+          {/* Right Button: Chatbot ile Konuş */}
+          <button
+            type="button"
+            onClick={handleStartChat}
+            className="py-4 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-orange-500/40 text-orange-300 hover:text-white font-black text-xs sm:text-sm shadow-lg transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
+          >
+            <MessageSquare className="w-4.5 h-4.5 text-orange-400 shrink-0" />
+            <span>💬 Chatbot ile Konuş</span>
+          </button>
+        </div>
       )}
 
-      {/* Open State: Full Chatbot Section with Fixed Height & Dedicated Message Scroll */}
+      {/* Open State: Report & Chatbot Container */}
       {isOpen && (
         <div className="flex flex-col gap-4">
-          {/* Quick Questions Collapsible Header */}
-          <div className="flex-shrink-0 space-y-2">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setShowQuickQuestions((prev) => !prev)}
-                className="text-xs font-bold text-slate-400 hover:text-orange-400 uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <HelpCircle className="w-3.5 h-3.5 text-orange-400" />
-                <span>💡 Önerilen Hızlı Sorular ({quickQuestions.length})</span>
-                {showQuickQuestions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+          {/* Top Mode Switcher Bar */}
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-950/80 border border-white/10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveMode("REPORT")}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer ${
+                activeMode === "REPORT"
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>📄 Araç Raporu</span>
+            </button>
 
-            {showQuickQuestions && (
-              <div className="flex flex-wrap gap-2 pt-1 animate-fade-in">
-                {quickQuestions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    disabled={Boolean(loading || isQuotaExhausted)}
-                    onClick={() => handleSendMessage(q)}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-xs text-slate-300 hover:text-white disabled:opacity-40 transition font-medium cursor-pointer"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveMode("CHAT")}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer ${
+                activeMode === "CHAT"
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>💬 Chatbot Sohbeti ({messages.length})</span>
+            </button>
           </div>
 
-          {/* ZONE 2: SCROLLABLE MESSAGES STREAM ONLY */}
+          {/* Quick Questions (Visible in Chat Mode) */}
+          {activeMode === "CHAT" && (
+            <div className="flex-shrink-0 space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickQuestions((prev) => !prev)}
+                  className="text-xs font-bold text-slate-400 hover:text-orange-400 uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-orange-400" />
+                  <span>💡 Önerilen Hızlı Sorular ({quickQuestions.length})</span>
+                  {showQuickQuestions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {showQuickQuestions && (
+                <div className="flex flex-wrap gap-2 pt-1 animate-fade-in">
+                  {quickQuestions.map((q, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={Boolean(loading || isChatbotQuotaExhausted)}
+                      onClick={() => handleSendMessage(q)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-xs text-slate-300 hover:text-white disabled:opacity-40 transition font-medium cursor-pointer"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ZONE 2: SCROLLABLE MESSAGES / REPORT DISPLAY STREAM */}
           <div className="flex-1 min-h-[320px] max-h-[460px] overflow-y-auto space-y-4 p-4 sm:p-6 rounded-2xl bg-slate-950/95 border border-white/10 scrollbar-thin scrollbar-thumb-white/20">
             {initializing && (
               <div className="p-8 text-center text-xs text-slate-400 animate-pulse flex flex-col items-center justify-center gap-3">
                 <span className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                <span>İlan verileri detaylı analiz ediliyor, lütfen bekleyin...</span>
+                <span>Araç raporu veritabanından çekiliyor ve hazırlanıyor, lütfen bekleyin...</span>
               </div>
             )}
 
@@ -494,12 +589,27 @@ export default function ListingAiAdvisorCard({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ZONE 3: FIXED COMPOSER BAR (Never Scrolls) */}
-          {isQuotaExhausted ? (
+          {/* ZONE 3: COMPOSER BAR OR REPORT READ-ONLY NOTICE */}
+          {activeMode === "REPORT" ? (
+            <div className="flex-shrink-0 p-4 rounded-2xl bg-slate-900/90 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-300">
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>📄 <strong>Araç Raporu Modundasınız.</strong> Chatbot girişi kapalıdır. Özel soru sormak için Chatbot'a geçebilirsiniz.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveMode("CHAT")}
+                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>💬 Chatbot'a Geç</span>
+              </button>
+            </div>
+          ) : isChatbotQuotaExhausted ? (
             <div className="flex-shrink-0 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-rose-300 font-medium">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>Chatbot mesaj kullanım hakkınız doldu. Yeni mesaj göndermek için paketinizi yükseltebilirsiniz.</span>
+                <span>AI Chatbot mesaj hakkınız dolmuştur. Sohbet etmeye devam etmek için paketinizi yükseltebilirsiniz.</span>
               </div>
               <Link
                 href="/pricing"

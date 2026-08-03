@@ -5,7 +5,7 @@ import { ListingAiQuotaService } from './listing-ai-quota.service';
 import { ListingAiScopeClassifierService } from './listing-ai-scope-classifier.service';
 import { ListingAiProviderService } from './listing-ai-provider.service';
 import { ListingAiChatRequestDto, InitialAnalysisRequestDto, ListingAiChatResponseDto } from './listing-ai.dto';
-import { ListingAiMessageType } from '@prisma/client';
+import { ListingAiMessageType, AiQuotaFeature } from '@prisma/client';
 
 @Injectable()
 export class ListingAiService implements OnModuleInit {
@@ -306,8 +306,13 @@ export class ListingAiService implements OnModuleInit {
       };
     }
 
-    // 3. Reserve Quota for Scope-Valid Query
-    const { quotaUsageId } = await this.quotaService.reserveQuota(userId, dto.idempotencyKey, listingId);
+    // 3. Reserve Quota for Scope-Valid Query (GENERAL_CHATBOT feature)
+    const { quotaUsageId } = await this.quotaService.reserveQuota(
+      userId,
+      dto.idempotencyKey,
+      listingId,
+      AiQuotaFeature.GENERAL_CHATBOT,
+    );
 
     // Save User Message
     await this.prisma.listingAiMessage.create({
