@@ -14,8 +14,10 @@ import { VehicleReportFallbackService } from './vehicle-report-fallback.service'
 import { VehicleReportCacheService } from './vehicle-report-cache.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
+  imports: [AuthModule],
   controllers: [VehicleReportController],
   providers: [
     PrismaService,
