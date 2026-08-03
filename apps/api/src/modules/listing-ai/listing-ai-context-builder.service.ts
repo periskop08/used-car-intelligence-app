@@ -51,6 +51,8 @@ export interface ListingAiContext {
     serviceHistoryDeclared?: string;
     inspectionDeclared?: string;
   };
+  knownDatabaseProblems?: Array<{ title: string; description: string; riskLevel?: string }>;
+  knownDatabaseRecalls?: Array<{ title: string; description: string }>;
   sellerDescriptionFormatted?: string;
   missingFields: string[];
   warnings: ListingAiContextWarning[];
@@ -77,6 +79,8 @@ export class ListingAiContextBuilderService {
             engine: true,
             transmission: true,
             trim: true,
+            problems: { where: { status: 'APPROVED' } },
+            recalls: true,
           },
         },
         media: { select: { id: true } },
@@ -94,6 +98,48 @@ export class ListingAiContextBuilderService {
     const fuel = listing.fuelType || listing.vehicleVariant?.engine?.fuelType || undefined;
     const transmission = listing.transmission || listing.vehicleVariant?.transmission?.type || listing.customTransmission || undefined;
     const bodyType = listing.bodyType || listing.vehicleVariant?.bodyType || undefined;
+
+    // Fetch Database Problems & Recalls
+    let knownDatabaseProblems: Array<{ title: string; description: string; riskLevel?: string }> = [];
+    let knownDatabaseRecalls: Array<{ title: string; description: string }> = [];
+
+    if (listing.vehicleVariant?.problems && listing.vehicleVariant.problems.length > 0) {
+      knownDatabaseProblems = listing.vehicleVariant.problems.map((p) => ({
+        title: p.title,
+        description: p.description,
+        riskLevel: String(p.riskLevel),
+      }));
+    }
+    if (listing.vehicleVariant?.recalls && listing.vehicleVariant.recalls.length > 0) {
+      knownDatabaseRecalls = listing.vehicleVariant.recalls.map((r) => ({
+        title: r.title,
+        description: r.description,
+      }));
+    }
+
+    // Fallback: If no variant linked, search database by brand/model for chronic problems
+    if (knownDatabaseProblems.length === 0 && (model || brand)) {
+      try {
+        const matchingProblems = await this.prisma.commonProblem.findMany({
+          where: {
+            status: 'APPROVED',
+            variant: {
+              model: {
+                name: { contains: model || '', mode: 'insensitive' },
+              },
+            },
+          },
+          take: 5,
+        });
+        if (matchingProblems && matchingProblems.length > 0) {
+          knownDatabaseProblems = matchingProblems.map((p) => ({
+            title: p.title,
+            description: p.description,
+            riskLevel: String(p.riskLevel),
+          }));
+        }
+      } catch (e) {}
+    }
 
     // Detect Missing Fields
     const missingFields: string[] = [];
@@ -190,6 +236,8 @@ export class ListingAiContextBuilderService {
         heavyDamageDeclared: listing.heavyDamage,
         warrantyDeclared: listing.hasWarranty,
       },
+      knownDatabaseProblems,
+      knownDatabaseRecalls,
       sellerDescriptionFormatted,
       missingFields,
       warnings,
