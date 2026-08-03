@@ -18,14 +18,14 @@ export class ListingAiProviderService {
 
   private getSystemPrompt(): string {
     return `Sen TorqueScout'un doğrulanmış veritabanı verileriyle çalışan uzman otomotiv danışmanısın.
-Kullanıcı şu anda ilandaki araç hakkında seninle sohbet ediyor: LISTING_CONTEXT.
+Kullanıcı şu anda seçili araç hakkında seninle sohbet ediyor: VEHICLE_OR_LISTING_CONTEXT.
 
 TEMEL DAYANAKLARIN & KURALLARIN:
-1. GERÇEK VERİTABANI RAPORU (verifiedDatabaseVehicleReport): LISTING_CONTEXT içindeki verifiedDatabaseVehicleReport nesnesi ve knownDatabaseProblems dizisi TorqueScout'un veritabanında kayıtlı DOĞRULANMIŞ araç raporudur. Araç hakkındaki kronik arıza, risk puanı, satın alınabilirlik skoru ve kontrol önerilerini bu veritabanı kaydından al ve yanıtlarında referans göster.
-2. İLAN PARAMETRELERİ (listing & vehicle & condition): Araç model yılı, kilometresi, şanzımanı, yakıt türü, ağır hasar beyanı ve kaporta durumunu veritabanı raporu ile eksiksiz harmanla.
-3. KESİNLİKLE UYDURMA / YANILTICI BİLGİ VERME: Fiktif parça adı, var olmayan fiyat tahminleri veya doğrulanmamış uydurma rakamlar UYDURMA. Bir bilgi veritabanında veya ilanda yoksa, "TorqueScout veritabanı kayıtlarına ve ilandaki teknik parametrelere göre..." ifadesini kullan.
-4. GİRİŞ VE SOHBET: Kullanıcının sorusuna (şanzıman, kronik arıza, bakım, şehir içi kullanım) doğrudan, samimi, otomotiv uzmanı gözüyle detaylı ve tatmin edici şekilde Türkçe yanıt ver. Asla "İlanda bu bilgi yazmıyor" diyerek kestirip atma! İlandaki teknik detayları ve veritabanı raporunu kullanarak açıkla.
-5. CÜMLE TAMAMLAMA & NETLİK: Yanıtın her zaman noktalı ve tam bir cümleyle bitsin. Asla metnin sonunu yarıda kesme! Gereksiz laf kalabalığı yapmadan doğrudan soruyu yanıtla.`;
+1. GERÇEK VERİTABANI RAPORU (verifiedDatabaseVehicleReport / vehicle): Veritabanında kayıtlı DOĞRULANMIŞ kronik arıza, risk puanı, geri çağırmalar ve teknik özellikleri esas al.
+2. İLAN VE TEKNİK PARAMETRELER: Araç model yılı, kilometresi, şanzımanı, yakıt türü ve teknik detaylarını veritabanı raporu ile eksiksiz harmanla.
+3. KESİNLİKLE UYDURMA BİLGİ VERME: Var olmayan fiyat veya hayali kronik arıza UYDURMA. Doğrulanmış verilere dayan.
+4. GİRİŞ VE SOHBET: Kullanıcının sorusuna (şanzıman, kronik arıza, bakım, şehir içi kullanım) doğrudan, samimi, otomotiv uzmanı gözüyle detaylı ve tatmin edici şekilde Türkçe yanıt ver.
+5. CÜMLE TAMAMLAMA & NETLİK: Yanıtın her zaman noktalı ve tam bir cümleyle bitsin. Asla metnin sonunu yarıda kesme!`;
   }
 
   async generateListingAdvice(
@@ -50,41 +50,41 @@ TEMEL DAYANAKLARIN & KURALLARIN:
           contextJson,
         );
 
-        let validation = this.semanticValidationService.validate(response.answer, contextJson);
+        if (response && response.answer && response.answer.trim().length > 10) {
+          let validation = this.semanticValidationService.validate(response.answer, contextJson);
 
-        // Max 1 repair attempt if validation requested repair
-        if (!validation.isValid && validation.needsRepair) {
-          this.logger.warn(`Triggering 1 repair attempt for ${adapter.providerName}: ${validation.reason}`);
-          const repairMessage = `${userMessage}\n\n[SİSTEM UYARISI: Önceki yanıtınız kuralları ihlal etti (${validation.reason}). Lütfen satıcı beyanlarını kesin gerçek olarak sunmadan ve dış araç adı eklemeden tekrar yanıtlayın.]`;
-          const repairedResponse = await adapter.generateAnswer(systemPrompt, repairMessage, contextJson);
-          validation = this.semanticValidationService.validate(repairedResponse.answer, contextJson);
-          if (validation.isValid) {
+          // Max 1 repair attempt if validation requested repair
+          if (!validation.isValid && validation.needsRepair) {
+            this.logger.warn(`Triggering 1 repair attempt for ${adapter.providerName}: ${validation.reason}`);
+            const repairMessage = `${userMessage}\n\n[SİSTEM UYARISI: Önceki yanıtınız kuralları ihlal etti (${validation.reason}). Lütfen satıcı beyanlarını kesin gerçek olarak sunmadan ve dış araç adı eklemeden tekrar yanıtlayın.]`;
+            const repairedResponse = await adapter.generateAnswer(systemPrompt, repairMessage, contextJson);
+            validation = this.semanticValidationService.validate(repairedResponse.answer, contextJson);
+            if (validation.isValid) {
+              return {
+                answer: repairedResponse.answer,
+                mode: 'AI',
+                providerName: `${adapter.providerName} (Repaired)`,
+              };
+            }
+          } else {
             return {
-              answer: repairedResponse.answer,
+              answer: response.answer,
               mode: 'AI',
               providerName: adapter.providerName,
             };
           }
-        } else if (validation.isValid) {
-          return {
-            answer: response.answer,
-            mode: 'AI',
-            providerName: adapter.providerName,
-          };
         }
-      } catch (err: any) {
-        this.logger.warn(`AI Provider ${adapter.providerName} failed: ${err?.message || err}`);
+      } catch (e: any) {
+        this.logger.error(`Adapter ${adapter.providerName} failed: ${e?.message}`);
       }
     }
 
-    // Safe Fallback if all providers failed
-    this.logger.warn('All primary/secondary AI providers failed or were unconfigured. Using SafeFallbackAdapter.');
-    const fallbackResponse = await this.safeFallbackAdapter.generateAnswer(systemPrompt, userMessage, contextJson);
-
+    // ALL PRIMARY AI PROVIDERS FAILED (e.g. Rate limit 429 or quota depleted)
+    this.logger.error(`All primary AI providers failed for query. Returning polite error message.`);
     return {
-      answer: fallbackResponse.answer,
+      answer: `⚠️ Yapay zeka servis sağlayıcısında geçici bir kısıtlama veya kota sınırı yaşanmaktadır. Yönetici ekibimize otomatik bildirim iletilmiş olup lütfen birkaç dakika sonra tekrar deneyiniz.`,
       mode: 'SAFE_FALLBACK',
-      providerName: this.safeFallbackAdapter.providerName,
+      providerName: 'QuotaLimitErrorResponse',
     };
   }
 }

@@ -27,6 +27,6 @@ import { SafeFallbackAdapter } from './adapters/safe-fallback.adapter';
     OpenAiAdapter,
     SafeFallbackAdapter,
   ],
-  exports: [ListingAiService, ListingAiQuotaService],
+  exports: [ListingAiService, ListingAiQuotaService, ListingAiProviderService],
 })
 export class ListingAiModule {}
