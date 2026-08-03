@@ -89,9 +89,10 @@ export default function ListingAiAdvisorCard({
       });
       if (res.ok) {
         const data = await res.json();
-        const msgList = data.messages || [];
+        const msgList: ChatMessage[] = data.messages || [];
         setMessages(msgList);
         if (data.quota) setQuota(data.quota);
+
         if (msgList.length > 0) {
           setIsOpen(true);
           setShowQuickQuestions(false);
@@ -145,7 +146,19 @@ export default function ListingAiAdvisorCard({
       if (res.ok) {
         const data = await res.json();
         if (data.quota) setQuota(data.quota);
-        await fetchConversation();
+
+        const reportMsg: ChatMessage = {
+          id: data.messageId || `report-${Date.now()}`,
+          role: "ASSISTANT",
+          messageType: "INITIAL_ANALYSIS",
+          content: data.answer,
+          createdAt: data.createdAt || new Date().toISOString(),
+        };
+
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.messageType !== "INITIAL_ANALYSIS");
+          return [reportMsg, ...filtered];
+        });
       } else {
         const err = await res.json();
         alert(err.message || "Değerlendirme raporu alınamadı.");
@@ -168,9 +181,6 @@ export default function ListingAiAdvisorCard({
 
     setIsOpen(true);
     setActiveMode("CHAT");
-    if (messages.length === 0) {
-      await handleGetReport();
-    }
   };
 
   const handleSendMessage = async (textToSend?: string) => {
@@ -238,7 +248,7 @@ export default function ListingAiAdvisorCard({
     const token = localStorage.getItem("accessToken");
     if (!token) return;
 
-    if (!confirm("Sohbet geçmişini silmek istediğinize emin misiniz?")) return;
+    if (!confirm("Konuşma ve rapor geçmişini temizlemek istediğinize emin misiniz?")) return;
 
     try {
       const res = await fetch(`${API_URL}/api/listings/${listingId}/ai-conversation`, {
@@ -248,10 +258,11 @@ export default function ListingAiAdvisorCard({
       if (res.ok) {
         setMessages([]);
         setIsOpen(false);
+        setActiveMode("REPORT");
         fetchQuota();
       }
     } catch (e) {
-      alert("Sohbet temizlenemedi.");
+      alert("Geçmiş temizlenemedi.");
     }
   };
 
@@ -333,6 +344,9 @@ export default function ListingAiAdvisorCard({
   const reportRemaining = quota?.reportQuota ? quota.reportQuota.remaining : quota?.remaining;
   const chatbotRemaining = quota?.chatbotQuota ? quota.chatbotQuota.remaining : quota?.remaining;
 
+  const initialReportMsg = messages.find((m) => m.messageType === "INITIAL_ANALYSIS");
+  const chatMessages = messages.filter((m) => m.messageType !== "INITIAL_ANALYSIS");
+
   return (
     <div id="listing-ai-advisor-card" className="w-full my-8 scroll-mt-24 glass p-6 sm:p-8 rounded-3xl border border-orange-500/30 bg-gradient-to-r from-[#0b0f19] via-[#0d1222] to-orange-950/20 shadow-2xl flex flex-col gap-5 relative">
       {/* Background Decorative Glow */}
@@ -392,7 +406,7 @@ export default function ListingAiAdvisorCard({
             <button
               type="button"
               onClick={handleClearConversation}
-              title="Sohbet geçmişini temizle"
+              title="Konuşma ve rapor geçmişini temizle"
               className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
@@ -466,7 +480,7 @@ export default function ListingAiAdvisorCard({
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              <span>💬 Chatbot Sohbeti ({messages.length})</span>
+              <span>💬 Chatbot Sohbeti ({chatMessages.length})</span>
             </button>
           </div>
 
@@ -503,7 +517,7 @@ export default function ListingAiAdvisorCard({
             </div>
           )}
 
-          {/* ZONE 2: SCROLLABLE MESSAGES / REPORT DISPLAY STREAM */}
+          {/* ZONE 2: SCROLLABLE STREAM (REPORT MODE VS CHAT MODE) */}
           <div className="flex-1 min-h-[320px] max-h-[460px] overflow-y-auto space-y-4 p-4 sm:p-6 rounded-2xl bg-slate-950/95 border border-white/10 scrollbar-thin scrollbar-thumb-white/20">
             {initializing && (
               <div className="p-8 text-center text-xs text-slate-400 animate-pulse flex flex-col items-center justify-center gap-3">
@@ -512,75 +526,120 @@ export default function ListingAiAdvisorCard({
               </div>
             )}
 
-            {messages.map((msg) => {
-              if (msg.role === "SYSTEM" || msg.messageType === "CONTEXT_SEPARATOR") {
-                return (
-                  <div
-                    key={msg.id}
-                    className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs text-center font-bold"
-                  >
-                    {msg.content}
+            {/* REPORT MODE VIEW */}
+            {activeMode === "REPORT" && (
+              <>
+                {initialReportMsg ? (
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-2 mb-1.5 text-[11px] font-bold text-slate-400">
+                      <span>🤖 TorqueScout Doğrulanmış Araç Raporu</span>
+                      <span>•</span>
+                      <span>
+                        {new Date(initialReportMsg.createdAt).toLocaleTimeString("tr-TR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+
+                    <div className="w-full p-4 sm:p-6 rounded-2xl bg-slate-900 text-slate-200 border border-amber-500/30 shadow-xl">
+                      {renderFormattedMarkdown(initialReportMsg.content)}
+                    </div>
                   </div>
-                );
-              }
-
-              const isUser = msg.role === "USER";
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
-                >
-                  <div className="flex items-center gap-2 mb-1.5 text-[11px] font-bold text-slate-400">
-                    <span>{isUser ? "Siz" : "🤖 TorqueScout İlan Danışmanı"}</span>
-                    <span>•</span>
-                    <span>
-                      {new Date(msg.createdAt).toLocaleTimeString("tr-TR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                ) : !initializing && (
+                  <div className="p-8 text-center text-xs text-slate-300 flex flex-col items-center justify-center gap-3">
+                    <FileText className="w-8 h-8 text-orange-400 animate-pulse" />
+                    <span className="font-bold text-sm text-white">Henüz Bu Araç İçin Rapor Alınmadı</span>
+                    <span className="text-slate-400 max-w-md">
+                      Aşağıdaki "📄 Bu Araç İçin Rapor Al" butonuna tıklayarak aracın veritabanı destekli kronik risk ve durum değerlendirme raporunu oluşturabilirsiniz.
                     </span>
                   </div>
+                )}
+              </>
+            )}
 
-                  <div
-                    className={`max-w-[90%] sm:max-w-[85%] p-4 sm:p-5 rounded-2xl ${
-                      isUser
-                        ? "bg-orange-500 text-white rounded-br-none shadow-md shadow-orange-500/10 font-medium text-xs sm:text-sm"
-                        : "bg-slate-900 text-slate-200 border border-white/10 rounded-bl-none shadow-lg"
-                    }`}
-                  >
-                    {isUser ? msg.content : renderFormattedMarkdown(msg.content)}
-
-                    {/* Feedback Action Buttons for AI responses */}
-                    {!isUser && (
-                      <div className="flex items-center justify-between border-t border-white/10 pt-2.5 mt-3 text-[10px] text-slate-400">
-                        <span className="italic">Bu değerlendirme faydalı oldu mu?</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleFeedback(msg.id, "UP")}
-                            className={`p-1 rounded hover:text-emerald-400 transition ${
-                              feedbacks[msg.id] === "UP" ? "text-emerald-400 font-bold" : ""
-                            }`}
-                          >
-                            <ThumbsUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleFeedback(msg.id, "DOWN")}
-                            className={`p-1 rounded hover:text-rose-400 transition ${
-                              feedbacks[msg.id] === "DOWN" ? "text-rose-400 font-bold" : ""
-                            }`}
-                          >
-                            <ThumbsDown className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+            {/* CHAT MODE VIEW */}
+            {activeMode === "CHAT" && (
+              <>
+                {chatMessages.length === 0 && !loading && (
+                  <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <MessageSquare className="w-6 h-6 text-orange-400" />
+                    <span className="font-bold text-slate-300">AI Chatbot Danışmanına Hoş Geldiniz</span>
+                    <span>İlan hakkındaki merak ettiğiniz tüm soruları aşağıya yazabilir veya önerilen hızlı sorulardan seçebilirsiniz.</span>
                   </div>
-                </div>
-              );
-            })}
+                )}
+
+                {chatMessages.map((msg) => {
+                  if (msg.role === "SYSTEM" || msg.messageType === "CONTEXT_SEPARATOR") {
+                    return (
+                      <div
+                        key={msg.id}
+                        className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs text-center font-bold"
+                      >
+                        {msg.content}
+                      </div>
+                    );
+                  }
+
+                  const isUser = msg.role === "USER";
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5 text-[11px] font-bold text-slate-400">
+                        <span>{isUser ? "Siz" : "🤖 TorqueScout İlan Danışmanı"}</span>
+                        <span>•</span>
+                        <span>
+                          {new Date(msg.createdAt).toLocaleTimeString("tr-TR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`max-w-[90%] sm:max-w-[85%] p-4 sm:p-5 rounded-2xl ${
+                          isUser
+                            ? "bg-orange-500 text-white rounded-br-none shadow-md shadow-orange-500/10 font-medium text-xs sm:text-sm"
+                            : "bg-slate-900 text-slate-200 border border-white/10 rounded-bl-none shadow-lg"
+                        }`}
+                      >
+                        {isUser ? msg.content : renderFormattedMarkdown(msg.content)}
+
+                        {/* Feedback Action Buttons for AI responses */}
+                        {!isUser && (
+                          <div className="flex items-center justify-between border-t border-white/10 pt-2.5 mt-3 text-[10px] text-slate-400">
+                            <span className="italic">Bu değerlendirme faydalı oldu mu?</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleFeedback(msg.id, "UP")}
+                                className={`p-1 rounded hover:text-emerald-400 transition ${
+                                  feedbacks[msg.id] === "UP" ? "text-emerald-400 font-bold" : ""
+                                }`}
+                              >
+                                <ThumbsUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleFeedback(msg.id, "DOWN")}
+                                className={`p-1 rounded hover:text-rose-400 transition ${
+                                  feedbacks[msg.id] === "DOWN" ? "text-rose-400 font-bold" : ""
+                                }`}
+                              >
+                                <ThumbsDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
 
             {loading && (
               <div className="flex items-center gap-2.5 p-4 text-xs text-slate-400 font-medium">
@@ -592,20 +651,21 @@ export default function ListingAiAdvisorCard({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ZONE 3: COMPOSER BAR OR REPORT READ-ONLY NOTICE */}
+          {/* ZONE 3: COMPOSER BAR OR REPORT ACTION BUTTON */}
           {activeMode === "REPORT" ? (
             <div className="flex-shrink-0 p-4 rounded-2xl bg-slate-900/90 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-300">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 font-medium">
                 <FileText className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>📄 <strong>Araç Raporu Modundasınız.</strong> Chatbot girişi kapalıdır. Özel soru sormak için Chatbot'a geçebilirsiniz.</span>
+                <span>📄 <strong>Araç Raporu Modundasınız.</strong> Chatbot mesaj girişi kapalıdır.</span>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveMode("CHAT")}
-                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                disabled={initializing}
+                onClick={handleGetReport}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs shadow-xl shadow-orange-500/20 transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40"
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>💬 Chatbot'a Geç</span>
+                <Sparkles className="w-4 h-4 text-white" />
+                <span>{initialReportMsg ? "📄 Araç Raporunu Yenile" : "📄 Bu Araç İçin Rapor Al"}</span>
               </button>
             </div>
           ) : isChatbotQuotaExhausted ? (
