@@ -31,23 +31,32 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  // Configure Swagger/OpenAPI
-  const config = new DocumentBuilder()
-    .setTitle('Used Car Intelligence API')
-    .setDescription('Used Car Intelligence application REST API')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
-  
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  // Configure Swagger/OpenAPI (Only in non-production to save RAM)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Used Car Intelligence API')
+      .setDescription('Used Car Intelligence application REST API')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
+    
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
+
+  // Periodic Garbage Collection to keep RSS memory low on Render free tier (512MB limit)
+  if (global.gc) {
+    setInterval(() => {
+      try {
+        global.gc!();
+      } catch (e) {}
+    }, 60000);
+  }
 
   const port = process.env.API_PORT || 3000;
   await app.listen(port);
   console.log(`================================================================`);
   console.log(` API Service is running at: http://localhost:${port}`);
-  console.log(` Swagger documentation is available at: http://localhost:${port}/docs`);
-  console.log(` Healthcheck is available at: http://localhost:${port}/health`);
   console.log(`================================================================`);
 }
 bootstrap();

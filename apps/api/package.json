@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "start": "nest start",
+    "start": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
     "start:dev": "nest start --watch",
-    "start:prod": "node --max-old-space-size=384 dist/src/main.js",
+    "start:prod": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev --name init",
     "db:migrate:prod": "prisma migrate deploy",
