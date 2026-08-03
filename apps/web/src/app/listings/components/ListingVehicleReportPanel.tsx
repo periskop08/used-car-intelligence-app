@@ -25,7 +25,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
       const res = await fetch(`${API_URL}/vehicle-reports/by-listing/${listingId}/current`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -46,7 +46,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
     setIsGenerating(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
       if (!token) {
         setError("Rapor oluşturmak için lütfen giriş yapın.");
         setIsGenerating(false);
@@ -107,9 +107,9 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+      <div className="p-12 bg-[#090d1a] border border-white/10 rounded-[28px] text-center text-slate-400 flex flex-col items-center justify-center gap-3">
         <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs">Rapor verileri kontrol ediliyor...</span>
+        <span className="text-xs font-medium">Rapor verileri kontrol ediliyor...</span>
       </div>
     );
   }
@@ -125,28 +125,30 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
   }
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 text-center space-y-4">
-      <div className="w-12 h-12 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center justify-center mx-auto text-orange-400">
-        <FileText className="w-6 h-6" />
+    <div className="bg-[#090d1a] border border-white/10 rounded-[28px] p-8 text-center space-y-5 shadow-2xl relative overflow-hidden">
+      <div className="w-14 h-14 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center justify-center mx-auto text-orange-400">
+        <FileText className="w-7 h-7" />
       </div>
-      <div>
-        <h3 className="text-lg font-bold text-white mb-1">Bu İlan İçin Araç Raporu Alın</h3>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
+
+      <div className="space-y-1.5">
+        <h3 className="text-xl font-extrabold text-white">Bu İlan İçin Araç Raporu Alın</h3>
+        <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
           Aracın kronik sorunları, recall kayıtları, ekspertiz kontrol listesi, satıcı soruları ve bu ilana özel çelişki analizi 1 rapor hakkı ile hazırlanır.
         </p>
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 max-w-md mx-auto flex items-center gap-2">
+        <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 max-w-md mx-auto flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <button
+        type="button"
         onClick={handleCreateReport}
         disabled={isGenerating}
-        className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+        className="px-6 py-3.5 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center justify-center gap-2.5 mx-auto disabled:opacity-50 cursor-pointer"
       >
         {isGenerating ? (
           <>
@@ -155,8 +157,8 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
           </>
         ) : (
           <>
-            <Sparkles className="w-4 h-4" />
-            <span>📄 Bu Araç İçin Rapor Al (1 Hak)</span>
+            <Sparkles className="w-4.5 h-4.5" />
+            <span>Bu Araç İçin Rapor Al (1 Hak)</span>
           </>
         )}
       </button>
