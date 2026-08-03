@@ -31,6 +31,65 @@ export class SafeFallbackAdapter implements AiProviderAdapter {
 
     const msg = (userMessage || '').toLowerCase();
 
+    // 0. INITIAL ANALYSIS OR GENERAL EVALUATION -> Full Comprehensive Report
+    if (
+      msg.includes('genel değerlendirmesini yap') ||
+      msg.includes('genel değerlendirme') ||
+      msg.includes('initial-analysis') ||
+      msg.includes('rapor al') ||
+      !msg.trim()
+    ) {
+      let answer = `### 🚗 İlan Genel Değerlendirme & Risk Raporu\n\n`;
+      answer += `İlandaki **${brand} ${model} (${year})** aracı teknik veriler, satıcı beyanları ve piyasa standartları ışığında analiz edilmiştir:\n\n`;
+
+      answer += `**1. Temel Araç Özeti:**\n`;
+      answer += `• **Marka & Model:** ${brand} ${model} (${year})\n`;
+      answer += `• **Fiyat & Kilometre:** ${price} | ${mileage}\n`;
+      answer += `• **Yakıt & Şanzıman:** ${fuel} | ${transmission}\n`;
+      answer += `• **Kasa Tipi:** ${bodyType}\n\n`;
+
+      answer += `**2. 📊 Kaporta, Hasar & Beyan Durumu:**\n`;
+      if (condition.heavyDamageDeclared) {
+        answer += `🚨 **Ağır Hasar Kaydı Riski:** Satıcı ilanda aracın ağır hasarlı olduğunu beyan etmiştir. Bağımsız ekspertizde şasi, podye, direk ve hava yastıkları titizlikle taranmalıdır.\n\n`;
+      } else {
+        answer += `✓ İlanda ağır hasar beyanı bulunmamaktadır.\n\n`;
+      }
+
+      if (condition.paintedParts?.length > 0 || condition.changedParts?.length > 0) {
+        answer += `**Kaporta Beyan Detayları:**\n`;
+        if (condition.paintedParts?.length > 0) answer += `• Boyalı parçalar: ${condition.paintedParts.join(', ')}\n`;
+        if (condition.changedParts?.length > 0) answer += `• Değişen parçalar: ${condition.changedParts.join(', ')}\n`;
+        answer += `\n`;
+      }
+
+      answer += `**3. ⚠️ Riskler & Kilometre Dengesi:**\n`;
+      answer += `• Yıllık ortalama kullanım ~${avgKmPerYear.toLocaleString('tr-TR')} km/yıl seviyesindedir. `;
+      if (avgKmPerYear > 25000) {
+        answer += `Yıllık kilometre yüksek segmenttedir; motor ve yürüyen aksam yıpranması ekspertizde taranmalıdır.\n`;
+      } else {
+        answer += `Kilometre ve yaş dengesi standart sınırlar içerisindedir.\n`;
+      }
+
+      if (missing.length > 0) {
+        answer += `• **İlandaki Eksik Bilgiler:** İlanda **${missing.join(', ')}** alanları belirtilmemiştir.\n\n`;
+      } else {
+        answer += `\n`;
+      }
+
+      answer += `**4. 📋 Satıcıya Sorulması Gereken Öncelikli Sorular:**\n`;
+      answer += `1. Periyodik bakım geçmişi ve servis kayıtları mevcut mu?\n`;
+      answer += `2. Hasar kaydı (Tramer) sorgu ekran görüntüsü ve ekspertiz raporu var mı?\n`;
+      answer += `3. Fenni muayene bitiş tarihi ve lastiklerin kondisyonu nedir?\n`;
+      answer += `4. Yedek anahtarı ve orijinal kitapçıkları teslim edilecek mi?\n\n`;
+      answer += `*Bu değerlendirme ilan sahibinin beyanları ve TorqueScout teknik veritabanı verileriyle hazırlanmıştır. Alım öncesi bağımsız ekspertiz kontrolü önerilir.*`;
+
+      return {
+        answer,
+        providerName: this.providerName,
+        tokenCount: 0,
+      };
+    }
+
     // 1. QUESTION: City Use / Şehir içi kullanım
     if (msg.includes('şehir içi') || msg.includes('sehir ici') || msg.includes('şehirde') || msg.includes('trafik')) {
       let answer = `### 🏙️ Şehir İçi Kullanım ve Trafik Uyum Değerlendirmesi\n\n`;
@@ -91,7 +150,7 @@ export class SafeFallbackAdapter implements AiProviderAdapter {
     }
 
     // 3. QUESTION: Questions for Seller / Satıcıya sorular
-    if (msg.includes('satıcıya') || msg.includes('sormalı') || msg.includes('soru')) {
+    if (msg.includes('satıcıya sormalı') || msg.includes('satıcıya hangi sorular') || msg.includes('satıcıya sorulacak')) {
       let answer = `### 📋 Satıcıya Sorulması Gereken Öncelikli Sorular\n\n`;
       answer += `1. **Bakım & Servis Kayıtları:** Aracın periyodik bakım geçmişi tam mı ve servis faturaları mevcut mu?\n`;
       answer += `2. **Tramer & Hasar Belgesi:** Hasar kaydı sorgulama ekran görüntüsü ve mevcut ekspertiz raporu paylaşılabilir mi?\n`;
@@ -105,7 +164,7 @@ export class SafeFallbackAdapter implements AiProviderAdapter {
     }
 
     // 4. QUESTION: Mileage vs Age / Kilometre ve Yaş
-    if (msg.includes('kilometre') || msg.includes('km') || msg.includes('yaş')) {
+    if (msg.includes('kilometre') || msg.includes('km') || msg.includes('yaş dengesi')) {
       let answer = `### 📊 Kilometre ve Yaş Dengesi Analizi\n\n`;
       answer += `• **Model Yılı & Yaş:** ${year} (${age} yaşında)\n`;
       answer += `• **Mevcut Kilometre:** ${mileage}\n`;
@@ -121,42 +180,42 @@ export class SafeFallbackAdapter implements AiProviderAdapter {
       return { answer, providerName: this.providerName, tokenCount: 0 };
     }
 
-    // 5. DEFAULT COMPREHENSIVE INITIAL ANALYSIS (For "Bu İlanı AI ile Değerlendir" or General Queries)
-    let answer = `### 🚗 İlan Genel Değerlendirmesi\n\n`;
-    answer += `İlandaki **${brand} ${model} (${year})** aracı teknik veriler, satıcı beyanları ve piyasa standartları ışığında analiz edilmiştir:\n\n`;
+    // 5. DEFAULT COMPREHENSIVE INITIAL ANALYSIS
+    let defaultAnswer = `### 🚗 İlan Genel Değerlendirme & Risk Raporu\n\n`;
+    defaultAnswer += `İlandaki **${brand} ${model} (${year})** aracı teknik veriler, satıcı beyanları ve piyasa standartları ışığında analiz edilmiştir:\n\n`;
 
-    answer += `**Temel Veriler:**\n`;
-    answer += `• **Araç:** ${brand} ${model} (${year})\n`;
-    answer += `• **Fiyat & Kilometre:** ${price} | ${mileage}\n`;
-    answer += `• **Yakıt & Şanzıman:** ${fuel} | ${transmission}\n`;
-    answer += `• **Kasa Tipi:** ${bodyType}\n\n`;
+    defaultAnswer += `**1. Temel Veriler:**\n`;
+    defaultAnswer += `• **Araç:** ${brand} ${model} (${year})\n`;
+    defaultAnswer += `• **Fiyat & Kilometre:** ${price} | ${mileage}\n`;
+    defaultAnswer += `• **Yakıt & Şanzıman:** ${fuel} | ${transmission}\n`;
+    defaultAnswer += `• **Kasa Tipi:** ${bodyType}\n\n`;
 
-    answer += `**📊 Kaporta & Hasar Beyanı:**\n`;
+    defaultAnswer += `**2. 📊 Kaporta & Hasar Beyanı:**\n`;
     if (condition.heavyDamageDeclared) {
-      answer += `⚠️ **Ağır Hasar Kaydı:** Satıcı ilanda aracın ağır hasarlı olduğunu beyan etmiştir. Şasi, direk ve airbag kontrolleri zorunludur.\n\n`;
+      defaultAnswer += `⚠️ **Ağır Hasar Kaydı:** Satıcı ilanda aracın ağır hasarlı olduğunu beyan etmiştir. Şasi, direk ve airbag kontrolleri zorunludur.\n\n`;
     } else {
-      answer += `✓ İlanda ağır hasar beyanı bulunmamaktadır.\n\n`;
+      defaultAnswer += `✓ İlanda ağır hasar beyanı bulunmamaktadır.\n\n`;
     }
 
     if (condition.paintedParts?.length > 0 || condition.changedParts?.length > 0) {
-      answer += `**Kaporta Beyan Detayları:**\n`;
-      if (condition.paintedParts?.length > 0) answer += `• Boyalı parçalar: ${condition.paintedParts.join(', ')}\n`;
-      if (condition.changedParts?.length > 0) answer += `• Değişen parçalar: ${condition.changedParts.join(', ')}\n`;
-      answer += `\n`;
+      defaultAnswer += `**Kaporta Beyan Detayları:**\n`;
+      if (condition.paintedParts?.length > 0) defaultAnswer += `• Boyalı parçalar: ${condition.paintedParts.join(', ')}\n`;
+      if (condition.changedParts?.length > 0) defaultAnswer += `• Değişen parçalar: ${condition.changedParts.join(', ')}\n`;
+      defaultAnswer += `\n`;
     }
 
     if (missing.length > 0) {
-      answer += `**⚠️ İlandaki Eksik Veriler:** İlanda **${missing.join(', ')}** alanları boş bırakılmıştır.\n\n`;
+      defaultAnswer += `**3. ⚠️ İlandaki Eksik Veriler:** İlanda **${missing.join(', ')}** alanları boş bırakılmıştır.\n\n`;
     }
 
-    answer += `**📋 Satıcıya Sorulacak Sorular:**\n`;
-    answer += `1. Periyodik bakım geçmişi ve servis kayıtları mevcut mu?\n`;
-    answer += `2. Tramer sorgu ekran görüntüsü paylaşılabilir mi?\n`;
-    answer += `3. Fenni muayene bitiş tarihi nedir?\n\n`;
-    answer += `*Bu değerlendirme ilan sahibinin beyanları üzerinden hazırlanmıştır. Alım öncesi bağımsız ekspertiz kontrolü önerilir.*`;
+    defaultAnswer += `**4. 📋 Satıcıya Sorulacak Sorular:**\n`;
+    defaultAnswer += `1. Periyodik bakım geçmişi ve servis kayıtları mevcut mu?\n`;
+    defaultAnswer += `2. Tramer sorgu ekran görüntüsü paylaşılabilir mi?\n`;
+    defaultAnswer += `3. Fenni muayene bitiş tarihi nedir?\n\n`;
+    defaultAnswer += `*Bu değerlendirme ilan sahibinin beyanları üzerinden hazırlanmıştır. Alım öncesi bağımsız ekspertiz kontrolü önerilir.*`;
 
     return {
-      answer,
+      answer: defaultAnswer,
       providerName: this.providerName,
       tokenCount: 0,
     };
