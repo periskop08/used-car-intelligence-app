@@ -166,53 +166,75 @@ export default function VehicleDetail() {
   const [structuredReport, setStructuredReport] = useState<ComprehensiveVehicleReport | null>(null);
   const [loadingStructuredReport, setLoadingStructuredReport] = useState<boolean>(false);
 
-  const fetchStructuredReport = async () => {
+  const getAuthHeaders = (): any => {
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
+    const headers: any = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
 
     setLoadingStructuredReport(true);
+    setReportError("");
+
     try {
-      const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.reportData) {
-          setStructuredReport(data.reportData);
-          setLoadingStructuredReport(false);
-          return;
+      const headers = getAuthHeaders();
+
+      if (!force) {
+        const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, {
+          headers,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.reportData) {
+            setStructuredReport(data.reportData);
+            setLoadingStructuredReport(false);
+            setCountdown(null);
+            return;
+          }
         }
       }
 
       const genRes = await fetch(`${API_URL}/vehicle-reports`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({
           mode: "VEHICLE_REPORT",
           variantId,
           idempotencyKey: `vr_${variantId}_${Date.now()}`,
         }),
       });
+
       if (genRes.ok) {
         const genData = await genRes.json();
-        if (genData && genData.reportId) {
-          const detailRes = await fetch(`${API_URL}/vehicle-reports/${genData.reportId}`, {
-            headers: { Authorization: `Bearer ${token}` },
+        const reportId = genData.reportId || genData.id;
+        if (reportId) {
+          const detailRes = await fetch(`${API_URL}/vehicle-reports/${reportId}`, {
+            headers,
           });
           if (detailRes.ok) {
             const detailData = await detailRes.json();
             if (detailData && detailData.reportData) {
               setStructuredReport(detailData.reportData);
+              setCountdown(null);
+              setLoadingStructuredReport(false);
+              return;
             }
           }
         }
+      } else {
+        const errData = await genRes.json().catch(() => ({}));
+        if (errData.message) {
+          setReportError(errData.message);
+        }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Fetch structured vehicle report error", e);
+      setReportError("Rapor verisi yüklenirken bir bağlantı hatası oluştu.");
     } finally {
       setLoadingStructuredReport(false);
     }
@@ -221,50 +243,36 @@ export default function VehicleDetail() {
   useEffect(() => {
     if (variantId) {
       fetchVehicleDetails(variantId);
-      // Automatically load the AI report on page mount if logged in
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        fetchStructuredReport();
-        handleGenerateReport(false);
-      }
+      setCountdown(30);
+      fetchStructuredReport(false);
     }
   }, [variantId]);
 
   // Poll report status silently in the background
-  const checkReportStatusSilently = () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    fetch(`${API_URL}/reports/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify({ variantId, languageCode: "tr", force: false }),
-    })
-      .then(res => {
-        if (res.ok) return res.json();
-      })
-      .then(data => {
-        if (data && data.finalDecision !== 'INSUFFICIENT_DATA') {
-          setAiReport(data);
+  const checkReportStatusSilently = async () => {
+    if (!variantId || structuredReport) return;
+    try {
+      const headers = getAuthHeaders();
+      const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.reportData) {
+          setStructuredReport(data.reportData);
           setCountdown(null);
-          fetchVehicleDetails(variantId);
+          setLoadingStructuredReport(false);
         }
-      })
-      .catch(() => {});
+      }
+    } catch (e) {}
   };
 
   useEffect(() => {
     if (countdown === null) return;
     if (countdown === 0) {
       setCountdown(null);
-      handleGenerateReport(false); // check final status one last time
+      checkReportStatusSilently();
       return;
     }
 
-    // Check silently every 3 seconds (e.g. at 27, 24, 21, 18, 15, 12, 9, 6, 3 seconds remaining)
     if (countdown > 0 && countdown % 3 === 0) {
       checkReportStatusSilently();
     }
@@ -273,7 +281,7 @@ export default function VehicleDetail() {
       setCountdown(countdown - 1);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, structuredReport]);
 
   // Toggle Favorite
   const handleToggleFavorite = () => {
@@ -572,21 +580,53 @@ export default function VehicleDetail() {
           {structuredReport ? (
             <VehicleReportShell 
               report={structuredReport} 
-              onRefresh={fetchStructuredReport} 
+              onRefresh={() => fetchStructuredReport(true)} 
               isRefreshing={loadingStructuredReport} 
             />
           ) : (
-            <div className="bg-slate-900/60 border border-slate-800 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4">
-              <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                Bu araç hakkında karar odaklı, avantajları, dezavantajları ve kronik sorunları kapsayan detaylı TorqueScout AI Uzman Karar Sentezi raporunu oluşturun.
-              </p>
-              <button
-                onClick={fetchStructuredReport}
-                disabled={loadingStructuredReport}
-                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl transition text-sm shadow-lg shadow-orange-500/20"
-              >
-                {loadingStructuredReport ? "Rapor Oluşturuluyor..." : "Araç AI Raporunu Oluştur"}
-              </button>
+            <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-5 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
+              
+              <div className="relative flex items-center justify-center my-2">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
+                <div className="absolute text-lg font-black text-orange-500">
+                  {countdown !== null ? countdown : "..."}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 max-w-md">
+                <h3 className="text-sm font-bold text-slate-200 animate-pulse">
+                  TorqueScout AI Uzman Raporu Hazırlanıyor...
+                </h3>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Aracın motor-şanzıman kombinasyonu, kronik arıza veritabanı kayıtları ve geri çağırma listeleri taranıyor. Lütfen bekleyin...
+                </p>
+              </div>
+
+              {/* Road and Driving Car Animation */}
+              <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
+                <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
+                    style={{ width: `${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}%` }}
+                  ></div>
+                </div>
+                <div 
+                  className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
+                  style={{ 
+                    left: `calc(${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}% - 14px)`,
+                    transform: 'scaleX(-1)'
+                  }}
+                >
+                  🚗
+                </div>
+              </div>
+
+              {reportError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mt-2">
+                  ⚠️ {reportError}
+                </div>
+              )}
             </div>
           )}
 
