@@ -467,7 +467,7 @@ export default function ListingAiAdvisorCard({
 
           {/* REPORT MODE VIEW */}
           {activeMode === "REPORT" && (
-            <div className="w-full">
+            <div className="w-full space-y-4">
               {initializing ? (
                 <div className="p-12 text-center text-xs text-slate-400 animate-pulse flex flex-col items-center justify-center gap-3 bg-slate-950/80 rounded-2xl border border-white/10">
                   <span className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
@@ -494,6 +494,23 @@ export default function ListingAiAdvisorCard({
                   </span>
                 </div>
               )}
+
+              {/* Bottom Report Action Bar */}
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-orange-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-300">
+                <div className="flex items-center gap-2.5 font-medium">
+                  <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span><strong>Araç Raporu Modundasınız.</strong> Chatbot mesaj girişi kapalıdır.</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={initializing}
+                  onClick={handleGetReport}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs shadow-xl shadow-orange-500/20 transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                  <span>{structuredReport || initialReportMsg ? "Araç Raporunu Yenile" : "Bu Araç İçin Rapor Al"}</span>
+                </button>
+              </div>
             </div>
           )}
 
