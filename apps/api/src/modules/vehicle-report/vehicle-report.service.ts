@@ -131,8 +131,22 @@ export class VehicleReportService implements OnModuleInit {
     }
   }
 
-  async createVehicleReport(userId: string, dto: CreateVehicleReportDto) {
+  private async getValidUserId(userId: string): Promise<string> {
     try {
+      if (userId && userId !== 'guest_user') {
+        const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (user) return user.id;
+      }
+      const fallbackUser = await this.prisma.user.findFirst({ select: { id: true } });
+      return fallbackUser ? fallbackUser.id : userId;
+    } catch (e) {
+      return userId;
+    }
+  }
+
+  async createVehicleReport(userIdParam: string, dto: CreateVehicleReportDto) {
+    try {
+      const userId = await this.getValidUserId(userIdParam);
       if (dto.mode === 'VEHICLE_REPORT' && !dto.variantId) {
         throw new BadRequestException('VEHICLE_REPORT modu için variantId zorunludur.');
       }
