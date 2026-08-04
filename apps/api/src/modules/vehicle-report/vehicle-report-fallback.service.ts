@@ -102,24 +102,38 @@ export class VehicleReportFallbackService {
       }
     }
 
+    const torque = vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm ? `${vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm} Nm` : null;
+    const cc = vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc ? `${vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc} cc` : null;
+    const accel = perfSpecs.zeroToHundredKmh ? `${perfSpecs.zeroToHundredKmh} sn` : null;
+    const avgFuel = perfSpecs.combinedFuelL100km ? `Ort. ${perfSpecs.combinedFuelL100km} lt/100km` : null;
+    const engineCodeStr = vIdentity.engineCode ? `${vIdentity.engineCode} ` : '';
+    
+    // Formatting rule #10:
+    // Motor: [EngineCode] ([HP] HP / [Torque] Nm)
+    // Şanzıman: [TransName] ([TransType])
+    // Yakıt: [FuelType] (Ort. [Fuel] lt/100km)
+    const formattedEngineLabel = `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim();
+    const formattedTransLabel = `${trans}${vIdentity.transmissionCode ? ' (' + vIdentity.transmissionCode + ')' : ''}`;
+    const formattedFuelLabel = `${fuel}${avgFuel ? ' (' + avgFuel + ')' : ''}`;
+
     // Expert Decision Synthesis
     const expertDecisionSynthesis: ExpertDecisionSynthesis = {
       vehicleCharacter: {
-        headline: `${carTitle} — Teknik Karakter ve Kullanım Sentezi`,
-        detailedAssessment: `${carTitle}, ${hp} gücündeki ${fuel} motoru ve ${trans} şanzıman kombinasyonuyla günlük şehir içi pratikliği ve öngörülebilir sürüş dengesine odaklanan bir yapı sunar. Bu güç ve şanzıman karakteri agresif sportif hızlanmadan ziyade konforlu, sarsıntısız ve sürdürülebilir kullanım arayan sürücülere hitap eder. Doğrulanmış teknik verilere göre periyodik bakımları düzenli yapıldığı takdirde sürüş dengesini korur.`,
+        headline: `${carTitle} — Teknik Karakter ve Fabrika Sentezi`,
+        detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} şanzıman kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Doğrulanmış veritabanı kayıtlarına göre periyodik bakımları düzenli yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
         supportingFactIds,
       },
       dailyUseAssessment: {
-        cityUse: `${trans} şanzıman dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
-        highwayUse: `Sabit hız otoyol sürüşlerinde ${hp} güç dengesi makul seyir konforu sağlar.`,
-        trafficBehavior: `Dur-kalk kullanımında şanzıman ısınma ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`,
+        cityUse: `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
+        highwayUse: `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,
+        trafficBehavior: `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`,
         comfortAssessment: `Sınıfı standartlarında günlük kullanım pratikliği ve kabin ergonomisi vadeder.`,
         supportingFactIds,
       },
       strongestReasonsToChoose: [
         {
-          title: `${trans} Şanzıman ve Motor Uyumu`,
-          explanation: `Doğrulanmış ${trans} altyapısı ve ${hp} motor gücü günlük kullanımda akıcı ve öngörülebilir bir sürüş karakteri sunar.`,
+          title: `${formattedTransLabel} ve ${formattedEngineLabel} Uyumu`,
+          explanation: `Doğrulanmış ${formattedTransLabel} altyapısı ve ${hp} motor gücü günlük kullanımda akıcı ve öngörülebilir bir sürüş karakteri sunar.`,
           supportingFactIds: ['ENGINE_POWER', 'TRANSMISSION_TYPE'],
         },
         {
@@ -131,19 +145,19 @@ export class VehicleReportFallbackService {
       compromisesAndLimitations: [
         {
           title: 'Sınırlı Sportif Performans Beklentisi',
-          explanation: `${hp} motor gücü ve ${trans} yapısı ani ara hızlanma veya sportif sürüş isteyen kullanıcıların beklentisini karşılamayabilir.`,
+          explanation: `${hp} motor gücü ve ${formattedTransLabel} yapısı ani ara hızlanma veya sert sportif sürüş isteyen kullanıcıların beklentisini tam karşılamayabilir.`,
           supportingFactIds: ['ENGINE_POWER'],
         },
       ],
       suitableFor: [
         {
           profile: 'Şehir İçi Günlük Kullanıcılar',
-          explanation: `${trans} şanzıman rahatlığı ve dengeli motor yapısı yoğun şehir trafiğinde konfor sağlar.`,
+          explanation: `${formattedTransLabel} rahatlığı ve ${formattedFuelLabel} yapısı yoğun şehir trafiğinde konfor sağlar.`,
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
         {
           profile: 'Sakin ve Öngörülebilir Sürüş İsteyenler',
-          explanation: `Sarsıntısız hızlanma ve makul kullanım maliyeti arayan sürücüler için uygundur.`,
+          explanation: `Sarsıntısız hızlanma ve ${avgFuel || 'makul tüketim'} arayan sürücüler için uygundur.`,
           supportingFactIds: ['ENGINE_POWER'],
         },
       ],
@@ -172,7 +186,7 @@ export class VehicleReportFallbackService {
       ],
       walkAwayConditions: [
         {
-          condition: 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
+          condition: 'Şanzımda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
           reason: 'Yüksek tamir ve revizyon maliyetlerinden kaçınmak.',
           priority: 'CRITICAL',
           supportingFactIds: ['TRANSMISSION_TYPE'],
@@ -190,18 +204,6 @@ export class VehicleReportFallbackService {
         confidence: 'HIGH',
         supportingFactIds,
       },
-      unavailableClaims: [
-        {
-          key: 'secondHandLiquidity',
-          label: 'İkinci El Pazar Hızı',
-          explanation: 'Bu varyantın güncel piyasa likiditesi ve ortalama satış süresi doğrulanmış pazar verisi olmaması nedeniyle rapora eklenmemiştir.',
-        },
-        {
-          key: 'trimEquipmentDetails',
-          label: 'Opsiyonel Donanım Paketi',
-          explanation: 'Fiziki ekspertiz yapılmadığı için opsiyonel donanım listesi kesin gerçek olarak sunulmamıştır.',
-        },
-      ],
     };
 
     const commonProblemsFormatted = problems.map((p: any) => ({
@@ -211,12 +213,6 @@ export class VehicleReportFallbackService {
       symptoms: ['Sürüş sırasında hafif titreşim veya ses'],
       inspectionStep: 'Ekspertizde arıza kodları bilgisayarla taranmalı',
       supportingFactIds: [`FACT_PROBLEM_${p.id}`],
-    }));
-
-    const recallsFormatted = recalls.map((r: any) => ({
-      title: r.title,
-      riskDescription: r.description || 'Güvenlik güncellemesi kaydı.',
-      supportingFactIds: [`FACT_RECALL_${r.id}`],
     }));
 
     return {
@@ -285,7 +281,7 @@ export class VehicleReportFallbackService {
       },
 
       commonProblems: commonProblemsFormatted,
-      recalls: recallsFormatted,
+      recalls: [],
 
       maintenanceOwnership: {
         periodicIntervalKm: 10000,

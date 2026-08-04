@@ -21,9 +21,6 @@ export class VehicleReportContextBuilderService {
           where: { status: 'APPROVED' },
           orderBy: { riskLevel: 'desc' },
         },
-        recalls: {
-          where: { status: 'APPROVED' },
-        },
         checklists: {
           where: { status: 'APPROVED' },
           orderBy: { priority: 'asc' },
@@ -46,7 +43,7 @@ export class VehicleReportContextBuilderService {
 
     const specsJson = (variant.specs?.specs as any) || {};
 
-    // Build richer performance data from specs
+    // Build complete factory performance and technical specs
     const performanceData: Record<string, any> = {};
     if (specsJson.enginePowerHp) performanceData.enginePowerHp = specsJson.enginePowerHp;
     if (specsJson.enginePowerKw) performanceData.enginePowerKw = specsJson.enginePowerKw;
@@ -71,6 +68,7 @@ export class VehicleReportContextBuilderService {
         modelYear: variant.year,
         engineDisplacementCc: specsJson.engineDisplacementCc || undefined,
         enginePowerHp: specsJson.enginePowerHp || undefined,
+        engineTorqueNm: specsJson.engineTorqueNm || undefined,
         engineCode: variant.engine?.code || undefined,
         fuelType: variant.fuelType || 'Belirtilmemiş',
         transmissionName: variant.transmission?.name || 'Belirtilmemiş',
@@ -94,12 +92,6 @@ export class VehicleReportContextBuilderService {
           checkRecommendation: (p as any).checkRecommendation || null,
           category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
           problemType: (p as any).problemType || 'CHRONIC',
-        })),
-        recalls: variant.recalls.map((r) => ({
-          id: r.id,
-          title: r.title,
-          description: r.description,
-          riskLevel: r.riskLevel,
         })),
         inspectionChecklist: variant.checklists.map((c) => ({
           id: c.id,

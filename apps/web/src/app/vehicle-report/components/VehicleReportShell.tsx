@@ -23,18 +23,16 @@ import {
 const categoryLabels: Record<string, string> = {
   all: "Tüm Rapor",
   summary: "Karar Özeti",
-  identity: "Araç Kimliği",
-  engineTrans: "Motor & Şanzıman",
-  perf: "Performans & Sürüş",
+  identity: "Araç Kimliği & Fabrika Özellikleri",
+  engineTrans: "Motor & Şanzıman Karakteri",
+  perf: "Performans & Yakıt Ekonomisi",
   problems: "Kronik Sorunlar",
-  maint: "Bakım & Maliyet",
+  maint: "Bakım & Periyodik Bilgiler",
   scenarios: "Kullanım Senaryoları",
   checks: "Ekspertiz Kontrolleri",
   sellerQuestions: "Satıcı Soruları",
-  recalls: "Geri Çağırmalar",
   listingAnalysis: "İlan İncelemesi",
   verdict: "Nihai Karar",
-  quality: "Veri Güvenilirliği",
 };
 
 interface VehicleReportShellProps {
@@ -71,6 +69,17 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     return "text-rose-400 border-rose-500/40 bg-rose-500/10";
   };
 
+  // Calculations for Fuel Economy & Power Analysis card
+  const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp;
+  const torqueValue = report.performanceUsage?.torqueNm;
+  const weightValue = report.performanceUsage?.curbWeightKg;
+  const hpPerTonne = hpValue && weightValue ? Math.round((hpValue / weightValue) * 1000) : null;
+
+  const combinedFuel = report.performanceUsage?.combinedFuelL100km;
+  const cityFuel = report.performanceUsage?.cityFuelL100km;
+  const highwayFuel = report.performanceUsage?.highwayFuelL100km;
+  const annualLitersEstimate = combinedFuel ? Math.round((combinedFuel / 100) * 15000) : null;
+
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
       {/* Top Header Bar */}
@@ -92,8 +101,10 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             {report.vehicleIdentity.modelYear} {report.vehicleIdentity.brand} {report.vehicleIdentity.model}
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} • ` : ""}
-            {report.vehicleIdentity.transmissionName} ({report.vehicleIdentity.fuelType})
+            {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} ` : ""}
+            {hpValue ? `(${hpValue} HP${torqueValue ? ` / ${torqueValue} Nm` : ""}) ` : ""}• 
+            {report.vehicleIdentity.transmissionName} • {report.vehicleIdentity.fuelType}
+            {combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : ""}
           </p>
         </div>
 
@@ -111,58 +122,34 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         </div>
       </div>
 
-      {/* 4+2 Score Indicator Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* 2 Score Indicator Grid (Buyability & Technical Risk) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Buyability Score */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between ${getScoreColor(report.scoring.buyabilityScore.value)}`}>
-          <div className="flex items-center justify-between text-xs font-semibold opacity-90 mb-1">
-            <span>Satın Alınabilirlik</span>
-            <ShieldCheck className="w-4 h-4" />
+        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring.buyabilityScore.value)}`}>
+          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider opacity-90 mb-1">
+            <span>Satın Alınabilirlik Skoru</span>
+            <ShieldCheck className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-extrabold my-1">
+          <div className="text-3xl font-black my-2">
             {report.scoring.buyabilityScore.value !== null ? `${report.scoring.buyabilityScore.value} / 100` : "Veri Yetersiz"}
           </div>
-          <span className="text-[11px] opacity-75 font-medium">Genel Değerlendirme</span>
+          <span className="text-xs opacity-80 font-medium">Genel Değerlendirme & Satın Alma Uygunluğu</span>
         </div>
 
         {/* Technical Risk Score */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between ${getScoreColor(report.scoring.technicalRiskScore.value, true)}`}>
-          <div className="flex items-center justify-between text-xs font-semibold opacity-90 mb-1">
-            <span>Teknik Risk</span>
-            <AlertTriangle className="w-4 h-4" />
+        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring.technicalRiskScore.value, true)}`}>
+          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider opacity-90 mb-1">
+            <span>Teknik Risk Skoru</span>
+            <AlertTriangle className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-extrabold my-1">
+          <div className="text-3xl font-black my-2">
             {report.scoring.technicalRiskScore.value !== null ? `${report.scoring.technicalRiskScore.value} / 100` : "Veri Yetersiz"}
           </div>
-          <span className="text-[11px] font-semibold opacity-90">
+          <span className="text-xs font-semibold opacity-90">
             {report.scoring.technicalRiskScore.value !== null && report.scoring.technicalRiskScore.value > 60 
               ? "⚠️ Yüksek Risk Seviyesi" 
               : "Dengeli Risk Seviyesi"}
           </span>
-        </div>
-
-        {/* Variant Match Confidence */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between ${getScoreColor(report.scoring.variantConfidenceScore.value)}`}>
-          <div className="flex items-center justify-between text-xs font-semibold opacity-90 mb-1">
-            <span>Varyant Eşleşmesi</span>
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <div className="text-2xl font-extrabold my-1">
-            %{report.scoring.variantConfidenceScore.value ?? 85}
-          </div>
-          <span className="text-[11px] opacity-75 font-medium">{report.vehicleIdentity.variantMatchConfidence} Eşleşme</span>
-        </div>
-
-        {/* Evidence Confidence */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between ${getScoreColor(report.scoring.dataConfidenceScore.value)}`}>
-          <div className="flex items-center justify-between text-xs font-semibold opacity-90 mb-1">
-            <span>Veri Güven Skoru</span>
-            <Activity className="w-4 h-4" />
-          </div>
-          <div className="text-2xl font-extrabold my-1">
-            %{report.scoring.dataConfidenceScore.value ?? 90}
-          </div>
-          <span className="text-[11px] opacity-75 font-medium">{report.dataQuality.verifiedFactCount} Doğrulanmış Kayıt</span>
         </div>
       </div>
 
@@ -740,7 +727,6 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Doğrulanmış Kanıt Kayıt Sayısı</span>
                 <span className="font-bold text-emerald-400 text-base">{report.dataQuality.verifiedFactCount} Kanıt Kaydı</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">

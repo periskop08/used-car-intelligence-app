@@ -313,7 +313,7 @@ export interface ExpertDecisionSynthesis {
     supportingFactIds: string[];
   };
 
-  unavailableClaims: UnavailableClaimItem[];
+  unavailableClaims?: UnavailableClaimItem[];
 }
 
 /**
@@ -345,7 +345,7 @@ export interface ComprehensiveVehicleReport {
   engineTransmission: EngineTransmissionSection;
   performanceUsage: PerformanceUsageSection;
   commonProblems: CommonProblemReportItem[];
-  recalls: RecallReportItem[];
+  recalls?: RecallReportItem[];
   maintenanceOwnership: MaintenanceOwnershipSection;
   usageScenarios: UsageScenarioResult[];
   prePurchaseChecks: PrePurchaseCheckItem[];

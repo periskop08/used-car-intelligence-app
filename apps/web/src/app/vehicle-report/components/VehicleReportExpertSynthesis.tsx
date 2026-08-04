@@ -317,26 +317,6 @@ export default function VehicleReportExpertSynthesis({
         </div>
       </div>
 
-      {/* 6. VERİ EKSİKLİKLERİ (Unavailable Claims - Kullanıcı Dostu) */}
-      {synthesis.unavailableClaims && synthesis.unavailableClaims.length > 0 && (
-        <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-            <span>Doğrulanmış Veri Kapsamı Dışındaki Konular</span>
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            {synthesis.unavailableClaims.map((item, idx) => (
-              <div key={idx} className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5 flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0 mt-1.5" />
-                <div>
-                  <span className="font-bold text-slate-300 block">{item.label}</span>
-                  <span className="text-slate-400 text-[11px]">{item.explanation}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 7. ŞARTLI NİHAİ KARAR (Conditional Verdict Card) */}
       {synthesis.finalConditionalVerdict && (
