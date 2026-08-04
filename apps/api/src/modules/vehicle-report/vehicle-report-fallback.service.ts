@@ -18,6 +18,7 @@ export class VehicleReportFallbackService {
   ): ComprehensiveVehicleReport {
     const vIdentity = vehicleContext?.vehicleIdentity || {};
     const reportData = vehicleContext?.verifiedDatabaseVehicleReport || {};
+    const perfSpecs = vehicleContext?.performanceSpecs || {};
     const problems = reportData.knownDatabaseProblems || [];
     const recalls = reportData.recalls || [];
 
@@ -30,7 +31,7 @@ export class VehicleReportFallbackService {
     const year = vIdentity.modelYear || '';
     const fuel = vIdentity.fuelType || 'Benzin';
     const trans = vIdentity.transmissionName || 'Otomatik';
-    const hp = vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} bg` : 'standart güç';
+    const hp = vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} bg` : (perfSpecs.enginePowerHp ? `${perfSpecs.enginePowerHp} bg` : 'standart güç');
     const carTitle = `${year} ${brand} ${model} ${vIdentity.trimName || ''}`.trim();
 
     // Collect Supporting Facts
@@ -270,9 +271,15 @@ export class VehicleReportFallbackService {
       },
 
       performanceUsage: {
-        powerHp: vIdentity.enginePowerHp,
-        torqueNm: vIdentity.engineTorqueNm,
-        combinedFuelL100km: vIdentity.combinedFuelL100km,
+        powerHp: vIdentity.enginePowerHp || perfSpecs.enginePowerHp,
+        torqueNm: perfSpecs.engineTorqueNm,
+        zeroToHundredKmh: perfSpecs.zeroToHundredKmh,
+        topSpeedKmh: perfSpecs.topSpeedKmh,
+        curbWeightKg: perfSpecs.curbWeightKg,
+        combinedFuelL100km: perfSpecs.combinedFuelL100km,
+        cityFuelL100km: perfSpecs.cityFuelL100km,
+        highwayFuelL100km: perfSpecs.highwayFuelL100km,
+        trunkCapacityLiters: perfSpecs.trunkCapacityLiters,
         assessment: 'Performans ve tüketim verileri fabrika değerleri esas alınarak derlenmiştir.',
         supportingFactIds,
       },

@@ -310,7 +310,7 @@ export class VehicleReportService implements OnModuleInit {
       const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId);
       return await this.cacheService.getCachedReport(
         userId,
-        'VEHICLE_REPORT',
+        'TORQUE_SCOUT_VEHICLE_REPORT',
         vRes.vehicleContextHash,
         'v1.0',
         variantId,

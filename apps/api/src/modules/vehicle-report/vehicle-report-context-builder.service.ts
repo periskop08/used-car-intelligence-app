@@ -19,12 +19,14 @@ export class VehicleReportContextBuilderService {
         specs: true,
         problems: {
           where: { status: 'APPROVED' },
+          orderBy: { riskLevel: 'desc' },
         },
         recalls: {
           where: { status: 'APPROVED' },
         },
         checklists: {
           where: { status: 'APPROVED' },
+          orderBy: { priority: 'asc' },
         },
       },
     });
@@ -43,6 +45,21 @@ export class VehicleReportContextBuilderService {
     });
 
     const specsJson = (variant.specs?.specs as any) || {};
+
+    // Build richer performance data from specs
+    const performanceData: Record<string, any> = {};
+    if (specsJson.enginePowerHp) performanceData.enginePowerHp = specsJson.enginePowerHp;
+    if (specsJson.enginePowerKw) performanceData.enginePowerKw = specsJson.enginePowerKw;
+    if (specsJson.engineTorqueNm) performanceData.engineTorqueNm = specsJson.engineTorqueNm;
+    if (specsJson.engineDisplacementCc) performanceData.engineDisplacementCc = specsJson.engineDisplacementCc;
+    if (specsJson.zeroToHundredKmh) performanceData.zeroToHundredKmh = specsJson.zeroToHundredKmh;
+    if (specsJson.topSpeed) performanceData.topSpeedKmh = specsJson.topSpeed;
+    if (specsJson.averageFuelConsumption) performanceData.combinedFuelL100km = specsJson.averageFuelConsumption;
+    if (specsJson.cityFuelConsumption) performanceData.cityFuelL100km = specsJson.cityFuelConsumption;
+    if (specsJson.highwayFuelConsumption) performanceData.highwayFuelL100km = specsJson.highwayFuelConsumption;
+    if (specsJson.weight) performanceData.curbWeightKg = specsJson.weight;
+    if (specsJson.luggageCapacity) performanceData.trunkCapacityLiters = specsJson.luggageCapacity;
+    if (specsJson.drivetrain) performanceData.drivetrain = specsJson.drivetrain;
 
     const contextObj = {
       vehicleIdentity: {
@@ -63,6 +80,7 @@ export class VehicleReportContextBuilderService {
         marketRegion: variant.marketRegion || 'TR',
         variantMatchConfidence: variant.engine?.code && variant.transmission?.name ? 'KESİN' : 'YÜKSEK',
       },
+      performanceSpecs: Object.keys(performanceData).length > 0 ? performanceData : null,
       verifiedDatabaseVehicleReport: {
         summary: reportCache?.summary || null,
         riskScore: reportCache?.riskScore ?? null,
@@ -72,7 +90,10 @@ export class VehicleReportContextBuilderService {
           title: p.title,
           description: p.description,
           riskLevel: p.riskLevel,
-          category: p.affectedEngine || p.affectedTransmission || 'Mekanik',
+          symptoms: (p as any).symptoms || null,
+          checkRecommendation: (p as any).checkRecommendation || null,
+          category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
+          problemType: (p as any).problemType || 'CHRONIC',
         })),
         recalls: variant.recalls.map((r) => ({
           id: r.id,
