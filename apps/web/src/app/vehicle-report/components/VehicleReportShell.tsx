@@ -69,16 +69,27 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     return "text-rose-400 border-rose-500/40 bg-rose-500/10";
   };
 
-  // Calculations for Fuel Economy & Power Analysis card
+  // Detailed Factory Specifications & Performance Calculations
   const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp;
-  const torqueValue = report.performanceUsage?.torqueNm;
+  const torqueValue = report.performanceUsage?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
+  const powerRpm = report.performanceUsage?.powerRpm || report.vehicleIdentity?.enginePowerRpm;
+  const torqueRpm = report.performanceUsage?.torqueRpm || report.vehicleIdentity?.engineTorqueRpm;
+  const engineType = report.vehicleIdentity?.engineType;
   const weightValue = report.performanceUsage?.curbWeightKg;
   const hpPerTonne = hpValue && weightValue ? Math.round((hpValue / weightValue) * 1000) : null;
 
   const combinedFuel = report.performanceUsage?.combinedFuelL100km;
   const cityFuel = report.performanceUsage?.cityFuelL100km;
   const highwayFuel = report.performanceUsage?.highwayFuelL100km;
+  const fuelTank = report.performanceUsage?.fuelTankCapacityLiters;
+  const rangeEstimate = report.performanceUsage?.estimatedRangeKm || (combinedFuel && fuelTank ? Math.round((fuelTank * 100) / combinedFuel) : (combinedFuel ? Math.round((55 * 100) / combinedFuel) : null));
   const annualLitersEstimate = combinedFuel ? Math.round((combinedFuel / 100) * 15000) : null;
+
+  const accelTime = report.performanceUsage?.zeroToHundredKmh;
+  const topSpeed = report.performanceUsage?.topSpeedKmh;
+  const dimensions = report.performanceUsage?.dimensionsMm || report.vehicleIdentity?.dimensionsMm;
+  const trunkVol = report.performanceUsage?.trunkCapacityLiters;
+  const drivetrain = report.vehicleIdentity?.drivetrain;
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
@@ -291,28 +302,28 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 <span className="font-bold text-white text-sm">{report.vehicleIdentity.brand} {report.vehicleIdentity.model}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Model Yılı</span>
-                <span className="font-bold text-white text-sm">{report.vehicleIdentity.modelYear}</span>
+                <span className="text-slate-400 block text-[10px]">Model Yılı & Gövde</span>
+                <span className="font-bold text-white text-sm">{report.vehicleIdentity.modelYear} • {report.vehicleIdentity.bodyType}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Gövde Tipi</span>
-                <span className="font-bold text-white text-sm">{report.vehicleIdentity.bodyType}</span>
+                <span className="text-slate-400 block text-[10px]">Motor Kodu & Tipi</span>
+                <span className="font-bold text-orange-400 text-sm">{report.vehicleIdentity.engineCode || "Motor"} {engineType ? "(" + engineType + ")" : ""}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Motor / Yakıt</span>
-                <span className="font-bold text-white text-sm">{report.vehicleIdentity.engineCode || report.vehicleIdentity.fuelType}</span>
+                <span className="text-slate-400 block text-[10px]">Silindir Hacmi</span>
+                <span className="font-bold text-white text-sm">{report.vehicleIdentity.engineDisplacementCc ? report.vehicleIdentity.engineDisplacementCc + " cc" : "-"}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
                 <span className="text-slate-400 block text-[10px]">Şanzıman Tipi</span>
                 <span className="font-bold text-white text-sm">{report.vehicleIdentity.transmissionName}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Jenerasyon</span>
-                <span className="font-bold text-white text-sm">{report.vehicleIdentity.generation || "-"}</span>
+                <span className="text-slate-400 block text-[10px]">Çekiş Sistemi</span>
+                <span className="font-bold text-purple-400 text-sm">{drivetrain || "-"}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                <span className="text-slate-400 block text-[10px]">Donanım Paketi</span>
-                <span className="font-bold text-white text-sm">{report.vehicleIdentity.trimName || "-"}</span>
+                <span className="text-slate-400 block text-[10px]">Araç Boyutları (U x G x Y)</span>
+                <span className="font-bold text-white text-sm">{dimensions || "-"}</span>
               </div>
               <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
                 <span className="text-slate-400 block text-[10px]">Varyant Eşleşmesi</span>
@@ -370,43 +381,49 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
               <Activity className="w-5 h-5 text-emerald-400" />
               <h2 className="text-base font-bold text-white">Performans & Sürüş Verileri</h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-              {report.performanceUsage.powerHp && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">Motor Gücü</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.powerHp} HP</span>
-                </div>
-              )}
-              {report.performanceUsage.torqueNm && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">Tork Gücü</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.torqueNm} Nm</span>
-                </div>
-              )}
-              {report.performanceUsage.zeroToHundredKmh && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">0-100 Hızlanma</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.zeroToHundredKmh} sn</span>
-                </div>
-              )}
-              {report.performanceUsage.combinedFuelL100km && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">Ort. Yakıt Tüketimi</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.combinedFuelL100km} lt/100km</span>
-                </div>
-              )}
-              {report.performanceUsage.trunkCapacityLiters && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">Bagaj Hacmi</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.trunkCapacityLiters} lt</span>
-                </div>
-              )}
-              {report.performanceUsage.curbWeightKg && (
-                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
-                  <span className="text-slate-400 block text-[10px]">Ağırlık</span>
-                  <span className="font-bold text-white text-sm">{report.performanceUsage.curbWeightKg} kg</span>
-                </div>
-              )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Maksimum Güç (HP @ d/dk)</span>
+                <span className="font-bold text-amber-400 text-sm">{powerRpm || (hpValue ? hpValue + " HP" : "-")}</span>
+              </div>
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Maksimum Tork (Nm @ d/dk)</span>
+                <span className="font-bold text-orange-400 text-sm">{torqueRpm || (torqueValue ? torqueValue + " Nm" : "-")}</span>
+              </div>
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">0-100 km/s Hızlanma</span>
+                <span className="font-bold text-white text-sm">{accelTime ? accelTime + " sn" : "-"}</span>
+              </div>
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Maksimum Hız</span>
+                <span className="font-bold text-white text-sm">{topSpeed ? topSpeed + " km/h" : "-"}</span>
+              </div>
+
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Şehir İçi / Dışı / Karma Tüketim</span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {cityFuel || "-"} / {highwayFuel || "-"} / {combinedFuel || "-"} lt/100km
+                </span>
+              </div>
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Yakıt Deposu & Menzil</span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {fuelTank ? fuelTank + " L Depo" : "Depo Bilgisi Yok"} {rangeEstimate ? "(~" + rangeEstimate + " km menzil)" : ""}
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Boş Ağırlık & HP/Ton</span>
+                <span className="font-bold text-white text-sm">
+                  {weightValue ? weightValue + " kg" : "-"} {hpPerTonne ? "(" + hpPerTonne + " HP/Ton)" : ""}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40">
+                <span className="text-slate-400 block text-[10px]">Bagaj Hacmi & Boyutlar</span>
+                <span className="font-bold text-white text-sm">
+                  {trunkVol ? trunkVol + " Litre" : "-"} {dimensions ? "• " + dimensions : ""}
+                </span>
+              </div>
             </div>
             {report.performanceUsage.assessment && (
               <p className="text-xs text-slate-300 bg-slate-800/30 p-3 rounded-xl border border-slate-700/30 leading-relaxed">

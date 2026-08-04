@@ -47,16 +47,22 @@ export class VehicleReportContextBuilderService {
     const performanceData: Record<string, any> = {};
     if (specsJson.enginePowerHp) performanceData.enginePowerHp = specsJson.enginePowerHp;
     if (specsJson.enginePowerKw) performanceData.enginePowerKw = specsJson.enginePowerKw;
+    if (specsJson.enginePowerRpm) performanceData.powerRpm = specsJson.enginePowerRpm;
     if (specsJson.engineTorqueNm) performanceData.engineTorqueNm = specsJson.engineTorqueNm;
+    if (specsJson.engineTorqueRpm) performanceData.torqueRpm = specsJson.engineTorqueRpm;
     if (specsJson.engineDisplacementCc) performanceData.engineDisplacementCc = specsJson.engineDisplacementCc;
+    if (specsJson.engineType) performanceData.engineType = specsJson.engineType;
     if (specsJson.zeroToHundredKmh) performanceData.zeroToHundredKmh = specsJson.zeroToHundredKmh;
     if (specsJson.topSpeed) performanceData.topSpeedKmh = specsJson.topSpeed;
     if (specsJson.averageFuelConsumption) performanceData.combinedFuelL100km = specsJson.averageFuelConsumption;
     if (specsJson.cityFuelConsumption) performanceData.cityFuelL100km = specsJson.cityFuelConsumption;
     if (specsJson.highwayFuelConsumption) performanceData.highwayFuelL100km = specsJson.highwayFuelConsumption;
+    if (specsJson.fuelTankCapacityLiters || specsJson.fuelTankLiters) performanceData.fuelTankCapacityLiters = specsJson.fuelTankCapacityLiters || specsJson.fuelTankLiters;
+    if (specsJson.estimatedRangeKm) performanceData.estimatedRangeKm = specsJson.estimatedRangeKm;
     if (specsJson.weight) performanceData.curbWeightKg = specsJson.weight;
     if (specsJson.luggageCapacity) performanceData.trunkCapacityLiters = specsJson.luggageCapacity;
     if (specsJson.drivetrain) performanceData.drivetrain = specsJson.drivetrain;
+    if (specsJson.dimensionsMm) performanceData.dimensionsMm = specsJson.dimensionsMm;
 
     const contextObj = {
       vehicleIdentity: {
@@ -70,11 +76,15 @@ export class VehicleReportContextBuilderService {
         enginePowerHp: specsJson.enginePowerHp || undefined,
         engineTorqueNm: specsJson.engineTorqueNm || undefined,
         engineCode: variant.engine?.code || undefined,
+        engineType: specsJson.engineType || undefined,
+        enginePowerRpm: specsJson.enginePowerRpm || undefined,
+        engineTorqueRpm: specsJson.engineTorqueRpm || undefined,
         fuelType: variant.fuelType || 'Belirtilmemiş',
         transmissionName: variant.transmission?.name || 'Belirtilmemiş',
         transmissionCode: variant.transmission?.type || undefined,
         drivetrain: specsJson.drivetrain || 'Belirtilmemiş',
         trimName: variant.trim?.name || undefined,
+        dimensionsMm: specsJson.dimensionsMm || undefined,
         marketRegion: variant.marketRegion || 'TR',
         variantMatchConfidence: variant.engine?.code && variant.transmission?.name ? 'KESİN' : 'YÜKSEK',
       },

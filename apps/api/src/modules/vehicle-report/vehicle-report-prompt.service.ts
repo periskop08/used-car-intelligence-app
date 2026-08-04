@@ -112,16 +112,17 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 ## ZORUNLU KODLAMA VE ETİKET KURALLARI
 
 ### 1. "BU ARAÇ NASIL BİR OTOMOBİL?" (vehicleCharacter) DETAY STANDARDI
-- vehicleCharacter.detailedAssessment içinde aracın tüm fabrika çıkış teknik detaylarını (Motor kodu, cc, HP, Tork, 0-100 süresi, azami hız, karma tüketim, ton başına beygir gücü HP/Ton) harmanlayarak araç hakkında son derece kapsamlı ve teknik bir otomotiv mühendisliği analizi üret.
-- Örnek: "2024 BMW 3 Serisi M Sport, B48 2.0L turbo benzinli motor ünitesinden ürettiği 156 HP güç ve 250 Nm tork değerini Steptronic 8 ileri otomatik şanzıman ile arka tekerleklere iletir. 1540 kg boş ağırlığı ile ton başına 101 HP güç düşen araç, 0-100 km/s hızlanmasını 8.9 saniyede tamamlar..."
+- vehicleCharacter.detailedAssessment içinde aracın tüm fabrika çıkış teknik detaylarını (Motor kodu, cc, HP @ d/dk, Tork @ d/dk, 0-100 süresi, azami hız, şehir içi/dışı/karma tüketim, yakıt deposu hacmi, tam depo menzili, boyutlar U x G x Y, boş ağırlık ve ton başına beygir gücü HP/Ton) harmanlayarak araç hakkında son derece kapsamlı ve teknik bir otomotiv mühendisliği analizi üret.
+- Örnek: "2024 BMW 3 Serisi M Sport, B48 2.0L 4 Silindirli Turbo Benzinli motor ünitesinden ürettiği 184 HP (5000 d/dk) güç ve 300 Nm (1350-4000 d/dk) tork değerini Steptronic 8 ileri otomatik şanzıman ile arka tekerleklere (RWD) iletir. 4709x1827x1435 mm boyutlara ve 1545 kg boş ağırlığa sahip olan araç (HP/Ton: 119 HP/Ton), 0-100 km/s hızlanmasını 7.1 saniyede tamamlar ve 235 km/s azami hıza ulaşır. 59 Litrelik yakıt deposu ve 6.1 lt/100km karma tüketim verisiyle tam depoda yaklaşık 967 km menzil sunar..."
 
-### 2. STANDART ETİKET VE BİLGİ FORMATI (HER BÖLÜMDE UYGULA)
-- **Motor geçen yerlerde:** Motor kodunu, Beygir Gücü (HP) ve Tork (Nm) değerlerini mutlaka yaz. Örn: B48 2.0L (156 HP / 250 Nm)
-- **Şanzıman geçen yerlerde:** Şanzıman adı ve tipini mutlaka yaz. Örn: Steptronic (Tam Otomatik 8 İleri)
-- **Yakıt Tipi geçen yerlerde:** Yakıt tipi ile birlikte ortalama fabrika tüketim verisini yaz. Örn: Benzin (Ort. 6.5 lt/100km)
+### 2. RAPOR GENELİNDE TEKNİK VERİ HARMANLAMA (HER BÖLÜMDE UYGULA)
+- **Motor geçen yerlerde:** Motor kodunu, motor tipini, Beygir Gücü ve Tork devir değerlerini yaz. Örn: B48 2.0L 4-Silindir Turbo (184 HP @ 5000 d/dk / 300 Nm @ 1350-4000 d/dk)
+- **Şanzıman geçen yerlerde:** Şanzıman adı, tipi, vites sayısı ve çekiş sistemini yaz. Örn: Steptronic (8 İleri Tam Otomatik - RWD Arkadan İtiş)
+- **Yakıt & Tüketim geçen yerlerde:** Yakıt tipi, Şehir İçi/Şehir Dışı/Karma tüketim ve Depo/Menzil bilgisini yaz. Örn: Benzin (Şehir İçi: 7.8L / Şehir Dışı: 5.2L / Karma: 6.1L — 59L Depo ile ~967 km menzil)
+- **Kullanım Senaryolarında:** Boyutlar (park kolaylığı), Bagaj Hacmi (aile kullanımı), Sabit Hız Otoyol Seyri (depo menzili) somut verilerle açıklanmalıdır.
 
-### 3. GERÇEKÇİ VERİ VE HALÜSİNASYON YASAĞI
-- VEHICLE_CONTEXT içerisinde yer almayan değerleri uydurma.
+### 3. GERÇEKÇİ VERİ VE OTOMOTİV HASSASİYETİ
+- Araca özgü fabrika üretim veritabanı bilgilerini otomotiv mühendisliği hassasiyetiyle aktar.
 - "Yağını zamanında değiştirin", "Ekspertiz yaptırın" gibi jenerik tavsiyeleri tek başına sunma.
 
 ### 4. USAGE SCENARIOS (En az 4 senaryo)
@@ -131,7 +132,7 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 - Sürücü Adayı / Şehir İçi Pratiklik (yeni_surucu)
 
 ### 5. PREMIUM CHECKLIST VE INSPECTION (En az 6 soru ve 6 kontrol)
-- Sorular ve ekspertiz adımları araca ve kronik sorunlarına özgü teknik detaylar içermelidir.
+- Sorular ve ekspertiz adımları araca, motor koduna, turbo/şanzıman mimarisine özgü teknik detaylar içermelidir.
 
 ## ÇIKTI FORMATI
 Yalnızca geçerli JSON üret. Markdown, HTML, açıklama metni veya backtick ekleme. JSON dışında hiçbir şey yazma.`;
@@ -159,17 +160,21 @@ ${vehicleTitle || 'Belirtilmemiş'}
 --- VEHICLE_CONTEXT (DOĞRULANMIŞ FABRİKA VE TEKNİK VERİLER) ---
 ${JSON.stringify(vehicleContext, null, 2)}
 
---- SENTEZ ÖZETİ ---
+--- KAPSAMLI FABRİKA TEKNİK SENTEZ ÖZETİ ---
 Araç: ${vehicleTitle}
-Motor & Güç: ${identity.engineCode || 'Motor'} (${identity.enginePowerHp || perf.enginePowerHp || '?'} HP / ${identity.engineTorqueNm || perf.engineTorqueNm || '?'} Nm)
-Şanzıman: ${identity.transmissionName} (${identity.drivetrain || 'Çekiş'})
-Yakıt & Tüketim: ${identity.fuelType} (Karma Ort: ${perf.combinedFuelL100km || '?'} lt/100km)
-Performans: 0-100: ${perf.zeroToHundredKmh || '?'} sn | Azami Hız: ${perf.topSpeedKmh || '?'} km/h | Ağırlık: ${perf.curbWeightKg || '?'} kg
+Motor & Tipi: ${identity.engineCode || 'Motor'} (${identity.engineType || 'Motor Tipi'})
+Güç & Devir: ${identity.enginePowerHp || perf.enginePowerHp || '?'} HP ${identity.enginePowerRpm || ''}
+Tork & Devir: ${identity.engineTorqueNm || perf.engineTorqueNm || '?'} Nm ${identity.engineTorqueRpm || ''}
+Şanzıman & Çekiş: ${identity.transmissionName} (${identity.drivetrain || 'Çekiş'})
+Performans: 0-100 km/s: ${perf.zeroToHundredKmh || '?'} sn | Azami Hız: ${perf.topSpeedKmh || '?'} km/h
+Tüketim: Şehir İçi: ${perf.cityFuelL100km || '?'}L | Şehir Dışı: ${perf.highwayFuelL100km || '?'}L | Karma: ${perf.combinedFuelL100km || '?'}L / 100km
+Depo & Menzil: ${perf.fuelTankCapacityLiters || '?'} Litre Depo | Tahmini Menzil: ${perf.estimatedRangeKm || '?'} km
+Boyut & Ağırlık: ${perf.dimensionsMm || identity.dimensionsMm || '?'} mm | Boş Ağırlık: ${perf.curbWeightKg || '?'} kg | Bagaj: ${perf.trunkCapacityLiters || '?'} L
 Onaylı Kronik Sorun Sayısı: ${problems.length}
 
 ${problems.length > 0 ? `--- ONAYLANMIŞ KRONİK SORUNLAR ---
 ${problems.map((p: any, i: number) => `${i + 1}. [${p.riskLevel} RİSK] ${p.title}: ${p.description}`).join('\n')}` : '--- KRONİK SORUN: Onaylanmış kayıt bulunmamaktadır ---'}
 
-Yukarıdaki VEHICLE_CONTEXT verilerini ve etiketi standart kurallarını kullanarak VehicleReportGeneratedContent JSON yapısını tam ve eksiksiz üret.`;
+Yukarıdaki VEHICLE_CONTEXT verilerini ve 13 fabrika teknik özelliğini raporun TÜM bölümlerinde harmanlayarak VehicleReportGeneratedContent JSON yapısını tam ve eksiksiz üret.`;
   }
 }

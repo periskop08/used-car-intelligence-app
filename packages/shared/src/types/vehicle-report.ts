@@ -69,12 +69,16 @@ export interface VehicleIdentitySection {
   engineDisplacementCc?: number;
   enginePowerHp?: number;
   engineCode?: string;
+  engineType?: string;
+  enginePowerRpm?: string;
+  engineTorqueRpm?: string;
   fuelType: string;
   transmissionName: string;
   transmissionCode?: string;
   drivetrain?: string;
   trimName?: string;
   marketRegion?: string;
+  dimensionsMm?: string;
   variantMatchConfidence: 'KESİN' | 'YÜKSEK' | 'ORTA' | 'DÜŞÜK' | 'BELİRSİZ';
   matchWarning?: string;
   supportingFactIds: string[];
@@ -96,13 +100,18 @@ export interface EngineTransmissionSection {
 export interface PerformanceUsageSection {
   powerHp?: number;
   torqueNm?: number;
+  powerRpm?: string;
+  torqueRpm?: string;
   zeroToHundredKmh?: number;
   topSpeedKmh?: number;
   curbWeightKg?: number;
   combinedFuelL100km?: number;
   cityFuelL100km?: number;
   highwayFuelL100km?: number;
+  fuelTankCapacityLiters?: number;
+  estimatedRangeKm?: number;
   trunkCapacityLiters?: number;
+  dimensionsMm?: string;
   assessment?: string;
   supportingFactIds: string[];
 }
