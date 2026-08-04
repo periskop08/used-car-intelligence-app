@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
 import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import { 
@@ -8,9 +8,7 @@ import {
   AlertTriangle, 
   Car, 
   RefreshCcw, 
-  HelpCircle, 
-  AlertCircle,
-  Fuel
+  AlertCircle
 } from "lucide-react";
 
 interface VehicleReportShellProps {
@@ -20,8 +18,6 @@ interface VehicleReportShellProps {
 }
 
 export default function VehicleReportShell({ report, onRefresh, isRefreshing }: VehicleReportShellProps) {
-  const [showAllProblems, setShowAllProblems] = useState<boolean>(false);
-
   const isListingMode = report.mode === "LISTING_REPORT";
 
   const getScoreColor = (value: number | null, isRisk: boolean = false) => {
@@ -36,18 +32,10 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     return "text-rose-400 border-rose-500/40 bg-rose-500/10";
   };
 
-  // Detailed Factory Specifications & Performance Calculations
+  // Detailed Specifications & Calculations
   const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp;
   const torqueValue = report.performanceUsage?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
-
   const combinedFuel = report.performanceUsage?.combinedFuelL100km;
-  const cityFuel = report.performanceUsage?.cityFuelL100km;
-  const highwayFuel = report.performanceUsage?.highwayFuelL100km;
-  const fuelTank = report.performanceUsage?.fuelTankCapacityLiters || 50;
-
-  const highwayRange = report.performanceUsage?.highwayRangeKm || (highwayFuel && fuelTank ? Math.round((fuelTank * 100) / highwayFuel) : null);
-  const combinedRange = report.performanceUsage?.combinedRangeKm || report.performanceUsage?.estimatedRangeKm || (combinedFuel && fuelTank ? Math.round((fuelTank * 100) / combinedFuel) : null);
-  const cityRange = report.performanceUsage?.cityRangeKm || (cityFuel && fuelTank ? Math.round((fuelTank * 100) / cityFuel) : null);
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
@@ -163,208 +151,53 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         />
       )}
 
-      {/* Standardized Multi-Scenario Fuel Tank Range Card */}
-      <div className="p-5 bg-[#090d1a] border border-white/10 rounded-2xl space-y-4 shadow-xl">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <span className="font-bold text-white flex items-center gap-2 text-sm">
-            <Fuel className="w-5 h-5 text-emerald-400" />
-            Tam Depo Menzil & Tüketim Senaryoları Analizi ({fuelTank ? fuelTank + " Litre Depo" : "Standart Depo"})
-          </span>
-          <span className="text-xs text-slate-400 font-medium">Reel Yol & Yük Senaryoları</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
-              <span>🛣️ Otoyol / İdeal Menzil</span>
-              <span>{highwayFuel ? highwayFuel + " L/100km" : ""}</span>
-            </div>
-            <div className="text-2xl font-black text-white my-1">
-              {highwayRange ? "~" + highwayRange + " km" : (combinedRange ? "~" + Math.round(combinedRange * 1.18) + " km" : "Veri Yok")}
-            </div>
-            <span className="text-[11px] text-slate-300 block leading-tight">Sabit 90-110 km/s hız, klimasız, 2000 d/dk altı ideal uzun yol.</span>
+      {/* İLAN İNCELEME KATMANI (İlan Modunda) */}
+      {isListingMode && report.listingAnalysis && (
+        <div className="bg-[#090d1a] border border-purple-900/40 rounded-2xl p-6 space-y-4 shadow-xl">
+          <div className="flex items-center gap-2 border-b border-purple-800/40 pb-3">
+            <Car className="w-5 h-5 text-purple-400" />
+            <h2 className="text-sm font-black text-white uppercase tracking-wider">İlan İnceleme Katmanı</h2>
           </div>
+          <p className="text-xs text-slate-200 bg-purple-950/30 p-3.5 rounded-xl border border-purple-800/30 leading-relaxed">
+            {report.listingAnalysis.listingSummary}
+          </p>
 
-          <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-xs font-bold text-blue-400">
-              <span>⚖️ Karma (Reel) Menzil</span>
-              <span>{combinedFuel ? combinedFuel + " L/100km" : ""}</span>
+          {report.listingAnalysis.mileageAgeAnalysis && (
+            <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
+              <span className="font-bold text-orange-400 block">🚗 Kilometre & Yaş Oran Analizi</span>
+              <p>{report.listingAnalysis.mileageAgeAnalysis.assessment}</p>
+              {report.listingAnalysis.mileageAgeAnalysis.isApproximateNotice && (
+                <span className="text-[11px] text-slate-400 block italic mt-1">
+                  {report.listingAnalysis.mileageAgeAnalysis.isApproximateNotice}
+                </span>
+              )}
             </div>
-            <div className="text-2xl font-black text-white my-1">
-              {combinedRange ? "~" + combinedRange + " km" : "Veri Yok"}
-            </div>
-            <span className="text-[11px] text-slate-300 block leading-tight">Günlük karışık şehir içi - otoyol dengeli kullanım.</span>
-          </div>
+          )}
 
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
-            <div className="flex items-center justify-between text-xs font-bold text-amber-400">
-              <span>🏙️ Şehir İçi Trafik Menzili</span>
-              <span>{cityFuel ? cityFuel + " L/100km" : ""}</span>
-            </div>
-            <div className="text-2xl font-black text-white my-1">
-              {cityRange ? "~" + cityRange + " km" : (combinedRange ? "~" + Math.round(combinedRange * 0.78) + " km" : "Veri Yok")}
-            </div>
-            <span className="text-[11px] text-slate-300 block leading-tight">Yoğun dur-kalk şehir trafiği, açık klima ve sık ivmelenme.</span>
-          </div>
-        </div>
-
-        <div className="p-3 bg-slate-950/80 border border-white/10 rounded-xl flex items-start gap-2.5 text-xs text-slate-300">
-          <AlertCircle className="w-4.5 h-4.5 text-orange-400 shrink-0 mt-0.5" />
-          <span className="leading-relaxed">
-            <strong>Gerçek Hayat Faktörleri:</strong> Açık klima kullanımı, tam araç/yolcu yükü (+200 kg) veya yüksek hızlı (130+ km/s) otoyol sürüşlerinde tam depo menzili <strong>%10-%15 oranında kısalır</strong> {combinedRange ? "(~" + Math.round(combinedRange * 0.86) + " km seviyesine gerileyebilir)" : ""}.
-          </span>
-        </div>
-      </div>
-
-      {/* Section Content Area */}
-      <div className="space-y-6">
-        {/* KRONİK ARIZA KAYITLARI */}
-        <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-rose-400" />
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">Kronik Arıza Kayıtları ({report.commonProblems?.length || 0})</h2>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {(!report.commonProblems || report.commonProblems.length === 0) ? (
-              <p className="text-xs text-slate-400 italic">Bu varyant için onaylanmış yüksek riskli kronik arıza kaydı bulunmamaktadır.</p>
-            ) : (
-              (showAllProblems ? report.commonProblems : report.commonProblems.slice(0, 3)).map((prob) => (
-                <div key={prob.id || prob.title} className="p-4 bg-slate-950/60 border border-white/5 rounded-xl space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-sm">{prob.title}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      {prob.severity} RİSK
-                    </span>
-                  </div>
-                  {prob.description && <p className="text-slate-300 leading-relaxed">{prob.description}</p>}
-                  <div className="pt-2 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-400">
-                    <div><strong className="text-slate-200">Belirtiler:</strong> {prob.symptoms?.join(", ") || "-"}</div>
-                    <div><strong className="text-slate-200">Teşhis Adımı:</strong> {prob.diagnosisSteps?.join(", ") || "-"}</div>
-                  </div>
-                </div>
-              ))
-            )}
-
-            {report.commonProblems && report.commonProblems.length > 3 && (
-              <button
-                onClick={() => setShowAllProblems(!showAllProblems)}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 transition-all text-center cursor-pointer"
-              >
-                {showAllProblems ? "En Kritik 3 Sorunu Göster" : `Tüm Kronik Sorunları Göster (${report.commonProblems.length})`}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-        {report.prePurchaseChecks && report.prePurchaseChecks.length > 0 && (
-          <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-              <ShieldCheck className="w-5 h-5 text-orange-400" />
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">Satın Alma Öncesi Ekspertiz Kontrol Listesi</h2>
-            </div>
-            <div className="space-y-2.5 text-xs">
-              {report.prePurchaseChecks.map((chk, idx) => (
-                <div key={idx} className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl flex items-start gap-3">
-                  <span className="text-lg shrink-0">🔍</span>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white">{chk.title}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        chk.priority === 'KRİTİK' 
-                          ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' 
-                          : chk.priority === 'ÖNEMLİ' 
-                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
-                          : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                      }`}>
-                        {chk.priority} ÖNCELİK
-                      </span>
-                    </div>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{chk.instruction}</p>
-                    {chk.targetComponent && (
-                      <span className="text-[10px] text-slate-400 block">Hedef Parça: {chk.targetComponent}</span>
-                    )}
-                  </div>
+          {((report.listingAnalysis.contradictionFlags?.length || 0) > 0 || (report.listingAnalysis.contradictions?.length || 0) > 0) && (
+            <div className="space-y-2 text-xs">
+              <span className="font-bold text-rose-400 block">⚡ İlan Çelişki Uyarısı</span>
+              {(report.listingAnalysis.contradictionFlags || report.listingAnalysis.contradictions || []).map((c, idx) => (
+                <div key={idx} className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-1">
+                  <span className="font-bold text-rose-300 block">{c.title}</span>
+                  <span className="text-slate-300">{c.explanation}</span>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* SATICIYA SORULACAK KRİTİK SORULAR */}
-        {report.sellerQuestions && report.sellerQuestions.length > 0 && (
-          <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-              <HelpCircle className="w-5 h-5 text-purple-400" />
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">Satıcıya Sorulacak Kritik Sorular</h2>
-            </div>
-            <div className="space-y-2.5 text-xs">
-              {report.sellerQuestions.map((q, idx) => (
-                <div key={idx} className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1.5">
-                  <span className="font-bold text-purple-300 block">❓ {q.questionText}</span>
-                  {q.expectedAnswerHint && (
-                    <p className="text-emerald-400 text-[11px]">✔ <strong>Beklenen Cevap:</strong> {q.expectedAnswerHint}</p>
-                  )}
-                  {q.redFlagAnswerHint && (
-                    <p className="text-rose-400 text-[11px]">🚩 <strong>Şüphe Uyandıracak Cevap:</strong> {q.redFlagAnswerHint}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* İLAN İNCELEME KATMANI (İlan Modunda) */}
-        {isListingMode && report.listingAnalysis && (
-          <div className="bg-[#090d1a] border border-purple-900/40 rounded-2xl p-6 space-y-4 shadow-xl">
-            <div className="flex items-center gap-2 border-b border-purple-800/40 pb-3">
-              <Car className="w-5 h-5 text-purple-400" />
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">İlan İnceleme Katmanı</h2>
-            </div>
-            <p className="text-xs text-slate-200 bg-purple-950/30 p-3.5 rounded-xl border border-purple-800/30 leading-relaxed">
-              {report.listingAnalysis.listingSummary}
-            </p>
-
-            {report.listingAnalysis.mileageAgeAnalysis && (
-              <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
-                <span className="font-bold text-orange-400 block">🚗 Kilometre & Yaş Oran Analizi</span>
-                <p>{report.listingAnalysis.mileageAgeAnalysis.assessment}</p>
-                {report.listingAnalysis.mileageAgeAnalysis.isApproximateNotice && (
-                  <span className="text-[11px] text-slate-400 block italic mt-1">
-                    {report.listingAnalysis.mileageAgeAnalysis.isApproximateNotice}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {((report.listingAnalysis.contradictionFlags?.length || 0) > 0 || (report.listingAnalysis.contradictions?.length || 0) > 0) && (
-              <div className="space-y-2 text-xs">
-                <span className="font-bold text-rose-400 block">⚡ İlan Çelişki Uyarısı</span>
-                {(report.listingAnalysis.contradictionFlags || report.listingAnalysis.contradictions || []).map((c, idx) => (
-                  <div key={idx} className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-1">
-                    <span className="font-bold text-rose-300 block">{c.title}</span>
-                    <span className="text-slate-300">{c.explanation}</span>
-                  </div>
+          {report.listingAnalysis.damageAssessment && report.listingAnalysis.damageAssessment.length > 0 && (
+            <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
+              <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
+              <ul className="list-disc list-inside space-y-1 text-slate-300">
+                {report.listingAnalysis.damageAssessment.map((d, idx) => (
+                  <li key={idx}>{d}</li>
                 ))}
-              </div>
-            )}
-
-            {report.listingAnalysis.damageAssessment && report.listingAnalysis.damageAssessment.length > 0 && (
-              <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
-                <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
-                <ul className="list-disc list-inside space-y-1 text-slate-300">
-                  {report.listingAnalysis.damageAssessment.map((d, idx) => (
-                    <li key={idx}>{d}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
