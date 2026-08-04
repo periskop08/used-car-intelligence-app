@@ -118,7 +118,11 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 ### 2. RAPOR GENELİNDE TEKNİK VERİ HARMANLAMA (HER BÖLÜMDE UYGULA)
 - **Motor geçen yerlerde:** Motor kodunu, motor tipini, Beygir Gücü ve Tork devir değerlerini yaz. Örn: B48 2.0L 4-Silindir Turbo (184 HP @ 5000 d/dk / 300 Nm @ 1350-4000 d/dk)
 - **Şanzıman geçen yerlerde:** Şanzıman adı, tipi, vites sayısı ve çekiş sistemini yaz. Örn: Steptronic (8 İleri Tam Otomatik - RWD Arkadan İtiş)
-- **Yakıt & Tüketim geçen yerlerde:** Yakıt tipi, Şehir İçi/Şehir Dışı/Karma tüketim ve Depo/Menzil bilgisini yaz. Örn: Benzin (Şehir İçi: 7.8L / Şehir Dışı: 5.2L / Karma: 6.1L — 59L Depo ile ~967 km menzil)
+- **Yakıt & Tüketim & Menzil geçen yerlerde:** Tek bir menzil rakamı yerine menzili 3 farklı sürüş senaryosuna ayır:
+  1. Otoyol İdeal Menzil (Sabit 90-110 km/s, klimasız uzun yol)
+  2. Karma Reel Kullanım Menzili (Standart günlük karma sürüş)
+  3. Şehir İçi Yoğun Trafik Menzili (Dur-kalk trafik, açık klima)
+  - Ayrıca açık klima kullanımı, tam araç yükü (+200 kg) veya yüksek hızlı (130+ km/s) otoyol kullanımında menzilin yaklaşık %10-15 oranında kısalacağını açıkça vurgula.
 - **Kullanım Senaryolarında:** Boyutlar (park kolaylığı), Bagaj Hacmi (aile kullanımı), Sabit Hız Otoyol Seyri (depo menzili) somut verilerle açıklanmalıdır.
 
 ### 3. GERÇEKÇİ VERİ VE OTOMOTİV HASSASİYETİ

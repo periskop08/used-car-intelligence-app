@@ -110,6 +110,10 @@ export interface PerformanceUsageSection {
   highwayFuelL100km?: number;
   fuelTankCapacityLiters?: number;
   estimatedRangeKm?: number;
+  cityRangeKm?: number;
+  highwayRangeKm?: number;
+  combinedRangeKm?: number;
+  rangeFactorsNote?: string;
   trunkCapacityLiters?: number;
   dimensionsMm?: string;
   assessment?: string;

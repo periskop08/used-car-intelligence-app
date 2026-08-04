@@ -17,7 +17,8 @@ import {
   HelpCircle,
   Wrench,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Fuel
 } from "lucide-react";
 
 const categoryLabels: Record<string, string> = {
@@ -84,6 +85,10 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const fuelTank = report.performanceUsage?.fuelTankCapacityLiters;
   const rangeEstimate = report.performanceUsage?.estimatedRangeKm || (combinedFuel && fuelTank ? Math.round((fuelTank * 100) / combinedFuel) : (combinedFuel ? Math.round((55 * 100) / combinedFuel) : null));
   const annualLitersEstimate = combinedFuel ? Math.round((combinedFuel / 100) * 15000) : null;
+
+  const highwayRange = report.performanceUsage?.highwayRangeKm || (highwayFuel && fuelTank ? Math.round((fuelTank * 100) / highwayFuel) : null);
+  const combinedRange = report.performanceUsage?.combinedRangeKm || report.performanceUsage?.estimatedRangeKm || (combinedFuel && fuelTank ? Math.round((fuelTank * 100) / combinedFuel) : null);
+  const cityRange = report.performanceUsage?.cityRangeKm || (cityFuel && fuelTank ? Math.round((fuelTank * 100) / cityFuel) : null);
 
   const accelTime = report.performanceUsage?.zeroToHundredKmh;
   const topSpeed = report.performanceUsage?.topSpeedKmh;
@@ -430,6 +435,59 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 {report.performanceUsage.assessment}
               </p>
             )}
+
+            {/* Standardized Multi-Scenario Fuel Tank Range Card */}
+            <div className="p-4 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-3 text-xs mt-3">
+              <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
+                <span className="font-bold text-white flex items-center gap-2">
+                  <Fuel className="w-4 h-4 text-emerald-400" />
+                  Tam Depo Menzil & Tüketim Senaryoları Analizi ({fuelTank ? fuelTank + " Litre Depo" : "Standart Depo"})
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Reel Yol & Yük Senaryoları</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                    <span>🛣️ Otoyol / İdeal Menzil</span>
+                    <span>{highwayFuel ? highwayFuel + " L/100km" : ""}</span>
+                  </div>
+                  <div className="text-xl font-black text-white">
+                    {highwayRange ? "~" + highwayRange + " km" : (combinedRange ? "~" + Math.round(combinedRange * 1.18) + " km" : "Veri Yok")}
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">Sabit 90-110 km/s hız, klimasız, 2000 d/dk altı ideal uzun yol.</span>
+                </div>
+
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-blue-400">
+                    <span>⚖️ Karma (Reel) Menzil</span>
+                    <span>{combinedFuel ? combinedFuel + " L/100km" : ""}</span>
+                  </div>
+                  <div className="text-xl font-black text-white">
+                    {combinedRange ? "~" + combinedRange + " km" : "Veri Yok"}
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">Günlük karışık şehir içi - otoyol dengeli kullanım.</span>
+                </div>
+
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-amber-400">
+                    <span>🏙️ Şehir İçi Trafik Menzili</span>
+                    <span>{cityFuel ? cityFuel + " L/100km" : ""}</span>
+                  </div>
+                  <div className="text-xl font-black text-white">
+                    {cityRange ? "~" + cityRange + " km" : (combinedRange ? "~" + Math.round(combinedRange * 0.78) + " km" : "Veri Yok")}
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">Yoğun dur-kalk şehir trafiği, açık klima ve sık ivmelenme.</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-900/60 border border-slate-700/40 rounded-lg flex items-start gap-2 text-[11px] text-slate-300">
+                <AlertCircle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Gerçek Hayat Faktörleri:</strong> Açık klima kullanımı, tam araç/yolcu yükü (+200 kg) veya yüksek hızlı (130+ km/s) otoyol sürüşlerinde tam depo menzili <strong>%10-%15 oranında kısalır</strong> {combinedRange ? "(~" + Math.round(combinedRange * 0.86) + " km seviyesine gerileyebilir)" : ""}.
+                </span>
+              </div>
+            </div>
           </div>
         )}
 
