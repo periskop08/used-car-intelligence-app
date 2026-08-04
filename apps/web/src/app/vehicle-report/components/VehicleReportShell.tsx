@@ -8,6 +8,7 @@ import {
   AlertTriangle, 
   Car, 
   RefreshCcw, 
+  HelpCircle,
   AlertCircle
 } from "lucide-react";
 
@@ -149,6 +150,64 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           synthesis={report.expertDecisionSynthesis} 
           supportingFacts={report.dataQuality?.supportingFacts} 
         />
+      )}
+
+      {/* SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
+      {report.prePurchaseChecks && report.prePurchaseChecks.length > 0 && (
+        <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
+          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+            <ShieldCheck className="w-5 h-5 text-orange-400" />
+            <h2 className="text-sm font-black text-white uppercase tracking-wider">Satın Alma Öncesi Ekspertiz Kontrol Listesi</h2>
+          </div>
+          <div className="space-y-2.5 text-xs">
+            {report.prePurchaseChecks.map((chk, idx) => (
+              <div key={idx} className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl flex items-start gap-3">
+                <span className="text-lg shrink-0">🔍</span>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">{chk.title}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      chk.priority === 'KRİTİK' 
+                        ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' 
+                        : chk.priority === 'ÖNEMLİ' 
+                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                    }`}>
+                      {chk.priority} ÖNCELİK
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">{chk.instruction}</p>
+                  {chk.targetComponent && (
+                    <span className="text-[10px] text-slate-400 block">Hedef Parça: {chk.targetComponent}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SATICIYA SORULACAK KRİTİK SORULAR */}
+      {report.sellerQuestions && report.sellerQuestions.length > 0 && (
+        <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
+          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+            <HelpCircle className="w-5 h-5 text-purple-400" />
+            <h2 className="text-sm font-black text-white uppercase tracking-wider">Satıcıya Sorulacak Kritik Sorular</h2>
+          </div>
+          <div className="space-y-2.5 text-xs">
+            {report.sellerQuestions.map((q, idx) => (
+              <div key={idx} className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1.5">
+                <span className="font-bold text-purple-300 block">❓ {q.questionText}</span>
+                {q.expectedAnswerHint && (
+                  <p className="text-emerald-400 text-[11px]">✔ <strong>Beklenen Cevap:</strong> {q.expectedAnswerHint}</p>
+                )}
+                {q.redFlagAnswerHint && (
+                  <p className="text-rose-400 text-[11px]">🚩 <strong>Şüphe Uyandıracak Cevap:</strong> {q.redFlagAnswerHint}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* İLAN İNCELEME KATMANI (İlan Modunda) */}
