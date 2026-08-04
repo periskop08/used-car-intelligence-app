@@ -231,8 +231,9 @@ export default function VehicleDetail() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          mode: "VEHICLE_REPORT",
+          mode: "TORQUE_SCOUT_VEHICLE_REPORT",
           variantId,
+          entryPoint: "VEHICLE_SEARCH",
           idempotencyKey: `vr_${variantId}_${Date.now()}`,
         }),
       });

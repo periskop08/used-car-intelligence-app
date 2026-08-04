@@ -2373,6 +2373,7 @@ enum AiQuotaFeature {
 enum VehicleReportMode {
   VEHICLE_REPORT
   LISTING_REPORT
+  TORQUE_SCOUT_VEHICLE_REPORT
 }
 
 enum VehicleReportStatus {
@@ -2423,11 +2424,15 @@ model GeneratedVehicleReport {
   tokenInput         Int?
   tokenOutput        Int?
   generationMs       Int?
+  qualityScore       Int?
   repairAttempted    Boolean                 @default(false)
   fallbackReason     String?
 
   staleReasons       Json?
   lastRefreshReason  String?
+  refreshReason      String?
+  legacySourceMode   String?
+  upgradedFromId     String?
 
   generatedAt        DateTime                @default(now())
   completedAt        DateTime?

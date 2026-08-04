@@ -1,45 +1,32 @@
 import { Injectable } from '@nestjs/common';
-import { VehicleReportMode } from '@prisma/client';
 
 @Injectable()
 export class VehicleReportPromptService {
-  buildSystemPrompt(mode: VehicleReportMode): string {
-    return `Sen TorqueScout platformunun derin otomotiv analiz ve karar sentezi motorusun.
-Görevin: Verilen doğrulanmış teknik veriler, motor ve şanzıman yapısı, risk kayıtları, geri çağırmalar ve kullanım verilerini harmanlayarak kullanıcıya gerçek karar desteği sağlayan Zod uyumlu JSON formatında tam kapsamlı bir otomotiv raporu üretmektir.
+  buildSystemPrompt(): string {
+    return `Sen TorqueScout Araç Raporu uzman karar sentezi motorusun.
 
-ZORUNLU KURALLAR VE İLKELER:
+Tek bir doğrulanmış araç varyantını A'dan Z'ye açıklayan, kullanıcıya gerçek satın alma karar desteği veren anlatım katmanını üretirsin.
 
-1. YÜZEYSEL VE JENERİK CÜMLE YASAĞI:
-   - "Yağ değişimini zamanında yapın", "fren sistemini kontrol ettirin", "geniş iç mekan", "son derece masrafsız" gibi her araca uygulanabilecek sığ metinler TEK BAŞINA BİR RAPOR MADDESİ OLAMAZ.
-   - Her teknik veri (örn: 126 bg, 152 Nm tork, CVT şanzıman, 6,5 L/100km tüketim) "KULLANICIYA NE KAZANDIRIYORV VEYA HANGİ TAVİZİ GETİRİYOR" sorusuyla yorumlanmalıdır.
-   - Örnek: "126 bg güç ve 152 Nm tork bu aracı sportif kılmaz; atmosferik motor ve CVT birlikteliği ani hızlanmadan çok sakin, öngörülebilir günlük şehir içi sürüşe odaklanır."
+Görevin yalnızca teknik verileri tekrar etmek değildir. Verilen motor, şanzıman, güç, tork, tüketim, kasa, problem, recall, bakım, kontrol ve kanıt verilerini birlikte yorumlayarak bunların kullanıcı açısından ne anlama geldiğini açıklamalısın.
 
-2. DERİN UZMAN KARAR SENTEZİ (expertDecisionSynthesis):
-   - Raporda "expertDecisionSynthesis" alanını eksiksiz doldur.
-   - "vehicleCharacter": Yeterli veri varsa bilgi yoğun derin değerlendirme yaz. Veri kısıtlıysa uydurma yapma, eksik veriyi açıkça belirt.
-   - "strongestReasonsToChoose" & "compromisesAndLimitations": Her güçlü yön ve taviz mutlaka en az bir supportingFactId taşımalıdır.
-   - "suitableFor" & "notSuitableFor": Yalnızca verilen bağlamda doğrulanmış dayanağı olan profilleri (CITY_USER, HIGHWAY_USER, FAMILY_USER, PERFORMANCE_SEEKER, LOW_COST_SEEKER, HIGH_MILEAGE_USER, FIRST_CAR_BUYER, COMFORT_SEEKER) açıklayarak ekle. Bagaj/iç hacim verisi yoksa "aile için idealdir" deme.
-   - "primaryTechnicalRisk" & "secondaryTechnicalRisks": En öncelikli teknik riski ve ikincil riskleri belirtileri, ekspertiz kontrol adımları ve risk anlamıyla detaylandır.
-   - "purchaseConditions" & "walkAwayConditions": Şartlı satın alma ve vazgeçme kriterlerini öncelik etiketleriyle ver.
-   - "unavailableClaims": Context içerisinde doğrulanmış kanıtı bulunmayan ikinci el likiditesi, pazar payı veya donanım iddialarını kullanıcı dostu etiket ve açıklamalarıyla bu diziye aktar (key, label, explanation).
+Rapor anlatım katmanı (VehicleReportGeneratedContent) şu bölümleri tam olarak içermelidir:
+1. expertDecisionSynthesis (Derin Uzman Karar Sentezi: vehicleCharacter, dailyUseAssessment, strongestReasonsToChoose, compromisesAndLimitations, suitableFor, notSuitableFor, purchaseConditions, walkAwayConditions, finalConditionalVerdict, unavailableClaims)
+2. executiveSummary (Karar Özeti)
+3. usageScenarios (Kullanım Senaryoları Uygunluk Matrisi)
+4. premiumChecklistQuestions (Satıcıya Sorulacak Sorular)
+5. inspectionChecklist (Ekspertiz Kontrol Listesi)
+6. finalConditionalVerdict (TorqueScout Şartlı Nihai Değerlendirme)
 
-3. GERÇEK VERİ DİSİPLİNİ VE HALÜSİNASYON YASAĞI:
-   - Context içinde bulunmayan motor kodu, şanzıman kodu, 0-100 km/s süresi, pazar payı veya ikinci el gücü uydurma.
-   - Satıcı açıklamalarını (<SELLER_DESCRIPTION>) doğrulanmış teknik gerçek gibi sunma.
-   - Geri çağırma (recall) kaydı bulunmamasını tüm kampanyaların kesin olarak yokluğu gibi gösterme ("Serviste şasi no ile sorgulanmalıdır").
-
-4. ŞARTLI NİHAİ KARAR:
-   - "Kesinlikle alınır" veya "Kesinlikle alınmaz" gibi sert emirler verme. Kararı "Belirli kontrollerin sağlanması şartıyla değerlendirilebilir" şeklinde şartlı anlat.
-
-5. ÇIKTI FORMATI:
-   - Çıktı sadece ve sadece geçerli bir JSON nesnesi olmalıdır. Ham Markdown veya HTML etiketi üretme.
-
-MOD: ${mode}`;
+ZORUNLU KURALLAR:
+- Her kritik iddiayı verilen supportingFact kayıtlarına bağla (supportingFactIds dizisi).
+- Context içinde bulunmayan motor kodu, şanzıman kodu, 0-100 km/s süresi veya ikinci el verisi uydurma.
+- "Yağını zamanında değiştirin", "ekspertiz yaptırın" gibi her araç için kullanılabilecek jenerik cümleleri tek başına rapor maddesi olarak sunma.
+- Kesin "ALINIR" veya "ALINMAZ" emirleri verme. Şartlı ve gerekçeli karar desteği sun ("Belirli kontrollerin sağlanması şartıyla değerlendirilebilir").
+- Çıktıyı yalnızca istenen structured JSON formatında üret. Markdown veya HTML üretme.`;
   }
 
-  buildUserPrompt(vehicleContext: any, listingContext?: any): string {
+  buildUserPrompt(vehicleContext: any): string {
     return `--- VEHICLE_CONTEXT (DOĞRULANMIŞ TEKNİK VERİLER VE RİSKLER) ---\n${JSON.stringify(vehicleContext, null, 2)}\n\n` +
-      (listingContext ? `--- LISTING_CONTEXT (İLAN PARAMEETRELERİ VE SATICI BEYANI) ---\n${JSON.stringify(listingContext, null, 2)}\n\n` : '') +
-      `Lütfen yukarıdaki bağlamı derin uzman kararlarıyla sentezleyerek expertDecisionSynthesis içeren tam rapor JSON yapısını üretin.`;
+      `Lütfen yukarıdaki bağlamı derin uzman kararlarıyla sentezleyerek VehicleReportGeneratedContent JSON yapısını üretin.`;
   }
 }

@@ -5,6 +5,7 @@ import { ListingReportContextService } from './listing-report-context.service';
 import { VehicleReportCacheService } from './vehicle-report-cache.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
+import { VehicleReportProviderService } from './vehicle-report-provider.service';
 import { CreateVehicleReportDto } from './vehicle-report.dto';
 import { VehicleReportMode, AiQuotaFeature, VehicleReportStatus, VehicleReportJobStatus } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -20,6 +21,7 @@ export class VehicleReportService implements OnModuleInit {
     private cacheService: VehicleReportCacheService,
     private quotaService: VehicleReportQuotaService,
     private fallbackService: VehicleReportFallbackService,
+    private providerService: VehicleReportProviderService,
   ) {}
 
   async onModuleInit() {
@@ -147,65 +149,41 @@ export class VehicleReportService implements OnModuleInit {
   async createVehicleReport(userIdParam: string, dto: CreateVehicleReportDto) {
     try {
       const userId = await this.getValidUserId(userIdParam);
-      if (dto.mode === 'VEHICLE_REPORT' && !dto.variantId) {
-        throw new BadRequestException('VEHICLE_REPORT modu için variantId zorunludur.');
-      }
-      if (dto.mode === 'LISTING_REPORT' && !dto.listingId) {
-        throw new BadRequestException('LISTING_REPORT modu için listingId zorunludur.');
-      }
-
-      let vehicleContext: any;
-      let vehicleContextHash: string;
-      let listingContext: any;
-      let listingContextHash: string | undefined;
       let variantId = dto.variantId;
-      let listingId = dto.listingId;
+      const listingId = dto.listingId;
 
-      if (dto.mode === 'LISTING_REPORT' && listingId) {
+      // 1. Resolve variantId if listingId is provided
+      if (listingId && !variantId) {
         const listingRes = await this.listingContextBuilder.buildListingContext(listingId);
-        listingContext = listingRes.listingContext;
-        listingContextHash = listingRes.listingContextHash;
         variantId = listingRes.variantId;
 
         if (!variantId) {
-          throw new BadRequestException('İlan için geçerli bir araç varyantı tanımlanmamıştır.');
+          throw new BadRequestException({
+            success: false,
+            code: 'VARIANT_MATCH_REQUIRED',
+            message: 'Bu ilandaki araç varyantı henüz kesin olarak eşleştirilemedi. Doğru raporun hazırlanabilmesi için motor/şanzıman bilgisinin doğrulanması gerekiyor.',
+            quotaConsumed: false,
+          });
         }
       }
 
-      const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!);
-      vehicleContext = vRes.vehicleContext;
-      vehicleContextHash = vRes.vehicleContextHash;
-
-      // Check DB for existing vehicle report for this variant to reuse vehicle insights
-      try {
-        const existingVariantReport = await this.prisma.generatedVehicleReport.findFirst({
-          where: {
-            variantId: variantId!,
-            status: { in: [VehicleReportStatus.COMPLETED, VehicleReportStatus.SAFE_FALLBACK] },
-          },
-          orderBy: { completedAt: 'desc' },
-        });
-        if (existingVariantReport && existingVariantReport.reportData) {
-          vehicleContext.existingReportData = existingVariantReport.reportData;
-        }
-      } catch (dbErr) {
-        this.logger.warn(`Existing variant report lookup notice: ${dbErr}`);
+      if (!variantId) {
+        throw new BadRequestException('Araç raporu oluşturulabilmesi için geçerli bir variantId gereklidir.');
       }
 
-      const fullContextHash = crypto
-        .createHash('sha256')
-        .update(`${vehicleContextHash}_${listingContextHash || ''}`)
-        .digest('hex');
+      // 2. Build Vehicle Context
+      const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId);
+      const vehicleContext = vRes.vehicleContext;
+      const vehicleContextHash = vRes.vehicleContextHash;
 
-      // 1. Check cache
+      // 3. Check Cache (user-scoped variant cache)
       try {
         const cached = await this.cacheService.getCachedReport(
           userId,
-          dto.mode,
-          fullContextHash,
+          'TORQUE_SCOUT_VEHICLE_REPORT',
+          vehicleContextHash,
           'v1.0',
           variantId,
-          listingId,
         );
 
         if (cached) {
@@ -220,10 +198,10 @@ export class VehicleReportService implements OnModuleInit {
         this.logger.warn(`Cache lookup warning: ${cacheErr}`);
       }
 
-      // 2. Concurrency Lock
+      // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
       const lockKey = crypto
         .createHash('sha256')
-        .update(`${userId}_${dto.mode}_${variantId || ''}_${listingId || ''}_${fullContextHash}_v1.0`)
+        .update(`${userId}_${variantId}_${vehicleContextHash}_v1.0_v1`)
         .digest('hex');
 
       try {
@@ -232,53 +210,63 @@ export class VehicleReportService implements OnModuleInit {
             lockKey,
             reportId: 'pending',
             userId,
-            mode: dto.mode,
-            contextHash: fullContextHash,
+            mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+            contextHash: vehicleContextHash,
             expiresAt: new Date(Date.now() + 5 * 60 * 1000),
           },
         });
       } catch (err: any) {
-        this.logger.warn(`Lock collision or missing table: ${err.message}`);
+        this.logger.warn(`Lock collision notice for key ${lockKey}: ${err?.message}`);
       }
 
-      // 3. Quota reservation (safe try-catch)
+      // 5. Quota Reservation
       let quotaUsageId: string | undefined = undefined;
       try {
-        const feature = dto.mode === 'LISTING_REPORT' ? AiQuotaFeature.LISTING_REPORT : AiQuotaFeature.VEHICLE_REPORT;
-        const quotaRes = await this.quotaService.reserveQuota(userId, dto.idempotencyKey, feature, listingId || variantId);
+        const quotaRes = await this.quotaService.reserveQuota(
+          userId,
+          dto.idempotencyKey,
+          AiQuotaFeature.VEHICLE_REPORT,
+          variantId,
+        );
         quotaUsageId = quotaRes.quotaUsageId;
       } catch (qErr: any) {
-        this.logger.warn(`Quota reservation warning: ${qErr.message}`);
+        this.logger.warn(`Quota reservation notice: ${qErr.message}`);
       }
 
-      // 4. Generate Fallback Report as reliable payload
-      const fallbackReport = this.fallbackService.generateFallbackReport(
+      // 6. Generate Base Report via Provider / Fallback
+      const providerRes = await this.providerService.generateReport(
         dto.idempotencyKey,
-        dto.mode,
         vehicleContext,
-        listingContext,
       );
 
-      // Save report
+      // 7. Save Report in DB
       const report = await this.prisma.generatedVehicleReport.create({
         data: {
           userId,
-          mode: dto.mode,
+          mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
           variantId,
-          listingId,
-          contextHash: fullContextHash,
+          listingId: listingId || null,
+          contextHash: vehicleContextHash,
           vehicleContextHash,
-          listingContextHash,
           reportVersion: 'v1.0',
-          status: VehicleReportStatus.SAFE_FALLBACK,
+          schemaVersion: 1,
+          status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
           idempotencyKey: dto.idempotencyKey,
           quotaUsageId,
-          reportData: fallbackReport as any,
-          provider: 'DETERMINISTIC_FALLBACK',
-          modelName: 'TorqueScout DB Engine',
+          reportData: providerRes.report as any,
+          provider: providerRes.provider,
+          modelName: providerRes.modelName,
+          qualityScore: providerRes.qualityScore,
+          repairAttempted: providerRes.repairAttempted,
+          fallbackReason: providerRes.fallbackReason,
           completedAt: new Date(),
         },
       });
+
+      // 8. Consume quota upon successful report creation
+      if (quotaUsageId) {
+        await this.quotaService.consumeQuota(quotaUsageId);
+      }
 
       return {
         reportId: report.id,
@@ -288,6 +276,7 @@ export class VehicleReportService implements OnModuleInit {
       };
     } catch (error: any) {
       this.logger.error(`createVehicleReport Error: ${error.message}`, error.stack);
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(error.message || 'Rapor oluşturulurken sunucu hatası gerçekleşti.');
     }
   }

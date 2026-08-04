@@ -14,29 +14,19 @@ export class VehicleReportCacheService {
     variantId?: string,
     listingId?: string,
   ) {
-    if (mode === 'LISTING_REPORT' && listingId) {
-      return this.prisma.generatedVehicleReport.findFirst({
-        where: {
-          mode: 'LISTING_REPORT',
-          listingId,
-          status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-    }
+    if (!userId || !variantId) return null;
 
-    if (variantId) {
-      return this.prisma.generatedVehicleReport.findFirst({
-        where: {
-          mode: 'VEHICLE_REPORT',
-          variantId,
-          status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-    }
-
-    return null;
+    return this.prisma.generatedVehicleReport.findFirst({
+      where: {
+        userId,
+        variantId,
+        vehicleContextHash: contextHash,
+        reportVersion,
+        mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
+        status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
   }
 
   async checkStaleStatus(

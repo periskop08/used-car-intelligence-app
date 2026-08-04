@@ -1,4 +1,5 @@
-export type VehicleReportMode = 'VEHICLE_REPORT' | 'LISTING_REPORT';
+export type VehicleReportMode = 'VEHICLE_REPORT' | 'LISTING_REPORT' | 'TORQUE_SCOUT_VEHICLE_REPORT';
+export type VehicleReportEntryPoint = 'VEHICLE_SEARCH' | 'LISTING_DETAIL';
 
 export type VehicleReportStatus =
   | 'QUEUED'
@@ -315,6 +316,18 @@ export interface ExpertDecisionSynthesis {
   unavailableClaims: UnavailableClaimItem[];
 }
 
+/**
+ * AI-Generated Narrative Content (Gemini 2.5 output)
+ */
+export interface VehicleReportGeneratedContent {
+  expertDecisionSynthesis: ExpertDecisionSynthesis;
+  executiveSummary: ExecutiveSummarySection;
+  usageScenarios: UsageScenarioResult[];
+  premiumChecklistQuestions: SellerQuestionItem[];
+  inspectionChecklist: PrePurchaseCheckItem[];
+  finalConditionalVerdict: FinalVerdictSection;
+}
+
 export interface ComprehensiveVehicleReport {
   reportId: string;
   mode: VehicleReportMode;
@@ -343,6 +356,8 @@ export interface ComprehensiveVehicleReport {
   finalVerdict: FinalVerdictSection;
   dataQuality: ReportDataQualitySection;
 
+  generatedContent?: VehicleReportGeneratedContent;
+
   generatedAt: string;
   completedAt?: string;
   contextHash: string;
@@ -352,6 +367,22 @@ export interface ComprehensiveVehicleReport {
   schemaVersion?: number;
   modeLabel: string;
   staleReasons?: string[];
+
+  qualityScore?: number;
+  repairAttempted?: boolean;
+  refreshReason?: string;
+  legacySourceMode?: string;
+  upgradedFromId?: string;
+}
+
+export interface VehicleReportStatusResponse {
+  success: boolean;
+  reportId: string;
+  status: VehicleReportStatus;
+  reportData: ComprehensiveVehicleReport | null;
+  cached: boolean;
+  progressStage?: string;
+  errorCode?: string;
 }
 
 export interface CreateVehicleReportResponse {

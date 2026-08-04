@@ -31,6 +31,7 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
   async processNextJobs() {
     if (this.isProcessing) return;
     this.isProcessing = true;
+    let currentJob: any = null;
 
     try {
       // 1. Reconcile stale reservations
@@ -51,6 +52,8 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
         this.isProcessing = false;
         return;
       }
+
+      currentJob = job;
 
       this.logger.log(`Processing report job ${job.id} for report ${job.reportId} (Mode: ${job.mode})`);
 
@@ -73,13 +76,10 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
 
       // Execute AI generation
       const vehicleContext = (job.report.reportData as any)?._vehicleContext;
-      const listingContext = (job.report.reportData as any)?._listingContext;
 
       const result = await this.providerService.generateReport(
         job.reportId,
-        job.mode,
         vehicleContext,
-        listingContext,
       );
 
       // Save output
@@ -90,6 +90,7 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
           reportData: result.report as any,
           provider: result.provider,
           modelName: result.modelName,
+          qualityScore: result.qualityScore,
           repairAttempted: result.repairAttempted,
           fallbackReason: result.fallbackReason,
           completedAt: new Date(),
@@ -113,6 +114,10 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
       this.logger.log(`Job ${job.id} completed successfully with status ${result.report.status}`);
     } catch (err: any) {
       this.logger.error(`Job processing failed: ${err.message}`);
+      // Release quota reservation on unrecoverable job failure
+      if (currentJob?.report?.quotaUsageId) {
+        await this.quotaService.releaseQuota(currentJob.report.quotaUsageId);
+      }
     } finally {
       this.isProcessing = false;
     }

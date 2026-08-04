@@ -14,6 +14,7 @@ import { VehicleReportFallbackService } from './vehicle-report-fallback.service'
 import { VehicleReportCacheService } from './vehicle-report-cache.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.service';
+import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { AuthModule } from '../auth/auth.module';
     VehicleReportPromptService,
     VehicleReportProviderService,
     VehicleReportSemanticValidationService,
+    VehicleReportNarrativeQualityService,
     VehicleReportFallbackService,
     VehicleReportCacheService,
     VehicleReportQuotaService,
