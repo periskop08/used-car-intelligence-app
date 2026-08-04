@@ -249,19 +249,45 @@ export class VehicleReportProviderService implements OnModuleInit {
 
     const openai = new OpenAI({ apiKey });
 
+    // Explicitly instruct OpenAI NOT to wrap the output
+    const strictUserPrompt = `${userPrompt}\n\nÖNEMLİ: Yanıtın doğrudan expertDecisionSynthesis, executiveSummary, usageScenarios, premiumChecklistQuestions, inspectionChecklist ve finalConditionalVerdict alanlarını içeren düz JSON olmalıdır. Hiçbir wrapper key (örn. "VehicleReportGeneratedContent") kullanma.`;
+
     const response = await openai.chat.completions.create({
       model: this.openaiModelName,
       temperature: 0.3,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'user', content: strictUserPrompt },
       ],
     });
 
     const responseText = response.choices[0]?.message?.content || '';
     try {
-      return { content: JSON.parse(responseText) };
+      const parsed = JSON.parse(responseText);
+      // Unwrap if OpenAI nested the output in a key
+      if (parsed && typeof parsed === 'object') {
+        // Direct match: has expertDecisionSynthesis or executiveSummary at root
+        if (parsed.expertDecisionSynthesis || parsed.executiveSummary) {
+          return { content: parsed as VehicleReportGeneratedContent };
+        }
+        // Wrapped: {"VehicleReportGeneratedContent": {...}} or any single top-level key
+        const keys = Object.keys(parsed);
+        if (keys.length === 1) {
+          const inner = parsed[keys[0]];
+          if (inner && typeof inner === 'object' && (inner.expertDecisionSynthesis || inner.executiveSummary)) {
+            return { content: inner as VehicleReportGeneratedContent };
+          }
+        }
+        // Try to find expertDecisionSynthesis in any nested key
+        for (const key of keys) {
+          const val = parsed[key];
+          if (val && typeof val === 'object' && (val.expertDecisionSynthesis || val.executiveSummary)) {
+            return { content: val as VehicleReportGeneratedContent };
+          }
+        }
+      }
+      return { content: parsed as VehicleReportGeneratedContent };
     } catch {
       this.logger.warn(`OpenAI JSON parse failed`);
       return { content: null };
