@@ -316,30 +316,6 @@ export default function VehicleReportExpertSynthesis({
           </div>
         </div>
       </div>
-
-
-      {/* 7. ŞARTLI NİHAİ KARAR (Conditional Verdict Card) */}
-      {synthesis.finalConditionalVerdict && (
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-[#0c1224] to-slate-900 border border-orange-500/40 shadow-2xl space-y-3 relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-orange-400" />
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">TorqueScout Şartlı Nihai Değerlendirme</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Veri Güveni:</span>
-              <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-mono">
-                {synthesis.finalConditionalVerdict.confidence || "HIGH"}
-              </span>
-            </div>
-          </div>
-
-          <h4 className="text-base font-extrabold text-orange-400">{synthesis.finalConditionalVerdict.shortVerdict}</h4>
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-            {synthesis.finalConditionalVerdict.detailedVerdict}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
