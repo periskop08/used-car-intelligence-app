@@ -10,6 +10,18 @@ export class AnalyticsAggregationService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      // 1. Create enum type if not exists
+      await this.prisma.$executeRawUnsafe(`
+        DO $$ BEGIN
+          CREATE TYPE "AnalyticsMetricValueType" AS ENUM ('COUNT', 'MONEY', 'DECIMAL', 'PERCENTAGE', 'DURATION_MS');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;
+      `);
+    } catch (e: any) {
+      this.logger.log(`AnalyticsMetricValueType enum check: ${e.message}`);
+    }
+
+    try {
+      // 2. Create table with TEXT valueType (safe for all DB states)
       await this.prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS "DailyAnalyticsAggregate" (
           "id" TEXT NOT NULL,
@@ -30,14 +42,16 @@ export class AnalyticsAggregationService implements OnModuleInit {
         CREATE UNIQUE INDEX IF NOT EXISTS "DailyAnalyticsAggregate_date_category_metric_dimensionKey_key"
         ON "DailyAnalyticsAggregate"("date", "category", "metric", "dimensionKey");
       `);
-    } catch (e) {
-      this.logger.log('DailyAnalyticsAggregate table readiness verified or created.');
+      this.logger.log('DailyAnalyticsAggregate table readiness verified.');
+    } catch (e: any) {
+      this.logger.log(`DailyAnalyticsAggregate table check: ${e.message}`);
     }
 
     // Run daily aggregate reconciliation once on startup and every 6 hours
     setTimeout(() => this.runDailyAggregation(), 10000);
     setInterval(() => this.runDailyAggregation(), 6 * 3600 * 1000);
   }
+
 
   // Canonical Dimension Key Builder: Sorts keys alphabetically, normalizes values
   buildCanonicalDimensionKey(dimensions?: Record<string, any>): string {
@@ -78,53 +92,52 @@ export class AnalyticsAggregationService implements OnModuleInit {
     try {
       const date = this.getIstanbulDate(eventDate);
       const dimensionKey = this.buildCanonicalDimensionKey(dimensions);
+      const valueTypeStr = String(valueType);
+      const isCount = valueType === AnalyticsMetricValueType.COUNT;
+      const countValue = isCount ? Math.floor(value) : 0;
 
-      const existing = await (this.prisma as any).dailyAnalyticsAggregate.findUnique({
-        where: {
-          date_category_metric_dimensionKey: {
-            date,
-            category,
-            metric,
-            dimensionKey,
-          },
-        },
-      });
+      // Use raw SQL to avoid Prisma enum type casting issues with TEXT column
+      const existing = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, "numericValue" FROM "DailyAnalyticsAggregate"
+         WHERE date = $1 AND category = $2 AND metric = $3 AND "dimensionKey" = $4
+         LIMIT 1`,
+        date, category, metric, dimensionKey,
+      );
 
-      if (existing) {
-        if (valueType === AnalyticsMetricValueType.COUNT) {
-          await (this.prisma as any).dailyAnalyticsAggregate.update({
-            where: { id: existing.id },
-            data: {
-              countValue: { increment: Math.floor(value) },
-              numericValue: Number(existing.numericValue) + value,
-            },
-          });
-        } else {
-          await (this.prisma as any).dailyAnalyticsAggregate.update({
-            where: { id: existing.id },
-            data: {
-              numericValue: Number(existing.numericValue) + value,
-            },
-          });
-        }
+      if (existing && existing.length > 0) {
+        const rec = existing[0];
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "DailyAnalyticsAggregate"
+           SET "countValue" = "countValue" + $1,
+               "numericValue" = "numericValue" + $2,
+               "updatedAt" = NOW()
+           WHERE id = $3`,
+          BigInt(isCount ? Math.floor(value) : 0),
+          value,
+          rec.id,
+        );
       } else {
-        await (this.prisma as any).dailyAnalyticsAggregate.create({
-          data: {
-            date,
-            category,
-            metric,
-            dimensionKey,
-            dimensions: dimensions || {},
-            valueType,
-            countValue: valueType === AnalyticsMetricValueType.COUNT ? Math.floor(value) : 0,
-            numericValue: value,
-          },
-        });
+        const newId = `dag_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "DailyAnalyticsAggregate"
+           (id, date, category, metric, "dimensionKey", dimensions, "valueType", "numericValue", "countValue", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, NOW(), NOW())
+           ON CONFLICT (date, category, metric, "dimensionKey") DO UPDATE
+           SET "countValue" = "DailyAnalyticsAggregate"."countValue" + $9,
+               "numericValue" = "DailyAnalyticsAggregate"."numericValue" + $8,
+               "updatedAt" = NOW()`,
+          newId, date, category, metric, dimensionKey,
+          JSON.stringify(dimensions || {}),
+          valueTypeStr,
+          value,
+          BigInt(countValue),
+        );
       }
     } catch (err: any) {
       this.logger.error(`recordAggregateMetric error: ${err.message}`);
     }
   }
+
 
   async runDailyAggregation() {
     this.logger.log('Running daily analytics aggregation job...');
