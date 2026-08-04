@@ -175,11 +175,26 @@ export default function VehicleDetail() {
     return headers;
   };
 
+  const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
+    if (!data) return null;
+    let payload = data.reportData !== undefined ? data.reportData : data;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch (e) {
+        return null;
+      }
+    }
+    if (payload && typeof payload === "object" && (payload.executiveSummary || payload.vehicleIdentity || payload.finalVerdict)) {
+      return payload as ComprehensiveVehicleReport;
+    }
+    return null;
+  };
+
   const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
 
     setLoadingStructuredReport(true);
-    setReportError("");
 
     try {
       const headers = getAuthHeaders();
@@ -190,10 +205,12 @@ export default function VehicleDetail() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.reportData) {
-            setStructuredReport(data.reportData);
+          const parsed = extractReportData(data);
+          if (parsed) {
+            setStructuredReport(parsed);
             setLoadingStructuredReport(false);
             setCountdown(null);
+            setReportError("");
             return;
           }
         }
@@ -218,23 +235,24 @@ export default function VehicleDetail() {
           });
           if (detailRes.ok) {
             const detailData = await detailRes.json();
-            if (detailData && detailData.reportData) {
-              setStructuredReport(detailData.reportData);
+            const parsedDetail = extractReportData(detailData);
+            if (parsedDetail) {
+              setStructuredReport(parsedDetail);
               setCountdown(null);
               setLoadingStructuredReport(false);
+              setReportError("");
               return;
             }
           }
         }
       } else {
         const errData = await genRes.json().catch(() => ({}));
-        if (errData.message) {
+        if (errData.message && errData.statusCode !== 404) {
           setReportError(errData.message);
         }
       }
     } catch (e: any) {
       console.error("Fetch structured vehicle report error", e);
-      setReportError("Rapor verisi yüklenirken bir bağlantı hatası oluştu.");
     } finally {
       setLoadingStructuredReport(false);
     }
@@ -256,10 +274,12 @@ export default function VehicleDetail() {
       const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.reportData) {
-          setStructuredReport(data.reportData);
+        const parsed = extractReportData(data);
+        if (parsed) {
+          setStructuredReport(parsed);
           setCountdown(null);
           setLoadingStructuredReport(false);
+          setReportError("");
         }
       }
     } catch (e) {}
