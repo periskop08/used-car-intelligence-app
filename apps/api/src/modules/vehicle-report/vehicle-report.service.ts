@@ -28,8 +28,10 @@ export class VehicleReportService implements OnModuleInit {
     try {
       const statements = [
         `DO $$ BEGIN
-            CREATE TYPE "VehicleReportMode" AS ENUM ('VEHICLE_REPORT', 'LISTING_REPORT');
+            CREATE TYPE "VehicleReportMode" AS ENUM ('VEHICLE_REPORT', 'LISTING_REPORT', 'TORQUE_SCOUT_VEHICLE_REPORT');
         EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+
+        `ALTER TYPE "VehicleReportMode" ADD VALUE IF NOT EXISTS 'TORQUE_SCOUT_VEHICLE_REPORT';`,
 
         `DO $$ BEGIN
             CREATE TYPE "VehicleReportStatus" AS ENUM ('QUEUED', 'GENERATING', 'VALIDATING', 'REPAIRING', 'COMPLETED', 'SAFE_FALLBACK', 'FAILED', 'ARCHIVED');
@@ -41,6 +43,11 @@ export class VehicleReportService implements OnModuleInit {
 
         `ALTER TYPE "AiQuotaFeature" ADD VALUE IF NOT EXISTS 'VEHICLE_REPORT';`,
         `ALTER TYPE "AiQuotaFeature" ADD VALUE IF NOT EXISTS 'LISTING_REPORT';`,
+
+        `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "qualityScore" INTEGER;`,
+        `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "refreshReason" TEXT;`,
+        `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "legacySourceMode" TEXT;`,
+        `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "upgradedFromId" TEXT;`,
 
         `CREATE TABLE IF NOT EXISTS "GeneratedVehicleReport" (
             "id" TEXT NOT NULL,
