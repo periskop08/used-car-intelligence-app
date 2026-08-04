@@ -5,11 +5,16 @@ import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
 import { ComprehensiveVehicleReport, VehicleReportGeneratedContent } from '@used-car-intelligence/shared';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
+
+type AIProvider = 'gemini' | 'openai' | 'none';
 
 @Injectable()
 export class VehicleReportProviderService implements OnModuleInit {
   private readonly logger = new Logger(VehicleReportProviderService.name);
-  private modelName: string;
+  private geminiModelName: string;
+  private openaiModelName: string;
+  private activeProvider: AIProvider = 'none';
   private runtimeHealthStatus: 'HEALTHY' | 'DEGRADED' = 'HEALTHY';
 
   constructor(
@@ -18,25 +23,47 @@ export class VehicleReportProviderService implements OnModuleInit {
     private narrativeQualityService: VehicleReportNarrativeQualityService,
     private fallbackService: VehicleReportFallbackService,
   ) {
-    this.modelName = process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-pro';
+    this.geminiModelName = process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-flash';
+    this.openaiModelName = process.env.OPENAI_REPORT_MODEL || 'gpt-4o';
   }
 
   onModuleInit() {
-    this.validateGeminiConfig();
+    this.detectActiveProvider();
   }
 
-  private validateGeminiConfig() {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-    if (!apiKey) {
-      this.logger.warn(`[GEMINI CONFIG] GEMINI_API_KEY ortam değişkeni tanımlı değil. Rapor üretiminde deterministik altyapı kullanılacaktır.`);
+  private detectActiveProvider() {
+    const preferredProvider = (process.env.VEHICLE_REPORT_PRIMARY_PROVIDER || 'gemini').toLowerCase() as AIProvider;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    // Try preferred provider first
+    if (preferredProvider === 'openai' && openaiKey) {
+      this.activeProvider = 'openai';
+      this.logger.log(`[PROVIDER] OpenAI aktif (model: ${this.openaiModelName}) — tercih: ${preferredProvider}`);
+    } else if (preferredProvider === 'gemini' && geminiKey) {
+      this.activeProvider = 'gemini';
+      this.logger.log(`[PROVIDER] Gemini aktif (model: ${this.geminiModelName}) — tercih: ${preferredProvider}`);
+    } else if (geminiKey) {
+      // Fallback to gemini if available
+      this.activeProvider = 'gemini';
+      this.logger.log(`[PROVIDER] Gemini aktif (fallback — tercih "${preferredProvider}" için key bulunamadı)`);
+    } else if (openaiKey) {
+      // Fallback to openai if available
+      this.activeProvider = 'openai';
+      this.logger.log(`[PROVIDER] OpenAI aktif (fallback — tercih "${preferredProvider}" için key bulunamadı)`);
+    } else {
+      this.activeProvider = 'none';
       this.runtimeHealthStatus = 'DEGRADED';
-      return;
+      this.logger.warn(`[PROVIDER] Hiçbir AI API key tanımlı değil. Deterministik fallback aktif.`);
     }
-    this.logger.log(`[GEMINI CONFIG] Model '${this.modelName}' kilitlendi ve Gemini 2.5 adaptörü aktif.`);
   }
 
   getRuntimeHealthStatus(): 'HEALTHY' | 'DEGRADED' {
     return this.runtimeHealthStatus;
+  }
+
+  getActiveProvider(): AIProvider {
+    return this.activeProvider;
   }
 
   async generateReport(
@@ -57,47 +84,35 @@ export class VehicleReportProviderService implements OnModuleInit {
       vehicleContext,
     );
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-    if (!apiKey) {
+    if (this.activeProvider === 'none') {
       return {
         report: baseReport,
         provider: 'DETERMINISTIC_FALLBACK',
         modelName: 'TorqueScout DB Engine',
         repairAttempted: false,
-        fallbackReason: 'AI API key unconfigured, served deterministic DB evidence report',
+        fallbackReason: 'AI API key yapılandırılmamış, deterministik veritabanı raporu sunuldu',
       };
     }
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: this.modelName,
-        generationConfig: {
-          temperature: 0.25,
-          topP: 0.85,
-          responseMimeType: 'application/json',
-        },
-      });
-
       const systemPrompt = this.promptService.buildSystemPrompt();
       const userPrompt = this.promptService.buildUserPrompt(vehicleContext);
+      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      const result = await model.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
-        ],
-      });
-
-      const responseText = result.response.text();
       let generatedContent: VehicleReportGeneratedContent | null = null;
-      try {
-        generatedContent = JSON.parse(responseText);
-      } catch (parseErr) {
-        this.logger.warn(`Gemini 2.5 JSON parse notice for report ${reportId}: ${parseErr}`);
+      let usedModel = '';
+
+      if (this.activeProvider === 'gemini') {
+        const result = await this.callGemini(fullPrompt);
+        generatedContent = result.content;
+        usedModel = this.geminiModelName;
+      } else if (this.activeProvider === 'openai') {
+        const result = await this.callOpenAI(systemPrompt, userPrompt);
+        generatedContent = result.content;
+        usedModel = this.openaiModelName;
       }
 
       if (generatedContent) {
-        // Validate Narrative Quality (0-100 score, 75 threshold)
         const brandName = vehicleContext?.vehicleIdentity?.brand;
         const modelName = vehicleContext?.vehicleIdentity?.model;
         let qualityResult = this.narrativeQualityService.validateReportNarrativeQuality(
@@ -111,20 +126,25 @@ export class VehicleReportProviderService implements OnModuleInit {
         // Attempt 1 repair call if quality is below threshold
         if (!qualityResult.passed) {
           this.logger.warn(
-            `Report ${reportId} quality score ${qualityResult.totalScore}/100 is below 75 threshold. Reasons: ${qualityResult.rejectionReasons.join(', ')}. Triggering repair attempt 1.`,
+            `Report ${reportId} quality score ${qualityResult.totalScore}/100 below 75. Reasons: ${qualityResult.rejectionReasons.join(', ')}. Triggering repair.`,
           );
           repairAttempted = true;
           try {
-            const repairPrompt = `${systemPrompt}\n\nÖNCİKİ ÜRETİM UYARI ALDI:\n${qualityResult.rejectionReasons.join('\n')}\n\nLütfen kurallara tam uyarak düzeltilmiş VehicleReportGeneratedContent JSON yapısını üretin.`;
-            const repairResult = await model.generateContent({
-              contents: [{ role: 'user', parts: [{ text: `${repairPrompt}\n\n${userPrompt}` }] }],
-            });
-            const repairedText = repairResult.response.text();
-            const repairedJson = JSON.parse(repairedText);
-            if (repairedJson) {
-              generatedContent = repairedJson;
+            const repairSystemPrompt = `${systemPrompt}\n\nÖNCEKİ ÜRETİM SORUNLARI:\n${qualityResult.rejectionReasons.map(r => `- ${r}`).join('\n')}\n\nBu sorunları düzelterek aynı araç için kurallara tam uyarak yeni VehicleReportGeneratedContent JSON üretin.`;
+
+            let repairedContent: VehicleReportGeneratedContent | null = null;
+            if (this.activeProvider === 'gemini') {
+              const repairResult = await this.callGemini(`${repairSystemPrompt}\n\n${userPrompt}`);
+              repairedContent = repairResult.content;
+            } else if (this.activeProvider === 'openai') {
+              const repairResult = await this.callOpenAI(repairSystemPrompt, userPrompt);
+              repairedContent = repairResult.content;
+            }
+
+            if (repairedContent) {
+              generatedContent = repairedContent;
               qualityResult = this.narrativeQualityService.validateReportNarrativeQuality(
-                repairedJson,
+                repairedContent,
                 brandName,
                 modelName,
               );
@@ -161,8 +181,8 @@ export class VehicleReportProviderService implements OnModuleInit {
 
         return {
           report: baseReport,
-          provider: 'gemini',
-          modelName: this.modelName,
+          provider: this.activeProvider,
+          modelName: usedModel,
           qualityScore: qualityResult.totalScore,
           repairAttempted,
         };
@@ -173,7 +193,7 @@ export class VehicleReportProviderService implements OnModuleInit {
         provider: 'DETERMINISTIC_FALLBACK',
         modelName: 'TorqueScout DB Engine',
         repairAttempted: false,
-        fallbackReason: 'AI output parse failed, served deterministic fallback',
+        fallbackReason: 'AI çıktısı parse edilemedi, deterministik rapor sunuldu',
       };
     } catch (err: any) {
       this.logger.error(`AI Generation error: ${err?.message}. Executing deterministic fallback.`);
@@ -183,8 +203,68 @@ export class VehicleReportProviderService implements OnModuleInit {
         provider: 'DETERMINISTIC_FALLBACK',
         modelName: 'TorqueScout DB Engine',
         repairAttempted: false,
-        fallbackReason: err?.message || 'Gemini 2.5 API error',
+        fallbackReason: err?.message || 'AI API hatası',
       };
+    }
+  }
+
+  private async callGemini(fullPrompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+    if (!apiKey) throw new Error('Gemini API key eksik');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: this.geminiModelName,
+      generationConfig: {
+        temperature: 0.3,
+        topP: 0.85,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+    });
+
+    const responseText = result.response.text();
+    try {
+      return { content: JSON.parse(responseText) };
+    } catch {
+      this.logger.warn(`Gemini JSON parse failed, trying to extract JSON...`);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          return { content: JSON.parse(jsonMatch[0]) };
+        } catch {
+          return { content: null };
+        }
+      }
+      return { content: null };
+    }
+  }
+
+  private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API key eksik');
+
+    const openai = new OpenAI({ apiKey });
+
+    const response = await openai.chat.completions.create({
+      model: this.openaiModelName,
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    });
+
+    const responseText = response.choices[0]?.message?.content || '';
+    try {
+      return { content: JSON.parse(responseText) };
+    } catch {
+      this.logger.warn(`OpenAI JSON parse failed`);
+      return { content: null };
     }
   }
 }
