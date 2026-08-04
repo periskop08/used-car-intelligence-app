@@ -17,6 +17,22 @@ import {
   ShieldCheck
 } from "lucide-react";
 
+const cleanRangeText = (text?: string): string => {
+  if (!text) return "";
+  return text
+    .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)yla\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "$1 kapasitesine sahiptir")
+    .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)\s+ve\s+yaklaşık\s+\d+\s*km\s*menzil,\s*sık\s+mola\s+ihtiyacını\s+azaltır/gi, "$1 kapasitesi sunar")
+    .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "")
+    .replace(/ve\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/ve\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+\./g, ".")
+    .replace(/\.\./g, ".")
+    .trim();
+};
+
 interface VehicleReportExpertSynthesisProps {
   synthesis: ExpertDecisionSynthesis;
   supportingFacts?: ReportSupportingFact[];
@@ -83,7 +99,7 @@ export default function VehicleReportExpertSynthesis({
 
           <h4 className="text-base font-bold text-orange-400">{synthesis.vehicleCharacter.headline}</h4>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {synthesis.vehicleCharacter.detailedAssessment}
+            {cleanRangeText(synthesis.vehicleCharacter.detailedAssessment)}
           </p>
 
           {/* Daily Use Assessment Details */}
@@ -92,13 +108,13 @@ export default function VehicleReportExpertSynthesis({
               {synthesis.dailyUseAssessment.cityUse && (
                 <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5">
                   <span className="font-bold text-slate-400 block mb-0.5">Şehir İçi Kullanım</span>
-                  <span className="text-slate-300">{synthesis.dailyUseAssessment.cityUse}</span>
+                  <span className="text-slate-300">{cleanRangeText(synthesis.dailyUseAssessment.cityUse)}</span>
                 </div>
               )}
               {synthesis.dailyUseAssessment.highwayUse && (
                 <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5">
                   <span className="font-bold text-slate-400 block mb-0.5">Otoyol ve Seyir</span>
-                  <span className="text-slate-300">{synthesis.dailyUseAssessment.highwayUse}</span>
+                  <span className="text-slate-300">{cleanRangeText(synthesis.dailyUseAssessment.highwayUse)}</span>
                 </div>
               )}
             </div>

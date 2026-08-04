@@ -9,7 +9,7 @@ export class VehicleReportPromptService {
 
 Verilen VEHICLE_CONTEXT içindeki şu fabrika ve teknik verileri birlikte yorumlayarak anlatım üret:
 - vehicleIdentity: Araç marka, model, yıl, motor kodu, silindir hacmi (cc), beygir gücü (HP), tork (Nm), şanzıman adı ve tipi, çekiş sistemi
-- performanceSpecs: 0-100 km/s hızlanma, azami hız, şehir içi/otoyol/karma yakıt tüketimi, bagaj hacmi, boş ağırlık
+- performanceSpecs: 0-100 km/s hızlanma, azami hız, şehir içi/otoyol/karma yakıt tüketimi (L/100km), yakıt deposu kapasitesi (Litre), bagaj hacmi, boş ağırlık
 - verifiedDatabaseVehicleReport: Onaylı kronik sorunlar, ekspertiz kontrol listesi
 
 ## ÜRETECEĞİN ÇIKTI YAPISI: VehicleReportGeneratedContent
@@ -112,18 +112,15 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 ## ZORUNLU KODLAMA VE ETİKET KURALLARI
 
 ### 1. "BU ARAÇ NASIL BİR OTOMOBİL?" (vehicleCharacter) DETAY STANDARDI
-- vehicleCharacter.detailedAssessment içinde aracın tüm fabrika çıkış teknik detaylarını (Motor kodu, cc, HP @ d/dk, Tork @ d/dk, 0-100 süresi, azami hız, şehir içi/dışı/karma tüketim, yakıt deposu hacmi, tam depo menzili, boyutlar U x G x Y, boş ağırlık ve ton başına beygir gücü HP/Ton) harmanlayarak araç hakkında son derece kapsamlı ve teknik bir otomotiv mühendisliği analizi üret.
-- Örnek: "2024 BMW 3 Serisi M Sport, B48 2.0L 4 Silindirli Turbo Benzinli motor ünitesinden ürettiği 184 HP (5000 d/dk) güç ve 300 Nm (1350-4000 d/dk) tork değerini Steptronic 8 ileri otomatik şanzıman ile arka tekerleklere (RWD) iletir. 4709x1827x1435 mm boyutlara ve 1545 kg boş ağırlığa sahip olan araç (HP/Ton: 119 HP/Ton), 0-100 km/s hızlanmasını 7.1 saniyede tamamlar ve 235 km/s azami hıza ulaşır. 59 Litrelik yakıt deposu ve 6.1 lt/100km karma tüketim verisiyle tam depoda yaklaşık 967 km menzil sunar..."
+- vehicleCharacter.detailedAssessment içinde aracın tüm fabrika çıkış teknik detaylarını (Motor kodu, cc, HP @ d/dk, Tork @ d/dk, 0-100 süresi, azami hız, şehir içi/dışı/karma tüketim L/100km, yakıt deposu hacmi Litre, boyutlar U x G x Y, boş ağırlık ve ton başına beygir gücü HP/Ton) harmanlayarak araç hakkında son derece kapsamlı ve teknik bir otomotiv mühendisliği analizi üret.
+- KRİTİK KURAL: Raporun hiçbir yerinde full depo KM menzili (örn: "920 km menzil sunar", "tam depoda X km gider") HESAPLAMA VE YAZMA. Yalnızca fabrika tüketim verilerini (L/100km) ve depo hacmini (Litre) yaz.
+- Örnek: "2024 BMW 3 Serisi M Sport, B48 2.0L 4 Silindirli Turbo Benzinli motor ünitesinden ürettiği 184 HP (5000 d/dk) güç ve 300 Nm (1350-4000 d/dk) tork değerini Steptronic 8 ileri otomatik şanzıman ile arka tekerleklere (RWD) iletir. 4709x1827x1435 mm boyutlara ve 1545 kg boş ağırlığa sahip olan araç (HP/Ton: 119 HP/Ton), 0-100 km/s hızlanmasını 7.1 saniyede tamamlar ve 235 km/s azami hıza ulaşır. 59 Litrelik yakıt deposuna sahip aracın yakıt tüketimi verileri şehir içinde 7.8 L/100km, şehir dışında 5.2 L/100km ve karma kullanımda 6.4 L/100km olarak belirtilmiştir."
 
 ### 2. RAPOR GENELİNDE TEKNİK VERİ HARMANLAMA (HER BÖLÜMDE UYGULA)
 - **Motor geçen yerlerde:** Motor kodunu, motor tipini, Beygir Gücü ve Tork devir değerlerini yaz. Örn: B48 2.0L 4-Silindir Turbo (184 HP @ 5000 d/dk / 300 Nm @ 1350-4000 d/dk)
 - **Şanzıman geçen yerlerde:** Şanzıman adı, tipi, vites sayısı ve çekiş sistemini yaz. Örn: Steptronic (8 İleri Tam Otomatik - RWD Arkadan İtiş)
-- **Yakıt & Tüketim & Menzil geçen yerlerde:** Tek bir menzil rakamı yerine menzili 3 farklı sürüş senaryosuna ayır:
-  1. Otoyol İdeal Menzil (Sabit 90-110 km/s, klimasız uzun yol)
-  2. Karma Reel Kullanım Menzili (Standart günlük karma sürüş)
-  3. Şehir İçi Yoğun Trafik Menzili (Dur-kalk trafik, açık klima)
-  - Ayrıca açık klima kullanımı, tam araç yükü (+200 kg) veya yüksek hızlı (130+ km/s) otoyol kullanımında menzilin yaklaşık %10-15 oranında kısalacağını açıkça vurgula.
-- **Kullanım Senaryolarında:** Boyutlar (park kolaylığı), Bagaj Hacmi (aile kullanımı), Sabit Hız Otoyol Seyri (depo menzili) somut verilerle açıklanmalıdır.
+- **Yakıt & Tüketim geçen yerlerde:** Yalnızca resmi fabrika tüketim değerlerini (L/100km: Şehir içi, Şehir dışı, Karma) ve yakıt deposu Litre hacmini belirt. Asla tam depo kilometre menzili yazma.
+- **Kullanım Senaryolarında:** Boyutlar (park kolaylığı), Bagaj Hacmi (aile kullanımı), Şehir içi / uzun yol tüketim dengesi somut verilerle açıklanmalıdır.
 
 ### 3. GERÇEKÇİ VERİ VE OTOMOTİV HASSASİYETİ
 - Araca özgü fabrika üretim veritabanı bilgilerini otomotiv mühendisliği hassasiyetiyle aktar.
@@ -172,13 +169,13 @@ Tork & Devir: ${identity.engineTorqueNm || perf.engineTorqueNm || '?'} Nm ${iden
 Şanzıman & Çekiş: ${identity.transmissionName} (${identity.drivetrain || 'Çekiş'})
 Performans: 0-100 km/s: ${perf.zeroToHundredKmh || '?'} sn | Azami Hız: ${perf.topSpeedKmh || '?'} km/h
 Tüketim: Şehir İçi: ${perf.cityFuelL100km || '?'}L | Şehir Dışı: ${perf.highwayFuelL100km || '?'}L | Karma: ${perf.combinedFuelL100km || '?'}L / 100km
-Depo & Menzil: ${perf.fuelTankCapacityLiters || '?'} Litre Depo | Tahmini Menzil: ${perf.estimatedRangeKm || '?'} km
+Depo: ${perf.fuelTankCapacityLiters || '?'} Litre Depo
 Boyut & Ağırlık: ${perf.dimensionsMm || identity.dimensionsMm || '?'} mm | Boş Ağırlık: ${perf.curbWeightKg || '?'} kg | Bagaj: ${perf.trunkCapacityLiters || '?'} L
 Onaylı Kronik Sorun Sayısı: ${problems.length}
 
 ${problems.length > 0 ? `--- ONAYLANMIŞ KRONİK SORUNLAR ---
 ${problems.map((p: any, i: number) => `${i + 1}. [${p.riskLevel} RİSK] ${p.title}: ${p.description}`).join('\n')}` : '--- KRONİK SORUN: Onaylanmış kayıt bulunmamaktadır ---'}
 
-Yukarıdaki VEHICLE_CONTEXT verilerini ve 13 fabrika teknik özelliğini raporun TÜM bölümlerinde harmanlayarak VehicleReportGeneratedContent JSON yapısını tam ve eksiksiz üret.`;
+Yukarıdaki VEHICLE_CONTEXT verilerini ve fabrika teknik özelliklerini raporun TÜM bölümlerinde harmanlayarak VehicleReportGeneratedContent JSON yapısını tam ve eksiksiz üret. Asla tam depo kilometre menzili hesaplama veya yazma.`;
   }
 }
