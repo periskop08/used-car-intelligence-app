@@ -175,6 +175,17 @@ export default function VehicleDetail() {
     return headers;
   };
 
+  const safeFetchJson = async (res: Response): Promise<any> => {
+    if (!res || res.status === 204) return null;
+    try {
+      const text = await res.text();
+      if (!text || !text.trim()) return null;
+      return JSON.parse(text);
+    } catch (e) {
+      return null;
+    }
+  };
+
   const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
     if (!data) return null;
     let payload = data.reportData !== undefined ? data.reportData : data;
@@ -204,7 +215,7 @@ export default function VehicleDetail() {
           headers,
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeFetchJson(res);
           const parsed = extractReportData(data);
           if (parsed) {
             setStructuredReport(parsed);
@@ -227,14 +238,14 @@ export default function VehicleDetail() {
       });
 
       if (genRes.ok) {
-        const genData = await genRes.json();
-        const reportId = genData.reportId || genData.id;
+        const genData = await safeFetchJson(genRes);
+        const reportId = genData?.reportId || genData?.id;
         if (reportId) {
           const detailRes = await fetch(`${API_URL}/vehicle-reports/${reportId}`, {
             headers,
           });
           if (detailRes.ok) {
-            const detailData = await detailRes.json();
+            const detailData = await safeFetchJson(detailRes);
             const parsedDetail = extractReportData(detailData);
             if (parsedDetail) {
               setStructuredReport(parsedDetail);
@@ -246,8 +257,8 @@ export default function VehicleDetail() {
           }
         }
       } else {
-        const errData = await genRes.json().catch(() => ({}));
-        if (errData.message && errData.statusCode !== 404) {
+        const errData = await safeFetchJson(genRes);
+        if (errData?.message && errData?.statusCode !== 404) {
           setReportError(errData.message);
         }
       }
@@ -273,7 +284,7 @@ export default function VehicleDetail() {
       const headers = getAuthHeaders();
       const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, { headers });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeFetchJson(res);
         const parsed = extractReportData(data);
         if (parsed) {
           setStructuredReport(parsed);

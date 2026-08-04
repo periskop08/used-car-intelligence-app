@@ -24,12 +24,20 @@ export class VehicleReportController {
 
   @Get('by-variant/:variantId/current')
   async getCurrentVariantReport(@Request() req: any, @Param('variantId') variantId: string) {
-    return this.reportService.getCurrentVariantReport(this.getUserId(req), variantId);
+    const report = await this.reportService.getCurrentVariantReport(this.getUserId(req), variantId);
+    if (!report) {
+      return { success: true, cached: false, reportData: null };
+    }
+    return report;
   }
 
   @Get('by-listing/:listingId/current')
   async getCurrentListingReport(@Request() req: any, @Param('listingId') listingId: string) {
-    return this.reportService.getCurrentListingReport(this.getUserId(req), listingId);
+    const report = await this.reportService.getCurrentListingReport(this.getUserId(req), listingId);
+    if (!report) {
+      return { success: true, cached: false, reportData: null };
+    }
+    return report;
   }
 
   @Post(':reportId/upgrade-version')
