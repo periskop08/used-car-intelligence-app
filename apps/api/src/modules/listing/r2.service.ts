@@ -21,6 +21,9 @@ export class R2Service {
         },
         region: 'auto',
       });
+      this.logger.log('Cloudflare R2 depolama istemcisi başarıyla başlatıldı.');
+    } else {
+      this.logger.warn('Cloudflare R2 anahtarları (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY) eksik. Görseller yedek (inline WebP) modunda saklanacak.');
     }
   }
 
