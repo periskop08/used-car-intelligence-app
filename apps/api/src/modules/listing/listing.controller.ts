@@ -354,11 +354,16 @@ export class ListingController {
       favoritedIds = new Set(userFavs.map((f) => f.listingId));
     }
 
-    const mappedItems = items.map((item) => ({
-      ...item,
-      media: item.media ? this.formatMediaUrls(item.media, req) : [],
-      isFavorited: favoritedIds.has(item.id),
-    }));
+    const now = new Date();
+    const mappedItems = items.map((item) => {
+      const isUrgent = !!(item.isUrgent && item.urgentExpiresAt && new Date(item.urgentExpiresAt) > now);
+      return {
+        ...item,
+        isUrgent,
+        media: item.media ? this.formatMediaUrls(item.media, req) : [],
+        isFavorited: favoritedIds.has(item.id),
+      };
+    });
 
     return {
       items: mappedItems,
