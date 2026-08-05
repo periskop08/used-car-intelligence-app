@@ -7,7 +7,7 @@ import { ListingPromotionType } from '@prisma/client';
 @Injectable()
 export class ListingPromotionPricingService {
   private config: UrgentListingProductConfig = {
-    enabled: false, // Default disabled until explicitly configured by Admin
+    enabled: true, // Enabled by default so users can select Urgent Listing in Step 5
     priceAmount: 149.90,
     amountMinor: 14990,
     currency: 'TRY',

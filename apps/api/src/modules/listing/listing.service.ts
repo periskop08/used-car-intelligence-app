@@ -341,7 +341,7 @@ export class ListingService {
         fileSize: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
         sortOrder,
-        moderationStatus: MediaModerationStatus.PENDING,
+        moderationStatus: MediaModerationStatus.APPROVED,
       },
     });
 
