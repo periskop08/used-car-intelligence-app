@@ -144,13 +144,17 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
         lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
         paymentStatus: PromotionPaymentStatus.PAID,
       },
-      include: { listing: true },
+      include: { listing: { include: { seller: true } } },
     });
 
     for (const promo of paidPendingForActiveListings) {
       const isPublished = promo.listing && (promo.listing.status === ('ACTIVE' as any) || promo.listing.status === ('PUBLISHED' as any));
       if (promo.listingId && isPublished) {
-        const activeUntil = promo.listing?.expiresAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const tier = promo.listing?.seller?.subscriptionTier;
+        const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
+        const durationDays = isProTier ? 45 : 30;
+
+        const activeUntil = promo.listing?.expiresAt || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
         await this.prisma.$transaction([
           this.prisma.listingPromotionPurchase.update({
             where: { id: promo.id },

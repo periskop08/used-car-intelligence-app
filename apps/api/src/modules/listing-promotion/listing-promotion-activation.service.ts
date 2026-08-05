@@ -34,6 +34,7 @@ export class ListingPromotionActivationService {
     const listing = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
       include: {
+        seller: true,
         promotions: {
           where: {
             lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
@@ -62,8 +63,13 @@ export class ListingPromotionActivationService {
     }
 
     const now = new Date();
-    // Default duration: 30 days if listing.expiresAt is not set
-    const activeUntil = listing.expiresAt || (listing as any).activeUntil || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    // Tier-based duration calculation (45 days for PROFESYONEL/PREMIUM/PRO, 30 days for standard)
+    const tier = listing.seller?.subscriptionTier;
+    const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
+    const durationDays = isProTier ? 45 : 30;
+
+    const activeUntil = listing.expiresAt || (listing as any).activeUntil || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     // Atomic activation in single transaction
     await this.prisma.$transaction([

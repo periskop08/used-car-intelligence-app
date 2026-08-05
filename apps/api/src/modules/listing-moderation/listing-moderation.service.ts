@@ -430,11 +430,18 @@ export class ListingModerationService implements OnModuleInit {
   }
 
   async approveListing(listingId: string, adminUser: any) {
-    const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
+    const l = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+      include: { seller: true },
+    });
     if (!l) throw new NotFoundException('İlan bulunamadı.');
 
     const now = new Date();
-    const expiresAt = l.expiresAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const tier = l.seller?.subscriptionTier;
+    const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
+    const durationDays = isProTier ? 45 : 30;
+
+    const expiresAt = l.expiresAt || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     const updated = await this.prisma.vehicleListing.update({
       where: { id: listingId },
@@ -442,6 +449,7 @@ export class ListingModerationService implements OnModuleInit {
         status: 'ACTIVE',
         publishedAt: l.publishedAt || now,
         expiresAt,
+        listingDurationDays: l.listingDurationDays || durationDays,
       },
     });
 
