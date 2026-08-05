@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { formatImageUrl } from "@/utils/media";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -815,7 +816,7 @@ export default function EditListing() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {uploadedPhotos.map((photo) => (
               <div key={photo.id} className="relative aspect-[4/3] rounded-2xl overflow-hidden border border-white/10 group bg-slate-950">
-                <img src={photo.url} alt="Araç görseli" className="w-full h-full object-cover" />
+                <img src={formatImageUrl(photo.url || photo.thumbnailUrl || photo.mediumUrl)} alt="Araç görseli" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => handleDeletePhoto(photo.id)}

@@ -15,6 +15,7 @@ import QuotaBadge from "@/components/QuotaBadge";
 import UrgentListingPurchaseCard from "@/components/listings/UrgentListingPurchaseCard";
 import UrgentListingPaymentRecovery from "@/components/listings/UrgentListingPaymentRecovery";
 import { requestUrgentQuote, createUrgentCheckout } from "@/lib/listing-promotion-api";
+import { formatImageUrl } from "@/utils/media";
 
 export default function CreateListing() {
   const router = useRouter();
@@ -1084,7 +1085,7 @@ export default function CreateListing() {
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
               {uploadedPhotos.map((photo, index) => (
                 <div key={photo.id} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/10 group">
-                  <img src={photo.url} alt="Uploaded car" className="w-full h-full object-cover" />
+                  <img src={formatImageUrl(photo.url || photo.thumbnailUrl || photo.mediumUrl)} alt="Uploaded car" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                     <button
                       type="button"
