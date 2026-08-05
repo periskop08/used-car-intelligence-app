@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 
+import { ListingPromotionActivationService } from '../listing-promotion/listing-promotion-activation.service';
+import { ListingPromotionRefundService } from '../listing-promotion/listing-promotion-refund.service';
+import { Optional } from '@nestjs/common';
+
 const PRESET_REASONS = [
   { code: 'PHOTO_INSUFFICIENT', actionType: 'REVISION_REQUIRED', title: 'Araç fotoğrafları yetersiz', defaultSellerMessage: 'İlanınızdaki fotoğraflar yetersizdir. Lütfen aracın ön, arka, yan ve iç mekan fotoğraflarını net biçimde yükleyin.', requiresSellerNote: true, allowsResubmission: true },
   { code: 'PHOTO_MISMATCH', actionType: 'REVISION_REQUIRED', title: 'Fotoğraflar araçla uyuşmuyor', defaultSellerMessage: 'Yüklenen fotoğraflardan bazıları seçilen marka/model ile eşleşmemektedir.', requiresSellerNote: true, allowsResubmission: true },
@@ -14,7 +18,11 @@ const PRESET_REASONS = [
 
 @Injectable()
 export class ListingModerationService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly activationService?: ListingPromotionActivationService,
+    @Optional() private readonly refundService?: ListingPromotionRefundService,
+  ) {}
 
   async onModuleInit() {
     const valuesToAdd = ['DETAILED_REVIEW', 'REVISION_REQUIRED', 'REPORTED', 'DELETED'];
@@ -448,6 +456,10 @@ export class ListingModerationService implements OnModuleInit {
       // fallback
     }
 
+    if (this.activationService) {
+      await this.activationService.tryActivateUrgentPromotion(listingId).catch(() => null);
+    }
+
     return updated;
   }
 
@@ -546,6 +558,10 @@ export class ListingModerationService implements OnModuleInit {
       });
     } catch (e) {
       // fallback
+    }
+
+    if (this.refundService) {
+      await this.refundService.refundNeverActivatedPromotion(listingId, sellerMessage || 'İlan reddedildi').catch(() => null);
     }
 
     return updated;

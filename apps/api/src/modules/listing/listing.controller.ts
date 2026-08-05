@@ -88,6 +88,7 @@ export class ListingController {
     @Query('includeDescription') includeDescription?: string,
     @Query('currency') currency?: string,
     @Query('sellerId') sellerId?: string,
+    @Query('urgentOnly') urgentOnly?: string,
   ) {
     // Parse filters
     const filters: any = {
@@ -98,6 +99,11 @@ export class ListingController {
         },
       },
     };
+
+    if (urgentOnly === 'true') {
+      filters.isUrgent = true;
+      filters.urgentExpiresAt = { gt: new Date() };
+    }
 
     if (sellerId) {
       filters.sellerId = sellerId;

@@ -179,6 +179,9 @@ export default function Header() {
               <a href="/listings" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
                 <span>🚗</span> Tüm İlanlar
               </a>
+              <a href="/listings/urgent" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
+                <span>🚨</span> Acil İlanlar
+              </a>
               <a href="/listings/create" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
                 <span>➕</span> İlan Ver
               </a>

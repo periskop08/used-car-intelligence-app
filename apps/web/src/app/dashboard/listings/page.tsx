@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 
 const translateFuelType = (fuel: string) => {
   if (!fuel) return "-";
@@ -280,6 +281,7 @@ export default function SellerDashboard() {
                       <div className="flex flex-col text-center md:text-left gap-1">
                         <div className="flex items-center justify-center md:justify-start gap-2">
                           <h4 className="font-extrabold text-slate-200 text-sm line-clamp-1">{listing.title}</h4>
+                          {listing.isUrgent && <UrgentListingBadge size="small" animated />}
                           <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
                             listing.status === "ACTIVE"
                               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"

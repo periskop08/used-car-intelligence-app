@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
+import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -289,7 +290,10 @@ export default function ListingDetail() {
           {/* Sol Kolon (lg:col-span-6): Başlık ve İlan Detay Bilgileri */}
           <div className="lg:col-span-6">
             <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
-            <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
+              {listing.isUrgent && <UrgentListingBadge size="medium" animated />}
+            </div>
             <p className="text-[11px] text-slate-400 canvas-subtitle font-bold uppercase tracking-wider mt-0.5">
               {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
             </p>

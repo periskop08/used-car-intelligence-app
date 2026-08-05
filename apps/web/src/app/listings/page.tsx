@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ListingFilters from "../../components/listings/ListingFilters";
+import ListingCard from "../../components/listings/ListingCard";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -29,6 +31,7 @@ function ListingsContent() {
   const [isAiReady, setIsAiReady] = useState(false);
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
+  const [urgentOnly, setUrgentOnly] = useState(false);
 
   // sahibinden.com style extended filters
   const [city, setCity] = useState("");
@@ -91,6 +94,7 @@ function ListingsContent() {
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
     const aiReady = searchParams.get("isAiReady") === "true";
+    const urgentVal = searchParams.get("urgentOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
     const profileId = searchParams.get("preferenceProfileId");
@@ -99,6 +103,7 @@ function ListingsContent() {
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
     if (aiReady) setIsAiReady(true);
+    if (urgentVal) setUrgentOnly(true);
     if (statusVal) setVehicleStatuses(statusVal.split(","));
     if (cityVal) setCity(cityVal);
     if (profileId) setPreferenceProfileId(profileId);
@@ -118,6 +123,7 @@ function ListingsContent() {
     if (minKm) query += `&minKm=${minKm}`;
     if (maxKm) query += `&maxKm=${maxKm}`;
     if (isAiReady) query += `&isAiReady=true`;
+    if (urgentOnly) query += `&urgentOnly=true`;
     if (preferenceProfileId) query += `&preferenceProfileId=${preferenceProfileId}`;
     if (prefSessionId) query += `&sessionId=${prefSessionId}`;
 

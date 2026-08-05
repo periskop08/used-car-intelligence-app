@@ -12,6 +12,9 @@ const PAINTED_COMPONENTS = [
 ];
 
 import QuotaBadge from "@/components/QuotaBadge";
+import UrgentListingPurchaseCard from "@/components/listings/UrgentListingPurchaseCard";
+import UrgentListingPaymentRecovery from "@/components/listings/UrgentListingPaymentRecovery";
+import { requestUrgentQuote, createUrgentCheckout } from "@/lib/listing-promotion-api";
 
 export default function CreateListing() {
   const router = useRouter();
@@ -19,6 +22,13 @@ export default function CreateListing() {
   // Wizard Step State
   const [step, setStep] = useState(1);
   const [token, setToken] = useState("");
+
+  // Urgent Listing Promotion State
+  const [urgentSelected, setUrgentSelected] = useState(false);
+  const [paidConsentAccepted, setPaidConsentAccepted] = useState(false);
+  const [activeQuote, setActiveQuote] = useState<any>(null);
+  const [paymentRecoveryOpen, setPaymentRecoveryOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   // Step 1: Vehicle & Variant selection
   const [brands, setBrands] = useState<any[]>([]);
@@ -296,6 +306,12 @@ export default function CreateListing() {
       return;
     }
 
+    if (!asDraft && urgentSelected && !paidConsentAccepted) {
+      setErrorMsg("Acil İlan hizmetini satın almak için ek hizmet onay kutusunu kabul etmeniz gerekmektedir.");
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       title,
       description,
@@ -342,10 +358,36 @@ export default function CreateListing() {
           if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
           return res.json();
         })
-        .then(() => {
+        .then(async () => {
           if (asDraft) {
             router.push("/dashboard/listings");
           } else {
+            // If Urgent Listing is selected, run quote & checkout first
+            if (urgentSelected) {
+              try {
+                const quote = activeQuote || (await requestUrgentQuote(listingId));
+                const idempotencyKey = `chk_${listingId}_${Date.now()}`;
+                const checkoutRes = await createUrgentCheckout(listingId, quote.quoteId, quote.termsVersion, idempotencyKey);
+                
+                // Confirm payment (simulated callback)
+                await fetch(`${API_URL}/listing-promotions/urgent/webhooks/MOCK_PAYMENT`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    eventId: `evt_${Date.now()}`,
+                    eventType: 'payment.success',
+                    purchaseId: checkoutRes.purchaseId,
+                    paymentReferenceId: `PAY_REF_${checkoutRes.purchaseId}`,
+                  }),
+                });
+              } catch (checkoutErr: any) {
+                setPaymentError(checkoutErr.message || "Ödeme checkout işlemi başarısız.");
+                setPaymentRecoveryOpen(true);
+                setSaving(false);
+                return;
+              }
+            }
+
             // 2. Publish (Transition status to PENDING_REVIEW)
             fetch(`${API_URL}/listings/${listingId}/status`, {
               method: "PATCH",
@@ -1108,6 +1150,15 @@ export default function CreateListing() {
             </div>
           ) : null}
 
+          {/* Paid Urgent Listing Card */}
+          <UrgentListingPurchaseCard
+            selected={urgentSelected}
+            onToggle={setUrgentSelected}
+            paidConsentAccepted={paidConsentAccepted}
+            onPaidConsentChange={setPaidConsentAccepted}
+            onQuoteReceived={setActiveQuote}
+          />
+
           {/* Legal check */}
           <div className="flex items-start gap-3 cursor-pointer bg-slate-900/40 p-5 rounded-2xl border border-white/5">
             <input
@@ -1141,13 +1192,32 @@ export default function CreateListing() {
             <button
               onClick={() => handleSaveAndPublish(false)}
               disabled={saving || (quota ? quota.remaining === 0 : false)}
-              className="w-full sm:w-1/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-950 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-2xl transition text-sm shadow-lg shadow-orange-600/15"
+              className={`w-full sm:w-1/3 text-white font-bold py-3.5 rounded-2xl transition text-sm shadow-lg ${
+                urgentSelected
+                  ? "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-600/20"
+                  : "bg-orange-600 hover:bg-orange-500 shadow-orange-600/15"
+              } disabled:bg-slate-950 disabled:text-slate-600 disabled:cursor-not-allowed`}
             >
-              {saving ? "Yayınlanıyor..." : "İncelemeye Gönder"}
+              {saving ? "Yayınlanıyor..." : urgentSelected ? "Öde ve İncelemeye Gönder" : "İncelemeye Gönder"}
             </button>
           </div>
         </div>
       )}
+
+      {/* Payment Failure Recovery Modal */}
+      <UrgentListingPaymentRecovery
+        isOpen={paymentRecoveryOpen}
+        errorMessage={paymentError}
+        onRetry={() => {
+          setPaymentRecoveryOpen(false);
+          handleSaveAndPublish(false);
+        }}
+        onContinueAsNormal={() => {
+          setPaymentRecoveryOpen(false);
+          setUrgentSelected(false);
+          handleSaveAndPublish(false);
+        }}
+      />
     </div>
   );
 }
