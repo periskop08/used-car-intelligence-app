@@ -433,9 +433,16 @@ export class ListingModerationService implements OnModuleInit {
     const l = await this.prisma.vehicleListing.findUnique({ where: { id: listingId } });
     if (!l) throw new NotFoundException('İlan bulunamadı.');
 
+    const now = new Date();
+    const expiresAt = l.expiresAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     const updated = await this.prisma.vehicleListing.update({
       where: { id: listingId },
-      data: { status: 'ACTIVE' },
+      data: {
+        status: 'ACTIVE',
+        publishedAt: l.publishedAt || now,
+        expiresAt,
+      },
     });
 
     try {

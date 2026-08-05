@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { 
   ListingPromotionSource, 
@@ -61,13 +61,9 @@ export class ListingPromotionActivationService {
       return false; // Payment not confirmed yet
     }
 
-    // Determine activeUntil from listing active period
-    const activeUntil = listing.expiresAt || (listing as any).activeUntil;
-    if (!activeUntil) {
-      throw new BadRequestException('MISSING_ACTIVE_UNTIL: İlanın yayın dönemi bitiş tarihi bulunamadığı için acil hizmet aktifleştirilemez.');
-    }
-
     const now = new Date();
+    // Default duration: 30 days if listing.expiresAt is not set
+    const activeUntil = listing.expiresAt || (listing as any).activeUntil || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     // Atomic activation in single transaction
     await this.prisma.$transaction([
@@ -82,6 +78,7 @@ export class ListingPromotionActivationService {
       this.prisma.vehicleListing.update({
         where: { id: listingId },
         data: {
+          expiresAt: listing.expiresAt ? undefined : activeUntil,
           isUrgent: true,
           urgentSince: now,
           urgentExpiresAt: activeUntil,

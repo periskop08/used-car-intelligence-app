@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { PromotionLifecycleStatus, PromotionPaymentStatus } from '@prisma/client';
 
 @Injectable()
-export class ListingPromotionReconciliationService {
+export class ListingPromotionReconciliationService implements OnModuleInit {
   private readonly logger = new Logger(ListingPromotionReconciliationService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    this.runReconciliationJob().catch(() => null);
+  }
 
   public async expirePromotions(): Promise<number> {
     const now = new Date();
@@ -131,6 +135,43 @@ export class ListingPromotionReconciliationService {
         });
         repairedListings++;
         this.logger.warn(`Reconciliation: Repaired desynced isUrgent=true for listing ${promo.listingId}`);
+      }
+    }
+
+    // 3. Paid promotions waiting activation for published listings -> activate now
+    const paidPendingForActiveListings = await this.prisma.listingPromotionPurchase.findMany({
+      where: {
+        lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+        paymentStatus: PromotionPaymentStatus.PAID,
+      },
+      include: { listing: true },
+    });
+
+    for (const promo of paidPendingForActiveListings) {
+      const isPublished = promo.listing && (promo.listing.status === ('ACTIVE' as any) || promo.listing.status === ('PUBLISHED' as any));
+      if (promo.listingId && isPublished) {
+        const activeUntil = promo.listing?.expiresAt || new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        await this.prisma.$transaction([
+          this.prisma.listingPromotionPurchase.update({
+            where: { id: promo.id },
+            data: {
+              lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+              activatedAt: now,
+              expiresAt: activeUntil,
+            },
+          }),
+          this.prisma.vehicleListing.update({
+            where: { id: promo.listingId },
+            data: {
+              isUrgent: true,
+              urgentSince: now,
+              urgentExpiresAt: activeUntil,
+              expiresAt: promo.listing?.expiresAt ? undefined : activeUntil,
+            },
+          }),
+        ]);
+        repairedListings++;
+        this.logger.log(`Reconciliation: Activated pending urgent promotion for listing ${promo.listingId}`);
       }
     }
 
