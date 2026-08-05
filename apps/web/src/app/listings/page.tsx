@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ListingFilters from "../../components/listings/ListingFilters";
 import ListingCard from "../../components/listings/ListingCard";
+import UrgentListingBadge from "../../components/listings/UrgentListingBadge";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -813,11 +814,16 @@ function ListingsContent() {
                         alt={listing.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                       />
-                      {listing.isAiReady && (
-                        <span className="absolute top-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md flex items-center gap-1">
-                          ✨ AI Analizli
-                        </span>
-                      )}
+                      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 items-start">
+                        {listing.isUrgent && (
+                          <UrgentListingBadge size="small" animated />
+                        )}
+                        {listing.isAiReady && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md flex items-center gap-1">
+                            ✨ AI Analizli
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="p-4 flex flex-col justify-between flex-1 gap-4">
