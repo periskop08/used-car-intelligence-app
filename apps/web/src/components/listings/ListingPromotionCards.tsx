@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, Zap, Star, Flame, AlertCircle } from "lucide-react";
+import { CheckCircle2, Star, Flame, AlertCircle } from "lucide-react";
+import UrgentListingBadge from "./UrgentListingBadge";
 
 export type PromotionSku = "URGENT_LISTING" | "SHOWCASE_FEED" | "URGENT_SHOWCASE_BUNDLE" | null;
 
@@ -65,7 +66,7 @@ export default function ListingPromotionCards({
       </div>
 
       {/* 3 Option Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Acil İlan */}
         <div
           onClick={() => canBuyUrgent && onSelectSku(selectedSku === "URGENT_LISTING" ? null : "URGENT_LISTING")}
@@ -77,18 +78,15 @@ export default function ListingPromotionCards({
               : "bg-slate-900/40 border-white/10 hover:border-red-500/40 hover:bg-slate-900/70"
           }`}
         >
-          {/* Radio indicator */}
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30">
-                <Zap className="w-5 h-5" />
-              </span>
-              <div>
-                <h4 className="font-extrabold text-white text-base">Acil İlan</h4>
-                <span className="text-[10px] text-red-400 font-mono font-bold uppercase tracking-wider block">🚨 Kırmızı Rozet</span>
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-1 rounded-lg bg-red-500/10 border border-red-500/20">
+                <UrgentListingBadge size="small" animated />
               </div>
+              <h4 className="font-extrabold text-white text-base">Acil İlan</h4>
             </div>
-            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${
               selectedSku === "URGENT_LISTING" ? "border-red-500 bg-red-500 text-white" : "border-slate-600 bg-slate-950"
             }`}>
               {selectedSku === "URGENT_LISTING" && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -99,16 +97,16 @@ export default function ListingPromotionCards({
             İlanınız kırmızı <strong>ACİL</strong> rozetiyle öne çıkar, Acil İlanlar sayfasında ve acil filtrelerinde görünür.
           </p>
 
-          <ul className="space-y-1.5 text-[11px] text-slate-400 mb-5">
-            <li className="flex items-center gap-1.5">✓ Kırmızı yanıp sönen ACİL rozeti</li>
-            <li className="flex items-center gap-1.5">✓ Acil İlanlar özel sayfası</li>
-            <li className="flex items-center gap-1.5">✓ Sadece Acil arama filtresi</li>
+          <ul className="space-y-2 text-[11px] text-slate-400 mb-6">
+            <li className="flex items-center gap-2">✓ Kırmızı yanıp sönen ACİL rozeti</li>
+            <li className="flex items-center gap-2">✓ Acil İlanlar özel sayfası</li>
+            <li className="flex items-center gap-2">✓ Sadece Acil arama filtresi</li>
           </ul>
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between mt-auto">
-            <div className="text-xs text-slate-400">
+          <div className="pt-3.5 border-t border-white/10 flex items-center justify-between mt-auto">
+            <span className="text-xs text-slate-400 font-medium">
               {isCreateFlow ? "İlan süresince" : `Kalan ${remainingDays ?? 30} gün`}
-            </div>
+            </span>
             <span className="text-lg font-black text-white">{urgentPrice} TL</span>
           </div>
         </div>
@@ -124,17 +122,14 @@ export default function ListingPromotionCards({
               : "bg-slate-900/40 border-white/10 hover:border-amber-500/40 hover:bg-slate-900/70"
           }`}
         >
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-3">
               <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 <Star className="w-5 h-5" />
               </span>
-              <div>
-                <h4 className="font-extrabold text-white text-base">Vitrin + Akış</h4>
-                <span className="text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider block">⭐ Çift Yüzey</span>
-              </div>
+              <h4 className="font-extrabold text-white text-base">Vitrin + Akış</h4>
             </div>
-            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${
               selectedSku === "SHOWCASE_FEED" ? "border-amber-500 bg-amber-500 text-white" : "border-slate-600 bg-slate-950"
             }`}>
               {selectedSku === "SHOWCASE_FEED" && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -145,16 +140,16 @@ export default function ListingPromotionCards({
             İlanınız ana sayfadaki <strong>Vitrin</strong> alanında ve Keşfet içerisindeki <strong>İlan Akışı</strong> bölümünde yer alır.
           </p>
 
-          <ul className="space-y-1.5 text-[11px] text-slate-400 mb-5">
-            <li className="flex items-center gap-1.5">✓ Ana Sayfa Vitrin alanı</li>
-            <li className="flex items-center gap-1.5">✓ Keşfet &gt; İlan Akışı</li>
-            <li className="flex items-center gap-1.5">✓ Maksimum ana sayfa görünürlüğü</li>
+          <ul className="space-y-2 text-[11px] text-slate-400 mb-6">
+            <li className="flex items-center gap-2">✓ Ana Sayfa Vitrin alanı</li>
+            <li className="flex items-center gap-2">✓ Keşfet &gt; İlan Akışı</li>
+            <li className="flex items-center gap-2">✓ Maksimum ana sayfa görünürlüğü</li>
           </ul>
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between mt-auto">
-            <div className="text-xs text-slate-400">
+          <div className="pt-3.5 border-t border-white/10 flex items-center justify-between mt-auto">
+            <span className="text-xs text-slate-400 font-medium">
               {isCreateFlow ? "İlan süresince" : `Kalan ${remainingDays ?? 30} gün`}
-            </div>
+            </span>
             <span className="text-lg font-black text-white">{showcasePrice} TL</span>
           </div>
         </div>
@@ -175,17 +170,14 @@ export default function ListingPromotionCards({
             🔥 EN AVANTAJLI PAKET
           </div>
 
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-3">
               <span className="p-2 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30">
                 <Flame className="w-5 h-5" />
               </span>
-              <div>
-                <h4 className="font-extrabold text-white text-base">Hızlı Satış</h4>
-                <span className="text-[10px] text-orange-400 font-mono font-bold uppercase tracking-wider block">Acil + Vitrin + Akış</span>
-              </div>
+              <h4 className="font-extrabold text-white text-base">Hızlı Satış</h4>
             </div>
-            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${
               selectedSku === "URGENT_SHOWCASE_BUNDLE" ? "border-orange-500 bg-orange-500 text-white" : "border-slate-600 bg-slate-950"
             }`}>
               {selectedSku === "URGENT_SHOWCASE_BUNDLE" && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -196,18 +188,19 @@ export default function ListingPromotionCards({
             Acil İlan ve Vitrin + Akış özelliklerini tek paket altında avantajlı fiyatla birlikte aktif eder.
           </p>
 
-          <ul className="space-y-1.5 text-[11px] text-slate-300 font-medium mb-5">
-            <li className="flex items-center gap-1.5 text-red-400 font-bold">✓ Kırmızı ACİL rozeti & Acil listesi</li>
-            <li className="flex items-center gap-1.5 text-amber-400 font-bold">✓ Ana Sayfa Vitrin alanı</li>
-            <li className="flex items-center gap-1.5 text-orange-400 font-bold">✓ Keşfet &gt; İlan Akışı görünürlüğü</li>
+          <ul className="space-y-2 text-[11px] text-slate-300 font-medium mb-6">
+            <li className="flex items-center gap-2 text-red-400 font-bold">✓ Kırmızı ACİL rozeti & Acil listesi</li>
+            <li className="flex items-center gap-2 text-amber-400 font-bold">✓ Ana Sayfa Vitrin alanı</li>
+            <li className="flex items-center gap-2 text-orange-400 font-bold">✓ Keşfet &gt; İlan Akışı görünürlüğü</li>
           </ul>
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between mt-auto">
-            <div>
-              <span className="text-xs text-slate-500 line-through block">Ayrı Ayrı: {individualTotal} TL</span>
+          {/* Pricing Bottom */}
+          <div className="pt-3.5 border-t border-white/10 flex items-end justify-between mt-auto">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] text-slate-500 line-through font-medium">Ayrı Ayrı: {individualTotal} TL</span>
               {savings > 0 && (
-                <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 inline-block">
-                  {savings} TL Avantaj
+                <span className="px-2 py-0.5 rounded-md font-extrabold text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 w-fit">
+                  {savings} TL AVANTAJ
                 </span>
               )}
             </div>
