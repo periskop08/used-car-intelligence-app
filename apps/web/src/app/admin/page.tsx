@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SellerBasedListingModeration } from "./components/SellerBasedListingModeration";
 import AdminFeedbackOperationCenter from "./components/AdminFeedbackOperationCenter";
+import VehicleProfileEditor from "./components/VehicleProfileEditor";
 
 const PART_LABELS: Record<string, string> = {
   FRONT_BUMPER: "Ön Tampon",
@@ -105,7 +106,17 @@ export default function UnifiedAdminPage() {
   const [token, setToken] = useState("");
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"listings" | "jobs" | "variants" | "feedbacks">("listings");
+  const [activeTab, setActiveTab] = useState<"listings" | "jobs" | "variants" | "feedbacks" | "vehicle-profiles">("listings");
+
+  // Vehicle Profiles state
+  const [vehicleProfiles, setVehicleProfiles] = useState<any[]>([]);
+  const [vehicleProfilesLoading, setVehicleProfilesLoading] = useState(false);
+  const [vehicleProfileFilter, setVehicleProfileFilter] = useState<"all" | "guide" | "discovery">("all");
+  const [vehicleProfileSearch, setVehicleProfileSearch] = useState("");
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<any | null>(null);
+  const [editorDefaultGuide, setEditorDefaultGuide] = useState(true);
+  const [editorDefaultDiscovery, setEditorDefaultDiscovery] = useState(true);
 
   // Feedbacks State
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
@@ -167,6 +178,7 @@ export default function UnifiedAdminPage() {
           fetchResearchJobs(savedToken);
           fetchPendingVariants(savedToken);
           fetchFeedbacks(savedToken);
+          fetchVehicleProfiles(savedToken);
         }
       } catch (e) {
         setErrorMsg("Oturum doğrulanamadı.");
@@ -177,6 +189,69 @@ export default function UnifiedAdminPage() {
       setAuthLoading(false);
     }
   }, []);
+
+  const fetchVehicleProfiles = (jwtToken: string) => {
+    setVehicleProfilesLoading(true);
+    fetch(`${API_URL}/admin/vehicle-profiles`, {
+      headers: { Authorization: `Bearer ${jwtToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Ortak araç profilleri yüklenemedi.");
+        return res.json();
+      })
+      .then((data) => {
+        setVehicleProfiles(Array.isArray(data) ? data : []);
+        setVehicleProfilesLoading(false);
+      })
+      .catch((err) => {
+        setVehicleProfilesLoading(false);
+      });
+  };
+
+  const handleSaveVehicleProfile = async (payload: any) => {
+    setActionLoading(true);
+    const url = editingProfile
+      ? `${API_URL}/admin/vehicle-profiles/${editingProfile.id}`
+      : `${API_URL}/admin/vehicle-profiles`;
+    const method = editingProfile ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      setActionLoading(false);
+      throw new Error(err.message || "Araç profili kaydedilemedi.");
+    }
+
+    setIsProfileEditorOpen(false);
+    setEditingProfile(null);
+    setActionLoading(false);
+    fetchVehicleProfiles(token);
+  };
+
+  const handleArchiveVehicleProfile = async (id: string) => {
+    if (!confirm("Bu araç profilini arşivlemek istediğinize emin misiniz?")) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/admin/vehicle-profiles/${id}/archive`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Arşivleme başarısız.");
+      fetchVehicleProfiles(token);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchFeedbacks = (jwtToken: string) => {
     setFeedbacksLoading(true);
@@ -580,6 +655,16 @@ export default function UnifiedAdminPage() {
           📋 Araç Onayları ({variants.length})
         </button>
         <button
+          onClick={() => setActiveTab("vehicle-profiles")}
+          className={`px-4 py-2 font-bold text-sm transition-all rounded-t-xl ${
+            activeTab === "vehicle-profiles"
+              ? "bg-slate-900 border-t border-x border-white/10 text-orange-400"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          🚘 Ortak Araç Yönetimi ({vehicleProfiles.length})
+        </button>
+        <button
           onClick={() => setActiveTab("feedbacks")}
           className={`px-4 py-2 font-bold text-sm transition-all rounded-t-xl ${
             activeTab === "feedbacks"
@@ -854,6 +939,193 @@ export default function UnifiedAdminPage() {
 
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT: Vehicle Profiles (Ortak Araç Yönetimi) */}
+      {activeTab === "vehicle-profiles" && (
+        <div className="flex flex-col gap-6 animate-in fade-in-50 duration-200">
+          {/* Header Bar */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-white/5">
+            <div>
+              <h2 className="text-base font-bold text-slate-200">Ortak Araç Profil Listesi (`VehicleProfile`)</h2>
+              <p className="text-xs text-slate-400">
+                Hem <strong>Araç Rehberi</strong> hem de <strong>Aracını Bul</strong> özelliklerini besleyen tek ortak araç havuzu.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setEditingProfile(null);
+                  setEditorDefaultGuide(true);
+                  setEditorDefaultDiscovery(true);
+                  setIsProfileEditorOpen(true);
+                }}
+                className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>➕</span>
+                <span>Yeni Araç Profili Ekle</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Editor Modal */}
+          {isProfileEditorOpen && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+              <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <VehicleProfileEditor
+                  initialData={editingProfile}
+                  defaultShowInGuide={editorDefaultGuide}
+                  defaultShowInDiscovery={editorDefaultDiscovery}
+                  onSave={handleSaveVehicleProfile}
+                  onCancel={() => {
+                    setIsProfileEditorOpen(false);
+                    setEditingProfile(null);
+                  }}
+                  loading={actionLoading}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+            <input
+              type="text"
+              placeholder="Marka, model veya isim ile filtrele..."
+              value={vehicleProfileSearch}
+              onChange={(e) => setVehicleProfileSearch(e.target.value)}
+              className="w-full md:w-96 bg-[#050914] border border-white/10 rounded-xl px-4 py-2 text-xs text-slate-200 focus:border-orange-500 focus:outline-none"
+            />
+            <div className="flex gap-2 text-xs font-bold">
+              <button
+                onClick={() => setVehicleProfileFilter("all")}
+                className={`px-3 py-1.5 rounded-lg border ${
+                  vehicleProfileFilter === "all"
+                    ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                    : "bg-slate-900 text-slate-400 border-white/5"
+                }`}
+              >
+                Tümü ({vehicleProfiles.length})
+              </button>
+              <button
+                onClick={() => setVehicleProfileFilter("guide")}
+                className={`px-3 py-1.5 rounded-lg border ${
+                  vehicleProfileFilter === "guide"
+                    ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                    : "bg-slate-900 text-slate-400 border-white/5"
+                }`}
+              >
+                Rehber'de Aktif ({vehicleProfiles.filter((p) => p.showInGuide).length})
+              </button>
+              <button
+                onClick={() => setVehicleProfileFilter("discovery")}
+                className={`px-3 py-1.5 rounded-lg border ${
+                  vehicleProfileFilter === "discovery"
+                    ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                    : "bg-slate-900 text-slate-400 border-white/5"
+                }`}
+              >
+                Aracını Bul'da Aktif ({vehicleProfiles.filter((p) => p.showInDiscovery).length})
+              </button>
+            </div>
+          </div>
+
+          {/* Profiles Grid / Table */}
+          {vehicleProfilesLoading ? (
+            <div className="p-12 text-center text-slate-400 font-bold text-xs">Profil havuzu yükleniyor...</div>
+          ) : vehicleProfiles.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 text-xs bg-slate-950/20 rounded-2xl border border-white/5">
+              Henüz tanımlanmış araç profili bulunmuyor. Eklemek için yukarıdaki butonu kullanın.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vehicleProfiles
+                .filter((p) => {
+                  if (vehicleProfileFilter === "guide") return p.showInGuide;
+                  if (vehicleProfileFilter === "discovery") return p.showInDiscovery;
+                  return true;
+                })
+                .filter((p) => {
+                  if (!vehicleProfileSearch) return true;
+                  const q = vehicleProfileSearch.toLowerCase();
+                  return (
+                    p.brand.toLowerCase().includes(q) ||
+                    p.model.toLowerCase().includes(q) ||
+                    p.displayName.toLowerCase().includes(q)
+                  );
+                })
+                .map((profile) => (
+                  <div
+                    key={profile.id}
+                    className="p-4 bg-slate-900/60 border border-white/10 rounded-2xl flex flex-col justify-between gap-3 hover:border-orange-500/30 transition"
+                  >
+                    <div>
+                      {profile.heroImageUrl && (
+                        <img
+                          src={profile.heroImageUrl}
+                          alt={profile.displayName}
+                          className="w-full h-36 object-cover rounded-xl border border-white/5 mb-3"
+                        />
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black text-white truncate">{profile.displayName}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+                          {profile.bodyType}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                        {profile.discoverySummary || profile.guideSummary || "Özet açıklama girilmemiş."}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 border-t border-white/5 pt-3">
+                      <div className="flex items-center justify-between text-[10px] font-bold">
+                        <span className="text-slate-400">Yayın Durumu:</span>
+                        <div className="flex gap-1.5">
+                          <span
+                            className={`px-2 py-0.5 rounded ${
+                              profile.showInGuide
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-slate-800 text-slate-500"
+                            }`}
+                          >
+                            Rehber
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded ${
+                              profile.showInDiscovery
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "bg-slate-800 text-slate-500"
+                            }`}
+                          >
+                            Aracını Bul
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingProfile(profile);
+                            setIsProfileEditorOpen(true);
+                          }}
+                          className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition"
+                        >
+                          ✏️ Düzenle
+                        </button>
+                        <button
+                          onClick={() => handleArchiveVehicleProfile(profile.id)}
+                          className="py-1.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold rounded-lg transition"
+                        >
+                          🗑️ Arşivle
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </div>

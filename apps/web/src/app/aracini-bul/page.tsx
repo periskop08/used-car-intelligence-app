@@ -37,6 +37,8 @@ const formatPrice = (amount: number | string) => {
 
 interface DiscoveryCard {
   id: string;
+  vehicleProfileId?: string;
+  displayName?: string;
   brand: string;
   modelFamily: string;
   bodyType: string;
@@ -50,6 +52,13 @@ interface DiscoveryCard {
   drivetrain: string;
   imageUrl: string;
   tags: string[];
+
+  discoverySummary?: string;
+  guideSummary?: string;
+  highlight?: string;
+  discoveryHighlight?: string;
+  watchout?: string;
+  discoveryWatchout?: string;
 }
 
 interface RecommendedVariant {
@@ -820,7 +829,7 @@ export default function FindMyCarPage() {
               </div>
 
               {/* Card Container (Expanded to Tablet Dimensions when Collapsed) */}
-              <div className={`relative w-full ${isFilterCollapsed ? "max-w-md md:max-w-xl h-[520px]" : "max-w-sm h-[480px]"} mb-6 select-none transition-all duration-300`}>
+              <div className={`relative w-full ${isFilterCollapsed ? "max-w-md md:max-w-xl min-h-[560px]" : "max-w-sm min-h-[540px]"} mb-6 select-none transition-all duration-300`}>
                 {/* Visual stacked cards background */}
                 <div className="absolute inset-0 bg-[#090d1a]/80 border border-white/5 rounded-[28px] scale-95 translate-y-3 opacity-60 -z-10 shadow-lg pointer-events-none" />
                 <div className="absolute inset-0 bg-[#090d1a]/50 border border-white/5 rounded-[28px] scale-90 translate-y-6 opacity-30 -z-20 shadow-md pointer-events-none" />
@@ -857,7 +866,7 @@ export default function FindMyCarPage() {
                   }`}
                 >
                   {/* Photo area */}
-                  <div className={`relative ${isFilterCollapsed ? "h-52 md:h-64" : "h-44"} w-full bg-slate-950 pointer-events-none flex-none border-b border-white/5 overflow-hidden transition-all duration-300`}>
+                  <div className={`relative ${isFilterCollapsed ? "h-48 md:h-56" : "h-40"} w-full bg-slate-950 pointer-events-none flex-none border-b border-white/5 overflow-hidden transition-all duration-300`}>
                     <div 
                       className="absolute inset-0 bg-cover bg-center blur-xl opacity-35 scale-110 pointer-events-none"
                       style={{ backgroundImage: `url(${formatImageUrl(currentCard.imageUrl)})` }}
@@ -875,7 +884,7 @@ export default function FindMyCarPage() {
                         {currentCard.brand}
                       </span>
                       <h4 className="text-lg md:text-xl font-black text-slate-100 leading-tight">
-                        {currentCard.modelFamily}
+                        {currentCard.displayName || currentCard.modelFamily}
                       </h4>
                     </div>
 
@@ -892,9 +901,9 @@ export default function FindMyCarPage() {
                     )}
                   </div>
 
-                  {/* Specification Details */}
-                  <div className="flex-1 p-5 flex flex-col justify-between overflow-y-auto pointer-events-none">
-                    <div className={`grid ${isFilterCollapsed ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-3 text-[11px] leading-tight`}>
+                  {/* Specification Details & Summary */}
+                  <div className="flex-1 p-4 flex flex-col justify-between overflow-y-auto pointer-events-none">
+                    <div className={`grid ${isFilterCollapsed ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-2.5 text-[11px] leading-tight`}>
                       <div>
                         <span className="text-slate-500 block mb-0.5">Kasa Tipi</span>
                         <span className="font-semibold text-slate-300">{translateBodyType(currentCard.bodyType)}</span>
@@ -921,14 +930,42 @@ export default function FindMyCarPage() {
                       </div>
                     </div>
 
+                    {/* BU ARAÇ NASIL? Section */}
+                    {(currentCard.discoverySummary || currentCard.guideSummary) && (
+                      <div className="border-t border-white/10 pt-3 mt-3 space-y-2 text-left">
+                        <div className="text-[10px] font-extrabold text-orange-400 uppercase tracking-wider">
+                          BU ARAÇ NASIL?
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+                          {currentCard.discoverySummary || currentCard.guideSummary}
+                        </p>
+
+                        {(currentCard.highlight || currentCard.discoveryHighlight) && (
+                          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-semibold flex items-start gap-1.5">
+                            <span className="font-bold">✓ ÖNE ÇIKAN:</span>
+                            <span>{currentCard.highlight || currentCard.discoveryHighlight}</span>
+                          </div>
+                        )}
+
+                        {(currentCard.watchout || currentCard.discoveryWatchout) && (
+                          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-semibold flex items-start gap-1.5">
+                            <span className="font-bold">⚠ DİKKAT:</span>
+                            <span>{currentCard.watchout || currentCard.discoveryWatchout}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Tags */}
-                    <div className="flex flex-wrap gap-1.5 border-t border-white/5 pt-3.5 mt-2">
-                      {currentCard.tags.map(t => (
-                        <span key={t} className="bg-white/5 text-[9px] text-slate-400 px-2 py-0.5 rounded-md">
-                          #{t}
-                        </span>
-                      ))}
-                    </div>
+                    {currentCard.tags && currentCard.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 border-t border-white/5 pt-2.5 mt-2">
+                        {currentCard.tags.map((t: string) => (
+                          <span key={t} className="bg-white/5 text-[9px] font-mono font-bold text-slate-300 px-2 py-0.5 rounded-md">
+                            #{t.replace(/^#/, "")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

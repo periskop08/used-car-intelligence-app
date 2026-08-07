@@ -23,6 +23,7 @@ import { ListingModerationModule } from './modules/listing-moderation/listing-mo
 import { ListingAiModule } from './modules/listing-ai/listing-ai.module';
 import { VehicleReportModule } from './modules/vehicle-report/vehicle-report.module';
 import { ListingPromotionModule } from './modules/listing-promotion/listing-promotion.module';
+import { VehicleProfileModule } from './modules/vehicle-profile/vehicle-profile.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ListingPromotionModule } from './modules/listing-promotion/listing-prom
     ListingAiModule,
     VehicleReportModule,
     ListingPromotionModule,
+    VehicleProfileModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],
