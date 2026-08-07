@@ -13,10 +13,6 @@ export interface SemanticValidationResult {
 const BANNED_GENERIC_PHRASES = [
   'kullanım amacınıza göre değişir',
   'en doğru araç bütçenize uygun olandır',
-  'periyodik bakım önemlidir',
-  'teknik özellik dengesi sunar',
-  'günlük kullanım için uygundur',
-  'motor hacmine göre bakım maliyetleri değişebilir',
 ];
 
 /**
