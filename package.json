@@ -13,6 +13,7 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "build": "npm --prefix packages/shared run build && npm --prefix apps/web run build",
+    "postinstall": "npm run postinstall --workspace=apps/api || true",
     "db:validate": "npm run db:validate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:migrate:prod": "npm run db:migrate:prod --workspace=apps/api",

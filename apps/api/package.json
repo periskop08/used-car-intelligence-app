@@ -7,9 +7,11 @@
     "start": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
     "start:dev": "nest start --watch",
     "start:prod": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
+    "postinstall": "node prisma/fix-stuck-migration.js",
+    "db:fix-stuck": "node prisma/fix-stuck-migration.js",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev --name init",
-    "db:migrate:prod": "npx prisma migrate resolve --rolled-back 20260807180000_add_listing_report_feedback || true && prisma migrate deploy",
+    "db:migrate:prod": "node prisma/fix-stuck-migration.js && prisma migrate deploy",
     "db:seed": "prisma db seed",
     "test": "jest --config jest.config.js"
   },
