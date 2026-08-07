@@ -16,16 +16,16 @@ interface UserProfile {
 
 interface Conversation {
   id: string;
-  listingId: string;
+  listingId: string | null;
   buyerId: string;
   sellerId: string;
   lastMessageAt: string;
-  listing: {
+  listing?: {
     id: string;
     title: string;
-    priceAmount: number;
-    city: string;
-  };
+    priceAmount?: number;
+    city?: string;
+  } | null;
   buyer: UserProfile;
   seller: UserProfile;
   messages: {
@@ -229,7 +229,7 @@ export default function MessagesPage() {
                       )}
                     </div>
                     <span className="text-[10px] text-slate-400 font-semibold truncate">
-                      İlan: {conv.listing.title}
+                      {conv.listing?.title ? `İlan: ${conv.listing.title}` : "Sistem / Destek Bildirimi"}
                     </span>
                     {lastMsg && (
                       <span className="text-[11px] text-slate-500 truncate mt-1">
@@ -253,12 +253,18 @@ export default function MessagesPage() {
                   <span className="text-xs font-bold text-slate-200">
                     {formatUserName(getOtherUser(selectedConversation))}
                   </span>
-                  <a
-                    href={`/listings/${selectedConversation.listing.id}`}
-                    className="text-[10px] font-bold text-orange-400 hover:text-orange-300 truncate"
-                  >
-                    İlan: {selectedConversation.listing.title}
-                  </a>
+                  {selectedConversation.listing?.id ? (
+                    <a
+                      href={`/listings/${selectedConversation.listing.id}`}
+                      className="text-[10px] font-bold text-orange-400 hover:text-orange-300 truncate"
+                    >
+                      İlan: {selectedConversation.listing.title}
+                    </a>
+                  ) : (
+                    <span className="text-[10px] font-bold text-slate-400 truncate">
+                      TorqueScout Sistem / Destek Mesajı
+                    </span>
+                  )}
                 </div>
               </div>
 
