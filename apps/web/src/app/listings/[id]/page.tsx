@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
@@ -906,6 +907,17 @@ export default function ListingDetail() {
         {/* 3. SAĞ KOLON (lg:col-span-3): Dikey Sıralı 2 Kart */}
         <div className="lg:col-span-3 flex flex-col gap-5">
           
+          {/* İlanı Bildir Link */}
+          <div className="flex justify-end pr-1">
+            <Link
+              href={`/dashboard/support/feedback?listingId=${listing.id}`}
+              className="text-xs font-semibold text-slate-400 hover:text-orange-400 transition flex items-center gap-1.5 cursor-pointer py-0.5 group"
+            >
+              <span className="text-slate-500 group-hover:text-orange-400 transition">⚑</span>
+              <span>İlanı Bildir</span>
+            </Link>
+          </div>
+
           {/* 1. KART: İlan Sahibi Bilgileri Kartı */}
           <div className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4 shadow-xl">
             {/* Seller Avatar Header */}

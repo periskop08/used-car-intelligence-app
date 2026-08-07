@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import AdminUserCommunicationDialog from "./AdminUserCommunicationDialog";
 import {
   Search,
   Filter,
@@ -96,11 +97,22 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   // Filters
+  const [activeQueue, setActiveQueue] = useState<"LISTING_REPORTS" | "GENERAL">("LISTING_REPORTS");
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+
+  // Communication Dialog State
+  const [commDialogState, setCommDialogState] = useState<{
+    isOpen: boolean;
+    feedbackId: string;
+    recipient: "REPORTER" | "LISTING_OWNER";
+    recipientDisplayName: string;
+    recipientCustomerNo?: string;
+    recipientEmail?: string;
+  } | null>(null);
 
   // Expandable cards state
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -118,20 +130,23 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
-      if (sourceFilter) queryParams.append("source", sourceFilter);
+      if (activeQueue === "LISTING_REPORTS") {
+        queryParams.append("source", "LISTING_REPORT");
+      } else if (sourceFilter) {
+        queryParams.append("source", sourceFilter);
+      }
       if (categoryFilter) queryParams.append("category", categoryFilter);
       if (statusFilter) queryParams.append("status", statusFilter);
       if (priorityFilter) queryParams.append("priority", priorityFilter);
       if (search) queryParams.append("search", search);
 
-      const res = await fetch(`${API_URL}/api/admin/feedbacks?${queryParams.toString()}`, {
+      const res = await fetch(`${API_URL}/admin/feedbacks?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Geri bildirimler yüklenemedi.");
       const data = await res.json();
       setFeedbacks(data);
 
-      // Pre-fill existing internal notes & user responses into form state
       const notesMap: Record<string, string> = {};
       const responsesMap: Record<string, string> = {};
       data.forEach((fb: any) => {
@@ -149,7 +164,7 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
 
   useEffect(() => {
     fetchFeedbacks();
-  }, [token, sourceFilter, categoryFilter, statusFilter, priorityFilter]);
+  }, [token, activeQueue, sourceFilter, categoryFilter, statusFilter, priorityFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,6 +290,33 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
         <div className="px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold">
           Toplam Talep: {feedbacks.length}
         </div>
+      </div>
+
+      {/* QUEUE TABS */}
+      <div className="flex items-center gap-3 border-b border-white/10 pb-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setActiveQueue("LISTING_REPORTS")}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+            activeQueue === "LISTING_REPORTS"
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20"
+              : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
+          }`}
+        >
+          <span>🚨</span> Şikâyet Edilen İlanlar (Listing Reports)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveQueue("GENERAL")}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+            activeQueue === "GENERAL"
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
+              : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
+          }`}
+        >
+          <span>💬</span> Genel Geri Bildirimler
+        </button>
       </div>
 
       {/* RICH FILTERS BAR */}
@@ -597,6 +639,72 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
                       </div>
                     )}
 
+                    {/* PANEL: LISTING REPORT SNAPSHOT & ACTIONS */}
+                    {fb.source === "LISTING_REPORT" && (
+                      <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-500/30 flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🚨</span>
+                            <span className="text-xs font-black text-rose-400 uppercase tracking-wider">
+                              Şikâyet Edilen İlan (Snapshot Korumalı Kayıt)
+                            </span>
+                          </div>
+                          <span className="font-mono text-xs font-bold text-slate-200 bg-slate-900 border border-white/10 px-3 py-1 rounded-xl">
+                            İlan No: {fb.listingNoSnapshot || fb.listingId?.substring(0, 8).toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">İlan Başlığı (Snapshot)</span>
+                            <span className="font-bold text-slate-100 text-sm">{fb.listingTitleSnapshot || "Başlık Yok"}</span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase">İlan Sahibi Kodu (Snapshot)</span>
+                            <span className="font-mono font-bold text-orange-400">{fb.listingOwnerReferenceSnapshot || "Belirtilmedi"}</span>
+                          </div>
+                        </div>
+
+                        {/* Direct Action Buttons for Controlled Messaging */}
+                        <div className="flex items-center gap-3 pt-2 border-t border-white/10 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCommDialogState({
+                                isOpen: true,
+                                feedbackId: fb.id,
+                                recipient: "REPORTER",
+                                recipientDisplayName: fb.formattedName,
+                                recipientCustomerNo: fb.formattedCustomerIdentity.split(" — ")[0],
+                                recipientEmail: fb.user?.email,
+                              })
+                            }
+                            className="px-4 py-2 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/30 text-orange-300 font-bold text-xs transition flex items-center gap-2 cursor-pointer"
+                          >
+                            <span>💬 Şikâyet Edene Mesaj Gönder</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCommDialogState({
+                                isOpen: true,
+                                feedbackId: fb.id,
+                                recipient: "LISTING_OWNER",
+                                recipientDisplayName: fb.listingOwnerInfo?.displayName || "İlan Sahibi",
+                                recipientCustomerNo: fb.listingOwnerReferenceSnapshot || fb.listingOwnerInfo?.customerNo,
+                                recipientEmail: fb.listingOwnerInfo?.email,
+                              })
+                            }
+                            className="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 font-bold text-xs transition flex items-center gap-2 cursor-pointer"
+                          >
+                            <span>💬 İlan Sahibine Mesaj Gönder (Gizlilik Korumalı)</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* PANEL 3: FULL USER MESSAGE & ATTACHMENT */}
                     <div className="flex flex-col gap-2">
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -789,6 +897,21 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
             );
           })}
         </div>
+      )}
+
+      {/* Admin Communication Dialog */}
+      {commDialogState && (
+        <AdminUserCommunicationDialog
+          isOpen={commDialogState.isOpen}
+          onClose={() => setCommDialogState(null)}
+          feedbackId={commDialogState.feedbackId}
+          recipient={commDialogState.recipient}
+          recipientDisplayName={commDialogState.recipientDisplayName}
+          recipientCustomerNo={commDialogState.recipientCustomerNo}
+          recipientEmail={commDialogState.recipientEmail}
+          token={token}
+          onSuccess={() => fetchFeedbacks()}
+        />
       )}
     </div>
   );

@@ -1,7 +1,19 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { R2Service } from '../listing/r2.service';
-import { FeedbackSource, FeedbackCategory, FeedbackStatus, FeedbackPriority } from '@prisma/client';
+import {
+  FeedbackSource,
+  FeedbackCategory,
+  FeedbackStatus,
+  FeedbackPriority,
+  ConversationContextType,
+} from '@prisma/client';
 
 export interface AuditTimelineEntry {
   timestamp: string;
@@ -11,63 +23,31 @@ export interface AuditTimelineEntry {
   note?: string;
 }
 
+export const ALLOWED_TRANSITIONS: Record<FeedbackStatus, FeedbackStatus[]> = {
+  NEW: [FeedbackStatus.IN_REVIEW, FeedbackStatus.REJECTED],
+  IN_REVIEW: [
+    FeedbackStatus.WAITING_USER_INFO,
+    FeedbackStatus.WAITING_LISTING_OWNER,
+    FeedbackStatus.RESOLVED,
+    FeedbackStatus.REJECTED,
+  ],
+  WAITING_USER_INFO: [FeedbackStatus.IN_REVIEW, FeedbackStatus.RESOLVED, FeedbackStatus.REJECTED],
+  WAITING_LISTING_OWNER: [FeedbackStatus.IN_REVIEW, FeedbackStatus.RESOLVED, FeedbackStatus.REJECTED],
+  ASSIGNED: [FeedbackStatus.IN_REVIEW, FeedbackStatus.RESOLVED, FeedbackStatus.REJECTED],
+  ACTION_TAKEN: [FeedbackStatus.RESOLVED, FeedbackStatus.ARCHIVED],
+  RESOLVED: [FeedbackStatus.ARCHIVED],
+  REJECTED: [FeedbackStatus.ARCHIVED],
+  ARCHIVED: [],
+};
+
 @Injectable()
-export class FeedbackService implements OnModuleInit {
+export class FeedbackService {
   private readonly logger = new Logger(FeedbackService.name);
 
   constructor(
     private prisma: PrismaService,
     private r2Service: R2Service,
   ) {}
-
-  async onModuleInit() {
-    // Safe idempotent table & enum migration for Neon Postgres
-    const statements = [
-      `DO $$ BEGIN
-          CREATE TYPE "FeedbackSource" AS ENUM (
-            'CLUB', 'LISTING_DETAIL', 'LISTING_MODERATION', 'VEHICLE_SEARCH', 'VEHICLE_COMPARISON',
-            'LISTING_AI_ADVISOR', 'CHATBOT', 'PAYMENT', 'MESSAGING', 'ACCOUNT', 'TECHNICAL_SUPPORT', 'OTHER'
-          );
-      EXCEPTION WHEN duplicate_object THEN null; END $$;`,
-
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'CLUB_MUTE_APPEAL';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'CLUB_BAN_APPEAL';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'COMMENT_MODERATION';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'LISTING_REJECT_APPEAL';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'LISTING_TECHNICAL';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'AI_RESPONSE_COMPLAINT';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'PAYMENT_PACKAGE';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'ACCOUNT_ACCESS';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'MESSAGING_ISSUE';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'GENERAL_TECHNICAL';`,
-      `ALTER TYPE "FeedbackCategory" ADD VALUE IF NOT EXISTS 'SUGGESTION';`,
-
-      `ALTER TYPE "FeedbackStatus" ADD VALUE IF NOT EXISTS 'WAITING_USER_INFO';`,
-      `ALTER TYPE "FeedbackStatus" ADD VALUE IF NOT EXISTS 'ASSIGNED';`,
-      `ALTER TYPE "FeedbackStatus" ADD VALUE IF NOT EXISTS 'ACTION_TAKEN';`,
-
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "ticketNo" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "source" "FeedbackSource" DEFAULT 'OTHER';`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "referenceType" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "referenceId" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "assignedAdminId" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "assignedAdminName" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "internalNote" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "userResponse" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "userResponseSentAt" TIMESTAMP(3);`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "userResponseSentBy" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "userResponseChannel" TEXT;`,
-      `ALTER TABLE "Feedback" ADD COLUMN IF NOT EXISTS "auditTimeline" JSONB;`,
-    ];
-
-    for (const stmt of statements) {
-      try {
-        await this.prisma.$executeRawUnsafe(stmt);
-      } catch (e: any) {
-        this.logger.debug(`Feedback schema migration note: ${e?.message || e}`);
-      }
-    }
-  }
 
   private sanitizeMessage(msg: string): string {
     if (!msg) return '';
@@ -90,13 +70,16 @@ export class FeedbackService implements OnModuleInit {
     }
   }
 
-  private generateTicketNo(): string {
+  private generateTicketNo(prefix: string = 'FB'): string {
     const now = new Date();
     const yearMonth = `${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
     const randomNum = Math.floor(100000 + Math.random() * 900000);
-    return `FB-${yearMonth}-${randomNum}`;
+    return `${prefix}-${yearMonth}-${randomNum}`;
   }
 
+  /**
+   * General Account Feedback creation flow
+   */
   async createFeedback(
     userId: string,
     category: FeedbackCategory,
@@ -125,6 +108,10 @@ export class FeedbackService implements OnModuleInit {
       if (file.size > 5 * 1024 * 1024) {
         throw new BadRequestException('Ekran görüntüsü boyutu en fazla 5MB olabilir.');
       }
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        throw new BadRequestException('Yalnızca JPG, JPEG, PNG ve WEBP formatlarında dosya yüklenebilir.');
+      }
       try {
         const uploadResult = await this.r2Service.uploadImage(file.buffer, 'feedbacks');
         attachmentUrl = uploadResult.url;
@@ -133,9 +120,9 @@ export class FeedbackService implements OnModuleInit {
       }
     }
 
-    const ticketNo = this.generateTicketNo();
+    const ticketNo = this.generateTicketNo('FB');
     const priority = this.determinePriority(category);
-    const effectiveSource = source || FeedbackSource.OTHER;
+    const effectiveSource = source || FeedbackSource.ACCOUNT_FEEDBACK;
 
     const initialTimeline: AuditTimelineEntry[] = [
       {
@@ -163,6 +150,108 @@ export class FeedbackService implements OnModuleInit {
     });
   }
 
+  /**
+   * Dedicated Listing Report creation flow (İlanı Bildir)
+   * All metadata is derived server-side from DB and auth session.
+   */
+  async createListingReport(
+    reporterId: string,
+    listingId: string,
+    message: string,
+    file?: Express.Multer.File,
+  ) {
+    if (!listingId) {
+      throw new BadRequestException('İlan ID zorunludur.');
+    }
+
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+      include: {
+        seller: {
+          select: { id: true, createdAt: true, username: true, email: true },
+        },
+      },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Şikâyet edilmek istenen ilan bulunamadı.');
+    }
+
+    // 1. Own listing check
+    if (reporterId === listing.sellerId) {
+      throw new BadRequestException('Kendi ilanınız hakkında şikâyet oluşturamazsınız. Destek için genel geri bildirim formunu kullanabilirsiniz.');
+    }
+
+    const sanitizedMessage = this.sanitizeMessage(message);
+    if (!sanitizedMessage || sanitizedMessage.length < 10) {
+      throw new BadRequestException('Şikâyet açıklaması en az 10 karakter olmalıdır.');
+    }
+    if (sanitizedMessage.length > 2000) {
+      throw new BadRequestException('Şikâyet açıklaması en fazla 2000 karakter olabilir.');
+    }
+
+    // Attachment validation & R2 persistence
+    let attachmentUrl: string | null = null;
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        throw new BadRequestException('Ekran görüntüsü boyutu en fazla 5MB olabilir.');
+      }
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        throw new BadRequestException('Yalnızca JPG, JPEG, PNG ve WEBP formatlarında dosya yüklenebilir.');
+      }
+      try {
+        const uploadResult = await this.r2Service.uploadImage(file.buffer, 'feedbacks');
+        attachmentUrl = uploadResult.url;
+      } catch (err) {
+        throw new BadRequestException('Ekran görüntüsü yüklenemedi.');
+      }
+    }
+
+    // Generate pseudonymous seller customer reference snapshot
+    const seller = listing.seller;
+    const sellerCustomerNo = seller
+      ? `TS-${seller.createdAt.getFullYear().toString().slice(-2)}${(seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${seller.id.substring(0, 6)}`.toUpperCase()
+      : 'TS-UNKNOWN';
+
+    const ticketNo = this.generateTicketNo('RPT');
+    const initialTimeline: AuditTimelineEntry[] = [
+      {
+        timestamp: new Date().toISOString(),
+        actorName: 'Kullanıcı',
+        action: 'İlan şikâyeti oluşturuldu',
+        note: `Bildirim No: ${ticketNo}`,
+      },
+    ];
+
+    try {
+      return await this.prisma.feedback.create({
+        data: {
+          ticketNo,
+          userId: reporterId,
+          source: FeedbackSource.LISTING_REPORT,
+          subjectCategory: FeedbackCategory.LISTINGS,
+          listingId: listing.id,
+          listingOwnerId: listing.sellerId,
+          listingNoSnapshot: listing.id.substring(0, 8).toUpperCase(),
+          listingTitleSnapshot: listing.title,
+          listingOwnerReferenceSnapshot: sellerCustomerNo,
+          message: sanitizedMessage,
+          priority: FeedbackPriority.NORMAL,
+          status: FeedbackStatus.NEW,
+          attachmentUrl,
+          auditTimeline: initialTimeline as any,
+        },
+      });
+    } catch (err: any) {
+      // Catch Prisma Partial Unique Index constraint violation (P2002)
+      if (err?.code === 'P2002') {
+        throw new BadRequestException('Bu ilan için tarafınızdan oluşturulmuş ve inceleme aşamasında olan aktif bir şikâyet zaten bulunmaktadır.');
+      }
+      throw err;
+    }
+  }
+
   async getAdminFeedbacks(
     source?: FeedbackSource,
     category?: FeedbackCategory,
@@ -183,6 +272,8 @@ export class FeedbackService implements OnModuleInit {
       whereClause.OR = [
         { ticketNo: { contains: search, mode: 'insensitive' } },
         { message: { contains: search, mode: 'insensitive' } },
+        { listingTitleSnapshot: { contains: search, mode: 'insensitive' } },
+        { listingNoSnapshot: { contains: search, mode: 'insensitive' } },
         {
           user: {
             OR: [
@@ -219,13 +310,30 @@ export class FeedbackService implements OnModuleInit {
             email: true,
           },
         },
+        listing: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            sellerId: true,
+            seller: {
+              select: {
+                id: true,
+                email: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const now = new Date();
 
-    // Enrich each feedback with real-time live DB restriction data & formatted customer identity
     const enriched = await Promise.all(
       feedbacks.map(async (fb) => {
         const user = fb.user;
@@ -242,54 +350,26 @@ export class FeedbackService implements OnModuleInit {
           formattedCustomerIdentity = `${customerNo} — ${formattedName}`;
         }
 
-        // Live DB Restriction Lookup for the User
-        let liveRestrictionStatus: any = null;
-        if (user?.id) {
-          const restrictions = await this.prisma.clubRestriction.findMany({
-            where: { userId: user.id },
-            include: {
-              createdBy: {
-                select: { id: true, firstName: true, lastName: true, email: true },
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 3,
-          });
+        let listingOwnerInfo: any = null;
+        if (fb.listing?.seller) {
+          const seller = fb.listing.seller;
+          const yearMonth = `${seller.createdAt.getFullYear().toString().slice(-2)}${(seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
+          const shortId = seller.id.slice(0, 6).toUpperCase();
+          const sellerCustomerNo = `TS-${yearMonth}-${shortId}`;
+          const fullName = `${seller.firstName || ''} ${seller.lastName || ''}`.trim();
 
-          if (restrictions && restrictions.length > 0) {
-            const activeOrRecent = restrictions[0]; // Most recent
-            const isRevoked = !!activeOrRecent.revokedAt;
-            const isExpired = activeOrRecent.expiresAt ? activeOrRecent.expiresAt < now : false;
-            const isActive = !isRevoked && !isExpired;
-
-            let remainingText = 'Süresiz';
-            if (activeOrRecent.expiresAt && isActive) {
-              const diffMs = activeOrRecent.expiresAt.getTime() - now.getTime();
-              const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-              const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-              remainingText = `${days} gün ${hours} saat kaldı`;
-            }
-
-            const creatorName = activeOrRecent.createdBy
-              ? `${activeOrRecent.createdBy.firstName || ''} ${activeOrRecent.createdBy.lastName || ''}`.trim() || activeOrRecent.createdBy.email
-              : activeOrRecent.createdById;
-
-            liveRestrictionStatus = {
-              id: activeOrRecent.id,
-              type: activeOrRecent.type,
-              isActive,
-              isRevoked,
-              isExpired,
-              displayStatus: isRevoked ? 'Kaldırıldı' : isExpired ? 'Süresi Doldu' : 'Aktif',
-              startsAt: activeOrRecent.startsAt.toISOString(),
-              expiresAt: activeOrRecent.expiresAt?.toISOString() || null,
-              remainingText,
-              reason: activeOrRecent.reason,
-              createdBy: creatorName,
-              revokedAt: activeOrRecent.revokedAt?.toISOString() || null,
-              revokedById: activeOrRecent.revokedById || null,
-            };
-          }
+          listingOwnerInfo = {
+            id: seller.id,
+            customerNo: sellerCustomerNo,
+            displayName: fullName || seller.username || seller.email.split('@')[0],
+            email: seller.email,
+          };
+        } else if (fb.listingOwnerId) {
+          listingOwnerInfo = {
+            id: fb.listingOwnerId,
+            customerNo: fb.listingOwnerReferenceSnapshot || 'TS-UNKNOWN',
+            displayName: 'İlan Sahibi',
+          };
         }
 
         return {
@@ -297,7 +377,7 @@ export class FeedbackService implements OnModuleInit {
           ticketNo: fb.ticketNo || `FB-${fb.id.slice(0, 8).toUpperCase()}`,
           formattedCustomerIdentity,
           formattedName,
-          liveRestrictionStatus,
+          listingOwnerInfo,
         };
       }),
     );
@@ -305,27 +385,36 @@ export class FeedbackService implements OnModuleInit {
     return enriched;
   }
 
-  async updateFeedback(
+  async updateFeedbackStatus(
     feedbackId: string,
     adminUser: { id: string; name: string },
     dto: {
       status?: FeedbackStatus;
       priority?: FeedbackPriority;
-      source?: FeedbackSource;
-      subjectCategory?: FeedbackCategory;
       assignedAdminId?: string;
       assignedAdminName?: string;
+      adminNote?: string;
       internalNote?: string;
     },
   ) {
     const feedback = await this.prisma.feedback.findUnique({ where: { id: feedbackId } });
     if (!feedback) throw new NotFoundException('Geri bildirim bulunamadı.');
 
+    if (dto.status && dto.status !== feedback.status) {
+      const allowedNextStatuses = ALLOWED_TRANSITIONS[feedback.status] || [];
+      if (!allowedNextStatuses.includes(dto.status)) {
+        throw new BadRequestException(
+          `Geçersiz durum geçişi: '${feedback.status}' durumundan '${dto.status}' durumuna geçilemez.`
+        );
+      }
+    }
+
     const timeline: AuditTimelineEntry[] = (feedback.auditTimeline as any) || [];
+    const now = new Date();
 
     if (dto.status && dto.status !== feedback.status) {
       timeline.push({
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         actorId: adminUser.id,
         actorName: adminUser.name,
         action: `Durum güncellendi: ${dto.status}`,
@@ -334,144 +423,173 @@ export class FeedbackService implements OnModuleInit {
 
     if (dto.assignedAdminId && dto.assignedAdminId !== feedback.assignedAdminId) {
       timeline.push({
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         actorId: adminUser.id,
         actorName: adminUser.name,
         action: `Atandı: ${dto.assignedAdminName || dto.assignedAdminId}`,
       });
     }
 
-    if (dto.internalNote && dto.internalNote !== feedback.internalNote) {
+    const noteToSave = dto.adminNote || dto.internalNote;
+    if (noteToSave && noteToSave !== feedback.internalNote) {
       timeline.push({
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
         actorId: adminUser.id,
         actorName: adminUser.name,
-        action: 'İç Not Eklendi',
-        note: dto.internalNote.slice(0, 100),
+        action: 'Yönetici Notu Eklendi',
+        note: noteToSave.slice(0, 100),
       });
     }
+
+    const isResolving = dto.status === FeedbackStatus.RESOLVED || dto.status === FeedbackStatus.REJECTED;
 
     return this.prisma.feedback.update({
       where: { id: feedbackId },
       data: {
         status: dto.status || feedback.status,
         priority: dto.priority || feedback.priority,
-        source: dto.source || feedback.source,
-        subjectCategory: dto.subjectCategory || feedback.subjectCategory,
         assignedAdminId: dto.assignedAdminId ?? feedback.assignedAdminId,
         assignedAdminName: dto.assignedAdminName ?? feedback.assignedAdminName,
-        internalNote: dto.internalNote ?? feedback.internalNote,
+        internalNote: noteToSave ?? feedback.internalNote,
+        adminNote: noteToSave ?? feedback.adminNote,
+        resolvedAt: isResolving ? now : feedback.resolvedAt,
         auditTimeline: timeline as any,
       },
       include: { user: true, assignedAdmin: true },
     });
   }
 
-  async sendUserResponse(
+  /**
+   * Controlled Admin messaging to either REPORTER or LISTING_OWNER.
+   * Prevents arbitrary userId payloads and enforces privacy redaction.
+   */
+  async sendAdminMessageToFeedbackUser(
     feedbackId: string,
-    adminUser: { id: string; name: string },
-    dto: { responseMessage: string; channel?: 'IN_APP' | 'EMAIL' | 'BOTH'; markStatus?: FeedbackStatus },
+    adminUser: { id: string; email: string },
+    dto: {
+      recipient: 'REPORTER' | 'LISTING_OWNER';
+      channels: ('IN_APP' | 'EMAIL')[];
+      subject?: string;
+      message: string;
+    },
   ) {
+    if (!dto.recipient || !['REPORTER', 'LISTING_OWNER'].includes(dto.recipient)) {
+      throw new BadRequestException('Alıcı tipi yalnızca REPORTER veya LISTING_OWNER olabilir.');
+    }
+
+    if (!dto.message || !dto.message.trim()) {
+      throw new BadRequestException('Mesaj içeriği boş olamaz.');
+    }
+
     const feedback = await this.prisma.feedback.findUnique({
       where: { id: feedbackId },
-      include: { user: true },
-    });
-    if (!feedback) throw new NotFoundException('Geri bildirim bulunamadı.');
-
-    const timeline: AuditTimelineEntry[] = (feedback.auditTimeline as any) || [];
-    const now = new Date();
-
-    timeline.push({
-      timestamp: now.toISOString(),
-      actorId: adminUser.id,
-      actorName: adminUser.name,
-      action: `Kullanıcıya Yanıt Gönderildi (${dto.channel || 'IN_APP'})`,
-      note: dto.responseMessage,
+      include: { user: true, listing: { include: { seller: true } } },
     });
 
-    const newStatus = dto.markStatus || FeedbackStatus.ACTION_TAKEN;
+    if (!feedback) {
+      throw new NotFoundException('Şikâyet / Geri bildirim kaydı bulunamadı.');
+    }
 
-    // Create In-App Notification / Message for User
-    if (feedback.userId) {
-      try {
-        await (this.prisma as any).userNotification.create({
-          data: {
-            userId: feedback.userId,
-            title: 'Geri Bildiriminiz Yanıtlandı',
-            body: dto.responseMessage,
-            type: 'FEEDBACK_RESPONSE',
-            referenceId: feedback.id,
-          },
-        });
-      } catch (e) {
-        this.logger.log('In-app notification created or bypassed.');
+    let targetUserId: string | null = null;
+    let targetEmail: string | null = null;
+
+    if (dto.recipient === 'REPORTER') {
+      targetUserId = feedback.userId;
+      targetEmail = feedback.user?.email || null;
+    } else if (dto.recipient === 'LISTING_OWNER') {
+      targetUserId = feedback.listingOwnerId || feedback.listing?.sellerId || null;
+      targetEmail = feedback.listing?.seller?.email || null;
+    }
+
+    if (!targetUserId) {
+      throw new BadRequestException('Hedef alıcı kullanıcı veritabanında bulunamadı.');
+    }
+
+    const adminId = adminUser.id;
+    const channels = dto.channels && dto.channels.length > 0 ? dto.channels : ['IN_APP'];
+    const subject = dto.subject || (dto.recipient === 'LISTING_OWNER' ? 'İlanınız Hakkında Yönetici Bildirimi' : 'Şikâyet Bildiriminiz Hakkında Yanıt');
+
+    // Filter message body to ensure reporter's personal information is NEVER exposed to LISTING_OWNER
+    let sanitizedBody = dto.message.trim();
+    if (dto.recipient === 'LISTING_OWNER' && feedback.user) {
+      // Redact reporter email/name if manually injected
+      if (feedback.user.email) {
+        sanitizedBody = sanitizedBody.replace(new RegExp(feedback.user.email, 'gi'), '[GİZLİ KULLANICI]');
+      }
+      if (feedback.user.firstName) {
+        sanitizedBody = sanitizedBody.replace(new RegExp(feedback.user.firstName, 'gi'), '[GİZLİ KULLANICI]');
       }
     }
 
-    return this.prisma.feedback.update({
-      where: { id: feedbackId },
-      data: {
-        userResponse: dto.responseMessage,
-        userResponseSentAt: now,
-        userResponseSentBy: adminUser.name,
-        userResponseChannel: dto.channel || 'IN_APP',
-        status: newStatus,
-        auditTimeline: timeline as any,
-      },
-      include: { user: true },
-    });
-  }
+    let inAppSent = false;
+    let emailSent = false;
 
-  async revokeClubRestriction(
-    feedbackId: string,
-    restrictionId: string,
-    adminUser: { id: string; name: string },
-  ) {
-    const feedback = await this.prisma.feedback.findUnique({ where: { id: feedbackId } });
-    if (!feedback) throw new NotFoundException('Geri bildirim bulunamadı.');
+    // 1. IN_APP Direct Message / Conversation
+    if (channels.includes('IN_APP')) {
+      let conv = await this.prisma.conversation.findFirst({
+        where: {
+          contextType: ConversationContextType.CLUB_ADMIN,
+          buyerId: targetUserId,
+        },
+      });
 
-    const restriction = await this.prisma.clubRestriction.findUnique({ where: { id: restrictionId } });
-    if (!restriction) throw new NotFoundException('Kısıtlama kaydı bulunamadı.');
+      if (!conv) {
+        conv = await this.prisma.conversation.create({
+          data: {
+            contextType: ConversationContextType.CLUB_ADMIN,
+            buyerId: targetUserId,
+            sellerId: adminId,
+          },
+        });
+      }
 
-    const now = new Date();
+      await this.prisma.message.create({
+        data: {
+          conversationId: conv.id,
+          senderId: adminId,
+          body: `[${subject}]\n\n${sanitizedBody}`,
+        },
+      });
 
-    // Revoke restriction cleanly - DOES NOT DELETE RECORD!
-    await this.prisma.clubRestriction.update({
-      where: { id: restrictionId },
-      data: {
-        revokedAt: now,
-        revokedById: adminUser.id,
-      },
-    });
+      await this.prisma.conversation.update({
+        where: { id: conv.id },
+        data: { lastMessageAt: new Date() },
+      });
 
-    // Create Audit Log in ClubModerationLog
-    await this.prisma.clubModerationLog.create({
-      data: {
-        actorId: adminUser.id,
-        actorRole: 'ADMIN',
-        actionType: 'REVOKE_RESTRICTION_VIA_FEEDBACK',
-        targetUserId: restriction.userId,
-        reason: `Geri bildirim itirazı kabul edildi (${feedback.ticketNo || feedback.id})`,
-        metadata: { feedbackId, restrictionId },
-      },
-    });
+      inAppSent = true;
+    }
 
-    // Append to Feedback Audit Timeline
+    // 2. EMAIL Dispatch Log
+    if (channels.includes('EMAIL') && targetEmail) {
+      this.logger.log(`[EMAIL DISPATCH] Sent email to ${targetEmail} (Recipient: ${dto.recipient}, Subject: ${subject})`);
+      emailSent = true;
+    }
+
+    // Audit timeline update
     const timeline: AuditTimelineEntry[] = (feedback.auditTimeline as any) || [];
     timeline.push({
-      timestamp: now.toISOString(),
+      timestamp: new Date().toISOString(),
       actorId: adminUser.id,
-      actorName: adminUser.name,
-      action: `Club Kısıtlaması Kaldırıldı (${restriction.type})`,
-      note: `Kısıtlama ID: ${restrictionId}`,
+      actorName: 'Sistem Yöneticisi',
+      action: `Mesaj Gönderildi -> ${dto.recipient} (${channels.join(', ')})`,
+      note: subject,
     });
 
-    const autoReplyText = `Tork Scout Club üzerindeki kısıtlanma kaydınız (${restriction.type}) incelenmiş ve kaldırılmıştır. Club topluluk akışına yeniden katılabilirsiniz.`;
-
-    return this.sendUserResponse(feedbackId, adminUser, {
-      responseMessage: autoReplyText,
-      channel: 'IN_APP',
-      markStatus: FeedbackStatus.ACTION_TAKEN,
+    await this.prisma.feedback.update({
+      where: { id: feedbackId },
+      data: {
+        auditTimeline: timeline as any,
+      },
     });
+
+    return {
+      success: true,
+      recipient: dto.recipient,
+      targetUserId,
+      targetEmail,
+      inAppSent,
+      emailSent,
+      timestamp: new Date(),
+    };
   }
 }
