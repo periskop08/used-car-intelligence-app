@@ -9,7 +9,91 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    this.runReconciliationJob().catch(() => null);
+    this.runReconciliationJob().catch((err) => this.logger.error('Error in promotion reconciliation on module init:', err));
+  }
+
+  public async backfillLegacyPurchasesToEntitlements(): Promise<number> {
+    const legacyPurchases = await this.prisma.listingPromotionPurchase.findMany({
+      where: {
+        paymentStatus: PromotionPaymentStatus.PAID,
+      },
+      include: {
+        entitlements: true,
+      },
+    });
+
+    let backfilled = 0;
+    const now = new Date();
+
+    for (const purchase of legacyPurchases) {
+      if (!purchase.listingId) continue;
+
+      const listing = await this.prisma.vehicleListing.findUnique({
+        where: { id: purchase.listingId },
+      });
+      if (!listing) continue;
+
+      let targetExpiresAt = purchase.expiresAt || listing.expiresAt;
+      if (!targetExpiresAt) {
+        targetExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+
+      const isExpired = targetExpiresAt && new Date(targetExpiresAt) <= now;
+      const lifecycleStatus = isExpired
+        ? PromotionLifecycleStatus.EXPIRED
+        : purchase.lifecycleStatus === PromotionLifecycleStatus.CANCELLED || purchase.lifecycleStatus === PromotionLifecycleStatus.TERMINATED
+        ? purchase.lifecycleStatus
+        : PromotionLifecycleStatus.ACTIVE;
+
+      if (purchase.entitlements.length === 0) {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.listingPromotionEntitlement.create({
+            data: {
+              purchaseId: purchase.id,
+              listingId: purchase.listingId,
+              promotionType: purchase.promotionType || ListingPromotionType.URGENT_LISTING,
+              lifecycleStatus,
+              activatedAt: purchase.activatedAt || purchase.createdAt,
+              expiresAt: targetExpiresAt,
+            },
+          });
+
+          await tx.listingPromotionPurchase.update({
+            where: { id: purchase.id },
+            data: {
+              lifecycleStatus,
+              expiresAt: targetExpiresAt,
+            },
+          });
+        });
+        backfilled++;
+      }
+
+      if (lifecycleStatus === PromotionLifecycleStatus.ACTIVE && (listing.status === ('PUBLISHED' as any) || listing.status === ('ACTIVE' as any))) {
+        const type = purchase.promotionType || ListingPromotionType.URGENT_LISTING;
+        if (type === ListingPromotionType.SHOWCASE_FEED) {
+          await this.prisma.vehicleListing.update({
+            where: { id: purchase.listingId },
+            data: {
+              isShowcaseFeedActive: true,
+              showcaseFeedSince: purchase.activatedAt || now,
+              showcaseFeedExpiresAt: targetExpiresAt,
+            },
+          });
+        } else {
+          await this.prisma.vehicleListing.update({
+            where: { id: purchase.listingId },
+            data: {
+              isUrgent: true,
+              urgentSince: purchase.activatedAt || now,
+              urgentExpiresAt: targetExpiresAt,
+            },
+          });
+        }
+      }
+    }
+
+    return backfilled;
   }
 
   public async expirePromotions(): Promise<number> {
@@ -32,7 +116,6 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
           },
         });
 
-        // Also check parent purchase lifecycle
         await tx.listingPromotionPurchase.updateMany({
           where: { id: entitlement.purchaseId },
           data: { lifecycleStatus: PromotionLifecycleStatus.EXPIRED },
@@ -99,8 +182,14 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
     return count;
   }
 
-  public async runReconciliationJob(): Promise<{ repairedListings: number }> {
+  public async runReconciliationJob(): Promise<{ repairedListings: number; backfilled: number }> {
     const now = new Date();
+
+    // 0. Backfill legacy purchases to entitlements & restore active listings
+    const backfilled = await this.backfillLegacyPurchasesToEntitlements().catch((err) => {
+      this.logger.error('Error during backfill in reconciliation:', err);
+      return 0;
+    });
 
     // 1. Expire past promotions
     await this.expirePromotions().catch(() => null);
@@ -161,6 +250,32 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
       this.logger.warn(`Reconciliation: Repaired desynced isShowcaseFeedActive=false for listing ${listing.id}`);
     }
 
-    return { repairedListings };
+    // 4. Restore active entitlements that were not marked on listing
+    const activeUrgentEntitlementsNotMarked = await this.prisma.listingPromotionEntitlement.findMany({
+      where: {
+        promotionType: ListingPromotionType.URGENT_LISTING,
+        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+        expiresAt: { gt: now },
+        listing: { isUrgent: false },
+      },
+      include: { listing: true },
+    });
+
+    for (const ent of activeUrgentEntitlementsNotMarked) {
+      if (ent.listing && (ent.listing.status === ('PUBLISHED' as any) || ent.listing.status === ('ACTIVE' as any))) {
+        await this.prisma.vehicleListing.update({
+          where: { id: ent.listingId! },
+          data: {
+            isUrgent: true,
+            urgentSince: ent.activatedAt || now,
+            urgentExpiresAt: ent.expiresAt,
+          },
+        });
+        repairedListings++;
+        this.logger.log(`Reconciliation: Restored isUrgent=true for listing ${ent.listingId}`);
+      }
+    }
+
+    return { repairedListings, backfilled };
   }
 }

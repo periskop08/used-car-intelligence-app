@@ -16,6 +16,7 @@ import { ListingPromotionAdminService } from './listing-promotion-admin.service'
 import { ListingPromotionRefundService } from './listing-promotion-refund.service';
 import { ListingPromotionWebhookService } from './listing-promotion-webhook.service';
 import { ListingPromotionQueryService } from './listing-promotion-query.service';
+import { ListingPromotionReconciliationService } from './listing-promotion-reconciliation.service';
 import { CreatePromotionQuoteDto } from './dto/create-promotion-quote.dto';
 import { CreatePromotionCheckoutDto } from './dto/create-promotion-checkout.dto';
 import { UpdateProductConfigDto } from './dto/promotion-product-config.dto';
@@ -35,6 +36,7 @@ export class ListingPromotionController {
     private refundService: ListingPromotionRefundService,
     private webhookService: ListingPromotionWebhookService,
     private queryService: ListingPromotionQueryService,
+    private reconciliationService: ListingPromotionReconciliationService,
   ) {}
 
   private verifyAdminAccess(req: any) {
@@ -118,6 +120,14 @@ export class ListingPromotionController {
   public async getStats(@Req() req: any) {
     this.verifyAdminAccess(req);
     return this.adminService.getRevenueStats();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('admin/reconcile')
+  @Post('urgent/admin/reconcile')
+  public async reconcile(@Req() req: any) {
+    this.verifyAdminAccess(req);
+    return this.reconciliationService.runReconciliationJob();
   }
 
   @UseGuards(JwtAuthGuard)
