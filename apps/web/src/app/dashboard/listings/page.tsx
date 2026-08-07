@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
 
 const translateFuelType = (fuel: string) => {
   if (!fuel) return "-";
@@ -42,6 +43,25 @@ export default function SellerDashboard() {
   const [actionSuccess, setActionSuccess] = useState("");
   const [expandedLeads, setExpandedLeads] = useState<Record<string, boolean>>({});
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [promotionModalListing, setPromotionModalListing] = useState<any | null>(null);
+
+  const refreshListings = () => {
+    const activeToken = token || localStorage.getItem("accessToken");
+    if (!activeToken) return;
+    Promise.all([
+      fetch(`${API_URL}/me/listings`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).then((res) => res.json()),
+      fetch(`${API_URL}/me/listing-quota`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).then((res) => res.json()),
+    ])
+      .then(([listingsData, quotaData]) => {
+        setListings(Array.isArray(listingsData) ? listingsData : []);
+        setQuota(quotaData);
+      })
+      .catch((err) => console.error("Error refreshing listings:", err));
+  };
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (!savedToken) {
@@ -359,7 +379,7 @@ export default function SellerDashboard() {
                     </div>
 
                      {/* Actions Column */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => router.push(`/listings/${listing.id}`)}
                         className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
@@ -372,6 +392,15 @@ export default function SellerDashboard() {
                       >
                         Düzenle
                       </button>
+                      {listing.status === "ACTIVE" && (
+                        <button
+                          type="button"
+                          onClick={() => setPromotionModalListing(listing)}
+                          className="text-xs font-black px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          🚀 Öne Çıkar
+                        </button>
+                      )}
                       {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
                         <button
                           onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
@@ -459,6 +488,41 @@ export default function SellerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Promotion Management Modal */}
+      {promotionModalListing && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="relative w-full max-w-4xl bg-[#0b0f19] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase text-orange-400 tracking-wider">İlan Promosyon Yönetimi</span>
+                <h3 className="text-lg font-black text-white mt-0.5">{promotionModalListing.title}</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {promotionModalListing.modelYear} • {promotionModalListing.kilometers?.toLocaleString('tr-TR')} km • {promotionModalListing.city}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPromotionModalListing(null)}
+                className="w-8 h-8 rounded-full bg-slate-900 border border-white/10 text-slate-400 hover:text-white flex items-center justify-center transition text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Promotion Cards Component */}
+            <ListingPromotionsManagement
+              listingId={promotionModalListing.id}
+              token={token}
+              onSuccess={() => {
+                setActionSuccess("Promosyon ilanınıza başarıyla uygulandı!");
+                refreshListings();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

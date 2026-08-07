@@ -8,9 +8,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 interface ListingPromotionsManagementProps {
   listingId: string;
   token: string;
+  onSuccess?: () => void;
 }
 
-export default function ListingPromotionsManagement({ listingId, token }: ListingPromotionsManagementProps) {
+export default function ListingPromotionsManagement({ listingId, token, onSuccess }: ListingPromotionsManagementProps) {
   const [selectedSku, setSelectedSku] = useState<PromotionSku>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -120,6 +121,7 @@ export default function ListingPromotionsManagement({ listingId, token }: Listin
       await fetchData();
       setSelectedSku(null);
       setTermsAccepted(false);
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       setError(err.message || "Bir hata oluştu.");
     } finally {
