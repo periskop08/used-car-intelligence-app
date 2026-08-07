@@ -195,16 +195,16 @@ export default function ListingPromotionCards({
           </ul>
 
           {/* Pricing Bottom */}
-          <div className="pt-3.5 border-t border-white/10 flex items-end justify-between mt-auto">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[11px] text-slate-500 line-through font-medium">Ayrı Ayrı: {individualTotal} TL</span>
-              {savings > 0 && (
-                <span className="px-2 py-0.5 rounded-md font-extrabold text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 w-fit">
-                  {savings} TL AVANTAJ
-                </span>
-              )}
+          <div className="pt-3.5 border-t border-white/10 flex items-center justify-between mt-auto">
+            <span className="text-xs text-slate-400 font-medium">
+              {isCreateFlow ? "İlan süresince" : `Kalan ${remainingDays ?? 30} gün`}
+            </span>
+            <div className="text-right flex flex-col items-end">
+              <span className="text-[11px] text-slate-500 line-through font-medium leading-none mb-1">
+                Ayrı Ayrı: {individualTotal} TL
+              </span>
+              <span className="text-xl font-black text-orange-400 leading-none">{bundlePrice} TL</span>
             </div>
-            <span className="text-xl font-black text-orange-400">{bundlePrice} TL</span>
           </div>
         </div>
       </div>
