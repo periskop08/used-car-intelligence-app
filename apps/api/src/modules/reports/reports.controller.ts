@@ -99,6 +99,16 @@ export class ReportsController {
     return this.userService.getUserByCustomerNo(customerNo);
   }
 
+  @Post('users/:customerNo/message')
+  async sendMessageToUser(
+    @Param('customerNo') customerNo: string,
+    @Body() body: { content: string; sendAsEmail?: boolean; title?: string },
+    @Req() req: any
+  ) {
+    this.verifyAdminAccess(req);
+    return this.userService.sendMessageToUser(customerNo, req.user, body);
+  }
+
   // PRODUCT REPORTS
   @Get('product/ai-reports')
   async getProductAiReports(@Query() filter: any, @Req() req: any) {
