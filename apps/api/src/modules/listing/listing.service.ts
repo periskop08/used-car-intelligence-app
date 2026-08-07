@@ -573,7 +573,7 @@ CRITICAL SAFETY RULES:
     });
   }
 
-  async toggleFavorite(userId: string, listingId: string): Promise<{ isFavorited: boolean }> {
+  async toggleFavorite(userId: string, listingId: string): Promise<{ isFavorited: boolean; favoriteCount: number }> {
     const listing = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
     });
@@ -588,11 +588,12 @@ CRITICAL SAFETY RULES:
       },
     });
 
+    let isFavorited = false;
     if (existing) {
       await this.prisma.favoriteListing.delete({
         where: { id: existing.id },
       });
-      return { isFavorited: false };
+      isFavorited = false;
     } else {
       await this.prisma.favoriteListing.create({
         data: {
@@ -600,8 +601,14 @@ CRITICAL SAFETY RULES:
           listingId,
         },
       });
-      return { isFavorited: true };
+      isFavorited = true;
     }
+
+    const favoriteCount = await this.prisma.favoriteListing.count({
+      where: { listingId },
+    });
+
+    return { isFavorited, favoriteCount };
   }
 
   async getFavorites(userId: string): Promise<any[]> {

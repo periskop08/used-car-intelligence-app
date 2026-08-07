@@ -294,9 +294,12 @@ export default function SellerDashboard() {
                             {listing.status}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500">
-                          {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}
-                        </span>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium flex-wrap">
+                          <span>{listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}</span>
+                          <span className="inline-flex items-center gap-1 font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full text-[10px]">
+                            ❤️ {listing.favoriteCount || 0} Favoriye Eklendi
+                          </span>
+                        </div>
 
                         {/* Dynamic Duration Badges */}
                         <div className="mt-2 text-xs flex flex-col gap-0.5">

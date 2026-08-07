@@ -327,6 +327,9 @@ export class ListingController {
           skip,
           take: limitNum,
           include: {
+            _count: {
+              select: { favorites: true },
+            },
             media: {
               where: { moderationStatus: MediaModerationStatus.APPROVED },
               orderBy: { sortOrder: 'asc' },
@@ -360,6 +363,7 @@ export class ListingController {
       return {
         ...item,
         isUrgent,
+        favoriteCount: item._count?.favorites ?? item.favoriteCount ?? 0,
         media: item.media ? this.formatMediaUrls(item.media, req) : [],
         isFavorited: favoritedIds.has(item.id),
       };
@@ -593,10 +597,15 @@ export class ListingController {
       listing.media = this.formatMediaUrls(listing.media, req);
     }
 
+    const favoriteCount = await this.listingService['prisma'].favoriteListing.count({
+      where: { listingId: id },
+    });
+
     return {
       ...listing,
       isFavorited,
       isSellerFavorited,
+      favoriteCount,
     };
   }
 
@@ -654,15 +663,23 @@ export class ListingController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Satıcının kendi tüm ilanlarını listele' })
   async getMyListings(@GetUser() user: UserPayload) {
-    return this.listingService['prisma'].vehicleListing.findMany({
+    const items = await this.listingService['prisma'].vehicleListing.findMany({
       where: { sellerId: user.id },
       include: {
+        _count: {
+          select: { favorites: true },
+        },
         media: { orderBy: { sortOrder: 'asc' } },
         vehicleVariant: { include: { brand: true, model: true } },
         leads: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return items.map((item) => ({
+      ...item,
+      favoriteCount: item._count?.favorites ?? 0,
+    }));
   }
 
   @Get('me/listing-quota')

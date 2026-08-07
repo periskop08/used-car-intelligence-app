@@ -33,7 +33,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
           </div>
         )}
 
-        {/* Top Right: Favorite Button */}
+        {/* Top Right: Favorite Button with Count */}
         {onFavoriteToggle && (
           <button
             type="button"
@@ -42,13 +42,17 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
               e.stopPropagation();
               onFavoriteToggle(listing.id);
             }}
-            className={`absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition ${
+            className={`absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md transition text-xs font-bold shadow-lg ${
               isFavorite 
-                ? "bg-red-500 text-white" 
-                : "bg-slate-950/60 text-slate-300 hover:text-white border border-white/10"
+                ? "bg-red-500/90 text-white border border-red-400/50" 
+                : "bg-slate-950/80 text-slate-300 hover:text-white border border-white/15"
             }`}
+            title={isFavorite ? "Favorilerden Kaldır" : "Favoriye Ekle"}
           >
-            ♥
+            <span>{isFavorite ? "❤️" : "🤍"}</span>
+            {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
+              <span className="text-[11px] font-extrabold">{listing.favoriteCount}</span>
+            )}
           </button>
         )}
       </div>

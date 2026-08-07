@@ -192,7 +192,13 @@ function ListingsContent() {
       .then((data) => {
         setListings((prev) =>
           prev.map((item) =>
-            item.id === listingId ? { ...item, isFavorited: data.isFavorited } : item
+            item.id === listingId
+              ? {
+                  ...item,
+                  isFavorited: data.isFavorited,
+                  favoriteCount: data.favoriteCount !== undefined ? data.favoriteCount : (data.isFavorited ? (item.favoriteCount || 0) + 1 : Math.max(0, (item.favoriteCount || 0) - 1)),
+                }
+              : item
           )
         );
       })
@@ -796,17 +802,20 @@ function ListingsContent() {
                     className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300"
                   >
                     <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden">
-                      {/* Favorite Button */}
+                      {/* Favorite Button with Count */}
                       <button
                         onClick={(e) => handleToggleFavorite(e, listing.id)}
-                        className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm ${
+                        className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition shadow-lg backdrop-blur-md text-xs font-bold ${
                           listing.isFavorited
                             ? "bg-red-500/20 text-red-500 border-red-500/40"
                             : "bg-slate-950/80 text-slate-450 border-white/10 hover:text-white"
                         }`}
                         title={listing.isFavorited ? "Favorilerden Kaldır" : "Favoriye Ekle"}
                       >
-                        {listing.isFavorited ? "❤️" : "🤍"}
+                        <span>{listing.isFavorited ? "❤️" : "🤍"}</span>
+                        {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
+                          <span className="text-[11px] font-extrabold">{listing.favoriteCount}</span>
+                        )}
                       </button>
 
                       <img

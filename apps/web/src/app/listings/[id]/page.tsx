@@ -192,7 +192,11 @@ export default function ListingDetail() {
         return res.json();
       })
       .then((data) => {
-        setListing((prev: any) => ({ ...prev, isFavorited: data.isFavorited }));
+        setListing((prev: any) => ({
+          ...prev,
+          isFavorited: data.isFavorited,
+          favoriteCount: data.favoriteCount !== undefined ? data.favoriteCount : (data.isFavorited ? (prev.favoriteCount || 0) + 1 : Math.max(0, (prev.favoriteCount || 0) - 1)),
+        }));
       })
       .catch((err) => console.error("Error toggling favorite:", err));
   };
@@ -290,9 +294,12 @@ export default function ListingDetail() {
           {/* Sol Kolon (lg:col-span-6): Başlık ve İlan Detay Bilgileri */}
           <div className="lg:col-span-6">
             <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
               {listing.isUrgent && <UrgentListingBadge size="medium" animated />}
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-full">
+                ❤️ {listing.favoriteCount || 0} Favori
+              </span>
             </div>
             <p className="text-[11px] text-slate-400 canvas-subtitle font-bold uppercase tracking-wider mt-0.5">
               {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
@@ -321,14 +328,17 @@ export default function ListingDetail() {
               {/* Favorite Toggle Button */}
               <button
                 onClick={handleToggleFavorite}
-                className={`absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full border flex items-center justify-center transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 ${
+                className={`absolute top-2.5 right-2.5 z-10 px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition shadow-lg backdrop-blur-sm cursor-pointer select-none hover:scale-105 text-xs font-bold ${
                   listing.isFavorited
-                    ? "bg-red-500/20 text-red-500 border-red-500/40"
+                    ? "bg-red-500/20 text-red-400 border-red-500/40"
                     : "bg-slate-950/80 text-slate-400 border-white/10 hover:text-white"
                 }`}
                 title={listing.isFavorited ? "Favorilerden Kaldır" : "Favoriye Ekle"}
               >
-                {listing.isFavorited ? "❤️" : "🤍"}
+                <span>{listing.isFavorited ? "❤️" : "🤍"}</span>
+                {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
+                  <span className="text-[11px] font-extrabold">{listing.favoriteCount}</span>
+                )}
               </button>
 
               <img
