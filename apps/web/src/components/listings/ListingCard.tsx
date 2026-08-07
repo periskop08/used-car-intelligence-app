@@ -74,12 +74,15 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
           className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
         />
 
-        {/* Top Left: Urgent Badge */}
-        {listing.isUrgent && (
-          <div className="absolute top-3 left-3 z-20">
-            <UrgentListingBadge size="small" animated />
-          </div>
-        )}
+        {/* Top Left: Badges */}
+        <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start">
+          {listing.isUrgent && <UrgentListingBadge size="small" animated />}
+          {listing.isShowcaseFeedActive && (
+            <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
+              ⭐ Vitrin
+            </span>
+          )}
+        </div>
 
         {/* Top Right: Favorite Button with Count */}
         <button

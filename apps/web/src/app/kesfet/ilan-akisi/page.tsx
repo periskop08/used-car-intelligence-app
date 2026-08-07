@@ -1,692 +1,138 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState, Suspense } from "react";
+import ListingCard from "../../../components/listings/ListingCard";
+import { Star } from "lucide-react";
 
-// Env variable for API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-interface Location {
-  city: string;
-  district: string;
-  neighborhood: string;
-}
-
-interface Seller {
-  id: string;
-  displayName: string;
-  memberSince: string;
-  avatarUrl: string | null;
-}
-
-interface Vehicle {
-  brand: string;
-  modelFamily: string;
-  modelName: string;
-  year: number;
-  fuelType: string;
-  transmissionType: string;
-  condition: string;
-  mileage: number;
-  bodyType: string;
-  enginePower: string;
-  engineCapacity: string;
-  drivetrain: string;
-  color: string;
-  warranty: boolean;
-  heavyDamage: boolean;
-  plateOrigin: string;
-  sellerType: string;
-  exchange: boolean;
-  trimPackage: string | null;
-  engineVersion: string | null;
-}
-
-interface Photo {
-  id: string;
-  url: string;
-  order: number;
-}
-
-interface TechnicalSummary {
-  maxPower: string | null;
-  topSpeed: string | null;
-  acceleration0100: string | null;
-  fuelConsumption: string | null;
-}
-
-interface ListingFeedItem {
-  id: string;
-  title: string;
-  price: number;
-  currency: string;
-  listingDate: string;
-  listingNo: string;
-  location: Location;
-  seller: Seller;
-  vehicle: Vehicle;
-  photos: Photo[];
-  technicalSummary: TechnicalSummary;
-  breadcrumb: string[];
-  isFavorite: boolean;
-  detailUrl: string;
-}
-
-export default function ListingFeedPage() {
-  const [listings, setListings] = useState<ListingFeedItem[]>([]);
+function FeedContent() {
+  const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [seed, setSeed] = useState<string>("");
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [token, setToken] = useState("");
 
-  // States per listing
-  const [activeTabs, setActiveTabs] = useState<Record<string, "info" | "desc" | "loc">>({});
-  const [activePhotoIndices, setActivePhotoIndices] = useState<Record<string, number>>({});
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-
-  // Seen list to pass as excludeIds (limit to 100)
-  const [seenIds, setSeenIds] = useState<string[]>([]);
-  const loadingMoreRef = useRef(false);
-
-  // Refs for scroll snapping & scrolling lock
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const viewedTimerRefs = useRef<Record<string, NodeJS.Timeout>>({});
-  const viewedLoggedRefs = useRef<Record<string, boolean>>({});
-  const isScrollingRef = useRef(false);
-
-  const handleWheelScroll = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (isScrollingRef.current) return;
-    
-    if (Math.abs(e.deltaY) > 15) {
-      if (e.deltaY > 0 && currentIndex < listings.length - 1) {
-        isScrollingRef.current = true;
-        const targetId = listings[currentIndex + 1]?.id;
-        if (targetId && cardRefs.current[targetId]) {
-          cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-        setTimeout(() => { isScrollingRef.current = false; }, 500);
-      } else if (e.deltaY < 0 && currentIndex > 0) {
-        isScrollingRef.current = true;
-        const targetId = listings[currentIndex - 1]?.id;
-        if (targetId && cardRefs.current[targetId]) {
-          cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-        setTimeout(() => { isScrollingRef.current = false; }, 500);
-      }
-    }
-  };
-
-  // Generate initial seed on client load
   useEffect(() => {
-    const generatedSeed = Math.random().toString(36).substring(2, 15);
-    setSeed(generatedSeed);
-    fetchFeed(generatedSeed, true, []);
-    logEvent("listing_feed_opened", {});
+    const savedToken = localStorage.getItem("accessToken");
+    if (savedToken) setToken(savedToken);
   }, []);
 
-  const getHeaders = () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    return headers;
-  };
-
-  const fetchFeed = async (activeSeed: string, replace: boolean, currentSeen: string[]) => {
-    if (loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    if (replace) setLoading(true);
-
-    try {
-      const excludeIdsParam = currentSeen.slice(-100).join(",");
-      const response = await fetch(
-        `${API_URL}/listings/feed?limit=10&seed=${activeSeed}&excludeIds=${excludeIdsParam}`,
-        { headers: getHeaders() }
-      );
-
-      if (!response.ok) {
-        throw new Error("İlan akışı yüklenirken bir hata oluştu.");
-      }
-
-      const data = await response.json();
-      const newItems: ListingFeedItem[] = data.items || [];
-
-      if (replace) {
-        setListings(newItems);
-        // Default values for new items
-        const initialTabs: Record<string, "info" | "desc" | "loc"> = {};
-        const initialPhotos: Record<string, number> = {};
-        const initialFavs: Record<string, boolean> = {};
-
-        newItems.forEach((item) => {
-          initialTabs[item.id] = "info";
-          initialPhotos[item.id] = 0;
-          initialFavs[item.id] = item.isFavorite;
-        });
-
-        setActiveTabs(initialTabs);
-        setActivePhotoIndices(initialPhotos);
-        setFavorites(initialFavs);
-      } else {
-        setListings((prev) => {
-          const filtered = newItems.filter(item => !prev.some(p => p.id === item.id));
-          return [...prev, ...filtered];
-        });
-
-        setActiveTabs((prev) => {
-          const updated = { ...prev };
-          newItems.forEach((item) => {
-            if (!updated[item.id]) updated[item.id] = "info";
-          });
-          return updated;
-        });
-
-        setActivePhotoIndices((prev) => {
-          const updated = { ...prev };
-          newItems.forEach((item) => {
-            if (updated[item.id] === undefined) updated[item.id] = 0;
-          });
-          return updated;
-        });
-
-        setFavorites((prev) => {
-          const updated = { ...prev };
-          newItems.forEach((item) => {
-            if (updated[item.id] === undefined) updated[item.id] = item.isFavorite;
-          });
-          return updated;
-        });
-      }
-
-      setHasMore(data.hasMore);
-      if (data.nextSeed) setSeed(data.nextSeed);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || "İlan akışı yüklenirken hata oluştu.");
-    } finally {
-      setLoading(false);
-      loadingMoreRef.current = false;
-    }
-  };
-
-  // Visibility tracking for viewed event
   useEffect(() => {
-    if (listings.length === 0) return;
+    setLoading(true);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const id = entry.target.getAttribute("data-id");
-          if (!id) return;
-
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
-            // Find active index
-            const index = listings.findIndex((x) => x.id === id);
-            if (index !== -1) {
-              setCurrentIndex(index);
-              
-              // Infinite scroll prefetch: if user is at index 7, load next
-              if (index >= listings.length - 3 && hasMore) {
-                const nextSeen = [...seenIds, ...listings.map(x => x.id)];
-                fetchFeed(seed, false, nextSeen);
-              }
-            }
-
-            // Start viewed timer (500ms)
-            if (!viewedLoggedRefs.current[id]) {
-              if (viewedTimerRefs.current[id]) clearTimeout(viewedTimerRefs.current[id]);
-              viewedTimerRefs.current[id] = setTimeout(() => {
-                viewedLoggedRefs.current[id] = true;
-                const item = listings.find((x) => x.id === id);
-                if (item) {
-                  logEvent("listing_feed_item_viewed", {
-                    listingId: item.id,
-                    sellerId: item.seller.id,
-                    brand: item.vehicle.brand,
-                    modelFamily: item.vehicle.modelFamily,
-                    year: item.vehicle.year,
-                    position: index,
-                  });
-                  setSeenIds((prev) => {
-                    if (prev.includes(id)) return prev;
-                    return [...prev, id];
-                  });
-                }
-              }, 500);
-            }
-          } else {
-            // Cancel viewed timer if card becomes less than 70% visible
-            if (viewedTimerRefs.current[id]) {
-              clearTimeout(viewedTimerRefs.current[id]);
-            }
-          }
-        });
-      },
-      {
-        root: containerRef.current,
-        threshold: 0.7,
-      }
-    );
-
-    Object.values(cardRefs.current).forEach((node) => {
-      if (node) observer.observe(node);
-    });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [listings]);
-
-  const logEvent = (eventName: string, params: Record<string, any>) => {
-    console.log(`[Analytics Event] ${eventName}:`, {
-      ...params,
-      source: "listing_feed",
-      timestamp: new Date().toISOString(),
-    });
-    // Call mock API for logging if desired
-    fetch(`${API_URL}/audit-logs`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ action: eventName, details: params }),
-    }).catch(() => {});
-  };
-
-  const handleFavoriteToggle = async (id: string, item: ListingFeedItem) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert("Devam etmek için ücretsiz giriş yapmalısın.");
-      window.location.href = `/login?redirect=/kesfet/ilan-akisi`;
-      return;
-    }
-
-    const currentFav = favorites[id];
-    // Optimistic update
-    setFavorites((prev) => ({ ...prev, [id]: !currentFav }));
-
-    try {
-      const response = await fetch(`${API_URL}/listings/${id}/favorite`, {
-        method: "POST",
-        headers: getHeaders(),
+    fetch(`${API_URL}/listings?showcaseOnly=true&page=${page}&limit=12&sort=newest`, { headers })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.items)) {
+          setListings(data.items);
+          setTotal(data.total || data.items.length);
+        } else if (Array.isArray(data)) {
+          setListings(data);
+          setTotal(data.length);
+        } else {
+          setListings([]);
+          setTotal(0);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("İlan Akışı yüklenirken hata:", err);
+        setListings([]);
+        setLoading(false);
       });
+  }, [page, token]);
 
-      if (!response.ok) {
-        throw new Error();
-      }
-      logEvent("listing_feed_favorite_clicked", { listingId: id, sellerId: item.seller.id });
-    } catch {
-      // Revert on error
-      setFavorites((prev) => ({ ...prev, [id]: currentFav }));
-      alert("Favorilere eklenirken bir hata oluştu.");
-    }
-  };
-
-  const handleShare = async (item: ListingFeedItem) => {
-    const shareUrl = `${window.location.origin}/listings/${item.id}`;
-    logEvent("listing_feed_share_clicked", { listingId: item.id });
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: item.title,
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      alert("İlan linki panoya kopyalandı!");
-    }
-  };
-
-  const handleCall = (item: ListingFeedItem) => {
-    logEvent("listing_feed_call_clicked", { listingId: item.id });
-    alert("Satıcı iletişim bilgisi için ilan detay sayfasına yönlendiriliyorsunuz.");
-    window.location.href = `/listings/${item.id}`;
-  };
-
-  const handleMessage = (item: ListingFeedItem) => {
-    logEvent("listing_feed_message_clicked", { listingId: item.id });
-    const token = localStorage.getItem("token");
+  const handleFavoriteToggle = (listingId: string) => {
     if (!token) {
-      alert("Devam etmek için ücretsiz giriş yapmalısın.");
       window.location.href = `/login?redirect=/kesfet/ilan-akisi`;
       return;
     }
-    // Redirect to chat
-    window.location.href = `/dashboard/messages?listingId=${item.id}`;
+
+    fetch(`${API_URL}/listings/${listingId}/favorite`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setListings((prev) =>
+          prev.map((item) =>
+            item.id === listingId
+              ? {
+                  ...item,
+                  isFavorited: data.isFavorited,
+                  favoriteCount:
+                    data.favoriteCount !== undefined
+                      ? data.favoriteCount
+                      : data.isFavorited
+                      ? (item.favoriteCount || 0) + 1
+                      : Math.max(0, (item.favoriteCount || 0) - 1),
+                }
+              : item
+          )
+        );
+      })
+      .catch((err) => console.error("Error toggling favorite on feed page:", err));
   };
 
   return (
-    <div className="flex-1 flex justify-center items-center py-6 px-4">
-      <div className="w-full max-w-[430px] md:max-w-[840px] h-[85vh] max-h-[760px] md:h-[580px] bg-[#0b0f19] border border-white/10 rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden select-none">
-          
-          {loading && listings.length === 0 ? (
-            <div className="flex-1 flex flex-col justify-center items-center gap-3">
-              <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-slate-400">Akış hazırlanıyor...</p>
-            </div>
-          ) : error && listings.length === 0 ? (
-            <div className="flex-1 flex flex-col justify-center items-center gap-4 px-6 text-center">
-              <span className="text-4xl">⚠️</span>
-              <p className="text-sm font-semibold text-slate-300">{error}</p>
-              <button
-                onClick={() => fetchFeed(seed || "retry_seed", true, [])}
-                className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 transition text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20"
-              >
-                Tekrar Dene
-              </button>
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="flex-1 flex flex-col justify-center items-center gap-3 px-6 text-center">
-              <span className="text-4xl">🎞️</span>
-              <p className="text-sm font-semibold text-slate-300">Şu anda akışta gösterilecek aktif ilan bulunmuyor.</p>
-              <p className="text-xs text-slate-500">Yeni ilanlar yayına alındığında burada görünecek.</p>
-            </div>
-          ) : (
-            <div
-              ref={containerRef}
-              onWheel={handleWheelScroll}
-              className="flex-1 overflow-y-auto snap-y snap-mandatory snap-always scroll-smooth scrollbar-none"
-            >
-              {listings.map((item, index) => {
-                const activeTab = activeTabs[item.id] || "info";
-                const activePhoto = activePhotoIndices[item.id] || 0;
-                const isFav = favorites[item.id] || false;
-
-                return (
-                  <div
-                    key={item.id}
-                    ref={(el) => { cardRefs.current[item.id] = el; }}
-                    data-id={item.id}
-                    className="w-full h-full snap-start snap-always flex-none flex flex-col md:flex-row relative"
-                  >
-                    {/* Left Column: Image Container (Rectangular Centered with Listing Nav & Photo Arrows) */}
-                    <div className="w-full md:w-[48%] h-[320px] md:h-full relative flex-none border-b md:border-b-0 md:border-r border-white/10 bg-[#060913] flex flex-col justify-between items-center p-3 select-none">
-                      {/* Top Button: Önceki İlan */}
-                      <button
-                        disabled={index === 0}
-                        onClick={() => {
-                          if (index > 0) {
-                            const targetId = listings[index - 1]?.id;
-                            if (targetId && cardRefs.current[targetId]) {
-                              cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                          }
-                        }}
-                        className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
-                          index === 0
-                            ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
-                            : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
-                        }`}
-                      >
-                        <span>▲</span>
-                        <span>Önceki İlan</span>
-                      </button>
-
-                      {/* Centered Rectangular Image Box with Left/Right Photo Arrows */}
-                      <div className="relative w-full flex-1 max-h-[220px] md:max-h-[380px] my-2 flex items-center justify-center overflow-hidden rounded-2xl bg-black/80 border border-white/5 group">
-                        {item.photos.length > 0 ? (
-                          <>
-                            <img
-                              src={item.photos[activePhoto]?.url}
-                              alt={item.title}
-                              className="w-full h-full object-contain"
-                            />
-                            
-                            {/* Photo counter badge */}
-                            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-bold text-slate-300 border border-white/10 z-10">
-                              {activePhoto + 1} / {item.photos.length}
-                            </div>
-
-                            {/* Left/Right Photo Carousel Arrows */}
-                            {item.photos.length > 1 && (
-                              <>
-                                <button
-                                  disabled={activePhoto === 0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActivePhotoIndices((prev) => ({
-                                      ...prev,
-                                      [item.id]: Math.max(0, activePhoto - 1),
-                                    }));
-                                  }}
-                                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold transition-all z-20 ${
-                                    activePhoto === 0
-                                      ? "bg-black/30 border-white/5 text-slate-600 opacity-30 cursor-not-allowed"
-                                      : "bg-slate-900/80 hover:bg-orange-500 border-white/20 text-white shadow-lg cursor-pointer active:scale-95"
-                                  }`}
-                                  title="Önceki Fotoğraf"
-                                >
-                                  ◀
-                                </button>
-                                <button
-                                  disabled={activePhoto >= item.photos.length - 1}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActivePhotoIndices((prev) => ({
-                                      ...prev,
-                                      [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                                    }));
-                                  }}
-                                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold transition-all z-20 ${
-                                    activePhoto >= item.photos.length - 1
-                                      ? "bg-black/30 border-white/5 text-slate-600 opacity-30 cursor-not-allowed"
-                                      : "bg-slate-900/80 hover:bg-orange-500 border-white/20 text-white shadow-lg cursor-pointer active:scale-95"
-                                  }`}
-                                  title="Sonraki Fotoğraf"
-                                >
-                                  ▶
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">
-                            Görsel Bulunmuyor
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bottom Button: Sonraki İlan */}
-                      <button
-                        disabled={index >= listings.length - 1}
-                        onClick={() => {
-                          if (index < listings.length - 1) {
-                            const targetId = listings[index + 1]?.id;
-                            if (targetId && cardRefs.current[targetId]) {
-                              cardRefs.current[targetId]?.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                          }
-                        }}
-                        className={`w-full py-1.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all z-20 ${
-                          index >= listings.length - 1
-                            ? "bg-white/[0.02] border-white/5 text-slate-600 cursor-not-allowed"
-                            : "bg-slate-900/90 border-white/10 hover:border-orange-500/40 text-slate-300 hover:text-orange-400 cursor-pointer shadow-md active:scale-[0.99]"
-                        }`}
-                      >
-                        <span>▼</span>
-                        <span>Sonraki İlan</span>
-                      </button>
-                    </div>
-
-                    {/* Right Column: Details & Actions */}
-                    <div className="flex-1 flex flex-col justify-between p-5 md:p-6 overflow-hidden bg-[#090d1a] h-[calc(100%-320px)] md:h-full">
-                      {/* Top Bar Actions */}
-                      <div className="flex justify-between items-center z-10 pb-2">
-                        <button
-                          onClick={() => { window.location.href = "/"; }}
-                          className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10 text-xs"
-                        >
-                          ◀
-                        </button>
-                        <span className="text-[10px] md:text-xs font-black tracking-wider text-slate-400 uppercase">
-                          🎞️ İLAN AKIŞI
-                        </span>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleShare(item)}
-                            className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10 text-xs"
-                          >
-                            📤
-                          </button>
-                          <button
-                            onClick={() => handleFavoriteToggle(item.id, item)}
-                            className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors text-xs ${
-                              isFav
-                                ? "bg-red-500/20 border-red-500/50 text-red-500"
-                                : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                            }`}
-                          >
-                            {isFav ? "❤️" : "🤍"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Title & Seller */}
-                      <div className="mt-1 md:mt-2">
-                        <h2 className="text-xs md:text-sm font-black tracking-tight text-white line-clamp-1">
-                          {item.title.toUpperCase()}
-                        </h2>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
-                          <span>👤 {item.seller.displayName}</span>
-                          <span>📍 {item.location.city}, {item.location.district}</span>
-                        </div>
-                      </div>
-
-                      {/* Breadcrumb */}
-                      <div className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-[9px] md:text-[10px] text-blue-400 font-semibold mt-2 line-clamp-1">
-                        {item.breadcrumb.join(" > ")}
-                      </div>
-
-                      {/* Tabs */}
-                      <div className="grid grid-cols-3 gap-1 mt-2.5">
-                        {(["info", "desc", "loc"] as const).map((tab) => (
-                          <button
-                            key={tab}
-                            onClick={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
-                            className={`py-1.5 text-[9px] md:text-[10px] font-black rounded-lg border transition-all ${
-                              activeTab === tab
-                                ? "bg-blue-600/20 border-blue-500 text-blue-400"
-                                : "bg-white/5 border-white/5 text-slate-400 hover:text-slate-300"
-                            }`}
-                          >
-                            {tab === "info" ? "Özellikler" : tab === "desc" ? "Açıklama" : "Konum"}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Tab Content Box - compact scroll */}
-                      <div className="flex-1 min-h-[90px] md:min-h-[120px] bg-black/20 border border-white/5 rounded-xl p-3 my-2 overflow-hidden text-xs">
-                        {activeTab === "info" && (
-                          <div className="w-full h-full overflow-y-auto pr-1 flex flex-col gap-1 text-[10px] md:text-[11px] scrollbar-none">
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">Fiyat</span>
-                              <span className="font-extrabold text-orange-500">
-                                {item.price.toLocaleString("tr-TR")} {item.currency}
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">İlan No</span>
-                              <span className="text-slate-200">{item.listingNo}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">Model Yılı</span>
-                              <span className="text-slate-200">{item.vehicle.year}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">KM</span>
-                              <span className="text-slate-200">
-                                {item.vehicle.mileage.toLocaleString("tr-TR")} km
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">Yakıt</span>
-                              <span className="text-slate-200">{item.vehicle.fuelType}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-slate-400">Vites</span>
-                              <span className="text-slate-200">{item.vehicle.transmissionType}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {activeTab === "desc" && (
-                          <div className="w-full h-full flex flex-col justify-between">
-                            <p className="text-slate-300 italic line-clamp-3 md:line-clamp-4 leading-relaxed text-[10px] md:text-[11px]">
-                              "Bu araç TorqueScout akıllı yapay zeka analizinden başarıyla geçti. Hasar geçmişi ve kronik problemleri sorgulandı."
-                            </p>
-                            <a
-                              href={item.detailUrl}
-                              onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
-                              className="text-[9px] md:text-[10px] text-orange-400 font-extrabold self-end hover:underline"
-                            >
-                              İlan Detayına Git ➔
-                            </a>
-                          </div>
-                        )}
-
-                        {activeTab === "loc" && (
-                          <div className="w-full h-full flex flex-col justify-between">
-                            <div className="text-slate-300 flex flex-col gap-1 text-[10px] md:text-[11px]">
-                              <p className="font-bold text-white">📍 İlan Konumu</p>
-                              <p>Şehir: {item.location.city}</p>
-                              <p>İlçe: {item.location.district || "Belirtilmemiş"}</p>
-                            </div>
-                            <a
-                              href={item.detailUrl}
-                              onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
-                              className="text-[9px] md:text-[10px] text-blue-400 font-extrabold self-end hover:underline"
-                            >
-                              Haritada Göster ➔
-                            </a>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Specs */}
-                      <div className="bg-[#141b2c] border border-blue-500/10 rounded-xl p-2 md:p-2.5 flex justify-between text-[9px] text-slate-300 mb-2">
-                        <div className="flex flex-col">
-                          <span className="text-[7px] md:text-[8px] text-slate-500">Güç</span>
-                          <span className="font-bold">{item.technicalSummary.maxPower || "-"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[7px] md:text-[8px] text-slate-500">Azami Hız</span>
-                          <span className="font-bold">{item.technicalSummary.topSpeed || "-"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[7px] md:text-[8px] text-slate-500">0-100 km/s</span>
-                          <span className="font-bold">{item.technicalSummary.acceleration0100 || "-"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[7px] md:text-[8px] text-slate-500">Tüketim</span>
-                          <span className="font-bold">{item.technicalSummary.fuelConsumption || "-"}</span>
-                        </div>
-                      </div>
-
-                      {/* Single Primary Action: İlana Git */}
-                      <div className="pt-2 border-t border-white/5">
-                        <a
-                          href={item.detailUrl || `/listings/${item.id}`}
-                          onClick={() => logEvent("listing_feed_detail_clicked", { listingId: item.id })}
-                          className="w-full py-3 rounded-2xl text-xs md:text-sm font-black tracking-wider uppercase bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/35 transition duration-150 flex items-center justify-center gap-2 cursor-pointer group"
-                        >
-                          <span>İlana Git</span>
-                          <span className="group-hover:translate-x-1 transition-transform">➔</span>
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
+    <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-8 w-full">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/50 border border-amber-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
+        <div className="flex items-center gap-3">
+          <span className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            <Star className="w-6 h-6" />
+          </span>
+          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">İlan Akışı (Vitrin)</h1>
         </div>
+        <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+          Vitrin + Akış promosyonu ile öne çıkarılmış, yüksek görünürlüğe sahip özel araç ilanları.
+        </p>
       </div>
+
+      {/* Listing Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-64 rounded-2xl bg-slate-900/40 border border-white/5 animate-pulse" />
+          ))}
+        </div>
+      ) : listings.length === 0 ? (
+        <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-white/10 space-y-3">
+          <span className="text-4xl block">⭐</span>
+          <h3 className="text-base font-bold text-slate-200">Şu an aktif vitrin/akış ilanı bulunmamaktadır</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Yeni vitrin ilanları eklendiğinde bu alanda otomatik olarak listelenecektir.
+          </p>
+          <a
+            href="/listings"
+            className="inline-block px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold text-slate-200 transition mt-2"
+          >
+            Tüm İlanları İncele
+          </a>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {listings.map((item) => (
+            <ListingCard
+              key={item.id}
+              listing={item}
+              isFavorite={item.isFavorited}
+              onFavoriteToggle={(id) => handleFavoriteToggle(id)}
+            />
+          ))}
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#020617] flex items-center justify-center text-xs text-slate-400">Yükleniyor...</div>}>
+      <FeedContent />
+    </Suspense>
   );
 }

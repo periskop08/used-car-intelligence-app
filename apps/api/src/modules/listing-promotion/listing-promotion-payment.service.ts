@@ -1,10 +1,11 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { CreateUrgentCheckoutDto, UrgentCheckoutResponseDto } from './dto/create-urgent-checkout.dto';
+import { CreatePromotionCheckoutDto, PromotionCheckoutResponseDto } from './dto/create-promotion-checkout.dto';
 import { ListingPromotionActivationService } from './listing-promotion-activation.service';
 import { 
   ListingPromotionSource, 
   ListingPromotionType, 
+  ListingPromotionProductSku,
   PromotionLifecycleStatus, 
   PromotionPaymentStatus 
 } from '@prisma/client';
@@ -17,7 +18,7 @@ export class ListingPromotionPaymentService {
     private activationService: ListingPromotionActivationService,
   ) {}
 
-  public async checkout(userId: string, listingId: string, dto: CreateUrgentCheckoutDto): Promise<UrgentCheckoutResponseDto> {
+  public async checkout(userId: string, listingId: string, dto: CreatePromotionCheckoutDto): Promise<PromotionCheckoutResponseDto> {
     if (!dto.termsAccepted) {
       throw new BadRequestException('TERMS_NOT_ACCEPTED: Ücretli hizmet koşullarını kabul etmeniz gerekmektedir.');
     }
@@ -25,7 +26,7 @@ export class ListingPromotionPaymentService {
     const now = new Date();
 
     // 1. Acquire Listing Lock to prevent race condition across multiple idempotency keys
-    const lockKey = crypto.createHash('sha256').update(`${userId}:${listingId}:URGENT_LISTING`).digest('hex');
+    const lockKey = crypto.createHash('sha256').update(`${userId}:${listingId}:PROMOTION_CHECKOUT`).digest('hex');
     const existingLock = await this.prisma.listingPromotionLock.findUnique({ where: { lockKey } });
     
     if (existingLock && existingLock.expiresAt > now) {
@@ -99,7 +100,8 @@ export class ListingPromotionPaymentService {
             listingId,
             quoteId: quote.id,
             source: ListingPromotionSource.PAYMENT,
-            promotionType: ListingPromotionType.URGENT_LISTING,
+            promotionType: quote.promotionType,
+            productSku: quote.productSku,
             lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
             paymentStatus: PromotionPaymentStatus.PENDING,
             priceAmount: quote.priceAmount,
@@ -130,6 +132,7 @@ export class ListingPromotionPaymentService {
       return {
         purchaseId: result.id,
         listingId: result.listingId!,
+        productSku: result.productSku,
         lifecycleStatus: result.lifecycleStatus,
         paymentStatus: result.paymentStatus,
         priceAmount: Number(result.priceAmount),
@@ -147,10 +150,11 @@ export class ListingPromotionPaymentService {
   public async verifyAndConfirmPayment(purchaseId: string, paymentReferenceId: string, provider: string = 'MOCK_PAYMENT_PROVIDER'): Promise<void> {
     const purchase = await this.prisma.listingPromotionPurchase.findUnique({
       where: { id: purchaseId },
+      include: { entitlements: true },
     });
 
     if (!purchase) {
-      throw new NotFoundException('PURCHASE_NOT_FOUND: Promosyon kaydı bulunamadı.');
+      throw new NotFoundException('PURCHASE_NOT_FOUND: Promosyon ödeme kaydı bulunamadı.');
     }
 
     if (purchase.paymentStatus === PromotionPaymentStatus.PAID) {
@@ -158,19 +162,62 @@ export class ListingPromotionPaymentService {
     }
 
     const now = new Date();
-    await this.prisma.listingPromotionPurchase.update({
-      where: { id: purchaseId },
-      data: {
-        paymentStatus: PromotionPaymentStatus.PAID,
-        paymentProvider: provider,
-        paymentReferenceId,
-        purchasedAt: now,
-      },
+
+    // Execute Payment Status Update + Entitlements Creation inside Single DB Transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.listingPromotionPurchase.update({
+        where: { id: purchaseId },
+        data: {
+          paymentStatus: PromotionPaymentStatus.PAID,
+          paymentProvider: provider,
+          paymentReferenceId,
+          purchasedAt: now,
+        },
+      });
+
+      // Create Entitlements based on Product SKU
+      const sku = purchase.productSku;
+      if (sku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE) {
+        await tx.listingPromotionEntitlement.createMany({
+          data: [
+            {
+              purchaseId: purchase.id,
+              listingId: purchase.listingId,
+              promotionType: ListingPromotionType.URGENT_LISTING,
+              lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+            },
+            {
+              purchaseId: purchase.id,
+              listingId: purchase.listingId,
+              promotionType: ListingPromotionType.SHOWCASE_FEED,
+              lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+            },
+          ],
+        });
+      } else if (sku === ListingPromotionProductSku.SHOWCASE_FEED) {
+        await tx.listingPromotionEntitlement.create({
+          data: {
+            purchaseId: purchase.id,
+            listingId: purchase.listingId,
+            promotionType: ListingPromotionType.SHOWCASE_FEED,
+            lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+          },
+        });
+      } else {
+        await tx.listingPromotionEntitlement.create({
+          data: {
+            purchaseId: purchase.id,
+            listingId: purchase.listingId,
+            promotionType: ListingPromotionType.URGENT_LISTING,
+            lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+          },
+        });
+      }
     });
 
-    // Attempt activation if listing is already published/approved
+    // Attempt activation if listing is published/approved
     if (purchase.listingId) {
-      await this.activationService.tryActivateUrgentPromotion(purchase.listingId);
+      await this.activationService.tryActivatePromotions(purchase.listingId);
     }
   }
 }

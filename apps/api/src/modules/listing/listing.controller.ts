@@ -89,6 +89,7 @@ export class ListingController {
     @Query('currency') currency?: string,
     @Query('sellerId') sellerId?: string,
     @Query('urgentOnly') urgentOnly?: string,
+    @Query('showcaseOnly') showcaseOnly?: string,
   ) {
     // Parse filters
     const filters: any = {
@@ -103,6 +104,11 @@ export class ListingController {
     if (urgentOnly === 'true') {
       filters.isUrgent = true;
       filters.urgentExpiresAt = { gt: new Date() };
+    }
+
+    if (showcaseOnly === 'true') {
+      filters.isShowcaseFeedActive = true;
+      filters.showcaseFeedExpiresAt = { gt: new Date() };
     }
 
     if (sellerId) {
@@ -360,9 +366,11 @@ export class ListingController {
     const now = new Date();
     const mappedItems = items.map((item) => {
       const isUrgent = !!(item.isUrgent && item.urgentExpiresAt && new Date(item.urgentExpiresAt) > now);
+      const isShowcaseFeedActive = !!(item.isShowcaseFeedActive && item.showcaseFeedExpiresAt && new Date(item.showcaseFeedExpiresAt) > now);
       return {
         ...item,
         isUrgent,
+        isShowcaseFeedActive,
         favoriteCount: item._count?.favorites ?? item.favoriteCount ?? 0,
         media: item.media ? this.formatMediaUrls(item.media, req) : [],
         isFavorited: favoritedIds.has(item.id),

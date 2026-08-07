@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { PromotionLifecycleStatus, PromotionPaymentStatus } from '@prisma/client';
+import { PromotionLifecycleStatus, PromotionPaymentStatus, ListingPromotionType } from '@prisma/client';
 
 @Injectable()
 export class ListingPromotionReconciliationService implements OnModuleInit {
@@ -15,7 +15,7 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
   public async expirePromotions(): Promise<number> {
     const now = new Date();
 
-    const expiredPromotions = await this.prisma.listingPromotionPurchase.findMany({
+    const expiredEntitlements = await this.prisma.listingPromotionEntitlement.findMany({
       where: {
         lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
         expiresAt: { lte: now },
@@ -23,25 +23,43 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
     });
 
     let count = 0;
-    for (const promo of expiredPromotions) {
-      await this.prisma.$transaction([
-        this.prisma.listingPromotionPurchase.update({
-          where: { id: promo.id },
+    for (const entitlement of expiredEntitlements) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.listingPromotionEntitlement.update({
+          where: { id: entitlement.id },
           data: {
             lifecycleStatus: PromotionLifecycleStatus.EXPIRED,
           },
-        }),
-        ...(promo.listingId ? [
-          this.prisma.vehicleListing.update({
-            where: { id: promo.listingId },
-            data: {
-              isUrgent: false,
-              urgentSince: null,
-              urgentExpiresAt: null,
-            },
-          }),
-        ] : []),
-      ]);
+        });
+
+        // Also check parent purchase lifecycle
+        await tx.listingPromotionPurchase.updateMany({
+          where: { id: entitlement.purchaseId },
+          data: { lifecycleStatus: PromotionLifecycleStatus.EXPIRED },
+        });
+
+        if (entitlement.listingId) {
+          if (entitlement.promotionType === ListingPromotionType.URGENT_LISTING) {
+            await tx.vehicleListing.update({
+              where: { id: entitlement.listingId },
+              data: {
+                isUrgent: false,
+                urgentSince: null,
+                urgentExpiresAt: null,
+              },
+            });
+          } else if (entitlement.promotionType === ListingPromotionType.SHOWCASE_FEED) {
+            await tx.vehicleListing.update({
+              where: { id: entitlement.listingId },
+              data: {
+                isShowcaseFeedActive: false,
+                showcaseFeedSince: null,
+                showcaseFeedExpiresAt: null,
+              },
+            });
+          }
+        }
+      });
       count++;
     }
 
@@ -84,12 +102,17 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
   public async runReconciliationJob(): Promise<{ repairedListings: number }> {
     const now = new Date();
 
-    // 1. Listings marked isUrgent=true but no active promotion -> set isUrgent=false
+    // 1. Expire past promotions
+    await this.expirePromotions().catch(() => null);
+    await this.cleanupStaleCheckouts().catch(() => null);
+
+    // 2. Repair desynced urgent listings
     const desyncedUrgentListings = await this.prisma.vehicleListing.findMany({
       where: {
         isUrgent: true,
-        promotions: {
+        promotionEntitlements: {
           none: {
+            promotionType: ListingPromotionType.URGENT_LISTING,
             lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
             expiresAt: { gt: now },
           },
@@ -111,72 +134,31 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
       this.logger.warn(`Reconciliation: Repaired desynced isUrgent=false for listing ${listing.id}`);
     }
 
-    // 2. Active promotions where listing is not marked isUrgent=true -> set isUrgent=true
-    const activePromotionsNotMarked = await this.prisma.listingPromotionPurchase.findMany({
+    // 3. Repair desynced showcase listings
+    const desyncedShowcaseListings = await this.prisma.vehicleListing.findMany({
       where: {
-        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-        expiresAt: { gt: now },
-        listing: {
-          isUrgent: false,
+        isShowcaseFeedActive: true,
+        promotionEntitlements: {
+          none: {
+            promotionType: ListingPromotionType.SHOWCASE_FEED,
+            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+            expiresAt: { gt: now },
+          },
         },
       },
-      include: { listing: true },
     });
 
-    for (const promo of activePromotionsNotMarked) {
-      if (promo.listing && (promo.listing.status === ('PUBLISHED' as any) || promo.listing.status === ('ACTIVE' as any))) {
-        await this.prisma.vehicleListing.update({
-          where: { id: promo.listingId! },
-          data: {
-            isUrgent: true,
-            urgentSince: promo.activatedAt || now,
-            urgentExpiresAt: promo.expiresAt,
-          },
-        });
-        repairedListings++;
-        this.logger.warn(`Reconciliation: Repaired desynced isUrgent=true for listing ${promo.listingId}`);
-      }
-    }
-
-    // 3. Paid promotions waiting activation for published listings -> activate now
-    const paidPendingForActiveListings = await this.prisma.listingPromotionPurchase.findMany({
-      where: {
-        lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
-        paymentStatus: PromotionPaymentStatus.PAID,
-      },
-      include: { listing: { include: { seller: true } } },
-    });
-
-    for (const promo of paidPendingForActiveListings) {
-      const isPublished = promo.listing && (promo.listing.status === ('ACTIVE' as any) || promo.listing.status === ('PUBLISHED' as any));
-      if (promo.listingId && isPublished) {
-        const tier = promo.listing?.seller?.subscriptionTier;
-        const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
-        const durationDays = isProTier ? 45 : 30;
-
-        const activeUntil = promo.listing?.expiresAt || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
-        await this.prisma.$transaction([
-          this.prisma.listingPromotionPurchase.update({
-            where: { id: promo.id },
-            data: {
-              lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-              activatedAt: now,
-              expiresAt: activeUntil,
-            },
-          }),
-          this.prisma.vehicleListing.update({
-            where: { id: promo.listingId },
-            data: {
-              isUrgent: true,
-              urgentSince: now,
-              urgentExpiresAt: activeUntil,
-              expiresAt: promo.listing?.expiresAt ? undefined : activeUntil,
-            },
-          }),
-        ]);
-        repairedListings++;
-        this.logger.log(`Reconciliation: Activated pending urgent promotion for listing ${promo.listingId}`);
-      }
+    for (const listing of desyncedShowcaseListings) {
+      await this.prisma.vehicleListing.update({
+        where: { id: listing.id },
+        data: {
+          isShowcaseFeedActive: false,
+          showcaseFeedSince: null,
+          showcaseFeedExpiresAt: null,
+        },
+      });
+      repairedListings++;
+      this.logger.warn(`Reconciliation: Repaired desynced isShowcaseFeedActive=false for listing ${listing.id}`);
     }
 
     return { repairedListings };

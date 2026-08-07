@@ -12,9 +12,8 @@ const PAINTED_COMPONENTS = [
 ];
 
 import QuotaBadge from "@/components/QuotaBadge";
-import UrgentListingPurchaseCard from "@/components/listings/UrgentListingPurchaseCard";
+import ListingPromotionCards, { PromotionSku } from "@/components/listings/ListingPromotionCards";
 import UrgentListingPaymentRecovery from "@/components/listings/UrgentListingPaymentRecovery";
-import { requestUrgentQuote, createUrgentCheckout } from "@/lib/listing-promotion-api";
 import { formatImageUrl } from "@/utils/media";
 
 export default function CreateListing() {
@@ -24,10 +23,10 @@ export default function CreateListing() {
   const [step, setStep] = useState(1);
   const [token, setToken] = useState("");
 
-  // Urgent Listing Promotion State
-  const [urgentSelected, setUrgentSelected] = useState(false);
-  const [paidConsentAccepted, setPaidConsentAccepted] = useState(false);
-  const [activeQuote, setActiveQuote] = useState<any>(null);
+  // Promotion State
+  const [selectedPromotionSku, setSelectedPromotionSku] = useState<PromotionSku>(null);
+  const [promotionTermsAccepted, setPromotionTermsAccepted] = useState(false);
+  const [promotionPricingDetails, setPromotionPricingDetails] = useState<any>(null);
   const [paymentRecoveryOpen, setPaymentRecoveryOpen] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
@@ -307,8 +306,8 @@ export default function CreateListing() {
       return;
     }
 
-    if (!asDraft && urgentSelected && !paidConsentAccepted) {
-      setErrorMsg("Acil İlan hizmetini satın almak için ek hizmet onay kutusunu kabul etmeniz gerekmektedir.");
+    if (!asDraft && selectedPromotionSku && !promotionTermsAccepted) {
+      setErrorMsg("Seçtiğiniz promosyon hizmetini satın almak için ek hizmet onay kutusunu kabul etmeniz gerekmektedir.");
       setSaving(false);
       return;
     }
@@ -363,24 +362,51 @@ export default function CreateListing() {
           if (asDraft) {
             router.push("/dashboard/listings");
           } else {
-            // If Urgent Listing is selected, run quote & checkout first
-            if (urgentSelected) {
+            // If Promotion SKU is selected, run quote & checkout first
+            if (selectedPromotionSku) {
               try {
-                const quote = activeQuote || (await requestUrgentQuote(listingId));
-                const idempotencyKey = `chk_${listingId}_${Date.now()}`;
-                const checkoutRes = await createUrgentCheckout(listingId, quote.quoteId, quote.termsVersion, idempotencyKey);
-                
-                // Confirm payment (simulated callback)
-                await fetch(`${API_URL}/listing-promotions/urgent/webhooks/MOCK_PAYMENT`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                const quoteRes = await fetch(`${API_URL}/listing-promotions/quotes`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
                   body: JSON.stringify({
-                    eventId: `evt_${Date.now()}`,
-                    eventType: 'payment.success',
-                    purchaseId: checkoutRes.purchaseId,
-                    paymentReferenceId: `PAY_REF_${checkoutRes.purchaseId}`,
+                    listingId,
+                    productSku: selectedPromotionSku,
                   }),
                 });
+                const quoteData = await quoteRes.json();
+                if (!quoteRes.ok) throw new Error(quoteData.message || "Promosyon teklifi alınamadı.");
+
+                const idempotencyKey = `chk_${listingId}_${selectedPromotionSku}_${Date.now()}`;
+                const checkoutRes = await fetch(`${API_URL}/listing-promotions/checkout/${listingId}`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    quoteId: quoteData.quoteId,
+                    idempotencyKey,
+                    termsAccepted: true,
+                    termsVersion: quoteData.termsVersion || "v1",
+                    entryPoint: "LISTING_CREATE_STEP_5",
+                  }),
+                });
+                const checkoutData = await checkoutRes.json();
+                if (!checkoutRes.ok) throw new Error(checkoutData.message || "Ödeme checkout işlemi başlatılamadı.");
+
+                const mockRes = await fetch(`${API_URL}/listing-promotions/webhooks/mock`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    eventType: "payment.success",
+                    purchaseId: checkoutData.purchaseId,
+                    paymentReferenceId: `PAY_${checkoutData.purchaseId}`,
+                  }),
+                });
+                if (!mockRes.ok) throw new Error("Ödeme doğrulaması tamamlanamadı.");
               } catch (checkoutErr: any) {
                 setPaymentError(checkoutErr.message || "Ödeme checkout işlemi başarısız.");
                 setPaymentRecoveryOpen(true);
@@ -1151,13 +1177,14 @@ export default function CreateListing() {
             </div>
           ) : null}
 
-          {/* Paid Urgent Listing Card */}
-          <UrgentListingPurchaseCard
-            selected={urgentSelected}
-            onToggle={setUrgentSelected}
-            paidConsentAccepted={paidConsentAccepted}
-            onPaidConsentChange={setPaidConsentAccepted}
-            onQuoteReceived={setActiveQuote}
+          {/* 3 Option Promotion Cards */}
+          <ListingPromotionCards
+            selectedSku={selectedPromotionSku}
+            onSelectSku={setSelectedPromotionSku}
+            termsAccepted={promotionTermsAccepted}
+            onTermsAcceptedChange={setPromotionTermsAccepted}
+            pricingDetails={promotionPricingDetails}
+            isCreateFlow={true}
           />
 
           {/* Legal check */}
@@ -1194,12 +1221,12 @@ export default function CreateListing() {
               onClick={() => handleSaveAndPublish(false)}
               disabled={saving || (quota ? quota.remaining === 0 : false)}
               className={`w-full sm:w-1/3 text-white font-bold py-3.5 rounded-2xl transition text-sm shadow-lg ${
-                urgentSelected
-                  ? "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-600/20"
+                selectedPromotionSku
+                  ? "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 shadow-orange-500/20"
                   : "bg-orange-600 hover:bg-orange-500 shadow-orange-600/15"
               } disabled:bg-slate-950 disabled:text-slate-600 disabled:cursor-not-allowed`}
             >
-              {saving ? "Yayınlanıyor..." : urgentSelected ? "Öde ve İncelemeye Gönder" : "İncelemeye Gönder"}
+              {saving ? "Yayınlanıyor..." : selectedPromotionSku ? "Öde ve İncelemeye Gönder" : "İncelemeye Gönder"}
             </button>
           </div>
         </div>
@@ -1215,7 +1242,7 @@ export default function CreateListing() {
         }}
         onContinueAsNormal={() => {
           setPaymentRecoveryOpen(false);
-          setUrgentSelected(false);
+          setSelectedPromotionSku(null);
           handleSaveAndPublish(false);
         }}
       />

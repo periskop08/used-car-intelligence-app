@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { PromotionLifecycleStatus, PromotionPaymentStatus, PromotionRefundMethod } from '@prisma/client';
+import { PromotionLifecycleStatus, PromotionPaymentStatus, PromotionRefundMethod, ListingPromotionType } from '@prisma/client';
 
 @Injectable()
 export class ListingPromotionRefundService {
@@ -17,6 +17,7 @@ export class ListingPromotionRefundService {
         paymentStatus: PromotionPaymentStatus.PAID,
         lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
       },
+      include: { entitlements: true },
     });
 
     if (!promotion) {
@@ -34,26 +35,33 @@ export class ListingPromotionRefundService {
 
     const now = new Date();
 
-    const updated = await this.prisma.listingPromotionPurchase.update({
-      where: { id: promotion.id },
-      data: {
-        paymentStatus: PromotionPaymentStatus.REFUND_PENDING,
-        refundIdempotencyKey: idempotencyKey,
-        refundMethod,
-        refundReferenceId: `REFUND_REF_${promotion.id}`,
-        refundedAmount: promotion.priceAmount,
-        refundedAmountMinor: promotion.amountMinor,
-        refundReason: reason,
-      },
-    });
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Update purchase payment status
+      const updated = await tx.listingPromotionPurchase.update({
+        where: { id: promotion.id },
+        data: {
+          paymentStatus: PromotionPaymentStatus.REFUNDED,
+          lifecycleStatus: PromotionLifecycleStatus.CANCELLED,
+          refundIdempotencyKey: idempotencyKey,
+          refundMethod,
+          refundReferenceId: `REFUND_REF_${promotion.id}`,
+          refundedAmount: promotion.priceAmount,
+          refundedAmountMinor: promotion.amountMinor,
+          refundReason: reason,
+          refundedAt: now,
+        },
+      });
 
-    // Simulate instant refund completion
-    return await this.prisma.listingPromotionPurchase.update({
-      where: { id: updated.id },
-      data: {
-        paymentStatus: PromotionPaymentStatus.REFUNDED,
-        refundedAt: now,
-      },
+      // 2. Terminate all entitlements linked to this Purchase/Order
+      await tx.listingPromotionEntitlement.updateMany({
+        where: { purchaseId: promotion.id },
+        data: {
+          lifecycleStatus: PromotionLifecycleStatus.CANCELLED,
+          terminatedAt: now,
+        },
+      });
+
+      return updated;
     });
   }
 
@@ -63,32 +71,45 @@ export class ListingPromotionRefundService {
         listingId,
         lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
       },
+      include: { entitlements: true },
     });
 
     if (!promotion) {
-      throw new NotFoundException('ACTIVE_PROMOTION_NOT_FOUND: Yayında aktif bir acil ilan bulunamadı.');
+      throw new NotFoundException('ACTIVE_PROMOTION_NOT_FOUND: Yayında aktif bir promosyon bulunamadı.');
     }
 
     const now = new Date();
 
-    await this.prisma.$transaction([
-      this.prisma.listingPromotionPurchase.update({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.listingPromotionPurchase.update({
         where: { id: promotion.id },
         data: {
           lifecycleStatus: PromotionLifecycleStatus.TERMINATED,
           terminatedAt: now,
         },
-      }),
-      this.prisma.vehicleListing.update({
+      });
+
+      await tx.listingPromotionEntitlement.updateMany({
+        where: { purchaseId: promotion.id },
+        data: {
+          lifecycleStatus: PromotionLifecycleStatus.TERMINATED,
+          terminatedAt: now,
+        },
+      });
+
+      await tx.vehicleListing.update({
         where: { id: listingId },
         data: {
           isUrgent: false,
           urgentSince: null,
           urgentExpiresAt: null,
+          isShowcaseFeedActive: false,
+          showcaseFeedSince: null,
+          showcaseFeedExpiresAt: null,
         },
-      }),
-    ]);
+      });
+    });
 
-    return { success: true, message: 'Acil etiket kaldırıldı. Otomatik iade yapılmamıştır.' };
+    return { success: true, message: 'Promosyon görünürlükleri kaldırıldı.' };
   }
 }

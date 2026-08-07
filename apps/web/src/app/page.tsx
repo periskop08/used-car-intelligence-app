@@ -61,14 +61,25 @@ export default function Home() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Featured Listings on Load
+  // Fetch Vitrin (Showcase) Listings on Load
   useEffect(() => {
     setLoadingListings(true);
-    fetch(`${API_URL}/listings?limit=16&sort=featured`)
+    fetch(`${API_URL}/listings?showcaseOnly=true&limit=16`)
       .then((res) => res.json())
       .then((data) => {
-        setFeaturedListings(data.items && Array.isArray(data.items) ? data.items : []);
-        setLoadingListings(false);
+        const showcaseItems = data.items && Array.isArray(data.items) ? data.items : [];
+        if (showcaseItems.length > 0) {
+          setFeaturedListings(showcaseItems);
+          setLoadingListings(false);
+        } else {
+          fetch(`${API_URL}/listings?limit=16&sort=featured`)
+            .then((res) => res.json())
+            .then((d) => {
+              setFeaturedListings(d.items && Array.isArray(d.items) ? d.items : []);
+              setLoadingListings(false);
+            })
+            .catch(() => setLoadingListings(false));
+        }
       })
       .catch(() => setLoadingListings(false));
   }, []);

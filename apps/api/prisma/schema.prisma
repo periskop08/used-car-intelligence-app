@@ -1027,11 +1027,17 @@ model VehicleListing {
   packageAtPublish   ListingPackageType?
   listingDurationDays Int?              // 30 for FREE/STANDARD, 45 for PREMIUM
 
-  // Urgent Listing Promotion derived fields
-  isUrgent           Boolean            @default(false)
-  urgentSince        DateTime?
-  urgentExpiresAt    DateTime?
-  promotions         ListingPromotionPurchase[]
+  // Promotion derived fields
+  isUrgent               Boolean            @default(false)
+  urgentSince            DateTime?
+  urgentExpiresAt        DateTime?
+
+  isShowcaseFeedActive   Boolean            @default(false)
+  showcaseFeedSince      DateTime?
+  showcaseFeedExpiresAt  DateTime?
+
+  promotions             ListingPromotionPurchase[]
+  promotionEntitlements  ListingPromotionEntitlement[]
   
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -2577,6 +2583,13 @@ model AiQuotaUsage {
 
 enum ListingPromotionType {
   URGENT_LISTING
+  SHOWCASE_FEED
+}
+
+enum ListingPromotionProductSku {
+  URGENT_LISTING
+  SHOWCASE_FEED
+  URGENT_SHOWCASE_BUNDLE
 }
 
 enum ListingPromotionSource {
@@ -2620,23 +2633,24 @@ enum PaymentWebhookStatus {
 }
 
 model ListingPromotionQuote {
-  id             String                @id @default(cuid())
+  id             String                     @id @default(cuid())
   userId         String
   listingId      String
-  promotionType  ListingPromotionType  @default(URGENT_LISTING)
-  priceAmount    Decimal               @db.Decimal(12, 2)
+  promotionType  ListingPromotionType       @default(URGENT_LISTING)
+  productSku     ListingPromotionProductSku @default(URGENT_LISTING)
+  priceAmount    Decimal                    @db.Decimal(12, 2)
   amountMinor    Int
-  currency       String                @default("TRY")
+  currency       String                     @default("TRY")
   pricingVersion String
 
-  taxIncluded    Boolean               @default(true)
-  taxRate        Decimal?              @db.Decimal(5, 2)
+  taxIncluded    Boolean                    @default(true)
+  taxRate        Decimal?                   @db.Decimal(5, 2)
   termsVersion   String
 
   expiresAt      DateTime
   consumedAt     DateTime?
 
-  createdAt      DateTime              @default(now())
+  createdAt      DateTime                   @default(now())
 
   purchase       ListingPromotionPurchase?
 
@@ -2645,26 +2659,30 @@ model ListingPromotionQuote {
 }
 
 model ListingPromotionPurchase {
-  id                      String                   @id @default(cuid())
+  id                      String                     @id @default(cuid())
   userId                  String?
   listingId               String?
-  source                  ListingPromotionSource   @default(PAYMENT)
-  promotionType           ListingPromotionType     @default(URGENT_LISTING)
+  source                  ListingPromotionSource     @default(PAYMENT)
+  promotionType           ListingPromotionType       @default(URGENT_LISTING)
+  productSku              ListingPromotionProductSku @default(URGENT_LISTING)
   
-  lifecycleStatus         PromotionLifecycleStatus @default(PENDING_ACTIVATION)
-  paymentStatus           PromotionPaymentStatus   @default(PENDING)
+  lifecycleStatus         PromotionLifecycleStatus   @default(PENDING_ACTIVATION)
+  paymentStatus           PromotionPaymentStatus     @default(PENDING)
 
   // 1-to-1 Quote Relation
-  quoteId                 String?                  @unique
-  quote                   ListingPromotionQuote?   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  quoteId                 String?                    @unique
+  quote                   ListingPromotionQuote?     @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  // Entitlements
+  entitlements            ListingPromotionEntitlement[]
 
   // Pricing & Tax Snapshots
-  priceAmount             Decimal?                 @db.Decimal(12, 2)
+  priceAmount             Decimal?                   @db.Decimal(12, 2)
   amountMinor             Int?
-  currency                String?                  @default("TRY")
+  currency                String?                    @default("TRY")
   pricingVersion          String?
-  taxIncluded             Boolean                  @default(true)
-  taxRate                 Decimal?                 @db.Decimal(5, 2)
+  taxIncluded             Boolean                    @default(true)
+  taxRate                 Decimal?                   @db.Decimal(5, 2)
 
   // Financial & User Snapshots
   listingPublicIdSnapshot String?
@@ -2675,7 +2693,7 @@ model ListingPromotionPurchase {
   // Payment Metadata
   paymentProvider         String?
   paymentReferenceId      String?
-  paymentIdempotencyKey   String?                  @unique
+  paymentIdempotencyKey   String?                    @unique
   checkoutExpiresAt       DateTime?
 
   // User Consent Snapshots
@@ -2692,9 +2710,9 @@ model ListingPromotionPurchase {
 
   // Refund Tracking & Idempotency
   refundMethod            PromotionRefundMethod?
-  refundIdempotencyKey    String?                  @unique
+  refundIdempotencyKey    String?                    @unique
   refundReferenceId       String?
-  refundedAmount          Decimal?                 @db.Decimal(12, 2)
+  refundedAmount          Decimal?                   @db.Decimal(12, 2)
   refundedAmountMinor     Int?
   rejectionReason         String?
   refundReason            String?
@@ -2705,16 +2723,37 @@ model ListingPromotionPurchase {
   grantedByAdminId        String?
   adminGrantReason        String?
 
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
 
-  user                    User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  listing                 VehicleListing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  user                    User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  listing                 VehicleListing?            @relation(fields: [listingId], references: [id], onDelete: SetNull)
 
   @@index([listingId, promotionType, lifecycleStatus])
   @@index([userId, promotionType, lifecycleStatus])
   @@index([lifecycleStatus, expiresAt])
   @@unique([paymentProvider, paymentReferenceId])
+}
+
+model ListingPromotionEntitlement {
+  id              String                   @id @default(cuid())
+  purchaseId      String
+  listingId       String?
+  promotionType   ListingPromotionType
+  lifecycleStatus PromotionLifecycleStatus @default(PENDING_ACTIVATION)
+
+  activatedAt     DateTime?
+  expiresAt       DateTime?
+  terminatedAt    DateTime?
+
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  purchase        ListingPromotionPurchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  listing         VehicleListing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseId])
+  @@index([listingId, promotionType, lifecycleStatus])
 }
 
 model ListingPromotionLock {

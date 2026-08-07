@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { 
   ListingPromotionSource, 
+  ListingPromotionType,
   PromotionLifecycleStatus, 
   PromotionPaymentStatus 
 } from '@prisma/client';
@@ -10,36 +11,39 @@ import {
 export class ListingPromotionActivationService {
   constructor(private prisma: PrismaService) {}
 
-  public isPromotionEligibleForActivation(promotion: any): boolean {
-    if (promotion.lifecycleStatus !== PromotionLifecycleStatus.PENDING_ACTIVATION) {
+  public isEntitlementEligibleForActivation(entitlement: any): boolean {
+    if (entitlement.lifecycleStatus !== PromotionLifecycleStatus.PENDING_ACTIVATION) {
       return false;
     }
 
-    if (promotion.source === ListingPromotionSource.PAYMENT) {
-      return promotion.paymentStatus === PromotionPaymentStatus.PAID;
+    const purchase = entitlement.purchase;
+    if (!purchase) return false;
+
+    if (purchase.source === ListingPromotionSource.PAYMENT) {
+      return purchase.paymentStatus === PromotionPaymentStatus.PAID;
     }
 
-    if (promotion.source === ListingPromotionSource.ADMIN_GRANT) {
-      return !!promotion.grantedByAdminId;
+    if (purchase.source === ListingPromotionSource.ADMIN_GRANT) {
+      return !!purchase.grantedByAdminId;
     }
 
-    if (promotion.source === ListingPromotionSource.CAMPAIGN) {
-      return !!promotion.campaignId;
+    if (purchase.source === ListingPromotionSource.CAMPAIGN) {
+      return !!purchase.campaignId;
     }
 
     return false;
   }
 
-  public async tryActivateUrgentPromotion(listingId: string): Promise<boolean> {
+  public async tryActivatePromotions(listingId: string): Promise<boolean> {
     const listing = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
       include: {
         seller: true,
-        promotions: {
+        promotionEntitlements: {
           where: {
             lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
           },
-          orderBy: { createdAt: 'desc' },
+          include: { purchase: true },
         },
       },
     });
@@ -50,48 +54,91 @@ export class ListingPromotionActivationService {
 
     const isListingPublished = listing.status === ('PUBLISHED' as any) || listing.status === ('ACTIVE' as any);
     if (!isListingPublished) {
-      return false; // Waiting for listing approval
+      return false; // Waiting for listing approval/publication
     }
 
-    const pendingPromotion = listing.promotions?.[0];
-    if (!pendingPromotion) {
-      return false; // No pending promotion
+    const pendingEntitlements = listing.promotionEntitlements || [];
+    if (pendingEntitlements.length === 0) {
+      return false; // No pending entitlements
     }
 
-    if (!this.isPromotionEligibleForActivation(pendingPromotion)) {
+    const eligibleEntitlements = pendingEntitlements.filter((e) => this.isEntitlementEligibleForActivation(e));
+    if (eligibleEntitlements.length === 0) {
       return false; // Payment not confirmed yet
     }
 
     const now = new Date();
-    
-    // Tier-based duration calculation (45 days for PROFESYONEL/PREMIUM/PRO, 30 days for standard)
-    const tier = listing.seller?.subscriptionTier;
-    const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
-    const durationDays = isProTier ? 45 : 30;
 
-    const activeUntil = listing.expiresAt || (listing as any).activeUntil || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    // Determine target expiration date (Source of Truth: listing.expiresAt)
+    let activeUntil = listing.expiresAt;
+    if (!activeUntil) {
+      const tier = listing.seller?.subscriptionTier;
+      const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
+      const durationDays = isProTier ? 45 : 30;
+      activeUntil = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    }
 
-    // Atomic activation in single transaction
-    await this.prisma.$transaction([
-      this.prisma.listingPromotionPurchase.update({
-        where: { id: pendingPromotion.id },
-        data: {
-          lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-          activatedAt: now,
-          expiresAt: activeUntil,
-        },
-      }),
-      this.prisma.vehicleListing.update({
-        where: { id: listingId },
-        data: {
-          expiresAt: listing.expiresAt ? undefined : activeUntil,
-          isUrgent: true,
-          urgentSince: now,
-          urgentExpiresAt: activeUntil,
-        },
-      }),
-    ]);
+    let isUrgentActivated = false;
+    let isShowcaseActivated = false;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const entitlement of eligibleEntitlements) {
+        await tx.listingPromotionEntitlement.update({
+          where: { id: entitlement.id },
+          data: {
+            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+            activatedAt: now,
+            expiresAt: activeUntil,
+          },
+        });
+
+        // Also update parent Purchase status if all entitlements activated
+        await tx.listingPromotionPurchase.update({
+          where: { id: entitlement.purchaseId },
+          data: {
+            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+            activatedAt: now,
+            expiresAt: activeUntil,
+          },
+        });
+
+        if (entitlement.promotionType === ListingPromotionType.URGENT_LISTING) {
+          isUrgentActivated = true;
+        } else if (entitlement.promotionType === ListingPromotionType.SHOWCASE_FEED) {
+          isShowcaseActivated = true;
+        }
+      }
+
+      const listingUpdateData: any = {};
+      if (!listing.expiresAt) {
+        listingUpdateData.expiresAt = activeUntil;
+      }
+
+      if (isUrgentActivated) {
+        listingUpdateData.isUrgent = true;
+        listingUpdateData.urgentSince = now;
+        listingUpdateData.urgentExpiresAt = activeUntil;
+      }
+
+      if (isShowcaseActivated) {
+        listingUpdateData.isShowcaseFeedActive = true;
+        listingUpdateData.showcaseFeedSince = now;
+        listingUpdateData.showcaseFeedExpiresAt = activeUntil;
+      }
+
+      if (Object.keys(listingUpdateData).length > 0) {
+        await tx.vehicleListing.update({
+          where: { id: listingId },
+          data: listingUpdateData,
+        });
+      }
+    });
 
     return true;
+  }
+
+  // Alias for backward compatibility
+  public async tryActivateUrgentPromotion(listingId: string): Promise<boolean> {
+    return this.tryActivatePromotions(listingId);
   }
 }
