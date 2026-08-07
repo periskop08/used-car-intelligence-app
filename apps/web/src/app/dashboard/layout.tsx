@@ -21,6 +21,7 @@ const MENU_GROUPS: MenuGroup[] = [
     title: "İlan Yönetimi",
     items: [
       { name: "İlanlarım", href: "/dashboard/listings" },
+      { name: "Geçmiş İlanlarım", href: "/dashboard/listings?tab=past" },
       { name: "İlan Ekle", href: "/listings/create" },
     ],
   },
