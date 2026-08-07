@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import UrgentListingBadge from "./UrgentListingBadge";
 import { formatImageUrl } from "../../utils/media";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface ListingCardProps {
   listing: any;
@@ -11,14 +13,60 @@ interface ListingCardProps {
 }
 
 export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: ListingCardProps) {
+  const [internalIsFav, setInternalIsFav] = useState<boolean>(
+    isFavorite !== undefined ? isFavorite : !!listing.isFavorited
+  );
+  const [internalFavCount, setInternalFavCount] = useState<number>(
+    listing.favoriteCount !== undefined ? listing.favoriteCount : 0
+  );
+
+  const favState = isFavorite !== undefined ? isFavorite : internalIsFav;
+  const favCount = listing.favoriteCount !== undefined ? listing.favoriteCount : internalFavCount;
+
   const coverImage = listing.media && listing.media.length > 0 
     ? formatImageUrl(listing.media[0].url) 
     : "/placeholder-car.jpg";
 
   const formattedPrice = Number(listing.priceAmount || 0).toLocaleString("tr-TR");
 
+  const handleHeartClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (onFavoriteToggle) {
+      onFavoriteToggle(listing.id);
+      return;
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) {
+      window.location.href = `/login?redirect=/listings`;
+      return;
+    }
+
+    fetch(`${API_URL}/listings/${listing.id}/favorite`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setInternalIsFav(data.isFavorited);
+        if (data.favoriteCount !== undefined) {
+          setInternalFavCount(data.favoriteCount);
+        } else {
+          setInternalFavCount((prev) => (data.isFavorited ? prev + 1 : Math.max(0, prev - 1)));
+        }
+      })
+      .catch((err) => console.error("Error toggling favorite on card:", err));
+  };
+
   return (
-    <div className="group bg-[#0b0f19] border border-white/10 rounded-2xl overflow-hidden hover:border-orange-500/40 transition duration-300 shadow-xl flex flex-col justify-between relative">
+    <a 
+      href={`/listings/${listing.id}`}
+      className="group bg-[#0b0f19] border border-white/10 rounded-2xl overflow-hidden hover:border-orange-500/40 transition duration-300 shadow-xl flex flex-col justify-between relative cursor-pointer"
+    >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950">
         <img
           src={coverImage}
@@ -34,27 +82,21 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         )}
 
         {/* Top Right: Favorite Button with Count */}
-        {onFavoriteToggle && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onFavoriteToggle(listing.id);
-            }}
-            className={`absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md transition text-xs font-bold shadow-lg ${
-              isFavorite 
-                ? "bg-red-500/90 text-white border border-red-400/50" 
-                : "bg-slate-950/80 text-slate-300 hover:text-white border border-white/15"
-            }`}
-            title={isFavorite ? "Favorilerden Kaldır" : "Favoriye Ekle"}
-          >
-            <span>{isFavorite ? "❤️" : "🤍"}</span>
-            {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
-              <span className="text-[11px] font-extrabold">{listing.favoriteCount}</span>
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleHeartClick}
+          className={`absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md transition text-xs font-bold shadow-lg ${
+            favState 
+              ? "bg-red-500/90 text-white border border-red-400/50" 
+              : "bg-slate-950/80 text-slate-300 hover:text-white border border-white/15"
+          }`}
+          title={favState ? "Favorilerden Kaldır" : "Favoriye Ekle"}
+        >
+          <span>{favState ? "❤️" : "🤍"}</span>
+          {favCount > 0 && (
+            <span className="text-[11px] font-extrabold">{favCount}</span>
+          )}
+        </button>
       </div>
 
       <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
@@ -63,21 +105,18 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
             <span>{listing.modelYear} • {listing.kilometers?.toLocaleString("tr-TR")} KM</span>
             <span>{listing.city}</span>
           </div>
-          <a href={`/listings/${listing.id}`} className="font-bold text-slate-100 hover:text-orange-400 transition text-sm line-clamp-1">
+          <h3 className="font-bold text-slate-100 group-hover:text-orange-400 transition text-sm line-clamp-1">
             {listing.title}
-          </a>
+          </h3>
         </div>
 
         <div className="pt-2 border-t border-white/5 flex items-center justify-between">
           <span className="text-base font-black text-white">{formattedPrice} {listing.currency || "TRY"}</span>
-          <a
-            href={`/listings/${listing.id}`}
-            className="px-3 py-1.5 rounded-xl bg-orange-600/20 hover:bg-orange-600 text-orange-400 hover:text-white border border-orange-500/30 text-xs font-bold transition"
-          >
+          <span className="px-3 py-1.5 rounded-xl bg-orange-600/20 group-hover:bg-orange-600 text-orange-400 group-hover:text-white border border-orange-500/30 text-xs font-bold transition">
             İncele
-          </a>
+          </span>
         </div>
       </div>
-    </div>
+    </a>
   );
 }

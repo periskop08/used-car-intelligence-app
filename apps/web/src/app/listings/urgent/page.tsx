@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import ListingCard from "../../../components/listings/ListingCard";
 import UrgentListingBadge from "../../../components/listings/UrgentListingBadge";
 import { AlertCircle } from "lucide-react";
@@ -8,14 +9,26 @@ import { AlertCircle } from "lucide-react";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 function UrgentListingsContent() {
+  const router = useRouter();
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [token, setToken] = useState("");
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (savedToken) setToken(savedToken);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_URL}/listings?urgentOnly=true&page=${page}&limit=12&sort=newest`)
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    fetch(`${API_URL}/listings?urgentOnly=true&page=${page}&limit=12&sort=newest`, { headers })
       .then((res) => res.json())
       .then((data) => {
         if (data && Array.isArray(data.items)) {
@@ -35,7 +48,41 @@ function UrgentListingsContent() {
         setListings([]);
         setLoading(false);
       });
-  }, [page]);
+  }, [page, token]);
+
+  const handleFavoriteToggle = (listingId: string) => {
+    if (!token) {
+      router.push(`/login?redirect=/listings/urgent`);
+      return;
+    }
+
+    fetch(`${API_URL}/listings/${listingId}/favorite`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setListings((prev) =>
+          prev.map((item) =>
+            item.id === listingId
+              ? {
+                  ...item,
+                  isFavorited: data.isFavorited,
+                  favoriteCount:
+                    data.favoriteCount !== undefined
+                      ? data.favoriteCount
+                      : data.isFavorited
+                      ? (item.favoriteCount || 0) + 1
+                      : Math.max(0, (item.favoriteCount || 0) - 1),
+                }
+              : item
+          )
+        );
+      })
+      .catch((err) => console.error("Error toggling favorite on urgent page:", err));
+  };
 
   return (
     <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-8 w-full">
@@ -80,7 +127,12 @@ function UrgentListingsContent() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {listings.map((item) => (
-            <ListingCard key={item.id} listing={item} />
+            <ListingCard
+              key={item.id}
+              listing={item}
+              isFavorite={item.isFavorited}
+              onFavoriteToggle={(id) => handleFavoriteToggle(id)}
+            />
           ))}
         </div>
       )}
