@@ -294,8 +294,14 @@ function SellerDashboardContent() {
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-200 tracking-tight">Satıcı Paneli</h1>
-          <p className="text-sm text-slate-400 mt-1">İlanlarınızı, yayın durumlarını ve aktif kota haklarınızı yönetin.</p>
+          <h1 className="text-3xl font-black text-slate-200 tracking-tight">
+            {activeTab === "past" ? "📜 Geçmiş İlanlarım" : "Satıcı Paneli"}
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            {activeTab === "past"
+              ? "Satıldı veya süresi doldu olarak işaretlenmiş geçmiş araç ilanlarınız."
+              : "İlanlarınızı, yayın durumlarını ve aktif kota haklarınızı yönetin."}
+          </p>
         </div>
         <button
           onClick={() => router.push("/listings/create")}
@@ -332,7 +338,10 @@ function SellerDashboardContent() {
         <div className="flex items-center gap-3 border-b border-white/10 pb-3 flex-wrap">
           <button
             type="button"
-            onClick={() => setActiveTab("active")}
+            onClick={() => {
+              setActiveTab("active");
+              router.push("/dashboard/listings");
+            }}
             className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
               activeTab === "active"
                 ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
@@ -349,7 +358,10 @@ function SellerDashboardContent() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("past")}
+            onClick={() => {
+              setActiveTab("past");
+              router.push("/dashboard/listings?tab=past");
+            }}
             className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
               activeTab === "past"
                 ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"

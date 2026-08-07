@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React, { useEffect, useState, Suspense } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { formatImageUrl } from "../../utils/media";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -68,9 +68,10 @@ const MENU_GROUPS: MenuGroup[] = [
   },
 ];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -82,14 +83,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return;
     }
 
-    // Load user profile & verify status
     fetch(`${API_URL}/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
-        if (!res.ok) {
-          throw new Error("Oturum doğrulanamadı.");
-        }
+        if (!res.ok) throw new Error("Oturum doğrulanamadı.");
         return res.json();
       })
       .then((data) => {
@@ -100,42 +98,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return;
         }
         setProfile(data);
-        // Sync local storage user
-        localStorage.setItem("user", JSON.stringify({
-          email: data.email,
-          subscriptionTier: data.subscriptionTier,
-          role: data.role,
-          username: data.username,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          profilePhotoUrl: data.profilePhotoUrl,
-          displayNamePreference: data.displayNamePreference,
-        }));
         setLoading(false);
       })
-      .catch((err) => {
-        console.error("Profile load error:", err);
-        // Fallback to offline localstorage if API is down
-        const localUser = localStorage.getItem("user");
-        if (localUser) {
-          setProfile(JSON.parse(localUser));
-          setLoading(false);
-        } else {
-          localStorage.removeItem("accessToken");
-          router.push("/login");
-        }
+      .catch(() => {
+        localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
+        router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
       });
-  }, [pathname]);
+  }, [pathname, router]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("accessToken");
-    router.push("/");
+    router.push("/login");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
           <span className="text-sm font-semibold text-slate-400">Yükleniyor...</span>
@@ -143,6 +123,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
+
+  const currentTab = searchParams.get("tab");
+  const fullPath = pathname + (currentTab ? `?tab=${currentTab}` : "");
 
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -176,7 +159,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </span>
             <div className="space-y-0.5">
               {group.items.map((item, iIdx) => {
-                const isActive = pathname === item.href;
+                const isActive = item.href.includes("?")
+                  ? fullPath === item.href
+                  : pathname === item.href && !currentTab;
+
                 return (
                   <a
                     key={iIdx}
@@ -184,7 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center px-3 py-2 rounded-xl text-xs font-bold transition ${
                       isActive
-                        ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                        ? "bg-orange-500/10 text-orange-400 border border-orange-500/20 font-black"
                         : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                     }`}
                   >
@@ -252,5 +238,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#020617] flex items-center justify-center text-xs text-slate-400 font-bold">Yükleniyor...</div>}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
   );
 }
