@@ -125,6 +125,85 @@ export class VehicleReportService implements OnModuleInit {
 
         `CREATE UNIQUE INDEX IF NOT EXISTS "VehicleReportGenerationLock_lockKey_key" 
         ON "VehicleReportGenerationLock"("lockKey");`,
+
+        `DO $$ BEGIN
+            CREATE TYPE "EquipmentFeatureStatus" AS ENUM ('STANDARD', 'OPTIONAL', 'NOT_AVAILABLE', 'PACKAGE_DEPENDENT', 'MARKET_DEPENDENT', 'PERIOD_DEPENDENT', 'UNKNOWN');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+
+        `DO $$ BEGIN
+            CREATE TYPE "PeriodStatus" AS ENUM ('PERIOD_VERIFIED', 'PERIOD_PROBABLE', 'PERIOD_AMBIGUOUS');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+
+        `DO $$ BEGIN
+            CREATE TYPE "EvidenceStance" AS ENUM ('SUPPORTS', 'REFUTES', 'NEUTRAL');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+
+        `DO $$ BEGIN
+            CREATE TYPE "ComparisonType" AS ENUM ('LOWER_TRIM', 'HIGHER_TRIM');
+        EXCEPTION WHEN duplicate_object THEN null; END $$;`,
+
+        `CREATE TABLE IF NOT EXISTS "VehicleTrimEquipment" (
+            "id" TEXT NOT NULL,
+            "vehicleVariantId" TEXT NOT NULL,
+            "trimId" TEXT NOT NULL,
+            "market" TEXT NOT NULL DEFAULT 'TR',
+            "effectiveFrom" TIMESTAMP(3),
+            "effectiveTo" TIMESTAMP(3),
+            "equipmentRevision" TEXT,
+            "periodStatus" "PeriodStatus" NOT NULL DEFAULT 'PERIOD_VERIFIED',
+            "status" "ApprovalStatus" NOT NULL DEFAULT 'PENDING',
+            "highlights" JSONB,
+            "signatures" JSONB,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "VehicleTrimEquipment_pkey" PRIMARY KEY ("id")
+        );`,
+
+        `CREATE TABLE IF NOT EXISTS "EquipmentFeature" (
+            "id" TEXT NOT NULL,
+            "trimEquipmentId" TEXT NOT NULL,
+            "featureCode" TEXT NOT NULL,
+            "featureName" TEXT NOT NULL,
+            "category" TEXT NOT NULL,
+            "status" "EquipmentFeatureStatus" NOT NULL,
+            "valueText" TEXT,
+            "valueNumber" DOUBLE PRECISION,
+            "unit" TEXT,
+            "valueJson" JSONB,
+            "availabilityConditions" JSONB,
+            "optionPackageName" TEXT,
+            "optionPackageCode" TEXT,
+            "relevanceBasis" JSONB NOT NULL,
+            "confidenceScore" INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT "EquipmentFeature_pkey" PRIMARY KEY ("id")
+        );`,
+
+        `CREATE TABLE IF NOT EXISTS "EquipmentClaim" (
+            "id" TEXT NOT NULL,
+            "equipmentFeatureId" TEXT NOT NULL,
+            "claimText" TEXT NOT NULL,
+            "featureStatus" "EquipmentFeatureStatus" NOT NULL,
+            CONSTRAINT "EquipmentClaim_pkey" PRIMARY KEY ("id")
+        );`,
+
+        `CREATE TABLE IF NOT EXISTS "EquipmentEvidence" (
+            "id" TEXT NOT NULL,
+            "equipmentClaimId" TEXT NOT NULL,
+            "rawSourceId" TEXT NOT NULL,
+            "sourceKind" "SourceKind" NOT NULL,
+            "sourceRank" INTEGER NOT NULL,
+            "stance" "EvidenceStance" NOT NULL DEFAULT 'SUPPORTS',
+            CONSTRAINT "EquipmentEvidence_pkey" PRIMARY KEY ("id")
+        );`,
+
+        `CREATE TABLE IF NOT EXISTS "TrimComparison" (
+            "id" TEXT NOT NULL,
+            "trimEquipmentId" TEXT NOT NULL,
+            "targetTrimName" TEXT NOT NULL,
+            "comparisonType" "ComparisonType" NOT NULL,
+            "featureIds" JSONB NOT NULL,
+            CONSTRAINT "TrimComparison_pkey" PRIMARY KEY ("id")
+        );`,
       ];
 
       for (const statement of statements) {
