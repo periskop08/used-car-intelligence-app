@@ -6,8 +6,8 @@ async function fixStuckMigration() {
     return;
   }
 
-  const prisma = new PrismaClient();
   try {
+    const prisma = new PrismaClient();
     console.log('[fix-stuck-migration] Checking _prisma_migrations for failed migration entry...');
     const deletedCount = await prisma.$executeRawUnsafe(`
       DELETE FROM "_prisma_migrations"
@@ -15,10 +15,9 @@ async function fixStuckMigration() {
          OR "finished_at" IS NULL;
     `);
     console.log(`[fix-stuck-migration] Cleaned up ${deletedCount} failed migration record(s) from _prisma_migrations.`);
+    await prisma.$disconnect();
   } catch (err) {
     console.log('[fix-stuck-migration] Migration cleanup note:', err?.message || err);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

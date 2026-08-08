@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "start": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
     "start:dev": "nest start --watch",
     "start:prod": "node --max-old-space-size=256 --expose-gc dist/src/main.js",
-    "postinstall": "node prisma/fix-stuck-migration.js",
+    "postinstall": "prisma generate && node prisma/fix-stuck-migration.js",
     "db:fix-stuck": "node prisma/fix-stuck-migration.js",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate dev --name init",
-    "db:migrate:prod": "node prisma/fix-stuck-migration.js && prisma migrate deploy",
+    "db:migrate:prod": "prisma generate && node prisma/fix-stuck-migration.js && prisma migrate deploy",
     "db:seed": "prisma db seed",
     "test": "jest --config jest.config.js"
   },
