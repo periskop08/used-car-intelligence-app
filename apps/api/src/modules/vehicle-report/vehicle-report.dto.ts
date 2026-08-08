@@ -23,6 +23,9 @@ export class CreateVehicleReportDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey: string;
+
+  @IsOptional()
+  forceRefresh?: boolean;
 }
 
 export class CreateListingVehicleReportDto {

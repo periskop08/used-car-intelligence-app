@@ -183,26 +183,30 @@ export class VehicleReportService implements OnModuleInit {
       const vehicleContext = vRes.vehicleContext;
       const vehicleContextHash = vRes.vehicleContextHash;
 
-      // 3. Check Cache (user-scoped variant cache)
-      try {
-        const cached = await this.cacheService.getCachedReport(
-          userId,
-          'TORQUE_SCOUT_VEHICLE_REPORT',
-          vehicleContextHash,
-          'v1.0',
-          variantId,
-        );
+      // 3. Check Cache (user-scoped variant cache - bypassed if forceRefresh is true)
+      if (!dto.forceRefresh) {
+        try {
+          const cached = await this.cacheService.getCachedReport(
+            userId,
+            'TORQUE_SCOUT_VEHICLE_REPORT',
+            vehicleContextHash,
+            'v2.4',
+            variantId,
+          );
 
-        if (cached) {
-          return {
-            reportId: cached.id,
-            mode: cached.mode,
-            status: cached.status,
-            cached: true,
-          };
+          if (cached) {
+            return {
+              reportId: cached.id,
+              mode: cached.mode,
+              status: cached.status,
+              cached: true,
+            };
+          }
+        } catch (cacheErr) {
+          this.logger.warn(`Cache lookup warning: ${cacheErr}`);
         }
-      } catch (cacheErr) {
-        this.logger.warn(`Cache lookup warning: ${cacheErr}`);
+      } else {
+        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache.`);
       }
 
       // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
@@ -255,7 +259,7 @@ export class VehicleReportService implements OnModuleInit {
           listingId: listingId || null,
           contextHash: vehicleContextHash,
           vehicleContextHash,
-          reportVersion: 'v1.0',
+          reportVersion: 'v2.4',
           schemaVersion: 1,
           status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
           idempotencyKey: dto.idempotencyKey,

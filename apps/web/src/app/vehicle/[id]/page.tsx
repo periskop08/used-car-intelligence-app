@@ -235,6 +235,7 @@ export default function VehicleDetail() {
           variantId,
           entryPoint: "VEHICLE_SEARCH",
           idempotencyKey: `vr_${variantId}_${Date.now()}`,
+          forceRefresh: force,
         }),
       });
 

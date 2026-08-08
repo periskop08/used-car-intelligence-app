@@ -25,6 +25,12 @@ export class VehicleReportContextBuilderService {
           where: { status: 'APPROVED' },
           orderBy: { priority: 'asc' },
         },
+        trimEquipments: {
+          include: {
+            features: true,
+            comparisons: true,
+          },
+        },
       },
     });
 
@@ -103,7 +109,7 @@ export class VehicleReportContextBuilderService {
           category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
           problemType: (p as any).problemType || 'CHRONIC',
         })),
-        inspectionChecklist: variant.checklists.map((c) => ({
+        inspectionChecklist: (variant.checklists || []).map((c) => ({
           id: c.id,
           category: c.category,
           title: c.title,
@@ -111,6 +117,23 @@ export class VehicleReportContextBuilderService {
           priority: c.priority,
         })),
       },
+      equipmentIntelligence: (variant.trimEquipments && variant.trimEquipments.length > 0) ? {
+        periodStatus: variant.trimEquipments[0].periodStatus,
+        equipmentRevision: variant.trimEquipments[0].equipmentRevision,
+        highlights: variant.trimEquipments[0].highlights,
+        signatures: variant.trimEquipments[0].signatures,
+        features: variant.trimEquipments[0].features.map(f => ({
+          featureCode: f.featureCode,
+          featureName: f.featureName,
+          category: f.category,
+          status: f.status,
+          valueText: f.valueText,
+          valueNumber: f.valueNumber,
+          unit: f.unit,
+          availabilityConditions: f.availabilityConditions,
+          confidenceScore: f.confidenceScore,
+        }))
+      } : null,
     };
 
     const contextHash = crypto
