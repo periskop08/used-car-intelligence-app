@@ -72,6 +72,9 @@ export class VehicleFiltersController {
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
   async getBrands() {
     const brands = await this.prisma.brand.findMany({
+      where: {
+        variants: { some: { status: 'APPROVED' } },
+      },
       orderBy: { name: 'asc' },
       select: { name: true },
     });
@@ -91,6 +94,7 @@ export class VehicleFiltersController {
     const models = await this.prisma.model.findMany({
       where: {
         brand: { name: { equals: brand, mode: 'insensitive' } },
+        variants: { some: { status: 'APPROVED' } },
       },
       select: { name: true },
       orderBy: { name: 'asc' },
