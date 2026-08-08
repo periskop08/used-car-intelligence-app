@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { TavilySearchProvider } from './providers/tavily-search.provider';
 import { GeminiGroundingProvider } from './providers/gemini-grounding.provider';
+import { FirecrawlExtractProvider } from './providers/firecrawl-extract.provider';
 import { AiAnalysisService } from './ai-analysis.service';
 import { CoverageService } from './coverage.service';
 import { AiReportGeneratorService } from './ai-report-generator.service';
@@ -25,6 +26,7 @@ import { EvidenceValidatorService } from './evidence-validator.service';
     WebSearchProvider,
     TavilySearchProvider,
     GeminiGroundingProvider,
+    FirecrawlExtractProvider,
     IdentityGateService,
     ResearchConfidenceService,
     ClaimEvidenceService,
@@ -47,6 +49,7 @@ import { EvidenceValidatorService } from './evidence-validator.service';
     EvidenceValidatorService,
     TavilySearchProvider,
     GeminiGroundingProvider,
+    FirecrawlExtractProvider,
   ],
 })
 export class ResearchModule {}
