@@ -17,6 +17,7 @@ import { IdentityGateService } from './identity-gate.service';
 import { ResearchConfidenceService } from './research-confidence.service';
 import { ClaimEvidenceService } from './claim-evidence.service';
 import { EvidenceValidatorService } from './evidence-validator.service';
+import { RawSourceStoreService } from './raw-source-store.service';
 
 @Module({
   imports: [],
@@ -31,6 +32,7 @@ import { EvidenceValidatorService } from './evidence-validator.service';
     ResearchConfidenceService,
     ClaimEvidenceService,
     EvidenceValidatorService,
+    RawSourceStoreService,
     AiAnalysisService,
     CoverageService,
     AiReportGeneratorService,
@@ -47,6 +49,7 @@ import { EvidenceValidatorService } from './evidence-validator.service';
     ResearchConfidenceService,
     ClaimEvidenceService,
     EvidenceValidatorService,
+    RawSourceStoreService,
     TavilySearchProvider,
     GeminiGroundingProvider,
     FirecrawlExtractProvider,
