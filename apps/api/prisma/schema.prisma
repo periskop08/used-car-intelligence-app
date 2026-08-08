@@ -510,6 +510,7 @@ model VehicleVariant {
   researchJobs VehicleResearchJob[]
   rawSources   RawSource[]
   listings     VehicleListing[]
+  trimEquipments VehicleTrimEquipment[]
 
   representativeCard    VehicleDiscoveryCard? @relation("DiscoveryCardRepresentativeVariant")
   mappedCards           VehicleDiscoveryCardVariant[]
@@ -743,6 +744,7 @@ model RawSource {
   variant         VehicleVariant? @relation(fields: [vehicleVariantId], references: [id])
   problems        CommonProblemSource[]
   recalls         RecallSource[]
+  equipmentEvidences EquipmentEvidence[]
 
   @@index([url])
   @@index([vehicleVariantId, status])
@@ -2891,6 +2893,106 @@ model PaymentWebhookEvent {
   @@index([lockExpiresAt])
 }
 
+enum EquipmentFeatureStatus {
+  STANDARD
+  OPTIONAL
+  NOT_AVAILABLE
+  PACKAGE_DEPENDENT
+  MARKET_DEPENDENT
+  PERIOD_DEPENDENT
+  UNKNOWN
+}
 
+enum PeriodStatus {
+  PERIOD_VERIFIED
+  PERIOD_PROBABLE
+  PERIOD_AMBIGUOUS
+}
 
+enum EvidenceStance {
+  SUPPORTS
+  REFUTES
+  NEUTRAL
+}
 
+enum ComparisonType {
+  LOWER_TRIM
+  HIGHER_TRIM
+}
+
+model VehicleTrimEquipment {
+  id               String          @id @default(uuid())
+  vehicleVariantId String
+  trimId           String
+  market           String          @default("TR")
+  effectiveFrom    DateTime?
+  effectiveTo      DateTime?
+  equipmentRevision String?
+  periodStatus     PeriodStatus    @default(PERIOD_VERIFIED)
+  status           ApprovalStatus  @default(PENDING)
+  highlights       Json?
+  signatures       Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  variant          VehicleVariant  @relation(fields: [vehicleVariantId], references: [id])
+  features         EquipmentFeature[]
+  comparisons      TrimComparison[]
+
+  @@index([vehicleVariantId, status])
+}
+
+model EquipmentFeature {
+  id                     String                 @id @default(uuid())
+  trimEquipmentId        String
+  featureCode            String
+  featureName            String
+  category               String
+  status                 EquipmentFeatureStatus
+  valueText              String?
+  valueNumber            Float?
+  unit                   String?
+  valueJson              Json?
+  availabilityConditions Json?
+  optionPackageName      String?
+  optionPackageCode      String?
+  relevanceBasis         Json
+  confidenceScore        Int                    @default(0)
+
+  trimEquipment          VehicleTrimEquipment   @relation(fields: [trimEquipmentId], references: [id], onDelete: Cascade)
+  claims                 EquipmentClaim[]
+
+  @@index([trimEquipmentId, featureCode])
+}
+
+model EquipmentClaim {
+  id                 String               @id @default(uuid())
+  equipmentFeatureId String
+  claimText          String
+  featureStatus      EquipmentFeatureStatus
+
+  feature            EquipmentFeature     @relation(fields: [equipmentFeatureId], references: [id], onDelete: Cascade)
+  evidences          EquipmentEvidence[]
+}
+
+model EquipmentEvidence {
+  id               String            @id @default(uuid())
+  equipmentClaimId String
+  rawSourceId      String
+  sourceKind       SourceKind
+  sourceRank       Int
+  stance           EvidenceStance    @default(SUPPORTS)
+
+  claim            EquipmentClaim    @relation(fields: [equipmentClaimId], references: [id], onDelete: Cascade)
+  rawSource        RawSource         @relation(fields: [rawSourceId], references: [id], onDelete: Cascade)
+}
+
+model TrimComparison {
+  id               String               @id @default(uuid())
+  trimEquipmentId  String
+  targetTrimName   String
+  comparisonType   ComparisonType
+  featureIds       Json
+
+  trimEquipment    VehicleTrimEquipment @relation(fields: [trimEquipmentId], references: [id], onDelete: Cascade)
+}

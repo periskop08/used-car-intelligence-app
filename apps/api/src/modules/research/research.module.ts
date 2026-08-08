@@ -19,6 +19,14 @@ import { ClaimEvidenceService } from './claim-evidence.service';
 import { EvidenceValidatorService } from './evidence-validator.service';
 import { RawSourceStoreService } from './raw-source-store.service';
 
+import { PdfTableExtractorService } from './equipment/pdf-table-extractor.service';
+import { TrimEquipmentResolverService } from './equipment/trim-equipment-resolver.service';
+import { EquipmentConfidenceService } from './equipment/equipment-confidence.service';
+import { EquipmentNormalizerService } from './equipment/equipment-normalizer.service';
+import { EquipmentValidatorService } from './equipment/equipment-validator.service';
+import { TrimComparisonService } from './equipment/trim-comparison.service';
+import { EquipmentResearchService } from './equipment/equipment-research.service';
+
 @Module({
   imports: [],
   controllers: [ResearchController, AdminApprovalController],
@@ -33,6 +41,13 @@ import { RawSourceStoreService } from './raw-source-store.service';
     ClaimEvidenceService,
     EvidenceValidatorService,
     RawSourceStoreService,
+    PdfTableExtractorService,
+    TrimEquipmentResolverService,
+    EquipmentConfidenceService,
+    EquipmentNormalizerService,
+    EquipmentValidatorService,
+    TrimComparisonService,
+    EquipmentResearchService,
     AiAnalysisService,
     CoverageService,
     AiReportGeneratorService,
@@ -53,6 +68,13 @@ import { RawSourceStoreService } from './raw-source-store.service';
     TavilySearchProvider,
     GeminiGroundingProvider,
     FirecrawlExtractProvider,
+    EquipmentResearchService,
+    PdfTableExtractorService,
+    TrimEquipmentResolverService,
+    EquipmentConfidenceService,
+    EquipmentNormalizerService,
+    EquipmentValidatorService,
+    TrimComparisonService,
   ],
 })
 export class ResearchModule {}
