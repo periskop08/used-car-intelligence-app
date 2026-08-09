@@ -7,15 +7,14 @@
  * "Bu Araç Nasıl Bir Otomobil?" section of the vehicle report.
  * Questions Q6 and Q7 are pure synthesis — no web search required.
  *
- * Search Providers (4-Step Cascade):
+ * Search Providers (5-Step Cascade):
  * 1. Tavily Search (English query template)
  * 2. Tavily Search (Turkish query template)
- * 3. Gemini Search Grounding (Google Search via Gemini API)
- * 4. WebSearchProvider (Serper / AI Search Grounding)
+ * 3. Firecrawl Search (JS-rendered deep web & forum search)
+ * 4. Gemini Search Grounding (Google Search via Gemini API)
+ * 5. WebSearchProvider (Serper / AI Search Grounding)
  *
- * Enforces strict evidence-only rules at the code level:
- * - null returned for any question where evidence is insufficient.
- * - No numeric values fabricated when source data is absent.
+ * Concurrency-guarded: Only 1 character research run allowed at any time per process.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -56,6 +55,8 @@ export class VehicleCharacterResearchService {
   private readonly MIN_SOURCES_MODERATE = 2;
   private readonly MIN_SOURCES_STRONG = 3;
 
+  private isResearchRunning = false;
+
   constructor(
     private readonly tavilySearch: TavilySearchProvider,
     private readonly firecrawlSearch: FirecrawlExtractProvider,
@@ -64,99 +65,111 @@ export class VehicleCharacterResearchService {
   ) {}
 
   /**
-   * Main entry point. Runs Q1–Q5 web searches in parallel with multi-provider fallbacks,
+   * Main entry point. Runs Q1–Q5 web searches sequentially with multi-provider fallbacks,
    * then synthesises Q6 and Q7.
+   * Concurrency-guarded: Only 1 character research run allowed at any time per process.
    */
   async runCharacterResearch(
     input: VehicleCharacterResearchInput,
   ): Promise<VehicleCharacterResearchResult> {
+    if (this.isResearchRunning) {
+      this.logger.warn(
+        `Another character research task is currently running. Skipping to prevent memory overflow on 512MB RAM.`,
+      );
+      return null as any;
+    }
+
+    this.isResearchRunning = true;
     const variantTitle = this.buildVariantTitle(input);
     this.logger.log(`Starting character research for: ${variantTitle}`);
 
-    const allDomains = [
-      ...CHARACTER_RESEARCH_DOMAINS.tier1_aggregate,
-      ...CHARACTER_RESEARCH_DOMAINS.tier2_community,
-      ...CHARACTER_RESEARCH_DOMAINS.tier3_press,
-    ];
+    try {
+      const allDomains = [
+        ...CHARACTER_RESEARCH_DOMAINS.tier1_aggregate,
+        ...CHARACTER_RESEARCH_DOMAINS.tier2_community,
+        ...CHARACTER_RESEARCH_DOMAINS.tier3_press,
+      ];
 
-    // Filter searchable questions (Q1–Q5)
-    const searchableQuestions = CHARACTER_RESEARCH_QUESTIONS.filter(
-      (q): q is typeof CHARACTER_RESEARCH_QUESTIONS[number] & { tavilyQueryTemplate: string } =>
-        !(q as any).isSynthesisOnly,
-    );
+      // Filter searchable questions (Q1–Q5)
+      const searchableQuestions = CHARACTER_RESEARCH_QUESTIONS.filter(
+        (q): q is typeof CHARACTER_RESEARCH_QUESTIONS[number] & { tavilyQueryTemplate: string } =>
+          !(q as any).isSynthesisOnly,
+      );
 
-    // Process Q1–Q5 sequentially to minimize memory concurrency & prevent V8 heap spikes on 512MB RAM containers
-    const answers: Record<string, CharacterQuestionAnswer | null> = {};
+      // Process Q1–Q5 sequentially to minimize memory concurrency & prevent V8 heap spikes on 512MB RAM containers
+      const answers: Record<string, CharacterQuestionAnswer | null> = {};
 
-    for (const question of searchableQuestions) {
-      const engQuery = this.buildQuery(
-        (question as any).tavilyQueryTemplate || '',
-        input,
+      for (const question of searchableQuestions) {
+        const engQuery = this.buildQuery(
+          (question as any).tavilyQueryTemplate || '',
+          input,
+        );
+        const trQuery = this.buildQuery(
+          (question as any).turkishQueryTemplate || '',
+          input,
+        );
+        answers[question.questionId] = await this.fetchEvidenceForQuestion(
+          question.questionId,
+          engQuery,
+          trQuery,
+          allDomains,
+          input,
+        );
+      }
+
+      const characterAndSegment = answers['Q1_CHARACTER_AND_SEGMENT'] || null;
+      const engineTransmissionFit = answers['Q2_ENGINE_TRANSMISSION_PERFORMANCE'] || null;
+      const drivingDynamics = answers['Q3_DRIVING_DYNAMICS'] || null;
+      const comfortAndIsolation = answers['Q4_COMFORT_ISOLATION'] || null;
+      const interiorPracticality = answers['Q5_INTERIOR_PRACTICALITY'] || null;
+
+      // Q6: Synthesise from Q1–Q5 via LLM
+      const usageScenarios = await this.synthesiseQuestion(
+        'Q6_USAGE_SCENARIOS',
+        variantTitle,
+        { characterAndSegment, engineTransmissionFit, drivingDynamics, comfortAndIsolation, interiorPracticality },
       );
-      const trQuery = this.buildQuery(
-        (question as any).turkishQueryTemplate || '',
-        input,
+
+      // Q7: Synthesise from Q1–Q6 via LLM
+      const userProfileAndVerdict = await this.synthesiseQuestion(
+        'Q7_USER_PROFILE_VERDICT',
+        variantTitle,
+        { characterAndSegment, engineTransmissionFit, drivingDynamics, comfortAndIsolation, interiorPracticality, usageScenarios },
       );
-      answers[question.questionId] = await this.fetchEvidenceForQuestion(
-        question.questionId,
-        engQuery,
-        trQuery,
-        allDomains,
-        input,
+
+      const totalSourcesFound = [
+        characterAndSegment, engineTransmissionFit, drivingDynamics,
+        comfortAndIsolation, interiorPracticality,
+      ]
+        .filter(Boolean)
+        .reduce((sum, q) => sum + (q?.sourceCount ?? 0), 0);
+
+      const result: VehicleCharacterResearchResult = {
+        variantTitle,
+        researchedAt: new Date().toISOString(),
+        totalSourcesFound,
+        questions: {
+          characterAndSegment,
+          engineTransmissionFit,
+          drivingDynamics,
+          comfortAndIsolation,
+          interiorPracticality,
+          usageScenarios,
+          userProfileAndVerdict,
+        },
+      };
+
+      this.logger.log(
+        `Character research complete for ${variantTitle}. Total sources found across web: ${totalSourcesFound}`,
       );
+
+      return result;
+    } finally {
+      this.isResearchRunning = false;
+      if (typeof global.gc === 'function') {
+        global.gc();
+      }
     }
-
-    const characterAndSegment = answers['Q1_CHARACTER_AND_SEGMENT'] || null;
-    const engineTransmissionFit = answers['Q2_ENGINE_TRANSMISSION_PERFORMANCE'] || null;
-    const drivingDynamics = answers['Q3_DRIVING_DYNAMICS'] || null;
-    const comfortAndIsolation = answers['Q4_COMFORT_ISOLATION'] || null;
-    const interiorPracticality = answers['Q5_INTERIOR_PRACTICALITY'] || null;
-
-    // Q6: Synthesise from Q1–Q5 via LLM
-    const usageScenarios = await this.synthesiseQuestion(
-      'Q6_USAGE_SCENARIOS',
-      variantTitle,
-      { characterAndSegment, engineTransmissionFit, drivingDynamics, comfortAndIsolation, interiorPracticality },
-    );
-
-    // Q7: Synthesise from Q1–Q6 via LLM
-    const userProfileAndVerdict = await this.synthesiseQuestion(
-      'Q7_USER_PROFILE_VERDICT',
-      variantTitle,
-      { characterAndSegment, engineTransmissionFit, drivingDynamics, comfortAndIsolation, interiorPracticality, usageScenarios },
-    );
-
-    const totalSourcesFound = [
-      characterAndSegment, engineTransmissionFit, drivingDynamics,
-      comfortAndIsolation, interiorPracticality,
-    ]
-      .filter(Boolean)
-      .reduce((sum, q) => sum + (q?.sourceCount ?? 0), 0);
-
-    const result: VehicleCharacterResearchResult = {
-      variantTitle,
-      researchedAt: new Date().toISOString(),
-      totalSourcesFound,
-      questions: {
-        characterAndSegment,
-        engineTransmissionFit,
-        drivingDynamics,
-        comfortAndIsolation,
-        interiorPracticality,
-        usageScenarios,
-        userProfileAndVerdict,
-      },
-    };
-
-    this.logger.log(
-      `Character research complete for ${variantTitle}. Total sources found across web: ${totalSourcesFound}`,
-    );
-
-    if (typeof global.gc === 'function') {
-      global.gc();
-    }
-
-    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -270,7 +283,7 @@ export class VehicleCharacterResearchService {
       }
     }
 
-    // Step 4: Fallback to WebSearchProvider (Serper / AI Search Grounding)
+    // Step 5: Fallback to WebSearchProvider (Serper / AI Search Grounding)
     if (sources.length === 0) {
       const fallbackQuery = `${input.year} ${input.brand} ${input.model} ${input.trimName || ''} inceleme sürüş testi`;
       try {
@@ -281,7 +294,7 @@ export class VehicleCharacterResearchService {
             url: r.url,
             domain: this.extractDomain(r.url),
             title: r.title,
-            relevantSnippet: r.snippet,
+            relevantSnippet: (r.snippet || '').substring(0, 600),
             reliabilityTier: this.getReliabilityTier(r.url),
           }));
           usedProvider = 'web_search_provider';
@@ -388,15 +401,6 @@ export class VehicleCharacterResearchService {
     )
       return 2;
     return 3;
-  }
-
-  private extractResult(
-    settled: PromiseSettledResult<CharacterQuestionAnswer | null>,
-    questionId: string,
-  ): CharacterQuestionAnswer | null {
-    if (settled.status === 'fulfilled') return settled.value;
-    this.logger.error(`Question ${questionId} search promise rejected: ${(settled as any).reason}`);
-    return null;
   }
 
   /**
