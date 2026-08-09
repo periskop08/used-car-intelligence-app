@@ -146,34 +146,47 @@ export class VehicleReportProviderService implements OnModuleInit {
     if (!apiKey) throw new Error('Gemini API key eksik');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: this.geminiModelName,
-      generationConfig: {
-        temperature: 0.3,
-        topP: 0.85,
-        responseMimeType: 'application/json',
-      },
-    });
+    const candidateModels = Array.from(new Set([
+      this.geminiModelName,
+      'gemini-1.5-flash',
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-pro',
+    ]));
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-    });
+    let lastErr: any = null;
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            temperature: 0.3,
+            topP: 0.85,
+            responseMimeType: 'application/json',
+          },
+        });
 
-    const responseText = result.response.text();
-    try {
-      return { content: JSON.parse(responseText) };
-    } catch {
-      this.logger.warn(`Gemini JSON parse failed, trying to extract JSON...`);
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        });
+
+        const responseText = result.response.text();
         try {
-          return { content: JSON.parse(jsonMatch[0]) };
+          return { content: JSON.parse(responseText) };
         } catch {
-          return { content: null };
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              return { content: JSON.parse(jsonMatch[0]) };
+            } catch {}
+          }
         }
+      } catch (err: any) {
+        lastErr = err;
+        this.logger.warn(`Gemini model ${modelName} call notice: ${err?.message}. Trying next model...`);
       }
-      return { content: null };
     }
+
+    throw lastErr || new Error('All Gemini model candidates failed');
   }
 
   private async callOpenAI(
