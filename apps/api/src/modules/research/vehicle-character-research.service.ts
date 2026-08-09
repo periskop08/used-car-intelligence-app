@@ -22,6 +22,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TavilySearchProvider } from './providers/tavily-search.provider';
 import { GeminiGroundingProvider } from './providers/gemini-grounding.provider';
 import { WebSearchProvider } from './providers/web-search.provider';
+import { FirecrawlExtractProvider } from './providers/firecrawl-extract.provider';
 import {
   CHARACTER_RESEARCH_QUESTIONS,
   CHARACTER_RESEARCH_DOMAINS,
@@ -57,6 +58,7 @@ export class VehicleCharacterResearchService {
 
   constructor(
     private readonly tavilySearch: TavilySearchProvider,
+    private readonly firecrawlSearch: FirecrawlExtractProvider,
     private readonly geminiGrounding: GeminiGroundingProvider,
     private readonly webSearch: WebSearchProvider,
   ) {}
@@ -236,7 +238,21 @@ export class VehicleCharacterResearchService {
       }
     }
 
-    // Step 3: Fallback to Gemini Grounding (Google Search via Gemini API)
+    // Step 3: Firecrawl Deep Search (renders JS & extracts markdown from forum threads & review sites)
+    if (sources.length === 0 && turkishQuery) {
+      try {
+        this.logger.log(`Trying Firecrawl Deep Search for ${questionId} with query: "${turkishQuery}"`);
+        const resp = await this.firecrawlSearch.search(turkishQuery, { maxResults: 5 });
+        if (resp.results && resp.results.length > 0) {
+          sources = this.mapSearchResults(resp.results);
+          usedProvider = 'firecrawl';
+        }
+      } catch (err: any) {
+        this.logger.warn(`Firecrawl search failed for ${questionId}: ${err.message}`);
+      }
+    }
+
+    // Step 4: Fallback to Gemini Grounding (Google Search via Gemini API)
     if (sources.length === 0 && turkishQuery) {
       try {
         this.logger.log(`Falling back to Gemini Grounding for ${questionId} with query: "${turkishQuery}"`);
