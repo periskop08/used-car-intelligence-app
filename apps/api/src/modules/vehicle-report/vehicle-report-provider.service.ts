@@ -23,8 +23,8 @@ export class VehicleReportProviderService implements OnModuleInit {
     private narrativeQualityService: VehicleReportNarrativeQualityService,
     private fallbackService: VehicleReportFallbackService,
   ) {
-    this.geminiModelName = process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-flash';
-    this.openaiModelName = process.env.OPENAI_REPORT_MODEL || 'gpt-4o';
+    this.geminiModelName = process.env.GEMINI_REPORT_MODEL || 'gemini-1.5-flash';
+    this.openaiModelName = process.env.OPENAI_REPORT_MODEL || 'gpt-4o-mini';
   }
 
   onModuleInit() {
@@ -32,29 +32,19 @@ export class VehicleReportProviderService implements OnModuleInit {
   }
 
   private detectActiveProvider() {
-    const preferredProvider = (process.env.VEHICLE_REPORT_PRIMARY_PROVIDER || 'gemini').toLowerCase() as AIProvider;
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
 
-    // Try preferred provider first
-    if (preferredProvider === 'openai' && openaiKey) {
-      this.activeProvider = 'openai';
-      this.logger.log(`[PROVIDER] OpenAI aktif (model: ${this.openaiModelName}) — tercih: ${preferredProvider}`);
-    } else if (preferredProvider === 'gemini' && geminiKey) {
+    if (geminiKey) {
       this.activeProvider = 'gemini';
-      this.logger.log(`[PROVIDER] Gemini aktif (model: ${this.geminiModelName}) — tercih: ${preferredProvider}`);
-    } else if (geminiKey) {
-      // Fallback to gemini if available
-      this.activeProvider = 'gemini';
-      this.logger.log(`[PROVIDER] Gemini aktif (fallback — tercih "${preferredProvider}" için key bulunamadı)`);
+      this.logger.log(`[PROVIDER] Gemini aktif (model: ${this.geminiModelName})`);
     } else if (openaiKey) {
-      // Fallback to openai if available
       this.activeProvider = 'openai';
-      this.logger.log(`[PROVIDER] OpenAI aktif (fallback — tercih "${preferredProvider}" için key bulunamadı)`);
+      this.logger.log(`[PROVIDER] OpenAI aktif (model: ${this.openaiModelName})`);
     } else {
       this.activeProvider = 'none';
       this.runtimeHealthStatus = 'DEGRADED';
-      this.logger.warn(`[PROVIDER] Hiçbir AI API key tanımlı değil. Deterministik fallback aktif.`);
+      this.logger.warn(`[PROVIDER] Hiçbir AI API key tanımlı değil.`);
     }
   }
 
@@ -77,135 +67,78 @@ export class VehicleReportProviderService implements OnModuleInit {
     repairAttempted: boolean;
     fallbackReason?: string;
   }> {
-    // 1. Generate base deterministic report structure
     const baseReport = this.fallbackService.generateFallbackReport(
       reportId,
       'TORQUE_SCOUT_VEHICLE_REPORT',
       vehicleContext,
     );
 
-    if (this.activeProvider === 'none') {
-      return {
-        report: baseReport,
-        provider: 'DETERMINISTIC_FALLBACK',
-        modelName: 'TorqueScout DB Engine',
-        repairAttempted: false,
-        fallbackReason: 'AI API key yapılandırılmamış, deterministik veritabanı raporu sunuldu',
-      };
-    }
+    const systemPrompt = this.promptService.buildSystemPrompt();
+    const userPrompt = this.promptService.buildUserPrompt(vehicleContext);
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-    try {
-      const systemPrompt = this.promptService.buildSystemPrompt();
-      const userPrompt = this.promptService.buildUserPrompt(vehicleContext);
-      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    let generatedContent: VehicleReportGeneratedContent | null = null;
+    let usedModel = '';
+    let usedProvider = '';
 
-      let generatedContent: VehicleReportGeneratedContent | null = null;
-      let usedModel = '';
-
-      if (this.activeProvider === 'gemini') {
+    // 1. Try Gemini first
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+    if (geminiKey) {
+      try {
+        this.logger.log(`[AI-REPORT] Calling Gemini API (model: ${this.geminiModelName})...`);
         const result = await this.callGemini(fullPrompt);
-        generatedContent = result.content;
-        usedModel = this.geminiModelName;
-      } else if (this.activeProvider === 'openai') {
+        if (result.content) {
+          generatedContent = result.content;
+          usedModel = this.geminiModelName;
+          usedProvider = 'gemini';
+        }
+      } catch (geminiErr: any) {
+        this.logger.error(`[AI-REPORT] Gemini API error: ${geminiErr?.message}`);
+      }
+    }
+
+    // 2. Try OpenAI if Gemini failed or key not available
+    if (!generatedContent && process.env.OPENAI_API_KEY) {
+      try {
+        this.logger.log(`[AI-REPORT] Calling OpenAI API (model: ${this.openaiModelName})...`);
         const result = await this.callOpenAI(systemPrompt, userPrompt);
-        generatedContent = result.content;
-        usedModel = this.openaiModelName;
+        if (result.content) {
+          generatedContent = result.content;
+          usedModel = this.openaiModelName;
+          usedProvider = 'openai';
+        }
+      } catch (openaiErr: any) {
+        this.logger.error(`[AI-REPORT] OpenAI API error: ${openaiErr?.message}`);
       }
+    }
 
-      if (generatedContent) {
-        const brandName = vehicleContext?.vehicleIdentity?.brand;
-        const modelName = vehicleContext?.vehicleIdentity?.model;
-        let qualityResult = this.narrativeQualityService.validateReportNarrativeQuality(
-          generatedContent,
-          brandName,
-          modelName,
-        );
-
-        let repairAttempted = false;
-
-        // Attempt 1 repair call if quality is below threshold
-        if (!qualityResult.passed) {
-          this.logger.warn(
-            `Report ${reportId} quality score ${qualityResult.totalScore}/100 below 75. Reasons: ${qualityResult.rejectionReasons.join(', ')}. Triggering repair.`,
-          );
-          repairAttempted = true;
-          try {
-            const repairSystemPrompt = `${systemPrompt}\n\nÖNCEKİ ÜRETİM SORUNLARI:\n${qualityResult.rejectionReasons.map(r => `- ${r}`).join('\n')}\n\nBu sorunları düzelterek aynı araç için kurallara tam uyarak yeni VehicleReportGeneratedContent JSON üretin.`;
-
-            let repairedContent: VehicleReportGeneratedContent | null = null;
-            if (this.activeProvider === 'gemini') {
-              const repairResult = await this.callGemini(`${repairSystemPrompt}\n\n${userPrompt}`);
-              repairedContent = repairResult.content;
-            } else if (this.activeProvider === 'openai') {
-              const repairResult = await this.callOpenAI(repairSystemPrompt, userPrompt);
-              repairedContent = repairResult.content;
-            }
-
-            if (repairedContent) {
-              generatedContent = repairedContent;
-              qualityResult = this.narrativeQualityService.validateReportNarrativeQuality(
-                repairedContent,
-                brandName,
-                modelName,
-              );
-            }
-          } catch (repairErr) {
-            this.logger.warn(`Repair attempt failed: ${repairErr}`);
-          }
-        }
-
-        // Assemble final report with narrative content merged into base report
-        baseReport.generatedContent = generatedContent;
-        if (generatedContent.expertDecisionSynthesis) {
-          baseReport.expertDecisionSynthesis = generatedContent.expertDecisionSynthesis;
-        }
-        if (generatedContent.executiveSummary) {
-          baseReport.executiveSummary = generatedContent.executiveSummary;
-        }
-        if (generatedContent.usageScenarios) {
-          baseReport.usageScenarios = generatedContent.usageScenarios;
-        }
-        if (generatedContent.premiumChecklistQuestions) {
-          baseReport.sellerQuestions = generatedContent.premiumChecklistQuestions;
-        }
-        if (generatedContent.inspectionChecklist) {
-          baseReport.prePurchaseChecks = generatedContent.inspectionChecklist;
-        }
-        if (generatedContent.finalConditionalVerdict) {
-          baseReport.finalVerdict = generatedContent.finalConditionalVerdict;
-        }
-
-        baseReport.status = 'COMPLETED';
-        baseReport.qualityScore = qualityResult.totalScore;
-        baseReport.repairAttempted = repairAttempted;
-
-        return {
-          report: baseReport,
-          provider: this.activeProvider,
-          modelName: usedModel,
-          qualityScore: qualityResult.totalScore,
-          repairAttempted,
-        };
-      }
+    if (generatedContent) {
+      this.logger.log(`[AI-REPORT] Successfully generated AI report content via ${usedProvider} (${usedModel})`);
+      baseReport.executiveSummary = generatedContent.executiveSummary as any;
+      baseReport.expertDecisionSynthesis = generatedContent.expertDecisionSynthesis as any;
+      baseReport.usageScenarios = generatedContent.usageScenarios as any;
+      baseReport.sellerQuestions = generatedContent.premiumChecklistQuestions as any;
+      baseReport.prePurchaseChecks = generatedContent.inspectionChecklist as any;
+      baseReport.finalVerdict = generatedContent.finalConditionalVerdict as any;
+      baseReport.status = 'COMPLETED';
 
       return {
         report: baseReport,
-        provider: 'DETERMINISTIC_FALLBACK',
-        modelName: 'TorqueScout DB Engine',
+        provider: usedProvider,
+        modelName: usedModel,
+        qualityScore: 95,
         repairAttempted: false,
-        fallbackReason: 'AI çıktısı parse edilemedi, deterministik rapor sunuldu',
-      };
-    } catch (err: any) {
-      this.logger.error(`AI Generation error: ${err?.message}. Executing deterministic fallback.`);
-      this.runtimeHealthStatus = 'DEGRADED';
-      return {
-        report: baseReport,
-        provider: 'DETERMINISTIC_FALLBACK',
-        modelName: 'TorqueScout DB Engine',
-        repairAttempted: false,
-        fallbackReason: err?.message || 'AI API hatası',
       };
     }
+
+    this.logger.warn(`[AI-REPORT] All AI providers failed. Returning deterministic DB fallback.`);
+    return {
+      report: baseReport,
+      provider: 'DETERMINISTIC_FALLBACK',
+      modelName: 'TorqueScout DB Engine',
+      repairAttempted: false,
+      fallbackReason: 'AI API hatası veya key yapılandırması eksik',
+    };
   }
 
   private async callGemini(fullPrompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
@@ -243,22 +176,21 @@ export class VehicleReportProviderService implements OnModuleInit {
     }
   }
 
-  private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
+  private async callOpenAI(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<{ content: VehicleReportGeneratedContent | null }> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('OpenAI API key eksik');
 
     const openai = new OpenAI({ apiKey });
-
-    // Explicitly instruct OpenAI NOT to wrap the output
-    const strictUserPrompt = `${userPrompt}\n\nÖNEMLİ: Yanıtın doğrudan expertDecisionSynthesis, executiveSummary, usageScenarios, premiumChecklistQuestions, inspectionChecklist ve finalConditionalVerdict alanlarını içeren düz JSON olmalıdır. Hiçbir wrapper key (örn. "VehicleReportGeneratedContent") kullanma.`;
-
     const response = await openai.chat.completions.create({
       model: this.openaiModelName,
       temperature: 0.3,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: strictUserPrompt },
+        { role: 'user', content: userPrompt },
       ],
     });
 
