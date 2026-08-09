@@ -85,7 +85,10 @@ export class VehicleCharacterResearchService {
         !(q as any).isSynthesisOnly,
     );
 
-    const searchPromises = searchableQuestions.map(async (question) => {
+    // Process Q1–Q5 sequentially to minimize memory concurrency & prevent V8 heap spikes on 512MB RAM containers
+    const answers: Record<string, CharacterQuestionAnswer | null> = {};
+
+    for (const question of searchableQuestions) {
       const engQuery = this.buildQuery(
         (question as any).tavilyQueryTemplate || '',
         input,
@@ -94,23 +97,20 @@ export class VehicleCharacterResearchService {
         (question as any).turkishQueryTemplate || '',
         input,
       );
-      return this.fetchEvidenceForQuestion(
+      answers[question.questionId] = await this.fetchEvidenceForQuestion(
         question.questionId,
         engQuery,
         trQuery,
         allDomains,
         input,
       );
-    });
+    }
 
-    const [q1Result, q2Result, q3Result, q4Result, q5Result] =
-      await Promise.allSettled(searchPromises);
-
-    const characterAndSegment = this.extractResult(q1Result, 'Q1_CHARACTER_AND_SEGMENT');
-    const engineTransmissionFit = this.extractResult(q2Result, 'Q2_ENGINE_TRANSMISSION_PERFORMANCE');
-    const drivingDynamics = this.extractResult(q3Result, 'Q3_DRIVING_DYNAMICS');
-    const comfortAndIsolation = this.extractResult(q4Result, 'Q4_COMFORT_ISOLATION');
-    const interiorPracticality = this.extractResult(q5Result, 'Q5_INTERIOR_PRACTICALITY');
+    const characterAndSegment = answers['Q1_CHARACTER_AND_SEGMENT'] || null;
+    const engineTransmissionFit = answers['Q2_ENGINE_TRANSMISSION_PERFORMANCE'] || null;
+    const drivingDynamics = answers['Q3_DRIVING_DYNAMICS'] || null;
+    const comfortAndIsolation = answers['Q4_COMFORT_ISOLATION'] || null;
+    const interiorPracticality = answers['Q5_INTERIOR_PRACTICALITY'] || null;
 
     // Q6: Synthesise from Q1–Q5 via LLM
     const usageScenarios = await this.synthesiseQuestion(
@@ -340,11 +340,12 @@ export class VehicleCharacterResearchService {
     return results.map((r) => {
       const url = r.url || '';
       const domain = r.domain || this.extractDomain(url);
+      const rawSnippet = r.snippet || r.contentMarkdown || '';
       return {
         url,
         domain,
         title: r.title || 'Automotive Source',
-        relevantSnippet: r.snippet || r.contentMarkdown || '',
+        relevantSnippet: rawSnippet.substring(0, 600),
         reliabilityTier: this.getReliabilityTier(domain || url),
       };
     });
