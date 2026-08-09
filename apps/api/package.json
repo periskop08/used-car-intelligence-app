@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "prisma generate && nest build",
-    "start": "node --max-old-space-size=300 --expose-gc dist/src/main.js",
+    "start": "node --expose-gc dist/src/main.js",
     "start:dev": "nest start --watch",
-    "start:prod": "node --max-old-space-size=300 --expose-gc dist/src/main.js",
+    "start:prod": "node --expose-gc dist/src/main.js",
     "postinstall": "prisma generate && node prisma/fix-stuck-migration.js",
     "db:fix-stuck": "node prisma/fix-stuck-migration.js",
     "db:validate": "prisma validate",

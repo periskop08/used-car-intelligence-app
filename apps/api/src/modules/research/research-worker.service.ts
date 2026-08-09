@@ -28,14 +28,14 @@ export class ResearchWorkerService implements OnApplicationBootstrap, OnApplicat
     this.isProcessing = true;
 
     try {
-      let processed = true;
-      while (processed) {
-        processed = await this.researchService.processNextJob();
-        if (processed) {
-          this.logger.log('Successfully processed a queued vehicle research job.');
+      const processed = await this.researchService.processNextJob();
+      if (processed) {
+        this.logger.log('Successfully processed a queued vehicle research job.');
+        if (typeof global.gc === 'function') {
+          global.gc();
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error(`Error in research worker cycle: ${err.message}`);
     } finally {
       this.isProcessing = false;

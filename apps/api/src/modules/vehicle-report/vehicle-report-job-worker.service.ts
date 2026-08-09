@@ -120,6 +120,9 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
       }
     } finally {
       this.isProcessing = false;
+      if (typeof global.gc === 'function') {
+        global.gc();
+      }
     }
   }
 }
