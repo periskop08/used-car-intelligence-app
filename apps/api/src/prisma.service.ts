@@ -7,7 +7,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
-    await this.ensureClubTablesExist();
+    // Non-blocking background DDL check
+    setTimeout(() => {
+      this.ensureClubTablesExist().catch((err) =>
+        this.logger.warn(`Background DDL bootstrap notice: ${err?.message}`),
+      );
+    }, 2000);
   }
 
   async onModuleDestroy() {

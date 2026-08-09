@@ -44,13 +44,17 @@ async function bootstrap() {
     SwaggerModule.setup('docs', app, document);
   }
 
-  // Periodic Garbage Collection to keep RSS memory low on Render free tier (512MB limit)
+  // Periodic Garbage Collection every 15 seconds to keep RSS memory low
   if (global.gc) {
+    try {
+      global.gc();
+    } catch (e) {}
+
     setInterval(() => {
       try {
         global.gc!();
       } catch (e) {}
-    }, 60000);
+    }, 15000);
   }
 
   const port = process.env.API_PORT || 3000;
