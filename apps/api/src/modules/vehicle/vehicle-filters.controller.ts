@@ -150,25 +150,30 @@ export class VehicleFiltersController {
     @Query('modelFamily') modelFamily?: string,
     @Query('model') model?: string,
   ) {
-    const targetModel = model || modelFamily;
-    if (!brand || !targetModel || !year) {
-      throw new BadRequestException('brand, modelFamily ve year query parametreleri gereklidir.');
+    try {
+      const targetModel = model || modelFamily;
+      const parsedYear = parseInt(String(year), 10);
+      if (!brand || !targetModel || isNaN(parsedYear)) {
+        return { success: true, data: [] };
+      }
+      const variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          year: parsedYear,
+        },
+        select: { bodyType: true },
+      });
+      const typesSet = new Set(variants.map(v => getBodyTypeTr(v.bodyType?.toString() || '')));
+      const sortedTypes = Array.from(typesSet).filter(Boolean).sort();
+      return {
+        success: true,
+        data: sortedTypes.map(name => ({ label: name, value: name })),
+      };
+    } catch (err: any) {
+      return { success: true, data: [] };
     }
-    const variants = await this.prisma.vehicleVariant.findMany({
-      where: {
-        status: 'APPROVED',
-        brand: { name: { equals: brand, mode: 'insensitive' } },
-        model: { name: { equals: targetModel, mode: 'insensitive' } },
-        year: Number(year),
-      },
-      select: { bodyType: true },
-    });
-    const typesSet = new Set(variants.map(v => getBodyTypeTr(v.bodyType?.toString() || '')));
-    const sortedTypes = Array.from(typesSet).filter(Boolean).sort();
-    return {
-      success: true,
-      data: sortedTypes.map(name => ({ label: name, value: name })),
-    };
   }
 
   @Get('engines')

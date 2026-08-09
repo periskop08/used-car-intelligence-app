@@ -718,9 +718,7 @@ export default function Home() {
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
               >
-                <option value="">
-                  {loadingBodyTypes ? "Yükleniyor..." : !selectedYear ? "Önce Yıl Seçiniz" : "Seçiniz..."}
-                </option>
+                <option value="">{loadingBodyTypes ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {bodyTypes.map((body) => (
                   <option key={body} value={body}>
                     {displayBodyType(body)}
@@ -746,9 +744,7 @@ export default function Home() {
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedBodyType || loadingEngines || engines.length === 0}
               >
-                <option value="">
-                  {loadingEngines ? "Yükleniyor..." : !selectedBodyType ? "Önce Kasa Tipi Seçiniz" : "Seçiniz..."}
-                </option>
+                <option value="">{loadingEngines ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {engines.map((eng) => (
                   <option key={eng} value={eng}>
                     {eng}
@@ -772,9 +768,7 @@ export default function Home() {
                 }`}
                 disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0 || isFuelTypeAutoSelected}
               >
-                <option value="">
-                  {loadingFuels ? "Yükleniyor..." : !selectedEngine ? "Önce Motor Seçiniz" : "Seçiniz..."}
-                </option>
+                <option value="">{loadingFuels ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {fuelTypes.map((fuel) => (
                   <option key={fuel} value={fuel}>
                     {displayFuelType(fuel)}
@@ -795,9 +789,7 @@ export default function Home() {
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
               >
-                <option value="">
-                  {loadingTransmissions ? "Yükleniyor..." : !selectedFuelType ? "Önce Yakıt Seçiniz" : "Seçiniz..."}
-                </option>
+                <option value="">{loadingTransmissions ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {transmissions.map((trans) => (
                   <option key={trans} value={trans}>
                     {trans}
@@ -815,9 +807,7 @@ export default function Home() {
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedTransmission || loadingTrims || trims.length === 0}
               >
-                <option value="">
-                  {loadingTrims ? "Yükleniyor..." : !selectedTransmission ? "Önce Şanzıman Seçiniz" : "Seçiniz..."}
-                </option>
+                <option value="">{loadingTrims ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {trims.map((trimName) => (
                   <option key={trimName} value={trimName}>
                     {trimName}
