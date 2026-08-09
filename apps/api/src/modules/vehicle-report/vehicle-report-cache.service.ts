@@ -10,7 +10,7 @@ export class VehicleReportCacheService {
     userId: string,
     mode: VehicleReportMode,
     contextHash: string,
-    reportVersion: string = 'v2.4',
+    reportVersion: string = 'v3.5_AI_ENGINE',
     variantId?: string,
     listingId?: string,
   ) {
@@ -23,7 +23,7 @@ export class VehicleReportCacheService {
         vehicleContextHash: contextHash,
         reportVersion,
         mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
-        status: { in: ['COMPLETED', 'SAFE_FALLBACK'] },
+        status: 'COMPLETED',
       },
       orderBy: { completedAt: 'desc' },
     });

@@ -273,7 +273,7 @@ export class VehicleReportService implements OnModuleInit {
             userId,
             'TORQUE_SCOUT_VEHICLE_REPORT',
             vehicleContextHash,
-            'v2.4',
+            'v3.5_AI_ENGINE',
             variantId,
           );
 
@@ -295,7 +295,7 @@ export class VehicleReportService implements OnModuleInit {
       // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
       const lockKey = crypto
         .createHash('sha256')
-        .update(`${userId}_${variantId}_${vehicleContextHash}_v1.0_v1`)
+        .update(`${userId}_${variantId}_${vehicleContextHash}_v3.5_v1`)
         .digest('hex');
 
       try {
@@ -342,7 +342,7 @@ export class VehicleReportService implements OnModuleInit {
           listingId: listingId || null,
           contextHash: vehicleContextHash,
           vehicleContextHash,
-          reportVersion: 'v2.4',
+          reportVersion: 'v3.5_AI_ENGINE',
           schemaVersion: 1,
           status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
           idempotencyKey: dto.idempotencyKey,
