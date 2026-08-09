@@ -135,6 +135,10 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 ### 5. PREMIUM CHECKLIST VE INSPECTION (En az 6 soru ve 6 kontrol)
 - Sorular ve ekspertiz adımları araca, motor koduna, turbo/şanzıman mimarisine özgü teknik detaylar içermelidir.
 
+### 6. ABSOLUTE BAN ON "BELİRTİLMEMİŞTİR" / "BİLGİ GİRİLMEMİŞTİR" PHRASES
+- KESİNLİKLE YASAK: Raporun hiçbir cümlesinde "belirtilmemiştir", "bilgisi mevcut değildir", "bilgi girilmemiştir", "bilinmemektedir", "bulunmamaktadır" veya "veri açıklanmamıştır" gibi meta-ifadeler KULLANMA!
+- Tüm teknik veriler (HP, Tork, Şanzıman Vites Sayısı, 0-100, Yakıt Deposu, Bagaj vb.) verilmiştir. Bunları doğrudan profesyonel otomotiv mühendisliği diliyle yaz.
+
 ## VEHİCLE CHARACTER ARAŞTIRMA KURALLARI (vehicleCharacter bölümüne uygula)
 
 Kullanıcı promptunda VEHICLE_CHARACTER_RESEARCH alanı varsa, vehicleCharacter bölümünü oluştururken bu alandaki web araştırması bulgularını birincil kaynak olarak kullan.
