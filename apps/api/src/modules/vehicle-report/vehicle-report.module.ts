@@ -16,9 +16,10 @@ import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.service';
 import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
 import { AuthModule } from '../auth/auth.module';
+import { ResearchModule } from '../research/research.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ResearchModule],
   controllers: [VehicleReportController],
   providers: [
     PrismaService,

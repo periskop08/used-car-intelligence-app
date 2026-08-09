@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { VehicleCharacterResearchService } from '../research/vehicle-character-research.service';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class VehicleReportContextBuilderService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(VehicleReportContextBuilderService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private vehicleCharacterResearch: VehicleCharacterResearchService,
+  ) {}
 
   async buildVehicleContext(variantId: string) {
     const variant = await this.prisma.vehicleVariant.findUnique({
@@ -48,6 +54,56 @@ export class VehicleReportContextBuilderService {
     });
 
     const specsJson = (variant.specs?.specs as any) || {};
+
+    // ─── On-demand character research ────────────────────────────────────────
+    // If characterResearchCache is null (first time or stale), run the 7-question
+    // web research now so the LLM gets real web evidence for the vehicleCharacter section.
+    let characterResearchCache = (variant as any).characterResearchCache || null;
+
+    if (!characterResearchCache) {
+      this.logger.log(
+        `characterResearchCache is null for variant ${variantId} — running on-demand research`,
+      );
+      try {
+        const result = await this.vehicleCharacterResearch.runCharacterResearch({
+          year: variant.year,
+          brand: variant.brand?.name,
+          model: variant.model?.name,
+          generation: variant.generation?.name,
+          bodyType: (variant.bodyType as string) || undefined,
+          engineCode: variant.engine?.code,
+          enginePowerHp: (variant.engine as any)?.powerHp,
+          transmissionName: variant.transmission?.name,
+          transmissionType: (variant.transmission as any)?.type,
+          driveType: (variant as any).driveType,
+          trimName: variant.trim?.name,
+          market: variant.marketRegion || 'TR',
+          languageCode: 'tr',
+        });
+
+        characterResearchCache = result;
+
+        // Persist to DB so subsequent reports use the cached result
+        await this.prisma.vehicleVariant.update({
+          where: { id: variantId },
+          data: {
+            characterResearchCache: result as any,
+            characterResearchedAt: new Date(),
+          } as any,
+        });
+
+        this.logger.log(
+          `On-demand character research completed for variant ${variantId}. Sources: ${result.totalSourcesFound}`,
+        );
+      } catch (err: any) {
+        this.logger.error(
+          `On-demand character research failed for variant ${variantId}: ${err.message}`,
+        );
+        // Non-fatal: continue report generation without character research data
+        characterResearchCache = null;
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Build complete factory performance and technical specs
     const performanceData: Record<string, any> = {};
@@ -135,8 +191,8 @@ export class VehicleReportContextBuilderService {
         }))
       } : null,
       // Vehicle character research: 7-question web research results
-      // null = not yet researched or research returned insufficient evidence
-      vehicleCharacterResearch: (variant as any).characterResearchCache || null,
+      // null = research failed or Tavily returned no results
+      vehicleCharacterResearch: characterResearchCache,
     };
 
     const contextHash = crypto
