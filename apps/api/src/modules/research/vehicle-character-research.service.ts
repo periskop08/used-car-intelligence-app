@@ -152,6 +152,10 @@ export class VehicleCharacterResearchService {
       `Character research complete for ${variantTitle}. Total sources found across web: ${totalSourcesFound}`,
     );
 
+    if (typeof global.gc === 'function') {
+      global.gc();
+    }
+
     return result;
   }
 

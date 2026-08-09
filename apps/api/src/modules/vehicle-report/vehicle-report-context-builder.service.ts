@@ -55,53 +55,21 @@ export class VehicleReportContextBuilderService {
 
     const specsJson = (variant.specs?.specs as any) || {};
 
-    // ─── On-demand character research ────────────────────────────────────────
-    // If characterResearchCache is null (first time or stale), run the 7-question
-    // web research now so the LLM gets real web evidence for the vehicleCharacter section.
+    // ─── Asynchronous character research ──────────────────────────────────────
+    // If characterResearchCache is null, launch research asynchronously in background
+    // so the HTTP report request finishes instantly without locking memory or hitting OOM.
     let characterResearchCache = (variant as any).characterResearchCache || null;
 
     if (!characterResearchCache) {
       this.logger.log(
-        `characterResearchCache is null for variant ${variantId} — running on-demand research`,
+        `characterResearchCache is null for variant ${variantId} — launching background research`,
       );
-      try {
-        const result = await this.vehicleCharacterResearch.runCharacterResearch({
-          year: variant.year,
-          brand: variant.brand?.name,
-          model: variant.model?.name,
-          generation: variant.generation?.name,
-          bodyType: (variant.bodyType as string) || undefined,
-          engineCode: variant.engine?.code,
-          enginePowerHp: (variant.engine as any)?.powerHp,
-          transmissionName: variant.transmission?.name,
-          transmissionType: (variant.transmission as any)?.type,
-          driveType: (variant as any).driveType,
-          trimName: variant.trim?.name,
-          market: variant.marketRegion || 'TR',
-          languageCode: 'tr',
-        });
-
-        characterResearchCache = result;
-
-        // Persist to DB so subsequent reports use the cached result
-        await this.prisma.vehicleVariant.update({
-          where: { id: variantId },
-          data: {
-            characterResearchCache: result as any,
-            characterResearchedAt: new Date(),
-          } as any,
-        });
-
-        this.logger.log(
-          `On-demand character research completed for variant ${variantId}. Sources: ${result.totalSourcesFound}`,
-        );
-      } catch (err: any) {
+      // Non-blocking async execution
+      this.runCharacterResearchInBackground(variant).catch((err) =>
         this.logger.error(
-          `On-demand character research failed for variant ${variantId}: ${err.message}`,
-        );
-        // Non-fatal: continue report generation without character research data
-        characterResearchCache = null;
-      }
+          `Background character research failed for variant ${variantId}: ${err.message}`,
+        ),
+      );
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -205,4 +173,45 @@ export class VehicleReportContextBuilderService {
       vehicleContextHash: contextHash,
     };
   }
+
+  private async runCharacterResearchInBackground(variant: any): Promise<void> {
+    this.logger.log(`Starting background character research for variant ${variant.id}`);
+    try {
+      const result = await this.vehicleCharacterResearch.runCharacterResearch({
+        year: variant.year,
+        brand: variant.brand?.name,
+        model: variant.model?.name,
+        generation: variant.generation?.name,
+        bodyType: (variant.bodyType as string) || undefined,
+        engineCode: variant.engine?.code,
+        enginePowerHp: (variant.engine as any)?.powerHp,
+        transmissionName: variant.transmission?.name,
+        transmissionType: (variant.transmission as any)?.type,
+        driveType: (variant as any).driveType,
+        trimName: variant.trim?.name,
+        market: variant.marketRegion || 'TR',
+        languageCode: 'tr',
+      });
+
+      await this.prisma.vehicleVariant.update({
+        where: { id: variant.id },
+        data: {
+          characterResearchCache: result as any,
+          characterResearchedAt: new Date(),
+        } as any,
+      });
+
+      this.logger.log(
+        `Background character research completed & saved for variant ${variant.id}. Total sources: ${result.totalSourcesFound}`,
+      );
+    } catch (err: any) {
+      this.logger.error(`Background character research failed for ${variant.id}: ${err.message}`);
+    } finally {
+      // Explicitly trigger garbage collection if exposed
+      if (typeof global.gc === 'function') {
+        global.gc();
+      }
+    }
+  }
 }
+
