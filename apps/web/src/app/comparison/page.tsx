@@ -297,11 +297,17 @@ export default function ComparisonPage() {
       transmissions: [],
       trims: [],
       loadingBodyTypes: !!yearVal,
+      loadingEngines: !!yearVal,
+      loadingFuels: !!yearVal,
+      loadingTransmissions: !!yearVal,
+      loadingTrims: !!yearVal,
     });
 
     if (!yearVal || !slot.selectedBrand || !slot.selectedModel) return;
 
-    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}`)
+    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}`;
+
+    fetch(`${API_URL}/vehicle-filters/body-types?${baseQuery}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -311,6 +317,59 @@ export default function ComparisonPage() {
         }
       })
       .catch(() => updateSlot(index, { loadingBodyTypes: false }));
+
+    fetch(`${API_URL}/vehicle-filters/engines?${baseQuery}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { engines: res.data.map((e: any) => e.value), loadingEngines: false });
+        } else {
+          updateSlot(index, { loadingEngines: false });
+        }
+      })
+      .catch(() => updateSlot(index, { loadingEngines: false }));
+
+    fetch(`${API_URL}/vehicle-filters/fuel-types?${baseQuery}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { fuelTypes: res.data.map((f: any) => f.value), loadingFuels: false });
+        } else {
+          updateSlot(index, { loadingFuels: false });
+        }
+      })
+      .catch(() => updateSlot(index, { loadingFuels: false }));
+
+    fetch(`${API_URL}/vehicle-filters/transmissions?${baseQuery}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { transmissions: res.data.map((t: any) => t.value), loadingTransmissions: false });
+        } else {
+          updateSlot(index, { loadingTransmissions: false });
+        }
+      })
+      .catch(() => updateSlot(index, { loadingTransmissions: false }));
+
+    fetch(`${API_URL}/vehicle-filters/trims?${baseQuery}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data)) {
+          updateSlot(index, { trims: res.data.map((tr: any) => tr.value), loadingTrims: false, matchedVariantId: res.autoVariantId || null });
+        } else {
+          updateSlot(index, { loadingTrims: false });
+        }
+      })
+      .catch(() => updateSlot(index, { loadingTrims: false }));
+
+    fetch(`${API_URL}/vehicle-filters/match-variant?${baseQuery}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && res.variantId) {
+          updateSlot(index, { matchedVariantId: res.variantId });
+        }
+      })
+      .catch(() => {});
   };
 
   const handleBodyTypeChange = (index: number, bodyVal: string) => {

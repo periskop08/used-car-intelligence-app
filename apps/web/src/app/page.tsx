@@ -767,8 +767,8 @@ export default function Home() {
                   setSelectedTransmission("");
                   setSelectedTrim("");
                 }}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={!selectedBodyType || loadingEngines || engines.length === 0}
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition cursor-pointer"
+                disabled={!selectedYear || loadingEngines || engines.length === 0}
               >
                 <option value="">{loadingEngines ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {engines.map((eng) => (
@@ -790,9 +790,9 @@ export default function Home() {
                   setSelectedTrim("");
                 }}
                 className={`bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm outline-none transition ${
-                  isFuelTypeAutoSelected ? "text-slate-400 border-white/5 cursor-not-allowed opacity-80" : "text-slate-200 focus:border-orange-500"
+                  isFuelTypeAutoSelected ? "text-slate-400 border-white/5 cursor-not-allowed opacity-80" : "text-slate-200 focus:border-orange-500 cursor-pointer"
                 }`}
-                disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0 || isFuelTypeAutoSelected}
+                disabled={!selectedYear || loadingFuels || fuelTypes.length === 0 || isFuelTypeAutoSelected}
               >
                 <option value="">{loadingFuels ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {fuelTypes.map((fuel) => (
@@ -812,8 +812,8 @@ export default function Home() {
                   setSelectedTransmission(e.target.value);
                   setSelectedTrim("");
                 }}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition cursor-pointer"
+                disabled={!selectedYear || loadingTransmissions || transmissions.length === 0}
               >
                 <option value="">{loadingTransmissions ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {transmissions.map((trans) => (
@@ -830,8 +830,8 @@ export default function Home() {
               <select
                 value={selectedTrim}
                 onChange={(e) => setSelectedTrim(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                disabled={!selectedTransmission || loadingTrims || trims.length === 0}
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition cursor-pointer"
+                disabled={!selectedYear || loadingTrims || trims.length === 0}
               >
                 <option value="">{loadingTrims ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {trims.map((trimName) => (
