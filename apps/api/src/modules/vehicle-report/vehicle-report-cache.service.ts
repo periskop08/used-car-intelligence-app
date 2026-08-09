@@ -10,7 +10,7 @@ export class VehicleReportCacheService {
     userId: string,
     mode: VehicleReportMode,
     contextHash: string,
-    reportVersion: string = 'v4.3_TRIM_INTELLIGENCE',
+    reportVersion: string = 'v4.4_KM_BREAKDOWN_TIMELINE',
     variantId?: string,
     listingId?: string,
   ) {
