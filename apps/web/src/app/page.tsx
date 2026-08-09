@@ -267,6 +267,7 @@ export default function Home() {
   }, [selectedYear, selectedBrand, selectedModel, brands, models]);
 
   // Fetch Engines when Body Type changes (New Order: Brand -> Model -> Year -> Body Type -> Engine)
+  // Fetch Engines when Year or Body Type changes
   useEffect(() => {
     setEngines([]);
     setSelectedEngine("");
@@ -276,17 +277,23 @@ export default function Home() {
     setSelectedTransmission("");
     setTrims([]);
     setSelectedTrim("");
-    setMatchedVariantId(null);
     setNoTrimFound(false);
 
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType) return;
+    if (!selectedBrand || !selectedModel || !selectedYear) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
     const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
     
     setLoadingEngines(true);
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}`)
+    const queryParams = new URLSearchParams({
+      brand: brandName,
+      modelFamily: modelName,
+      year: selectedYear,
+    });
+    if (selectedBodyType) queryParams.set('bodyType', selectedBodyType);
+
+    fetch(`${API_URL}/vehicle-filters/engines?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -301,7 +308,7 @@ export default function Home() {
       .catch(() => setLoadingEngines(false));
   }, [selectedBodyType, selectedBrand, selectedModel, selectedYear, brands, models]);
 
-  // Fetch Fuel Types when Engine changes (New Order: Engine -> Fuel Type)
+  // Fetch Fuel Types when Engine/Year changes
   useEffect(() => {
     setFuelTypes([]);
     setSelectedFuelType("");
@@ -310,17 +317,24 @@ export default function Home() {
     setSelectedTransmission("");
     setTrims([]);
     setSelectedTrim("");
-    setMatchedVariantId(null);
     setNoTrimFound(false);
 
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine) return;
+    if (!selectedBrand || !selectedModel || !selectedYear) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
     const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
     
     setLoadingFuels(true);
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}`)
+    const queryParams = new URLSearchParams({
+      brand: brandName,
+      modelFamily: modelName,
+      year: selectedYear,
+    });
+    if (selectedBodyType) queryParams.set('bodyType', selectedBodyType);
+    if (selectedEngine) queryParams.set('engineVersion', selectedEngine);
+
+    fetch(`${API_URL}/vehicle-filters/fuel-types?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -338,23 +352,31 @@ export default function Home() {
       .catch(() => setLoadingFuels(false));
   }, [selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
 
-  // Fetch Transmissions when Fuel Type changes (New Order: Fuel Type -> Transmission)
+  // Fetch Transmissions when Fuel Type/Engine/Year changes
   useEffect(() => {
     setTransmissions([]);
     setSelectedTransmission("");
     setTrims([]);
     setSelectedTrim("");
-    setMatchedVariantId(null);
     setNoTrimFound(false);
 
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedFuelType || !selectedEngine) return;
+    if (!selectedBrand || !selectedModel || !selectedYear) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
     const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
     
     setLoadingTransmissions(true);
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}`)
+    const queryParams = new URLSearchParams({
+      brand: brandName,
+      modelFamily: modelName,
+      year: selectedYear,
+    });
+    if (selectedBodyType) queryParams.set('bodyType', selectedBodyType);
+    if (selectedEngine) queryParams.set('engineVersion', selectedEngine);
+    if (selectedFuelType) queryParams.set('fuelType', selectedFuelType);
+
+    fetch(`${API_URL}/vehicle-filters/transmissions?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -369,21 +391,30 @@ export default function Home() {
       .catch(() => setLoadingTransmissions(false));
   }, [selectedFuelType, selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
 
-  // Fetch Trims (Donanım Paketleri) when Transmission changes
+  // Fetch Trims (Donanım Paketleri)
   useEffect(() => {
     setTrims([]);
     setSelectedTrim("");
     setNoTrimFound(false);
-    setMatchedVariantId(null);
 
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedFuelType || !selectedEngine || !selectedTransmission) return;
+    if (!selectedBrand || !selectedModel || !selectedYear) return;
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
     const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
     
     setLoadingTrims(true);
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}&transmissionType=${encodeURIComponent(selectedTransmission)}`)
+    const queryParams = new URLSearchParams({
+      brand: brandName,
+      modelFamily: modelName,
+      year: selectedYear,
+    });
+    if (selectedBodyType) queryParams.set('bodyType', selectedBodyType);
+    if (selectedEngine) queryParams.set('engineVersion', selectedEngine);
+    if (selectedFuelType) queryParams.set('fuelType', selectedFuelType);
+    if (selectedTransmission) queryParams.set('transmissionType', selectedTransmission);
+
+    fetch(`${API_URL}/vehicle-filters/trims?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -414,26 +445,30 @@ export default function Home() {
       });
   }, [selectedTransmission, selectedFuelType, selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
 
-  // Match final Variant ID when Trim changes
+  // Match Variant ID whenever selection updates (as soon as Brand, Model, Year are selected)
   useEffect(() => {
-    setMatchedVariantId(null);
-    if (
-      !selectedBrand ||
-      !selectedModel ||
-      !selectedYear ||
-      !selectedBodyType ||
-      !selectedFuelType ||
-      !selectedEngine ||
-      !selectedTransmission ||
-      !selectedTrim
-    ) return;
+    if (!selectedBrand || !selectedModel || !selectedYear) {
+      setMatchedVariantId(null);
+      return;
+    }
     
     const brandName = brands.find(b => b.id === selectedBrand)?.name;
     const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
     
     setLoadingMatch(true);
-    fetch(`${API_URL}/vehicle-filters/match-variant?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}&trimPackage=${encodeURIComponent(selectedTrim)}&transmissionType=${encodeURIComponent(selectedTransmission)}`)
+    const queryParams = new URLSearchParams({
+      brand: brandName,
+      modelFamily: modelName,
+      year: selectedYear,
+    });
+    if (selectedBodyType) queryParams.set('bodyType', selectedBodyType);
+    if (selectedEngine) queryParams.set('engineVersion', selectedEngine);
+    if (selectedFuelType) queryParams.set('fuelType', selectedFuelType);
+    if (selectedTrim) queryParams.set('trimPackage', selectedTrim);
+    if (selectedTransmission) queryParams.set('transmissionType', selectedTransmission);
+
+    fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && res.variantId) {
@@ -442,7 +477,7 @@ export default function Home() {
         setLoadingMatch(false);
       })
       .catch(() => setLoadingMatch(false));
-  }, [selectedTrim, selectedBrand, selectedModel, selectedYear, selectedBodyType, selectedFuelType, selectedEngine, selectedTransmission, brands, models]);
+  }, [selectedTrim, selectedTransmission, selectedFuelType, selectedEngine, selectedBodyType, selectedYear, selectedBrand, selectedModel, brands, models]);
 
   const applyAlternative = (v: any) => {
     const brandObj = brands.find(b => b.name === v.brand.name);
