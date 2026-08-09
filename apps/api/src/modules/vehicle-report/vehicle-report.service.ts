@@ -273,7 +273,7 @@ export class VehicleReportService implements OnModuleInit {
             userId,
             'TORQUE_SCOUT_VEHICLE_REPORT',
             vehicleContextHash,
-            'v4.2_ACCURATE_SPECS',
+            'v4.3_TRIM_INTELLIGENCE',
             variantId,
           );
 
@@ -342,7 +342,7 @@ export class VehicleReportService implements OnModuleInit {
           listingId: listingId || null,
           contextHash: vehicleContextHash,
           vehicleContextHash,
-          reportVersion: 'v4.2_ACCURATE_SPECS',
+          reportVersion: 'v4.3_TRIM_INTELLIGENCE',
           schemaVersion: 1,
           status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
           idempotencyKey: dto.idempotencyKey,
