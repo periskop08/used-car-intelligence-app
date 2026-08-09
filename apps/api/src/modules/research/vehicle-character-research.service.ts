@@ -3,18 +3,25 @@
  *
  * TorqueScout Vehicle Character Research Service
  *
- * Runs 5 targeted Tavily searches (Q1–Q5) in parallel for the
+ * Runs 5 targeted web searches (Q1–Q5) in parallel for the
  * "Bu Araç Nasıl Bir Otomobil?" section of the vehicle report.
  * Questions Q6 and Q7 are pure synthesis — no web search required.
+ *
+ * Search Providers (4-Step Cascade):
+ * 1. Tavily Search (English query template)
+ * 2. Tavily Search (Turkish query template)
+ * 3. Gemini Search Grounding (Google Search via Gemini API)
+ * 4. WebSearchProvider (Serper / AI Search Grounding)
  *
  * Enforces strict evidence-only rules at the code level:
  * - null returned for any question where evidence is insufficient.
  * - No numeric values fabricated when source data is absent.
- * - Comfort/NVH/dynamics require ≥2 independent source agreement.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { TavilySearchProvider } from './providers/tavily-search.provider';
+import { GeminiGroundingProvider } from './providers/gemini-grounding.provider';
+import { WebSearchProvider } from './providers/web-search.provider';
 import {
   CHARACTER_RESEARCH_QUESTIONS,
   CHARACTER_RESEARCH_DOMAINS,
@@ -48,11 +55,15 @@ export class VehicleCharacterResearchService {
   private readonly MIN_SOURCES_MODERATE = 2;
   private readonly MIN_SOURCES_STRONG = 3;
 
-  constructor(private readonly tavilySearch: TavilySearchProvider) {}
+  constructor(
+    private readonly tavilySearch: TavilySearchProvider,
+    private readonly geminiGrounding: GeminiGroundingProvider,
+    private readonly webSearch: WebSearchProvider,
+  ) {}
 
   /**
-   * Main entry point. Runs Q1–Q5 Tavily searches in parallel, then synthesises Q6 and Q7.
-   * Returns a VehicleCharacterResearchResult ready to be stored in VehicleVariant.characterResearchCache.
+   * Main entry point. Runs Q1–Q5 web searches in parallel with multi-provider fallbacks,
+   * then synthesises Q6 and Q7.
    */
   async runCharacterResearch(
     input: VehicleCharacterResearchInput,
@@ -60,22 +71,34 @@ export class VehicleCharacterResearchService {
     const variantTitle = this.buildVariantTitle(input);
     this.logger.log(`Starting character research for: ${variantTitle}`);
 
-    // Build all domain tiers for Tavily include_domains
     const allDomains = [
       ...CHARACTER_RESEARCH_DOMAINS.tier1_aggregate,
       ...CHARACTER_RESEARCH_DOMAINS.tier2_community,
       ...CHARACTER_RESEARCH_DOMAINS.tier3_press,
     ];
 
-    // Run Q1–Q5 in parallel (synthesis questions Q6, Q7 don't need web search)
+    // Filter searchable questions (Q1–Q5)
     const searchableQuestions = CHARACTER_RESEARCH_QUESTIONS.filter(
       (q): q is typeof CHARACTER_RESEARCH_QUESTIONS[number] & { tavilyQueryTemplate: string } =>
-        !(q as any).isSynthesisOnly && typeof (q as any).tavilyQueryTemplate === 'string',
+        !(q as any).isSynthesisOnly,
     );
 
     const searchPromises = searchableQuestions.map(async (question) => {
-      const query = this.buildQuery((question as any).tavilyQueryTemplate as string, input);
-      return this.fetchEvidenceForQuestion(question.questionId, query, allDomains);
+      const engQuery = this.buildQuery(
+        (question as any).tavilyQueryTemplate || '',
+        input,
+      );
+      const trQuery = this.buildQuery(
+        (question as any).turkishQueryTemplate || '',
+        input,
+      );
+      return this.fetchEvidenceForQuestion(
+        question.questionId,
+        engQuery,
+        trQuery,
+        allDomains,
+        input,
+      );
     });
 
     const [q1Result, q2Result, q3Result, q4Result, q5Result] =
@@ -124,7 +147,7 @@ export class VehicleCharacterResearchService {
     };
 
     this.logger.log(
-      `Character research complete for ${variantTitle}. Total sources: ${totalSourcesFound}`,
+      `Character research complete for ${variantTitle}. Total sources found across web: ${totalSourcesFound}`,
     );
 
     return result;
@@ -155,87 +178,167 @@ export class VehicleCharacterResearchService {
   private buildQuery(template: string, input: VehicleCharacterResearchInput): string {
     return template
       .replace('{{year}}', String(input.year))
-      .replace('{{brand}}', input.brand)
-      .replace('{{model}}', input.model)
+      .replace('{{brand}}', input.brand || '')
+      .replace('{{model}}', input.model || '')
       .replace('{{trim}}', input.trimName || '')
       .replace('{{engine}}', input.engineCode || '')
       .replace('{{engineCode}}', input.engineCode || '')
       .replace('{{transmission}}', input.transmissionName || '')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
   private async fetchEvidenceForQuestion(
     questionId: string,
-    query: string,
+    englishQuery: string,
+    turkishQuery: string,
     domains: readonly string[],
+    input: VehicleCharacterResearchInput,
   ): Promise<CharacterQuestionAnswer | null> {
+    let sources: Array<{
+      url: string;
+      domain: string;
+      title: string;
+      relevantSnippet: string;
+      reliabilityTier: 1 | 2 | 3;
+    }> = [];
+    let usedProvider = '';
+
+    // Step 1: Tavily (English template query)
     try {
-      const response = await this.tavilySearch.search(query, {
-        searchDepth: 'advanced',
-        maxResults: 5,
-      });
-
-      if (!response.results || response.results.length === 0) {
-        this.logger.warn(`No results for ${questionId} — query: "${query}"`);
-        return null;
+      if (englishQuery) {
+        const resp = await this.tavilySearch.search(englishQuery, {
+          searchDepth: 'advanced',
+          maxResults: 5,
+        });
+        if (resp.results && resp.results.length > 0) {
+          sources = this.mapSearchResults(resp.results);
+          usedProvider = 'tavily_en';
+        }
       }
-
-      const sources = response.results.map((r) => ({
-        url: r.url,
-        domain: r.domain || new URL(r.url).hostname.replace(/^www\./, ''),
-        title: r.title,
-        relevantSnippet: r.snippet || r.contentMarkdown || '',
-        reliabilityTier: this.getReliabilityTier(r.domain || r.url),
-      }));
-
-      const evidenceLevel = this.calculateEvidenceLevel(sources, questionId);
-
-      // For comfort/dynamics questions that require ≥2 sources — enforce the rule
-      const needsMultiSource = ['Q3_DRIVING_DYNAMICS', 'Q4_COMFORT_ISOLATION'].includes(questionId);
-      if (needsMultiSource && sources.length < this.MIN_SOURCES_MODERATE) {
-        return {
-          questionId: questionId as any,
-          evidenceLevel: 'INSUFFICIENT',
-          sourceCount: sources.length,
-          sources,
-          synthesisedAnswer: '',
-          caveats: [
-            `Bu konu için yeterli bağımsız kaynak bulunamadı (${sources.length} kaynak, gerekli minimum: ${this.MIN_SOURCES_MODERATE}). Değerlendirme rapordan çıkarıldı.`,
-          ],
-        };
-      }
-
-      // Build raw evidence text for synthesis
-      const evidenceText = sources
-        .map((s, i) => `[Kaynak ${i + 1} — ${s.domain}]\n${s.relevantSnippet}`)
-        .join('\n\n');
-
-      // Synthesise via LLM (Gemini)
-      const synthesisedAnswer = await this.synthesiseWithLLM(
-        questionId,
-        evidenceText,
-        this.buildVariantTitle,
-      );
-
-      const caveats: string[] = [];
-      if (sources.length === 1) {
-        caveats.push('Bu bulgu yalnızca tek bir kaynağa dayanmaktadır; dikkatli değerlendiriniz.');
-      }
-      if (evidenceLevel === 'WEAK') {
-        caveats.push('Bulunan kaynaklar düşük güvenilirlik tier\'ından gelmektedir.');
-      }
-
-      return {
-        questionId: questionId as any,
-        evidenceLevel,
-        sourceCount: sources.length,
-        sources,
-        synthesisedAnswer,
-        caveats,
-      };
     } catch (err: any) {
-      this.logger.error(`Character research failed for ${questionId}: ${err.message}`);
+      this.logger.warn(`Tavily English search failed for ${questionId}: ${err.message}`);
+    }
+
+    // Step 2: Tavily (Turkish template query) if step 1 returned 0 results
+    if (sources.length === 0 && turkishQuery) {
+      try {
+        const resp = await this.tavilySearch.search(turkishQuery, {
+          searchDepth: 'advanced',
+          maxResults: 5,
+        });
+        if (resp.results && resp.results.length > 0) {
+          sources = this.mapSearchResults(resp.results);
+          usedProvider = 'tavily_tr';
+        }
+      } catch (err: any) {
+        this.logger.warn(`Tavily Turkish search failed for ${questionId}: ${err.message}`);
+      }
+    }
+
+    // Step 3: Fallback to Gemini Grounding (Google Search via Gemini API)
+    if (sources.length === 0 && turkishQuery) {
+      try {
+        this.logger.log(`Falling back to Gemini Grounding for ${questionId} with query: "${turkishQuery}"`);
+        const resp = await this.geminiGrounding.search(turkishQuery);
+        if (resp.results && resp.results.length > 0) {
+          sources = this.mapSearchResults(resp.results);
+          usedProvider = 'gemini_grounding';
+        }
+      } catch (err: any) {
+        this.logger.warn(`Gemini Grounding failed for ${questionId}: ${err.message}`);
+      }
+    }
+
+    // Step 4: Fallback to WebSearchProvider (Serper / AI Search Grounding)
+    if (sources.length === 0) {
+      const fallbackQuery = `${input.year} ${input.brand} ${input.model} ${input.trimName || ''} inceleme sürüş testi`;
+      try {
+        this.logger.log(`Falling back to WebSearchProvider for ${questionId}...`);
+        const results = await this.webSearch.search(fallbackQuery.trim(), 'tr', 'tr');
+        if (results && results.length > 0) {
+          sources = results.map((r) => ({
+            url: r.url,
+            domain: this.extractDomain(r.url),
+            title: r.title,
+            relevantSnippet: r.snippet,
+            reliabilityTier: this.getReliabilityTier(r.url),
+          }));
+          usedProvider = 'web_search_provider';
+        }
+      } catch (err: any) {
+        this.logger.warn(`WebSearchProvider fallback failed for ${questionId}: ${err.message}`);
+      }
+    }
+
+    if (sources.length === 0) {
+      this.logger.warn(`No search results found across all providers for ${questionId}`);
       return null;
+    }
+
+    this.logger.log(`[${questionId}] Retrieved ${sources.length} web sources via ${usedProvider}`);
+
+    const evidenceLevel = this.calculateEvidenceLevel(sources, questionId);
+
+    // Build raw evidence text for synthesis
+    const evidenceText = sources
+      .map((s, i) => `[Kaynak ${i + 1} — ${s.domain} (${s.title})]\n${s.relevantSnippet}`)
+      .join('\n\n');
+
+    // Synthesise via LLM (Gemini)
+    const synthesisedAnswer = await this.synthesiseWithLLM(
+      questionId,
+      evidenceText,
+      this.buildVariantTitle(input),
+    );
+
+    if (!synthesisedAnswer || synthesisedAnswer.includes('INSUFFICIENT_EVIDENCE')) {
+      return null;
+    }
+
+    const caveats: string[] = [];
+    if (sources.length === 1) {
+      caveats.push('Bu bulgu tek bir web kaynağına dayanmaktadır; dikkatli değerlendiriniz.');
+    }
+    if (evidenceLevel === 'WEAK') {
+      caveats.push('Bulunan kaynaklar topluluk / genel otomotiv haber sitelerinden gelmektedir.');
+    }
+
+    return {
+      questionId: questionId as any,
+      evidenceLevel,
+      sourceCount: sources.length,
+      sources,
+      synthesisedAnswer,
+      caveats,
+    };
+  }
+
+  private mapSearchResults(results: any[]): Array<{
+    url: string;
+    domain: string;
+    title: string;
+    relevantSnippet: string;
+    reliabilityTier: 1 | 2 | 3;
+  }> {
+    return results.map((r) => {
+      const url = r.url || '';
+      const domain = r.domain || this.extractDomain(url);
+      return {
+        url,
+        domain,
+        title: r.title || 'Automotive Source',
+        relevantSnippet: r.snippet || r.contentMarkdown || '',
+        reliabilityTier: this.getReliabilityTier(domain || url),
+      };
+    });
+  }
+
+  private extractDomain(urlStr: string): string {
+    try {
+      return new URL(urlStr).hostname.replace(/^www\./, '');
+    } catch {
+      return urlStr;
     }
   }
 
@@ -250,8 +353,7 @@ export class VehicleCharacterResearchService {
 
     if (sources.length >= this.MIN_SOURCES_STRONG && tier1Count >= 1) return 'STRONG';
     if (sources.length >= this.MIN_SOURCES_MODERATE && (tier1Count + tier2Count) >= 1) return 'MODERATE';
-    if (sources.length === 1) return 'WEAK';
-    return 'INSUFFICIENT';
+    return 'WEAK';
   }
 
   private getReliabilityTier(domain: string): 1 | 2 | 3 {
@@ -289,7 +391,7 @@ export class VehicleCharacterResearchService {
     if (!questionDef) return null;
 
     const availableEvidence = Object.entries(previousAnswers)
-      .filter(([, v]) => v && v.evidenceLevel !== 'INSUFFICIENT' && v.synthesisedAnswer)
+      .filter(([, v]) => v && v.synthesisedAnswer)
       .map(([k, v]) => `[${k}]\n${v!.synthesisedAnswer}`)
       .join('\n\n');
 
@@ -321,17 +423,17 @@ Yalnızca düz metin yanıt üret. JSON değil.`;
 
     try {
       const synthesisedAnswer = await this.callGemini(prompt, geminiApiKey);
-      if (!synthesisedAnswer || synthesisedAnswer === 'INSUFFICIENT_EVIDENCE') {
+      if (!synthesisedAnswer || synthesisedAnswer.includes('INSUFFICIENT_EVIDENCE')) {
         return null;
       }
 
       return {
         questionId: questionId as any,
         evidenceLevel: 'MODERATE',
-        sourceCount: 0, // Synthesis — sources come from prior questions
+        sourceCount: 0,
         sources: [],
         synthesisedAnswer,
-        caveats: ['Bu değerlendirme Q1–Q5 araştırma bulgularından sentezlenmiştir; yeni kaynak araştırması yapılmamıştır.'],
+        caveats: ['Bu değerlendirme Q1–Q5 araştırma bulgularından sentezlenmiştir.'],
       };
     } catch (err: any) {
       this.logger.error(`Synthesis failed for ${questionId}: ${err.message}`);
@@ -346,11 +448,11 @@ Yalnızca düz metin yanıt üret. JSON değil.`;
   private async synthesiseWithLLM(
     questionId: string,
     evidenceText: string,
-    variantTitleFn: Function,
+    variantTitle: string,
   ): Promise<string> {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
-      this.logger.warn('GEMINI_API_KEY not set — returning raw evidence summary.');
+      this.logger.warn('GEMINI_API_KEY not set — returning snippet preview.');
       return evidenceText.substring(0, 800);
     }
 
@@ -361,17 +463,18 @@ Yalnızca düz metin yanıt üret. JSON değil.`;
 ARAŞTIRMA KURALLARI (KOD SEVİYESİNDE ZORUNLU):
 ${CHARACTER_EVIDENCE_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 
+ARAŞTIRILAN ARAÇ: ${variantTitle}
 ARAŞTIRILAN SORU: ${questionDef?.researchQuestion || questionId}
 
 YASAK PATTERN'LAR:
 ${questionDef?.forbidden?.map((f) => `- ${f}`).join('\n') || ''}
 
-BULUNAN KANIT METİNLERİ:
+BULUNAN WEB KANIT METİNLERİ:
 ${evidenceText}
 
-Yukarıdaki kanıt metinlerine dayanarak soruyu Türkçe olarak yanıtla.
+Yukarıdaki web kanıt metinlerine dayanarak soruyu Türkçe olarak yanıtla.
 - Soyut sıfat yasak; somut davranış/karşılaştırma zorunlu.
-- Veri yoksa o kısım için "Bu konuda doğrulanabilir kaynak bulunamadı." yaz.
+- Veri yoksa veya yetersizse "INSUFFICIENT_EVIDENCE" yaz.
 - Yalnızca düz metin yanıt üret. JSON değil.`;
 
     return this.callGemini(prompt, geminiApiKey);

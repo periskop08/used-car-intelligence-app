@@ -46,6 +46,7 @@ export const CHARACTER_RESEARCH_QUESTIONS = [
     forbidden: ['Sadece marka prestij ifadesi', 'Boş sıfat karşılaştırması (daha iyi/daha kötü gerekçesiz)'],
     outputField: 'characterAndSegment',
     tavilyQueryTemplate: '{{year}} {{brand}} {{model}} {{trim}} {{engine}} vs competitors review segment comparison',
+    turkishQueryTemplate: '{{year}} {{brand}} {{model}} {{trim}} segment rakipleri karsilastirma inceleme',
   },
   {
     questionId: 'Q2_ENGINE_TRANSMISSION_PERFORMANCE',
@@ -55,6 +56,7 @@ export const CHARACTER_RESEARCH_QUESTIONS = [
     forbidden: ['Ölçüm kaynağı olmadan sayısal hızlanma verisi', 'Motor aile genellemesi (bu motorlu tüm araçlar...)'],
     outputField: 'engineTransmissionFit',
     tavilyQueryTemplate: '{{year}} {{brand}} {{model}} {{engineCode}} {{transmission}} acceleration performance highway test review',
+    turkishQueryTemplate: '{{year}} {{brand}} {{model}} {{engineCode}} {{transmission}} motor sanziman performansi hizlanma testi',
   },
   {
     questionId: 'Q3_DRIVING_DYNAMICS',
@@ -64,6 +66,7 @@ export const CHARACTER_RESEARCH_QUESTIONS = [
     forbidden: ['Tek kelime sıfat (sportif/sert/yumuşak)', 'Ölçüm verisi olmadan g-kuvveti veya fren mesafesi'],
     outputField: 'drivingDynamics',
     tavilyQueryTemplate: '{{year}} {{brand}} {{model}} {{trim}} handling steering suspension dynamics road test',
+    turkishQueryTemplate: '{{year}} {{brand}} {{model}} {{trim}} surus dinamikleri direksiyon suspansiyon yol tutusu',
   },
   {
     questionId: 'Q4_COMFORT_ISOLATION',
@@ -73,6 +76,7 @@ export const CHARACTER_RESEARCH_QUESTIONS = [
     forbidden: ['Tek kaynak konfor genellemesi', 'Subjektif duygu ifadesi kaynak gösterilmeden ("çok konforlu hissettirdi")'],
     outputField: 'comfortAndIsolation',
     tavilyQueryTemplate: '{{year}} {{brand}} {{model}} comfort noise road quality suspension owner review long term',
+    turkishQueryTemplate: '{{year}} {{brand}} {{model}} konfor yalitimi ruzgar sesi kabin sessizligi sürüş testi',
   },
   {
     questionId: 'Q5_INTERIOR_PRACTICALITY',
@@ -82,6 +86,7 @@ export const CHARACTER_RESEARCH_QUESTIONS = [
     forbidden: ['Boyut/hacim rakamı tek başına (kullanım sonucu olmadan)', 'Donanım listesi tekrarı'],
     outputField: 'interiorPracticality',
     tavilyQueryTemplate: '{{year}} {{brand}} {{model}} interior space rear seat practicality cargo boot review',
+    turkishQueryTemplate: '{{year}} {{brand}} {{model}} ic mekan genisligi bagaj hacmi arka koltuk inceleme',
   },
   // Q6 and Q7 are synthesis-only — no Tavily search, built from Q1-Q5 evidence
   {
