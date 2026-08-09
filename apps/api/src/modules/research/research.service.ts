@@ -5,6 +5,7 @@ import { AiAnalysisService } from './ai-analysis.service';
 import { CoverageService } from './coverage.service';
 import { EvidenceRulesService } from './evidence-rules.service';
 import { AiReportGeneratorService } from './ai-report-generator.service';
+import { VehicleCharacterResearchService } from './vehicle-character-research.service';
 import {
   ResearchJobStatus,
   ResearchScope,
@@ -28,6 +29,7 @@ export class ResearchService {
     private coverageService: CoverageService,
     private evidenceRules: EvidenceRulesService,
     private reportGenerator: AiReportGeneratorService,
+    private vehicleCharacterResearch: VehicleCharacterResearchService,
   ) {}
 
   /**
@@ -277,7 +279,16 @@ export class ResearchService {
       const trimName = job.variant.trim?.name || '';
 
       const query = `${year} ${brandName} ${modelName} ${trimName} ${engineCode} ${transName} problems recalls reliability`;
-      const searchResults = await this.searchProvider.search(query.trim(), job.languageCode, job.countryCode);
+
+      // Run chronic issue search AND character research in parallel
+      const [searchResults] = await Promise.all([
+        this.searchProvider.search(query.trim(), job.languageCode, job.countryCode),
+        // Character research: runs 5 targeted Tavily searches for the 7-question framework
+        // Saves result to VehicleVariant.characterResearchCache in DB
+        this.runCharacterResearchInBackground(job).catch((err) => {
+          this.logger.error(`Character research failed for job ${job.id}: ${err.message}`);
+        }),
+      ]);
 
       // Save raw sources
       const rawSources = [];
@@ -554,6 +565,54 @@ export class ResearchService {
       case SubscriptionTier.PREMIUM: return 10;
       default: return 1;
     }
+  }
+
+  /**
+   * Runs the 7-question vehicle character research in parallel with chronic issue research.
+   * Persists results to VehicleVariant.characterResearchCache and characterResearchedAt.
+   *
+   * Called via Promise.all in processNextJob() — failure is caught and logged without
+   * blocking the main chronic research pipeline.
+   */
+  private async runCharacterResearchInBackground(job: any): Promise<void> {
+    const variant = job.variant;
+    const brand = variant.brand;
+    const model = variant.model;
+    const generation = variant.generation;
+    const engine = variant.engine;
+    const transmission = variant.transmission;
+    const trim = variant.trim;
+
+    this.logger.log(`Starting character research for variant ${job.vehicleVariantId}`);
+
+    const result = await this.vehicleCharacterResearch.runCharacterResearch({
+      year: variant.year,
+      brand: brand.name,
+      model: model.name,
+      generation: generation?.name,
+      bodyType: generation?.bodyType,
+      engineCode: engine?.code,
+      enginePowerHp: engine?.powerHp,
+      transmissionName: transmission?.name,
+      transmissionType: transmission?.type,
+      driveType: variant.driveType,
+      trimName: trim?.name,
+      market: job.countryCode,
+      languageCode: job.languageCode,
+    });
+
+    await this.prisma.vehicleVariant.update({
+      where: { id: job.vehicleVariantId },
+      data: {
+        characterResearchCache: result as any,
+        characterResearchedAt: new Date(),
+      } as any,
+    });
+
+    this.logger.log(
+      `Character research persisted for variant ${job.vehicleVariantId}. ` +
+      `Sources found: ${result.totalSourcesFound}`,
+    );
   }
 
   private async updateVariantSpecs(variantId: string) {

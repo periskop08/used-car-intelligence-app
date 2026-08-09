@@ -134,6 +134,9 @@ export class VehicleReportContextBuilderService {
           confidenceScore: f.confidenceScore,
         }))
       } : null,
+      // Vehicle character research: 7-question web research results
+      // null = not yet researched or research returned insufficient evidence
+      vehicleCharacterResearch: (variant as any).characterResearchCache || null,
     };
 
     const contextHash = crypto

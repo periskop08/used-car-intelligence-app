@@ -49,6 +49,10 @@ export class VehicleReportService implements OnModuleInit {
         `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "legacySourceMode" TEXT;`,
         `ALTER TABLE "GeneratedVehicleReport" ADD COLUMN IF NOT EXISTS "upgradedFromId" TEXT;`,
 
+        // Vehicle character research cache columns (added in v2.5)
+        `ALTER TABLE "VehicleVariant" ADD COLUMN IF NOT EXISTS "characterResearchCache" JSONB;`,
+        `ALTER TABLE "VehicleVariant" ADD COLUMN IF NOT EXISTS "characterResearchedAt" TIMESTAMP(3);`,
+
         `CREATE TABLE IF NOT EXISTS "GeneratedVehicleReport" (
             "id" TEXT NOT NULL,
             "userId" TEXT NOT NULL,

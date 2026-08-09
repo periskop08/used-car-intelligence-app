@@ -135,6 +135,21 @@ Aşağıdaki JSON yapısını tam olarak üretmelisin. Bütün alanları eksiksi
 ### 5. PREMIUM CHECKLIST VE INSPECTION (En az 6 soru ve 6 kontrol)
 - Sorular ve ekspertiz adımları araca, motor koduna, turbo/şanzıman mimarisine özgü teknik detaylar içermelidir.
 
+## VEHİCLE CHARACTER ARAŞTIRMA KURALLARI (vehicleCharacter bölümüne uygula)
+
+Kullanıcı promptunda VEHICLE_CHARACTER_RESEARCH alanı varsa, vehicleCharacter bölümünü oluştururken bu alandaki web araştırması bulgularını birincil kaynak olarak kullan.
+
+Bu kurallara KESİNLİKLE uy:
+- EVIDENCE_ONLY: Araştırma verisi boş veya null ise ilgili alt bölümü atla; genel otomobil bilgisi ile doldurma.
+- NO_NUMERIC_FABRICATION: Hızlanma, ara hızlanma veya tüketim sayısı araştırma verisinde yoksa kesinlikle sayısal değer üretme.
+- MULTI_SOURCE: Konfor, izolasyon, direksiyon hissi değerlendirmeleri araştırma verisinde en az 2 kaynak ortaklaşmalı; aksi halde "bazı kullanıcılar bildirmiştir" frame'i kullan.
+- NO_GENERIC_ADJECTIVES: "Konforlu, sportif, kaliteli, premium" tek başına kullanma; somut davranış/kaynak açıklaması zorunlu.
+- VARIANT_SPECIFIC: Model ailesini değil bu tam varyantı değerlendir.
+- NO_EQUIPMENT_REPEAT: Donanım listesini tekrar etme; yalnızca sürüşü etkileyen donanımı belirt.
+- Q6_Q7_SYNTHESIS: usageScenarios ve finalConditionalVerdict yalnızca Q1–Q5 bulgularından sentezlenecek; bu alanlarda yeni teknik iddia üretilmeyecek.
+
+ARAŞTIRMA VERİSİ YOKSA (vehicleCharacterResearch == null): vehicleCharacter bölümünü yalnızca VEHICLE_CONTEXT'teki fabrika teknik verilerine dayandır; kullanım deneyimi veya konfor iddiası üretme.
+
 ## ÇIKTI FORMATI
 Yalnızca geçerli JSON üret. Markdown, HTML, açıklama metni veya backtick ekleme. JSON dışında hiçbir şey yazma.`;
   }
@@ -144,6 +159,7 @@ Yalnızca geçerli JSON üret. Markdown, HTML, açıklama metni veya backtick ek
     const perf = vehicleContext?.performanceSpecs || {};
     const dbReport = vehicleContext?.verifiedDatabaseVehicleReport || {};
     const problems = dbReport.knownDatabaseProblems || [];
+    const charResearch = vehicleContext?.vehicleCharacterResearch;
 
     const vehicleTitle = [
       identity.modelYear,
@@ -154,6 +170,40 @@ Yalnızca geçerli JSON üret. Markdown, HTML, açıklama metni veya backtick ek
       identity.enginePowerHp ? `${identity.enginePowerHp} HP` : null,
       identity.engineTorqueNm ? `${identity.engineTorqueNm} Nm` : null,
     ].filter(Boolean).join(' ');
+
+    // Build the character research block for the prompt
+    const charResearchBlock = charResearch
+      ? `\n--- VEHICLE_CHARACTER_RESEARCH (7 SORULU WEB ARAŞTIRMASI BULGULARI) ---
+Araştırma tarihi: ${charResearch.researchedAt}
+Toplam kaynak: ${charResearch.totalSourcesFound}
+
+[S1 — Araç karakteri & segment konumu]
+Kanıt seviyesi: ${charResearch.questions?.characterAndSegment?.evidenceLevel || 'YOK'}
+${charResearch.questions?.characterAndSegment?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S2 — Motor-şanzıman uyumu & performans]
+Kanıt seviyesi: ${charResearch.questions?.engineTransmissionFit?.evidenceLevel || 'YOK'}
+${charResearch.questions?.engineTransmissionFit?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S3 — Sürüş dinamikleri & yol davranışı]
+Kanıt seviyesi: ${charResearch.questions?.drivingDynamics?.evidenceLevel || 'YOK'}
+${charResearch.questions?.drivingDynamics?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S4 — Konfor, izolasyon & yolculuk kalitesi]
+Kanıt seviyesi: ${charResearch.questions?.comfortAndIsolation?.evidenceLevel || 'YOK'}
+${charResearch.questions?.comfortAndIsolation?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S5 — İç mekân & günlük kullanım pratikliği]
+Kanıt seviyesi: ${charResearch.questions?.interiorPracticality?.evidenceLevel || 'YOK'}
+${charResearch.questions?.interiorPracticality?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S6 — Kullanım senaryoları (Sentez)]
+${charResearch.questions?.usageScenarios?.synthesisedAnswer || 'Veri bulunamadı.'}
+
+[S7 — Kullanıcı profili & nihai değerlendirme (Sentez)]
+${charResearch.questions?.userProfileAndVerdict?.synthesisedAnswer || 'Veri bulunamadı.'}
+--- VEHICLE_CHARACTER_RESEARCH SONU ---`
+      : `\n--- VEHICLE_CHARACTER_RESEARCH: Henüz web araştırması yapılmamış. vehicleCharacter bölümü yalnızca fabrika teknik verilerine dayandırılacak. Kullanım deneyimi veya konfor iddiası üretilmeyecek. ---`;
 
     return `--- HEDEF ARAÇ ---
 ${vehicleTitle || 'Belirtilmemiş'}
@@ -175,6 +225,7 @@ Onaylı Kronik Sorun Sayısı: ${problems.length}
 
 ${problems.length > 0 ? `--- ONAYLANMIŞ KRONİK SORUNLAR ---
 ${problems.map((p: any, i: number) => `${i + 1}. [${p.riskLevel} RİSK] ${p.title}: ${p.description}`).join('\n')}` : '--- KRONİK SORUN: Onaylanmış kayıt bulunmamaktadır ---'}
+${charResearchBlock}
 
 Yukarıdaki VEHICLE_CONTEXT verilerini ve fabrika teknik özelliklerini raporun TÜM bölümlerinde harmanlayarak VehicleReportGeneratedContent JSON yapısını tam ve eksiksiz üret. Asla tam depo kilometre menzili hesaplama veya yazma.`;
   }
