@@ -10,7 +10,7 @@ export class VehicleReportCacheService {
     userId: string,
     mode: VehicleReportMode,
     contextHash: string,
-    reportVersion: string = 'v3.5_AI_ENGINE',
+    reportVersion: string = 'v4.2_ACCURATE_SPECS',
     variantId?: string,
     listingId?: string,
   ) {

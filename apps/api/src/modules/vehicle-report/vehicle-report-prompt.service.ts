@@ -143,24 +143,41 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     const identity = vehicleContext?.vehicleIdentity || {};
     const perf = vehicleContext?.performanceSpecs || {};
 
-    const fullVehicleTitle = `${identity.modelYear || 2021} ${identity.brand || 'BMW'} ${identity.model || '3 Serisi'} ${identity.bodyType || 'Sedan'} ${identity.trimName || 'M Sport'} ${identity.engineCode || '2.0 (320i)'} ${identity.fuelType || 'PETROL'} ${identity.transmissionName || 'Otomatik (8 İleri Steptronic)'}`;
+    const brand = identity.brand || '';
+    const model = identity.model || '';
+    const year = identity.modelYear || '';
+    const body = identity.bodyType || '';
+    const trim = identity.trimName || '';
+    const engine = identity.engineCode || '';
+    const fuel = identity.fuelType || '';
+    const trans = identity.transmissionName || '';
+
+    const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
+
+    const hpText = perf.enginePowerHp ? `${perf.enginePowerHp} HP` : 'AI Otomotiv Bilgisiyle Tamamla';
+    const torqueText = perf.engineTorqueNm ? `${perf.engineTorqueNm} Nm Tork` : 'AI Bilgisiyle Tamamla';
+    const ccText = perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'AI Bilgisiyle Tamamla';
+    const zeroHundredText = perf.zeroToHundredKmh ? `${perf.zeroToHundredKmh} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
+    const topSpeedText = perf.topSpeedKmh ? `${perf.topSpeedKmh} km/s` : 'Gerçek Veriyle Tamamla';
+    const driveTypeText = perf.drivetrain || identity.drivetrain || 'Orijinal Çekiş Sistemi';
 
     return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki TAM ARAÇ SPESİFİKASYONUNU analiz et ve 9 temel soruyu (Bu araç nasıl bir otomobil, Güçlü Nedenler, Tavizler, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
 --- ANALİZ EDİLECEK TAM ARAÇ DONANIM VE TEKNİK BİLGİLERİ ---
 • Araç Başlığı: ${fullVehicleTitle}
-• Marka: ${identity.brand}
-• Model Ailesi: ${identity.model}
-• Üretim Yılı: ${identity.modelYear}
-• Kasa Tipi: ${identity.bodyType}
-• Motor / Versiyon: ${identity.engineCode} (${perf.enginePowerHp || 184} HP, ${perf.engineTorqueNm || 300} Nm Tork, ${perf.engineDisplacementCc || 1995} cc)
-• Yakıt Türü: ${identity.fuelType}
-• Şanzıman Tipi: ${identity.transmissionName}
-• Çekiş Sistemi: ${identity.drivetrain || 'RWD (Arkadan İtiş)'}
-• Donanım Paketi: ${identity.trimName}
-• Fabrika Performans Verileri: 0-100 km/s: ${perf.zeroToHundredKmh || 7.1} sn | Azami Hız: ${perf.topSpeedKmh || 235} km/s
-• Yakıt Tüketimi (L/100km): Şehir İçi: ${perf.cityFuelL100km || 7.8}L | Şehir Dışı: ${perf.highwayFuelL100km || 5.2}L | Karma: ${perf.combinedFuelL100km || 6.4}L
-• Bagaj Hacmi: ${perf.trunkCapacityLiters || 480} Litre | Boş Ağırlık: ${perf.curbWeightKg || 1535} kg | Yakıt Deposu: ${perf.fuelTankCapacityLiters || 59} Litre
+• Marka: ${brand}
+• Model Ailesi: ${model}
+• Üretim Yılı: ${year}
+• Kasa Tipi: ${body}
+• Motor / Versiyon: ${engine} (${hpText}, ${torqueText}, ${ccText})
+• Yakıt Türü: ${fuel}
+• Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
+• Çekiş Sistemi: ${driveTypeText}
+• Donanım Paketi: ${trim}
+• Fabrika Performans Verileri: 0-100 km/s: ${zeroHundredText} | Azami Hız: ${topSpeedText}
+• Yakıt Tüketimi (L/100km): ${perf.combinedFuelL100km ? `Karma: ${perf.combinedFuelL100km}L` : 'Aracın Orijinal Tüketim Değerlerini Kullan'}
+
+ÖNEMLİ NOT: Eğer yukarıdaki teknik verilerde belirtilmeyen parametreler veya hibrit sistem gücü detayları varsa, kendi %100 doğrulanmış otomotiv mühendisliği bilgini kullanarak aracın gerçek 0-100 hızlanmasını, toplam sistem gücünü (örneğin hibrit araçlarda Benzin + Elektrik toplam HP) ve doğru şanzıman yapısını (e-CVT, DSG, Tork Konvertörlü vb.) rapora doğru yansıt. Asla ilgisiz jenerik fallback sayıları kullanma!
 
 Yukarıdaki araca özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }

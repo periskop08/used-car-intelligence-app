@@ -73,27 +73,27 @@ export class VehicleReportContextBuilderService {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Build complete factory performance and technical specs with robust fallback chain
-    const engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || (variant.engine?.code?.includes('320i') ? 184 : (variant.engine?.code?.includes('320d') ? 190 : 150));
-    const engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || (variant.engine?.code?.includes('320i') ? 300 : (variant.engine?.code?.includes('320d') ? 400 : 250));
-    const engineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || (variant.engine?.code?.includes('320i') || variant.engine?.code?.includes('320d') ? 1995 : 1598);
-    const transName = variant.transmission?.name || 'Otomatik';
-    const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || 8;
-    const driveType = specsJson.drivetrain || (variant as any).driveType || (variant.engine?.code?.includes('xDrive') || variant.trim?.name?.includes('xDrive') ? 'AWD (4-Tekerlekten Çekiş)' : 'RWD (Arkadan İtiş)');
-    const zeroToHundred = specsJson.zeroToHundredKmh || (variant.engine?.code?.includes('320i') ? 7.1 : (variant.engine?.code?.includes('320d') ? 6.8 : 7.5));
-    const topSpeedVal = specsJson.topSpeed || 235;
-    const weightVal = specsJson.weight || 1535;
-    const trunkVal = specsJson.luggageCapacity || 480;
-    const fuelTankVal = specsJson.fuelTankCapacityLiters || specsJson.fuelTankLiters || 59;
-    const cityFuelVal = specsJson.cityFuelConsumption || 7.8;
-    const highwayFuelVal = specsJson.highwayFuelConsumption || 5.2;
-    const combinedFuelVal = specsJson.averageFuelConsumption || 6.4;
+    // Build complete factory performance and technical specs (use actual specs if available, otherwise null to let AI rely on real vehicle knowledge)
+    const engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || null;
+    const engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || null;
+    const engineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+    const transName = variant.transmission?.name || null;
+    const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
+    const driveType = specsJson.drivetrain || (variant as any).driveType || null;
+    const zeroToHundred = specsJson.zeroToHundredKmh || null;
+    const topSpeedVal = specsJson.topSpeed || null;
+    const weightVal = specsJson.weight || null;
+    const trunkVal = specsJson.luggageCapacity || null;
+    const fuelTankVal = specsJson.fuelTankCapacityLiters || specsJson.fuelTankLiters || null;
+    const cityFuelVal = specsJson.cityFuelConsumption || null;
+    const highwayFuelVal = specsJson.highwayFuelConsumption || null;
+    const combinedFuelVal = specsJson.averageFuelConsumption || null;
 
     const performanceData: Record<string, any> = {
       enginePowerHp: engineHp,
       engineTorqueNm: engineTorque,
       engineDisplacementCc: engineCc,
-      transmissionName: `${transName} (${transSpeeds} İleri)`,
+      transmissionName: transName ? (transSpeeds ? `${transName} (${transSpeeds} İleri)` : transName) : null,
       transmissionSpeeds: transSpeeds,
       drivetrain: driveType,
       zeroToHundredKmh: zeroToHundred,
