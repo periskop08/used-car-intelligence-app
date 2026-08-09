@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleIni
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportContextBuilderService } from './vehicle-report-context-builder.service';
 import { ListingReportContextService } from './listing-report-context.service';
-import { VehicleReportCacheService } from './vehicle-report-cache.service';
+import { VehicleReportCacheService, CURRENT_REPORT_VERSION } from './vehicle-report-cache.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
 import { VehicleReportProviderService } from './vehicle-report-provider.service';
@@ -273,7 +273,7 @@ export class VehicleReportService implements OnModuleInit {
             userId,
             'TORQUE_SCOUT_VEHICLE_REPORT',
             vehicleContextHash,
-            'v4.4_KM_BREAKDOWN_TIMELINE',
+            CURRENT_REPORT_VERSION,
             variantId,
           );
 
@@ -342,7 +342,7 @@ export class VehicleReportService implements OnModuleInit {
           listingId: listingId || null,
           contextHash: vehicleContextHash,
           vehicleContextHash,
-          reportVersion: 'v4.4_KM_BREAKDOWN_TIMELINE',
+          reportVersion: CURRENT_REPORT_VERSION,
           schemaVersion: 1,
           status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
           idempotencyKey: dto.idempotencyKey,
@@ -399,7 +399,7 @@ export class VehicleReportService implements OnModuleInit {
         userId,
         'TORQUE_SCOUT_VEHICLE_REPORT',
         vRes.vehicleContextHash,
-        'v1.0',
+        CURRENT_REPORT_VERSION,
         variantId,
       );
     } catch (e: any) {
@@ -421,7 +421,7 @@ export class VehicleReportService implements OnModuleInit {
         userId,
         'LISTING_REPORT',
         fullHash,
-        'v1.0',
+        CURRENT_REPORT_VERSION,
         lRes.variantId,
         listingId,
       );

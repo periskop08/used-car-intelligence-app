@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ComprehensiveVehicleReport, VehicleReportMode, ExpertDecisionSynthesis, ReportSupportingFact } from '@used-car-intelligence/shared';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
 import { VehicleReportContradictionService } from './vehicle-report-contradiction.service';
+import { CURRENT_REPORT_VERSION } from './vehicle-report-cache.service';
 
 @Injectable()
 export class VehicleReportFallbackService {
@@ -222,7 +223,7 @@ export class VehicleReportFallbackService {
       variantId: vIdentity.variantId,
       listingId: listingContext?.listingId,
       publicListingNo: listingContext?.publicListingNo,
-      reportVersion: 'v1.0',
+      reportVersion: CURRENT_REPORT_VERSION,
       schemaVersion: 2,
       modeLabel: mode === 'LISTING_REPORT' ? 'İlan Özel Araç Raporu' : 'Araç Sorgulama Raporu',
       generatedAt: new Date().toISOString(),

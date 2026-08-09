@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportMode } from '@prisma/client';
 
+export const CURRENT_REPORT_VERSION = 'v4.4_KM_BREAKDOWN_TIMELINE';
+
 @Injectable()
 export class VehicleReportCacheService {
   constructor(private prisma: PrismaService) {}
@@ -10,7 +12,7 @@ export class VehicleReportCacheService {
     userId: string,
     mode: VehicleReportMode,
     contextHash: string,
-    reportVersion: string = 'v4.4_KM_BREAKDOWN_TIMELINE',
+    reportVersion: string = CURRENT_REPORT_VERSION,
     variantId?: string,
     listingId?: string,
   ) {
