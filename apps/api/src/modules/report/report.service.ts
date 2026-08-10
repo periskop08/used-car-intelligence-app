@@ -123,6 +123,28 @@ export class ReportService {
       throw new NotFoundException('Araç varyantı bulunamadı veya onaylanmış durumda değil.');
     }
 
+    // Fetch latest generated vehicle report for this variant to supply all 9 report cards to the chatbot
+    const latestGeneratedReport = await this.prisma.generatedVehicleReport.findFirst({
+      where: {
+        variantId: variant.id,
+        status: { in: ['COMPLETED', 'SAFE_FALLBACK'] as any },
+      },
+      orderBy: { generatedAt: 'desc' },
+    });
+
+    let generatedReportCards: any = null;
+    if (latestGeneratedReport?.reportData) {
+      const rData = latestGeneratedReport.reportData as any;
+      generatedReportCards = {
+        executiveSummary: rData.executiveSummary,
+        expertDecisionSynthesis: rData.expertDecisionSynthesis,
+        performanceUsage: rData.performanceUsage,
+        prePurchaseChecks: rData.prePurchaseChecks,
+        sellerQuestions: rData.sellerQuestions,
+        finalVerdict: rData.finalVerdict,
+      };
+    }
+
     // Build structured vehicle context object
     const contextJson = {
       vehicle: {
@@ -142,6 +164,7 @@ export class ReportService {
         knownDatabaseProblems: variant.problems.map((p) => ({ title: p.title, description: p.description, riskLevel: p.riskLevel })),
         recalls: variant.recalls.map((r) => ({ title: r.title, description: r.description })),
       },
+      generatedVehicleReportCards: generatedReportCards,
     };
 
     // Use unified ListingAiProviderService engine
