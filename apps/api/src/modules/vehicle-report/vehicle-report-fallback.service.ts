@@ -31,7 +31,11 @@ export class VehicleReportFallbackService {
     const model = vIdentity.model || '';
     const year = vIdentity.modelYear || '';
     const fuel = vIdentity.fuelType || 'Benzin';
-    const trans = vIdentity.transmissionName || 'Otomatik';
+    let cleanTrans = vIdentity.transmissionName || 'Otomatik';
+    if (cleanTrans.includes('8 İleri') && (brand.toLowerCase().includes('kia') || brand.toLowerCase().includes('honda') || model.toLowerCase().includes('cerato') || model.toLowerCase().includes('civic'))) {
+      cleanTrans = 'Otomatik';
+    }
+    const trans = cleanTrans;
 
     let rawHp = vIdentity.enginePowerHp || perfSpecs.enginePowerHp;
     let rawTorque = vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm;
