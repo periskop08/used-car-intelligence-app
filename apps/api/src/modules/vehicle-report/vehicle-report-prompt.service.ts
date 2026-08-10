@@ -22,8 +22,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 {
   "expertDecisionSynthesis": {
     "vehicleCharacter": {
-      "headline": "2021 BMW 3 Serisi M Sport 2.0 (320i): Performans Potansiyelli, Donanımlı Şık Sedan",
-      "detailedAssessment": "Araç hakkındaki 1-2 paragraflık derin otomotiv mühendisliği ve donanım paketi analizi...",
+      "headline": "2010 Honda Civic 1.6 i-VTEC Elegance: Dayanıklı Mekanik, Yüksek Konfor ve Güçlü İkinci El Sedan",
+      "detailedAssessment": "Tıpkı uzman chatbot gibi şu 4 alt başlıkta derin, samimi ve teknik otomotiv analizi yaz:\n* **1. Motor ve Şanzıman Uyumu:** (Motorun atmosferik/turbo yapısı, tork konvertörlü/DSG/CVT şanzıman karakteri, vites geçiş hissiyatı, direksiyon kulakçıkları [Paddle Shift] ve mekanik ömrü)\n* **2. Donanım Seviyesi (Seçilen Paket):** (Seçilen donanım paketinin araca kattığı kilit konfor ve teknolojik aksamlar - örn. Sunroof, dijital klima, dijital hız göstergeli kadran, çelik jant vb.)\n* **3. Doğrulanmış Veritabanı Bulguları & Kronik Uyarısı:** (Aracın bilinen kronik durumları, sızıntı riski veya ekspertizde bakılacak kritik mekanik detaylar)\n* **4. Genel Değerlendirme & Kullanım Maliyeti:** (Şehir içi/otoyol tüketim beklentisi [ör. 8.5-10L/100km] ve aracın genel piyasa/konfor değeri)",
       "supportingFactIds": []
     },
     "dailyUseAssessment": {
