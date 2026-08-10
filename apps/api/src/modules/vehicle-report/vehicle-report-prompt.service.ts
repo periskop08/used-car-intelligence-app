@@ -193,7 +193,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
       : '';
 
-    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
+    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki YALNIZCA 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
 --- ANALİZ EDİLECEK YALNIZCA 8 KİLİT ARAÇ KİMLİK FİLTRESİ ---
 1. Marka: ${brand}
@@ -207,7 +207,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 • Çekiş Sistemi: ${driveTypeText}
 
 ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
-1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (HP, TORK, VİTES SAYISI, 0-100) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik model ve motorun GERÇEK fabrika Beygir Gücünü (HP - örn. 2010 Audi A5 2.0 TFSI Quattro için 211 HP; 2010 Civic 1.6 i-VTEC için 125 HP), Torkunu (Nm - örn. Audi A5 için 350 Nm), Şanzıman Vites Sayısını (örn. Civic için 5 İleri tork konvertörlü otomatik) ve 0-100 km/s hızlanmasını kendi doğrulanmış otomotiv mühendisliği bilgine göre sen tespit et ve raporda bu GERÇEK verilerle kullan!
+1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (TÜRKİYE RESMİ KATALOG HP, TORK, VİTES SAYISI, 0-100) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki tüm eski/hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik modelin TÜRKİYE RESMİ FABRİKA KATALOG Beygir Gücünü (HP - örn. 2022 Kia Cerato 1.6 MPI için Türkiye pazarında 128 HP / 155 Nm tork verisini; 2010 Audi A5 2.0 TFSI Quattro için 211 HP; 2010 Civic 1.6 i-VTEC için 125 HP), Torkunu (Nm), Şanzıman Vites Sayısını (örn. Cerato için 6 İleri Otomatik; Civic için 5 İleri Otomatik) kendi doğrulanmış otomotiv mühendisliği bilgine göre tespit et ve raporda Türkiye fabrika verileriyle birebir aynı kullan!
 2. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
    - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
 3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
@@ -218,10 +218,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 6. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
    Yukarıdaki 8 kimlik filtresini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
    - Motor Hacmi cc ("engineDisplacementCc")
-   - Motor Gücü HP ("enginePowerHp")
-   - Tork Nm ("engineTorqueNm")
-   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "5 İleri Tork Konvertörlü Otomatik", "6 İleri Manuel")
-   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 5 veya 6, Asla 8 yazma!)
+   - Motor Gücü HP ("enginePowerHp" — örn. 2022 Kia Cerato 1.6 MPI için 128)
+   - Tork Nm ("engineTorqueNm" — örn. 2022 Kia Cerato 1.6 MPI için 155)
+   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "6 İleri Tam Otomatik", "5 İleri Tork Konvertörlü Otomatik")
+   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 6 veya 5)
    - 0-100 km/s Hızlanma sn ("zeroToHundredKmh")
    - Maksimum Hız km/s ("topSpeedKmh")
    - Şehir İçi Tüketim L/100km ("cityFuelL100km")
@@ -253,6 +253,7 @@ Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kull
 • Marka / Model: ${brand} ${model} (${year})
 • Kasa Tipi: ${body} | Donanım Paketi: ${trim}
 • Motor: ${engine} | Şanzıman: ${trans}
+• Pazar: Türkiye Resmi Katalog / Distribütör Verileri (Örn. 2022 Kia Cerato 1.6 MPI için Türkiye piyasasında resmi 128 HP / 155 Nm tork verisini esas al)
 ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilter.join(', ')}` : ''}
 
 ## ÜRETECEĞİN ÇIKTI ŞEMASI (JSON):
