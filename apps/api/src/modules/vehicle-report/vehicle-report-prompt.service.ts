@@ -174,21 +174,19 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
     return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
---- ANALİZ EDİLECEK 8 KİLİT ARAÇ KİMLİK VE DONANIM FİLTRESİ ---
+--- ANALİZ EDİLECEK YALNIZCA 8 KİLİT ARAÇ KİMLİK FİLTRESİ ---
 1. Marka: ${brand}
 2. Model Ailesi: ${model}
 3. Üretim Yılı: ${year}
 4. Kasa Tipi: ${body}
 5. Donanım Paketi Seviyesi: ${trim}${equipmentHighlights}${equipmentFeaturesText}
-6. Motor / Versiyon Kitle Kodu: ${engine} (${ccText})
+6. Motor / Versiyon Kitle Kodu: ${engine}
 7. Yakıt Türü: ${fuel}
 8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}
-• Fabrika Performans Referansı: HP: ${hpText} | Tork: ${torqueText} | 0-100 km/s: ${zeroHundredText} | Azami Hız: ${topSpeedText}
-• Yakıt Tüketimi (L/100km): ${perf.combinedFuelL100km ? `Karma: ${perf.combinedFuelL100km}L` : 'Aracın Orijinal Tüketim Değerlerini Kullan'}
 
 ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
-1. GERÇEK MOTOR GÜCÜ, ŞANZIMAN VİTES SAYISI VE TORK SENTEZİ: Yukarıdaki 8 araç kimlik filtresine göre (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik modelin GERÇEK fabrika Şanzıman Vites Sayısını (örneğin 2010 Honda Civic için 5 İleri Tork Konvertörlü Otomatik Şanzıman verisini; KESİNLİKLE veritabanındaki varsayılan/hatalı 8 İleri veya başka araç verilerini YAZMA!), Beygir Gücünü (HP), Torkunu (Nm), 0-100 km/s hızlanmasını ve yakıt tüketimini kendi doğrulanmış otomotiv bilginle/canlı aramayla tespit et ve raporda GERÇEK verilerle kullan!
+1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (HP, TORK, VİTES SAYISI, 0-100) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik model ve motorun GERÇEK fabrika Beygir Gücünü (HP - örn. 2010 Audi A5 2.0 TFSI Quattro için 211 HP; 2010 Civic 1.6 i-VTEC için 125 HP), Torkunu (Nm - örn. Audi A5 için 350 Nm), Şanzıman Vites Sayısını (örn. Civic için 5 İleri tork konvertörlü otomatik) ve 0-100 km/s hızlanmasını kendi doğrulanmış otomotiv mühendisliği bilgine göre sen tespit et ve raporda bu GERÇEK verilerle kullan!
 2. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
    - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
 3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.

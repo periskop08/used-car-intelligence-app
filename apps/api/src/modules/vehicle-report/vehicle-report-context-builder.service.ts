@@ -102,8 +102,8 @@ export class VehicleReportContextBuilderService {
     const combinedFuelVal = specsJson.averageFuelConsumption || null;
 
     const performanceData: Record<string, any> = {
-      enginePowerHp: engineHp,
-      engineTorqueNm: engineTorque,
+      enginePowerHp: null,
+      engineTorqueNm: null,
       engineDisplacementCc: engineCc,
       transmissionName: transName ? (transSpeeds ? `${transName} (${transSpeeds} İleri)` : transName) : null,
       transmissionSpeeds: transSpeeds,
@@ -127,8 +127,8 @@ export class VehicleReportContextBuilderService {
         bodyType: variant.bodyType || 'Sedan',
         modelYear: variant.year,
         engineDisplacementCc: engineCc,
-        enginePowerHp: engineHp,
-        engineTorqueNm: engineTorque,
+        enginePowerHp: null,
+        engineTorqueNm: null,
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineType: specsJson.engineType || null,
         fuelType: variant.fuelType || 'PETROL',
