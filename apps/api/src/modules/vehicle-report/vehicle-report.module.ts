@@ -18,9 +18,10 @@ import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
 import { AuthModule } from '../auth/auth.module';
 import { ResearchModule } from '../research/research.module';
+import { ListingAiModule } from '../listing-ai/listing-ai.module';
 
 @Module({
-  imports: [AuthModule, ResearchModule],
+  imports: [AuthModule, ResearchModule, ListingAiModule],
   controllers: [VehicleReportController],
   providers: [
     PrismaService,

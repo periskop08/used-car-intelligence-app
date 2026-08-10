@@ -33,7 +33,11 @@ TEMEL DAYANAKLARIN & KURALLARIN:
     contextJson: any,
   ): Promise<{ answer: string; mode: 'AI' | 'SAFE_FALLBACK'; providerName: string }> {
     const primaryProviderName = (process.env.LISTING_AI_PRIMARY_PROVIDER || 'gemini').toLowerCase();
-    const systemPrompt = this.getSystemPrompt();
+    
+    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
+    const systemPrompt = isReportIntent 
+      ? `Sen TorqueScout Yapay Zeka Danışmanısın (Vehicle Intelligence Research Engine). Görevin, sana iletilen 8 araç kimlik filtresini ve araştırmayı esas alarak, 10 temel araç raporu bölümünü ("Bu Araç Nasıl Bir Otomobil?", "Tercih Etmek İçin Güçlü Nedenler", "Satın Almadan Önce Bilinecek Tavizler", "Kimler İçin Mantıklı?", "Kimler İçin Uygun Olmayabilir?", "Hangi Şartlarda Değerlendirilebilir?", "Hangi Durumda Satın Almaktan Vazgeçilmeli?", "Satın Alma Öncesi Ekspertiz Kontrol Listesi", "Satıcıya Sorulacak Kritik Sorular", "Teknik Özellikler") yanıtlayan zengin, samimi ve teknik bir VehicleReportGeneratedContent JSON çıktısı üretmektir. YALNIZCA GEÇERLİ JSON ÜRET.`
+      : this.getSystemPrompt();
 
     const adaptersToTry: AiProviderAdapter[] = [];
     if (primaryProviderName === 'openai') {

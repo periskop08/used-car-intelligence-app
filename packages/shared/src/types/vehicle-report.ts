@@ -340,6 +340,44 @@ export interface ExpertDecisionSynthesis {
   unavailableClaims?: UnavailableClaimItem[];
 }
 
+export type VehicleReportIntent = 'CHAT_QUESTION' | 'VEHICLE_FULL_REPORT';
+
+export interface TenStructuredReportSections {
+  vehicleOverview: string;
+  strongReasons: Array<{ title: string; explanation: string; supportingFactIds?: string[] }>;
+  tradeoffs: Array<{ title: string; explanation: string; supportingFactIds?: string[] }>;
+  idealFor: Array<{ profile: string; explanation: string; supportingFactIds?: string[] }>;
+  notIdealFor: Array<{ profile: string; explanation: string; supportingFactIds?: string[] }>;
+  conditionsToConsider: Array<{ condition: string; reason: string; priority?: string; supportingFactIds?: string[] }>;
+  walkAwayConditions: Array<{ condition: string; reason: string; priority?: string; supportingFactIds?: string[] }>;
+  inspectionChecklist: PrePurchaseCheckItem[];
+  sellerQuestions: SellerQuestionItem[];
+  technicalSpecifications: TechnicalSpecificationsData;
+}
+
+export interface VehicleResearchContextData {
+  vehicleIdentity: Record<string, any>;
+  technicalFacts: Array<Record<string, any>>;
+  claims: Array<{
+    claim: string;
+    category?: string;
+    status?: string;
+    confidence?: number;
+    variantMatch?: Record<string, boolean>;
+    evidence?: any[];
+    counterEvidence?: any[];
+  }>;
+  commonProblems?: any[];
+  recalls?: any[];
+  maintenanceFindings?: any[];
+  drivingCharacteristics?: any[];
+  ownershipFindings?: any[];
+  sourceMetadata?: any[];
+  conflicts?: any[];
+  unsupportedClaims?: any[];
+  researchTimestamp?: string;
+}
+
 export interface TechnicalSpecificationsData {
   engineDisplacementCc?: number;
   enginePowerHp?: number;

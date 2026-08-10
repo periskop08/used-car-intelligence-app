@@ -419,7 +419,7 @@ export default function ListingAiAdvisorCard({
             className="py-4 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
           >
             <FileText className="w-4.5 h-4.5 text-white shrink-0" />
-            <span>Bu Araç İçin Rapor Al</span>
+            <span>Aracı incele & Al Raporu Al</span>
           </button>
 
           <button

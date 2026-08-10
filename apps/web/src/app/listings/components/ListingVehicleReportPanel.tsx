@@ -158,7 +158,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
         ) : (
           <>
             <Sparkles className="w-4.5 h-4.5" />
-            <span>Bu Araç İçin Rapor Al (1 Hak)</span>
+            <span>Aracı incele & Al Raporu Al (1 Hak)</span>
           </>
         )}
       </button>
