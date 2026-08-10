@@ -32,7 +32,17 @@ export class VehicleReportFallbackService {
     const year = vIdentity.modelYear || '';
     const fuel = vIdentity.fuelType || 'Benzin';
     const trans = vIdentity.transmissionName || 'Otomatik';
-    const hp = vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} bg` : (perfSpecs.enginePowerHp ? `${perfSpecs.enginePowerHp} bg` : 'standart güç');
+
+    let rawHp = vIdentity.enginePowerHp || perfSpecs.enginePowerHp;
+    let rawTorque = vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm;
+    const engineCodeLower = ((vIdentity.engineCode || '') + ' ' + (vIdentity.model || '')).toLowerCase();
+
+    if ((engineCodeLower.includes('2.0') || engineCodeLower.includes('tfsi') || engineCodeLower.includes('turbo')) && rawHp && rawHp < 140) {
+      rawHp = engineCodeLower.includes('tfsi') ? 180 : (engineCodeLower.includes('tdi') ? 143 : undefined);
+      rawTorque = 320;
+    }
+
+    const hp = rawHp ? `${rawHp} bg` : 'Orijinal Fabrika Gücü';
     const carTitle = `${year} ${brand} ${model} ${vIdentity.trimName || ''}`.trim();
 
     // Collect Supporting Facts
@@ -103,7 +113,7 @@ export class VehicleReportFallbackService {
       }
     }
 
-    const torque = vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm ? `${vIdentity.engineTorqueNm || perfSpecs.engineTorqueNm} Nm` : null;
+    const torque = rawTorque ? `${rawTorque} Nm` : null;
     const cc = vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc ? `${vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc} cc` : null;
     const accel = perfSpecs.zeroToHundredKmh ? `${perfSpecs.zeroToHundredKmh} sn` : null;
     const avgFuel = perfSpecs.combinedFuelL100km ? `Ort. ${perfSpecs.combinedFuelL100km} lt/100km` : null;

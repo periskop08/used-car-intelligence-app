@@ -74,9 +74,21 @@ export class VehicleReportContextBuilderService {
     // ─────────────────────────────────────────────────────────────────────────
 
     // Build complete factory performance and technical specs (use actual specs if available, otherwise null to let AI rely on real vehicle knowledge)
-    const engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || null;
-    const engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || null;
+    let engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || null;
+    let engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || null;
     const engineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+
+    // Sanitize engine power & torque if DB contains clear mismatch (e.g. 2.0 TFSI / 2.0 Turbo with 110 HP / 143 Nm)
+    const engineCodeLower = ((variant.engine?.code || '') + ' ' + (variant.engine?.name || '')).toLowerCase();
+    if (engineCodeLower.includes('2.0') || engineCodeLower.includes('tfsi') || engineCodeLower.includes('turbo')) {
+      if (engineHp && engineHp < 140) {
+        engineHp = engineCodeLower.includes('tfsi') ? 180 : (engineCodeLower.includes('tdi') ? 143 : null);
+      }
+      if (engineTorque && engineTorque < 220) {
+        engineTorque = engineCodeLower.includes('tfsi') ? 320 : (engineCodeLower.includes('tdi') ? 320 : null);
+      }
+    }
+
     const transName = variant.transmission?.name || null;
     const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
     const driveType = specsJson.drivetrain || (variant as any).driveType || null;

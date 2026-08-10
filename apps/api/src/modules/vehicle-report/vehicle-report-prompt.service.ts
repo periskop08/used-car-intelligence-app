@@ -160,9 +160,9 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
     const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
 
-    const hpText = perf.enginePowerHp ? `${perf.enginePowerHp} HP` : 'AI Otomotiv Bilgisiyle Tamamla';
-    const torqueText = perf.engineTorqueNm ? `${perf.engineTorqueNm} Nm Tork` : 'AI Bilgisiyle Tamamla';
-    const ccText = perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'AI Bilgisiyle Tamamla';
+    const hpText = (perf.enginePowerHp && perf.enginePowerHp >= 140) ? `${perf.enginePowerHp} HP` : 'Gerçek Fabrika Verisiyle Tamamla';
+    const torqueText = (perf.engineTorqueNm && perf.engineTorqueNm >= 200) ? `${perf.engineTorqueNm} Nm Tork` : 'Gerçek Fabrika Verisiyle Tamamla';
+    const ccText = perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'Gerçek Hacim Verisiyle Tamamla';
     const zeroHundredText = perf.zeroToHundredKmh ? `${perf.zeroToHundredKmh} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
     const topSpeedText = perf.topSpeedKmh ? `${perf.topSpeedKmh} km/s` : 'Gerçek Veriyle Tamamla';
     const driveTypeText = perf.drivetrain || identity.drivetrain || 'Orijinal Çekiş Sistemi';
@@ -172,31 +172,30 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
       : '';
 
-    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki TAM ARAÇ VE DONANIM PAKETİ SPESİFİKASYONUNU analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
+    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
---- ANALİZ EDİLECEK TAM ARAÇ DONANIM VE TEKNİK BİLGİLERİ ---
-• Araç Başlığı: ${fullVehicleTitle}
-• Marka: ${brand}
-• Model Ailesi: ${model}
-• Üretim Yılı: ${year}
-• Kasa Tipi: ${body}
-• Motor / Versiyon: ${engine} (${hpText}, ${torqueText}, ${ccText})
-• Yakıt Türü: ${fuel}
-• Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
+--- ANALİZ EDİLECEK 8 KİLİT ARAÇ KİMLİK VE DONANIM FİLTRESİ ---
+1. Marka: ${brand}
+2. Model Ailesi: ${model}
+3. Üretim Yılı: ${year}
+4. Kasa Tipi: ${body}
+5. Donanım Paketi Seviyesi: ${trim}${equipmentHighlights}${equipmentFeaturesText}
+6. Motor / Versiyon Kitle Kodu: ${engine} (${ccText})
+7. Yakıt Türü: ${fuel}
+8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}
-• Donanım Paketi Seviyesi: ${trim}${equipmentHighlights}${equipmentFeaturesText}
-• Fabrika Performans Verileri: 0-100 km/s: ${zeroHundredText} | Azami Hız: ${topSpeedText}
+• Fabrika Performans Referansı: HP: ${hpText} | Tork: ${torqueText} | 0-100 km/s: ${zeroHundredText} | Azami Hız: ${topSpeedText}
 • Yakıt Tüketimi (L/100km): ${perf.combinedFuelL100km ? `Karma: ${perf.combinedFuelL100km}L` : 'Aracın Orijinal Tüketim Değerlerini Kullan'}
 
-ÖNEMLİ KİLOMETRE VE AŞINMA ZAMAN TÜNELİ İLKESİ:
-1. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
+ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
+1. GERÇEK MOTOR GÜCÜ (HP) VE TORK (Nm) SENTEZİ: Yukarıdaki 8 araç kimlik filtresine göre (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik motorun GERÇEK fabrika Beygir Gücünü (HP), Torkunu (Nm), 0-100 km/s hızlanmasını ve yakıt tüketimini doğrula ve raporda GERÇEK FABRİKA VERİLERİYLE kullan. Başka küçük/farklı motorların verilerini (örneğin 110 HP / 143 Nm gibi 1.2 TSI verilerini) 2.0 TFSI veya performanslı motorlara KESİNLİKLE YAZMA!
+2. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
    - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
-2. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
-3. Eğer belirtilmeyen performans verileri veya hibrit sistem gücü detayları varsa, kendi %100 doğrulanmış otomotiv mühendisliği bilgini kullanarak aracın gerçek 0-100 hızlanmasını, toplam sistem gücünü ve doğru şanzıman yapısını rapora doğru yansıt.
+3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
 4. YÜKSEK KİLOMETRE VE KRONİK RİSK UYARILARI ÜSLUBU:
    Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
 
-Yukarıdaki araca, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
+Yukarıdaki 8 filtreye, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }
 
   buildStage1ResearchPrompt(vehicleContext: any, sectionFilter?: string[]): string {
