@@ -139,6 +139,28 @@ export class VehicleReportProviderService implements OnModuleInit {
           baseReport.sellerQuestions = writerContent.premiumChecklistQuestions as any;
           baseReport.prePurchaseChecks = writerContent.inspectionChecklist as any;
           baseReport.finalVerdict = writerContent.finalConditionalVerdict as any;
+
+          // Map AI-derived verified technical specifications to vehicleIdentity and performanceUsage
+          if (writerContent.technicalSpecifications) {
+            const specs = writerContent.technicalSpecifications;
+            if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
+            if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
+            if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+
+            baseReport.performanceUsage = {
+              powerHp: specs.enginePowerHp || baseReport.performanceUsage?.powerHp,
+              torqueNm: specs.engineTorqueNm || baseReport.performanceUsage?.torqueNm,
+              zeroToHundredKmh: specs.zeroToHundredKmh || baseReport.performanceUsage?.zeroToHundredKmh,
+              topSpeedKmh: specs.topSpeedKmh || baseReport.performanceUsage?.topSpeedKmh,
+              cityFuelL100km: specs.cityFuelL100km || baseReport.performanceUsage?.cityFuelL100km,
+              highwayFuelL100km: specs.highwayFuelL100km || baseReport.performanceUsage?.highwayFuelL100km,
+              combinedFuelL100km: specs.combinedFuelL100km || baseReport.performanceUsage?.combinedFuelL100km,
+              trunkCapacityLiters: specs.trunkCapacityLiters || baseReport.performanceUsage?.trunkCapacityLiters,
+              curbWeightKg: specs.curbWeightKg || baseReport.performanceUsage?.curbWeightKg,
+              supportingFactIds: ['AI_VERIFIED_TECHNICAL_SPECS'],
+            };
+          }
+
           baseReport.status = 'COMPLETED';
 
           return {

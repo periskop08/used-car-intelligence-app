@@ -20,6 +20,20 @@ export class VehicleReportPromptService {
 Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sığ ifadeler kullanma, TorqueScout Yapay Zeka Danışmanı samimiyeti ve derinliğiyle zengin paragraflar üret:
 
 {
+  "technicalSpecifications": {
+    "engineDisplacementCc": 1595,
+    "enginePowerHp": 125,
+    "engineTorqueNm": 152,
+    "transmissionTypeAndSpeeds": "5 İleri Tork Konvertörlü Tam Otomatik",
+    "transmissionSpeeds": 5,
+    "zeroToHundredKmh": 9.6,
+    "topSpeedKmh": 192,
+    "cityFuelL100km": 9.5,
+    "highwayFuelL100km": 5.8,
+    "combinedFuelL100km": 7.1,
+    "trunkCapacityLiters": 450,
+    "curbWeightKg": 1280
+  },
   "expertDecisionSynthesis": {
     "vehicleCharacter": {
       "headline": "2010 Honda Civic 1.6 i-VTEC Elegance: Dayanıklı Mekanik, Yüksek Konfor ve Güçlü İkinci El Sedan",
@@ -201,8 +215,22 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
 5. DONANIM PAKETİ KARŞILAŞTIRMASI VE PAKETE ÖZEL FARKLAR ("trimPackageComparison"):
    Kullanıcının seçtiği "${trim}" paketini, aynı modelin alt veya alternatif donanım paketleriyle (örneğin Active, Comfort vb.) somut karşılaştır! "${trim}" paketinde standart olarak sunulup alt paketlerde OLMAYAN kilit özellikleri (örneğin Sunroof, dijital klima, hız sabitleyici, F1 vites kulakçıkları, çelik jantlar vb.) hem karşılaştırma paragrafında ("comparisonNarrative") hem de eklenen özellikler listesinde ("keyAddedFeatures") açıkça anlat.
+6. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
+   Yukarıdaki 8 kimlik filtresini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
+   - Motor Hacmi cc ("engineDisplacementCc")
+   - Motor Gücü HP ("enginePowerHp")
+   - Tork Nm ("engineTorqueNm")
+   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "5 İleri Tork Konvertörlü Otomatik", "6 İleri Manuel")
+   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 5 veya 6, Asla 8 yazma!)
+   - 0-100 km/s Hızlanma sn ("zeroToHundredKmh")
+   - Maksimum Hız km/s ("topSpeedKmh")
+   - Şehir İçi Tüketim L/100km ("cityFuelL100km")
+   - Şehir Dışı Tüketim L/100km ("highwayFuelL100km")
+   - Karma Tüketim L/100km ("combinedFuelL100km")
+   - Bagaj Hacmi Litre ("trunkCapacityLiters")
+   - Boş Ağırlık kg ("curbWeightKg")
 
-Yukarıdaki 8 filtreye, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
+Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }
 
   buildStage1ResearchPrompt(vehicleContext: any, sectionFilter?: string[]): string {

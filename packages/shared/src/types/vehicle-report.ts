@@ -340,10 +340,26 @@ export interface ExpertDecisionSynthesis {
   unavailableClaims?: UnavailableClaimItem[];
 }
 
+export interface TechnicalSpecificationsData {
+  engineDisplacementCc?: number;
+  enginePowerHp?: number;
+  engineTorqueNm?: number;
+  transmissionTypeAndSpeeds?: string;
+  transmissionSpeeds?: number;
+  zeroToHundredKmh?: number;
+  topSpeedKmh?: number;
+  cityFuelL100km?: number;
+  highwayFuelL100km?: number;
+  combinedFuelL100km?: number;
+  trunkCapacityLiters?: number;
+  curbWeightKg?: number;
+}
+
 /**
  * AI-Generated Narrative Content (Gemini 2.5 output)
  */
 export interface VehicleReportGeneratedContent {
+  technicalSpecifications?: TechnicalSpecificationsData;
   expertDecisionSynthesis: ExpertDecisionSynthesis;
   executiveSummary: ExecutiveSummarySection;
   usageScenarios: UsageScenarioResult[];
