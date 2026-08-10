@@ -134,6 +134,13 @@ export class VehicleReportFallbackService {
         detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} şanzıman kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Doğrulanmış veritabanı kayıtlarına göre periyodik bakımları düzenli yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
         supportingFactIds,
       },
+      trimPackageComparison: {
+        selectedTrimName: vIdentity.trimName || 'Seçilen Paket',
+        lowerOrAlternativeTrimName: 'Alt / Standart Paket',
+        comparisonNarrative: `${vIdentity.trimName || 'Seçilen Paket'} donanım paketi, aracın baz donanım paketlerine kıyasla kilit konfor ve estetik unsurlar sunar. Ek donanım seviyeleri ekspertiz sırasında kontrol edilmelidir.`,
+        keyAddedFeatures: ['Donanım Paketine Özel Konfor Aksamları', 'Gelişmiş Kabin / Donanım Özellikleri'],
+        missingFeaturesInLowerTrim: ['Üst Paket Konfor Elemanları'],
+      },
       dailyUseAssessment: {
         cityUse: `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
         highwayUse: `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,

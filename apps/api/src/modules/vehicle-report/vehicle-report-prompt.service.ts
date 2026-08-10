@@ -26,6 +26,13 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       "detailedAssessment": "Tıpkı uzman chatbot gibi şu 4 alt başlıkta derin, samimi ve teknik otomotiv analizi yaz:\n* **1. Motor ve Şanzıman Uyumu:** (Motorun atmosferik/turbo yapısı, tork konvertörlü/DSG/CVT şanzıman karakteri, vites geçiş hissiyatı, direksiyon kulakçıkları [Paddle Shift] ve mekanik ömrü)\n* **2. Donanım Seviyesi (Seçilen Paket):** (Seçilen donanım paketinin araca kattığı kilit konfor ve teknolojik aksamlar - örn. Sunroof, dijital klima, dijital hız göstergeli kadran, çelik jant vb.)\n* **3. Doğrulanmış Veritabanı Bulguları & Kronik Uyarısı:** (Aracın bilinen kronik durumları, sızıntı riski veya ekspertizde bakılacak kritik mekanik detaylar)\n* **4. Genel Değerlendirme & Kullanım Maliyeti:** (Şehir içi/otoyol tüketim beklentisi [ör. 8.5-10L/100km] ve aracın genel piyasa/konfor değeri)",
       "supportingFactIds": []
     },
+    "trimPackageComparison": {
+      "selectedTrimName": "Elegance",
+      "lowerOrAlternativeTrimName": "Comfort / Active",
+      "comparisonNarrative": "Seçilen Elegance paketinde Sunroof, Dijital Klima, Deri Direksiyon, Hız Sabitleyici, Çelik Jantlar ve Direksiyon Arkası Vites Kulakçıkları (Paddle Shift) standart olarak sunulurken; bir alt paket olan Comfort/Active paketinde Sunroof bulunmamakta, kumaş koltuklar ve standart klima yer almaktadır.",
+      "keyAddedFeatures": ["Sunroof / Açılır Tavan", "Dijital Klima", "Paddle Shift (Direksiyon Kulakçıkları)", "16' Çelik Jantlar", "Sis Farları"],
+      "missingFeaturesInLowerTrim": ["Sunroof", "Paddle Shift Kulakçıklar", "Dijital Klima"]
+    },
     "dailyUseAssessment": {
       "cityUse": "Şehir içi sürüş, manevra kabiliyeti, şanzıman tepkileri ve şehir içi tüketim dengesi...",
       "highwayUse": "Otoyol seyri, yüksek hız stabilitesi, rüzgar/yol izolasyonu ve uzun yol konforu...",
@@ -192,6 +199,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
 4. YÜKSEK KİLOMETRE VE KRONİK RİSK UYARILARI ÜSLUBU:
    Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
+5. DONANIM PAKETİ KARŞILAŞTIRMASI VE PAKETE ÖZEL FARKLAR ("trimPackageComparison"):
+   Kullanıcının seçtiği "${trim}" paketini, aynı modelin alt veya alternatif donanım paketleriyle (örneğin Active, Comfort vb.) somut karşılaştır! "${trim}" paketinde standart olarak sunulup alt paketlerde OLMAYAN kilit özellikleri (örneğin Sunroof, dijital klima, hız sabitleyici, F1 vites kulakçıkları, çelik jantlar vb.) hem karşılaştırma paragrafında ("comparisonNarrative") hem de eklenen özellikler listesinde ("keyAddedFeatures") açıkça anlat.
 
 Yukarıdaki 8 filtreye, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }

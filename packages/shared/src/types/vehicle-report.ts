@@ -291,12 +291,23 @@ export interface TechnicalRiskSummary {
   supportingFactIds: string[];
 }
 
+export interface TrimPackageComparison {
+  selectedTrimName: string;
+  lowerOrAlternativeTrimName?: string;
+  comparisonNarrative: string;
+  keyAddedFeatures: string[];
+  missingFeaturesInLowerTrim?: string[];
+  supportingFactIds?: string[];
+}
+
 export interface ExpertDecisionSynthesis {
   vehicleCharacter: {
     headline: string;
     detailedAssessment: string;
     supportingFactIds: string[];
   };
+
+  trimPackageComparison?: TrimPackageComparison;
 
   dailyUseAssessment: {
     cityUse?: string;
