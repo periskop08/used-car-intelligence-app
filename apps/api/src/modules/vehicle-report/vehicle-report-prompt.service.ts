@@ -198,5 +198,95 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
 Yukarıdaki araca, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }
+
+  buildStage1ResearchPrompt(vehicleContext: any, sectionFilter?: string[]): string {
+    const identity = vehicleContext?.vehicleIdentity || {};
+    const brand = identity.brand || '';
+    const model = identity.model || '';
+    const year = identity.modelYear || '';
+    const body = identity.bodyType || '';
+    const trim = identity.trimName || '';
+    const engine = identity.engineCode || '';
+    const trans = identity.transmissionName || '';
+
+    const fullVehicleTitle = [year, brand, model, body, trim, engine, trans].filter(Boolean).join(' ');
+
+    return `Sen TorqueScout İnternet Otomotiv Araştırma Ajanısın (Web-Grounded Vehicle Research Agent).
+Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak doğrulanmış otomotiv verileri, 7 araç karakteri alanı, donanım paketi detayları, kronik arıza kayıtları ve resmi geri çağırmaları (recalls) araştırmak ve ham JSON formatında üretmektir.
+
+--- İNCELENECEK ARAÇ VARYANTI ---
+• Araç: ${fullVehicleTitle}
+• Marka / Model: ${brand} ${model} (${year})
+• Kasa Tipi: ${body} | Donanım Paketi: ${trim}
+• Motor: ${engine} | Şanzıman: ${trans}
+${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilter.join(', ')}` : ''}
+
+## ÜRETECEĞİN ÇIKTI ŞEMASI (JSON):
+{
+  "vehicleIdentityResearch": { "brand": "${brand}", "model": "${model}", "year": "${year}" },
+  "vehicleCharacterResearch": {
+    "segmentPositioning": { "summary": "...", "claimIds": ["CLM-1"], "sourceIds": ["SRC-1"] },
+    "engineTransmissionFit": { "summary": "...", "claimIds": ["CLM-2"], "sourceIds": ["SRC-1"] },
+    "drivingDynamics": { "summary": "...", "claimIds": ["CLM-3"], "sourceIds": ["SRC-1"] },
+    "comfortAndIsolation": { "summary": "...", "claimIds": ["CLM-4"], "sourceIds": ["SRC-1"] },
+    "interiorPracticality": { "summary": "...", "claimIds": ["CLM-5"], "sourceIds": ["SRC-1"] },
+    "usageScenarios": { "summary": "...", "claimIds": ["CLM-6"], "sourceIds": ["SRC-1"] },
+    "targetUserProfile": { "summary": "...", "claimIds": ["CLM-7"], "sourceIds": ["SRC-1"] }
+  },
+  "equipmentResearch": [ { "featureName": "...", "status": "STANDARD|OPTIONAL", "claimId": "CLM-8" } ],
+  "reliabilityResearch": [ { "title": "...", "description": "...", "riskLevel": "CRITICAL|MEDIUM", "claimId": "CLM-9" } ],
+  "recallResearch": [ { "campaignNumber": "...", "description": "..." } ],
+  "groundingSources": [
+    {
+      "sourceId": "SRC-1",
+      "url": "https://...",
+      "title": "...",
+      "domain": "...",
+      "sourceKind": "OFFICIAL_MANUFACTURER|OFFICIAL_BROCHURE|PERIOD_ROAD_TEST|SPECIALIST_FORUM|MARKETPLACE|OTHER",
+      "evidenceExcerpt": "...",
+      "evidenceLocation": { "section": "..." }
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "CLM-1",
+      "claimText": "...",
+      "category": "CHARACTER|RELIABILITY|EQUIPMENT",
+      "claimType": "FACT|OBSERVED_BEHAVIOR|CROSS_SOURCE_EVALUATION|DERIVED_CONCLUSION",
+      "verificationStatus": "RAW",
+      "derivedFromClaimIds": [],
+      "sources": [ { "sourceId": "SRC-1", "stance": "SUPPORTS" } ],
+      "relevance": {
+        "generation": { "required": true, "match": true },
+        "engineCode": { "required": true, "match": true },
+        "trim": { "required": true, "match": true },
+        "market": { "required": true, "match": true }
+      }
+    }
+  ],
+  "webSearchPerformed": true
 }
 
+Yalnızca geçerli JSON formatı üret. JSON dışında hiçbir metin ekleme.`;
+  }
+
+  buildStage2ClosedWriterPrompt(vehicleContext: any, verifiedResearch: any): string {
+    const systemPrompt = this.buildSystemPrompt();
+    const userPrompt = this.buildUserPrompt(vehicleContext);
+
+    return `${systemPrompt}
+
+## SIKI KAPALI ORTAM (CLOSED-BOOK WRITER) TALİMATLARI:
+- Sen kapalı ortam rapor yazıcısısın (Web erişimin KAPALIDIR).
+- Yalnızca aşağıdaki DB Context ve VERIFIED_RESEARCH_DATA içerisinde bulunan doğrulanmış iddialardan (VerificationStatus = VERIFIED) yararlanarak 9 soruluk nihai raporu yazabilirsin.
+- VERIFIED iddialar ve DB Context dışında yepyeni bir teknik veri, motor kodu veya kronik iddiası ÜRETEMEZSİN!
+- Rapordaki teknik/değerlendirme bloklarına dayandığın verified claim ID'lerini ("supportingFactIds" / "supportingClaimIds") ekle.
+- Yeterli doğrulanmış iddia bulunmayan alt alanlarda veri uydurmak yerine "insufficientData: true" veya dengeli uzman değerlendirmesi sun.
+
+--- DOĞRULANMIŞ ARAŞTIRMA VERİSİ (VERIFIED_RESEARCH_DATA) ---
+${JSON.stringify(verifiedResearch, null, 2)}
+
+--- TAM ARAÇ VE DONANIM PAKETİ SPESİFİKASYONLARI ---
+${userPrompt}`;
+  }
+}

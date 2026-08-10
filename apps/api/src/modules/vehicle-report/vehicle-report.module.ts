@@ -15,6 +15,7 @@ import { VehicleReportCacheService } from './vehicle-report-cache.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.service';
 import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
+import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
 import { AuthModule } from '../auth/auth.module';
 import { ResearchModule } from '../research/research.module';
 
@@ -33,6 +34,7 @@ import { ResearchModule } from '../research/research.module';
     VehicleReportProviderService,
     VehicleReportSemanticValidationService,
     VehicleReportNarrativeQualityService,
+    ResearchEvidenceValidationService,
     VehicleReportFallbackService,
     VehicleReportCacheService,
     VehicleReportQuotaService,

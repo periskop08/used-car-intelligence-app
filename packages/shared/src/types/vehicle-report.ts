@@ -406,3 +406,121 @@ export interface CreateVehicleReportResponse {
   cached: boolean;
   message?: string;
 }
+
+export interface RelevanceCheck {
+  required: boolean;
+  match: boolean | null;
+}
+
+export interface ClaimRelevanceBasis {
+  generation: RelevanceCheck;
+  bodyType: RelevanceCheck;
+  year: RelevanceCheck;
+  engineFamily: RelevanceCheck;
+  engineCode: RelevanceCheck;
+  transmission: RelevanceCheck;
+  trim: RelevanceCheck;
+  market: RelevanceCheck;
+  equipmentPeriod: RelevanceCheck;
+}
+
+export interface EvidenceLocation {
+  page?: number;
+  section?: string;
+  table?: string;
+  column?: string;
+}
+
+export interface GroundingSource {
+  sourceId: string;
+  url: string;
+  title: string;
+  domain: string;
+  sourceKind: 
+    | 'OFFICIAL_MANUFACTURER'
+    | 'OFFICIAL_REGULATOR'
+    | 'OFFICIAL_BROCHURE'
+    | 'OFFICIAL_DEALER_DOCUMENT'
+    | 'TECHNICAL_PUBLICATION'
+    | 'PERIOD_ROAD_TEST'
+    | 'SPECIALIST_FORUM'
+    | 'MARKETPLACE'
+    | 'OTHER';
+  reliabilityScore: number;
+  retrievedAt: string;
+  publishedAt?: string;
+  contentHash?: string;
+  canonicalSourceId?: string;
+  independenceGroupId?: string;
+  evidenceExcerpt?: string;
+  evidenceLocation?: EvidenceLocation;
+}
+
+export interface ClaimSourceMapping {
+  sourceId: string;
+  stance: 'SUPPORTS' | 'REFUTES' | 'NEUTRAL';
+}
+
+export type ClaimType = 'FACT' | 'OBSERVED_BEHAVIOR' | 'CROSS_SOURCE_EVALUATION' | 'DERIVED_CONCLUSION';
+export type VerificationStatus = 'RAW' | 'VERIFIED' | 'REJECTED' | 'INSUFFICIENT_EVIDENCE';
+
+export interface ResearchClaim {
+  claimId: string;
+  claimText: string;
+  category: string;
+  claimType: ClaimType;
+  verificationStatus: VerificationStatus;
+  derivedFromClaimIds?: string[];
+  sources: ClaimSourceMapping[];
+  relevance: ClaimRelevanceBasis;
+}
+
+export interface CharacterResearchSection {
+  summary: string;
+  claimIds: string[];
+  sourceIds: string[];
+  insufficientData?: boolean;
+}
+
+export interface VehicleCharacterResearch {
+  segmentPositioning: CharacterResearchSection;
+  engineTransmissionFit: CharacterResearchSection;
+  drivingDynamics: CharacterResearchSection;
+  comfortAndIsolation: CharacterResearchSection;
+  interiorPracticality: CharacterResearchSection;
+  usageScenarios: CharacterResearchSection;
+  targetUserProfile: CharacterResearchSection;
+}
+
+export interface SectionStatusMap {
+  vehicleIdentity: 'VERIFIED' | 'PARTIAL' | 'FAILED';
+  vehicleCharacter: 'VERIFIED' | 'PARTIAL' | 'FAILED';
+  equipment: 'VERIFIED' | 'PARTIAL' | 'FAILED';
+  reliability: 'VERIFIED' | 'PARTIAL' | 'FAILED';
+  recall: 'VERIFIED' | 'PARTIAL' | 'FAILED';
+  buyerInspection: 'DERIVED' | 'VERIFIED' | 'FAILED';
+  sellerQuestions: 'DERIVED' | 'VERIFIED' | 'FAILED';
+}
+
+export interface VehicleReportResearchData {
+  vehicleIdentityResearch: Record<string, any>;
+  vehicleCharacterResearch: VehicleCharacterResearch;
+  equipmentResearch: Record<string, any>;
+  reliabilityResearch: Record<string, any>;
+  recallResearch: Record<string, any>;
+  buyerInspectionResearch: Record<string, any>;
+  sellerQuestionResearch: Record<string, any>;
+  groundingSources: GroundingSource[];
+  claims: ResearchClaim[];
+  researchStatus: 'WEB_VERIFIED' | 'PARTIAL_WEB_VERIFIED' | 'DB_ONLY_FALLBACK';
+  sectionStatus: SectionStatusMap;
+  webSearchPerformed: boolean;
+  researchedAt: string;
+  freshness: {
+    vehicleCharacter: string;
+    equipment: string;
+    reliability: string;
+    recalls: string;
+  };
+}
+

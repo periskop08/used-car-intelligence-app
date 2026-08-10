@@ -3,7 +3,8 @@ import { VehicleReportPromptService } from './vehicle-report-prompt.service';
 import { VehicleReportSemanticValidationService } from './vehicle-report-semantic-validation.service';
 import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
-import { ComprehensiveVehicleReport, VehicleReportGeneratedContent } from '@used-car-intelligence/shared';
+import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
+import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData } from '@used-car-intelligence/shared';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
@@ -22,6 +23,7 @@ export class VehicleReportProviderService implements OnModuleInit {
     private semanticValidation: VehicleReportSemanticValidationService,
     private narrativeQualityService: VehicleReportNarrativeQualityService,
     private fallbackService: VehicleReportFallbackService,
+    private evidenceValidationService: ResearchEvidenceValidationService,
   ) {
     this.geminiModelName = process.env.GEMINI_REPORT_MODEL || 'gemini-1.5-flash';
     this.openaiModelName = process.env.OPENAI_REPORT_MODEL || 'gpt-4o-mini';
@@ -66,6 +68,7 @@ export class VehicleReportProviderService implements OnModuleInit {
     qualityScore?: number;
     repairAttempted: boolean;
     fallbackReason?: string;
+    verifiedResearch?: VehicleReportResearchData;
   }> {
     const baseReport = this.fallbackService.generateFallbackReport(
       reportId,
@@ -73,169 +76,211 @@ export class VehicleReportProviderService implements OnModuleInit {
       vehicleContext,
     );
 
-    const systemPrompt = this.promptService.buildSystemPrompt();
-    const userPrompt = this.promptService.buildUserPrompt(vehicleContext);
-    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    // STAGE 1: Conduct Web-Grounded Research
+    let verifiedResearch: VehicleReportResearchData | null = null;
+    let researchProvider = '';
 
-    let generatedContent: VehicleReportGeneratedContent | null = null;
-    let usedModel = '';
-    let usedProvider = '';
+    try {
+      this.logger.log(`[STAGE 1] Initiating Web-Grounded Research...`);
+      const rawResearchRes = await this.conductGroundedResearch(vehicleContext);
+      if (rawResearchRes.rawResearch) {
+        verifiedResearch = this.evidenceValidationService.validateResearchData(
+          rawResearchRes.rawResearch,
+          vehicleContext,
+        );
+        researchProvider = rawResearchRes.provider;
+        this.logger.log(`[STAGE 1.5] Evidence Validation complete. Research Status: ${verifiedResearch.researchStatus}`);
+      }
+    } catch (researchErr: any) {
+      this.logger.warn(`[STAGE 1] Web Research error: ${researchErr?.message}. Proceeding to DB Fallback...`);
+    }
 
-    // 1. Try Gemini first
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-    if (geminiKey) {
+    // STAGE 2: Closed-Book Report Generation
+    if (verifiedResearch && verifiedResearch.researchStatus !== 'DB_ONLY_FALLBACK') {
       try {
-        this.logger.log(`[AI-REPORT] Calling Gemini API (model: ${this.geminiModelName})...`);
-        const result = await this.callGemini(fullPrompt);
-        if (result.content) {
-          generatedContent = result.content;
-          usedModel = this.geminiModelName;
-          usedProvider = 'gemini';
+        this.logger.log(`[STAGE 2] Generating Closed Report with VERIFIED_RESEARCH_DATA...`);
+        const writerPrompt = this.promptService.buildStage2ClosedWriterPrompt(vehicleContext, verifiedResearch);
+        
+        let writerContent: VehicleReportGeneratedContent | null = null;
+        let usedProvider = '';
+        let usedModel = '';
+
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+        if (geminiKey) {
+          try {
+            const res = await this.callGeminiClosedWriter(writerPrompt);
+            if (res.content) {
+              writerContent = res.content;
+              usedProvider = 'gemini';
+              usedModel = this.geminiModelName;
+            }
+          } catch (e: any) {
+            this.logger.warn(`Gemini Closed Writer notice: ${e.message}`);
+          }
         }
-      } catch (geminiErr: any) {
-        this.logger.error(`[AI-REPORT] Gemini API error: ${geminiErr?.message}`);
+
+        if (!writerContent && process.env.OPENAI_API_KEY) {
+          try {
+            const res = await this.callOpenAIClosedWriter(writerPrompt);
+            if (res.content) {
+              writerContent = res.content;
+              usedProvider = 'openai';
+              usedModel = this.openaiModelName;
+            }
+          } catch (e: any) {
+            this.logger.warn(`OpenAI Closed Writer notice: ${e.message}`);
+          }
+        }
+
+        if (writerContent) {
+          baseReport.executiveSummary = writerContent.executiveSummary as any;
+          baseReport.expertDecisionSynthesis = writerContent.expertDecisionSynthesis as any;
+          baseReport.usageScenarios = writerContent.usageScenarios as any;
+          baseReport.sellerQuestions = writerContent.premiumChecklistQuestions as any;
+          baseReport.prePurchaseChecks = writerContent.inspectionChecklist as any;
+          baseReport.finalVerdict = writerContent.finalConditionalVerdict as any;
+          baseReport.status = 'COMPLETED';
+
+          return {
+            report: baseReport,
+            provider: `${researchProvider}+${usedProvider}`,
+            modelName: usedModel,
+            qualityScore: 95,
+            repairAttempted: false,
+            verifiedResearch,
+          };
+        }
+      } catch (writerErr: any) {
+        this.logger.error(`[STAGE 2] Writer error: ${writerErr?.message}`);
       }
     }
 
-    // 2. Try OpenAI if Gemini failed or key not available
-    if (!generatedContent && process.env.OPENAI_API_KEY) {
-      try {
-        this.logger.log(`[AI-REPORT] Calling OpenAI API (model: ${this.openaiModelName})...`);
-        const result = await this.callOpenAI(systemPrompt, userPrompt);
-        if (result.content) {
-          generatedContent = result.content;
-          usedModel = this.openaiModelName;
-          usedProvider = 'openai';
-        }
-      } catch (openaiErr: any) {
-        this.logger.error(`[AI-REPORT] OpenAI API error: ${openaiErr?.message}`);
-      }
-    }
+    // SAFE FALLBACK: If Web research or Writer failed
+    this.logger.warn(`[AI-REPORT] Web research/writer failed or unavailable. Saving DB Safe Fallback with status SAFE_FALLBACK.`);
+    baseReport.status = 'SAFE_FALLBACK' as any;
 
-    if (generatedContent) {
-      this.logger.log(`[AI-REPORT] Successfully generated AI report content via ${usedProvider} (${usedModel})`);
-      baseReport.executiveSummary = generatedContent.executiveSummary as any;
-      baseReport.expertDecisionSynthesis = generatedContent.expertDecisionSynthesis as any;
-      baseReport.usageScenarios = generatedContent.usageScenarios as any;
-      baseReport.sellerQuestions = generatedContent.premiumChecklistQuestions as any;
-      baseReport.prePurchaseChecks = generatedContent.inspectionChecklist as any;
-      baseReport.finalVerdict = generatedContent.finalConditionalVerdict as any;
-      baseReport.status = 'COMPLETED';
-
-      return {
-        report: baseReport,
-        provider: usedProvider,
-        modelName: usedModel,
-        qualityScore: 95,
-        repairAttempted: false,
-      };
-    }
-
-    this.logger.warn(`[AI-REPORT] All AI providers failed. Returning deterministic DB fallback.`);
     return {
       report: baseReport,
       provider: 'DETERMINISTIC_FALLBACK',
       modelName: 'TorqueScout DB Engine',
       repairAttempted: false,
-      fallbackReason: 'AI API hatası veya key yapılandırması eksik',
+      fallbackReason: 'Web-grounded research failed or unavailable',
+      verifiedResearch: verifiedResearch || undefined,
     };
   }
 
-  private async callGemini(fullPrompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-    if (!apiKey) throw new Error('Gemini API key eksik');
+  private async conductGroundedResearch(vehicleContext: any): Promise<{ rawResearch: any; provider: string }> {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+    const researchPrompt = this.promptService.buildStage1ResearchPrompt(vehicleContext);
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const candidateModels = Array.from(new Set([
-      this.geminiModelName,
-      'gemini-1.5-flash',
-      'gemini-2.0-flash-exp',
-      'gemini-1.5-pro',
-    ]));
-
-    let lastErr: any = null;
-    for (const modelName of candidateModels) {
+    // 1. Primary: Gemini with Google Search Tool
+    if (geminiKey) {
       try {
+        const genAI = new GoogleGenerativeAI(geminiKey);
         const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            temperature: 0.3,
-            topP: 0.85,
-            responseMimeType: 'application/json',
-          },
+          model: this.geminiModelName,
+          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+          tools: [{ googleSearch: {} }] as any,
         });
 
         const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+          contents: [{ role: 'user', parts: [{ text: researchPrompt }] }],
         });
 
         const responseText = result.response.text();
+        const candidate = result.response.candidates?.[0];
+        const groundingMetadata = (candidate as any)?.groundingMetadata;
+        const webSearchPerformed = Boolean(groundingMetadata?.groundingChunks?.length || groundingMetadata?.searchEntryPoint);
+
+        let parsed: any = null;
         try {
-          return { content: JSON.parse(responseText) };
+          parsed = JSON.parse(responseText);
         } catch {
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              return { content: JSON.parse(jsonMatch[0]) };
-            } catch {}
+          const match = responseText.match(/\{[\s\S]*\}/);
+          if (match) parsed = JSON.parse(match[0]);
+        }
+
+        if (parsed) {
+          parsed.webSearchPerformed = webSearchPerformed;
+          if (groundingMetadata?.groundingChunks) {
+            parsed.groundingSources = groundingMetadata.groundingChunks.map((chunk: any, idx: number) => ({
+              sourceId: `SRC-G-${idx + 1}`,
+              url: chunk.web?.uri || 'https://google.com',
+              title: chunk.web?.title || 'Google Search Result',
+              domain: chunk.web?.uri ? new URL(chunk.web.uri).hostname : 'google.com',
+              snippet: chunk.web?.title,
+            }));
           }
+          return { rawResearch: parsed, provider: 'gemini_grounded' };
         }
       } catch (err: any) {
-        lastErr = err;
-        this.logger.warn(`Gemini model ${modelName} call notice: ${err?.message}. Trying next model...`);
+        this.logger.warn(`Gemini Grounded Research notice: ${err?.message}. Trying OpenAI Fallback...`);
       }
     }
 
-    throw lastErr || new Error('All Gemini model candidates failed');
+    // 2. Fallback: OpenAI with built-in web_search tool
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const response = await openai.chat.completions.create({
+          model: this.openaiModelName,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: researchPrompt }],
+        });
+
+        const text = response.choices[0]?.message?.content || '';
+        const parsed = JSON.parse(text);
+        if (parsed) {
+          parsed.webSearchPerformed = true;
+          return { rawResearch: parsed, provider: 'openai_web_search' };
+        }
+      } catch (oErr: any) {
+        this.logger.warn(`OpenAI Web Search Fallback notice: ${oErr?.message}`);
+      }
+    }
+
+    return { rawResearch: null, provider: 'none' };
   }
 
-  private async callOpenAI(
-    systemPrompt: string,
-    userPrompt: string,
-  ): Promise<{ content: VehicleReportGeneratedContent | null }> {
+  private async callGeminiClosedWriter(prompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+    if (!apiKey) throw new Error('Gemini API key missing');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: this.geminiModelName,
+      generationConfig: { temperature: 0.3, topP: 0.85, responseMimeType: 'application/json' },
+    });
+
+    const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+    const text = result.response.text();
+    try {
+      return { content: JSON.parse(text) };
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      return { content: match ? JSON.parse(match[0]) : null };
+    }
+  }
+
+  private async callOpenAIClosedWriter(prompt: string): Promise<{ content: VehicleReportGeneratedContent | null }> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OpenAI API key eksik');
+    if (!apiKey) throw new Error('OpenAI API key missing');
 
     const openai = new OpenAI({ apiKey });
     const response = await openai.chat.completions.create({
       model: this.openaiModelName,
       temperature: 0.3,
       response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    const responseText = response.choices[0]?.message?.content || '';
+    const text = response.choices[0]?.message?.content || '';
     try {
-      const parsed = JSON.parse(responseText);
-      // Unwrap if OpenAI nested the output in a key
-      if (parsed && typeof parsed === 'object') {
-        // Direct match: has expertDecisionSynthesis or executiveSummary at root
-        if (parsed.expertDecisionSynthesis || parsed.executiveSummary) {
-          return { content: parsed as VehicleReportGeneratedContent };
-        }
-        // Wrapped: {"VehicleReportGeneratedContent": {...}} or any single top-level key
-        const keys = Object.keys(parsed);
-        if (keys.length === 1) {
-          const inner = parsed[keys[0]];
-          if (inner && typeof inner === 'object' && (inner.expertDecisionSynthesis || inner.executiveSummary)) {
-            return { content: inner as VehicleReportGeneratedContent };
-          }
-        }
-        // Try to find expertDecisionSynthesis in any nested key
-        for (const key of keys) {
-          const val = parsed[key];
-          if (val && typeof val === 'object' && (val.expertDecisionSynthesis || val.executiveSummary)) {
-            return { content: val as VehicleReportGeneratedContent };
-          }
-        }
-      }
-      return { content: parsed as VehicleReportGeneratedContent };
+      return { content: JSON.parse(text) };
     } catch {
-      this.logger.warn(`OpenAI JSON parse failed`);
       return { content: null };
     }
   }
 }
+
