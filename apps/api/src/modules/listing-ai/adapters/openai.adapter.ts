@@ -35,7 +35,7 @@ export class OpenAiAdapter implements AiProviderAdapter {
         model: process.env.LISTING_AI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: fullPrompt }],
         temperature: 0.3,
-        max_tokens: 3500,
+        max_tokens: userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') ? 8192 : 4000,
       }),
     });
 

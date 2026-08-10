@@ -45,7 +45,7 @@ export class GeminiAdapter implements AiProviderAdapter {
               ],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 3500,
+                maxOutputTokens: userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') ? 8192 : 4000,
               },
             }),
           });

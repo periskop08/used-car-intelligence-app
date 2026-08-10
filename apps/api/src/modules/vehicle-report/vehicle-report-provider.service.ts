@@ -72,19 +72,22 @@ export class VehicleReportProviderService {
         try {
           writerContent = JSON.parse(cleanAnswer);
         } catch {
-          const match = cleanAnswer.match(/\{[\s\S]*\}/);
-          if (match) {
-            try {
-              writerContent = JSON.parse(match[0]);
-            } catch (e) {
-              this.logger.warn(`JSON extraction notice: ${(e as Error).message}`);
-            }
+          const repaired = this.repairJson(cleanAnswer);
+          try {
+            writerContent = JSON.parse(repaired);
+          } catch (e) {
+            this.logger.warn(`JSON extraction notice: ${(e as Error).message}`);
           }
         }
 
         if (writerContent) {
           if (writerContent.executiveSummary) baseReport.executiveSummary = writerContent.executiveSummary as any;
-          if (writerContent.expertDecisionSynthesis) baseReport.expertDecisionSynthesis = writerContent.expertDecisionSynthesis as any;
+          if (writerContent.expertDecisionSynthesis) {
+            baseReport.expertDecisionSynthesis = writerContent.expertDecisionSynthesis as any;
+            if (baseReport.expertDecisionSynthesis.vehicleCharacter) {
+              baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds = ['AI_RESEARCH_ENGINE'];
+            }
+          }
           if (writerContent.usageScenarios) baseReport.usageScenarios = writerContent.usageScenarios as any;
           if (writerContent.premiumChecklistQuestions) baseReport.sellerQuestions = writerContent.premiumChecklistQuestions as any;
           if (writerContent.inspectionChecklist) baseReport.prePurchaseChecks = writerContent.inspectionChecklist as any;
@@ -139,5 +142,58 @@ export class VehicleReportProviderService {
       fallbackReason: 'Vehicle Intelligence Orchestrator fallback',
       verifiedResearch: verifiedResearch || undefined,
     };
+  }
+
+  private repairJson(jsonStr: string): string {
+    let cleaned = jsonStr.trim();
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace === -1) return cleaned;
+    cleaned = cleaned.substring(firstBrace);
+
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let isEscaped = false;
+
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (isEscaped) {
+        isEscaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        isEscaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === '{') openBraces++;
+        else if (char === '}') openBraces--;
+        else if (char === '[') openBrackets++;
+        else if (char === ']') openBrackets--;
+      }
+    }
+
+    if (inString) {
+      cleaned += '"';
+    }
+
+    cleaned = cleaned.replace(/[,:\s]+$/, '');
+
+    while (openBrackets > 0) {
+      cleaned += ']';
+      openBrackets--;
+    }
+    while (openBraces > 0) {
+      cleaned += '}';
+      openBraces--;
+    }
+
+    return cleaned;
   }
 }

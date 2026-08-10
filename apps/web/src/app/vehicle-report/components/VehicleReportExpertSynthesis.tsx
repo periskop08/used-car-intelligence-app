@@ -57,10 +57,13 @@ export default function VehicleReportExpertSynthesis({
       if (firstFact.source === "SELLER_DECLARATION") {
         label = "Kaynak: Satıcı Beyanı — Doğrulanmamış";
         colorClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      } else if (firstFact.source === "VEHICLE_DATABASE" || firstFact.source === "EVIDENCE_VERIFIED") {
-        label = "Kaynak: Onaylı Veritabanı Kaydı";
+      } else {
+        label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
         colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
       }
+    } else if (factIds.includes("AI_RESEARCH_ENGINE") || factIds.includes("AI_VERIFIED_TECHNICAL_SPECS")) {
+      label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
+      colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
     }
 
     return (
