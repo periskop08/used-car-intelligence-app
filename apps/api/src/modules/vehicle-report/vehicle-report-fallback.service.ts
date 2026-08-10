@@ -38,8 +38,8 @@ export class VehicleReportFallbackService {
     const engineCodeLower = ((vIdentity.engineCode || '') + ' ' + (vIdentity.model || '')).toLowerCase();
 
     if ((engineCodeLower.includes('2.0') || engineCodeLower.includes('tfsi') || engineCodeLower.includes('turbo')) && rawHp && rawHp < 140) {
-      rawHp = engineCodeLower.includes('tfsi') ? 180 : (engineCodeLower.includes('tdi') ? 143 : undefined);
-      rawTorque = 320;
+      rawHp = undefined;
+      rawTorque = undefined;
     }
 
     const hp = rawHp ? `${rawHp} bg` : 'Orijinal Fabrika Gücü';

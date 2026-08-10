@@ -82,10 +82,10 @@ export class VehicleReportContextBuilderService {
     const engineCodeLower = ((variant.engine?.code || '') + ' ' + (variant.engine?.description || '')).toLowerCase();
     if (engineCodeLower.includes('2.0') || engineCodeLower.includes('tfsi') || engineCodeLower.includes('turbo')) {
       if (engineHp && engineHp < 140) {
-        engineHp = engineCodeLower.includes('tfsi') ? 180 : (engineCodeLower.includes('tdi') ? 143 : null);
+        engineHp = null; // Let AI derive exact factory HP (e.g. 211 HP for 2.0 TFSI Quattro)
       }
       if (engineTorque && engineTorque < 220) {
-        engineTorque = engineCodeLower.includes('tfsi') ? 320 : (engineCodeLower.includes('tdi') ? 320 : null);
+        engineTorque = null; // Let AI derive exact factory Torque (e.g. 350 Nm)
       }
     }
 
