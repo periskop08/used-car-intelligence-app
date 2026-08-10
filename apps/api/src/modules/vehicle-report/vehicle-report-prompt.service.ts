@@ -11,7 +11,7 @@ export class VehicleReportPromptService {
 4. **Kimler İçin Mantıklı?** (Bu aracın ve donanım paketinin birebir uyduğu kullanıcı profilleri ve yaşam tarzları)
 5. **Kimler İçin Uygun Olmayabilir?** (Bu aracı alırken iki kez düşünmesi gereken kullanıcı profilleri)
 6. **Hangi Şartlarda Değerlendirilebilir & Km Bakım Koşulları?** (Satın alırken aranacak spesifik ekspertiz, km bazlı ağır bakım geçmişi ve bakım koşulları)
-7. **Hangi Durumda Satın Almaktan Vazgeçilmeli?** (Görülürse arkaya bakmadan uzak durulacak kırmızı bayraklar/kötü senaryolar)
+7. **Hangi Durumda Satın Almaktan Vazgeçilmeli / Ekstra Dikkat Edilmeli?** (Satın almadan önce ekstra hassasiyet gösterilmesi gereken, yüksek tamir masrafına yol açabilecek ve mutlaka ekspertiz kontrolünde teyit edilmesi gereken en kritik risk durumları)
 8. **Satın Alma Öncesi Ekspertiz Kontrol Listesi:** (Ekspertizde usta veya alıcı tarafından kontrol edilecek en az 5 kritik mekanik/elektronik/donanım noktası)
 9. **Satıcıya Sorulacak Kritik Sorular:** (Alıcının satıcıya sorması gereken km geçmişi, ağır bakım ve parçalarla ilgili en az 5 spesifik ve akılcı teknik soru)
 
@@ -135,6 +135,11 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
 ## ZORUNLU KURAL VE YASAKLAR
 - KESİNLİKLE YASAK: Raporun hiçbir yerinde "belirtilmemiştir", "bilgisi mevcut değildir", "bilgi girilmemiştir", "bilinmektedir" gibi ifadeler KULLANILAMAZ!
+- UYARILARDA VE 'walkAwayConditions' ALANINDA KESİNLİKLE "bu araçtan uzak durulmalıdır", "arkaya bakmadan uzak durun", "kesinlikle alınmamalıdır" GİBİ KESİN REDDEDİCİ İFADELER KULLANMA!
+- Yüksek kilometre (150.000 km ve üzeri) veya kronik mekanik arıza risklerinde kullanıcıyı aracı almaktan tamamen vazgeçirmek yerine:
+  1. Ekstra dikkatli ve temkinli olunması gerektiğini belirt.
+  2. İlgili aksamın/kronik durumun ciddi tamir/parça masrafı doğurabileceği konusunda uyar.
+  3. Belirtilen risklerin fiziki olarak ekspertiz kontrolünde (ustasına/uzmanına) teyit ettirilmesini ve tespit edilen masrafların satın alma fiyat pazarlığında göz önünde bulundurulmasını tavsiye eden dengeli, yönlendirici ve uzman üslubu kullan.
 - Sen TorqueScout Yapay Zeka Danışmanısın. Kullanıcıya tam otomotiv uzmanı gözüyle doğrudan, net, detaylı ve tatmin edici yanıtlar ver.
 - Yalnızca geçerli JSON üret. JSON dışında başlık veya açıklama metni ekleme.`;
   }
@@ -188,6 +193,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
 2. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
 3. Eğer belirtilmeyen performans verileri veya hibrit sistem gücü detayları varsa, kendi %100 doğrulanmış otomotiv mühendisliği bilgini kullanarak aracın gerçek 0-100 hızlanmasını, toplam sistem gücünü ve doğru şanzıman yapısını rapora doğru yansıt.
+4. YÜKSEK KİLOMETRE VE KRONİK RİSK UYARILARI ÜSLUBU:
+   Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
 
 Yukarıdaki araca, donanım paketine ve kilometre aşınma skalasına özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
   }

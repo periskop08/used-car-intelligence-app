@@ -187,14 +187,14 @@ export class VehicleReportFallbackService {
       ],
       walkAwayConditions: [
         {
-          condition: 'Şanzımda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
-          reason: 'Yüksek tamir ve revizyon maliyetlerinden kaçınmak.',
+          condition: 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
+          reason: 'Yüksek tamir ve revizyon masrafları doğurabileceğinden, satın alım öncesinde ekspertiz kontrolünde mekatronik ve kavrama sağlığı detaylıca teyit edilmelidir.',
           priority: 'CRITICAL',
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
         {
           condition: 'Motor Altında Aktif Yağ Kaçağı ve Hararet Geçmişi',
-          reason: 'Ciddi kapak ve blok hasarı riskini engellemek.',
+          reason: 'Ciddi kapak ve blok masrafı riskine karşı uzman eksper incelemesi ve kompresyon testiyle sızıntı kaynağı netleştirilmelidir.',
           priority: 'CRITICAL',
           supportingFactIds: ['ENGINE_POWER'],
         },
@@ -342,7 +342,7 @@ export class VehicleReportFallbackService {
         bestFor: ['Şehir içi kullanım', 'Sakin sürücüler'],
         avoidIf: ['Bakım geçmişi belgesiz ise'],
         proceedIf: ['Ekspertizde şanzıman pürüzsüz ve kaçak yoksa'],
-        walkAwayIf: ['Şanzımanda titreme veya hararet geçmişi varsa'],
+        walkAwayIf: ['Şanzımanda titreme veya hararet geçmişi ekspertizde teyit edilirse'],
         topThreeActions: [
           'Şasi numarasıyla yetkili serviste geçmiş kontrolü yapın',
           'Ekspertizde aracı lifte kaldırıp alt muhafazayı inceleyin',

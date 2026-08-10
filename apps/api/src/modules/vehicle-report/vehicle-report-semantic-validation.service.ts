@@ -54,10 +54,15 @@ export class VehicleReportSemanticValidationService {
     }
 
     // Rule 3: Absolute buy/walk away commands check
-    if (reportStr.includes('bu aracı sakın alma') || reportStr.includes('kesinlikle satın alın')) {
+    if (
+      reportStr.includes('bu aracı sakın alma') ||
+      reportStr.includes('kesinlikle satın alın') ||
+      reportStr.includes('uzak durulmalıdır') ||
+      reportStr.includes('uzak durun')
+    ) {
       return {
         isValid: false,
-        reason: 'Kullanıcıya emredici "kesin al" veya "kesin alma" ifadesi kullanıldı.',
+        reason: 'Kullanıcıya emredici veya kesin reddedici ("uzak durulmalıdır" / "sakın alma") ifade kullanıldı. Ekspertiz yönlendirmesi yapılmalı.',
         needsRepair: true,
       };
     }
