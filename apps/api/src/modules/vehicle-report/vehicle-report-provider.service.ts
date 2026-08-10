@@ -65,11 +65,14 @@ export class VehicleReportProviderService {
       );
 
       if (orchestratorResult && orchestratorResult.answer) {
+        let cleanAnswer = orchestratorResult.answer.trim();
+        cleanAnswer = cleanAnswer.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
         let writerContent: VehicleReportGeneratedContent | null = null;
         try {
-          writerContent = JSON.parse(orchestratorResult.answer);
+          writerContent = JSON.parse(cleanAnswer);
         } catch {
-          const match = orchestratorResult.answer.match(/\{[\s\S]*\}/);
+          const match = cleanAnswer.match(/\{[\s\S]*\}/);
           if (match) {
             try {
               writerContent = JSON.parse(match[0]);

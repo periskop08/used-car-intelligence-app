@@ -64,6 +64,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
           mode: "LISTING_REPORT",
           listingId,
           idempotencyKey,
+          forceRefresh: true,
         }),
       });
 

@@ -13,6 +13,7 @@ export class GeminiAdapter implements AiProviderAdapter {
   ): Promise<AiProviderResponse> {
     const apiKey =
       process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_AI_KEY ||
       process.env.GOOGLE_AI_API_KEY ||
       process.env.GOOGLE_API_KEY;
 
@@ -24,7 +25,11 @@ export class GeminiAdapter implements AiProviderAdapter {
 
     if (apiKey) {
       // Models to try in sequence
-      const models = ['gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-flash-latest'];
+      const models = [
+        process.env.GEMINI_REPORT_MODEL || 'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-2.0-flash-exp',
+      ];
 
       for (const model of models) {
         try {

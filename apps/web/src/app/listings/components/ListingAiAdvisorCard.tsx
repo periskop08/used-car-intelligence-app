@@ -171,6 +171,7 @@ export default function ListingAiAdvisorCard({
           mode: "LISTING_REPORT",
           listingId,
           idempotencyKey,
+          forceRefresh: true,
         }),
       });
 
