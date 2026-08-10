@@ -118,7 +118,9 @@ export class VehicleReportFallbackService {
     }
 
     const torque = rawTorque ? `${rawTorque} Nm` : null;
-    const cc = vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc ? `${vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc} cc` : null;
+    const isElectric = (fuel || '').toUpperCase().includes('ELECTR') || (fuel || '').toUpperCase().includes('ELEKTRİK');
+    const rawCc = (vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc);
+    const cc = (!isElectric && rawCc && rawCc > 0) ? `${rawCc} cc` : null;
     const accel = perfSpecs.zeroToHundredKmh ? `${perfSpecs.zeroToHundredKmh} sn` : null;
     const avgFuel = perfSpecs.combinedFuelL100km ? `Ort. ${perfSpecs.combinedFuelL100km} lt/100km` : null;
     const engineCodeStr = vIdentity.engineCode ? `${vIdentity.engineCode} ` : '';

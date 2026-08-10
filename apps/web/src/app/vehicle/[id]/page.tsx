@@ -217,7 +217,7 @@ export default function VehicleDetail() {
         if (res.ok) {
           const data = await safeFetchJson(res);
           const parsed = extractReportData(data);
-          if (parsed) {
+          if (parsed && data.status === "COMPLETED") {
             setStructuredReport(parsed);
             setLoadingStructuredReport(false);
             setCountdown(null);
