@@ -28,29 +28,41 @@ export class ReportsOverviewService {
         yesterdayUsers,
         last7DaysUsers,
         last30DaysUsers,
-        tanismaUsers,
-        yetkinUsers,
-        profesyonelUsers,
-        activePaidSubs,
+        freeTierUsers,
+        standardTierUsers,
+        proTierUsers,
+        premiumTierUsers,
+        activePaidSubsCount,
         todayAiReports,
-        todayComparisons,
-        todayListings,
+        pendingListingsCount,
+        queuedResearchJobsCount,
+        fallbackReportsCount,
+        openFeedbacksCount,
       ] = await Promise.all([
         this.safeCount('user'),
         this.safeCount('user', { createdAt: { gte: todayStart } }),
         this.safeCount('user', { createdAt: { gte: yesterdayStart, lt: todayStart } }),
         this.safeCount('user', { createdAt: { gte: last7DaysStart } }),
         this.safeCount('user', { createdAt: { gte: last30DaysStart } }),
-        this.safeCount('user', { subscriptionTier: SubscriptionTier.FREE }),
-        this.safeCount('user', { subscriptionTier: SubscriptionTier.STANDARD }),
-        this.safeCount('user', { subscriptionTier: SubscriptionTier.PRO }),
+        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.FREE }, { subscriptionTier: SubscriptionTier.TANISMA }] }),
+        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.STANDARD }, { subscriptionTier: SubscriptionTier.YETKIN }] }),
+        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.PRO }, { subscriptionTier: SubscriptionTier.PROFESYONEL }] }),
+        this.safeCount('user', { subscriptionTier: SubscriptionTier.PREMIUM }),
         this.safeCount('subscription', { status: 'ACTIVE' }),
-        this.safeCount('analyticsEvent', { eventType: 'AI_REPORT_COMPLETED', occurredAt: { gte: todayStart } }),
-        this.safeCount('analyticsEvent', { eventType: 'COMPARISON_CREATED', occurredAt: { gte: todayStart } }),
-        this.safeCount('clubPost', { createdAt: { gte: todayStart } }),
+        this.safeCount('aiVehicleReport', { createdAt: { gte: todayStart } }),
+        this.safeCount('vehicleListing', { status: 'PENDING_REVIEW' }),
+        this.safeCount('vehicleResearchJob', { status: 'QUEUED' }),
+        this.safeCount('aiVehicleReport', { isSafeFallback: true }),
+        this.safeCount('feedback', { status: 'NEW' }),
       ]);
 
-      // Financial estimations (Decimal precision)
+      const yetkinUsers = standardTierUsers;
+      const profesyonelUsers = proTierUsers + premiumTierUsers;
+      const tanismaUsers = freeTierUsers;
+
+      const activePaidSubs = Math.max(activePaidSubsCount, yetkinUsers + profesyonelUsers);
+
+      // Financial estimations
       const mrr = (yetkinUsers * 249) + (profesyonelUsers * 499);
       const arr = mrr * 12;
       const estAiCost = (todayAiReports * 1.85);
@@ -123,6 +135,10 @@ export class ReportsOverviewService {
             drilldownParams: {},
           },
         ],
+        pendingListingsCount,
+        queuedResearchJobsCount,
+        fallbackReportsCount,
+        openFeedbacksCount,
         packageDistribution: {
           tanismaUsers,
           yetkinUsers,
@@ -138,9 +154,14 @@ export class ReportsOverviewService {
       console.error('ReportsOverviewService Error:', e);
       return {
         kpis: [],
+        pendingListingsCount: 0,
+        queuedResearchJobsCount: 0,
+        fallbackReportsCount: 0,
+        openFeedbacksCount: 0,
         packageDistribution: { tanismaUsers: 0, yetkinUsers: 0, profesyonelUsers: 0 },
         financialSummary: { mrr: 0, arr: 0, grossMarginPct: 0 },
       };
     }
   }
 }
+

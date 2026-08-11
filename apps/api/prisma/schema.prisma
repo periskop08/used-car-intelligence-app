@@ -268,6 +268,8 @@ model User {
   generatedVehicleReports GeneratedVehicleReport[]
   assignedFeedbacks      Feedback[]                @relation("AssignedFeedbackAdmin")
   promotions             ListingPromotionPurchase[]
+  adminNotes             AdminUserNote[]           @relation("UserAdminNotes")
+  adminMessages          AdminUserMessage[]        @relation("UserAdminMessages")
 }
 
 model SubscriptionPlan {
@@ -2998,3 +3000,54 @@ model TrimComparison {
 
   trimEquipment    VehicleTrimEquipment @relation(fields: [trimEquipmentId], references: [id], onDelete: Cascade)
 }
+
+model AdminAuditLog {
+  id              String   @id @default(uuid())
+  entityType      String
+  entityId        String
+  adminUserId     String
+  adminEmail      String?
+  action          String
+  before          Json?
+  after           Json?
+  changedFields   String[] @default([])
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([adminUserId])
+  @@index([createdAt])
+}
+
+model AdminUserNote {
+  id               String   @id @default(uuid())
+  userId           String
+  createdByAdminId String
+  adminEmail       String?
+  content          String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation("UserAdminNotes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdByAdminId])
+}
+
+model AdminUserMessage {
+  id               String   @id @default(uuid())
+  userId           String
+  createdByAdminId String
+  adminEmail       String?
+  subject          String
+  message          String
+  sendInApp        Boolean  @default(true)
+  sendEmail        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  user             User     @relation("UserAdminMessages", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdByAdminId])
+}
+

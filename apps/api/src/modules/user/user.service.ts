@@ -319,10 +319,225 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
-    return {
-      message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
+    return { message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
       email: user.email,
     };
+  }
+
+  // --- ADMIN BACKOFFICE METHODS ---
+
+  async getAdminUsers(params: {
+    search?: string;
+    subscriptionTier?: string;
+    isActive?: boolean;
+    hasListings?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(params.page) || 1;
+    const limit = Number(params.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { email: { contains: s, mode: 'insensitive' } },
+        { firstName: { contains: s, mode: 'insensitive' } },
+        { lastName: { contains: s, mode: 'insensitive' } },
+        { phone: { contains: s, mode: 'insensitive' } },
+        { username: { contains: s, mode: 'insensitive' } },
+        { id: { contains: s, mode: 'insensitive' } },
+      ];
+    }
+
+    if (params.subscriptionTier) {
+      where.subscriptionTier = params.subscriptionTier;
+    }
+
+    if (params.isActive !== undefined) {
+      where.isActive = params.isActive;
+    }
+
+    if (params.hasListings) {
+      where.listings = { some: {} };
+    }
+
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: {
+              listings: true,
+              chatLogs: true,
+              generatedVehicleReports: true,
+              subscriptions: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const formatted = users.map((u) => ({
+      id: u.id,
+      customerNo: `TS-${u.id.slice(0, 8).toUpperCase()}`,
+      email: u.email,
+      firstName: u.firstName || '-',
+      lastName: u.lastName || '-',
+      fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
+      phone: u.phone || '-',
+      role: u.role,
+      subscriptionTier: u.subscriptionTier,
+      isActive: u.isActive,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+      activeListingCount: u._count.listings,
+      aiReportCount: u._count.generatedVehicleReports + u._count.chatLogs,
+    }));
+
+    return {
+      users: formatted,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getAdminUserDetail(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        buyerPurchases: true,
+        subscriptions: {
+          include: { plan: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        listings: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          include: { vehicleVariant: { include: { brand: true, model: true } } },
+        },
+        adminNotes: {
+          orderBy: { createdAt: 'desc' },
+        },
+        adminMessages: {
+          orderBy: { createdAt: 'desc' },
+        },
+        _count: {
+          select: {
+            chatLogs: true,
+            generatedVehicleReports: true,
+            comparisons: true,
+            favorites: true,
+          },
+        },
+      },
+    });
+
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    return {
+      user: {
+        id: user.id,
+        customerNo: `TS-${user.id.slice(0, 8).toUpperCase()}`,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0],
+        phone: user.phone,
+        role: user.role,
+        subscriptionTier: user.subscriptionTier,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        profilePhotoUrl: user.profilePhotoUrl,
+      },
+      subscriptions: user.subscriptions,
+      packagePurchases: user.buyerPurchases,
+      listings: user.listings,
+      adminNotes: user.adminNotes,
+      adminMessages: user.adminMessages,
+      usageStats: {
+        aiReports: user._count.generatedVehicleReports,
+        chatbotQueries: user._count.chatLogs,
+        comparisons: user._count.comparisons,
+        favorites: user._count.favorites,
+      },
+    };
+  }
+
+  async sendAdminUserMessage(
+    userId: string,
+    adminUserId: string,
+    adminEmail: string | undefined,
+    dto: { subject: string; message: string; sendInApp?: boolean; sendEmail?: boolean }
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    const adminMessage = await this.prisma.adminUserMessage.create({
+      data: {
+        userId,
+        createdByAdminId: adminUserId,
+        adminEmail: adminEmail || 'Admin',
+        subject: dto.subject,
+        message: dto.message,
+        sendInApp: dto.sendInApp ?? true,
+        sendEmail: dto.sendEmail ?? false,
+      },
+    });
+
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'User',
+        entityId: userId,
+        adminUserId,
+        adminEmail,
+        action: 'USER_MESSAGE_SENT',
+        after: adminMessage as any,
+      },
+    });
+
+    return adminMessage;
+  }
+
+  async createAdminUserNote(
+    userId: string,
+    adminUserId: string,
+    adminEmail: string | undefined,
+    content: string
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    const note = await this.prisma.adminUserNote.create({
+      data: {
+        userId,
+        createdByAdminId: adminUserId,
+        adminEmail: adminEmail || 'Admin',
+        content,
+      },
+    });
+
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'User',
+        entityId: userId,
+        adminUserId,
+        adminEmail,
+        action: 'USER_NOTE_CREATED',
+        after: note as any,
+      },
+    });
+
+    return note;
   }
 
   private async deleteImageFromR2(url: string) {
@@ -342,3 +557,4 @@ export class UserService {
     }
   }
 }
+

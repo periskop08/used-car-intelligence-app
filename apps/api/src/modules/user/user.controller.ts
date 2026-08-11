@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Delete, Body, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto } from './user.dto';
@@ -91,4 +91,75 @@ export class UserController {
   ) {
     return this.userService.cancelAccount(user.id, dto);
   }
+
+  // --- ADMIN ROUTES ---
+
+  @Get('admin/list')
+  @ApiOperation({ summary: 'Kayıtlı Kullanıcıları Listele (Admin)' })
+  getAdminUsers(
+    @GetUser() user: UserPayload,
+    @Query('search') search?: string,
+    @Query('subscriptionTier') subscriptionTier?: string,
+    @Query('isActive') isActive?: string,
+    @Query('hasListings') hasListings?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Yetkisiz erişim.');
+    }
+    return this.userService.getAdminUsers({
+      search,
+      subscriptionTier,
+      isActive: isActive !== undefined ? isActive === 'true' : undefined,
+      hasListings: hasListings !== undefined ? hasListings === 'true' : undefined,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Get('admin/:id')
+  @ApiOperation({ summary: 'Kullanıcı Detayı (Admin)' })
+  getAdminUserDetail(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Yetkisiz erişim.');
+    }
+    return this.userService.getAdminUserDetail(id);
+  }
+
+  @Post('admin/:id/message')
+  @ApiOperation({ summary: 'Kullanıcıya Uygulama İçi / E-posta Mesajı Gönder (Admin)' })
+  sendAdminUserMessage(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() body: { subject: string; message: string; sendInApp?: boolean; sendEmail?: boolean },
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Yetkisiz erişim.');
+    }
+    if (!body.subject || !body.message) {
+      throw new BadRequestException('Mesaj başlığı ve içeriği zorunludur.');
+    }
+    return this.userService.sendAdminUserMessage(id, user.id, user.email, body);
+  }
+
+  @Post('admin/:id/notes')
+  @ApiOperation({ summary: 'Kullanıcı İçin İnternal Admin Notu Ekle (Admin)' })
+  createAdminUserNote(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() body: { content: string },
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Yetkisiz erişim.');
+    }
+    if (!body.content || !body.content.trim()) {
+      throw new BadRequestException('Not içeriği boş olamaz.');
+    }
+    return this.userService.createAdminUserNote(id, user.id, user.email, body.content.trim());
+  }
 }
+

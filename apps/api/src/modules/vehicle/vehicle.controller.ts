@@ -122,6 +122,107 @@ export class VehicleController {
     return this.vehicleService.rejectVariant(id, body.reason, user.id);
   }
 
+  @Get('admin/variants/all')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyant Veritabanı Listesi (Admin Backoffice)' })
+  getAdminVariants(
+    @GetUser() user: UserPayload,
+    @Query('search') search?: string,
+    @Query('brandId') brandId?: string,
+    @Query('modelId') modelId?: string,
+    @Query('bodyType') bodyType?: string,
+    @Query('status') status?: string,
+    @Query('marketRegion') marketRegion?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.getAdminVariants({
+      search,
+      brandId,
+      modelId,
+      bodyType,
+      status,
+      marketRegion,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Post('admin/variants')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Yeni Araç Varyantı Ekle (Admin Backoffice - Exact 8 Field Check)' })
+  createAdminVariant(
+    @GetUser() user: UserPayload,
+    @Body() body: any,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.createAdminVariant(body, user.id, user.email);
+  }
+
+  @Patch('admin/variants/:id/full')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantı Inline/Detaylı Düzenle (Admin Backoffice)' })
+  updateAdminVariantFull(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() body: any,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.updateAdminVariantFull(id, body, user.id, user.email);
+  }
+
+  @Post('admin/variants/:id/archive')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantını Arşivle / Pasife Al (Admin)' })
+  archiveAdminVariant(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.archiveAdminVariant(id, user.id, user.email);
+  }
+
+  @Get('admin/variants/:id/impact')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantı Etki Analizi (Admin)' })
+  calculateVariantImpact(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.calculateVariantImpact(id);
+  }
+
+  @Get('admin/variants/:id/audit')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Araç Varyantı Değişiklik Geçmişi (Audit Logs)' })
+  getVariantAuditLogs(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.vehicleService.getVariantAuditLogs(id);
+  }
+
   @Patch('admin/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -137,4 +238,5 @@ export class VehicleController {
     return this.vehicleService.updateVariant(id, dto);
   }
 }
+
 

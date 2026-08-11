@@ -692,24 +692,455 @@ Paket: ${trimName}
     return dbTrans;
   }
 
-  private async resolveTrim(trimNameStr: string): Promise<any> {
-    const name = trimNameStr.trim();
-    let dbTrim = await this.prisma.trim.findFirst({
-      where: { name: { equals: name, mode: 'insensitive' } }
+  async getAdminVariants(params: {
+    search?: string;
+    brandId?: string;
+    modelId?: string;
+    bodyType?: string;
+    status?: string;
+    marketRegion?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(params.page) || 1;
+    const limit = Number(params.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.brandId) where.brandId = params.brandId;
+    if (params.modelId) where.modelId = params.modelId;
+    if (params.bodyType) where.bodyType = params.bodyType as BodyType;
+    if (params.status) where.status = params.status as ApprovalStatus;
+    if (params.marketRegion) where.marketRegion = params.marketRegion;
+
+    if (params.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { brand: { name: { contains: s, mode: 'insensitive' } } },
+        { model: { name: { contains: s, mode: 'insensitive' } } },
+        { engine: { code: { contains: s, mode: 'insensitive' } } },
+        { trim: { name: { contains: s, mode: 'insensitive' } } },
+        { transmission: { name: { contains: s, mode: 'insensitive' } } },
+        { id: { contains: s, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, variants] = await Promise.all([
+      this.prisma.vehicleVariant.count({ where }),
+      this.prisma.vehicleVariant.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+          country: true,
+          _count: {
+            select: {
+              listings: true,
+              problems: true,
+              recalls: true,
+              reviews: true,
+              aiReports: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      variants,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async createAdminVariant(
+    dto: {
+      brandName: string;
+      modelName: string;
+      year: number;
+      bodyType: string;
+      engineCode: string;
+      displacement: number;
+      horsepower: number;
+      torque: number;
+      fuelType: string;
+      transmissionType: string;
+      speeds: number;
+      trimName: string;
+      countryCode?: string;
+      marketRegion?: string;
+    },
+    adminUserId: string,
+    adminEmail?: string
+  ) {
+    // 1. Resolve or create Brand
+    let brand = await this.prisma.brand.findFirst({
+      where: { name: { equals: dto.brandName.trim(), mode: 'insensitive' } },
     });
-    if (!dbTrim) {
-      dbTrim = await this.prisma.trim.create({
-        data: { name, description: `${name} Donanım Paketi` }
+    if (!brand) {
+      brand = await this.prisma.brand.create({
+        data: { name: dto.brandName.trim() },
       });
     }
-    return dbTrim;
+
+    // 2. Resolve or create Model
+    let model = await this.prisma.model.findFirst({
+      where: {
+        brandId: brand.id,
+        name: { equals: dto.modelName.trim(), mode: 'insensitive' },
+      },
+    });
+    if (!model) {
+      model = await this.prisma.model.create({
+        data: {
+          brandId: brand.id,
+          name: dto.modelName.trim(),
+          startYear: dto.year,
+        },
+      });
+    }
+
+    // 3. Resolve or create Generation
+    let generation = await this.prisma.generation.findFirst({
+      where: {
+        modelId: model.id,
+        bodyType: dto.bodyType as BodyType,
+      },
+    });
+    if (!generation) {
+      generation = await this.prisma.generation.create({
+        data: {
+          modelId: model.id,
+          name: `${dto.modelName.trim()} (${dto.year})`,
+          startYear: dto.year,
+          bodyType: dto.bodyType as BodyType,
+        },
+      });
+    }
+
+    // 4. Resolve or create Engine
+    let engine = await this.prisma.engine.findFirst({
+      where: {
+        code: { equals: dto.engineCode.trim(), mode: 'insensitive' },
+        displacement: dto.displacement,
+        fuelType: dto.fuelType as FuelType,
+      },
+    });
+    if (!engine) {
+      engine = await this.prisma.engine.create({
+        data: {
+          code: dto.engineCode.trim(),
+          displacement: dto.displacement,
+          horsepower: dto.horsepower,
+          torque: dto.torque,
+          fuelType: dto.fuelType as FuelType,
+          hasTurbo: checkIfEngineHasTurbo(dto.engineCode, dto.fuelType as FuelType),
+        },
+      });
+    }
+
+    // 5. Resolve or create Transmission
+    let transmission = await this.prisma.transmission.findFirst({
+      where: {
+        type: dto.transmissionType as TransmissionType,
+        speeds: dto.speeds,
+      },
+    });
+    if (!transmission) {
+      transmission = await this.prisma.transmission.create({
+        data: {
+          name: `${dto.speeds}-İleri ${dto.transmissionType}`,
+          type: dto.transmissionType as TransmissionType,
+          speeds: dto.speeds,
+        },
+      });
+    }
+
+    // 6. Resolve or create Trim
+    let trim = await this.prisma.trim.findFirst({
+      where: { name: { equals: dto.trimName.trim(), mode: 'insensitive' } },
+    });
+    if (!trim) {
+      trim = await this.prisma.trim.create({
+        data: { name: dto.trimName.trim() },
+      });
+    }
+
+    // 7. Resolve Country
+    let country = await this.prisma.country.findFirst({
+      where: { code: (dto.countryCode || 'TR').toUpperCase() },
+    });
+    if (!country) {
+      country = await this.prisma.country.create({
+        data: { code: 'TR', name: 'Türkiye' },
+      });
+    }
+
+    // 8. EXACT 8-FIELD DUPLICATE CHECK
+    const existingExact = await this.prisma.vehicleVariant.findFirst({
+      where: {
+        brandId: brand.id,
+        modelId: model.id,
+        generationId: generation.id,
+        engineId: engine.id,
+        transmissionId: transmission.id,
+        trimId: trim.id,
+        countryId: country.id,
+        year: dto.year,
+      },
+    });
+
+    if (existingExact) {
+      throw new BadRequestException('Bu 8 alanlı kombinasyonda araç varyantı veritabanında zaten kayıtlıdır.');
+    }
+
+    // Create new Variant
+    const newVariant = await this.prisma.vehicleVariant.create({
+      data: {
+        brandId: brand.id,
+        modelId: model.id,
+        generationId: generation.id,
+        engineId: engine.id,
+        transmissionId: transmission.id,
+        trimId: trim.id,
+        countryId: country.id,
+        year: dto.year,
+        bodyType: dto.bodyType as BodyType,
+        fuelType: dto.fuelType as FuelType,
+        marketRegion: dto.marketRegion || 'TR',
+        status: ApprovalStatus.APPROVED,
+        approvedAt: new Date(),
+        createdById: adminUserId,
+      },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+        country: true,
+      },
+    });
+
+    // Create Audit Log
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'VehicleVariant',
+        entityId: newVariant.id,
+        adminUserId,
+        adminEmail,
+        action: 'VEHICLE_VARIANT_CREATED',
+        after: newVariant as any,
+      },
+    });
+
+    return newVariant;
+  }
+
+  async updateAdminVariantFull(
+    id: string,
+    dto: Partial<{
+      trimName: string;
+      engineCode: string;
+      horsepower: number;
+      torque: number;
+      year: number;
+      bodyType: string;
+      fuelType: string;
+      status: string;
+      marketRegion: string;
+    }>,
+    adminUserId: string,
+    adminEmail?: string
+  ) {
+    const variant = await this.prisma.vehicleVariant.findUnique({
+      where: { id },
+      include: { engine: true, trim: true },
+    });
+    if (!variant) throw new NotFoundException('Araç varyantı bulunamadı.');
+
+    const beforeState = JSON.parse(JSON.stringify(variant));
+    const changedFields: string[] = [];
+
+    // Update Trim if provided
+    if (dto.trimName && dto.trimName.trim() !== variant.trim.name) {
+      let trim = await this.prisma.trim.findFirst({
+        where: { name: { equals: dto.trimName.trim(), mode: 'insensitive' } },
+      });
+      if (!trim) {
+        trim = await this.prisma.trim.create({ data: { name: dto.trimName.trim() } });
+      }
+      await this.prisma.vehicleVariant.update({
+        where: { id },
+        data: { trimId: trim.id },
+      });
+      changedFields.push('trimName');
+    }
+
+    // Update Engine if provided
+    if (dto.engineCode || dto.horsepower || dto.torque) {
+      await this.prisma.engine.update({
+        where: { id: variant.engineId },
+        data: {
+          code: dto.engineCode ? dto.engineCode.trim() : undefined,
+          horsepower: dto.horsepower ? Number(dto.horsepower) : undefined,
+          torque: dto.torque ? Number(dto.torque) : undefined,
+        },
+      });
+      changedFields.push('engine');
+    }
+
+    // Update Variant scalar fields
+    const dataToUpdate: any = {};
+    if (dto.year && dto.year !== variant.year) {
+      dataToUpdate.year = Number(dto.year);
+      changedFields.push('year');
+    }
+    if (dto.bodyType && dto.bodyType !== variant.bodyType) {
+      dataToUpdate.bodyType = dto.bodyType as BodyType;
+      changedFields.push('bodyType');
+    }
+    if (dto.fuelType && dto.fuelType !== variant.fuelType) {
+      dataToUpdate.fuelType = dto.fuelType as FuelType;
+      changedFields.push('fuelType');
+    }
+    if (dto.status && dto.status !== variant.status) {
+      dataToUpdate.status = dto.status as ApprovalStatus;
+      changedFields.push('status');
+    }
+    if (dto.marketRegion && dto.marketRegion !== variant.marketRegion) {
+      dataToUpdate.marketRegion = dto.marketRegion;
+      changedFields.push('marketRegion');
+    }
+
+    let updated = variant;
+    if (Object.keys(dataToUpdate).length > 0 || changedFields.length > 0) {
+      updated = await this.prisma.vehicleVariant.update({
+        where: { id },
+        data: dataToUpdate,
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+          country: true,
+        },
+      });
+
+      // Audit Log
+      await this.prisma.adminAuditLog.create({
+        data: {
+          entityType: 'VehicleVariant',
+          entityId: id,
+          adminUserId,
+          adminEmail,
+          action: 'VEHICLE_VARIANT_UPDATED',
+          before: beforeState,
+          after: updated as any,
+          changedFields,
+        },
+      });
+    }
+
+    return updated;
+  }
+
+  async archiveAdminVariant(id: string, adminUserId: string, adminEmail?: string) {
+    const variant = await this.prisma.vehicleVariant.findUnique({ where: { id } });
+    if (!variant) throw new NotFoundException('Araç varyantı bulunamadı.');
+
+    const updated = await this.prisma.vehicleVariant.update({
+      where: { id },
+      data: { status: ApprovalStatus.ARCHIVED },
+    });
+
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'VehicleVariant',
+        entityId: id,
+        adminUserId,
+        adminEmail,
+        action: 'VEHICLE_VARIANT_ARCHIVED',
+        before: variant as any,
+        after: updated as any,
+      },
+    });
+
+    return updated;
+  }
+
+  async calculateVariantImpact(id: string) {
+    const variant = await this.prisma.vehicleVariant.findUnique({ where: { id } });
+    if (!variant) throw new NotFoundException('Araç varyantı bulunamadı.');
+
+    const [
+      listingCount,
+      profileCount,
+      reportCount,
+      favoriteCount,
+      problemCount,
+      recallCount,
+      questionCount,
+      checklistCount,
+    ] = await Promise.all([
+      this.prisma.vehicleListing.count({ where: { vehicleVariantId: id } }),
+      this.prisma.vehicleProfileVariant.count({ where: { variantId: id } }),
+      this.prisma.aiVehicleReport.count({ where: { variantId: id } }),
+      this.prisma.favoriteVehicle.count({ where: { variantId: id } }),
+      this.prisma.commonProblem.count({ where: { variantId: id } }),
+      this.prisma.recall.count({ where: { variantId: id } }),
+      this.prisma.sellerQuestion.count({ where: { variantId: id } }),
+      this.prisma.inspectionChecklistItem.count({ where: { variantId: id } }),
+    ]);
+
+    return {
+      variantId: id,
+      impacts: {
+        listings: listingCount,
+        profiles: profileCount,
+        reports: reportCount,
+        favorites: favoriteCount,
+        problems: problemCount,
+        recalls: recallCount,
+        questions: questionCount,
+        checklists: checklistCount,
+      },
+      totalRelatedRecords:
+        listingCount +
+        profileCount +
+        reportCount +
+        favoriteCount +
+        problemCount +
+        recallCount +
+        questionCount +
+        checklistCount,
+    };
+  }
+
+  async getVariantAuditLogs(id: string) {
+    return this.prisma.adminAuditLog.findMany({
+      where: { entityType: 'VehicleVariant', entityId: id },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // Suggest a variant (pending approval)
   async suggestVariant(dto: SuggestVehicleDto, userId?: string) {
     const bodyType = this.mapBodyType(dto.bodyType);
     const fuelType = this.mapFuelType(dto.fuelType);
-    
     const dbEngine = await this.resolveEngine(dto.engine, fuelType);
     const dbTrans = await this.resolveTransmission(dto.transmission);
     const dbTrim = await this.resolveTrim(dto.trimName);
@@ -883,4 +1314,18 @@ Paket: ${trimName}
       }
     });
   }
+
+  private async resolveTrim(trimNameStr: string): Promise<any> {
+    const name = trimNameStr.trim();
+    let dbTrim = await this.prisma.trim.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } }
+    });
+    if (!dbTrim) {
+      dbTrim = await this.prisma.trim.create({
+        data: { name, description: `${name} Donanım Paketi` }
+      });
+    }
+    return dbTrim;
+  }
 }
+
