@@ -161,5 +161,18 @@ export class UserController {
     }
     return this.userService.createAdminUserNote(id, user.id, user.email, body.content.trim());
   }
+
+  @Patch('admin/:id/permissions')
+  @ApiOperation({ summary: 'Kullanıcı Admin/Moderatör Yetkilerini Güncelle (SuperAdmin)' })
+  updateUserPermissions(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+    @Body() body: { permissions: string[] },
+  ) {
+    if (user.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Yetki yönetimi yalnızca SUPER_ADMIN tarafından yapılabilir.');
+    }
+    return this.userService.updateUserPermissions(id, body.permissions || [], user.id, user.email);
+  }
 }
 

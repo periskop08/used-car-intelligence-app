@@ -17,6 +17,8 @@ import {
   ChevronRight,
   LogOut,
   ShieldAlert,
+  History,
+  Lock,
 } from 'lucide-react';
 
 export type AdminNavItem = {
@@ -57,8 +59,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     children: [
       { key: 'AI_REPORTS', label: 'AI Raporları', href: '/admin/reports/product/ai-reports' },
       { key: 'RESEARCH_QUEUE', label: 'Araştırma Kuyruğu', href: '/admin/product-ai/research-queue' },
-      { key: 'EVIDENCE_QUALITY', label: 'Claim / Evidence Kalitesi', href: '/admin/reports/vehicle-data/evidence' },
-      { key: 'AI_COSTS', label: 'AI Kullanımı & Maliyet', href: '/admin/reports/system-ai' },
+      { key: 'EVIDENCE_QUALITY', label: 'Claim / Evidence Kalitesi', href: '/admin/vehicle-data/evidence' },
       { key: 'PROVIDER_HEALTH', label: 'Provider Sağlığı', href: '/admin/product-ai/provider-health' },
     ],
   },
@@ -77,10 +78,10 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Finans',
     icon: CircleDollarSign,
     children: [
-      { key: 'REVENUE', label: 'Finans Özeti & MRR', href: '/admin/reports/finance/revenue' },
+      { key: 'REVENUE', label: 'Finans Özeti & MRR', href: '/admin/finance' },
       { key: 'SUBSCRIPTIONS', label: 'Aktif Abonelikler', href: '/admin/reports/finance/subscriptions' },
       { key: 'ONE_TIME_PACKAGES', label: 'Tek Seferlik Paketler', href: '/admin/reports/finance/one-time-packages' },
-      { key: 'COSTS', label: 'Maliyetler & Kârlılık', href: '/admin/reports/finance/costs' },
+      { key: 'COSTS', label: 'AI & Altyapı Maliyetleri', href: '/admin/finance' },
     ],
   },
   {
@@ -88,7 +89,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Tork Scout Club',
     icon: Shield,
     children: [
-      { key: 'CLUB_POSTS', label: 'Gönderiler & Moderasyon', href: '/admin/club' },
+      { key: 'CLUB_POSTS', label: 'Gönderiler & Moderasyon', href: '/admin/club/posts' },
       { key: 'CLUB_USERS', label: 'Üyeler & Moderatörler', href: '/admin/club/users' },
       { key: 'CLUB_REPORTS', label: 'Şikayetler', href: '/admin/club/reports' },
     ],
@@ -99,19 +100,10 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: Database,
     children: [
       { key: 'VARIANT_DB', label: 'Araç Varyant Veritabanı', href: '/admin/vehicle-data/variants' },
+      { key: 'VEHICLE_QUALITY', label: 'Araç Veri Kalitesi (Quality)', href: '/admin/vehicle-data/quality' },
       { key: 'VEHICLE_GUIDE', label: 'Araç Rehberi Yönetimi', href: '/admin/vehicle-data/guide' },
       { key: 'VEHICLE_APPROVALS', label: 'Araç Onayları', href: '/admin/vehicle-data/approvals' },
       { key: 'COMMON_PROFILES', label: 'Ortak Araç Yönetimi', href: '/admin/vehicle-data/profiles' },
-      { key: 'DATA_COVERAGE', label: 'Veri Kalitesi & Kapsam', href: '/admin/reports/vehicle-data/coverage' },
-    ],
-  },
-  {
-    key: 'MARKETING',
-    label: 'Pazarlama ve Kitle',
-    icon: Megaphone,
-    children: [
-      { key: 'CAMPAIGNS', label: 'Kampanyalar & ROAS', href: '/admin/reports/marketing' },
-      { key: 'GEOGRAPHY', label: 'Coğrafya ve Cihaz', href: '/admin/reports/geography-device' },
     ],
   },
   {
@@ -119,8 +111,9 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Sistem ve Güvenlik',
     icon: Settings,
     children: [
-      { key: 'SYSTEM_HEALTH', label: 'Sistem Performansı', href: '/admin/reports/system-ai' },
-      { key: 'SECURITY_LOGS', label: 'Audit & Güvenlik Kayıtları', href: '/admin/reports/security' },
+      { key: 'ROLES', label: 'Admin & Yetkiler (RBAC)', href: '/admin/system/roles' },
+      { key: 'AUDIT_LOGS', label: 'Sistem Audit Logları', href: '/admin/system/audit-log' },
+      { key: 'PROVIDER_HEALTH', label: 'Provider Sağlığı', href: '/admin/product-ai/provider-health' },
     ],
   },
 ];
@@ -142,95 +135,113 @@ export function UnifiedAdminSidebar() {
   };
 
   return (
-    <aside className="w-full lg:w-72 bg-[#080d1a] border-b lg:border-b-0 lg:border-r border-white/10 p-4 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
-      {/* Sidebar Header */}
-      <div className="flex items-center gap-3 px-3 py-3 mb-4 rounded-xl bg-slate-900/80 border border-white/5">
-        <div className="w-9 h-9 rounded-lg bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 font-bold">
-          TS
+    <aside className="w-64 bg-[#090d16] border-r border-white/10 flex flex-col justify-between shrink-0 min-h-screen text-slate-300 font-sans select-none">
+      <div className="p-4 space-y-6">
+        {/* Brand Header */}
+        <div className="flex items-center gap-3 px-2 py-3 border-b border-white/10">
+          <div className="w-8 h-8 rounded-xl bg-orange-500 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-orange-500/30">
+            TS
+          </div>
+          <div>
+            <span className="font-black text-sm text-white tracking-wider uppercase block">TorqueScout</span>
+            <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest block font-mono">
+              Backoffice
+            </span>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xs font-black text-white uppercase tracking-wider">TorqueScout</h2>
-          <p className="text-[10px] font-semibold text-orange-400">Backoffice Admin Panel</p>
-        </div>
+
+        {/* Navigation Groups */}
+        <nav className="space-y-1">
+          {adminNavigationGroups.map((group) => {
+            const Icon = group.icon;
+            const isOpen = !!openGroups[group.key];
+            const hasChildren = group.children && group.children.length > 0;
+            const isGroupActive =
+              group.href === pathname || group.children?.some((c) => pathname === c.href || pathname.startsWith(c.href));
+
+            if (!hasChildren && group.href) {
+              return (
+                <Link
+                  key={group.key}
+                  href={group.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                    isGroupActive
+                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{group.label}</span>
+                </Link>
+              );
+            }
+
+            return (
+              <div key={group.key} className="space-y-1">
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition ${
+                    isGroupActive
+                      ? 'bg-white/5 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-4 h-4 text-orange-400" />
+                    <span>{group.label}</span>
+                  </div>
+                  {isOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                  )}
+                </button>
+
+                {isOpen && group.children && (
+                  <div className="pl-9 pr-1 py-1 space-y-1 border-l-2 border-white/5 ml-4">
+                    {group.children.map((child) => {
+                      const isChildActive = pathname === child.href;
+                      return (
+                        <Link
+                          key={child.key}
+                          href={child.href}
+                          className={`block px-3 py-1.5 rounded-lg text-[11px] font-semibold transition ${
+                            isChildActive
+                              ? 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/20'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* Navigation Groups */}
-      <nav className="space-y-1.5 flex-1">
-        {adminNavigationGroups.map((group) => {
-          const Icon = group.icon;
-          const hasChildren = group.children && group.children.length > 0;
-          const isGroupActive = hasChildren
-            ? group.children!.some((child) => pathname === child.href || (child.href !== '/admin' && pathname.startsWith(child.href)))
-            : pathname === group.href;
-          const isOpen = openGroups[group.key] ?? isGroupActive;
+      {/* Footer Profile & Logout */}
+      <div className="p-4 border-t border-white/10 space-y-3 bg-slate-950/40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-orange-400 font-mono">
+            ADM
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-xs font-bold text-white truncate">Sistem Yöneticisi</p>
+            <p className="text-[10px] text-slate-500 font-mono truncate">admin@torquescout.com</p>
+          </div>
+        </div>
 
-          if (!hasChildren && group.href) {
-            return (
-              <Link
-                key={group.key}
-                href={group.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition ${
-                  isGroupActive
-                    ? 'bg-gradient-to-r from-orange-500/20 to-orange-600/10 text-orange-400 border border-orange-500/30 shadow-lg shadow-orange-500/10'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isGroupActive ? 'text-orange-400' : 'text-slate-400'}`} />
-                <span>{group.label}</span>
-              </Link>
-            );
-          }
-
-          return (
-            <div key={group.key} className="space-y-1">
-              <button
-                onClick={() => toggleGroup(group.key)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  isGroupActive
-                    ? 'text-orange-400 bg-orange-500/10 border border-orange-500/20'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isGroupActive ? 'text-orange-400' : 'text-slate-400'}`} />
-                  <span>{group.label}</span>
-                </div>
-                {isOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                )}
-              </button>
-
-              {isOpen && (
-                <div className="pl-9 pr-1 py-1 space-y-1 border-l-2 border-white/5 ml-4">
-                  {group.children!.map((child) => {
-                    const isChildActive = pathname === child.href || (child.href !== '/admin' && pathname.startsWith(child.href));
-                    return (
-                      <Link
-                        key={child.key}
-                        href={child.href}
-                        className={`block px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                          isChildActive
-                            ? 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                        }`}
-                      >
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Footer Info */}
-      <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500">
-        <span>v1.0.0 Backoffice</span>
-        <a href="/" className="hover:text-slate-300 transition">Ana Sayfa →</a>
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2 py-2 bg-slate-900 hover:bg-rose-500/20 hover:text-rose-300 text-slate-400 rounded-xl text-xs font-bold transition border border-white/5"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Kullanıcı Görünümüne Dön</span>
+        </Link>
       </div>
     </aside>
   );

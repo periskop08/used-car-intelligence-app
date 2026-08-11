@@ -25,6 +25,9 @@ import { VehicleReportModule } from './modules/vehicle-report/vehicle-report.mod
 import { ListingPromotionModule } from './modules/listing-promotion/listing-promotion.module';
 import { VehicleProfileModule } from './modules/vehicle-profile/vehicle-profile.module';
 
+import { AdminAuditLogController } from './modules/admin/admin-audit-log.controller';
+import { AdminAuditLogService } from './modules/admin/admin-audit-log.service';
+
 @Module({
   imports: [
     AuthModule,
@@ -51,8 +54,8 @@ import { VehicleProfileModule } from './modules/vehicle-profile/vehicle-profile.
     ListingPromotionModule,
     VehicleProfileModule,
   ],
-  controllers: [AppController],
-  providers: [PrismaService],
-  exports: [PrismaService],
+  controllers: [AppController, AdminAuditLogController],
+  providers: [PrismaService, AdminAuditLogService],
+  exports: [PrismaService, AdminAuditLogService],
 })
 export class AppModule {}

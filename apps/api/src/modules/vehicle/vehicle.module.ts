@@ -6,9 +6,12 @@ import { VehicleService } from './vehicle.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { PrismaService } from '../../prisma.service';
 
+import { DataQualityController } from './data-quality.controller';
+import { DataQualityService } from './data-quality.service';
+
 @Module({
-  controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController],
-  providers: [VehicleService, SubscriptionService, PrismaService],
-  exports: [VehicleService],
+  controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController, DataQualityController],
+  providers: [VehicleService, SubscriptionService, PrismaService, DataQualityService],
+  exports: [VehicleService, DataQualityService],
 })
 export class VehicleModule {}

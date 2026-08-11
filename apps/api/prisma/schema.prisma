@@ -211,6 +211,8 @@ model User {
   profilePhotoUrl        String?
   displayNamePreference  DisplayNamePreference @default(FULL_NAME)
   notificationSettings   Json?
+  customerNo             String?           @unique
+  permissions            String[]          @default([])
   isActive               Boolean           @default(true)
 
   buyerPurchases         BuyerPackagePurchase[]
@@ -2521,7 +2523,7 @@ enum VehicleReportJobStatus {
 
 model GeneratedVehicleReport {
   id                 String                  @id @default(cuid())
-  userId             String
+  userId             String?
   mode               VehicleReportMode
   variantId          String?
   listingId          String?
@@ -2560,7 +2562,7 @@ model GeneratedVehicleReport {
   updatedAt          DateTime                @updatedAt
   archivedAt         DateTime?
 
-  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   job                VehicleReportResearchJob?
 
   @@unique([userId, idempotencyKey])
@@ -3050,4 +3052,24 @@ model AdminUserMessage {
   @@index([userId])
   @@index([createdByAdminId])
 }
+
+model CustomerNoCounter {
+  period    String   @id // YYMM format, e.g. "2608"
+  counter   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model DataQualitySnapshot {
+  id              String   @id @default(uuid())
+  qualityScore    Float
+  totalDuplicates Int
+  missingTrims    Int
+  missingEngines  Int
+  missingTrans    Int
+  orphanRecords   Int
+  suspiciousYears Int
+  issuesJson      Json
+  createdAt       DateTime @default(now())
+}
+
 

@@ -314,13 +314,125 @@ export class UserService {
 
     return { message: 'Hesabınız başarıyla iptal edildi ve tüm ilanlarınız yayından kaldırıldı.' };
   }
-
   async forgotPassword(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
     return { message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
       email: user.email,
+    };
+  }
+
+  async generateCustomerNo(createdAtDate: Date = new Date()): Promise<string> {
+    const yy = String(createdAtDate.getFullYear()).slice(-2);
+    const mm = String(createdAtDate.getMonth() + 1).padStart(2, '0');
+    const period = `${yy}${mm}`;
+
+    const updatedCounter = await this.prisma.customerNoCounter.upsert({
+      where: { period },
+      update: { counter: { increment: 1 } },
+      create: { period, counter: 1 },
+    });
+
+    const seqStr = String(updatedCounter.counter).padStart(6, '0');
+    return `TS-${period}-${seqStr}`;
+  }
+
+  async ensureCustomerNo(user: any): Promise<string> {
+    if (user.customerNo) return user.customerNo;
+    const generated = await this.generateCustomerNo(user.createdAt || new Date());
+    try {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { customerNo: generated },
+      });
+      return generated;
+    } catch (e) {
+      return generated;
+    }
+  }
+
+  async getAdminUserList(params: {
+    search?: string;
+    subscriptionTier?: string;
+    isActive?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(params.page) || 1;
+    const limit = Number(params.limit) || 15;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.subscriptionTier) {
+      where.subscriptionTier = params.subscriptionTier;
+    }
+
+    if (params.isActive !== undefined && params.isActive !== '') {
+      where.isActive = params.isActive === 'true';
+    }
+
+    if (params.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { email: { contains: s, mode: 'insensitive' } },
+        { firstName: { contains: s, mode: 'insensitive' } },
+        { lastName: { contains: s, mode: 'insensitive' } },
+        { phone: { contains: s, mode: 'insensitive' } },
+        { customerNo: { contains: s, mode: 'insensitive' } },
+        { id: { contains: s, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: {
+              listings: true,
+              chatLogs: true,
+              generatedVehicleReports: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const formatted = await Promise.all(
+      users.map(async (u) => {
+        const customerNo = await this.ensureCustomerNo(u);
+        return {
+          id: u.id,
+          customerNo,
+          email: u.email,
+          firstName: u.firstName || '-',
+          lastName: u.lastName || '-',
+          fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
+          phone: u.phone || '-',
+          role: u.role,
+          permissions: u.permissions || [],
+          subscriptionTier: u.subscriptionTier,
+          isActive: u.isActive,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+          activeListingCount: u._count.listings,
+          aiReportCount: u._count.generatedVehicleReports + u._count.chatLogs,
+        };
+      })
+    );
+
+    return {
+      users: formatted,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 
@@ -538,6 +650,35 @@ export class UserService {
     });
 
     return note;
+  }
+
+  async updateUserPermissions(
+    targetUserId: string,
+    permissions: string[],
+    adminUserId: string,
+    adminEmail?: string
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { permissions },
+    });
+
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'User',
+        entityId: targetUserId,
+        adminUserId,
+        adminEmail: adminEmail || 'SuperAdmin',
+        action: 'USER_PERMISSIONS_UPDATED',
+        before: { permissions: user.permissions } as any,
+        after: { permissions: updated.permissions } as any,
+      },
+    });
+
+    return updated;
   }
 
   private async deleteImageFromR2(url: string) {
