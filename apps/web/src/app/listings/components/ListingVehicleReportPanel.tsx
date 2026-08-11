@@ -147,7 +147,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
 
       <button
         type="button"
-        onClick={handleCreateReport}
+        onClick={() => handleCreateReport(false)}
         disabled={isGenerating}
         className="px-6 py-3.5 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-xl shadow-orange-500/20 transition-all flex items-center justify-center gap-2.5 mx-auto disabled:opacity-50 cursor-pointer"
       >
