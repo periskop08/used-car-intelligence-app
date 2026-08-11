@@ -81,21 +81,72 @@ export class VehicleReportProviderService {
         }
 
         if (writerContent) {
-          if (writerContent.executiveSummary) baseReport.executiveSummary = writerContent.executiveSummary as any;
-          if (writerContent.expertDecisionSynthesis) {
-            baseReport.expertDecisionSynthesis = writerContent.expertDecisionSynthesis as any;
+          const contentObj: any = (writerContent as any).VehicleReportGeneratedContent || writerContent;
+
+          if (contentObj.executiveSummary) baseReport.executiveSummary = contentObj.executiveSummary as any;
+          if (contentObj.usageScenarios) baseReport.usageScenarios = contentObj.usageScenarios as any;
+          if (contentObj.premiumChecklistQuestions || contentObj.sellerQuestions || contentObj['Satıcıya Sorulacak Kritik Sorular']) {
+            baseReport.sellerQuestions = contentObj.premiumChecklistQuestions || contentObj.sellerQuestions || contentObj['Satıcıya Sorulacak Kritik Sorular'];
+          }
+          if (contentObj.inspectionChecklist || contentObj.prePurchaseChecks || contentObj['Satın Alma Öncesi Ekspertiz Kontrol Listesi']) {
+            baseReport.prePurchaseChecks = contentObj.inspectionChecklist || contentObj.prePurchaseChecks || contentObj['Satın Alma Öncesi Ekspertiz Kontrol Listesi'];
+          }
+          if (contentObj.finalConditionalVerdict) baseReport.finalVerdict = contentObj.finalConditionalVerdict as any;
+
+          if (contentObj.expertDecisionSynthesis) {
+            baseReport.expertDecisionSynthesis = contentObj.expertDecisionSynthesis as any;
             if (baseReport.expertDecisionSynthesis.vehicleCharacter) {
               baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds = ['AI_RESEARCH_ENGINE'];
             }
+          } else {
+            const vOverview = contentObj['Bu Araç Nasıl Bir Otomobil?'] || contentObj.vehicleOverview || contentObj.vehicleCharacter;
+            if (vOverview) {
+              const overviewText = typeof vOverview === 'string' ? vOverview : (vOverview.detailedAssessment || vOverview.headline || JSON.stringify(vOverview));
+              baseReport.expertDecisionSynthesis = {
+                vehicleCharacter: {
+                  headline: `${baseReport.vehicleIdentity.modelYear || ''} ${baseReport.vehicleIdentity.brand || ''} ${baseReport.vehicleIdentity.model || ''} - TorqueScout Derin Yapay Zeka Analizi`,
+                  detailedAssessment: overviewText,
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                },
+                strongestReasonsToChoose: (contentObj['Tercih Etmek İçin Güçlü Nedenler'] || contentObj.strongReasons || []).map((item: any) => ({
+                  title: item.title || item.reason || 'Güçlü Neden',
+                  explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+                compromisesAndLimitations: (contentObj['Satın Almadan Önce Bilinecek Tavizler'] || contentObj.tradeoffs || []).map((item: any) => ({
+                  title: item.title || item.limitation || 'Taviz',
+                  explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+                whoIsThisCarFor: (contentObj['Kimler İçin Mantıklı?'] || contentObj.idealFor || []).map((item: any) => ({
+                  profile: item.profile || item.target || 'Kullanıcı Profili',
+                  explanation: item.explanation || (typeof item === 'string' ? item : ''),
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+                whoIsThisCarNotFor: (contentObj['Kimler İçin Uygun Olmayabilir?'] || contentObj.notIdealFor || []).map((item: any) => ({
+                  profile: item.profile || item.target || 'Kullanıcı Profili',
+                  explanation: item.explanation || (typeof item === 'string' ? item : ''),
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+                conditionsToConsider: (contentObj['Hangi Şartlarda Değerlendirilebilir?'] || contentObj.conditionsToConsider || []).map((item: any) => ({
+                  condition: item.condition || item.title || 'Koşul',
+                  reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
+                  priority: item.priority || 'ÖNEMLİ',
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+                walkAwayConditions: (contentObj['Hangi Durumda Satın Almaktan Vazgeçilmeli?'] || contentObj.walkAwayConditions || []).map((item: any) => ({
+                  condition: item.condition || item.title || 'Vazgeçme Şartı',
+                  reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
+                  priority: item.priority || 'KRİTİK',
+                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
+                })),
+              } as any;
+            }
           }
-          if (writerContent.usageScenarios) baseReport.usageScenarios = writerContent.usageScenarios as any;
-          if (writerContent.premiumChecklistQuestions) baseReport.sellerQuestions = writerContent.premiumChecklistQuestions as any;
-          if (writerContent.inspectionChecklist) baseReport.prePurchaseChecks = writerContent.inspectionChecklist as any;
-          if (writerContent.finalConditionalVerdict) baseReport.finalVerdict = writerContent.finalConditionalVerdict as any;
 
           // Map AI-derived verified technical specifications
-          if (writerContent.technicalSpecifications) {
-            const specs = writerContent.technicalSpecifications;
+          if (contentObj.technicalSpecifications) {
+            const specs = contentObj.technicalSpecifications;
             if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
             if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
             if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
