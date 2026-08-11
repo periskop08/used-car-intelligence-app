@@ -18,7 +18,7 @@ export class VehicleReportCacheService {
   ) {
     if (!variantId) return null;
 
-    // 1. Try finding user's own report for this variant
+    // 1. Try finding user's own report for this variant/listing
     if (userId) {
       const userReport = await this.prisma.generatedVehicleReport.findFirst({
         where: {
@@ -26,7 +26,7 @@ export class VehicleReportCacheService {
           variantId,
           vehicleContextHash: contextHash,
           reportVersion,
-          mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
+          mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT', 'LISTING_REPORT'] },
           status: 'COMPLETED',
           provider: { not: 'DETERMINISTIC_FALLBACK' },
         },
@@ -41,7 +41,7 @@ export class VehicleReportCacheService {
         variantId,
         vehicleContextHash: contextHash,
         reportVersion,
-        mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
+        mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT', 'LISTING_REPORT'] },
         status: 'COMPLETED',
         provider: { not: 'DETERMINISTIC_FALLBACK' },
       },

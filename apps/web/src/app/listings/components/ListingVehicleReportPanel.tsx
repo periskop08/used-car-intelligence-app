@@ -42,7 +42,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
     }
   };
 
-  const handleCreateReport = async () => {
+  const handleCreateReport = async (force: boolean = false) => {
     setIsGenerating(true);
     setError(null);
     try {
@@ -64,7 +64,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
           mode: "LISTING_REPORT",
           listingId,
           idempotencyKey,
-          forceRefresh: true,
+          forceRefresh: force,
         }),
       });
 
@@ -119,7 +119,7 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
     return (
       <VehicleReportShell 
         report={report} 
-        onRefresh={handleCreateReport} 
+        onRefresh={() => handleCreateReport(true)} 
         isRefreshing={isGenerating} 
       />
     );

@@ -47,7 +47,7 @@ export class GeminiAdapter implements AiProviderAdapter {
               ],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: isReportIntent ? 8192 : 4000,
+                maxOutputTokens: isReportIntent ? 16384 : 4000,
                 ...(isReportIntent ? { responseMimeType: 'application/json' } : {}),
               },
             }),
