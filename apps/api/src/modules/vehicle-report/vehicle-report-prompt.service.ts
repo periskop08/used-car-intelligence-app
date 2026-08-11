@@ -214,14 +214,18 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 4. YÜKSEK KİLOMETRE VE KRONİK RİSK UYARILARI ÜSLUBU:
    Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
 5. DONANIM PAKETİ KARŞILAŞTIRMASI VE PAKETE ÖZEL FARKLAR ("trimPackageComparison"):
-   Kullanıcının seçtiği "${trim}" paketini, aynı modelin alt veya alternatif donanım paketleriyle (örneğin Active, Comfort vb.) somut karşılaştır! "${trim}" paketinde standart olarak sunulup alt paketlerde OLMAYAN kilit özellikleri (örneğin Sunroof, dijital klima, hız sabitleyici, F1 vites kulakçıkları, çelik jantlar vb.) hem karşılaştırma paragrafında ("comparisonNarrative") hem de eklenen özellikler listesinde ("keyAddedFeatures") açıkça anlat.
-6. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
+   Kullanıcının seçtiği "${trim}" paketini, aynı modelin alt veya alternatif donanım paketleriyle (örneğin Active, Comfort vb.) somut karşılaştır! "${trim}" paketinde standart veya opsiyonel olarak sunulup alt paketlerde OLMAYAN kilit özellikleri (özellikle Sunroof / Açılır Tavan, dijital klima, hız sabitleyici, F1 vites kulakçıkları, çelik jantlar vb.) hem karşılaştırma paragrafında ("comparisonNarrative") hem de eklenen özellikler listesinde ("keyAddedFeatures") açıkça isim vererek anlat.
+6. SUNROOF VE SPESİFİK DONANIM AÇIKLAMASI:
+   İncelenen "${trim}" donanım seviyesinde Sunroof (açılır tavan), panoramik cam tavan, dijital klima, mercekli farlar gibi çok sorulan aksamların bulunma durumunu raporda açıkça belirt.
+7. MAKYAJ / FACELIFT GEÇİŞ DÖNEMİ BİLGİLENDİRMESİ:
+   Eğer araç yılı bir makyaj veya kasa/motor geçiş yılına denk geliyorsa (örneğin 2014 VW Polo 1.2 TSI modellerinde makyaj öncesi 105 HP [EA111 / CBZB] ve makyaj sonrası 90 HP [EA211 / CJZD Euro 6] kasaların her ikisinin de bulunması gibi), bu durumu 'vehicleCharacter.detailedAssessment' ve 'executiveSummary' bölümlerinde açıkça vurgula! "Bu model yılı makyaj geçiş dönemi olduğundan araç makyaj öncesi (105 HP) veya makyaj sonrası (90 HP) versiyona sahip olabilir, motor kodundan (CBZB / CJZD) kontrol edilmelidir" tarzında kullanıcıyı bilgilendiren samimi ve uzman notu ekle!
+8. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
    Yukarıdaki 8 kimlik filtresini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
    - Motor Hacmi cc ("engineDisplacementCc")
-   - Motor Gücü HP ("enginePowerHp" — örn. 2022 Kia Cerato 1.6 MPI için 128)
-   - Tork Nm ("engineTorqueNm" — örn. 2022 Kia Cerato 1.6 MPI için 155)
-   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "6 İleri Tam Otomatik", "5 İleri Tork Konvertörlü Otomatik")
-   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 6 veya 5)
+   - Motor Gücü HP ("enginePowerHp" — örn. 2022 Kia Cerato 1.6 MPI için 128, 2014 Polo 1.2 TSI için 90)
+   - Tork Nm ("engineTorqueNm" — örn. 2022 Kia Cerato 1.6 MPI için 155, Polo 1.2 TSI için 160)
+   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "6 İleri Tam Otomatik", "7 İleri DSG Otomatik")
+   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 7 veya 6)
    - 0-100 km/s Hızlanma sn ("zeroToHundredKmh")
    - Maksimum Hız km/s ("topSpeedKmh")
    - Şehir İçi Tüketim L/100km ("cityFuelL100km")
@@ -230,7 +234,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - Bagaj Hacmi Litre ("trunkCapacityLiters")
    - Boş Ağırlık kg ("curbWeightKg")
 
-Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
+Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına, makyaj geçiş notlarına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
