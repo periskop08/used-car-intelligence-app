@@ -26,6 +26,7 @@ export class VehicleReportCacheService {
         reportVersion,
         mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
         status: 'COMPLETED',
+        provider: { not: 'DETERMINISTIC_FALLBACK' },
       },
       orderBy: { completedAt: 'desc' },
     });

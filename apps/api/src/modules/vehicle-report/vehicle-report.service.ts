@@ -289,7 +289,21 @@ export class VehicleReportService implements OnModuleInit {
           this.logger.warn(`Cache lookup warning: ${cacheErr}`);
         }
       } else {
-        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache.`);
+        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache and clearing old fallback records.`);
+        try {
+          await this.prisma.generatedVehicleReport.deleteMany({
+            where: {
+              userId,
+              variantId,
+              OR: [
+                { provider: 'DETERMINISTIC_FALLBACK' },
+                { status: 'SAFE_FALLBACK' },
+              ],
+            },
+          });
+        } catch (cleanErr) {
+          this.logger.warn(`Notice clearing old fallback reports: ${cleanErr}`);
+        }
       }
 
       // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
