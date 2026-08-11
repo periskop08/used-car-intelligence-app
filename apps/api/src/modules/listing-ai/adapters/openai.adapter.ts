@@ -25,6 +25,8 @@ export class OpenAiAdapter implements AiProviderAdapter {
 
     const url = 'https://api.openai.com/v1/chat/completions';
 
+    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -35,7 +37,8 @@ export class OpenAiAdapter implements AiProviderAdapter {
         model: process.env.LISTING_AI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: fullPrompt }],
         temperature: 0.3,
-        max_tokens: userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') ? 8192 : 4000,
+        max_tokens: isReportIntent ? 8192 : 4000,
+        ...(isReportIntent ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
 

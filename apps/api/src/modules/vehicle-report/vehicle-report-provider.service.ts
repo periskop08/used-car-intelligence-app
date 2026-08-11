@@ -81,70 +81,131 @@ export class VehicleReportProviderService {
         }
 
         if (writerContent) {
-          const contentObj: any = (writerContent as any).VehicleReportGeneratedContent || writerContent;
+          const contentObj: any = (writerContent as any).VehicleReportGeneratedContent 
+            || (writerContent as any).report 
+            || (writerContent as any).content 
+            || writerContent;
+
+          this.logger.log(`[DELEGATOR] AI JSON Content extracted. Top-level keys: ${Object.keys(contentObj).join(', ')}`);
 
           if (contentObj.executiveSummary) baseReport.executiveSummary = contentObj.executiveSummary as any;
           if (contentObj.usageScenarios) baseReport.usageScenarios = contentObj.usageScenarios as any;
-          if (contentObj.premiumChecklistQuestions || contentObj.sellerQuestions || contentObj['Satıcıya Sorulacak Kritik Sorular']) {
-            baseReport.sellerQuestions = contentObj.premiumChecklistQuestions || contentObj.sellerQuestions || contentObj['Satıcıya Sorulacak Kritik Sorular'];
+
+          // 1. Map Seller Questions
+          const rawSellerQs = contentObj.premiumChecklistQuestions 
+            || contentObj.sellerQuestions 
+            || contentObj['Satıcıya Sorulacak Kritik Sorular'] 
+            || contentObj.questions;
+          if (Array.isArray(rawSellerQs) && rawSellerQs.length > 0) {
+            baseReport.sellerQuestions = rawSellerQs.map((q: any, i: number) => ({
+              questionId: q.questionId || `q_${i + 1}`,
+              category: q.category || 'MEKANİK',
+              questionText: typeof q === 'string' ? q : (q.questionText || q.question || JSON.stringify(q)),
+              expectedAnswerHint: q.expectedAnswerHint || q.hint || undefined,
+              supportingFactIds: ['AI_RESEARCH_ENGINE'],
+            }));
           }
-          if (contentObj.inspectionChecklist || contentObj.prePurchaseChecks || contentObj['Satın Alma Öncesi Ekspertiz Kontrol Listesi']) {
-            baseReport.prePurchaseChecks = contentObj.inspectionChecklist || contentObj.prePurchaseChecks || contentObj['Satın Alma Öncesi Ekspertiz Kontrol Listesi'];
+
+          // 2. Map Pre-Purchase Inspection Checks
+          const rawChecks = contentObj.inspectionChecklist 
+            || contentObj.prePurchaseChecks 
+            || contentObj['Satın Alma Öncesi Ekspertiz Kontrol Listesi'] 
+            || contentObj.checks 
+            || contentObj.checklist;
+          if (Array.isArray(rawChecks) && rawChecks.length > 0) {
+            baseReport.prePurchaseChecks = rawChecks.map((c: any, i: number) => ({
+              checkId: c.checkId || `c_${i + 1}`,
+              category: c.category || 'MEKANİK',
+              title: c.title || c.check || `Ekspertiz Kontrolü #${i + 1}`,
+              instruction: typeof c === 'string' ? c : (c.instruction || c.description || c.title || ''),
+              priority: c.priority || 'ÖNEMLİ',
+              targetComponent: c.targetComponent || undefined,
+              supportingFactIds: ['AI_RESEARCH_ENGINE'],
+            }));
           }
+
           if (contentObj.finalConditionalVerdict) baseReport.finalVerdict = contentObj.finalConditionalVerdict as any;
 
+          // 3. Preserve DB Technical Risks from Fallback Report
+          const originalRisks = {
+            primaryTechnicalRisk: baseReport.expertDecisionSynthesis?.primaryTechnicalRisk,
+            secondaryTechnicalRisks: baseReport.expertDecisionSynthesis?.secondaryTechnicalRisks,
+          };
+
+          // 4. Map Expert Decision Synthesis
           if (contentObj.expertDecisionSynthesis) {
-            baseReport.expertDecisionSynthesis = contentObj.expertDecisionSynthesis as any;
+            baseReport.expertDecisionSynthesis = {
+              ...baseReport.expertDecisionSynthesis,
+              ...contentObj.expertDecisionSynthesis,
+              primaryTechnicalRisk: contentObj.expertDecisionSynthesis?.primaryTechnicalRisk || originalRisks.primaryTechnicalRisk,
+              secondaryTechnicalRisks: contentObj.expertDecisionSynthesis?.secondaryTechnicalRisks || originalRisks.secondaryTechnicalRisks,
+            } as any;
             if (baseReport.expertDecisionSynthesis.vehicleCharacter) {
               baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds = ['AI_RESEARCH_ENGINE'];
             }
           } else {
-            const vOverview = contentObj['Bu Araç Nasıl Bir Otomobil?'] || contentObj.vehicleOverview || contentObj.vehicleCharacter;
-            if (vOverview) {
-              const overviewText = typeof vOverview === 'string' ? vOverview : (vOverview.detailedAssessment || vOverview.headline || JSON.stringify(vOverview));
-              baseReport.expertDecisionSynthesis = {
-                vehicleCharacter: {
-                  headline: `${baseReport.vehicleIdentity.modelYear || ''} ${baseReport.vehicleIdentity.brand || ''} ${baseReport.vehicleIdentity.model || ''} - TorqueScout Derin Yapay Zeka Analizi`,
-                  detailedAssessment: overviewText,
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                },
-                strongestReasonsToChoose: (contentObj['Tercih Etmek İçin Güçlü Nedenler'] || contentObj.strongReasons || []).map((item: any) => ({
-                  title: item.title || item.reason || 'Güçlü Neden',
-                  explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-                compromisesAndLimitations: (contentObj['Satın Almadan Önce Bilinecek Tavizler'] || contentObj.tradeoffs || []).map((item: any) => ({
-                  title: item.title || item.limitation || 'Taviz',
-                  explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-                whoIsThisCarFor: (contentObj['Kimler İçin Mantıklı?'] || contentObj.idealFor || []).map((item: any) => ({
-                  profile: item.profile || item.target || 'Kullanıcı Profili',
-                  explanation: item.explanation || (typeof item === 'string' ? item : ''),
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-                whoIsThisCarNotFor: (contentObj['Kimler İçin Uygun Olmayabilir?'] || contentObj.notIdealFor || []).map((item: any) => ({
-                  profile: item.profile || item.target || 'Kullanıcı Profili',
-                  explanation: item.explanation || (typeof item === 'string' ? item : ''),
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-                conditionsToConsider: (contentObj['Hangi Şartlarda Değerlendirilebilir?'] || contentObj.conditionsToConsider || []).map((item: any) => ({
-                  condition: item.condition || item.title || 'Koşul',
-                  reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
-                  priority: item.priority || 'ÖNEMLİ',
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-                walkAwayConditions: (contentObj['Hangi Durumda Satın Almaktan Vazgeçilmeli?'] || contentObj.walkAwayConditions || []).map((item: any) => ({
-                  condition: item.condition || item.title || 'Vazgeçme Şartı',
-                  reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
-                  priority: item.priority || 'KRİTİK',
-                  supportingFactIds: ['AI_RESEARCH_ENGINE'],
-                })),
-              } as any;
-            }
+            // Flexible fallback mapper if AI returned pros/cons or sections
+            const vOverview = contentObj['Bu Araç Nasıl Bir Otomobil?'] 
+              || contentObj.vehicleOverview 
+              || contentObj.vehicleCharacter 
+              || contentObj.introduction 
+              || contentObj.overview;
+              
+            const overviewText = typeof vOverview === 'string' 
+              ? vOverview 
+              : (vOverview?.detailedAssessment || vOverview?.headline || (contentObj.sections ? JSON.stringify(contentObj.sections) : ''));
+
+            const pros = contentObj.pros || contentObj['Tercih Etmek İçin Güçlü Nedenler'] || contentObj.strongReasons || [];
+            const cons = contentObj.cons || contentObj['Satın Almadan Önce Bilinecek Tavizler'] || contentObj.tradeoffs || [];
+            const idealFor = contentObj['Kimler İçin Mantıklı?'] || contentObj.idealFor || contentObj.suitableFor || [];
+            const notIdealFor = contentObj['Kimler İçin Uygun Olmayabilir?'] || contentObj.notIdealFor || contentObj.notSuitableFor || [];
+            const purchaseConds = contentObj['Hangi Şartlarda Değerlendirilebilir?'] || contentObj.purchaseConditions || contentObj.conditionsToConsider || [];
+            const walkAwayConds = contentObj['Hangi Durumda Satın Almaktan Vazgeçilmeli?'] || contentObj.walkAwayConditions || [];
+
+            baseReport.expertDecisionSynthesis = {
+              vehicleCharacter: {
+                headline: `${baseReport.vehicleIdentity.modelYear || ''} ${baseReport.vehicleIdentity.brand || ''} ${baseReport.vehicleIdentity.model || ''} - TorqueScout Derin Yapay Zeka Analizi`,
+                detailedAssessment: overviewText || baseReport.expertDecisionSynthesis?.vehicleCharacter?.detailedAssessment || '',
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              },
+              strongestReasonsToChoose: pros.map((item: any) => ({
+                title: item.title || item.reason || (typeof item === 'string' ? item : 'Güçlü Neden'),
+                explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              compromisesAndLimitations: cons.map((item: any) => ({
+                title: item.title || item.limitation || (typeof item === 'string' ? item : 'Taviz'),
+                explanation: item.explanation || item.description || (typeof item === 'string' ? item : ''),
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              suitableFor: idealFor.map((item: any) => ({
+                profile: item.profile || item.target || (typeof item === 'string' ? item : 'Kullanıcı Profili'),
+                explanation: item.explanation || (typeof item === 'string' ? item : ''),
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              notSuitableFor: notIdealFor.map((item: any) => ({
+                profile: item.profile || item.target || (typeof item === 'string' ? item : 'Kullanıcı Profili'),
+                explanation: item.explanation || (typeof item === 'string' ? item : ''),
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              purchaseConditions: purchaseConds.map((item: any) => ({
+                condition: item.condition || item.title || (typeof item === 'string' ? item : 'Koşul'),
+                reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
+                priority: item.priority || 'ÖNEMLİ',
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              walkAwayConditions: walkAwayConds.map((item: any) => ({
+                condition: item.condition || item.title || (typeof item === 'string' ? item : 'Vazgeçme Şartı'),
+                reason: item.reason || item.explanation || (typeof item === 'string' ? item : ''),
+                priority: item.priority || 'KRİTİK',
+                supportingFactIds: ['AI_RESEARCH_ENGINE'],
+              })),
+              primaryTechnicalRisk: originalRisks.primaryTechnicalRisk,
+              secondaryTechnicalRisks: originalRisks.secondaryTechnicalRisks,
+            } as any;
           }
 
-          // Map AI-derived verified technical specifications
+          // 5. Map AI-derived verified technical specifications
           if (contentObj.technicalSpecifications) {
             const specs = contentObj.technicalSpecifications;
             if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
@@ -166,6 +227,8 @@ export class VehicleReportProviderService {
           }
 
           baseReport.status = 'COMPLETED';
+
+          this.logger.log(`[DELEGATOR] Report updated successfully with AI content from ${orchestratorResult.providerName}`);
 
           return {
             report: baseReport,

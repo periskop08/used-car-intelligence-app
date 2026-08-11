@@ -24,12 +24,14 @@ export class GeminiAdapter implements AiProviderAdapter {
     )}\n\n--- KULLANICI MESAJI ---\n${userMessage}`;
 
     if (apiKey) {
-      // Models to try in sequence
+      // Models to try in sequence (Updated to active 2.5 series models)
       const models = [
-        process.env.GEMINI_REPORT_MODEL || 'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-2.0-flash-exp',
+        process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.0-flash',
       ];
+
+      const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
 
       for (const model of models) {
         try {
@@ -45,7 +47,8 @@ export class GeminiAdapter implements AiProviderAdapter {
               ],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') ? 8192 : 4000,
+                maxOutputTokens: isReportIntent ? 8192 : 4000,
+                ...(isReportIntent ? { responseMimeType: 'application/json' } : {}),
               },
             }),
           });

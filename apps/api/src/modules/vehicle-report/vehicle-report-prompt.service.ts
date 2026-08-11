@@ -230,7 +230,26 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - Bagaj Hacmi Litre ("trunkCapacityLiters")
    - Boş Ağırlık kg ("curbWeightKg")
 
-Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.`;
+Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
+
+YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
+{
+  "expertDecisionSynthesis": {
+    "vehicleCharacter": { "headline": "...", "detailedAssessment": "..." },
+    "trimPackageComparison": { "selectedTrimName": "${trim}", "comparisonNarrative": "...", "keyAddedFeatures": [...], "missingFeaturesInLowerTrim": [...] },
+    "dailyUseAssessment": { "cityUse": "...", "highwayUse": "...", "trafficBehavior": "...", "comfortAssessment": "..." },
+    "strongestReasonsToChoose": [ { "title": "...", "explanation": "..." } ],
+    "compromisesAndLimitations": [ { "title": "...", "explanation": "..." } ],
+    "suitableFor": [ { "profile": "...", "explanation": "..." } ],
+    "notSuitableFor": [ { "profile": "...", "explanation": "..." } ],
+    "purchaseConditions": [ { "condition": "...", "reason": "...", "priority": "ÖNEMLİ" } ],
+    "walkAwayConditions": [ { "condition": "...", "reason": "...", "priority": "KRİTİK" } ]
+  },
+  "executiveSummary": { "oneSentenceSummary": "...", "strongestAdvantage": "...", "biggestRisk": "..." },
+  "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
+  "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
+  "technicalSpecifications": { "enginePowerHp": 0, "engineTorqueNm": 0, "transmissionTypeAndSpeeds": "..." }
+}`;
   }
 
   buildStage1ResearchPrompt(vehicleContext: any, sectionFilter?: string[]): string {
