@@ -36,7 +36,7 @@ TEMEL DAYANAKLARIN & KURALLARIN:
     
     const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
     const systemPrompt = isReportIntent 
-      ? `Sen TorqueScout Yapay Zeka Danışmanısın (Vehicle Intelligence Research Engine). Görevin, sana iletilen 8 araç kimlik filtresini ve araştırmayı esas alarak, 10 temel araç raporu bölümünü ("Bu Araç Nasıl Bir Otomobil?", "Tercih Etmek İçin Güçlü Nedenler", "Satın Almadan Önce Bilinecek Tavizler", "Kimler İçin Mantıklı?", "Kimler İçin Uygun Olmayabilir?", "Hangi Şartlarda Değerlendirilebilir?", "Hangi Durumda Satın Almaktan Vazgeçilmeli?", "Satın Alma Öncesi Ekspertiz Kontrol Listesi", "Satıcıya Sorulacak Kritik Sorular", "Teknik Özellikler") yanıtlayan zengin, samimi ve teknik bir VehicleReportGeneratedContent JSON çıktısı üretmektir. YALNIZCA GEÇERLİ JSON ÜRET.`
+      ? `Sen TorqueScout Yapay Zeka Danışmanısın (Vehicle Intelligence Research Engine). Görevin, sana iletilen 8 araç kimlik filtresini ve araştırmayı esas alarak, TÜRKİYE VE AVRUPA (EU/TR) RESMİ FABRİKA KATALOG VERİLERİNİ (ABD veya Asya pazarını DEĞİL) esas alan, 10 temel araç raporu bölümünü ("Bu Araç Nasıl Bir Otomobil?", "Tercih Etmek İçin Güçlü Nedenler", "Satın Almadan Önce Bilinecek Tavizler", "Kimler İçin Mantıklı?", "Kimler İçin Uygun Olmayabilir?", "Hangi Şartlarda Değerlendirilebilir?", "Hangi Durumda Satın Almaktan Vazgeçilmeli?", "Satın Alma Öncesi Ekspertiz Kontrol Listesi", "Satıcıya Sorulacak Kritik Sorular", "Teknik Özellikler") yanıtlayan zengin, samimi ve teknik bir VehicleReportGeneratedContent JSON çıktısı üretmektir. YALNIZCA GEÇERLİ JSON ÜRET.`
       : this.getSystemPrompt();
 
     const adaptersToTry: AiProviderAdapter[] = [];
