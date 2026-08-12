@@ -253,7 +253,19 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "executiveSummary": { "oneSentenceSummary": "...", "strongestAdvantage": "...", "biggestRisk": "..." },
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
   "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
-  "technicalSpecifications": { "enginePowerHp": 0, "engineTorqueNm": 0, "transmissionTypeAndSpeeds": "..." }
+  "technicalSpecifications": {
+    "enginePowerHp": 128,
+    "engineTorqueNm": 155,
+    "transmissionTypeAndSpeeds": "6 İleri Tam Otomatik",
+    "transmissionSpeeds": 6,
+    "zeroToHundredKmh": 10.8,
+    "topSpeedKmh": 192,
+    "cityFuelL100km": 8.0,
+    "highwayFuelL100km": 5.7,
+    "combinedFuelL100km": 6.1,
+    "trunkCapacityLiters": 450,
+    "curbWeightKg": 1350
+  }
 }`;
   }
 

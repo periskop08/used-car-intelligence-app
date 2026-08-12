@@ -44,14 +44,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     return fuel;
   };
 
-  // Detailed Specifications & Calculations
-  const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp;
-  const torqueValue = report.performanceUsage?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.torqueNm;
+  // Detailed Specifications & Calculations (Pulls 100% directly from AI technical specifications)
+  const hpValue = report.performanceUsage?.powerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp || report.vehicleIdentity?.enginePowerHp;
+  const torqueValue = report.performanceUsage?.torqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.engineTorqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
   const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
-  const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec;
+  const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh;
   const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
-  const trunkValue = (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
-  const weightValue = (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
+  const trunkValue = report.performanceUsage?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
+  const weightValue = report.performanceUsage?.curbWeightKg || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
@@ -211,27 +211,27 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
           <div className="bg-slate-950/60 border border-orange-500/30 p-3 rounded-xl flex flex-col justify-center shadow-md">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
-            <span className="font-extrabold text-orange-400 text-sm mt-0.5">{hpValue ? `${hpValue} HP` : "128 HP"}</span>
+            <span className="font-extrabold text-orange-400 text-sm mt-0.5">{hpValue ? `${hpValue} HP` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>
-            <span className="font-bold text-slate-200 text-sm mt-0.5">{topSpeedValue ? `${topSpeedValue} km/h` : "192 km/h"}</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{topSpeedValue ? `${topSpeedValue} km/h` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">0-100 Hızlanma</span>
-            <span className="font-bold text-slate-200 text-sm mt-0.5">{zeroToHundredValue ? `${zeroToHundredValue} sn` : "10.8 sn"}</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{zeroToHundredValue ? `${zeroToHundredValue} sn` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Ort. Tüketim</span>
-            <span className="font-bold text-slate-200 text-sm mt-0.5">{combinedFuel ? `${combinedFuel} lt/100km` : "6.1 lt/100km"}</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{combinedFuel ? `${combinedFuel} lt/100km` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Bagaj Hacmi</span>
-            <span className="font-bold text-slate-200 text-sm mt-0.5">{trunkValue ? `${trunkValue} lt` : "450 lt"}</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{trunkValue ? `${trunkValue} lt` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Ağırlık</span>
-            <span className="font-bold text-slate-200 text-sm mt-0.5">{weightValue ? `${weightValue} kg` : "1350 kg"}</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{weightValue ? `${weightValue} kg` : "—"}</span>
           </div>
         </div>
       </div>
