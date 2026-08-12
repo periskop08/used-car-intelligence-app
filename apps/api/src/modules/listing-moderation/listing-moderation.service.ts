@@ -424,6 +424,15 @@ export class ListingModerationService implements OnModuleInit {
         order: m.sortOrder || idx + 1,
         moderationStatus: m.moderationStatus || 'APPROVED',
       })),
+      canReactivate: l.status === 'PASSIVE' && (!l.expiresAt || new Date(l.expiresAt) >= new Date()) && l.seller?.isActive !== false,
+      reactivationBlockedReason:
+        l.status !== 'PASSIVE'
+          ? 'İlan pasif durumda olmadığı için aktifleştirilemez.'
+          : l.expiresAt && new Date(l.expiresAt) < new Date()
+          ? 'İlan süresi dolduğu için (EXPIRED) doğrudan aktifleştirilemez. Kullanıcının ilan süresini uzatması gereklidir.'
+          : l.seller?.isActive === false
+          ? 'Kullanıcı hesabı pasif durumdadır.'
+          : null,
       autoChecks,
       pastActions,
     };
@@ -590,6 +599,61 @@ export class ListingModerationService implements OnModuleInit {
       where: { id: listingId },
       data: { status: 'PASSIVE' },
     });
+  }
+
+  async activateListing(listingId: string, body: any, adminUser: any) {
+    const { reasonCode, internalNote, sellerMessage } = body || {};
+    if (!reasonCode && !internalNote && !sellerMessage) {
+      throw new BadRequestException('Aktifleştirme nedeni veya açıklaması zorunludur.');
+    }
+
+    const l = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+      include: { seller: true },
+    });
+    if (!l) throw new NotFoundException('İlan bulunamadı.');
+
+    if (l.status !== 'PASSIVE') {
+      throw new BadRequestException('Yalnızca pasif durumdaki ilanlar aktifleştirilebilir.');
+    }
+
+    if (l.expiresAt && new Date(l.expiresAt) < new Date()) {
+      throw new BadRequestException('İlan süresi dolduğu için (EXPIRED) doğrudan aktifleştirilemez.');
+    }
+
+    if (l.seller?.isActive === false) {
+      throw new BadRequestException('Kullanıcı hesabı pasif durumdadır.');
+    }
+
+    const updated = await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: {
+        status: 'ACTIVE',
+        publishedAt: new Date(),
+      },
+    });
+
+    try {
+      await (this.prisma as any).listingModerationAction.create({
+        data: {
+          listingId,
+          sellerId: l.sellerId,
+          actorAdminId: adminUser?.id || 'admin',
+          actionType: 'REACTIVATE_BY_ADMIN',
+          previousStatus: 'PASSIVE',
+          newStatus: 'ACTIVE',
+          reasonCode: reasonCode || 'ADMIN_REACTIVATION',
+          sellerMessage: sellerMessage || 'İlanınız yönetici tarafından yeniden aktifleştirilmiştir.',
+          internalNote: internalNote || 'Admin manuel aktifleştirme.',
+          emailStatus: 'SENT',
+          notificationStatus: 'SENT',
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    return updated;
   }
 
   async reopenListing(listingId: string, adminUser: any) {

@@ -116,6 +116,16 @@ export class ListingModerationController {
     return this.moderationService.setPassive(listingId, req.user);
   }
 
+  @Post('listings/:listingId/activate')
+  async activateListing(
+    @Param('listingId') listingId: string,
+    @Body() body: any,
+    @Req() req: any
+  ) {
+    this.verifyAdminAccess(req);
+    return this.moderationService.activateListing(listingId, body, req.user);
+  }
+
   @Post('listings/:listingId/reopen')
   async reopenListing(@Param('listingId') listingId: string, @Req() req: any) {
     this.verifyAdminAccess(req);

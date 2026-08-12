@@ -17,6 +17,14 @@ import {
   MessageSquare,
   History,
   ShieldAlert,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  User,
+  Info,
+  Car,
+  Tag,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -45,8 +53,10 @@ export function AdminUserDrawer({
   // Listing filter inside drawer
   const [listingFilter, setListingFilter] = useState<string>('ALL');
 
-  // Read-Only View Listing Modal State
-  const [viewingListing, setViewingListing] = useState<any>(null);
+  // Full Read-Only Inspection Screen State
+  const [viewingListingDetail, setViewingListingDetail] = useState<any>(null);
+  const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
+  const [showLightbox, setShowLightbox] = useState<boolean>(false);
 
   // Moderation Action Reason Modal State
   const [moderationActionListing, setModerationActionListing] = useState<any>(null);
@@ -143,6 +153,26 @@ export function AdminUserDrawer({
 
   if (!isOpen) return null;
 
+  // Open Full Read-Only Listing Inspection Screen
+  const handleOpenFullInspection = async (listing: any) => {
+    setActiveMenuId(null);
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/listing-moderation/listings/${listing.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const fullData = await res.json();
+        setViewingListingDetail({ ...fullData, rawListing: listing });
+        setActiveImageIdx(0);
+      } else {
+        setViewingListingDetail({ listing: listing, rawListing: listing });
+      }
+    } catch (e) {
+      setViewingListingDetail({ listing: listing, rawListing: listing });
+    }
+  };
+
   // Moderation Action Handler
   const handleTriggerModerationAction = (listing: any, actionType: string) => {
     setActiveMenuId(null);
@@ -151,11 +181,20 @@ export function AdminUserDrawer({
     } else {
       setModerationActionListing(listing);
       setModerationActionType(actionType);
+      setModReasonCode(
+        actionType === 'ACTIVATE'
+          ? 'ADMIN_REACTIVATION'
+          : actionType === 'REQUEST_REVISION'
+          ? 'INCORRECT_SPECS'
+          : 'PRICE_ANOMALY'
+      );
       setModSellerMessage(
         actionType === 'REQUEST_REVISION'
           ? 'Lütfen ilan detaylarınızdaki eksik/hatalı bilgileri güncelleyiniz.'
           : actionType === 'REJECT'
           ? 'İlanınız TorqueScout yayın ilkelerine uymadığı için reddedilmiştir.'
+          : actionType === 'ACTIVATE'
+          ? 'İlanınız yönetici tarafından yeniden aktifleştirilmiştir.'
           : 'İlanınız yönetici tarafından pasife alınmıştır.'
       );
       setModInternalNote('');
@@ -172,6 +211,7 @@ export function AdminUserDrawer({
     else if (actionType === 'DETAILED_REVIEW') endpoint = `/admin/listing-moderation/listings/${listingId}/send-to-detailed-review`;
     else if (actionType === 'REJECT') endpoint = `/admin/listing-moderation/listings/${listingId}/reject`;
     else if (actionType === 'PASSIVE') endpoint = `/admin/listing-moderation/listings/${listingId}/set-passive`;
+    else if (actionType === 'ACTIVATE') endpoint = `/admin/listing-moderation/listings/${listingId}/activate`;
     else if (actionType === 'REOPEN') endpoint = `/admin/listing-moderation/listings/${listingId}/reopen`;
 
     try {
@@ -191,7 +231,7 @@ export function AdminUserDrawer({
 
       setModerationActionListing(null);
       setModerationActionType(null);
-      setViewingListing(null);
+      setViewingListingDetail(null);
 
       // Instant refetch without full page reload
       await fetchUserData();
@@ -674,15 +714,12 @@ export function AdminUserDrawer({
                                     </button>
 
                                     {activeMenuId === l.id && (
-                                      <div className="absolute right-0 top-7 z-40 w-48 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1">
+                                      <div className="absolute right-0 top-7 z-40 w-52 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1">
                                         <button
-                                          onClick={() => {
-                                            setActiveMenuId(null);
-                                            setViewingListing(l);
-                                          }}
+                                          onClick={() => handleOpenFullInspection(l)}
                                           className="w-full text-left px-3 py-1.5 text-slate-200 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
                                         >
-                                          <Eye className="w-3.5 h-3.5" /> İlanı Gör (Read-Only)
+                                          <Eye className="w-3.5 h-3.5 text-orange-400" /> İlanı Gör (Read-Only)
                                         </button>
 
                                         <button
@@ -730,6 +767,15 @@ export function AdminUserDrawer({
                                             className="w-full text-left px-3 py-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
                                           >
                                             <Clock className="w-3.5 h-3.5" /> Pasife Al
+                                          </button>
+                                        )}
+
+                                        {l.status === 'PASSIVE' && (
+                                          <button
+                                            onClick={() => handleTriggerModerationAction(l, 'ACTIVATE')}
+                                            className="w-full text-left px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> Aktifleştir
                                           </button>
                                         )}
 
@@ -894,80 +940,238 @@ export function AdminUserDrawer({
         </aside>
       </div>
 
-      {/* NESTED MODAL 1: READ-ONLY İLANI GÖR MODAL */}
-      {viewingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="max-w-lg w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-5 shadow-2xl font-sans text-xs">
-            <div className="flex justify-between items-start pb-3 border-b border-white/10">
+      {/* NESTED MODAL 1: FULL READ-ONLY INSPECTION SCREEN MODAL */}
+      {viewingListingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+          <div className="w-full max-w-4xl bg-[#0b0f19] border border-white/10 rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl font-sans text-xs my-auto max-h-[90vh] flex flex-col">
+            {/* INSPECTION HEADER */}
+            <div className="flex justify-between items-start pb-4 border-b border-white/10 shrink-0">
               <div>
-                <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
-                  İLAN NO: {viewingListing.id.slice(0, 12)} (READ-ONLY)
-                </span>
-                <h3 className="text-base font-bold text-white mt-1">{viewingListing.title || 'Araç İlanı'}</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-orange-400 font-bold uppercase tracking-wider">
+                    İLAN NO: {viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                      (viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status) === 'ACTIVE'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    }`}
+                  >
+                    {viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status}
+                  </span>
+
+                  {(viewingListingDetail.listing?.status === 'ACTIVE' || viewingListingDetail.rawListing?.status === 'ACTIVE') && (
+                    <a
+                      href={`/listings/${viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-orange-400 hover:underline font-bold text-[11px] ml-2"
+                    >
+                      <span>Canlı İlanı Aç</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                <h2 className="text-lg md:text-xl font-black text-white mt-1">
+                  {viewingListingDetail.listing?.title || viewingListingDetail.rawListing?.title || 'Araç İlan Detayı'}
+                </h2>
               </div>
-              <button onClick={() => setViewingListing(null)} className="text-slate-400 hover:text-white cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-2">
-                <div className="flex justify-between items-center font-mono">
-                  <span className="text-slate-400">Fiyat (Ticari İçerik - Düzenlenemez):</span>
-                  <strong className="text-emerald-400 text-sm font-bold">
-                    ₺{Number(viewingListing.priceAmount || 0).toLocaleString('tr-TR')}
-                  </strong>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Şehir / İlçe:</span>
-                  <span className="text-slate-200 font-bold">{viewingListing.city || 'Belirtilmedi'}, {viewingListing.district || ''}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Yayın Durumu:</span>
-                  <span className="text-orange-400 font-bold uppercase">{viewingListing.status}</span>
-                </div>
-              </div>
-
-              {viewingListing.description && (
-                <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-1">
-                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Satıcı Açıklaması</span>
-                  <p className="text-slate-300 leading-relaxed">{viewingListing.description}</p>
-                </div>
-              )}
-            </div>
-
-            {/* MODERATION ACTION BUTTONS IN READ-ONLY MODAL */}
-            <div className="pt-3 border-t border-white/10 flex flex-wrap gap-2 justify-end">
-              {viewingListing.status === 'PENDING' && (
-                <>
-                  <button
-                    onClick={() => handleTriggerModerationAction(viewingListing, 'APPROVE')}
-                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Onayla
-                  </button>
-                  <button
-                    onClick={() => handleTriggerModerationAction(viewingListing, 'REQUEST_REVISION')}
-                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Düzeltme İste
-                  </button>
-                  <button
-                    onClick={() => handleTriggerModerationAction(viewingListing, 'REJECT')}
-                    className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Reddet
-                  </button>
-                </>
-              )}
               <button
-                onClick={() => setViewingListing(null)}
-                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+                onClick={() => setViewingListingDetail(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
               >
-                Kapat
+                <X className="w-6 h-6" />
               </button>
+            </div>
+
+            {/* INSPECTION SCROLLABLE BODY */}
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {/* PHOTO GALLERY */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-orange-400" /> İlan Fotoğrafları ({viewingListingDetail.media?.length || 0})
+                </h3>
+
+                {viewingListingDetail.media && viewingListingDetail.media.length > 0 ? (
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => setShowLightbox(true)}
+                      className="relative h-64 md:h-80 w-full bg-slate-950 rounded-2xl overflow-hidden border border-white/10 cursor-pointer group"
+                    >
+                      <img
+                        src={viewingListingDetail.media[activeImageIdx]?.url || '/placeholder.png'}
+                        alt="Listing Cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute bottom-3 right-3 bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-mono font-bold text-white flex items-center gap-1">
+                        <Eye className="w-3.5 h-3.5 text-orange-400" /> Büyük İncele ({activeImageIdx + 1}/{viewingListingDetail.media.length})
+                      </div>
+                    </div>
+
+                    {/* THUMBNAILS */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      {viewingListingDetail.media.map((m: any, idx: number) => (
+                        <button
+                          key={m.id || idx}
+                          onClick={() => setActiveImageIdx(idx)}
+                          className={`w-16 h-16 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
+                            activeImageIdx === idx ? 'border-orange-500 scale-95' : 'border-white/10 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={m.url} alt="thumb" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-slate-950 rounded-2xl border border-white/5 text-slate-500 font-medium">
+                    Fotoğraf mevcut değil.
+                  </div>
+                )}
+              </div>
+
+              {/* MAIN DETAILS & SPECS GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* ANA FİYAT & KONUM */}
+                <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-3 font-mono">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Fiyat & Konum</span>
+                  <div className="text-2xl font-black text-emerald-400">
+                    ₺{Number(viewingListingDetail.listing?.price || viewingListingDetail.rawListing?.priceAmount || 0).toLocaleString('tr-TR')}
+                  </div>
+                  <div className="text-slate-300 font-sans text-xs">
+                    {viewingListingDetail.listing?.city || viewingListingDetail.rawListing?.city || 'Şehir Belirtilmedi'}, {viewingListingDetail.listing?.district || viewingListingDetail.rawListing?.district || ''}
+                  </div>
+                </div>
+
+                {/* ARAÇ SPECS SUMMARY */}
+                <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-2 text-xs">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold block font-mono">Temel Özellikler</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><span className="text-slate-400">Marka/Model:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.brand || ''} {viewingListingDetail.listing?.model || ''}</strong></div>
+                    <div><span className="text-slate-400">Model Yılı:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.year || viewingListingDetail.rawListing?.modelYear || '-'}</strong></div>
+                    <div><span className="text-slate-400">Yakıt / Şanzıman:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.fuelType || 'BENZİN'} / {viewingListingDetail.listing?.transmission || 'OTOMATİK'}</strong></div>
+                    <div><span className="text-slate-400">Kilometre:</span> <strong className="text-white font-bold block font-mono">{Number(viewingListingDetail.listing?.mileage || viewingListingDetail.rawListing?.kilometers || 0).toLocaleString('tr-TR')} km</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SATICI AÇIKLAMASI (FULL DESCRIPTION) */}
+              <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-2">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Satıcı Açıklaması (Tam Metin)</h4>
+                <p className="text-slate-200 leading-relaxed whitespace-pre-line text-xs font-sans">
+                  {viewingListingDetail.listing?.description || viewingListingDetail.rawListing?.description || 'Açıklama girilmemiş.'}
+                </p>
+              </div>
+
+              {/* ADMIN-ONLY TECHNICAL METADATA SECTION */}
+              <div className="p-5 bg-slate-950 rounded-2xl border border-white/10 space-y-3 font-mono text-xs">
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider font-sans flex items-center gap-2">
+                  <Info className="w-4 h-4" /> Yönetici & Sistem Bilgileri (Admin-Only)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                  <div><span className="text-slate-500">Listing UUID:</span> <code className="text-slate-300 font-bold block">{viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}</code></div>
+                  <div><span className="text-slate-500">Seller User ID:</span> <code className="text-slate-300 font-bold block">{viewingListingDetail.seller?.userId || viewingListingDetail.rawListing?.sellerId}</code></div>
+                  <div><span className="text-slate-500">Oluşturulma Tarihi:</span> <span className="text-slate-300 block">{new Date(viewingListingDetail.listing?.createdAt || viewingListingDetail.rawListing?.createdAt || Date.now()).toLocaleString('tr-TR')}</span></div>
+                  <div><span className="text-slate-500">Aktifleştirilebilir mi?:</span> <span className="text-emerald-400 font-bold block">{viewingListingDetail.canReactivate ? 'EVET' : 'HAYIR'}</span></div>
+                </div>
+                {viewingListingDetail.reactivationBlockedReason && (
+                  <div className="p-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-[10px]">
+                    <strong>Aktifleştirme Engeli:</strong> {viewingListingDetail.reactivationBlockedReason}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* MODERATION ACTION FOOTER */}
+            <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <span className="text-xs font-mono text-slate-400">
+                Durum: <strong className="text-white uppercase">{viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status}</strong>
+              </span>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {(viewingListingDetail.listing?.status === 'PENDING' || viewingListingDetail.rawListing?.status === 'PENDING') && (
+                  <>
+                    <button
+                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'APPROVE')}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Onayla
+                    </button>
+                    <button
+                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'REQUEST_REVISION')}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Düzeltme İste
+                    </button>
+                    <button
+                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'REJECT')}
+                      className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Reddet
+                    </button>
+                  </>
+                )}
+
+                {(viewingListingDetail.listing?.status === 'ACTIVE' || viewingListingDetail.rawListing?.status === 'ACTIVE') && (
+                  <button
+                    onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'PASSIVE')}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Pasife Al
+                  </button>
+                )}
+
+                {(viewingListingDetail.listing?.status === 'PASSIVE' || viewingListingDetail.rawListing?.status === 'PASSIVE') && (
+                  <button
+                    onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'ACTIVATE')}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Aktifleştir
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setViewingListingDetail(null)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+                >
+                  Kapat
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX FOR FULLSCREEN IMAGE VIEWING */}
+      {showLightbox && viewingListingDetail?.media && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <button onClick={() => setShowLightbox(false)} className="absolute top-6 right-6 text-slate-400 hover:text-white cursor-pointer z-50">
+            <X className="w-8 h-8" />
+          </button>
+
+          <button
+            onClick={() => setActiveImageIdx(Math.max(0, activeImageIdx - 1))}
+            disabled={activeImageIdx === 0}
+            className="absolute left-6 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer p-2 bg-black/50 rounded-2xl"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+
+          <img
+            src={viewingListingDetail.media[activeImageIdx]?.url}
+            alt="Full Photo"
+            className="max-h-[85vh] max-w-[85vw] object-contain rounded-2xl shadow-2xl"
+          />
+
+          <button
+            onClick={() => setActiveImageIdx(Math.min(viewingListingDetail.media.length - 1, activeImageIdx + 1))}
+            disabled={activeImageIdx === viewingListingDetail.media.length - 1}
+            className="absolute right-6 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer p-2 bg-black/50 rounded-2xl"
+          >
+            <ChevronRight className="w-8 h-8" />
+          </button>
         </div>
       )}
 
@@ -985,6 +1189,8 @@ export function AdminUserDrawer({
                     ? 'Düzeltme İste (Zorunlu Neden)'
                     : moderationActionType === 'REJECT'
                     ? 'İlanı Reddet (Zorunlu Neden)'
+                    : moderationActionType === 'ACTIVATE'
+                    ? 'İlanı Aktifleştir (Zorunlu Neden)'
                     : 'İlanı Pasife Al'}
                 </h3>
               </div>
@@ -1017,11 +1223,22 @@ export function AdminUserDrawer({
                   onChange={(e) => setModReasonCode(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-slate-200 outline-none cursor-pointer"
                 >
-                  <option value="PRICE_ANOMALY">Fiyat Anomalisi / Gerçek Dışı Fiyat</option>
-                  <option value="MISSING_PHOTOS">Eksik / Kalitesiz Fotoğraf</option>
-                  <option value="INCORRECT_SPECS">Araç Bilgisi Uyuşmazlığı</option>
-                  <option value="SUSPICIOUS_CONTENT">Şüpheli / İhlal Edici Açıklama</option>
-                  <option value="OTHER">Diğer Açıklama</option>
+                  {moderationActionType === 'ACTIVATE' ? (
+                    <>
+                      <option value="ADMIN_REACTIVATION">Yönetici Tarafından İnceleme Tamamlandı</option>
+                      <option value="MODERATION_RESOLVED">Moderasyon Sorunu Giderildi</option>
+                      <option value="MANAGEMENT_DECISION">Yönetim Kararı</option>
+                      <option value="OTHER">Diğer Açıklama</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="PRICE_ANOMALY">Fiyat Anomalisi / Gerçek Dışı Fiyat</option>
+                      <option value="MISSING_PHOTOS">Eksik / Kalitesiz Fotoğraf</option>
+                      <option value="INCORRECT_SPECS">Araç Bilgisi Uyuşmazlığı</option>
+                      <option value="SUSPICIOUS_CONTENT">Şüpheli / İhlal Edici Açıklama</option>
+                      <option value="OTHER">Diğer Açıklama</option>
+                    </>
+                  )}
                 </select>
               </div>
 
