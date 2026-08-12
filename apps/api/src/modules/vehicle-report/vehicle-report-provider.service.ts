@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { VehicleReportPromptService } from './vehicle-report-prompt.service';
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
@@ -240,6 +240,10 @@ export class VehicleReportProviderService {
           };
         }
       }
+    } catch (err: any) {
+      this.logger.error(`[DELEGATOR] Orchestrator error: ${err?.message}`);
+    }
+
     // If AI Orchestrator failed or returned no content, throw error to force retry instead of returning generic fallback
     this.logger.error(`[DELEGATOR] AI Orchestrator failed to produce valid report payload.`);
     throw new BadRequestException('TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.');
