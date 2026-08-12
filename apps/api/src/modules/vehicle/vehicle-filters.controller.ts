@@ -44,12 +44,12 @@ export function getFuelTypeTr(ft: string): string {
 
 export function getFuelTypeEnums(tr: string): string[] {
   const clean = tr.toLowerCase().trim();
-  if (clean === 'benzin') return ['PETROL'];
-  if (clean === 'dizel') return ['DIESEL'];
-  if (clean === 'hibrit') return ['HYBRID', 'PLUG_IN_HYBRID'];
-  if (clean === 'elektrik') return ['ELECTRIC'];
-  if (clean === 'lpg & benzin' || clean === 'lpg') return ['LPG'];
-  return ['PETROL'];
+  if (clean === 'benzin') return ['PETROL', 'OTHER'];
+  if (clean === 'dizel') return ['DIESEL', 'OTHER'];
+  if (clean === 'hibrit') return ['HYBRID', 'PLUG_IN_HYBRID', 'OTHER'];
+  if (clean === 'elektrik') return ['ELECTRIC', 'OTHER'];
+  if (clean === 'lpg' || clean.includes('lpg')) return ['LPG', 'PETROL', 'OTHER'];
+  return ['PETROL', 'OTHER'];
 }
 
 export function getTransmissionTr(name: string): string {
@@ -300,7 +300,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: targetEngine } } : {}),
+        ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
       },
       select: { transmission: { select: { name: true } } },
@@ -360,7 +360,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: targetEngine } } : {}),
+        ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
       },
       select: {
