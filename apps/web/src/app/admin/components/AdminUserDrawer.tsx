@@ -6,17 +6,17 @@ import {
   Plus,
   Send,
   FileText,
-  Package,
-  Calendar,
+  Eye,
+  MoreVertical,
   CheckCircle2,
   AlertTriangle,
+  XCircle,
   Clock,
-  ExternalLink,
-  ShieldCheck,
-  Zap,
-  Tag,
   Camera,
-  Car,
+  RefreshCw,
+  MessageSquare,
+  History,
+  ShieldAlert,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -45,6 +45,21 @@ export function AdminUserDrawer({
   // Listing filter inside drawer
   const [listingFilter, setListingFilter] = useState<string>('ALL');
 
+  // Read-Only View Listing Modal State
+  const [viewingListing, setViewingListing] = useState<any>(null);
+
+  // Moderation Action Reason Modal State
+  const [moderationActionListing, setModerationActionListing] = useState<any>(null);
+  const [moderationActionType, setModerationActionType] = useState<string | null>(null);
+  const [modReasonCode, setModReasonCode] = useState<string>('PRICE_ANOMALY');
+  const [modSellerMessage, setModSellerMessage] = useState<string>('');
+  const [modInternalNote, setModInternalNote] = useState<string>('');
+  const [submittingAction, setSubmittingAction] = useState(false);
+
+  // Listing Moderation History Modal State
+  const [historyListing, setHistoryListing] = useState<any>(null);
+  const [listingHistoryLogs, setListingHistoryLogs] = useState<any[]>([]);
+
   // Grant Package Modal State
   const [showGrantModal, setShowGrantModal] = useState(false);
   const [packageGroup, setPackageGroup] = useState<'SUBSCRIPTION' | 'BUYER'>('SUBSCRIPTION');
@@ -65,6 +80,9 @@ export function AdminUserDrawer({
   const [showNoteDialog, setShowNoteDialog] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+
+  // Dropdown action menu state
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const fetchUserData = async () => {
     if (!userId && !customerNo) return;
@@ -95,9 +113,21 @@ export function AdminUserDrawer({
       const uData = await uRes.json();
       const subData = subRes.ok ? await subRes.json() : null;
 
-      setUser(uData.user || uData);
+      // Merging canonical API response properties (ROOT CAUSE FIX)
+      const fullUser = {
+        ...(uData.user || uData),
+        listings: uData.listings || uData.user?.listings || [],
+        subscriptions: uData.subscriptions || uData.user?.subscriptions || [],
+        packagePurchases: uData.packagePurchases || uData.user?.packagePurchases || [],
+        adminNotes: uData.adminNotes || uData.user?.adminNotes || [],
+        adminMessages: uData.adminMessages || uData.user?.adminMessages || [],
+        history: uData.history || uData.user?.history || [],
+        usageStats: uData.usageStats || uData.user?.usageStats || {},
+      };
+
+      setUser(fullUser);
       setSubscription(subData);
-      setHistoryItems(uData.history || []);
+      setHistoryItems(fullUser.history);
     } catch (err: any) {
       setError(err.message || 'Veriler yüklenirken hata oluştu.');
     } finally {
@@ -112,6 +142,81 @@ export function AdminUserDrawer({
   }, [isOpen, userId, customerNo]);
 
   if (!isOpen) return null;
+
+  // Moderation Action Handler
+  const handleTriggerModerationAction = (listing: any, actionType: string) => {
+    setActiveMenuId(null);
+    if (actionType === 'APPROVE' || actionType === 'REOPEN') {
+      executeModerationAction(listing.id, actionType, {});
+    } else {
+      setModerationActionListing(listing);
+      setModerationActionType(actionType);
+      setModSellerMessage(
+        actionType === 'REQUEST_REVISION'
+          ? 'Lütfen ilan detaylarınızdaki eksik/hatalı bilgileri güncelleyiniz.'
+          : actionType === 'REJECT'
+          ? 'İlanınız TorqueScout yayın ilkelerine uymadığı için reddedilmiştir.'
+          : 'İlanınız yönetici tarafından pasife alınmıştır.'
+      );
+      setModInternalNote('');
+    }
+  };
+
+  const executeModerationAction = async (listingId: string, actionType: string, payload: any) => {
+    setSubmittingAction(true);
+    const token = localStorage.getItem('accessToken');
+
+    let endpoint = '';
+    if (actionType === 'APPROVE') endpoint = `/admin/listing-moderation/listings/${listingId}/approve`;
+    else if (actionType === 'REQUEST_REVISION') endpoint = `/admin/listing-moderation/listings/${listingId}/request-revision`;
+    else if (actionType === 'DETAILED_REVIEW') endpoint = `/admin/listing-moderation/listings/${listingId}/send-to-detailed-review`;
+    else if (actionType === 'REJECT') endpoint = `/admin/listing-moderation/listings/${listingId}/reject`;
+    else if (actionType === 'PASSIVE') endpoint = `/admin/listing-moderation/listings/${listingId}/set-passive`;
+    else if (actionType === 'REOPEN') endpoint = `/admin/listing-moderation/listings/${listingId}/reopen`;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'İşlem gerçekleştirilemedi.');
+      }
+
+      setModerationActionListing(null);
+      setModerationActionType(null);
+      setViewingListing(null);
+
+      // Instant refetch without full page reload
+      await fetchUserData();
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'İşlem başarısız.');
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  const handleOpenListingHistory = async (listing: any) => {
+    setActiveMenuId(null);
+    setHistoryListing(listing);
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/listing-moderation/listings/${listing.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setListingHistoryLogs(data.pastActions || []);
+      }
+    } catch (e) {}
+  };
 
   const handleOpenGrantModal = () => {
     setGrantSuccessMsg(null);
@@ -146,7 +251,7 @@ export function AdminUserDrawer({
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || 'Paket tanımlama yetki hatası (USER_PACKAGE_MANAGE yetkisi gerekli).');
+        throw new Error(errData.message || 'Paket tanımlama hatası (USER_PACKAGE_MANAGE yetkisi gerekli).');
       }
 
       setGrantSuccessMsg(
@@ -233,8 +338,9 @@ export function AdminUserDrawer({
   };
 
   // Remaining Entitlements Calculation
+  const userListings = user?.listings || [];
   const listingsRight = {
-    used: user?.listings?.filter((l: any) => l.status === 'ACTIVE').length || 0,
+    used: userListings.filter((l: any) => l.status === 'ACTIVE').length,
     totalLimit: subscription?.limits?.activeListings || (user?.subscriptionTier === 'PROFESYONEL' ? 50 : user?.subscriptionTier === 'YETKIN' ? 10 : 1),
   };
 
@@ -244,14 +350,13 @@ export function AdminUserDrawer({
   };
 
   // Filtered Listings for İlanlar Tab
-  const userListings = user?.listings || [];
   const filteredListings = userListings.filter((l: any) => {
     if (listingFilter === 'ALL') return true;
     return l.status === listingFilter;
   });
 
   return (
-    <div className="relative z-50">
+    <div className="relative z-50 font-sans">
       {/* DRAWER BACKDROP */}
       <div
         onClick={onClose}
@@ -490,7 +595,7 @@ export function AdminUserDrawer({
                   </div>
                 )}
 
-                {/* TAB 2: İLANLAR (GERÇEK KULLANICI İLANLARI) */}
+                {/* TAB 2: İLANLAR (GERÇEK KULLANICI İLANLARI + CANONICAL MODERATION ACTIONS) */}
                 {activeTab === 'LISTINGS' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
@@ -499,7 +604,7 @@ export function AdminUserDrawer({
                     </div>
 
                     {/* STATUS FILTER BUTTONS */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold">
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold scrollbar-none">
                       {[
                         { key: 'ALL', label: 'Tümü' },
                         { key: 'ACTIVE', label: 'Aktif' },
@@ -510,7 +615,7 @@ export function AdminUserDrawer({
                         <button
                           key={st.key}
                           onClick={() => setListingFilter(st.key)}
-                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${
                             listingFilter === st.key
                               ? 'bg-orange-500 text-white font-bold'
                               : 'bg-slate-900 text-slate-400 hover:text-white border border-white/5'
@@ -533,7 +638,7 @@ export function AdminUserDrawer({
                           return (
                             <div
                               key={l.id}
-                              className="p-3.5 bg-slate-900/70 rounded-2xl border border-white/5 space-y-2 hover:border-white/20 transition group"
+                              className="p-3.5 bg-slate-900/70 rounded-2xl border border-white/5 space-y-2.5 hover:border-white/20 transition relative group"
                             >
                               <div className="flex justify-between items-start">
                                 <div>
@@ -544,19 +649,109 @@ export function AdminUserDrawer({
                                   <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{trimName}</span>
                                 </div>
 
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
-                                    l.status === 'ACTIVE'
-                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                      : l.status === 'REJECTED'
-                                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                      : l.status === 'PENDING'
-                                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                                      : 'bg-slate-800 text-slate-400'
-                                  }`}
-                                >
-                                  {l.status}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                                      l.status === 'ACTIVE'
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : l.status === 'REJECTED'
+                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                        : l.status === 'PENDING'
+                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                        : 'bg-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {l.status}
+                                  </span>
+
+                                  {/* DROPDOWN ACTION MENU */}
+                                  <div className="relative">
+                                    <button
+                                      onClick={() => setActiveMenuId(activeMenuId === l.id ? null : l.id)}
+                                      className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </button>
+
+                                    {activeMenuId === l.id && (
+                                      <div className="absolute right-0 top-7 z-40 w-48 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1">
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            setViewingListing(l);
+                                          }}
+                                          className="w-full text-left px-3 py-1.5 text-slate-200 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" /> İlanı Gör (Read-Only)
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            setActiveTab('OVERVIEW');
+                                          }}
+                                          className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <MessageSquare className="w-3.5 h-3.5" /> Kullanıcıyı Gör
+                                        </button>
+
+                                        {l.status === 'PENDING' && (
+                                          <>
+                                            <button
+                                              onClick={() => handleTriggerModerationAction(l, 'APPROVE')}
+                                              className="w-full text-left px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                            >
+                                              <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
+                                            </button>
+                                            <button
+                                              onClick={() => handleTriggerModerationAction(l, 'REQUEST_REVISION')}
+                                              className="w-full text-left px-3 py-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                            >
+                                              <AlertTriangle className="w-3.5 h-3.5" /> Düzeltme İste
+                                            </button>
+                                            <button
+                                              onClick={() => handleTriggerModerationAction(l, 'DETAILED_REVIEW')}
+                                              className="w-full text-left px-3 py-1.5 text-cyan-400 hover:bg-cyan-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                            >
+                                              <ShieldAlert className="w-3.5 h-3.5" /> Detaylı İncelemede
+                                            </button>
+                                            <button
+                                              onClick={() => handleTriggerModerationAction(l, 'REJECT')}
+                                              className="w-full text-left px-3 py-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                            >
+                                              <XCircle className="w-3.5 h-3.5" /> Reddet
+                                            </button>
+                                          </>
+                                        )}
+
+                                        {l.status === 'ACTIVE' && (
+                                          <button
+                                            onClick={() => handleTriggerModerationAction(l, 'PASSIVE')}
+                                            className="w-full text-left px-3 py-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <Clock className="w-3.5 h-3.5" /> Pasife Al
+                                          </button>
+                                        )}
+
+                                        {l.status === 'REJECTED' && (
+                                          <button
+                                            onClick={() => handleTriggerModerationAction(l, 'REOPEN')}
+                                            className="w-full text-left px-3 py-1.5 text-cyan-400 hover:bg-cyan-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <RefreshCw className="w-3.5 h-3.5" /> Tekrar İncele
+                                          </button>
+                                        )}
+
+                                        <button
+                                          onClick={() => handleOpenListingHistory(l)}
+                                          className="w-full text-left px-3 py-1.5 text-slate-400 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer border-t border-white/5 pt-1.5"
+                                        >
+                                          <History className="w-3.5 h-3.5" /> Moderasyon Geçmişi
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
 
                               <div className="flex justify-between items-center pt-2 border-t border-white/5 font-mono text-[11px]">
@@ -699,7 +894,229 @@ export function AdminUserDrawer({
         </aside>
       </div>
 
-      {/* NESTED MODAL 1: DUAL PACKAGE ASSIGNMENT MODAL (ABONELİK PAKETLERİ + ALICI PAKETLERİ) */}
+      {/* NESTED MODAL 1: READ-ONLY İLANI GÖR MODAL */}
+      {viewingListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-lg w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-5 shadow-2xl font-sans text-xs">
+            <div className="flex justify-between items-start pb-3 border-b border-white/10">
+              <div>
+                <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
+                  İLAN NO: {viewingListing.id.slice(0, 12)} (READ-ONLY)
+                </span>
+                <h3 className="text-base font-bold text-white mt-1">{viewingListing.title || 'Araç İlanı'}</h3>
+              </div>
+              <button onClick={() => setViewingListing(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-2">
+                <div className="flex justify-between items-center font-mono">
+                  <span className="text-slate-400">Fiyat (Ticari İçerik - Düzenlenemez):</span>
+                  <strong className="text-emerald-400 text-sm font-bold">
+                    ₺{Number(viewingListing.priceAmount || 0).toLocaleString('tr-TR')}
+                  </strong>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Şehir / İlçe:</span>
+                  <span className="text-slate-200 font-bold">{viewingListing.city || 'Belirtilmedi'}, {viewingListing.district || ''}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400">Yayın Durumu:</span>
+                  <span className="text-orange-400 font-bold uppercase">{viewingListing.status}</span>
+                </div>
+              </div>
+
+              {viewingListing.description && (
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-1">
+                  <span className="text-slate-400 font-bold block text-[10px] uppercase">Satıcı Açıklaması</span>
+                  <p className="text-slate-300 leading-relaxed">{viewingListing.description}</p>
+                </div>
+              )}
+            </div>
+
+            {/* MODERATION ACTION BUTTONS IN READ-ONLY MODAL */}
+            <div className="pt-3 border-t border-white/10 flex flex-wrap gap-2 justify-end">
+              {viewingListing.status === 'PENDING' && (
+                <>
+                  <button
+                    onClick={() => handleTriggerModerationAction(viewingListing, 'APPROVE')}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Onayla
+                  </button>
+                  <button
+                    onClick={() => handleTriggerModerationAction(viewingListing, 'REQUEST_REVISION')}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Düzeltme İste
+                  </button>
+                  <button
+                    onClick={() => handleTriggerModerationAction(viewingListing, 'REJECT')}
+                    className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Reddet
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => setViewingListing(null)}
+                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NESTED MODAL 2: MODERATION ACTION REASON MODAL (ZORUNLU NEDEN MODALI) */}
+      {moderationActionListing && moderationActionType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl font-sans text-xs">
+            <div className="flex justify-between items-start pb-3 border-b border-white/10">
+              <div>
+                <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
+                  İLAN NO: {moderationActionListing.id.slice(0, 12)}
+                </span>
+                <h3 className="text-base font-bold text-white mt-1">
+                  {moderationActionType === 'REQUEST_REVISION'
+                    ? 'Düzeltme İste (Zorunlu Neden)'
+                    : moderationActionType === 'REJECT'
+                    ? 'İlanı Reddet (Zorunlu Neden)'
+                    : 'İlanı Pasife Al'}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setModerationActionListing(null);
+                  setModerationActionType(null);
+                }}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                executeModerationAction(moderationActionListing.id, moderationActionType, {
+                  reasonCode: modReasonCode,
+                  sellerMessage: modSellerMessage,
+                  internalNote: modInternalNote,
+                });
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Neden Kodu (Zorunlu)</label>
+                <select
+                  value={modReasonCode}
+                  onChange={(e) => setModReasonCode(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-slate-200 outline-none cursor-pointer"
+                >
+                  <option value="PRICE_ANOMALY">Fiyat Anomalisi / Gerçek Dışı Fiyat</option>
+                  <option value="MISSING_PHOTOS">Eksik / Kalitesiz Fotoğraf</option>
+                  <option value="INCORRECT_SPECS">Araç Bilgisi Uyuşmazlığı</option>
+                  <option value="SUSPICIOUS_CONTENT">Şüpheli / İhlal Edici Açıklama</option>
+                  <option value="OTHER">Diğer Açıklama</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Satıcıya Gönderilecek Açıklama (Zorunlu Bildirim)</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={modSellerMessage}
+                  onChange={(e) => setModSellerMessage(e.target.value)}
+                  placeholder="Satıcının bildiriminde yer alacak açıklayıcı not..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 outline-none resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">İç Not (Audit / Dahili)</label>
+                <textarea
+                  rows={2}
+                  value={modInternalNote}
+                  onChange={(e) => setModInternalNote(e.target.value)}
+                  placeholder="Yalnızca admin kayıtlarında kalacak not..."
+                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModerationActionListing(null);
+                    setModerationActionType(null);
+                  }}
+                  className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl font-bold transition cursor-pointer"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingAction}
+                  className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 transition cursor-pointer"
+                >
+                  {submittingAction ? 'İşleniyor...' : 'Aksiyonu Onayla'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* NESTED MODAL 3: İLAN MODERASYON GEÇMİŞİ MODAL */}
+      {historyListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-md w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl font-sans text-xs">
+            <div className="flex justify-between items-start pb-3 border-b border-white/10">
+              <div>
+                <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
+                  İLAN NO: {historyListing.id.slice(0, 12)}
+                </span>
+                <h3 className="text-base font-bold text-white mt-1">İlan Moderasyon Geçmişi</h3>
+              </div>
+              <button onClick={() => setHistoryListing(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1 font-mono">
+              {listingHistoryLogs.length > 0 ? (
+                listingHistoryLogs.map((log: any, idx: number) => (
+                  <div key={log.id || idx} className="p-3 bg-slate-950 rounded-xl border border-white/5 space-y-1 text-[11px]">
+                    <div className="flex justify-between">
+                      <strong className="text-orange-400">{log.actionType}</strong>
+                      <span className="text-slate-500 text-[10px]">{new Date(log.createdAt).toLocaleString('tr-TR')}</span>
+                    </div>
+                    {log.sellerMessage && <p className="text-slate-300 font-sans">{log.sellerMessage}</p>}
+                  </div>
+                ))
+              ) : (
+                <div className="p-6 text-center text-slate-500">Bu ilana ait geçmiş bulunamadı.</div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setHistoryListing(null)}
+                className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NESTED MODAL 4: DUAL PACKAGE ASSIGNMENT MODAL */}
       {showGrantModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-6 shadow-2xl font-sans">
@@ -722,7 +1139,6 @@ export function AdminUserDrawer({
               </div>
             ) : (
               <form onSubmit={handleGrantPackageSubmit} className="space-y-4 text-xs font-sans">
-                {/* SEGMENTED CONTROL TABS (ABONELİK vs ALICI) */}
                 <div className="p-1 bg-slate-950 rounded-xl border border-white/10 flex items-center gap-1 font-bold">
                   <button
                     type="button"
@@ -744,7 +1160,6 @@ export function AdminUserDrawer({
                   </button>
                 </div>
 
-                {/* ABONELİK PAKETLERİ OPTIONS */}
                 {packageGroup === 'SUBSCRIPTION' && (
                   <div>
                     <label className="text-slate-300 font-bold block mb-1.5">Abonelik Paketi Seçin</label>
@@ -760,7 +1175,6 @@ export function AdminUserDrawer({
                   </div>
                 )}
 
-                {/* ALICI PAKETLERİ OPTIONS */}
                 {packageGroup === 'BUYER' && (
                   <div>
                     <label className="text-slate-300 font-bold block mb-1.5">Alıcı Ek Hak Paketi Seçin</label>
@@ -831,7 +1245,7 @@ export function AdminUserDrawer({
         </div>
       )}
 
-      {/* NESTED MODAL 2: MESAJ GÖNDER */}
+      {/* NESTED MODAL 5: MESAJ GÖNDER */}
       {showMessageDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl font-sans">
@@ -888,7 +1302,7 @@ export function AdminUserDrawer({
         </div>
       )}
 
-      {/* NESTED MODAL 3: NOT EKLE */}
+      {/* NESTED MODAL 6: NOT EKLE */}
       {showNoteDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-[#0b0f19] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl font-sans">
