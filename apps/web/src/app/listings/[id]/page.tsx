@@ -620,20 +620,20 @@ export default function ListingDetail() {
               {/* Marka */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Marka</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.brand?.name || listing.brand || "Belirtilmedi"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.brand?.name || listing.brand || listing.customBrand || "Belirtilmedi"}</span>
               </div>
 
               {/* Seri */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Seri</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.model?.name || listing.series || "Belirtilmedi"}</span>
+                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.model?.name || listing.series || listing.modelName || "Belirtilmedi"}</span>
               </div>
 
               {/* Model */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Model</span>
                 <span className="font-semibold text-slate-200 text-right truncate" title={listing.vehicleVariant?.trim?.name || listing.model}>
-                  {listing.vehicleVariant?.trim?.name || listing.vehicleVariant?.engine?.name || listing.model || "Belirtilmedi"}
+                  {[listing.vehicleVariant?.engine?.code, listing.vehicleVariant?.trim?.name].filter(Boolean).join(" ") || listing.model || listing.customModel || "Belirtilmedi"}
                 </span>
               </div>
 
@@ -676,13 +676,17 @@ export default function ListingDetail() {
               {/* Motor Gücü */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Gücü</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.power || listing.enginePower || "-"}</span>
+                <span className="font-semibold text-slate-200 text-right">
+                  {listing.vehicleVariant?.engine?.horsepower ? `${listing.vehicleVariant.engine.horsepower} HP` : listing.enginePower ? `${listing.enginePower} HP` : listing.vehicleVariant?.power || "-"}
+                </span>
               </div>
 
               {/* Motor Hacmi */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Hacmi</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.vehicleVariant?.engineCapacity || listing.engineCapacity || "-"}</span>
+                <span className="font-semibold text-slate-200 text-right">
+                  {listing.vehicleVariant?.engine?.displacement ? `${listing.vehicleVariant.engine.displacement} cc` : listing.engineDisplacement ? `${listing.engineDisplacement} cc` : listing.vehicleVariant?.engineCapacity || "-"}
+                </span>
               </div>
 
               {/* Çekiş */}
