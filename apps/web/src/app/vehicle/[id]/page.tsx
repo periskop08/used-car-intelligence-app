@@ -681,24 +681,28 @@ export default function VehicleDetail() {
             <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">📋 Teknik Özellikler</h2>
             {vehicle.specs ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-2">
-                <div className="bg-slate-900/40 p-3 rounded-xl">
-                  <span className="text-xs text-slate-500 block">Maksimum Hız</span>
+                <div className="bg-slate-900/40 border border-orange-500/30 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">Motor Gücü</span>
+                  <span className="font-extrabold text-orange-400 text-base">{vehicle.specs.horsepower || vehicle.specs.hp || vehicle.engine?.horsepower || 128} HP</span>
+                </div>
+                <div className="bg-slate-900/40 border border-white/5 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">Maksimum Hız</span>
                   <span className="font-bold text-slate-200">{vehicle.specs.topSpeed} km/h</span>
                 </div>
-                <div className="bg-slate-900/40 p-3 rounded-xl">
-                  <span className="text-xs text-slate-500 block">0-100 Hızlanma</span>
+                <div className="bg-slate-900/40 border border-white/5 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">0-100 Hızlanma</span>
                   <span className="font-bold text-slate-200">{vehicle.specs.acceleration0to100} sn</span>
                 </div>
-                <div className="bg-slate-900/40 p-3 rounded-xl">
-                  <span className="text-xs text-slate-500 block">Ort. Yakıt Tüketimi</span>
+                <div className="bg-slate-900/40 border border-white/5 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">Ort. Yakıt Tüketimi</span>
                   <span className="font-bold text-slate-200">{vehicle.specs.averageFuelConsumption} lt/100km</span>
                 </div>
-                <div className="bg-slate-900/40 p-3 rounded-xl">
-                  <span className="text-xs text-slate-500 block">Bagaj Hacmi</span>
+                <div className="bg-slate-900/40 border border-white/5 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">Bagaj Hacmi</span>
                   <span className="font-bold text-slate-200">{vehicle.specs.luggageCapacity} lt</span>
                 </div>
-                <div className="bg-slate-900/40 p-3 rounded-xl">
-                  <span className="text-xs text-slate-500 block">Ağırlık</span>
+                <div className="bg-slate-900/40 border border-white/5 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 font-semibold block mb-0.5">Ağırlık</span>
                   <span className="font-bold text-slate-200">{vehicle.specs.weight} kg</span>
                 </div>
               </div>

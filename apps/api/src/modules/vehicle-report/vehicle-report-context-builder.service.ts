@@ -131,7 +131,7 @@ export class VehicleReportContextBuilderService {
         engineTorqueNm: null,
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineType: specsJson.engineType || null,
-        fuelType: variant.fuelType || 'PETROL',
+        fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
         transmissionName: transName || 'Otomatik',
         transmissionCode: variant.transmission?.type || 'AUTOMATIC',
         drivetrain: driveType,

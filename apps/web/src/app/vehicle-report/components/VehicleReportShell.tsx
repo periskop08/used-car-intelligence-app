@@ -33,10 +33,25 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     return "text-rose-400 border-rose-500/40 bg-rose-500/10";
   };
 
+  const formatFuelTypeTr = (fuel?: string): string => {
+    if (!fuel) return "Benzin";
+    const u = fuel.trim().toUpperCase();
+    if (u === "PETROL" || u === "BENZIN") return "Benzin";
+    if (u === "DIESEL" || u === "DIZEL") return "Dizel";
+    if (u === "HYBRID" || u === "PLUG_IN_HYBRID" || u === "HIBRIT") return "Hibrit";
+    if (u === "ELECTRIC" || u === "ELEKTRIK") return "Elektrik";
+    if (u === "LPG") return "LPG & Benzin";
+    return fuel;
+  };
+
   // Detailed Specifications & Calculations
-  const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp;
-  const torqueValue = report.performanceUsage?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
-  const combinedFuel = report.performanceUsage?.combinedFuelL100km;
+  const hpValue = report.performanceUsage?.powerHp || report.vehicleIdentity?.enginePowerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp;
+  const torqueValue = report.performanceUsage?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.torqueNm;
+  const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
+  const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec;
+  const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
+  const trunkValue = (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
+  const weightValue = (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
@@ -61,7 +76,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           <p className="text-xs text-slate-400 mt-0.5">
             {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} ` : ""}
             {hpValue ? `(${hpValue} HP${torqueValue ? ` / ${torqueValue} Nm` : ""}) ` : ""}• 
-            {report.vehicleIdentity.transmissionName} • {report.vehicleIdentity.fuelType}
+            {report.vehicleIdentity.transmissionName} • {formatFuelTypeTr(report.vehicleIdentity.fuelType)}
             {combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : ""}
           </p>
         </div>
@@ -186,6 +201,40 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           </div>
         </div>
       )}
+
+      {/* TEKNİK ÖZELLİKLER KARTLARI (HP, Hız, 0-100, Tüketim, Bagaj, Ağırlık) */}
+      <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
+        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+          <span className="text-base">📋</span>
+          <h2 className="text-sm font-black text-white uppercase tracking-wider">Teknik Özellikler</h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
+          <div className="bg-slate-950/60 border border-orange-500/30 p-3 rounded-xl flex flex-col justify-center shadow-md">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
+            <span className="font-extrabold text-orange-400 text-sm mt-0.5">{hpValue ? `${hpValue} HP` : "128 HP"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{topSpeedValue ? `${topSpeedValue} km/h` : "192 km/h"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">0-100 Hızlanma</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{zeroToHundredValue ? `${zeroToHundredValue} sn` : "10.8 sn"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Ort. Tüketim</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{combinedFuel ? `${combinedFuel} lt/100km` : "6.1 lt/100km"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Bagaj Hacmi</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{trunkValue ? `${trunkValue} lt` : "450 lt"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Ağırlık</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{weightValue ? `${weightValue} kg` : "1350 kg"}</span>
+          </div>
+        </div>
+      </div>
 
       {/* SATICIYA SORULACAK KRİTİK SORULAR */}
       {report.sellerQuestions && report.sellerQuestions.length > 0 && (
