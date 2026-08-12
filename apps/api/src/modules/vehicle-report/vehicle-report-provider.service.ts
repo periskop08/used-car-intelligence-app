@@ -242,7 +242,7 @@ export class VehicleReportProviderService {
       }
     // If AI Orchestrator failed or returned no content, throw error to force retry instead of returning generic fallback
     this.logger.error(`[DELEGATOR] AI Orchestrator failed to produce valid report payload.`);
-    throw new BadRequestException('Yapay zeka araç raporu şu anda üretilemedi. Lütfen tekrar deneyin.');
+    throw new BadRequestException('TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.');
   }
 
   private repairJson(jsonStr: string): string {

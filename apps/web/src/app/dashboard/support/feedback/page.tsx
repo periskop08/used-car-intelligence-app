@@ -26,9 +26,14 @@ const SUBJECT_OPTIONS = [
 function FeedbackPageContent() {
   const searchParams = useSearchParams();
   const listingId = searchParams.get("listingId");
+  const initialCategory = searchParams.get("category") || searchParams.get("subject") || (listingId ? "LISTINGS" : "");
   const isListingReport = Boolean(listingId);
 
-  const [category, setCategory] = useState(isListingReport ? "LISTINGS" : "");
+  const [category, setCategory] = useState(
+    initialCategory === "VEHICLE_QUERY_AI_REPORT" || initialCategory === "Araç Sorgulama / AI Rapor"
+      ? "VEHICLE_QUERY_AI_REPORT"
+      : initialCategory
+  );
   const [message, setMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
@@ -37,6 +42,13 @@ function FeedbackPageContent() {
   const [listingDetails, setListingDetails] = useState<any | null>(null);
 
   useEffect(() => {
+    if (initialCategory) {
+      setCategory(
+        initialCategory === "VEHICLE_QUERY_AI_REPORT" || initialCategory === "Araç Sorgulama / AI Rapor"
+          ? "VEHICLE_QUERY_AI_REPORT"
+          : initialCategory
+      );
+    }
     if (isListingReport && listingId) {
       setCategory("LISTINGS");
       // Fetch basic listing title for user display
@@ -47,7 +59,7 @@ function FeedbackPageContent() {
         })
         .catch((err) => console.error("Error fetching listing details for report:", err));
     }
-  }, [listingId, isListingReport]);
+  }, [listingId, isListingReport, initialCategory]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMsg("");

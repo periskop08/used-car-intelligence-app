@@ -661,8 +661,16 @@ export default function VehicleDetail() {
               </div>
 
               {reportError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mt-2">
-                  ⚠️ {reportError}
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold mt-3 flex flex-col items-center gap-3 max-w-md mx-auto">
+                  <div className="flex items-center gap-2 text-center">
+                    <span>⚠️ {reportError}</span>
+                  </div>
+                  <a
+                    href="/dashboard/support/feedback?category=VEHICLE_QUERY_AI_REPORT"
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                  >
+                    <span>💬 Geri Bildirim Gönder</span>
+                  </a>
                 </div>
               )}
             </div>

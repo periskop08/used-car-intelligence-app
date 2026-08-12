@@ -139,9 +139,17 @@ export default function ListingVehicleReportPanel({ listingId }: ListingVehicleR
       </div>
 
       {error && (
-        <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 max-w-md mx-auto flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
+        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 max-w-md mx-auto flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2 text-center">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <a
+            href="/dashboard/support/feedback?category=VEHICLE_QUERY_AI_REPORT"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-orange-500/20 active:scale-95 mt-1"
+          >
+            <span>💬 Geri Bildirim Gönder</span>
+          </a>
         </div>
       )}
 
