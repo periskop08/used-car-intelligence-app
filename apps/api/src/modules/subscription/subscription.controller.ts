@@ -41,8 +41,10 @@ export class AdminPackageGrantController {
     @Param('userId') userId: string,
     @Request() req: any,
     @Body() body: {
+      packageGroup?: 'SUBSCRIPTION' | 'BUYER';
       planId?: string;
       tier?: SubscriptionTier;
+      buyerPackageCode?: 'ALICI_MINI' | 'ALICI_PLUS' | 'ALICI_MAX';
       activationMode?: string;
       reasonCode: string;
       reason?: string;

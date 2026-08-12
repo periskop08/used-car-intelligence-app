@@ -526,15 +526,27 @@ export class UserService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        buyerPurchases: true,
+        buyerPurchases: {
+          orderBy: { createdAt: 'desc' },
+        },
         subscriptions: {
           include: { plan: true },
           orderBy: { createdAt: 'desc' },
         },
         listings: {
           orderBy: { createdAt: 'desc' },
-          take: 50,
-          include: { vehicleVariant: { include: { brand: true, model: true } } },
+          take: 100,
+          include: {
+            vehicleVariant: {
+              include: {
+                model: { include: { brand: true } },
+                trim: true,
+              },
+            },
+            media: {
+              select: { id: true, url: true, sortOrder: true },
+            },
+          },
         },
         adminNotes: {
           orderBy: { createdAt: 'desc' },
@@ -555,10 +567,104 @@ export class UserService {
 
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
+    // Fetch audit logs for this user
+    let auditLogs: any[] = [];
+    try {
+      auditLogs = await this.prisma.adminAuditLog.findMany({
+        where: {
+          OR: [
+            { entityId: userId },
+            { entityType: 'UserSubscription', entityId: userId },
+            { entityType: 'BuyerPackagePurchase', entityId: userId },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+    } catch (e) {}
+
+    // Aggregate real history timeline
+    const history: any[] = [];
+
+    // 1. Account registration
+    if (user.createdAt) {
+      history.push({
+        id: `reg-${user.id}`,
+        type: 'USER_REGISTERED',
+        title: 'Hesap Oluşturuldu',
+        description: `Kullanıcı TorqueScout platformuna kayıt oldu (${user.email}).`,
+        date: user.createdAt,
+        badgeColor: 'emerald',
+      });
+    }
+
+    // 2. Listing events
+    (user.listings || []).forEach((l) => {
+      history.push({
+        id: `listing-${l.id}`,
+        type: 'LISTING_CREATED',
+        title: `İlan Yayınlandı/Gönderildi (${l.status})`,
+        description: `${l.title || 'Araç İlanı'} - ₺${Number(l.priceAmount || 0).toLocaleString('tr-TR')}`,
+        date: l.createdAt,
+        badgeColor: l.status === 'ACTIVE' ? 'emerald' : l.status === 'REJECTED' ? 'rose' : 'amber',
+      });
+    });
+
+    // 3. Subscriptions & Grants
+    (user.subscriptions || []).forEach((s: any) => {
+      history.push({
+        id: `sub-${s.id}`,
+        type: 'SUBSCRIPTION_GRANTED',
+        title: `Abonelik Paketi Tanımlandı (${s.plan?.name || s.tier || 'Standart'})`,
+        description: `Kaynak: ${s.source || 'ADMIN_GRANT'}`,
+        date: s.createdAt,
+        badgeColor: 'orange',
+      });
+    });
+
+    // 4. Buyer purchases
+    (user.buyerPurchases || []).forEach((p: any) => {
+      history.push({
+        id: `buyer-${p.id}`,
+        type: 'BUYER_PACKAGE_GRANTED',
+        title: `Alıcı Ek Hak Paketi Tanımlandı (${p.packageCode})`,
+        description: `+${p.aiReportLimit} AI Rapor / +${p.chatbotMessageLimit} Chatbot Hakkı`,
+        date: p.createdAt,
+        badgeColor: 'cyan',
+      });
+    });
+
+    // 5. Admin messages
+    (user.adminMessages || []).forEach((m: any) => {
+      history.push({
+        id: `msg-${m.id}`,
+        type: 'ADMIN_MESSAGE',
+        title: `Yönetici Mesajı: ${m.subject}`,
+        description: m.message,
+        date: m.createdAt,
+        badgeColor: 'indigo',
+      });
+    });
+
+    // 6. Admin notes
+    (user.adminNotes || []).forEach((n: any) => {
+      history.push({
+        id: `note-${n.id}`,
+        type: 'ADMIN_NOTE',
+        title: 'Yönetici Notu Eklendi',
+        description: n.content,
+        date: n.createdAt,
+        badgeColor: 'slate',
+      });
+    });
+
+    // Sort timeline descending
+    history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
     return {
       user: {
         id: user.id,
-        customerNo: `TS-${user.id.slice(0, 8).toUpperCase()}`,
+        customerNo: user.customerNo || `TS-${user.id.slice(0, 8).toUpperCase()}`,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -576,6 +682,8 @@ export class UserService {
       listings: user.listings,
       adminNotes: user.adminNotes,
       adminMessages: user.adminMessages,
+      auditLogs,
+      history,
       usageStats: {
         aiReports: user._count.generatedVehicleReports,
         chatbotQueries: user._count.chatLogs,
