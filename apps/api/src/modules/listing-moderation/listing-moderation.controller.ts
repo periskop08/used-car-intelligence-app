@@ -34,6 +34,18 @@ export class ListingModerationController {
     }
   }
 
+  @Get('status-counts')
+  async getStatusCounts(@Req() req: any) {
+    this.verifyAdminAccess(req);
+    return this.moderationService.getStatusCounts();
+  }
+
+  @Get('items')
+  async getModerationItems(@Query() query: any, @Req() req: any) {
+    this.verifyAdminAccess(req);
+    return this.moderationService.getModerationItems(query);
+  }
+
   @Get('reasons')
   async getReasons(@Query('actionType') actionType: string, @Req() req: any) {
     this.verifyAdminAccess(req);

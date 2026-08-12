@@ -1,6 +1,10 @@
-import { Controller, Get, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Request, UseGuards, ForbiddenException } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
-import { OptionalJwtAuthGuard } from '../auth/jwt.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { AdminPermission } from '../../common/enums/admin-permission.enum';
+import { SubscriptionTier } from '@prisma/client';
 
 @Controller('subscriptions')
 export class SubscriptionController {
@@ -18,5 +22,37 @@ export class SubscriptionController {
   async getMeSummary(@Request() req: any) {
     const userId = req.user?.id || req.query?.userId;
     return this.subscriptionService.getSubscriptionSummary(userId);
+  }
+
+  @Get('plans')
+  async getPlans() {
+    return this.subscriptionService.getAvailablePlans();
+  }
+}
+
+@Controller('admin/users')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class AdminPackageGrantController {
+  constructor(private readonly subscriptionService: SubscriptionService) {}
+
+  @Post(':userId/package-grants')
+  @Permissions(AdminPermission.USER_PACKAGE_MANAGE)
+  async grantPackage(
+    @Param('userId') userId: string,
+    @Request() req: any,
+    @Body() body: {
+      planId?: string;
+      tier?: SubscriptionTier;
+      activationMode?: string;
+      reasonCode: string;
+      reason?: string;
+      notifyUser?: boolean;
+    }
+  ) {
+    const user = req.user;
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && !user.permissions?.includes(AdminPermission.USER_PACKAGE_MANAGE)) {
+      throw new ForbiddenException('Kullanıcıya paket tanımlama yetkiniz bulunmamaktadır.');
+    }
+    return this.subscriptionService.grantPackageToUser(user, userId, body);
   }
 }

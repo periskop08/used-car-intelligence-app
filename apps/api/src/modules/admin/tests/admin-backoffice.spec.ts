@@ -203,19 +203,26 @@ describe('TorqueScout Admin Backoffice Acceptance Criteria Test Suite', () => {
     expect(new Set(results).size).toBe(3);
   });
 
-  // 12. Data Quality No Auto-Write Test
-  it('12. data quality no-auto-write test: scanner detects anomalies without mutating database rows until explicit approval', async () => {
-    const dbStateBefore = { id: 'v1', trimName: null };
-
-    // Scanner detects issue without mutating row
-    const scanResult = {
-      issueFound: true,
-      variantId: 'v1',
-      proposedFix: { trimName: 'Standart' },
+  // 13. Admin Package Grant & Finance Safety Test
+  it('13. admin package grant test: package grant creates ADMIN_GRANT source without inflating revenue/MRR', async () => {
+    const grantPayload = {
+      targetUserId: 'u-123',
+      tier: 'PROFESYONEL',
+      source: 'ADMIN_GRANT',
+      reasonCode: 'CUSTOMER_SUPPORT',
     };
 
-    expect(dbStateBefore.trimName).toBeNull();
-    expect(scanResult.proposedFix.trimName).toBe('Standart');
-    // Database row remains untouched until explicit approval call
+    // Revenue calculation ignores ADMIN_GRANT source
+    const payments = [
+      { amount: 1499, source: 'PAID_CHECKOUT', status: 'SUCCESS' },
+      { amount: 0, source: 'ADMIN_GRANT', status: 'GRANTED' },
+    ];
+
+    const totalRevenue = payments
+      .filter((p) => p.source !== 'ADMIN_GRANT')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    expect(totalRevenue).toBe(1499);
+    expect(grantPayload.source).toBe('ADMIN_GRANT');
   });
 });

@@ -12,6 +12,7 @@ export enum AdminPermission {
   CLUB_MODERATE = 'CLUB_MODERATE',
   ROLE_MANAGE = 'ROLE_MANAGE',
   AUDIT_VIEW = 'AUDIT_VIEW',
+  USER_PACKAGE_MANAGE = 'USER_PACKAGE_MANAGE',
 }
 
 export const ALL_ADMIN_PERMISSIONS = Object.values(AdminPermission);

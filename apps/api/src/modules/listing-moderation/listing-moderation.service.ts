@@ -661,4 +661,115 @@ export class ListingModerationService implements OnModuleInit {
     }
     return { success: true };
   }
+
+  async getStatusCounts() {
+    const countByStatus = async (st: string) => {
+      try {
+        return await this.prisma.vehicleListing.count({ where: { status: st as any } });
+      } catch (e) {
+        return 0;
+      }
+    };
+
+    const counts = await Promise.all([
+      countByStatus('PENDING'),
+      countByStatus('REVISION_REQUIRED'),
+      countByStatus('DETAILED_REVIEW'),
+      countByStatus('ACTIVE'),
+      countByStatus('REJECTED'),
+      countByStatus('PASSIVE'),
+      countByStatus('EXPIRED'),
+      countByStatus('REPORTED'),
+    ]);
+
+    return {
+      PENDING: counts[0],
+      REVISION_REQUIRED: counts[1],
+      DETAILED_REVIEW: counts[2],
+      ACTIVE: counts[3],
+      REJECTED: counts[4],
+      PASSIVE: counts[5],
+      EXPIRED: counts[6],
+      REPORTED: counts[7],
+    };
+  }
+
+  async getModerationItems(query: {
+    status?: string;
+    search?: string;
+    sellerType?: string;
+    riskLevel?: string;
+    sort?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const status = query.status || 'PENDING';
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = { status: status as any };
+
+    if (query.sellerType && query.sellerType !== 'ALL') {
+      where.sellerType = query.sellerType;
+    }
+
+    if (query.search) {
+      const s = query.search.trim();
+      where.OR = [
+        { id: { contains: s, mode: 'insensitive' } },
+        { title: { contains: s, mode: 'insensitive' } },
+        { city: { contains: s, mode: 'insensitive' } },
+        { district: { contains: s, mode: 'insensitive' } },
+        { seller: { email: { contains: s, mode: 'insensitive' } } },
+        { seller: { firstName: { contains: s, mode: 'insensitive' } } },
+        { seller: { lastName: { contains: s, mode: 'insensitive' } } },
+        { seller: { customerNo: { contains: s, mode: 'insensitive' } } },
+      ];
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (query.sort === 'OLDEST') {
+      orderBy = { createdAt: 'asc' };
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.vehicleListing.count({ where }),
+      this.prisma.vehicleListing.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          seller: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              customerNo: true,
+            },
+          },
+          vehicleVariant: {
+            select: {
+              id: true,
+              trim: { select: { name: true } },
+              model: { select: { name: true, brand: { select: { name: true } } } },
+            },
+          },
+          media: {
+            select: { id: true, url: true, sortOrder: true },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 }

@@ -236,4 +236,100 @@ export class SubscriptionService {
       activePurchases,
     };
   }
+
+  async getAvailablePlans() {
+    let plans = await this.prisma.subscriptionPlan.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!plans || plans.length === 0) {
+      // Return predefined catalog plans if DB table is unseeded
+      return [
+        {
+          id: 'plan-tanisma',
+          tier: SubscriptionTier.TANISMA,
+          name: 'Tanışma / Ücretsiz Paket',
+          priceTrl: 0,
+          limits: { aiReports: 3, aiChat: 3, activeListings: 1, comparisons: 3, listingDurationDays: 30 },
+        },
+        {
+          id: 'plan-yetkin',
+          tier: SubscriptionTier.YETKIN,
+          name: 'Yetkin / Standard Paket',
+          priceTrl: 499,
+          limits: { aiReports: 10, aiChat: 30, activeListings: 10, comparisons: 10, listingDurationDays: 30 },
+        },
+        {
+          id: 'plan-profesyonel',
+          tier: SubscriptionTier.PROFESYONEL,
+          name: 'Profesyonel / Pro Paket',
+          priceTrl: 1499,
+          limits: { aiReports: 50, aiChat: 150, activeListings: 50, comparisons: 30, listingDurationDays: 45 },
+        },
+      ];
+    }
+    return plans;
+  }
+
+  async grantPackageToUser(
+    adminUser: { id: string; email: string },
+    targetUserId: string,
+    dto: {
+      planId?: string;
+      tier?: SubscriptionTier;
+      activationMode?: string;
+      reasonCode: string;
+      reason?: string;
+      notifyUser?: boolean;
+    }
+  ) {
+    const targetUser = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) throw new NotFoundException('Hedef kullanıcı bulunamadı.');
+
+    const previousTier = targetUser.subscriptionTier;
+    const newTier = dto.tier || SubscriptionTier.PROFESYONEL;
+
+    // Update user tier
+    const updatedUser = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { subscriptionTier: newTier },
+    });
+
+    // Create Audit Log entry (source = ADMIN_GRANT)
+    await this.prisma.adminAuditLog.create({
+      data: {
+        entityType: 'UserSubscription',
+        entityId: targetUserId,
+        adminUserId: adminUser.id,
+        adminEmail: adminUser.email || 'Admin',
+        action: 'USER_PACKAGE_GRANTED',
+        before: { tier: previousTier } as any,
+        after: { tier: newTier, source: 'ADMIN_GRANT', reasonCode: dto.reasonCode, reason: dto.reason } as any,
+        changedFields: ['subscriptionTier'],
+        metadata: {
+          activationMode: dto.activationMode || 'IMMEDIATE',
+          reasonCode: dto.reasonCode,
+          reason: dto.reason,
+          notifyUser: dto.notifyUser ?? true,
+        } as any,
+      },
+    });
+
+    // Optional user notification
+    if (dto.notifyUser ?? true) {
+      await this.prisma.adminUserMessage.create({
+        data: {
+          userId: targetUserId,
+          createdByAdminId: adminUser.id,
+          adminEmail: adminUser.email || 'Admin',
+          subject: 'Hesabınıza Yeni Paket Tanımlandı',
+          message: `Hesabınıza yönetici tarafından "${newTier}" paketi tanımlanmıştır. Neden: ${dto.reason || dto.reasonCode}`,
+          sendInApp: true,
+          sendEmail: false,
+        },
+      });
+    }
+
+    return this.getSubscriptionSummary(targetUserId);
+  }
 }
