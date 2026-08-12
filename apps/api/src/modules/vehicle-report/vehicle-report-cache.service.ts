@@ -18,11 +18,10 @@ export class VehicleReportCacheService {
   ) {
     if (!variantId) return null;
 
-    // Global Variant Cache: Always return the single latest completed AI report for this variant across all users
-    return this.prisma.generatedVehicleReport.findFirst({
+    // 1. Direct variantId lookup
+    let cached = await this.prisma.generatedVehicleReport.findFirst({
       where: {
         variantId,
-        vehicleContextHash: contextHash,
         reportVersion,
         mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT', 'LISTING_REPORT'] },
         status: 'COMPLETED',
@@ -30,6 +29,60 @@ export class VehicleReportCacheService {
       },
       orderBy: { completedAt: 'desc' },
     });
+
+    if (cached) return cached;
+
+    // 2. Fallback: Normalized Vehicle Identity match (handles duplicate variant records with whitespace differences in DB)
+    try {
+      const currentVariant = await this.prisma.vehicleVariant.findUnique({
+        where: { id: variantId },
+        include: { brand: true, model: true, trim: true, engine: true, transmission: true },
+      });
+
+      if (currentVariant) {
+        const normBrand = (currentVariant.brand?.name || '').trim().toLowerCase();
+        const normModel = (currentVariant.model?.name || '').trim().toLowerCase();
+        const normYear = currentVariant.year;
+        const normTrim = (currentVariant.trim?.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const normEngine = (currentVariant.engine?.code || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+        const siblingVariants = await this.prisma.vehicleVariant.findMany({
+          where: {
+            year: normYear,
+            brand: { name: { equals: currentVariant.brand?.name, mode: 'insensitive' } },
+            model: { name: { equals: currentVariant.model?.name, mode: 'insensitive' } },
+          },
+          include: { trim: true, engine: true },
+        });
+
+        const matchingVariantIds = siblingVariants
+          .filter((v) => {
+            const vTrim = (v.trim?.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const vEng = (v.engine?.code || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            return vTrim === normTrim && vEng === normEngine;
+          })
+          .map((v) => v.id);
+
+        if (matchingVariantIds.length > 0) {
+          cached = await this.prisma.generatedVehicleReport.findFirst({
+            where: {
+              variantId: { in: matchingVariantIds },
+              reportVersion,
+              mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT', 'LISTING_REPORT'] },
+              status: 'COMPLETED',
+              provider: { not: 'DETERMINISTIC_FALLBACK' },
+            },
+            orderBy: { completedAt: 'desc' },
+          });
+
+          if (cached) return cached;
+        }
+      }
+    } catch (err) {
+      // Ignore fallback lookup error
+    }
+
+    return null;
   }
 
   async checkStaleStatus(
