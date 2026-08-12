@@ -240,22 +240,9 @@ export class VehicleReportProviderService {
           };
         }
       }
-    } catch (err: any) {
-      this.logger.error(`[DELEGATOR] Orchestrator error: ${err?.message}`);
-    }
-
-    // SAFE FALLBACK: If Orchestrator failed or unavailable
-    this.logger.warn(`[DELEGATOR] Falling back to DB safe report.`);
-    baseReport.status = 'SAFE_FALLBACK' as any;
-
-    return {
-      report: baseReport,
-      provider: 'DETERMINISTIC_FALLBACK',
-      modelName: 'TorqueScout DB Engine',
-      repairAttempted: false,
-      fallbackReason: 'Vehicle Intelligence Orchestrator fallback',
-      verifiedResearch: verifiedResearch || undefined,
-    };
+    // If AI Orchestrator failed or returned no content, throw error to force retry instead of returning generic fallback
+    this.logger.error(`[DELEGATOR] AI Orchestrator failed to produce valid report payload.`);
+    throw new BadRequestException('Yapay zeka araç raporu şu anda üretilemedi. Lütfen tekrar deneyin.');
   }
 
   private repairJson(jsonStr: string): string {
