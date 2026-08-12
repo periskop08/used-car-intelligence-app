@@ -132,6 +132,7 @@ export class AuthService implements OnModuleInit {
 
   async login(dto: LoginDto) {
     const cleanEmail = dto.email ? dto.email.trim().toLowerCase() : '';
+    const cleanPassword = dto.password ? dto.password.trim() : '';
     
     // Find user safely
     const users = await this.prisma.user.findMany({
@@ -142,7 +143,7 @@ export class AuthService implements OnModuleInit {
 
     const user = users[0] || await this.prisma.user.findUnique({ where: { email: cleanEmail } }).catch(() => null);
 
-    if (!user || user.passwordHash !== dto.password) {
+    if (!user || (user.passwordHash !== dto.password && user.passwordHash !== cleanPassword)) {
       throw new UnauthorizedException('E-posta adresi veya şifre hatalı.');
     }
 
