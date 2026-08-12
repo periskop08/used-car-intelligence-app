@@ -258,21 +258,21 @@ export function AdminUserDrawer({
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-orange-500/20">
-                    {user?.firstName ? `${user.firstName[0]}${user.lastName?.[0] || ''}` : 'AY'}
+                    {user?.firstName ? `${user.firstName[0]}${user.lastName?.[0] || ''}` : user?.email ? user.email[0].toUpperCase() : 'U'}
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-white leading-tight">
-                      {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || 'Ahmet Yılmaz'}
+                      {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || 'Kullanıcı'}
                     </h2>
                     <span className="text-xs font-mono font-bold text-orange-400 block mt-0.5">
-                      {user?.customerNo || 'TS-2608-000142'}
+                      {user?.customerNo || 'TS-Müşteri'}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold">
-                    Aktif
+                    {user?.isActive === false ? 'Pasif' : 'Aktif'}
                   </span>
                   <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer">
                     <X className="w-5 h-5" />
@@ -284,7 +284,7 @@ export function AdminUserDrawer({
               <div className="flex items-center gap-2 mt-6 border-b border-white/10 font-sans text-xs">
                 {[
                   { key: 'OVERVIEW', label: 'Genel Bakış' },
-                  { key: 'LISTINGS', label: `İlanlar (${user?.listings?.length || 4})` },
+                  { key: 'LISTINGS', label: `İlanlar (${user?.listings?.length || 0})` },
                   { key: 'HISTORY', label: 'Geçmiş' },
                   { key: 'NOTES', label: 'Notlar' },
                   { key: 'MESSAGES', label: 'Mesajlar' },
@@ -322,7 +322,7 @@ export function AdminUserDrawer({
                           <div className="text-right">
                             <span className="text-[10px] text-slate-500 uppercase font-bold block">Mevcut Paket</span>
                             <strong className="text-xs font-bold text-orange-400">
-                              {subscription?.tierName || user?.subscriptionTier || 'Profesyonel'}
+                              {subscription?.tierName || user?.subscriptionTier || 'Tanışma Paketi'}
                             </strong>
                           </div>
                         </div>
@@ -330,11 +330,11 @@ export function AdminUserDrawer({
                         <div className="grid grid-cols-1 gap-2.5 text-xs">
                           <div className="flex justify-between py-1">
                             <span className="text-slate-400">Ad Soyad</span>
-                            <span className="font-bold text-white">{user?.firstName ? `${user.firstName} ${user.lastName}` : 'Ahmet Yılmaz'}</span>
+                            <span className="font-bold text-white">{user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-slate-400">Telefon</span>
-                            <span className="font-mono text-slate-200">{user?.phone || '+90 531 234 56 78'}</span>
+                            <span className="font-mono text-slate-200">{user?.phone || 'Belirtilmedi'}</span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-slate-400">E-posta</span>
@@ -401,19 +401,27 @@ export function AdminUserDrawer({
                       {/* USER LISTING STATS COUNTERS */}
                       <div className="grid grid-cols-4 gap-2 text-center font-mono">
                         <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5">
-                          <span className="text-base font-black text-white block">4</span>
+                          <span className="text-base font-black text-white block">
+                            {user?.listings?.filter((l: any) => l.status === 'ACTIVE').length || 0}
+                          </span>
                           <span className="text-[10px] text-slate-500">Aktif İlan</span>
                         </div>
                         <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5">
-                          <span className="text-base font-black text-white block">11</span>
+                          <span className="text-base font-black text-white block">
+                            {user?.listings?.length || 0}
+                          </span>
                           <span className="text-[10px] text-slate-500">Toplam İlan</span>
                         </div>
                         <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5">
-                          <span className="text-base font-black text-rose-400 block">0</span>
+                          <span className="text-base font-black text-rose-400 block">
+                            {user?.listings?.filter((l: any) => l.status === 'REJECTED').length || 0}
+                          </span>
                           <span className="text-[10px] text-slate-500">Reddedilen</span>
                         </div>
                         <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5">
-                          <span className="text-base font-black text-amber-400 block">1</span>
+                          <span className="text-base font-black text-amber-400 block">
+                            {user?.listings?.filter((l: any) => l.status === 'PASSIVE').length || 0}
+                          </span>
                           <span className="text-[10px] text-slate-500">Pasif</span>
                         </div>
                       </div>
@@ -452,21 +460,22 @@ export function AdminUserDrawer({
                         </div>
 
                         <div className="space-y-2">
-                          {[
-                            { title: '2020 Volkswagen Passat 1.6 TDI Business DSG', city: 'İstanbul, Kadıköy', price: '₺1.250.000', date: '11.08.2026' },
-                            { title: '2019 Honda Civic 1.6 i-VTEC Eco Elegance', city: 'İstanbul, Üsküdar', price: '₺945.000', date: '08.08.2026' },
-                          ].map((l, i) => (
-                            <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-white/5 flex justify-between items-center text-xs">
-                              <div>
-                                <strong className="text-white block font-bold truncate max-w-[200px]">{l.title}</strong>
-                                <span className="text-[10px] text-slate-400 block">{l.city}</span>
+                          {user?.listings?.length ? (
+                            user.listings.slice(0, 3).map((l: any) => (
+                              <div key={l.id} className="p-3 bg-slate-900/60 rounded-xl border border-white/5 flex justify-between items-center text-xs">
+                                <div>
+                                  <strong className="text-white block font-bold truncate max-w-[200px]">{l.title || 'İlan'}</strong>
+                                  <span className="text-[10px] text-slate-400 block">{l.city ? `${l.city}, ${l.district || ''}` : 'Belirtilmedi'}</span>
+                                </div>
+                                <div className="text-right font-mono">
+                                  <span className="font-bold text-emerald-400 block">₺{Number(l.priceAmount || 0).toLocaleString('tr-TR')}</span>
+                                  <span className="text-[10px] text-slate-500">{new Date(l.createdAt).toLocaleDateString('tr-TR')}</span>
+                                </div>
                               </div>
-                              <div className="text-right font-mono">
-                                <span className="font-bold text-emerald-400 block">{l.price}</span>
-                                <span className="text-[10px] text-slate-500">{l.date}</span>
-                              </div>
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <div className="p-4 text-center text-slate-500 text-xs">Kullanıcıya ait aktif ilan bulunmuyor.</div>
+                          )}
                         </div>
                       </div>
                     </div>

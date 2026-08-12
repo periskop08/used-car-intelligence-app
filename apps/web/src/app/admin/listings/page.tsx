@@ -124,6 +124,7 @@ function AdminListingsContent() {
   };
 
   const handleOpenUserDrawer = (user: any) => {
+    if (!user || !user.id) return;
     setDrawerUserId(user.id);
     setDrawerCustomerNo(user.customerNo);
     setIsDrawerOpen(true);
@@ -156,52 +157,6 @@ function AdminListingsContent() {
     } catch (e) {}
   };
 
-  // Mock Fallback Items if DB is unseeded
-  const displayItems =
-    items.length > 0
-      ? items
-      : [
-          {
-            id: 'TS-1258793',
-            photoCount: 8,
-            title: '2020 Volkswagen Passat',
-            variant: '1.6 TDI Business DSG',
-            seller: { id: 'u1', firstName: 'Ahmet', lastName: 'Yılmaz', customerNo: 'TS-2608-000142' },
-            city: 'İstanbul',
-            district: 'Kadıköy',
-            priceAmount: 1250000,
-            createdAt: new Date().toISOString(),
-            riskLevel: 'YÜKSEK',
-            riskReason: 'Fiyat Anomalisi',
-          },
-          {
-            id: 'TS-1258776',
-            photoCount: 12,
-            title: '2018 Honda Civic',
-            variant: '1.6 i-VTEC Eco Elegance',
-            seller: { id: 'u2', firstName: 'Mehmet', lastName: 'Demir', customerNo: 'TS-2608-000089' },
-            city: 'Ankara',
-            district: 'Çankaya',
-            priceAmount: 920000,
-            createdAt: new Date().toISOString(),
-            riskLevel: 'ORTA',
-            riskReason: 'Eksik Fotoğraf',
-          },
-          {
-            id: 'TS-1258761',
-            photoCount: 15,
-            title: '2021 Renault Clio',
-            variant: '1.0 TCe Touch',
-            seller: { id: 'u3', firstName: 'Burak', lastName: 'Kaya', customerNo: 'TS-2608-000205' },
-            city: 'İzmir',
-            district: 'Bornova',
-            priceAmount: 815000,
-            createdAt: new Date().toISOString(),
-            riskLevel: 'DÜŞÜK',
-            riskReason: null,
-          },
-        ];
-
   return (
     <div className="space-y-6 max-w-full mx-auto font-sans">
       {/* 1. HEADER */}
@@ -212,11 +167,11 @@ function AdminListingsContent() {
         </p>
       </div>
 
-      {/* 2. MODERATION STATUS TABS WITH LIVE COUNTS */}
+      {/* 2. MODERATION STATUS TABS WITH LIVE BACKEND COUNTS */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {STATUS_TABS.map((tab) => {
           const isActive = currentStatus === tab.key;
-          const count = counts[tab.key] ?? (tab.key === 'PENDING' ? 24 : tab.key === 'ACTIVE' ? 312 : 12);
+          const count = counts[tab.key] ?? 0;
           return (
             <button
               key={tab.key}
@@ -305,6 +260,12 @@ function AdminListingsContent() {
       <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden shadow-xl">
         {loading ? (
           <div className="p-12 text-center text-slate-400 font-medium">İlanlar yükleniyor...</div>
+        ) : error ? (
+          <div className="p-6 text-center text-rose-400 font-bold text-xs">{error}</div>
+        ) : items.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 font-medium text-xs">
+            Bu sekmede gösterilecek ilan kaydı bulunmuyor.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -324,12 +285,17 @@ function AdminListingsContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-sans">
-                {displayItems.map((item) => {
+                {items.map((item) => {
                   const listingId = item.id;
-                  const seller = item.seller || { firstName: 'Ahmet', lastName: 'Yılmaz', customerNo: 'TS-2608-000142' };
-                  const variantText = item.variant || (item.vehicleVariant?.trim?.name ? `${item.vehicleVariant.model?.brand?.name} ${item.vehicleVariant.model?.name} ${item.vehicleVariant.trim.name}` : '1.6 TDI Business DSG');
-                  const risk = item.riskLevel || (listingId.endsWith('3') ? 'YÜKSEK' : listingId.endsWith('6') ? 'ORTA' : 'DÜŞÜK');
-                  const riskReason = item.riskReason || (risk === 'YÜKSEK' ? 'Fiyat Anomalisi' : risk === 'ORTA' ? 'Eksik Fotoğraf' : null);
+                  const seller = item.seller;
+                  const brandName = item.vehicleVariant?.model?.brand?.name || item.customBrand || '';
+                  const modelName = item.vehicleVariant?.model?.name || item.customModel || '';
+                  const trimName = item.vehicleVariant?.trim?.name || item.customEngine || '';
+                  const vehicleTitle = item.title || `${item.modelYear || ''} ${brandName} ${modelName}`.trim() || 'Araç İlanı';
+                  const variantText = trimName || item.customTransmission || 'Varyant';
+
+                  const risk = item.heavyDamage ? 'YÜKSEK' : item.tramerAmount > 20000 ? 'ORTA' : 'DÜŞÜK';
+                  const riskReason = item.heavyDamage ? 'Ağır Hasar Kaydı' : item.tramerAmount > 20000 ? 'Tramer / Hasar Anomalisi' : null;
 
                   return (
                     <tr key={listingId} className="hover:bg-white/[0.03] transition group">
@@ -339,46 +305,50 @@ function AdminListingsContent() {
 
                       {/* İLAN NO */}
                       <td className="p-4 font-mono">
-                        <span className="font-bold text-orange-400 block hover:underline cursor-pointer">{listingId}</span>
+                        <span className="font-bold text-orange-400 block hover:underline cursor-pointer">{listingId.slice(0, 10)}</span>
                         <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
                           <Camera className="w-3 h-3 text-slate-400" />
-                          <span>{item.photoCount || 8}</span>
+                          <span>{item.media?.length || 0}</span>
                         </div>
                       </td>
 
                       {/* ARAÇ BİLGİSİ */}
                       <td className="p-4">
-                        <strong className="text-white font-bold block">{item.title || '2020 Volkswagen Passat'}</strong>
+                        <strong className="text-white font-bold block">{vehicleTitle}</strong>
                         <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{variantText}</span>
                       </td>
 
-                      {/* SATICI (Opens AdminUserDrawer) */}
+                      {/* SATICI (Opens AdminUserDrawer with REAL seller.id) */}
                       <td className="p-4 font-mono">
-                        <button
-                          onClick={() => handleOpenUserDrawer(seller)}
-                          className="flex items-center gap-2 text-left group-hover:text-orange-400 transition cursor-pointer"
-                        >
-                          <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-[10px] border border-orange-500/30">
-                            {seller.firstName?.[0]}{seller.lastName?.[0]}
-                          </div>
-                          <div>
-                            <span className="font-bold text-white group-hover:text-orange-400 block font-sans">
-                              {seller.firstName} {seller.lastName}
-                            </span>
-                            <span className="text-[10px] text-slate-500 block">{seller.customerNo}</span>
-                          </div>
-                        </button>
+                        {seller ? (
+                          <button
+                            onClick={() => handleOpenUserDrawer(seller)}
+                            className="flex items-center gap-2 text-left group-hover:text-orange-400 transition cursor-pointer"
+                          >
+                            <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-[10px] border border-orange-500/30 shrink-0">
+                              {seller.firstName?.[0] || 'U'}{seller.lastName?.[0] || ''}
+                            </div>
+                            <div>
+                              <span className="font-bold text-white group-hover:text-orange-400 block font-sans">
+                                {seller.firstName && seller.lastName ? `${seller.firstName} ${seller.lastName}` : seller.email}
+                              </span>
+                              <span className="text-[10px] text-slate-500 block">{seller.customerNo || 'TS-Müşteri'}</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <span className="text-slate-500 text-[11px]">Bilinmeyen Satıcı</span>
+                        )}
                       </td>
 
                       {/* ŞEHİR */}
                       <td className="p-4">
-                        <span className="font-bold text-slate-200 block">{item.city || 'İstanbul'}</span>
-                        <span className="text-[10px] text-slate-400 font-mono block">{item.district || 'Kadıköy'}</span>
+                        <span className="font-bold text-slate-200 block">{item.city || 'Belirtilmedi'}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block">{item.district || ''}</span>
                       </td>
 
                       {/* FİYAT */}
                       <td className="p-4 font-mono">
-                        <span className="font-bold text-white">₺{Number(item.priceAmount || 1250000).toLocaleString('tr-TR')}</span>
+                        <span className="font-bold text-white">₺{Number(item.priceAmount || 0).toLocaleString('tr-TR')}</span>
                       </td>
 
                       {/* GÖNDERİM TARİHİ */}
@@ -456,15 +426,17 @@ function AdminListingsContent() {
                                     <RefreshCw className="w-3.5 h-3.5" /> Tekrar İncele
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    handleOpenUserDrawer(seller);
-                                  }}
-                                  className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
-                                >
-                                  <MessageSquare className="w-3.5 h-3.5" /> Satıcıyı Gör
-                                </button>
+                                {seller && (
+                                  <button
+                                    onClick={() => {
+                                      setActiveMenuId(null);
+                                      handleOpenUserDrawer(seller);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" /> Satıcıyı Gör
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -479,41 +451,43 @@ function AdminListingsContent() {
         )}
 
         {/* 5. SERVER-SIDE PAGINATION FOOTER */}
-        <div className="p-4 bg-slate-950/60 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-          <span>Toplam {totalItems || displayItems.length} ilan gösteriliyor</span>
-          <div className="flex items-center gap-2 font-mono">
-            <button
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 bg-slate-900 border border-white/10 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+        {items.length > 0 && (
+          <div className="p-4 bg-slate-950/60 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+            <span>Toplam {totalItems} ilan gösteriliyor</span>
+            <div className="flex items-center gap-2 font-mono">
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 bg-slate-900 border border-white/10 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
 
-            {[...Array(Math.min(5, totalPages))].map((_, i) => {
-              const p = i + 1;
-              return (
-                <button
-                  key={p}
-                  onClick={() => handlePageChange(p)}
-                  className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
-                    currentPage === p ? 'bg-orange-500 text-white' : 'bg-slate-900 text-slate-400 border border-white/10'
-                  }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
+              {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                const p = i + 1;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => handlePageChange(p)}
+                    className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
+                      currentPage === p ? 'bg-orange-500 text-white' : 'bg-slate-900 text-slate-400 border border-white/10'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
 
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1.5 bg-slate-900 border border-white/10 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+              <button
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 bg-slate-900 border border-white/10 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* REUSABLE ADMIN USER DRAWER */}
