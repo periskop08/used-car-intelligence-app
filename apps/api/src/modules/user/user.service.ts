@@ -620,6 +620,66 @@ export class UserService {
     return adminMessage;
   }
 
+  async getAdminUserMessagesAll(params: {
+    search?: string;
+    sendInApp?: string;
+    sendEmail?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Number(params.page) || 1;
+    const limit = Number(params.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (params.sendInApp !== undefined && params.sendInApp !== '') {
+      where.sendInApp = params.sendInApp === 'true';
+    }
+    if (params.sendEmail !== undefined && params.sendEmail !== '') {
+      where.sendEmail = params.sendEmail === 'true';
+    }
+
+    if (params.search) {
+      const s = params.search.trim();
+      where.OR = [
+        { subject: { contains: s, mode: 'insensitive' } },
+        { message: { contains: s, mode: 'insensitive' } },
+        { adminEmail: { contains: s, mode: 'insensitive' } },
+        { user: { email: { contains: s, mode: 'insensitive' } } },
+        { user: { customerNo: { contains: s, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [total, messages] = await Promise.all([
+      this.prisma.adminUserMessage.count({ where }),
+      this.prisma.adminUserMessage.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              customerNo: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      messages,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async createAdminUserNote(
     userId: string,
     adminUserId: string,

@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UnifiedAdminSidebar } from './components/UnifiedAdminSidebar';
-import Header from '@/components/Header';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -53,7 +52,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (errorMsg) {
     return (
       <div className="min-h-screen bg-[#020617] text-white flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-md w-full p-8 bg-rose-500/10 border border-rose-500/20 rounded-3xl text-center space-y-4">
             <div className="w-12 h-12 bg-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mx-auto text-xl font-bold">
@@ -75,8 +73,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans">
-      <Header />
-
       <div className="flex-1 flex flex-col lg:flex-row w-full">
         <UnifiedAdminSidebar />
         <main className="flex-1 p-4 lg:p-8 min-w-0 bg-gradient-to-b from-[#03081b] to-[#020617]">

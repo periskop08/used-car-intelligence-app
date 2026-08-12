@@ -130,6 +130,28 @@ export class UserController {
     return this.userService.getAdminUserDetail(id);
   }
 
+  @Get('admin/messages/all')
+  @ApiOperation({ summary: 'Tüm Yönetici Mesajlarını Listele (Admin)' })
+  getAdminUserMessagesAll(
+    @GetUser() user: UserPayload,
+    @Query('search') search?: string,
+    @Query('sendInApp') sendInApp?: string,
+    @Query('sendEmail') sendEmail?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && user.role !== 'MODERATOR') {
+      throw new BadRequestException('Yetkisiz erişim.');
+    }
+    return this.userService.getAdminUserMessagesAll({
+      search,
+      sendInApp,
+      sendEmail,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
   @Post('admin/:id/message')
   @ApiOperation({ summary: 'Kullanıcıya Uygulama İçi / E-posta Mesajı Gönder (Admin)' })
   sendAdminUserMessage(

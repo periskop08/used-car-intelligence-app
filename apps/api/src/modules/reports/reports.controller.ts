@@ -56,9 +56,16 @@ export class ReportsController {
   private verifyAdminAccess(req: any) {
     const email = req?.user?.email;
     const role = req?.user?.role;
-    const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN' || (email && ADMIN_EMAILS.includes(email));
+    const perms = (req?.user?.permissions as string[]) || [];
+    const isAdmin =
+      role === 'ADMIN' ||
+      role === 'SUPER_ADMIN' ||
+      role === 'MODERATOR' ||
+      perms.includes('ADMIN_PANEL_ACCESS') ||
+      (email && ADMIN_EMAILS.includes(email));
+
     if (!isAdmin) {
-      throw new ForbiddenException('Raporlar merkezine yalnızca yöneticiler erişebilir.');
+      throw new ForbiddenException('Raporlar merkezine yalnızca yetkili yöneticiler erişebilir.');
     }
   }
 

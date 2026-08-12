@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -11,14 +11,10 @@ import {
   CircleDollarSign,
   Shield,
   Database,
-  Megaphone,
   Settings,
   ChevronDown,
   ChevronRight,
   LogOut,
-  ShieldAlert,
-  History,
-  Lock,
 } from 'lucide-react';
 
 export type AdminNavItem = {
@@ -49,7 +45,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     children: [
       { key: 'USER_LIST', label: 'Kayıtlı Kullanıcılar', href: '/admin/users' },
       { key: 'USER_FEEDBACKS', label: 'Geri Bildirimler', href: '/admin/users/feedbacks' },
-      { key: 'USER_MESSAGES', label: 'Kullanıcı Mesajları', href: '/admin/reports/messaging' },
+      { key: 'USER_MESSAGES', label: 'Kullanıcı Mesajları', href: '/admin/users/messages' },
     ],
   },
   {
@@ -57,9 +53,9 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Ürün ve AI',
     icon: Bot,
     children: [
-      { key: 'AI_REPORTS', label: 'AI Raporları', href: '/admin/reports/product/ai-reports' },
+      { key: 'AI_REPORTS', label: 'AI Raporları', href: '/admin/product-ai/reports' },
       { key: 'RESEARCH_QUEUE', label: 'Araştırma Kuyruğu', href: '/admin/product-ai/research-queue' },
-      { key: 'EVIDENCE_QUALITY', label: 'Claim / Evidence Kalitesi', href: '/admin/vehicle-data/evidence' },
+      { key: 'EVIDENCE_QUALITY', label: 'Claim / Evidence Kalitesi', href: '/admin/product-ai/evidence-quality' },
       { key: 'PROVIDER_HEALTH', label: 'Provider Sağlığı', href: '/admin/product-ai/provider-health' },
     ],
   },
@@ -69,8 +65,8 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: Car,
     children: [
       { key: 'LISTING_MODERATION', label: 'İlan Moderasyonu', href: '/admin/listings' },
-      { key: 'LISTING_PERFORMANCE', label: 'İlan Performansı', href: '/admin/reports/listings/performance' },
-      { key: 'LISTING_QUALITY', label: 'Kalite Denetimi', href: '/admin/reports/listings/quality' },
+      { key: 'LISTING_PERFORMANCE', label: 'İlan Performansı', href: '/admin/listings/performance' },
+      { key: 'LISTING_QUALITY', label: 'Kalite Denetimi', href: '/admin/listings/quality' },
     ],
   },
   {
@@ -79,9 +75,9 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: CircleDollarSign,
     children: [
       { key: 'REVENUE', label: 'Finans Özeti & MRR', href: '/admin/finance' },
-      { key: 'SUBSCRIPTIONS', label: 'Aktif Abonelikler', href: '/admin/reports/finance/subscriptions' },
-      { key: 'ONE_TIME_PACKAGES', label: 'Tek Seferlik Paketler', href: '/admin/reports/finance/one-time-packages' },
-      { key: 'COSTS', label: 'AI & Altyapı Maliyetleri', href: '/admin/finance' },
+      { key: 'SUBSCRIPTIONS', label: 'Aktif Abonelikler', href: '/admin/finance/subscriptions' },
+      { key: 'ONE_TIME_PACKAGES', label: 'Tek Seferlik Paketler', href: '/admin/finance/packages' },
+      { key: 'COSTS', label: 'AI & Altyapı Maliyetleri', href: '/admin/finance/ai-costs' },
     ],
   },
   {
@@ -90,7 +86,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: Shield,
     children: [
       { key: 'CLUB_POSTS', label: 'Gönderiler & Moderasyon', href: '/admin/club/posts' },
-      { key: 'CLUB_USERS', label: 'Üyeler & Moderatörler', href: '/admin/club/users' },
+      { key: 'CLUB_USERS', label: 'Üyeler & Moderatörler', href: '/admin/club/members' },
       { key: 'CLUB_REPORTS', label: 'Şikayetler', href: '/admin/club/reports' },
     ],
   },
@@ -100,7 +96,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: Database,
     children: [
       { key: 'VARIANT_DB', label: 'Araç Varyant Veritabanı', href: '/admin/vehicle-data/variants' },
-      { key: 'VEHICLE_QUALITY', label: 'Araç Veri Kalitesi (Quality)', href: '/admin/vehicle-data/quality' },
+      { key: 'VEHICLE_QUALITY', label: 'Araç Veri Kalitesi', href: '/admin/vehicle-data/quality' },
       { key: 'VEHICLE_GUIDE', label: 'Araç Rehberi Yönetimi', href: '/admin/vehicle-data/guide' },
       { key: 'VEHICLE_APPROVALS', label: 'Araç Onayları', href: '/admin/vehicle-data/approvals' },
       { key: 'COMMON_PROFILES', label: 'Ortak Araç Yönetimi', href: '/admin/vehicle-data/profiles' },
@@ -111,31 +107,33 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Sistem ve Güvenlik',
     icon: Settings,
     children: [
-      { key: 'ROLES', label: 'Admin & Yetkiler (RBAC)', href: '/admin/system/roles' },
+      { key: 'ROLES', label: 'Admin & Yetkiler', href: '/admin/system/roles' },
       { key: 'AUDIT_LOGS', label: 'Sistem Audit Logları', href: '/admin/system/audit-log' },
-      { key: 'PROVIDER_HEALTH', label: 'Provider Sağlığı', href: '/admin/product-ai/provider-health' },
+      { key: 'SYSTEM_HEALTH', label: 'Sistem Sağlığı', href: '/admin/system/health' },
     ],
   },
 ];
 
 export function UnifiedAdminSidebar() {
   const pathname = usePathname();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const nextState: Record<string, boolean> = {};
     adminNavigationGroups.forEach((group) => {
       if (group.children?.some((child) => pathname === child.href || pathname.startsWith(child.href))) {
-        initial[group.key] = true;
+        nextState[group.key] = true;
       }
     });
-    return initial;
-  });
+    setOpenGroups((prev) => ({ ...prev, ...nextState }));
+  }, [pathname]);
 
   const toggleGroup = (key: string) => {
     setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
-    <aside className="w-64 bg-[#090d16] border-r border-white/10 flex flex-col justify-between shrink-0 min-h-screen text-slate-300 font-sans select-none">
+    <aside className="w-64 bg-[#090d16] border-r border-white/10 flex flex-col justify-between shrink-0 min-h-screen max-h-screen sticky top-0 overflow-y-auto text-slate-300 font-sans select-none z-30">
       <div className="p-4 space-y-6">
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-2 py-3 border-b border-white/10">

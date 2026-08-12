@@ -34,6 +34,7 @@ export class JwtAuthGuard implements CanActivate {
         id: user.id,
         email: user.email,
         role: user.role,
+        permissions: user.permissions || [],
         subscriptionTier: user.subscriptionTier,
       };
     } catch (err) {
@@ -90,6 +91,7 @@ export class OptionalJwtAuthGuard implements CanActivate {
           id: user.id,
           email: user.email,
           role: user.role,
+          permissions: user.permissions || [],
           subscriptionTier: user.subscriptionTier,
         };
       }
