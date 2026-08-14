@@ -445,6 +445,8 @@ export class UserService {
     hasListings?: boolean;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortDirection?: 'asc' | 'desc';
   }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 20;
@@ -476,27 +478,38 @@ export class UserService {
       where.listings = { some: {} };
     }
 
-    const [total, users] = await Promise.all([
-      this.prisma.user.count({ where }),
-      this.prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: {
-              listings: true,
-              chatLogs: true,
-              generatedVehicleReports: true,
-              subscriptions: true,
-            },
+    // Fetch matching users with relation counts for global dataset sorting
+    const users = await this.prisma.user.findMany({
+      where,
+      include: {
+        _count: {
+          select: {
+            listings: true,
+            chatLogs: true,
+            generatedVehicleReports: true,
+            subscriptions: true,
           },
         },
-      }),
-    ]);
+      },
+    });
 
-    const formatted = users.map((u) => ({
+    const getPackageDisplayName = (tier: string | undefined | null): string => {
+      if (!tier) return 'Tanışma Paketi';
+      const t = String(tier).toUpperCase();
+      if (t === 'YETKIN' || t === 'STANDARD') return 'Yetkin Paket';
+      if (t === 'PROFESYONEL' || t === 'PRO' || t === 'PREMIUM') return 'Profesyonel Paket';
+      return 'Tanışma Paketi';
+    };
+
+    const getPackageRank = (tier: string | undefined | null): number => {
+      if (!tier) return 1;
+      const t = String(tier).toUpperCase();
+      if (t === 'YETKIN' || t === 'STANDARD') return 2;
+      if (t === 'PROFESYONEL' || t === 'PRO' || t === 'PREMIUM') return 3;
+      return 1;
+    };
+
+    let formatted = users.map((u) => ({
       id: u.id,
       customerNo: `TS-${u.id.slice(0, 8).toUpperCase()}`,
       email: u.email,
@@ -505,7 +518,8 @@ export class UserService {
       fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
       phone: u.phone || '-',
       role: u.role,
-      subscriptionTier: u.subscriptionTier,
+      subscriptionTier: getPackageDisplayName(u.subscriptionTier),
+      packageRank: getPackageRank(u.subscriptionTier),
       isActive: u.isActive,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
@@ -513,12 +527,39 @@ export class UserService {
       aiReportCount: u._count.generatedVehicleReports + u._count.chatLogs,
     }));
 
+    // Server-side single-column sorting across entire dataset
+    const sortBy = params.sortBy || 'createdAt';
+    const sortDir = params.sortDirection === 'asc' ? 'asc' : 'desc';
+
+    formatted.sort((a, b) => {
+      let res = 0;
+      if (sortBy === 'customer' || sortBy === 'createdAt') {
+        res = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortBy === 'name') {
+        res = a.fullName.localeCompare(b.fullName, 'tr', { sensitivity: 'base' });
+      } else if (sortBy === 'package' || sortBy === 'subscriptionTier') {
+        res = a.packageRank - b.packageRank;
+      } else if (sortBy === 'listingCount' || sortBy === 'listings') {
+        res = a.activeListingCount - b.activeListingCount;
+      } else if (sortBy === 'aiUsage') {
+        res = a.aiReportCount - b.aiReportCount;
+      } else if (sortBy === 'accountStatus' || sortBy === 'isActive') {
+        res = a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1;
+      } else {
+        res = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      return sortDir === 'asc' ? res : -res;
+    });
+
+    const total = formatted.length;
+    const paginated = formatted.slice(skip, skip + limit);
+
     return {
-      users: formatted,
+      users: paginated,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
     };
   }
 

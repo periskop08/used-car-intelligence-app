@@ -104,6 +104,8 @@ export class UserController {
     @Query('hasListings') hasListings?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: string,
   ) {
     if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       throw new BadRequestException('Yetkisiz erişim.');
@@ -115,6 +117,8 @@ export class UserController {
       hasListings: hasListings !== undefined ? hasListings === 'true' : undefined,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
+      sortBy,
+      sortDirection: sortDirection === 'asc' ? 'asc' : 'desc',
     });
   }
 

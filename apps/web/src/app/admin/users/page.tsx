@@ -17,13 +17,15 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters & Pagination
+  // Search & Pagination State
   const [search, setSearch] = useState('');
-  const [tierFilter, setTierFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
+
+  // Single-Column Sorting State
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Reusable Canonical AdminUserDrawer State
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -34,8 +36,8 @@ export default function AdminUsersPage() {
     const token = localStorage.getItem('accessToken');
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    if (tierFilter) params.append('subscriptionTier', tierFilter);
-    if (statusFilter) params.append('isActive', statusFilter);
+    if (sortBy) params.append('sortBy', sortBy);
+    if (sortDirection) params.append('sortDirection', sortDirection);
     params.append('page', page.toString());
     params.append('limit', '15');
 
@@ -57,12 +59,33 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [page, tierFilter, statusFilter]);
+  }, [page, sortBy, sortDirection]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     fetchUsers();
+  };
+
+  const handleSortHeader = (key: string) => {
+    if (sortBy === key) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDirection('asc');
+    }
+    setPage(1);
+  };
+
+  const renderSortIndicator = (key: string) => {
+    if (sortBy !== key) {
+      return <span className="text-slate-600 font-normal ml-1">↕</span>;
+    }
+    return sortDirection === 'asc' ? (
+      <span className="text-orange-400 font-bold ml-1">↑</span>
+    ) : (
+      <span className="text-orange-400 font-bold ml-1">↓</span>
+    );
   };
 
   return (
@@ -86,55 +109,25 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Clean Filter Bar (Search Only) */}
       <form onSubmit={handleSearchSubmit} className="p-4 bg-slate-900/80 rounded-2xl border border-white/10 flex flex-col md:flex-row gap-3 justify-between items-center text-xs">
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Ad, soyad, e-posta, tel veya müşteri no..."
+            placeholder="Ad, soyad, e-posta, tel veya müşteri no ile ara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-orange-500 transition"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <select
-            value={tierFilter}
-            onChange={(e) => {
-              setTierFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-slate-300 outline-none cursor-pointer"
-          >
-            <option value="">Tüm Paketler</option>
-            <option value="FREE">FREE / Tanışma</option>
-            <option value="STANDARD">STANDARD / Yetkin</option>
-            <option value="PRO">PRO / Profesyonel</option>
-            <option value="PREMIUM">PREMIUM</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-slate-300 outline-none cursor-pointer"
-          >
-            <option value="">Tüm Durumlar</option>
-            <option value="true">Aktif Hesaplar</option>
-            <option value="false">Pasif / İptal Hesaplar</option>
-          </select>
-
-          <button
-            type="submit"
-            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-          >
-            Filtrele
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="w-full md:w-auto px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+        >
+          Ara
+        </button>
       </form>
 
       {/* Users Table */}
@@ -148,16 +141,53 @@ export default function AdminUsersPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-white/5">
+              <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-white/5 select-none">
                 <tr>
-                  <th className="p-4">Müşteri / No</th>
-                  <th className="p-4">Ad Soyad & İletişim</th>
-                  <th className="p-4">Paket</th>
-                  <th className="p-4">Kayıt Tarihi</th>
-                  <th className="p-4">İlanlar</th>
-                  <th className="p-4">AI Kullanımı</th>
-                  <th className="p-4">Hesap Durumu</th>
-                  <th className="p-4 text-right">Aksiyon</th>
+                  <th
+                    onClick={() => handleSortHeader('customer')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    Müşteri / No {renderSortIndicator('customer')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('name')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    Ad Soyad & İletişim {renderSortIndicator('name')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('package')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    Paket {renderSortIndicator('package')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('createdAt')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    Kayıt Tarihi {renderSortIndicator('createdAt')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('listingCount')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    İlanlar {renderSortIndicator('listingCount')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('aiUsage')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    AI Kullanımı {renderSortIndicator('aiUsage')}
+                  </th>
+                  <th
+                    onClick={() => handleSortHeader('accountStatus')}
+                    className="p-4 cursor-pointer hover:text-white transition"
+                  >
+                    Hesap Durumu {renderSortIndicator('accountStatus')}
+                  </th>
+                  <th className="p-4 text-right">
+                    Aksiyon
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-sans">
@@ -176,9 +206,9 @@ export default function AdminUsersPage() {
                     <td className="p-4">
                       <span
                         className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                          u.subscriptionTier === 'PRO' || u.subscriptionTier === 'PROFESYONEL' || u.subscriptionTier === 'PREMIUM'
+                          u.subscriptionTier === 'Profesyonel Paket'
                             ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                            : u.subscriptionTier === 'STANDARD' || u.subscriptionTier === 'YETKIN'
+                            : u.subscriptionTier === 'Yetkin Paket'
                             ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                             : 'bg-slate-800 text-slate-400 border border-white/10'
                         }`}
