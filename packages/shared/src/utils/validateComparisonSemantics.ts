@@ -18,7 +18,7 @@ const BANNED_GENERIC_PHRASES = [
 /**
  * Validates semantic consistency and quality of a generated AI Vehicle Comparison Result.
  * Enforces zero technical contradictions (e.g., fuel economy vs verified L/100km data),
- * complete vehicle coverage, non-generic summaries, and valid scenario winners.
+ * complete vehicle coverage, non-generic summaries, valid scenario winners, and no monetary estimates in criteria 1-7.
  */
 export function validateComparisonSemantics(
   result: Partial<VehicleComparisonResult>,
@@ -35,8 +35,8 @@ export function validateComparisonSemantics(
     errors.push('Seçilen araçların tamamı vehicleCards veya vehicleVerdicts içinde bulunmuyor.');
   }
 
-  // Check vehicleCards count equals profiles count
-  if (result.vehicleCards && result.vehicleCards.length !== profiles.length) {
+  // Check vehicleCards count equals profiles count if vehicleCards present
+  if (result.vehicleCards && result.vehicleCards.length > 0 && result.vehicleCards.length !== profiles.length) {
     errors.push(`Üretilen kart sayısı (${result.vehicleCards.length}) seçili araç sayısı (${profiles.length}) ile eşleşmiyor.`);
   }
 
@@ -100,17 +100,44 @@ export function validateComparisonSemantics(
   }
 
   // 6. No unsupported ownership claim
-  const noUnsupportedOwnershipClaim = true;
+  const ownershipNarrative = (result.ownershipCostComparison?.narrative || '').toLowerCase();
+  const unsupportedOwnershipPhrases = ['en ucuz bakım maliyetine sahip', 'en düşük yedek parça fiyatı'];
+  const hasUnsupportedOwnership = unsupportedOwnershipPhrases.some(phrase => ownershipNarrative.includes(phrase));
+  const noUnsupportedOwnershipClaim = !hasUnsupportedOwnership;
+  if (hasUnsupportedOwnership) {
+    errors.push('Desteklenmeyen kesin sahiplik/bakım maliyeti iddiası tespit edildi.');
+  }
 
   // 7. No unsupported resale claim
-  const noUnsupportedResaleClaim = true;
+  const execSummaryLower = (result.executiveSummary || '').toLowerCase();
+  const unsupportedResalePhrases = ['ikinci elde en hızlı satılan', 'değerini en iyi koruyan kesin seçenek'];
+  const hasUnsupportedResale = unsupportedResalePhrases.some(phrase => execSummaryLower.includes(phrase));
+  const noUnsupportedResaleClaim = !hasUnsupportedResale;
+  if (hasUnsupportedResale) {
+    errors.push('Desteklenmeyen kesin ikinci el piyasa iddiası tespit edildi.');
+  }
 
   // 8. No risk count based conclusion
   const riskNarrative = (result.riskComparison?.narrative || '').toLowerCase();
-  const noRiskCountBasedConclusion = !riskNarrative.includes('0 adet kronik arıza olduğu için en güvenilir');
+  const overallReasoning = (result.overallRecommendation?.reasoning || '').toLowerCase();
+  const allScenariosText = (result.scenarioRecommendations || []).map(s => (s.reasoning || '').toLowerCase()).join(' ');
+
+  const riskCountPhrases = [
+    '0 adet kronik arıza',
+    '0 arıza kaydı olduğu için',
+    '0 kronik arıza kaydı olduğu için',
+    'en az arıza kaydına sahip olduğu için kazanan',
+    'en az kronik arıza kaydına sahip olduğu için en güvenilir',
+  ];
+
+  const combinedRiskText = `${riskNarrative} ${overallReasoning} ${execSummaryLower} ${allScenariosText}`;
+  const hasRiskCountConclusion = riskCountPhrases.some(phrase => combinedRiskText.includes(phrase));
+  const noRiskCountBasedConclusion = !hasRiskCountConclusion;
+  if (hasRiskCountConclusion) {
+    errors.push('Sıfır kronik sorun kaydına veya arıza sayısına dayanarak araç en sorunsuz veya kazanan ilan edilemez.');
+  }
 
   // 9. No generic summary
-  const execSummaryLower = (result.executiveSummary || '').toLowerCase();
   const hasBannedPhrase = BANNED_GENERIC_PHRASES.some(phrase => execSummaryLower.includes(phrase));
   const noGenericSummary = !hasBannedPhrase;
   if (hasBannedPhrase) {
@@ -125,7 +152,31 @@ export function validateComparisonSemantics(
   const scenarioCoverageValid = Array.isArray(result.scenarioRecommendations) && result.scenarioRecommendations.length >= 1;
 
   // 12. Risk narrative valid
-  const riskNarrativeValid = (result.riskComparison?.narrative || '').length >= 30;
+  const riskNarrativeValid = (result.riskComparison?.narrative || '').length >= 25;
+
+  // 13. No forbidden monetary estimates in risk/technical descriptions (Criteria 1-7)
+  const monetaryPattern = /\b\d+\s*(?:TL|₺|lira|euro|\$)\b|tamir\s+fiyatı|parça\s+fiyatı|bakım\s+ücreti|işçilik\s+ücreti|kasko\s+ücreti|sigorta\s+ücreti|yıllık\s+maliyet/i;
+  const execAndRiskText = `${result.executiveSummary || ''} ${result.riskComparison?.narrative || ''} ${(result.vehicleVerdicts || []).flatMap(v => v.compromises).join(' ')}`;
+  const hasForbiddenMonetaryText = monetaryPattern.test(execAndRiskText);
+  if (hasForbiddenMonetaryText) {
+    errors.push('Kriter 1-7 ve arıza anlatımlarında TL/para/tamir fiyatı tahmini kullanılamaz; teknik etki tanımlanmalıdır.');
+  }
+
+  // 14. Check criterionAssessments across all vehicles for forbidden monetary terms in criteria 1-7
+  if (result.criterionResult && Array.isArray(result.criterionResult.vehicleEvaluations)) {
+    for (const ev of result.criterionResult.vehicleEvaluations) {
+      if (ev.assessments) {
+        for (const [cKey, assessment] of Object.entries(ev.assessments)) {
+          if (cKey !== 'VALUE_FOR_MONEY' && assessment) {
+            const summaryText = `${assessment.summary || ''} ${(assessment.positiveFactors || []).join(' ')} ${(assessment.compromises || []).join(' ')} ${(assessment.negativeFactors || []).join(' ')}`;
+            if (monetaryPattern.test(summaryText)) {
+              errors.push(`Araç ${ev.vehicleName || ev.vehicleId} için ${cKey} kriterinde TL/para/tamir fiyatı tahmini tespit edildi.`);
+            }
+          }
+        }
+      }
+    }
+  }
 
   const qualityCheck: ComparisonQualityCheck = {
     allVehiclesCovered,
@@ -145,9 +196,17 @@ export function validateComparisonSemantics(
   const isValid = errors.length === 0 &&
     allVehiclesCovered &&
     allVehicleVerdictsComplete &&
+    minimumNarrativeLengthMet &&
     noUnsupportedWinner &&
     noTechnicalContradiction &&
-    noGenericSummary;
+    noUnsupportedOwnershipClaim &&
+    noUnsupportedResaleClaim &&
+    noRiskCountBasedConclusion &&
+    noGenericSummary &&
+    noRawMarkdown &&
+    scenarioCoverageValid &&
+    riskNarrativeValid &&
+    !hasForbiddenMonetaryText;
 
   return {
     isValid,

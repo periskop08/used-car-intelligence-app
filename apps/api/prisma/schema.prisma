@@ -838,6 +838,7 @@ model VehicleComparison {
   userId     String
   variant1Id String
   variant2Id String
+  variantIds Json?
   createdAt  DateTime @default(now())
 
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1929,6 +1930,7 @@ model AiVehicleComparisonCache {
   id           String   @id @default(uuid())
   variant1Id   String
   variant2Id   String
+  variantIds   Json?
   cacheKey     String   @unique
   verdict      String
   analysisJson Json

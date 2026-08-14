@@ -235,7 +235,7 @@ export function formatFuelType(fuelType: string | null | undefined): string {
 }
 
 // ----------------------------------------------------
-// TorqueScout Advanced AI Comparison Engine (v5.0) Types
+// TorqueScout Advanced AI Comparison Engine (v6.0) Types
 // ----------------------------------------------------
 
 export type ComparisonPriority =
@@ -249,6 +249,75 @@ export type ComparisonPriority =
   | 'CITY_USE'
   | 'HIGHWAY'
   | 'RESALE_VALUE';
+
+// 8 Evidence-Based Criteria Definitions
+export type CriterionKey =
+  | 'RELIABILITY'           // 1. Mekanik güvenilirlik ve kronik risk (%20)
+  | 'FAILURE_SEVERITY'      // 2. Arıza ciddiyeti ve mekanik dayanıklılık (%15)
+  | 'SEVERITY_DURABILITY'   // Alias for backwards compatibility
+  | 'FUEL_EFFICIENCY'       // 3. Yakıt tüketimi ve verimlilik (%10)
+  | 'SAFETY'                // 4. Güvenlik seviyesi (%15)
+  | 'PERFORMANCE'           // 5. Motor, şanzıman ve sürüş performansı (%10)
+  | 'COMFORT'               // 6. Konfor ve sürüş kalitesi (%10)
+  | 'PRACTICALITY'          // 7. Kullanışlılık ve yaşam alanı (%10)
+  | 'VALUE_FOR_MONEY';      // 8. Donanım, teknoloji ve fiyatına göre sunduğu değer (%10)
+
+export const CRITERIA_WEIGHTS: Record<string, number> = {
+  RELIABILITY: 20,
+  FAILURE_SEVERITY: 15,
+  FUEL_EFFICIENCY: 10,
+  SAFETY: 15,
+  PERFORMANCE: 10,
+  COMFORT: 10,
+  PRACTICALITY: 10,
+  VALUE_FOR_MONEY: 10,
+};
+
+export interface MarketPriceEvidence {
+  minPrice?: number;
+  maxPrice?: number;
+  currency: 'TRY';
+  sampleCount?: number;
+  asOfDate?: string;
+  matchQuality?: 'EXACT' | 'COMPARABLE' | 'GENERAL_MODEL' | 'UNKNOWN';
+  sourceType?: 'LISTING_ANALYSIS' | 'SNAPSHOT' | 'VERIFIED_DATABASE' | 'INSUFFICIENT';
+}
+
+export interface CriterionAssessment {
+  criterionKey: CriterionKey;
+  score: number | null; // 0–100 or null if data insufficient
+  stars: number | null; // Calculated by backend: rounded to nearest 0.5 stars
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+  summary: string;
+  positiveFactors: string[];
+  compromises?: string[];
+  negativeFactors?: string[];
+  supportingFactIds: string[];
+  missingInputs?: string[];
+  insufficientData?: boolean;
+  marketPriceEvidence?: MarketPriceEvidence; // ONLY for Criterion 8
+}
+
+export interface VehicleCriterionEvaluation {
+  vehicleId: string;
+  vehicleName: string;
+  assessments: Record<string, CriterionAssessment>;
+  overallScore: number | null; // Normalized weighted average over valid criteria
+  overallStars: number | null; // Rounded to nearest 0.5 stars
+  coveragePct: number; // Percentage of criteria with valid scores (e.g. 87.5%)
+  coverageTooLow: boolean; // True if coverage < 60% (<5 valid criteria)
+}
+
+export interface ComparisonCriterionResult {
+  vehicleEvaluations: VehicleCriterionEvaluation[];
+  criterionRankings: Record<string, {
+    winnerVehicleIds: string[];
+    winnerVehicleNames: string[];
+    isTie: boolean;
+    insufficientData: boolean;
+    reasoning: string;
+  }>;
+}
 
 export interface ScenarioScore {
   score: number | null;
@@ -349,11 +418,12 @@ export interface ComparisonVehicleProfile {
   };
   sellerQuestions: string[];
   inspectionChecklist: string[];
-  evidenceQuality?: {
+  evidenceQuality: {
     confidence: 'LOW' | 'MEDIUM' | 'HIGH';
     missingFields: string[];
   };
   calculatedScenarioScores?: Record<string, ScenarioScore>;
+  dossier?: any;
 }
 
 export interface ComparisonQualityCheck {
@@ -473,9 +543,9 @@ export interface FinalDecisionGuideRow {
 
 export interface VehicleComparisonResult {
   comparisonId: string;
-  schemaVersion: '5.0';
-  promptVersion: '5';
-  engineVersion: 'comparison-v5';
+  schemaVersion: '5.0' | '6.0';
+  promptVersion: '5' | '6';
+  engineVersion: 'comparison-v5' | 'comparison-v6';
   generationMode: 'AI' | 'FALLBACK';
   generatedAt: string;
   sourceDataVersion: string;
@@ -487,12 +557,13 @@ export interface VehicleComparisonResult {
     vehicleName?: string;
     label: 'En Dengeli Seçenek' | 'Kullanım Önceliğine Göre Değişiyor' | 'Net Kazanan İçin Yeterli Veri Yok';
     reasoning: string;
-    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH' | 'INSUFFICIENT';
   };
   vehicleCards?: ComparisonVehicleCard[];
   vehicleHighlights?: VehicleHighlight[];
   scenarioRecommendations: ScenarioRecommendation[];
   vehicleVerdicts: VehicleVerdict[];
+  criterionResult?: ComparisonCriterionResult; // 8-Criteria Assessments & Rankings
   riskComparison: {
     narrative: string;
     items?: RiskComparisonItem[];
@@ -512,6 +583,80 @@ export interface VehicleComparisonResult {
   decisionMatrix: DecisionMatrixRow[];
   finalDecisionGuide: FinalDecisionGuideRow[];
   dataWarnings: DataWarning[];
+}
+
+/**
+ * Backend calculation helper for 8-Criteria Assessments.
+ * Computes stars (rounded to 0.5 stars), normalized weighted overall score,
+ * and data coverage percentage per vehicle.
+ */
+export function computeBackendCriterionMetrics(
+  evaluations: Record<string, Partial<CriterionAssessment>>,
+  vehicleId: string,
+  vehicleName: string,
+): VehicleCriterionEvaluation {
+  const keys = [
+    'RELIABILITY',
+    'FAILURE_SEVERITY',
+    'FUEL_EFFICIENCY',
+    'SAFETY',
+    'PERFORMANCE',
+    'COMFORT',
+    'PRACTICALITY',
+    'VALUE_FOR_MONEY',
+  ];
+
+  let weightedSum = 0;
+  let validWeightSum = 0;
+  let validCount = 0;
+
+  const processedAssessments: Record<string, CriterionAssessment> = {};
+
+  for (const key of keys) {
+    // Check key or legacy alias SEVERITY_DURABILITY
+    const raw = evaluations[key] || (key === 'FAILURE_SEVERITY' ? evaluations['SEVERITY_DURABILITY'] : undefined);
+    const rawScore = (raw && typeof raw.score === 'number' && !isNaN(raw.score)) ? raw.score : null;
+    const isInsufficient = rawScore === null || raw?.insufficientData === true || raw?.confidence === 'INSUFFICIENT';
+
+    const stars = isInsufficient ? null : Math.max(0.5, Math.min(5, Math.round((rawScore! / 20) * 2) / 2));
+
+    const positiveFactors = Array.isArray(raw?.positiveFactors) ? raw!.positiveFactors : [];
+    const compromises = Array.isArray(raw?.compromises)
+      ? raw!.compromises
+      : (Array.isArray(raw?.negativeFactors) ? raw!.negativeFactors : []);
+
+    processedAssessments[key] = {
+      criterionKey: key as CriterionKey,
+      score: isInsufficient ? null : rawScore,
+      stars,
+      confidence: (raw?.confidence as any) || (isInsufficient ? 'INSUFFICIENT' : 'MEDIUM'),
+      summary: raw?.summary || (isInsufficient ? 'Bu kriter için yeterli veri bulunmuyor.' : ''),
+      positiveFactors,
+      compromises,
+      negativeFactors: compromises,
+      supportingFactIds: Array.isArray(raw?.supportingFactIds) ? raw!.supportingFactIds : [],
+      missingInputs: Array.isArray(raw?.missingInputs) ? raw!.missingInputs : [],
+      insufficientData: isInsufficient,
+      ...(key === 'VALUE_FOR_MONEY' && raw?.marketPriceEvidence ? { marketPriceEvidence: raw.marketPriceEvidence } : {}),
+    };
+
+    if (!isInsufficient && rawScore !== null) {
+      const weight = CRITERIA_WEIGHTS[key] || 10;
+      weightedSum += rawScore * weight;
+      validWeightSum += weight;
+      validCount++;
+    }
+  }
+
+  return {
+    vehicleId,
+    vehicleName,
+    assessments: processedAssessments,
+    overallScore: (validCount / 8 >= 0.60 && validWeightSum > 0) ? Math.round((weightedSum / validWeightSum) * 10) / 10 : null,
+    overallStars: (validCount / 8 >= 0.60 && validWeightSum > 0) ? Math.max(0.5, Math.min(5, Math.round(((weightedSum / validWeightSum) / 20) * 2) / 2)) : null,
+    coveragePct: Math.round((validCount / 8) * 100),
+    coverageTooLow: (validCount / 8) < 0.60,
+  };
 }
 
 /**
@@ -561,7 +706,7 @@ export const SCENARIO_SCORING_CONFIG = {
       zeroToHundred: 0.10,
       riskScore: 0.30,
     },
-    minInputsPct: 0.40, // >= 40% returns score, >= 70% HIGH confidence
+    minInputsPct: 0.40,
   },
   highwayUse: {
     weights: {
@@ -593,5 +738,3 @@ export * from './utils/sanitizeComparisonText';
 export * from './utils/validateComparisonSemantics';
 export * from './types/reports';
 export * from './types/vehicle-report';
-
-

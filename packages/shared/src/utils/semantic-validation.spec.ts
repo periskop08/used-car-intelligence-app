@@ -92,9 +92,53 @@ export function runSemanticValidationTests() {
   assert.strictEqual(validation.qualityCheck.noTechnicalContradiction, false, 'noTechnicalContradiction MUST be false');
   assert.ok(validation.errors.some(e => e.includes('Yakıt ekonomisi kazananı')), 'Error message MUST describe fuel economy contradiction');
   console.log('✓ Test 2 Passed: Audi-Fluence fuel economy contradiction rejected cleanly.');
+
+  // Test 3: Rejection of zero-risk count based winner claims
+  const zeroRiskClaimResult: Partial<VehicleComparisonResult> = {
+    headline: 'Detaylı Karşılaştırma Analizi',
+    executiveSummary: 'Bu iki araç incelenmiştir ve Fluence 0 adet kronik arıza ile en güvenilir araç seçilmiştir.',
+    scenarioRecommendations: [
+      {
+        scenarioKey: 'RELIABILITY',
+        title: 'Sorunsuzluk',
+        recommendedVehicleIds: ['fluence_id'],
+        recommendedVehicleNames: ['Renault Fluence 2016'],
+        reasoning: '0 arıza kaydı olduğu için en güvenilir araç',
+      },
+    ],
+    vehicleVerdicts: [
+      {
+        vehicleId: 'fluence_id',
+        vehicleName: 'Renault Fluence 2016',
+        characterSummary: 'Ekonomik Sedan',
+        bestFor: ['Yakıt'],
+        notIdealFor: ['Performans'],
+        gains: ['Düşük tüketim'],
+        compromises: ['Daha eski yaş'],
+        criticalRisks: [],
+        prePurchaseChecks: [],
+      },
+      {
+        vehicleId: 'audi_id',
+        vehicleName: 'Audi A3 2017',
+        characterSummary: 'Kompakt Premium',
+        bestFor: ['Şehir içi'],
+        notIdealFor: ['Geniş aile'],
+        gains: ['Prestij'],
+        compromises: ['Yüksek yakıt'],
+        criticalRisks: [],
+        prePurchaseChecks: [],
+      },
+    ],
+    riskComparison: { narrative: 'Renault Fluence 0 adet kronik arıza olduğu için en güvenilir seçenektir.' },
+    narrativeRecommendation: 'Fluence araç tercih edilmelidir.',
+  };
+
+  const zeroRiskValidation = validateComparisonSemantics(zeroRiskClaimResult, mockProfiles);
+  assert.strictEqual(zeroRiskValidation.isValid, false, 'Validation MUST fail for zero-risk count based conclusion');
+  assert.strictEqual(zeroRiskValidation.qualityCheck.noRiskCountBasedConclusion, false, 'noRiskCountBasedConclusion MUST be false');
+  assert.ok(zeroRiskValidation.errors.some(e => e.includes('Sıfır kronik sorun kaydına')), 'Error message MUST mention zero-risk disclaimer');
+  console.log('✓ Test 3 Passed: Zero-risk count winner claims rejected cleanly.');
 }
 
-// Execute tests if run directly via ts-node/node
-if (require.main === module) {
-  runSemanticValidationTests();
-}
+runSemanticValidationTests();

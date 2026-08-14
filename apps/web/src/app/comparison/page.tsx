@@ -8,6 +8,7 @@ import { ComparisonModeNotice } from "./components/ComparisonModeNotice";
 import { RecallComparison } from "./components/RecallComparison";
 import { ContextualDataWarning } from "./components/ContextualDataWarning";
 import { ComparisonVehicleCards } from "./components/ComparisonVehicleCards";
+import { CriterionAssessmentMatrix } from "./components/CriterionAssessmentMatrix";
 import ScenarioCards from "./components/ScenarioCards";
 import RiskComparison from "./components/RiskComparison";
 import PrePurchaseChecks from "./components/PrePurchaseChecks";
@@ -902,6 +903,11 @@ export default function ComparisonPage() {
           {comparisonResult.comparisonResult.generationMode === "FALLBACK" && (
             <ComparisonModeNotice generationMode={comparisonResult.comparisonResult.generationMode} />
           )}
+
+          {/* Section 0: NEW 8-Criteria Assessment Matrix & Top Decision Summary Cards */}
+          <CriterionAssessmentMatrix
+            criterionResult={comparisonResult.comparisonResult.criterionResult}
+          />
 
           {/* Section 1: Unified Vehicle Cards (1 Card Per Selected Vehicle!) */}
           <ComparisonVehicleCards

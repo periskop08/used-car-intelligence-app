@@ -1,33 +1,43 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { ComparisonReportLoaderService, VehicleComparisonDossier } from './comparison-report-loader.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
-import { AiReportGeneratorService } from '../research/ai-report-generator.service';
-import { VehicleService } from '../vehicle/vehicle.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
 import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
 import OpenAI from 'openai';
-import { getFuelTypeTr } from '../vehicle/vehicle-filters.controller';
-import { createHash } from 'crypto';
+import * as crypto from 'crypto';
+
 import {
   ComparisonPriority,
+  ComparisonQualityCheck,
   ComparisonVehicleProfile,
-  VehicleComparisonResult,
-  ComparisonVehicleCard,
-  ScenarioScore,
+  CriterionAssessment,
+  CriterionKey,
+  ComparisonCriterionResult,
   DataWarning,
-  RiskComparisonItem,
+  DecisionMatrixRow,
+  FinalDecisionGuideRow,
+  MarketPriceEvidence,
   RecallComparisonItem,
+  RiskComparisonItem,
+  ScenarioRecommendation,
+  ScenarioScore,
+  VehicleComparisonResult,
+  VehicleCriterionEvaluation,
+  VehicleHighlight,
+  VehicleVerdict,
+  computeBackendCriterionMetrics,
   formatFuelType,
   sanitizeComparisonResult,
   validateComparisonSemantics,
 } from '@used-car-intelligence/shared';
 
-export interface ComparisonGenerationDiagnostics {
+interface ComparisonGenerationDiagnostics {
   comparisonId: string;
   generationMode: 'AI' | 'FALLBACK';
-  provider?: string;
-  model?: string;
+  provider: string;
+  model: string;
   requestStartedAt: string;
   requestCompletedAt?: string;
   durationMs?: number;
@@ -36,9 +46,86 @@ export interface ComparisonGenerationDiagnostics {
   totalTokens?: number;
   validationFailed?: boolean;
   validationErrors?: string[];
-  repairAttempted?: boolean;
-  repairSucceeded?: boolean;
-  fallbackReason?: 'PROVIDER_TIMEOUT' | 'PROVIDER_ERROR' | 'INVALID_JSON' | 'ZOD_VALIDATION_FAILED' | 'SEMANTIC_VALIDATION_FAILED' | 'REPAIR_FAILED' | 'TOKEN_LIMIT' | 'CONFIGURATION_ERROR';
+  fallbackReason?: string;
+}
+
+const TRUSTED_FACT_SOURCES = ['VEHICLE_DATABASE', 'EVIDENCE_VERIFIED', 'MODERATION_VERIFIED'];
+
+export function getVerifiedMarketPriceEvidence(snapshot: any): MarketPriceEvidence | undefined {
+  if (!snapshot) return undefined;
+
+  const now = new Date();
+  const isCorrectSource = snapshot.sourceType === 'ACTIVE_LISTINGS';
+
+  // NO || 1 FALLBACK! Must be valid number >= 3
+  const sampleSize = typeof snapshot.sampleSize === 'number' ? snapshot.sampleSize : 0;
+  const isSufficientSample = sampleSize >= 3;
+
+  const minPrice = snapshot.estimatedMin ? Number(snapshot.estimatedMin) : 0;
+  const maxPrice = snapshot.estimatedMax ? Number(snapshot.estimatedMax) : 0;
+  const isPositiveAndValidRange = minPrice > 0 && maxPrice > 0 && minPrice <= maxPrice;
+
+  const freshUntil = snapshot.freshUntil ? new Date(snapshot.freshUntil) : null;
+  const validUntil = snapshot.validUntil ? new Date(snapshot.validUntil) : null;
+  const isNotExpired = freshUntil !== null && validUntil !== null && freshUntil > now && validUntil > now;
+
+  if (isCorrectSource && isSufficientSample && isPositiveAndValidRange && isNotExpired) {
+    return {
+      minPrice,
+      maxPrice,
+      currency: 'TRY',
+      sampleCount: sampleSize,
+      asOfDate: snapshot.calculatedAt ? new Date(snapshot.calculatedAt).toISOString() : now.toISOString(),
+      matchQuality: 'COMPARABLE',
+      sourceType: 'SNAPSHOT',
+    };
+  }
+
+  return undefined;
+}
+
+/**
+ * Requirement 3: Unified production cache fingerprint generator.
+ * Uses JSON.stringify(f.value) so falsy values like 0 or false are not lost in serialization.
+ */
+export function computeSourceDataVersionFromProfiles(profiles: ComparisonVehicleProfile[]): string {
+  const sortedProfiles = [...profiles].sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
+
+  const fingerprintParts = sortedProfiles.map(p => {
+    const dossier = p.dossier;
+    const reportId = dossier?.reportId || 'no-report';
+    const reportVersion = dossier?.reportVersion || 'no-version';
+    const completedAt = dossier?.generatedAt ? new Date(dossier.generatedAt).getTime() : 0;
+
+    const probs = (dossier?.commonProblems || [])
+      .map((pr: any) => {
+        const factStr = (pr.supportingFactIds || []).slice().sort().join(',');
+        return `${pr.title}:${pr.severity || 'MEDIUM'}:[${factStr}]`;
+      })
+      .sort()
+      .join('|');
+
+    const detailedFacts = (dossier?.dataQuality?.supportingFacts || [])
+      .map((f: any) => `${f.factKey || ''}:${JSON.stringify(f.value)}:${f.source || ''}:${f.confidence || ''}`)
+      .sort()
+      .join('|');
+
+    const priceSnapshot = (p as any).priceSnapshot;
+    const verifiedPrice = getVerifiedMarketPriceEvidence(priceSnapshot);
+    const priceStr = verifiedPrice
+      ? `${priceSnapshot.calculatedAt ? new Date(priceSnapshot.calculatedAt).getTime() : 0}:${verifiedPrice.minPrice}:${verifiedPrice.maxPrice}:${verifiedPrice.sampleCount}`
+      : 'no-valid-price';
+
+    return `${p.vehicleId}:${reportId}:${reportVersion}:${completedAt}:${probs}:${detailedFacts}:${priceStr}`;
+  });
+
+  const rawFingerprint = fingerprintParts.join('||');
+  const hash = crypto.createHash('sha256').update(rawFingerprint).digest('hex').substring(0, 16);
+  return `v6_${hash}`;
+}
+
+export function calculateComparisonSourceDataVersion(profiles: ComparisonVehicleProfile[]): string {
+  return computeSourceDataVersionFromProfiles(profiles);
 }
 
 @Injectable()
@@ -47,10 +134,9 @@ export class ComparisonService {
 
   constructor(
     private prisma: PrismaService,
+    private reportLoaderService: ComparisonReportLoaderService,
     private featureLimitService: FeatureLimitService,
     private subscriptionService: SubscriptionService,
-    private aiReportGeneratorService: AiReportGeneratorService,
-    private vehicleService: VehicleService,
   ) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
@@ -58,6 +144,9 @@ export class ComparisonService {
     }
   }
 
+  /**
+   * Fetches user's comparison history with variant details.
+   */
   async getComparisonHistory(userId: string) {
     return this.prisma.vehicleComparison.findMany({
       where: { userId },
@@ -66,12 +155,17 @@ export class ComparisonService {
         variant2: { include: { brand: true, model: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 20,
     }).catch(() => []);
   }
 
+  /**
+   * Calculates remaining chatbot messages for user from subscription & buyer package credits.
+   */
   async getUserChatbotQuota(userId: string): Promise<number> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase()))) {
+    if (!userId) return 0;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
+    if (user && (user.role === 'ADMIN' || (user.email && ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase())))) {
       return 999;
     }
 
@@ -108,29 +202,35 @@ export class ComparisonService {
     }).catch(() => null);
 
     const used = usage?.count || 0;
-    const monthlyRemaining = Math.max(0, tierLimit - used);
+    const dailyRemaining = Math.max(0, tierLimit - used);
 
-    return monthlyRemaining + buyerCredits;
+    return dailyRemaining + buyerCredits;
   }
 
+  /**
+   * Returns user's active tier, comparison vehicle limit, and remaining chatbot messages.
+   */
   async getUserTierAndLimit(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const tier = await this.subscriptionService.getEffectiveTier(userId);
-    const maxAllowed = (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase())))
-      ? 10
-      : tier === SubscriptionTier.PROFESYONEL ? 10 : tier === SubscriptionTier.YETKIN ? 5 : 2;
+    const user = await this.prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
+    const tier = await this.subscriptionService.getEffectiveTier(userId).catch(() => SubscriptionTier.TANISMA);
 
+    const isAdmin = user && (user.role === 'ADMIN' || (user.email && ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase())));
+
+    const userLimit = isAdmin || tier === SubscriptionTier.PROFESYONEL ? 10 : tier === SubscriptionTier.YETKIN ? 5 : 2;
     const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
     return {
       userTier: tier,
-      userLimit: maxAllowed,
+      userLimit,
       remainingChatbotMessages,
     };
   }
 
+  /**
+   * Main API endpoint handler for POST /comparisons.
+   * Enforces server-side vehicle limit, checks cache using computeSourceDataVersionFromProfiles, increments usage quota, and returns full response contract.
+   */
   async compare(userId: string, dto: CompareVehiclesDto) {
-    // 1. Extract requested variant IDs array
     let requestedIds: string[] = [];
     if (dto.variantIds && Array.isArray(dto.variantIds) && dto.variantIds.length > 0) {
       requestedIds = Array.from(new Set(dto.variantIds.filter(Boolean)));
@@ -139,89 +239,64 @@ export class ComparisonService {
     }
 
     if (requestedIds.length < 2) {
-      throw new BadRequestException('Karşılaştırma yapmak için en az 2 adet farklı araç seçmelisiniz.');
+      throw new BadRequestException('Karşılaştırma yapmak için en az 2 farklı araç seçmelisiniz.');
     }
 
-    // 2. Validate package limits (ASCII tier names: GUEST=2, TANISMA=2, FREE=2, YETKIN=5, PROFESYONEL=10)
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    const tier = await this.subscriptionService.getEffectiveTier(userId);
+    const { userLimit, userTier, remainingChatbotMessages } = await this.getUserTierAndLimit(userId);
 
-    const maxAllowed = (user && (user.role === 'ADMIN' || ['efeguven9991@gmail.com', 'burhanseckin08@gmail.com', 'm.efeeguven@gmail.com'].includes(user.email.toLowerCase())))
-      ? 10
-      : tier === SubscriptionTier.PROFESYONEL ? 10 : tier === SubscriptionTier.YETKIN ? 5 : 2;
-
-    if (requestedIds.length > maxAllowed) {
-      throw new BadRequestException(`Mevcut ${tier} abonelik paketiniz ile tek seferde en fazla ${maxAllowed} araç karşılaştırabilirsiniz.`);
+    if (requestedIds.length > userLimit) {
+      throw new BadRequestException(`Paketiniz kapsamında aynı anda en fazla ${userLimit} araç karşılaştırabilirsiniz. Seçilen: ${requestedIds.length}`);
     }
 
-    const priority: ComparisonPriority = (dto.selectedPriority as ComparisonPriority) || 'BALANCED';
+    const priority = (dto.selectedPriority as ComparisonPriority) || 'BALANCED';
 
-    // 3. Ensure vehicle reports exist in DB for missing variants
-    await this.ensureVehicleReportsExist(requestedIds);
+    const profiles = await this.loadVehicleProfiles(requestedIds);
 
-    // 4. Build normalized vehicle profiles from DB
-    const profiles = await this.buildComparisonVehicleProfiles(requestedIds);
-    if (profiles.length < 2) {
-      throw new BadRequestException('Bu araç kombinasyonu için yeterli veritabanı kaydı bulunamadı.');
-    }
+    const sourceDataVersion = computeSourceDataVersionFromProfiles(profiles);
+    const cacheKey = `comp_${sourceDataVersion}_${priority}`;
 
-    // 5. Generate SHA-256 data version hash
-    const sourceDataVersion = createHash('sha256')
-      .update(profiles.map(p => `${p.vehicleId}_${p.reliability.problems.length}`).sort().join('_'))
-      .digest('hex')
-      .substring(0, 12);
-
-    const sortedIds = requestedIds.slice().sort().join('_');
-    const cacheKey = `comparison:v5:TR:tr-TR:priority=${priority}:variants=${sortedIds}:data=${sourceDataVersion}`;
-
-    // 6. Safe Cache Lookup
-    const cachedReport = await this.prisma.aiVehicleComparisonCache.findUnique({
+    const cached = await this.prisma.aiVehicleComparisonCache.findUnique({
       where: { cacheKey },
     }).catch(() => null);
 
     let comparisonResult: VehicleComparisonResult;
 
-    if (cachedReport && cachedReport.analysisJson) {
-      comparisonResult = cachedReport.analysisJson as unknown as VehicleComparisonResult;
+    if (cached && cached.analysisJson && typeof cached.analysisJson === 'object') {
+      comparisonResult = cached.analysisJson as unknown as VehicleComparisonResult;
+      await this.recordHistory(requestedIds, comparisonResult, userId).catch(() => null);
     } else {
-      // Deduct feature quota upon generating fresh analysis (both for AI or Fallback success)
-      await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON).catch((err) => {
-        console.warn('Feature limit check warning:', err?.message);
-      });
+      if (userId) {
+        await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON);
+      }
 
       try {
         comparisonResult = await this.generateAdvancedAiComparison(profiles, priority, sourceDataVersion);
       } catch (err: any) {
-        console.warn('AI comparison generation failed. Executing deterministic fallback:', err?.message || err);
-        comparisonResult = this.generateFallbackResult(profiles, priority, sourceDataVersion);
+        console.warn(`Comparison AI generation failed. Running Fallback generator. Reason: ${err?.message || err}`);
+        comparisonResult = await this.generateFallbackResult(profiles, priority, sourceDataVersion);
       }
 
-      // Sanitize raw markdown from result text
-      comparisonResult = sanitizeComparisonResult(comparisonResult);
-
-      await this.prisma.aiVehicleComparisonCache.create({
-        data: {
-          variant1Id: profiles[0].vehicleId,
-          variant2Id: profiles[1].vehicleId,
+      await this.prisma.aiVehicleComparisonCache.upsert({
+        where: { cacheKey },
+        create: {
           cacheKey,
-          verdict: comparisonResult.overallRecommendation?.reasoning || comparisonResult.headline || '',
+          variant1Id: requestedIds[0] || '',
+          variant2Id: requestedIds[1] || '',
+          variantIds: requestedIds,
+          verdict: comparisonResult.headline || '',
           analysisJson: comparisonResult as any,
         },
-      }).catch((err) => {
-        console.warn('Comparison cache write skipped:', err?.message);
-      });
+        update: {
+          variant1Id: requestedIds[0] || '',
+          variant2Id: requestedIds[1] || '',
+          variantIds: requestedIds,
+          verdict: comparisonResult.headline || '',
+          analysisJson: comparisonResult as any,
+        },
+      }).catch(() => null);
+
+      await this.recordHistory(requestedIds, comparisonResult, userId).catch(() => null);
     }
-
-    // Atomic history log
-    await this.prisma.vehicleComparison.create({
-      data: {
-        userId,
-        variant1Id: profiles[0].vehicleId,
-        variant2Id: profiles[1].vehicleId,
-      },
-    }).catch(() => null);
-
-    const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
     return {
       success: true,
@@ -229,756 +304,43 @@ export class ComparisonService {
       vehicles: profiles.map(p => ({
         id: p.vehicleId,
         name: p.displayName,
+        displayName: p.displayName,
         brand: p.identity.brand,
         model: p.identity.model,
         year: p.identity.year,
         trim: p.identity.trim,
-        engine: p.identity.engine,
+        engine: p.identity.engineCode,
         transmission: p.identity.transmission,
         fuelType: formatFuelType(p.identity.fuelType),
         problemsCount: p.reliability.problems.length,
       })),
       remainingChatbotMessages,
+      userTier,
+      userLimit,
     };
   }
 
-  private async ensureVehicleReportsExist(variantIds: string[]) {
-    for (const variantId of variantIds) {
-      try {
-        const existingReport = await this.prisma.aiVehicleReport.findUnique({
-          where: { variantId_languageCode: { variantId, languageCode: 'tr' } },
-        });
-
-        if (!existingReport) {
-          await this.vehicleService.populateVariantDetails(variantId).catch(() => null);
-          await this.aiReportGeneratorService.generateReportCache(variantId, 'tr').catch((err) => {
-            console.warn(`Auto-generating report for variant ${variantId} warning:`, err?.message || err);
-          });
-        }
-      } catch (err: any) {
-        console.warn(`Report existence check failed for ${variantId}:`, err?.message || err);
-      }
-    }
-  }
-
-  private async buildComparisonVehicleProfiles(variantIds: string[]): Promise<ComparisonVehicleProfile[]> {
-    const rawVariants = await this.prisma.vehicleVariant.findMany({
-      where: { id: { in: variantIds }, status: ApprovalStatus.APPROVED },
-      include: {
-        brand: true,
-        model: true,
-        generation: true,
-        engine: true,
-        transmission: true,
-        trim: true,
-        specs: true,
-        problems: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-        recalls: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-        questions: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-        checklists: {
-          where: { status: ApprovalStatus.APPROVED },
-        },
-      },
-    });
-
-    const profiles: ComparisonVehicleProfile[] = [];
-
-    for (const id of variantIds) {
-      const v = rawVariants.find(x => x.id === id);
-      if (!v) continue;
-
-      const aiReport = await this.prisma.aiVehicleReport.findUnique({
-        where: { variantId_languageCode: { variantId: id, languageCode: 'tr' } },
-      }).catch(() => null);
-
-      const specData: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
-
-      const problems = (v.problems || []).map(p => ({
-        title: p.title,
-        affectedComponent: (p as any).affectedComponent || (p as any).category || undefined,
-        severity: (p.riskLevel || 'MEDIUM') as any,
-        frequency: 'COMMON' as any,
-        inspectionHint: p.checkRecommendation || undefined,
-        preventiveAction: p.description || undefined,
-        confidence: 'HIGH' as any,
-      }));
-
-      const recalls = (v.recalls || []).map(r => ({
-        title: r.title,
-        description: r.description,
-        safetyRisk: r.riskLevel ? `${r.riskLevel} Risk Seviyesi` : undefined,
-      }));
-
-      const sellerQuestions = (v.questions || []).map(q => q.question);
-      const inspectionChecklist = (v.checklists || []).map(c => c.title);
-
-      const hp = specData.horsepower ? Number(specData.horsepower) : undefined;
-      const torque = specData.torqueNm ? Number(specData.torqueNm) : undefined;
-      const zeroToHundred = specData.acceleration0to100 ? Number(specData.acceleration0to100) : undefined;
-      const topSpeed = specData.topSpeed ? Number(specData.topSpeed) : undefined;
-      const combinedConsumption = specData.averageFuelConsumption ? Number(specData.averageFuelConsumption) : undefined;
-      const bootLitres = specData.luggageCapacity ? Number(specData.luggageCapacity) : undefined;
-
-      // Calculate scenario scores with >= 70% (HIGH) / 40-69% (LOW) / < 40% (null) tiering
-      const scenarioScores: Record<string, ScenarioScore> = {
-        cityUse: {
-          score: combinedConsumption ? Math.max(20, Math.min(100, Math.round(100 - combinedConsumption * 7.5))) : null,
-          confidence: combinedConsumption ? 'HIGH' : 'LOW',
-          positiveFactors: combinedConsumption && combinedConsumption <= 6.5 ? ['Düşük şehir içi yakıt tüketimi'] : [],
-          negativeFactors: combinedConsumption && combinedConsumption > 8.0 ? ['Yüksek yakıt maliyeti'] : [],
-          missingInputs: !combinedConsumption ? ['Ortalama yakıt verisi eksik'] : [],
-        },
-        highwayUse: {
-          score: hp ? Math.max(30, Math.min(100, Math.round(hp * 0.45 + (torque || 0) * 0.1))) : null,
-          confidence: hp ? 'HIGH' : 'LOW',
-          positiveFactors: hp && hp >= 120 ? ['Güçlü motor ve tork rezervi'] : [],
-          negativeFactors: hp && hp < 90 ? ['Sınırlı sollama performansı'] : [],
-          missingInputs: !hp ? ['Motor güç verisi eksik'] : [],
-        },
-        fuelEconomy: {
-          score: combinedConsumption ? Math.max(10, Math.min(100, Math.round(110 - combinedConsumption * 10))) : null,
-          confidence: combinedConsumption ? 'HIGH' : 'LOW',
-          positiveFactors: combinedConsumption && combinedConsumption <= 5.5 ? ['Fabrika verisi son derece tasarruflu'] : [],
-          negativeFactors: combinedConsumption && combinedConsumption > 7.5 ? ['Yüksek ortalama tüketim'] : [],
-          missingInputs: !combinedConsumption ? ['Fabrika tüketim verisi eksik'] : [],
-        },
-        reliability: {
-          score: Math.max(20, Math.min(100, 95 - problems.length * 15)),
-          confidence: 'HIGH',
-          positiveFactors: problems.length === 0 ? ['Onaylı kronik arıza kaydı veritabanında yok'] : [],
-          negativeFactors: problems.length > 0 ? [`${problems.length} kayıtlı kronik arıza riski`] : [],
-          missingInputs: [],
-        },
-      };
-
-      profiles.push({
-        vehicleId: v.id,
-        displayName: `${v.brand.name} ${v.model.name} ${v.year} (${v.trim.name})`,
-        identity: {
-          brand: v.brand.name,
-          model: v.model.name,
-          generation: v.generation.name,
-          year: v.year,
-          bodyType: v.generation.bodyType,
-          engine: v.engine.code,
-          engineCode: v.engine.code,
-          transmission: v.transmission.name,
-          fuelType: formatFuelType(v.fuelType),
-          trim: v.trim.name,
-        },
-        performance: {
-          horsepower: hp,
-          torqueNm: torque,
-          zeroToHundred: zeroToHundred,
-          topSpeed: topSpeed,
-        },
-        efficiency: {
-          combinedConsumption: combinedConsumption,
-        },
-        practicality: {
-          bootLitres: bootLitres,
-        },
-        comfortAndHandling: {},
-        ownership: {},
-        reliability: {
-          buyabilityScore: aiReport?.buyabilityScore || 75,
-          riskScore: aiReport?.riskScore || 25,
-          problems: problems.slice(0, 6),
-          recalls: recalls.slice(0, 4),
-        },
-        sellerQuestions: sellerQuestions.length > 0 ? sellerQuestions.slice(0, 5) : [
-          `${v.brand.name} ${v.model.name} (${v.year}) triger kayışı / zinciri en son ne zaman değiştirildi?`,
-          `${v.brand.name} ${v.transmission?.name || 'Şanzıman'} yağı ve kavraması en son ne zaman kontrol edildi?`,
-          `${v.engine?.code || v.brand.name} motor soğutma sıvısında eksilme veya yağ kaçağı var mı?`,
-        ],
-        inspectionChecklist: inspectionChecklist.length > 0 ? inspectionChecklist.slice(0, 5) : [
-          `${v.brand.name} ${v.model.name} motor rölanti çalışmasında titreşim ve trim sesi kontrolü`,
-          `${v.brand.name} ${v.transmission?.name || 'Şanzıman'} vites geçişlerinde vuruntu veya kararsızlık testi`,
-          `${v.brand.name} ${v.generation?.bodyType || 'Gövde'} alt takım ve amortisör yağ sızıntısı ekspertizi`,
-        ],
-        evidenceQuality: {
-          confidence: 'HIGH',
-          missingFields: [],
-        },
-        calculatedScenarioScores: scenarioScores,
-      });
-    }
-
-    return profiles;
-  }
-
-  private async generateAdvancedAiComparison(
-    profiles: ComparisonVehicleProfile[],
-    priority: ComparisonPriority,
-    sourceDataVersion: string,
+  /**
+   * Internal comparison execution method.
+   */
+  async compareVehicles(
+    variantIds: string[],
+    userId?: string,
+    idempotencyKey?: string,
+    priority: ComparisonPriority = 'BALANCED',
   ): Promise<VehicleComparisonResult> {
-    const diagnostics: ComparisonGenerationDiagnostics = {
-      comparisonId: `comp_${Date.now()}`,
-      generationMode: 'AI',
-      provider: process.env.COMPARISON_AI_PROVIDER || 'OpenAI',
-      model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
-      requestStartedAt: new Date().toISOString(),
-    };
-
-    const summaryList = profiles.map((p, i) => {
-      const probsText = p.reliability.problems.length > 0
-        ? p.reliability.problems.map(prob => `    * ${prob.title} (${prob.severity} Risk)`).join('\n')
-        : '    * Onaylı kronik arıza veritabanında bulunmuyor (Düşük Risk).';
-
-      return `ARAÇ ${i + 1} ID: "${p.vehicleId}"
-Tam İsim: ${p.displayName}
-Motor: ${p.identity.engineCode || 'Belirtilmedi'} (${p.identity.fuelType || 'Benzin'})
-Şanzıman: ${p.identity.transmission || 'Belirtilmedi'}
-Yakıt Tüketimi: ${p.efficiency.combinedConsumption ? p.efficiency.combinedConsumption + ' L/100km' : 'Veri yok'}
-0-100 km/h: ${p.performance.zeroToHundred ? p.performance.zeroToHundred + ' sn' : 'Veri yok'}
-Bagaj Hacmi: ${p.practicality.bootLitres ? p.practicality.bootLitres + ' Litre' : 'Veri yok'}
-Kronik Arızalar:
-${probsText}`;
-    }).join('\n\n');
-
-    const prompt = `Sen TorqueScout otomotiv istihbarat sisteminin kıdemli otomotiv uzmanı ve baş analistisin.
-Aşağıda veritabanından doğrulanmış teknik özellikleri ve onaylı kronik arıza kayıtları verilen ${profiles.length} adet aracı derinlemesine kıyasla.
-
-KULLANICI ÖNCELİĞİ: ${priority}
-
-ARAÇ VERİLERİ:
-${summaryList}
-
-KATI TALİMATLAR:
-1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. ("Kullanım amacınıza göre değişir", "En doğru araç bütçenize uygun olandır" gibi jenerik cümleler ASLA KULLANILAMAZ).
-2. JSON alanlarında MARKDOWN İŞARETLERİ (**bold**, ### başlık, satır başı -) KULLANMA. Düz metin üret.
-3. "vehicleVerdicts" dizisinde SEÇİLEN TÜM ${profiles.length} ARAÇ İÇİN o aracın kendi markasına, modeline, motoruna, şanzımanına, bagajına ve fabrika verilerine ÖZGÜ BENZERSİZ "gains", "compromises", "bestFor", "notIdealFor" ve "prePurchaseChecks" dizilerini eksiksiz doldur. Hiçbir iki aracın metinleri aynı olamaz!
-4. "scenarioRecommendations" dizisinde SEÇİLEN ARAÇLAR ARASINDAN EN AZ 3-4 FARKLI SENARYO (Yakıt Ekonomisi, Geniş Aile & Bagaj, Otoyol & Performans, Şehir İçi Pratiklik) için kazanan araçları gerekçeleriyle belirt. Tek bir senaryo kartı dönme!
-5. "overallRecommendation" objesinde "label" alanına tek kazanan varsa "En Dengeli Seçenek", eşitlik varsa "Kullanım Önceliğine Göre Değişiyor" yaz. Asla "Şampiyon" deme.
-6. "narrativeRecommendation" alanında arkadaş tavsiyesi tonunda samimi, net ve gerekçeli anlatım yap ("Açık konuşmak gerekirse...").
-
-Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
-{
-  "headline": "Kısa ve çarpıcı karşılaştırma başlığı",
-  "executiveSummary": "2-3 paragraflık derin teknik ve mantıksal karar özeti",
-  "overallRecommendation": {
-    "vehicleId": "${profiles[0].vehicleId}",
-    "vehicleName": "${profiles[0].displayName}",
-    "label": "En Dengeli Seçenek",
-    "reasoning": "Gerekçeli kazanan açıklaması",
-    "confidence": "HIGH"
-  },
-  "scenarioRecommendations": [
-    {
-      "scenarioKey": "FUEL_ECONOMY",
-      "title": "Yakıt Ekonomisi & Düşük Tüketim",
-      "recommendedVehicleIds": ["${profiles[0].vehicleId}"],
-      "recommendedVehicleNames": ["${profiles[0].displayName}"],
-      "reasoning": "En düşük doğrulanmış yakıt tüketimine sahip"
-    }
-  ],
-  "vehicleVerdicts": [
-    {
-      "vehicleId": "${profiles[0].vehicleId}",
-      "vehicleName": "${profiles[0].displayName}",
-      "characterSummary": "Kompakt ve Dengeli Premium",
-      "bestFor": ["Şehir içi pratiklik", "Düşük yakıt maliyeti"],
-      "notIdealFor": ["Aşırı performans beklentisi"],
-      "gains": ["Düşük yakıt tüketimi", "Kolay park etme"],
-      "compromises": ["Daha sınırlı kabin genişliği"],
-      "criticalRisks": ["Şanzıman vuruntu ve bakım hassasiyeti"],
-      "prePurchaseChecks": ["Ekspertiz vites geçiş testi"]
-    }
-  ],
-  "riskComparison": {
-    "narrative": "Kronik sorunların sıklık ve maliyet açısından kıyaslaması",
-    "lowestRiskVehicleId": "${profiles[0].vehicleId}"
-  },
-  "ownershipCostComparison": {
-    "narrative": "Yakıt, periyodik bakım ve parça maliyetleri kıyaslaması"
-  },
-  "narrativeRecommendation": "Açık konuşmak gerekirse...",
-  "decisionMatrix": [
-    {
-      "criterion": "Şehir İçi Kullanım",
-      "winnerVehicleIds": ["${profiles[0].vehicleId}"],
-      "winnerNames": ["${profiles[0].displayName}"],
-      "reason": "Düşük tüketim ve pratik boyut"
-    }
-  ],
-  "finalDecisionGuide": [
-    {
-      "priority": "Düşük Tüketim",
-      "recommendedVehicleName": "${profiles[0].displayName}",
-      "explanation": "En ekonomik fabrika tüketim verisine sahip"
-    }
-  ],
-  "dataWarnings": []
-}`;
-
-    let resultJsonText = '';
-    const startTime = Date.now();
-
-    if (this.openai) {
-      try {
-        const response = await this.openai.chat.completions.create({
-          model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Yalnızca geçerli JSON dön.' },
-            { role: 'user', content: prompt },
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.3,
-        });
-
-        resultJsonText = response.choices[0]?.message?.content || '';
-        diagnostics.promptTokens = response.usage?.prompt_tokens;
-        diagnostics.completionTokens = response.usage?.completion_tokens;
-        diagnostics.totalTokens = response.usage?.total_tokens;
-      } catch (err: any) {
-        console.warn('OpenAI comparison call warning:', err?.message || err);
-      }
-    }
-
-    if (!resultJsonText) {
-      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
-      if (geminiApiKey) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-          const res = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' },
-            }),
-          });
-
-          if (res.ok) {
-            const geminiData = await res.json();
-            resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          }
-        } catch (err: any) {
-          console.warn('Gemini API comparison call warning:', err?.message || err);
-        }
-      }
-    }
-
-    diagnostics.durationMs = Date.now() - startTime;
-    diagnostics.requestCompletedAt = new Date().toISOString();
-
-    if (!resultJsonText) {
-      diagnostics.fallbackReason = 'PROVIDER_ERROR';
-      console.warn('Comparison AI diagnostics:', diagnostics);
-      throw new Error('AI providers returned empty output');
-    }
-
-    const parsed = JSON.parse(resultJsonText.replace(/```json\n?|\n?```/g, '').trim());
-
-    // Execute 12-criteria Semantic Validation
-    const validation = validateComparisonSemantics(parsed, profiles);
-    if (!validation.isValid) {
-      diagnostics.validationFailed = true;
-      diagnostics.validationErrors = validation.errors;
-      console.warn('AI Output failed semantic validation. Triggering Fallback generator. Errors:', validation.errors);
-      diagnostics.fallbackReason = 'SEMANTIC_VALIDATION_FAILED';
-      console.warn('Comparison AI diagnostics:', diagnostics);
-      throw new Error(`Semantic validation failed: ${validation.errors.join('; ')}`);
-    }
-
-    const rawResult: VehicleComparisonResult = {
-      comparisonId: diagnostics.comparisonId,
-      schemaVersion: '5.0',
-      promptVersion: '5',
-      engineVersion: 'comparison-v5',
-      generationMode: 'AI',
-      generatedAt: new Date().toISOString(),
-      sourceDataVersion,
+    const dto: CompareVehiclesDto = {
+      variantIds,
+      idempotencyKey,
       selectedPriority: priority,
-      headline: parsed.headline || `${profiles.length} Araç Karşılaştırma Analizi`,
-      executiveSummary: parsed.executiveSummary || 'Araçların teknik verileri ve kronik durumları detaylıca incelenmiştir.',
-      overallRecommendation: parsed.overallRecommendation || {
-        vehicleId: profiles[0].vehicleId,
-        vehicleName: profiles[0].displayName,
-        label: 'En Dengeli Seçenek',
-        reasoning: `${profiles[0].displayName} toplam verimlilik ve arıza dengesiyle öne çıkmaktadır.`,
-        confidence: 'HIGH',
-      },
-      scenarioRecommendations: parsed.scenarioRecommendations || [],
-      vehicleVerdicts: parsed.vehicleVerdicts || [],
-      riskComparison: parsed.riskComparison || { narrative: 'Kronik arıza kayıtları kıyaslanmıştır.' },
-      recallComparison: profiles.flatMap(p => 
-        (p.reliability.recalls || []).map(r => ({
-          vehicleId: p.vehicleId,
-          vehicleName: p.displayName,
-          title: r.title,
-          description: r.description,
-          safetyImpact: r.safetyRisk,
-          verificationInstruction: 'Bu geri çağırma kampanyasının uygulanıp uygulanmadığını yetkili servisten şasi numarası sorgulatarak doğrulayın.',
-        }))
-      ),
-      ownershipCostComparison: parsed.ownershipCostComparison || { narrative: 'Sahiplik maliyetleri değerlendirilmiştir.' },
-      narrativeRecommendation: parsed.narrativeRecommendation || 'Açık konuşmak gerekirse bütçenize en uygun modeli tercih etmelisiniz.',
-      decisionMatrix: parsed.decisionMatrix || [],
-      finalDecisionGuide: parsed.finalDecisionGuide || [],
-      dataWarnings: parsed.dataWarnings || [],
     };
-
-    return sanitizeComparisonResult(rawResult);
+    const res = await this.compare(userId || '', dto);
+    return res.comparisonResult;
   }
 
-  private buildFallbackCautions(p: ComparisonVehicleProfile): string[] {
-    if (p.reliability.problems.length > 0) {
-      return p.reliability.problems.map(prob => `${prob.title} (${prob.severity} risk seviyesi)`);
-    }
-
-    const cautions: string[] = [];
-
-    if (p.efficiency.combinedConsumption && p.efficiency.combinedConsumption > 6.8) {
-      cautions.push(`Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi ile nispeten yüksek yakıt maliyeti`);
-    }
-
-    if (p.practicality.bootLitres && p.practicality.bootLitres < 400) {
-      cautions.push(`${p.practicality.bootLitres} Litre ile sınırlı bagaj hacmi`);
-    }
-
-    if (p.identity.transmission && /otomatik|dsg|dct|cvt|s tronic/i.test(p.identity.transmission)) {
-      cautions.push(`${p.identity.brand} ${p.identity.transmission} şanzıman periyodik yağ ve kavrama kontrol ihtiyacı`);
-    }
-
-    if (p.performance.horsepower && p.performance.horsepower < 110) {
-      cautions.push(`${p.performance.horsepower} HP motor gücü ile tam yük altında sınırlı sollama performansı`);
-    }
-
-    if (cautions.length === 0) {
-      cautions.push(`${p.displayName} periyodik yetkili servis motor ve alt takım bakım hassasiyeti`);
-    }
-
-    return cautions;
-  }
-
-  private buildFallbackBestFor(p: ComparisonVehicleProfile): string[] {
-    const bestFor: string[] = [];
-    const body = (p.identity.bodyType || '').toLowerCase();
-    const hp = p.performance.horsepower || 0;
-    const boot = p.practicality.bootLitres || 0;
-    const cons = p.efficiency.combinedConsumption || 99;
-
-    if (body.includes('suv') || body.includes('crossover')) {
-      bestFor.push('Geniş aile kullanımı', 'Yüksek oturma pozisyonu & görüş');
-    } else if (body.includes('hatchback') || body.includes('coupe')) {
-      bestFor.push('Şehir içi pratik kullanım & kolay park', 'Kıvrak sürüş ve günlük prestij');
-    } else if (body.includes('sedan') || body.includes('station')) {
-      bestFor.push('Uzun yol & otoyol sürüş konforu', 'Dengeli kabin genişliği arayanlar');
-    }
-
-    if (hp >= 160) {
-      bestFor.push('Seri ivmelenme & sollama gücü arayanlar');
-    } else if (cons <= 6.2) {
-      bestFor.push('Düşük yakıt bütçeli günlük kullanım');
-    }
-
-    if (boot >= 500) {
-      bestFor.push('Büyük bagaj ve yük taşıma ihtiyacı olanlar');
-    }
-
-    if (bestFor.length === 0) {
-      bestFor.push(`${p.identity.brand} ${p.identity.model} günlük sürüş`, 'Teknik verimlilik arayanlar');
-    }
-
-    return Array.from(new Set(bestFor)).slice(0, 3);
-  }
-
-  private buildFallbackNotIdealFor(p: ComparisonVehicleProfile): string[] {
-    const notIdealFor: string[] = [];
-    const body = (p.identity.bodyType || '').toLowerCase();
-    const hp = p.performance.horsepower || 0;
-    const cons = p.efficiency.combinedConsumption || 99;
-
-    if (body.includes('suv') || body.includes('crossover')) {
-      notIdealFor.push('Dar sokaklarda ultra kompakt park arayanlar', 'Alçak sportif viraj tutkunları');
-    } else if (body.includes('hatchback') || body.includes('coupe')) {
-      notIdealFor.push('Çok çocuklu aile uzun yol bagaj yüklemeleri', 'Bozuk arazi yolları');
-    } else if (body.includes('sedan')) {
-      notIdealFor.push('Yüksek arazi oturuşu ve yerden yüksek araç isteyenler');
-    }
-
-    if (hp >= 160) {
-      notIdealFor.push('Sadece minimum yakıt tüketimi hedefleyenler');
-    }
-
-    if (cons > 7.2) {
-      notIdealFor.push('Ultra düşük işletme maliyeti arayanlar');
-    }
-
-    if (notIdealFor.length === 0) {
-      notIdealFor.push(`${p.displayName} aşırı zorlu arazi koşulları`);
-    }
-
-    return Array.from(new Set(notIdealFor)).slice(0, 2);
-  }
-
-  private buildFallbackPrePurchaseChecks(p: ComparisonVehicleProfile): string[] {
-    const checks: string[] = [];
-
-    if (p.reliability.problems.length > 0) {
-      p.reliability.problems.forEach(prob => {
-        checks.push(`${prob.title} tespiti için ${prob.inspectionHint || 'özel ekspertiz kontrolü'}`);
-      });
-    }
-
-    checks.push(
-      `${p.identity.brand} ${p.identity.model} ${p.identity.transmission || 'Şanzıman'} vites geçiş, kavrama ve yağ kaçak ekspertizi`,
-      `${p.identity.engineCode || p.identity.brand} motor rölanti sesi, kompresyon ve soğutma sıvısı kontrolü`,
-      `${p.identity.brand} yetkili servis geçmişi ve şasi numarası tramer kayıt sorgusu`
-    );
-
-    return Array.from(new Set(checks)).slice(0, 4);
-  }
-
-  private generateFallbackResult(
-    profiles: ComparisonVehicleProfile[],
-    priority: ComparisonPriority,
-    sourceDataVersion: string,
-  ): VehicleComparisonResult {
-    // Find lowest consumption vehicle
-    const sortedByConsumption = profiles
-      .slice()
-      .filter(p => p.efficiency.combinedConsumption)
-      .sort((a, b) => (a.efficiency.combinedConsumption || 99) - (b.efficiency.combinedConsumption || 99));
-    const lowestFuelVehicle = sortedByConsumption[0] || profiles[0];
-
-    // Find highest boot volume vehicle
-    const sortedByBoot = profiles
-      .slice()
-      .filter(p => p.practicality.bootLitres)
-      .sort((a, b) => (b.practicality.bootLitres || 0) - (a.practicality.bootLitres || 0));
-    const highestBootVehicle = sortedByBoot[0] || profiles[0];
-
-    // Find highest horsepower vehicle
-    const sortedByHp = profiles
-      .slice()
-      .filter(p => p.performance.horsepower)
-      .sort((a, b) => (b.performance.horsepower || 0) - (a.performance.horsepower || 0));
-    const highestHpVehicle = sortedByHp[0] || profiles[0];
-
-    // Find lowest chronic problems vehicle
-    const sortedByReliability = profiles
-      .slice()
-      .sort((a, b) => a.reliability.problems.length - b.reliability.problems.length);
-    const mostReliableVehicle = sortedByReliability[0] || profiles[0];
-
-    const cards: ComparisonVehicleCard[] = profiles.map((p) => {
-      const cautions = this.buildFallbackCautions(p);
-      const bestFor = this.buildFallbackBestFor(p);
-      const notIdealFor = this.buildFallbackNotIdealFor(p);
-      const checks = this.buildFallbackPrePurchaseChecks(p);
-
-      return {
-        vehicleId: p.vehicleId,
-        vehicleName: p.displayName,
-        identity: {
-          year: p.identity.year,
-          engine: p.identity.engineCode,
-          transmission: p.identity.transmission,
-          trim: p.identity.trim,
-        },
-        characterSummary: `${p.identity.brand} ${p.identity.model} (${p.identity.year}) - ${p.identity.engineCode || 'Motor'}, ${p.identity.transmission || 'Şanzıman'}`,
-        strengths: [
-          p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi` : `${p.identity.brand} yakıt verimliliği`,
-          p.practicality.bootLitres ? `${p.practicality.bootLitres} Litre bagaj hacmi` : `${p.identity.brand} bagaj kullanımı`,
-          p.performance.horsepower ? `${p.performance.horsepower} HP motor gücü` : `${p.identity.model} motor performansı`,
-        ],
-        cautions,
-        bestFor,
-        notIdealFor,
-        criticalRisks: p.reliability.problems.map(prob => ({
-          title: prob.title,
-          severity: prob.severity,
-          shortExplanation: prob.inspectionHint || 'Ekspertiz kontrolü önerilir.',
-        })),
-        prePurchaseChecks: checks,
-        supportingFacts: [
-          `Model Yılı: ${p.identity.year}`,
-          p.performance.horsepower ? `Motor Gücü: ${p.performance.horsepower} HP` : `Motor: ${p.identity.engineCode || 'Standart'}`,
-        ],
-        evidenceConfidence: 'HIGH' as const,
-      };
-    });
-
-    const highlights = profiles.map(p => ({
-      vehicleId: p.vehicleId,
-      vehicleName: p.displayName,
-      strengths: [
-        p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi` : `${p.identity.brand} yakıt verimliliği`,
-        p.practicality.bootLitres ? `${p.practicality.bootLitres} Litre bagaj hacmi` : `${p.identity.brand} geniş bagaj`,
-      ],
-      cautions: this.buildFallbackCautions(p),
-      supportingFacts: [
-        `Model Yılı: ${p.identity.year}`,
-        p.performance.horsepower ? `Güç: ${p.performance.horsepower} HP` : `Motor: ${p.identity.engineCode || 'Standart'}`,
-      ],
-      confidence: 'HIGH' as const,
-    }));
-
-    const verdicts = profiles.map((p) => {
-      const cautions = this.buildFallbackCautions(p);
-      const bestFor = this.buildFallbackBestFor(p);
-      const notIdealFor = this.buildFallbackNotIdealFor(p);
-      const checks = this.buildFallbackPrePurchaseChecks(p);
-
-      return {
-        vehicleId: p.vehicleId,
-        vehicleName: p.displayName,
-        characterSummary: `${p.identity.brand} ${p.identity.model} (${p.identity.year}) - ${p.identity.engineCode || 'Motor'}, ${p.identity.transmission || 'Şanzıman'}`,
-        bestFor,
-        notIdealFor,
-        gains: [
-          p.efficiency.combinedConsumption ? `Ortalama ${p.efficiency.combinedConsumption} L/100km yakıt tüketimi` : `${p.identity.brand} yakıt ekonomisi`,
-          p.practicality.bootLitres ? `${p.practicality.bootLitres} Litre bagaj hacmi` : `${p.identity.model} bagaj pratikliği`,
-        ],
-        compromises: cautions,
-        criticalRisks: p.reliability.problems.map(prob => `${prob.title} (${prob.severity} Risk)`),
-        prePurchaseChecks: checks,
-        evidenceConfidence: 'HIGH' as const,
-      };
-    });
-
-    const riskItems: RiskComparisonItem[] = profiles.flatMap(p => 
-      p.reliability.problems.map(prob => ({
-        vehicleId: p.vehicleId,
-        vehicleName: p.displayName,
-        problemTitle: prob.title,
-        severity: prob.severity,
-        detectability: 'MODERATE' as const,
-        narrative: `${prob.title} kaydı ekspertiz kontrolünde ve motor rölanti dinlemesinde önceden tespit edilebilir.`,
-      }))
-    );
-
-    const recallItems: RecallComparisonItem[] = profiles.flatMap(p => 
-      (p.reliability.recalls || []).map(r => ({
-        vehicleId: p.vehicleId,
-        vehicleName: p.displayName,
-        title: r.title,
-        description: r.description,
-        safetyImpact: r.safetyRisk,
-        verificationInstruction: 'Bu kampanyanın aracınıza uygulanıp uygulanmadığını yetkili servisten şasi numarası sorgulatarak doğrulayın.',
-      }))
-    );
-
-    const scenarios = [
-      {
-        scenarioKey: 'FUEL_ECONOMY',
-        title: 'Yakıt Ekonomisi & Düşük Tüketim',
-        recommendedVehicleIds: [lowestFuelVehicle.vehicleId],
-        recommendedVehicleNames: [lowestFuelVehicle.displayName],
-        reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış ortalama ${lowestFuelVehicle.efficiency.combinedConsumption || 'düşük'} L/100km fabrika tüketimi ile en tasarruflu seçenek.`,
-        confidence: 'HIGH' as const,
-      },
-      {
-        scenarioKey: 'FAMILY_USE',
-        title: 'Geniş Aile & Bagaj Pratikliği',
-        recommendedVehicleIds: [highestBootVehicle.vehicleId],
-        recommendedVehicleNames: [highestBootVehicle.displayName],
-        reasoning: `${highestBootVehicle.displayName}, ${highestBootVehicle.practicality.bootLitres || 'Geniş'} Litre bagaj hacmi ile aile kullanımı için öne çıkıyor.`,
-        confidence: 'HIGH' as const,
-      },
-      {
-        scenarioKey: 'HIGHWAY_USE',
-        title: 'Otoyol & Seri İvmelenme',
-        recommendedVehicleIds: [highestHpVehicle.vehicleId],
-        recommendedVehicleNames: [highestHpVehicle.displayName],
-        reasoning: `${highestHpVehicle.displayName}, ${highestHpVehicle.performance.horsepower || 'Güçlü'} HP motor gücü ile otoyol sürüşünde en yüksek sollama performansını sunuyor.`,
-        confidence: 'HIGH' as const,
-      },
-      {
-        scenarioKey: 'RELIABILITY',
-        title: 'Sorunsuzluk & Düşük Arıza Riski',
-        recommendedVehicleIds: [mostReliableVehicle.vehicleId],
-        recommendedVehicleNames: [mostReliableVehicle.displayName],
-        reasoning: `${mostReliableVehicle.displayName}, veritabanımızdaki ${mostReliableVehicle.reliability.problems.length} adet kayıtlı arıza riski ile uzun vadede en düşük kronik sorun profiline sahip.`,
-        confidence: 'HIGH' as const,
-      },
-    ];
-
-    const rawResult: VehicleComparisonResult = {
-      comparisonId: `comp_fallback_${Date.now()}`,
-      schemaVersion: '5.0',
-      promptVersion: '5',
-      engineVersion: 'comparison-v5',
-      generationMode: 'FALLBACK',
-      generatedAt: new Date().toISOString(),
-      sourceDataVersion,
-      selectedPriority: priority,
-      headline: `${profiles.length} Araç Doğrulanmış Teknik Veri Karşılaştırması`,
-      executiveSummary: `Seçtiğiniz ${profiles.length} adet araç (${profiles.map(p => p.displayName).join(', ')}) veritabanımızdaki doğrulanmış teknik veriler ve onaylı arıza kayıtları üzerinden kıyaslanmıştır.`,
-      overallRecommendation: {
-        vehicleId: lowestFuelVehicle.vehicleId,
-        vehicleName: lowestFuelVehicle.displayName,
-        label: 'Kullanım Önceliğine Göre Değişiyor',
-        reasoning: `${lowestFuelVehicle.displayName}, doğrulanmış düşük yakıt tüketimi (${lowestFuelVehicle.efficiency.combinedConsumption || 'Standart'} L/100km) ile yakıt tasarrufu odağında öne çıkmaktadır.`,
-        confidence: 'HIGH',
-      },
-      vehicleCards: cards,
-      vehicleHighlights: highlights,
-      scenarioRecommendations: scenarios,
-      vehicleVerdicts: verdicts,
-      riskComparison: {
-        narrative: riskItems.length > 0
-          ? `Veritabanımızdaki onaylı kronik arıza kayıtları detaylandırılmıştır. Ekspertiz esnasında listelenen kontroller mutlaka yapılmalıdır.`
-          : `Bu araçlar için veritabanında onaylanmış kronik arıza kaydı bulunmamaktadır. Bu durum araçların tamamen risksiz olduğu anlamına gelmez.`,
-        items: riskItems,
-        lowestRiskVehicleId: mostReliableVehicle.vehicleId,
-      },
-      recallComparison: recallItems,
-      ownershipCostComparison: {
-        narrative: `Yakıt ve bakım verilerine göre ${lowestFuelVehicle.displayName} yakıt tarafında tasarruf sağlarken, ${highestHpVehicle.displayName} yüksek güç vaat ediyor.`,
-      },
-      narrativeRecommendation: `Seçtiğiniz ${profiles.length} araç arasında ${lowestFuelVehicle.displayName} yakıt tasarrufuyla öne çıkarken, ${highestBootVehicle.displayName} geniş bagajıyla aile kullanımına uygun.`,
-      decisionMatrix: [
-        {
-          criterion: 'Yakıt Tasarrufu',
-          winnerVehicleIds: [lowestFuelVehicle.vehicleId],
-          winnerNames: [lowestFuelVehicle.displayName],
-          reason: 'En düşük ortalama tüketim',
-        },
-        {
-          criterion: 'Bagaj Hacmi',
-          winnerVehicleIds: [highestBootVehicle.vehicleId],
-          winnerNames: [highestBootVehicle.displayName],
-          reason: 'En geniş bagaj',
-        },
-        {
-          criterion: 'Motor Performansı',
-          winnerVehicleIds: [highestHpVehicle.vehicleId],
-          winnerNames: [highestHpVehicle.displayName],
-          reason: 'En yüksek HP motor gücü',
-        },
-      ],
-      finalDecisionGuide: [
-        {
-          priority: 'Düşük Yakıt Tüketimi',
-          recommendedVehicleName: lowestFuelVehicle.displayName,
-          explanation: 'En ekonomik fabrika ortalama tüketim verisine sahip',
-        },
-        {
-          priority: 'Geniş Aile & Bagaj',
-          recommendedVehicleName: highestBootVehicle.displayName,
-          explanation: 'En yüksek bagaj litre kapasitesi',
-        },
-        {
-          priority: 'Otoyol Gücü & Performans',
-          recommendedVehicleName: highestHpVehicle.displayName,
-          explanation: 'En yüksek HP motor gücü',
-        },
-      ],
-      dataWarnings: [],
-    };
-
-    return sanitizeComparisonResult(rawResult);
-  }
-
+  /**
+   * AI Chatbot endpoint handler for POST /comparisons/chat.
+   */
   async chat(userId: string, dto: ComparisonChatDto) {
     if (userId) {
       await this.featureLimitService.checkAndIncrement(userId, FeatureKey.AI_CHAT);
@@ -995,9 +357,9 @@ Lütfen SADECE geçerli JSON yanıt ver (VehicleComparisonResult formatında):
       throw new BadRequestException('Chatbot ile sohbet etmek için en az bir araç seçmelisiniz.');
     }
 
-    const profiles = await this.buildComparisonVehicleProfiles(requestedIds);
-    const vehicleDescriptions = profiles.map(p => 
-      `• ${p.displayName}: Motor ${p.identity.engineCode}, Şanzıman ${p.identity.transmission}, Yakıt ${p.identity.fuelType}, Tüketim ${p.efficiency.combinedConsumption || 'Veri yok'} L/100km. Kronik Riskler: ${p.reliability.problems.map(prob => prob.title).join(', ') || 'Yok'}`
+    const profiles = await this.loadVehicleProfiles(requestedIds);
+    const vehicleDescriptions = profiles.map(p =>
+      `• ${p.displayName}: Motor ${p.identity.engineCode || 'Veri yok'}, Şanzıman ${p.identity.transmission || 'Veri yok'}, Yakıt ${p.identity.fuelType || 'Veri yok'}, Tüketim ${p.efficiency.combinedConsumption || 'Veri yok'} L/100km. Kronik Riskler: ${p.reliability.problems.map(prob => prob.title).join(', ') || 'Yok'}`
     ).join('\n');
 
     const systemPrompt = `Sen TorqueScout otomotiv istihbarat sisteminin canlı yapay zeka asistanısın.
@@ -1031,60 +393,982 @@ KATI TALİMATLAR:
     const apiKey = process.env.OPENAI_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
 
-    let response = '';
+    let responseText = '';
 
-    if (apiKey) {
+    if (this.openai) {
       try {
-        const openai = new OpenAI({ apiKey });
-        const aiRes = await openai.chat.completions.create({
+        const aiRes = await this.openai.chat.completions.create({
           model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
           messages: fullMessages,
           temperature: 0.5,
         });
-
-        response = aiRes.choices[0]?.message?.content || '';
+        responseText = aiRes.choices[0]?.message?.content || '';
       } catch (err: any) {
-        console.error('OpenAI comparison chat failed:', err?.message);
+        console.warn('OpenAI comparison chat failed:', err?.message || err);
       }
     }
 
-    if (!response && geminiApiKey) {
+    if (!responseText && geminiApiKey && process.env.NODE_ENV !== 'test') {
       try {
-        const geminiOpenai = new OpenAI({
-          apiKey: geminiApiKey,
-          baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: fullMessages.map(m => ({
+              role: m.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: m.content }],
+            })),
+          }),
         });
-        const aiRes = await geminiOpenai.chat.completions.create({
-          model: 'gemini-flash-latest',
-          messages: fullMessages,
-          temperature: 0.5,
-        });
-
-        response = aiRes.choices[0]?.message?.content || '';
+        if (res.ok) {
+          const geminiData = await res.json();
+          responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        }
       } catch (err: any) {
-        console.error('Gemini OpenAI-compatible comparison chat failed:', err?.message);
+        console.warn('Gemini API comparison chat failed:', err?.message || err);
       }
     }
 
-    if (!response) {
+    if (!responseText) {
       const summaryNames = profiles.map(p => p.displayName).join(', ');
-      response = `Seçtiğiniz ${profiles.length} araç (${summaryNames}) kıyaslandığında; motor güçleri, yakıt tüketimleri ve şanzıman verimlilikleri kullanım amacınıza göre farklılık gösterir. Şehir içi pratiklik veya uzun yol konforu kriterlerinize göre en uygun modeli belirleyebilirsiniz.`;
+      responseText = `Seçtiğiniz ${profiles.length} araç (${summaryNames}) kıyaslandığında; motor güçleri, yakıt tüketimleri ve şanzıman verimlilikleri kullanım amacınıza göre farklılık gösterir. Şehir içi pratiklik veya uzun yol konforu kriterlerinize göre en uygun modeli belirleyebilirsiniz.`;
     }
 
     await this.prisma.aiChatLog.create({
       data: {
         userId: userId || 'GUEST',
-        variantId: profiles[0].vehicleId,
+        variantId: profiles[0]?.vehicleId || '',
         prompt: dto.question,
-        response,
+        response: responseText,
       },
     }).catch(() => null);
 
     const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
     return {
-      response,
+      response: responseText,
       remainingChatbotMessages,
+    };
+  }
+
+  private async recordHistory(
+    variantIds: string[],
+    result: VehicleComparisonResult,
+    userId?: string,
+  ) {
+    if (!variantIds || variantIds.length < 2 || !userId) return;
+
+    await this.prisma.vehicleComparison.create({
+      data: {
+        userId,
+        variant1Id: variantIds[0] || '',
+        variant2Id: variantIds[1] || '',
+        variantIds: variantIds,
+      },
+    }).catch(() => null);
+  }
+
+  private buildAllowedFactIdsByCriterion(p: ComparisonVehicleProfile): Record<CriterionKey, Set<string>> {
+    const dossier = p.dossier;
+    const relFacts = new Set<string>();
+    const failFacts = new Set<string>();
+    const fuelFacts = new Set<string>();
+    const safetyFacts = new Set<string>();
+    const perfFacts = new Set<string>();
+    const comfortFacts = new Set<string>();
+    const pracFacts = new Set<string>();
+    const vfmFacts = new Set<string>();
+
+    if (dossier) {
+      // REQUIREMENT 1: SOLE Fact catalog is dossier.dataQuality.supportingFacts!
+      const validFactCatalogKeys = new Set<string>(
+        (dossier.dataQuality?.supportingFacts || []).map((f: any) => f.factKey).filter(Boolean)
+      );
+
+      const addIfInCatalog = (targetSet: Set<string>, id: string) => {
+        if (validFactCatalogKeys.has(id)) {
+          targetSet.add(id);
+        }
+      };
+
+      // 1. RELIABILITY & FAILURE_SEVERITY
+      (dossier.commonProblems || []).flatMap(prob => prob.supportingFactIds || []).forEach(id => {
+        addIfInCatalog(relFacts, id);
+        addIfInCatalog(failFacts, id);
+      });
+      (dossier.maintenanceOwnership?.supportingFactIds || []).forEach(id => {
+        addIfInCatalog(relFacts, id);
+        addIfInCatalog(failFacts, id);
+      });
+      (dossier.recalls || []).flatMap(r => r.supportingFactIds || []).forEach(id => {
+        addIfInCatalog(relFacts, id);
+        addIfInCatalog(safetyFacts, id);
+      });
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => {
+          const k = f.factKey.toLowerCase();
+          return k.includes('rel') || k.includes('risk') || k.includes('score') || k.includes('problem');
+        })
+        .forEach(f => relFacts.add(f.factKey));
+
+      // 2. FUEL_EFFICIENCY
+      (dossier.performanceUsage?.supportingFactIds || [])
+        .filter(id => {
+          const k = id.toLowerCase();
+          return k.includes('fuel') || k.includes('consumption') || k.includes('tuketim') || k.includes('efficiency') || k.includes('l100km');
+        })
+        .forEach(id => addIfInCatalog(fuelFacts, id));
+      (dossier.usageScenarios || [])
+        .filter(s => s.scenarioKey === 'FUEL_ECONOMY' || s.scenarioKey === 'cityUse')
+        .flatMap(s => s.supportingFactIds || [])
+        .forEach(id => addIfInCatalog(fuelFacts, id));
+
+      // 3. SAFETY
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => {
+          const k = f.factKey.toLowerCase();
+          return k.includes('safety') || k.includes('ncap') || k.includes('adas') || k.includes('airbag') || k.includes('recall');
+        })
+        .forEach(f => safetyFacts.add(f.factKey));
+
+      // 4. PERFORMANCE
+      (dossier.engineTransmission?.supportingFactIds || []).forEach(id => addIfInCatalog(perfFacts, id));
+      (dossier.performanceUsage?.supportingFactIds || [])
+        .filter(id => {
+          const k = id.toLowerCase();
+          return k.includes('power') || k.includes('hp') || k.includes('torque') || k.includes('speed') || k.includes('acceleration') || k.includes('0to100');
+        })
+        .forEach(id => addIfInCatalog(perfFacts, id));
+
+      // 5. COMFORT
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => {
+          const k = f.factKey.toLowerCase();
+          return k.includes('comfort') || k.includes('nvh') || k.includes('isolation') || k.includes('suspension') || k.includes('daily');
+        })
+        .forEach(f => comfortFacts.add(f.factKey));
+
+      // 6. PRACTICALITY
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => {
+          const k = f.factKey.toLowerCase();
+          return k.includes('boot') || k.includes('trunk') || k.includes('bagaj') || k.includes('practical') || k.includes('space') || k.includes('capacity');
+        })
+        .forEach(f => pracFacts.add(f.factKey));
+      (dossier.performanceUsage?.supportingFactIds || [])
+        .filter(id => id.toLowerCase().includes('boot') || id.toLowerCase().includes('trunk') || id.toLowerCase().includes('bagaj'))
+        .forEach(id => addIfInCatalog(pracFacts, id));
+
+      // 7. VALUE_FOR_MONEY
+      if (dossier.trimPackageComparison || dossier.expertDecisionSynthesis?.trimPackageComparison) {
+        (dossier.supportingFactIds || [])
+          .filter(id => id.toLowerCase().includes('trim') || id.toLowerCase().includes('package') || id.toLowerCase().includes('donanim') || id.toLowerCase().includes('price'))
+          .forEach(id => addIfInCatalog(vfmFacts, id));
+      }
+    }
+
+    return {
+      RELIABILITY: relFacts,
+      FAILURE_SEVERITY: failFacts,
+      SEVERITY_DURABILITY: failFacts,
+      FUEL_EFFICIENCY: fuelFacts,
+      SAFETY: safetyFacts,
+      PERFORMANCE: perfFacts,
+      COMFORT: comfortFacts,
+      PRACTICALITY: pracFacts,
+      VALUE_FOR_MONEY: vfmFacts,
+    };
+  }
+
+  private async loadVehicleProfiles(variantIds: string[]): Promise<ComparisonVehicleProfile[]> {
+    const profiles: ComparisonVehicleProfile[] = [];
+
+    for (const id of variantIds) {
+      const v = await this.prisma.vehicleVariant.findUnique({
+        where: { id },
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+          specs: true,
+          questions: { where: { status: ApprovalStatus.APPROVED } },
+          checklists: { where: { status: ApprovalStatus.APPROVED } },
+        },
+      });
+
+      if (!v) continue;
+
+      const dossier = await this.reportLoaderService.loadDossierForVariant(id);
+      const specData: Record<string, any> = (v.specs?.specs as Record<string, any>) || {};
+
+      const priceSnapshot = await this.prisma.vehicleVariantPriceSnapshot.findUnique({
+        where: { vehicleVariantId: id },
+      }).catch(() => null);
+
+      // REQUIREMENT 2: SOLE AUTHORITY for problem confidence is dossier.dataQuality.supportingFacts!
+      const factMap = new Map<string, { source?: string; confidence?: string }>();
+      (dossier.dataQuality?.supportingFacts || []).forEach((f: any) => {
+        if (f.factKey) {
+          factMap.set(f.factKey, { source: f.source, confidence: f.confidence });
+        }
+      });
+
+      const problems = dossier.commonProblems.map(p => {
+        const probFacts = Array.isArray(p.supportingFactIds) ? p.supportingFactIds : [];
+        let highestMatchedConfidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT' = 'INSUFFICIENT';
+
+        for (const fid of probFacts) {
+          const matchedFact = factMap.get(fid);
+          if (matchedFact) {
+            const isTrustedSource = matchedFact.source && TRUSTED_FACT_SOURCES.includes(matchedFact.source);
+            const isHighConfidence = matchedFact.confidence === 'HIGH';
+            const isMediumConfidence = matchedFact.confidence === 'MEDIUM' || matchedFact.confidence === 'HIGH';
+
+            if (isTrustedSource && isHighConfidence) {
+              highestMatchedConfidence = 'HIGH';
+              break;
+            } else if (isTrustedSource && isMediumConfidence) {
+              highestMatchedConfidence = 'MEDIUM';
+            } else if (matchedFact.source !== 'UNKNOWN' && matchedFact.source !== 'SELLER_DECLARATION') {
+              if (highestMatchedConfidence === 'INSUFFICIENT') highestMatchedConfidence = 'LOW';
+            }
+          }
+        }
+
+        if (highestMatchedConfidence === 'INSUFFICIENT' && dossier.reportAvailable) {
+          highestMatchedConfidence = 'LOW';
+        }
+
+        return {
+          title: p.title,
+          affectedComponent: p.system || undefined,
+          severity: (p.severity || 'MEDIUM') as any,
+          frequency: undefined,
+          inspectionHint: p.inspectionStep || (p.symptoms && p.symptoms[0]) || undefined,
+          preventiveAction: p.preventionAdvice || p.causeExplanation || undefined,
+          confidence: highestMatchedConfidence as any,
+        };
+      });
+
+      const recalls = dossier.recalls.map(r => ({
+        title: r.title,
+        description: r.riskDescription,
+        safetyRisk: r.remedyDescription || undefined,
+      }));
+
+      const sellerQuestions = (v.questions || []).map(q => q.question);
+      const inspectionChecklist = (v.checklists || []).map(c => c.title);
+
+      const hp = dossier.performanceUsage.powerHp ?? (specData.horsepower ? Number(specData.horsepower) : undefined);
+      const torque = dossier.performanceUsage.torqueNm ?? (specData.torqueNm ? Number(specData.torqueNm) : undefined);
+      const zeroToHundred = dossier.performanceUsage.zeroToHundredKmh ?? (specData.acceleration0to100 ? Number(specData.acceleration0to100) : undefined);
+      const topSpeed = dossier.performanceUsage.topSpeedKmh ?? (specData.topSpeed ? Number(specData.topSpeed) : undefined);
+      const combinedConsumption = dossier.performanceUsage.combinedFuelL100km ?? (specData.averageFuelConsumption ? Number(specData.averageFuelConsumption) : undefined);
+      const bootLitres = dossier.performanceUsage.trunkCapacityLiters ?? (specData.luggageCapacity ? Number(specData.luggageCapacity) : undefined);
+
+      profiles.push({
+        vehicleId: v.id,
+        displayName: `${dossier.vehicleIdentity.brand || v.brand.name} ${dossier.vehicleIdentity.model || v.model.name} ${dossier.vehicleIdentity.modelYear || v.year} (${dossier.vehicleIdentity.trimName || v.trim.name})`,
+        identity: {
+          brand: dossier.vehicleIdentity.brand || v.brand.name,
+          model: dossier.vehicleIdentity.model || v.model.name,
+          generation: dossier.vehicleIdentity.generation || v.generation.name,
+          year: dossier.vehicleIdentity.modelYear || v.year,
+          bodyType: dossier.vehicleIdentity.bodyType || v.generation.bodyType,
+          engine: dossier.vehicleIdentity.engineCode || v.engine.code,
+          engineCode: dossier.vehicleIdentity.engineCode || v.engine.code,
+          transmission: dossier.vehicleIdentity.transmissionName || v.transmission.name,
+          fuelType: dossier.vehicleIdentity.fuelType || v.fuelType,
+          trim: dossier.vehicleIdentity.trimName || v.trim.name,
+        },
+        performance: {
+          horsepower: hp,
+          torqueNm: torque,
+          zeroToHundred,
+          topSpeed,
+        },
+        efficiency: {
+          combinedConsumption,
+        },
+        practicality: {
+          bootLitres,
+        },
+        comfortAndHandling: {},
+        ownership: {},
+        reliability: {
+          buyabilityScore: dossier.scoring.buyabilityScore ?? undefined,
+          riskScore: dossier.scoring.technicalRiskScore ?? undefined,
+          problems,
+          recalls,
+        },
+        sellerQuestions,
+        inspectionChecklist,
+        evidenceQuality: {
+          confidence: dossier.scoring.overallConfidence,
+          missingFields: dossier.scoring.buyabilityScore === null ? ['buyabilityScore'] : [],
+        },
+        dossier,
+        priceSnapshot,
+      } as any);
+    }
+
+    return profiles;
+  }
+
+  private async buildFallbackCriterionAssessments(
+    p: ComparisonVehicleProfile,
+  ): Promise<Record<CriterionKey, CriterionAssessment>> {
+    const dossier = p.dossier;
+    const problems = p.reliability.problems || [];
+
+    const allowedFactIds = this.buildAllowedFactIdsByCriterion(p);
+    const relAllowedFacts = Array.from(allowedFactIds['RELIABILITY'] || []);
+
+    const priceSnapshot = (p as any).priceSnapshot || await this.prisma.vehicleVariantPriceSnapshot.findUnique({
+      where: { vehicleVariantId: p.vehicleId },
+    }).catch(() => null);
+
+    const verifiedPriceEvidence = getVerifiedMarketPriceEvidence(priceSnapshot);
+    const hasTrimEvidence = !!(dossier?.trimPackageComparison || dossier?.expertDecisionSynthesis?.trimPackageComparison);
+
+    // Requirement 3: DO NOT use buyabilityScore for RELIABILITY in Fallback!
+    // ONLY use 100 - technicalRiskScore if technicalRiskScore exists!
+    const rawRelScore = (dossier?.scoring?.technicalRiskScore !== null && dossier?.scoring?.technicalRiskScore !== undefined)
+      ? Math.max(0, 100 - dossier.scoring.technicalRiskScore)
+      : null;
+
+    const relScore = relAllowedFacts.length > 0 ? rawRelScore : null;
+    const relInsufficient = relScore === null;
+    const reliability: CriterionAssessment = {
+      criterionKey: 'RELIABILITY',
+      score: relScore,
+      stars: relInsufficient ? null : Math.max(0.5, Math.min(5, Math.round((relScore! / 20) * 2) / 2)),
+      confidence: relInsufficient ? 'INSUFFICIENT' : 'MEDIUM',
+      summary: relInsufficient
+        ? 'Doğrulanmış teknik arıza riski skoru veya uygun kanıt verisi bulunmamaktadır.'
+        : `${p.displayName} için doğrulanmış teknik arıza riski skoru ${relScore}/100.`,
+      positiveFactors: [],
+      compromises: problems.map(pr => `${pr.title} (${pr.severity})`),
+      supportingFactIds: relInsufficient ? [] : relAllowedFacts,
+      missingInputs: relInsufficient ? ['Doğrulanmış GeneratedVehicleReport teknik arıza risk skoru eksik'] : [],
+      insufficientData: relInsufficient,
+    };
+
+    const emptyCriterion = (key: CriterionKey, name: string): CriterionAssessment => ({
+      criterionKey: key,
+      score: null,
+      stars: null,
+      confidence: 'INSUFFICIENT',
+      summary: `${name} için doğrulanmış rapor analizi gereklidir.`,
+      positiveFactors: [],
+      compromises: [],
+      supportingFactIds: [],
+      missingInputs: [`${name} verisi eksik`],
+      insufficientData: true,
+    });
+
+    const vfmValid = !!(verifiedPriceEvidence && hasTrimEvidence);
+    const valueForMoney: CriterionAssessment = {
+      criterionKey: 'VALUE_FOR_MONEY',
+      score: null,
+      stars: null,
+      confidence: 'INSUFFICIENT',
+      summary: vfmValid
+        ? `${p.displayName} piyasa fiyatı ${verifiedPriceEvidence!.minPrice?.toLocaleString('tr-TR')} - ${verifiedPriceEvidence!.maxPrice?.toLocaleString('tr-TR')} TL aralığındadır.`
+        : 'Güncel piyasa fiyat verisi bulunmamaktadır.',
+      positiveFactors: [],
+      compromises: [],
+      supportingFactIds: vfmValid ? Array.from(allowedFactIds['VALUE_FOR_MONEY'] || []) : [],
+      missingInputs: ['Fiyat/donanım oran puanlama kanıtı eksik'],
+      insufficientData: true,
+      marketPriceEvidence: vfmValid ? verifiedPriceEvidence : undefined,
+    };
+
+    return {
+      RELIABILITY: reliability,
+      FAILURE_SEVERITY: emptyCriterion('FAILURE_SEVERITY', 'Arıza ciddiyeti'),
+      SEVERITY_DURABILITY: emptyCriterion('SEVERITY_DURABILITY', 'Arıza ciddiyeti'),
+      FUEL_EFFICIENCY: emptyCriterion('FUEL_EFFICIENCY', 'Yakıt verimliliği'),
+      SAFETY: emptyCriterion('SAFETY', 'Güvenlik'),
+      PERFORMANCE: emptyCriterion('PERFORMANCE', 'Motor performansı'),
+      COMFORT: emptyCriterion('COMFORT', 'Kabin konforu'),
+      PRACTICALITY: emptyCriterion('PRACTICALITY', 'Kullanışlılık'),
+      VALUE_FOR_MONEY: valueForMoney,
+    };
+  }
+
+  private buildComparisonCriterionResult(
+    evaluations: VehicleCriterionEvaluation[],
+  ): ComparisonCriterionResult {
+    const keys: CriterionKey[] = [
+      'RELIABILITY',
+      'FAILURE_SEVERITY',
+      'FUEL_EFFICIENCY',
+      'SAFETY',
+      'PERFORMANCE',
+      'COMFORT',
+      'PRACTICALITY',
+      'VALUE_FOR_MONEY',
+    ];
+
+    const rankings: Record<CriterionKey, any> = {} as any;
+
+    for (const key of keys) {
+      const valid = evaluations
+        .map(e => ({ vehicleId: e.vehicleId, vehicleName: e.vehicleName, assessment: e.assessments[key] }))
+        .filter(x => x.assessment && typeof x.assessment.score === 'number' && !x.assessment.insufficientData);
+
+      if (valid.length === 0) {
+        rankings[key] = {
+          winnerVehicleIds: [],
+          winnerVehicleNames: [],
+          isTie: false,
+          insufficientData: true,
+          reasoning: 'Bu kriter için araçlar arasında karşılaştırılabilir veri bulunmuyor.',
+        };
+      } else {
+        valid.sort((a, b) => (b.assessment.score || 0) - (a.assessment.score || 0));
+        const maxScore = valid[0].assessment.score || 0;
+        const winners = valid.filter(x => x.assessment.score === maxScore);
+
+        rankings[key] = {
+          winnerVehicleIds: winners.map(w => w.vehicleId),
+          winnerVehicleNames: winners.map(w => w.vehicleName),
+          isTie: winners.length > 1,
+          insufficientData: false,
+          reasoning: winners.length > 1
+            ? `${winners.map(w => w.vehicleName).join(' ve ')} bu kriterde eşit puana sahiptir (${maxScore}/100).`
+            : `${winners[0].vehicleName} bu kriterde en yüksek kanıta dayalı puanı elde etmiştir (${maxScore}/100).`,
+        };
+      }
+    }
+
+    return {
+      vehicleEvaluations: evaluations,
+      criterionRankings: rankings,
+    };
+  }
+
+  private async generateAdvancedAiComparison(
+    profiles: ComparisonVehicleProfile[],
+    priority: ComparisonPriority,
+    sourceDataVersion: string,
+  ): Promise<VehicleComparisonResult> {
+    const diagnostics: ComparisonGenerationDiagnostics = {
+      comparisonId: `comp_${Date.now()}`,
+      generationMode: 'AI',
+      provider: process.env.COMPARISON_AI_PROVIDER || 'OpenAI',
+      model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
+      requestStartedAt: new Date().toISOString(),
+    };
+
+    const summaryList = profiles.map((p, i) => {
+      const dossier = p.dossier;
+      const reportStatus = dossier?.reportAvailable
+        ? `Geçerli GeneratedVehicleReport Var (Rapor ID: ${dossier.reportId}, Sürüm: ${dossier.reportVersion || 'Güncel'})`
+        : `GeneratedVehicleReport Bulunamadı (Doğrulanmış Veritabanından Üretildi)`;
+
+      const buyabilityStr = dossier?.scoring?.buyabilityScore !== null && dossier?.scoring?.buyabilityScore !== undefined ? `${dossier.scoring.buyabilityScore}/100` : 'Belirtilmedi';
+      const riskStr = dossier?.scoring?.technicalRiskScore !== null && dossier?.scoring?.technicalRiskScore !== undefined ? `${dossier.scoring.technicalRiskScore}/100` : 'Belirtilmedi';
+      const dataConfStr = dossier?.scoring?.dataConfidenceScore !== null && dossier?.scoring?.dataConfidenceScore !== undefined ? `${dossier.scoring.dataConfidenceScore}/100` : 'Belirtilmedi';
+
+      const probsText = p.reliability.problems.length > 0
+        ? p.reliability.problems.map(prob => `    * ${prob.title} (Şiddet: ${prob.severity}${prob.inspectionHint ? ' | Ekspertiz: ' + prob.inspectionHint : ''})`).join('\n')
+        : '    * Onaylı kronik arıza veritabanında/raporda bulunmuyor.';
+
+      const recallsText = (p.reliability.recalls && p.reliability.recalls.length > 0)
+        ? p.reliability.recalls.map(r => `    * ${r.title}: ${r.description}`).join('\n')
+        : '    * Aktif geri çağırma kampanyası bulunmuyor.';
+
+      const maintNotes = dossier?.maintenanceOwnership?.criticalMaintenanceNotes?.length
+        ? dossier.maintenanceOwnership.criticalMaintenanceNotes.map((m: string) => `    * ${m}`).join('\n')
+        : '    * Detaylı bakım kaydı veritabanında eksik.';
+
+      const usageScenariosText = dossier?.usageScenarios?.length
+        ? dossier.usageScenarios.map((s: any) => `    * ${s.title}: ${s.suitability} (${s.reasoning})`).join('\n')
+        : '    * Senaryo verisi standart veritabanından hesaplandı.';
+
+      const factList = (dossier?.dataQuality?.supportingFacts || []).map((f: any) => `      [Fact ID: ${f.factKey}] ${f.label}: ${f.value} (${f.source})`).join('\n');
+      const factIdsText = dossier?.supportingFactIds?.length
+        ? `Kullanılabilir Fact ID'leri: ${dossier.supportingFactIds.join(', ')}\n${factList}`
+        : 'Kullanılabilir Fact ID bulunmuyor.';
+
+      return `ARAÇ ${i + 1} ID: "${p.vehicleId}"
+Tam İsim: ${p.displayName}
+Rapor Kaynak Durumu: ${reportStatus}
+Puanlama: Satın Alınabilirlik Score: ${buyabilityStr}, Teknik Risk Score: ${riskStr}, Veri Güveni: ${dataConfStr}
+Motor: ${p.identity.engineCode || 'Belirtilmedi'} (${p.identity.fuelType || 'Benzin'})
+Şanzıman: ${p.identity.transmission || 'Belirtilmedi'}
+Ortalama Yakıt Tüketimi: ${p.efficiency.combinedConsumption ? p.efficiency.combinedConsumption + ' L/100km' : 'Veri yok'}
+0-100 km/h İvmelenme: ${p.performance.zeroToHundred ? p.performance.zeroToHundred + ' sn' : 'Veri yok'}
+Motor Gücü: ${p.performance.horsepower ? p.performance.horsepower + ' HP' : 'Veri yok'}
+Bagaj Hacmi: ${p.practicality.bootLitres ? p.practicality.bootLitres + ' Litre' : 'Veri yok'}
+${factIdsText}
+Kronik Arızalar & Riskler:
+${probsText}
+Geri Çağırma Kampanyaları:
+${recallsText}
+Bakım & Sahiplik Notları:
+${maintNotes}
+Kullanım Senaryoları Uyumluluğu:
+${usageScenariosText}`;
+    }).join('\n\n');
+
+    const prompt = `Sen TorqueScout otomotiv istihbarat sisteminin kıdemli otomotiv uzmanı ve baş analistisin.
+Aşağıda veritabanından doğrulanmış teknik özellikleri ve onaylı kronik arıza kayıtları verilen ${profiles.length} adet aracı derinlemesine kıyasla.
+
+KULLANICI ÖNCELİĞİ: ${priority}
+
+ARAÇ VERİLERİ:
+${summaryList}
+
+KATI TALİMATLAR:
+1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. ("Kullanım amacınıza göre değişir", "En doğru araç bütçenize uygun olandır" gibi jenerik cümleler ASLA KULLANILAMAZ).
+2. JSON alanlarında MARKDOWN İŞARETLERİ (**bold**, ### başlık, satır başı -) KULLANMA. Düz metin üret.
+3. Kriter 1-7 ve arıza anlatımlarında TL, ₺, tamir fiyatı tahmini, parça ücreti veya işçilik tahmini ASLA KULLANMA. Arızanın büyüklüğünü parasal değil teknik sonuç olarak tanımla.
+4. "criterionAssessments" objesinde SEÇİLEN TÜM ${profiles.length} ARAÇ VE HER ARAÇ İÇİN TAM 8 KRİTER ("RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "SAFETY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "VALUE_FOR_MONEY") DÖNDÜRÜLMELİDİR.
+5. Her kriter için:
+   - score: 0-100 arasında tamsayı VEYA kanıt yetersizse null. (Score non-null ise supportingFactIds BOŞ OLAMAZ!).
+   - confidence: "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT".
+   - summary: Gerekçeli teknik analiz özeti.
+   - positiveFactors: Olumlu kanıtlar dizisi.
+   - compromises: Olumsuz riskler dizisi.
+   - supportingFactIds: YALNIZCA o aracın verilerinde tanımlanmış ve O KRİTERE UYGUN geçerli Fact ID'lerini içeren dizi. (Non-null puan için geçerli Fact ID zorunludur!).
+   - missingInputs: Eksik veriler dizisi.
+   - insufficientData: boolean (score null ise true, non-null ise false).
+6. Fiyat verisi yalnızca Kriter 8 ("VALUE_FOR_MONEY") içinde backend verisine dayanılarak verilebilir. Fiyat tahminini AI olarak sıfırdan UYDURMA. Donanım paketi karşılaştırması veya fiyat kanıtı yoksa score null olmalıdır.
+
+Lütfen SADECE geçerli JSON yanıt ver:
+{
+  "headline": "Kısa ve çarpıcı karşılaştırma başlığı",
+  "executiveSummary": "2-3 paragraflık derin teknik ve mantıksal karar özeti",
+  "overallRecommendation": {
+    "vehicleId": "${profiles[0].vehicleId}",
+    "vehicleName": "${profiles[0].displayName}",
+    "label": "En Dengeli Seçenek",
+    "reasoning": "Gerekçeli kazanan açıklaması",
+    "confidence": "HIGH"
+  },
+  "criterionAssessments": {
+    "${profiles[0].vehicleId}": {
+      "RELIABILITY": {
+        "score": null,
+        "confidence": "INSUFFICIENT",
+        "summary": "Doğrulanmış kanıt metinleri analiz edilmektedir.",
+        "positiveFactors": [],
+        "compromises": [],
+        "supportingFactIds": [],
+        "missingInputs": ["Doğrulanmış kanıt verisi bekleniyor"],
+        "insufficientData": true
+      },
+      "FAILURE_SEVERITY": {
+        "score": null,
+        "confidence": "INSUFFICIENT",
+        "summary": "Arıza ciddiyet analizi bekleniyor.",
+        "positiveFactors": [],
+        "compromises": [],
+        "supportingFactIds": [],
+        "missingInputs": [],
+        "insufficientData": true
+      },
+      "FUEL_EFFICIENCY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "SAFETY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "PERFORMANCE": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "COMFORT": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "PRACTICALITY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "VALUE_FOR_MONEY": {
+        "score": null,
+        "confidence": "INSUFFICIENT",
+        "summary": "Piyasa fiyatı ve donanım verisi bekleniyor.",
+        "positiveFactors": [],
+        "compromises": [],
+        "supportingFactIds": [],
+        "missingInputs": [],
+        "insufficientData": true
+      }
+    }
+  },
+  "scenarioRecommendations": [
+    {
+      "scenarioKey": "FUEL_ECONOMY",
+      "title": "Yakıt Ekonomisi & Düşük Tüketim",
+      "recommendedVehicleIds": ["${profiles[0].vehicleId}"],
+      "recommendedVehicleNames": ["${profiles[0].displayName}"],
+      "reasoning": "En düşük doğrulanmış yakıt tüketimine sahip"
+    }
+  ],
+  "vehicleVerdicts": [
+    {
+      "vehicleId": "${profiles[0].vehicleId}",
+      "vehicleName": "${profiles[0].displayName}",
+      "characterSummary": "Kompakt ve Dengeli Premium",
+      "bestFor": ["Şehir içi pratiklik", "Düşük yakıt maliyeti"],
+      "notIdealFor": ["Düşük devirde tork beklentisi"],
+      "gains": ["Düşük yakıt tüketimi", "Kolay park etme"],
+      "compromises": ["Daha sınırlı kabin genişliği"],
+      "criticalRisks": ["Şanzıman vuruntu ve bakım hassasiyeti"],
+      "prePurchaseChecks": ["Ekspertiz vites geçiş testi"]
+    }
+  ],
+  "riskComparison": {
+    "narrative": "Kronik sorunların sıklık ve mekanik ciddiyet açısından kıyaslaması",
+    "lowestRiskVehicleId": "${profiles[0].vehicleId}"
+  },
+  "ownershipCostComparison": {
+    "narrative": "Yakıt ve bakım hassasiyeti kıyaslaması"
+  },
+  "narrativeRecommendation": "Açık konuşmak gerekirse...",
+  "decisionMatrix": [],
+  "finalDecisionGuide": [],
+  "dataWarnings": []
+}`;
+
+    let resultJsonText = '';
+    const startTime = Date.now();
+
+    if (this.openai) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Yalnızca geçerli JSON dön.' },
+            { role: 'user', content: prompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.3,
+        });
+
+        resultJsonText = response.choices[0]?.message?.content || '';
+        diagnostics.promptTokens = response.usage?.prompt_tokens;
+        diagnostics.completionTokens = response.usage?.completion_tokens;
+        diagnostics.totalTokens = response.usage?.total_tokens;
+      } catch (err: any) {
+        console.warn('OpenAI comparison call warning:', err?.message || err);
+      }
+    }
+
+    if (!resultJsonText && process.env.NODE_ENV !== 'test') {
+      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
+      if (geminiApiKey) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+          const res = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          });
+
+          if (res.ok) {
+            const geminiData = await res.json();
+            resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          }
+        } catch (err: any) {
+          console.warn('Gemini API comparison call warning:', err?.message || err);
+        }
+      }
+    }
+
+    diagnostics.durationMs = Date.now() - startTime;
+    diagnostics.requestCompletedAt = new Date().toISOString();
+
+    if (!resultJsonText) {
+      diagnostics.fallbackReason = 'PROVIDER_ERROR';
+      throw new Error('AI providers returned empty output');
+    }
+
+    const parsed = JSON.parse(resultJsonText.replace(/```json\n?|\n?```/g, '').trim());
+
+    if (!parsed.criterionAssessments || typeof parsed.criterionAssessments !== 'object') {
+      throw new Error('AI output is missing required criterionAssessments object');
+    }
+
+    for (const p of profiles) {
+      const vAssessments = parsed.criterionAssessments[p.vehicleId];
+      if (!vAssessments || typeof vAssessments !== 'object') {
+        throw new Error(`AI criterionAssessments missing for vehicleId: ${p.vehicleId}`);
+      }
+
+      const requiredKeys: CriterionKey[] = [
+        'RELIABILITY',
+        'FAILURE_SEVERITY',
+        'FUEL_EFFICIENCY',
+        'SAFETY',
+        'PERFORMANCE',
+        'COMFORT',
+        'PRACTICALITY',
+        'VALUE_FOR_MONEY',
+      ];
+
+      // REQUIREMENT 1: Authoritative dossierFactIds MUST come ONLY from dataQuality.supportingFacts!
+      const dossierFactIds = new Set<string>(
+        (p.dossier?.dataQuality?.supportingFacts || []).map((f: any) => f.factKey).filter(Boolean)
+      );
+
+      const allowedFactIdsByCriterion = this.buildAllowedFactIdsByCriterion(p);
+      const hasTrimEvidence = !!(p.dossier?.trimPackageComparison || p.dossier?.expertDecisionSynthesis?.trimPackageComparison);
+
+      const priceSnapshot = (p as any).priceSnapshot || await this.prisma.vehicleVariantPriceSnapshot.findUnique({
+        where: { vehicleVariantId: p.vehicleId },
+      }).catch(() => null);
+
+      const verifiedPriceEvidence = getVerifiedMarketPriceEvidence(priceSnapshot);
+
+      for (const key of requiredKeys) {
+        const raw = vAssessments[key] || (key === 'FAILURE_SEVERITY' ? vAssessments['SEVERITY_DURABILITY'] : undefined);
+        if (!raw) {
+          throw new Error(`Vehicle ${p.vehicleId} is missing criterion: ${key}`);
+        }
+
+        if (
+          !Array.isArray(raw.positiveFactors) ||
+          !Array.isArray(raw.compromises || raw.negativeFactors) ||
+          !Array.isArray(raw.supportingFactIds) ||
+          !Array.isArray(raw.missingInputs)
+        ) {
+          throw new Error(`Vehicle ${p.vehicleId} criterion ${key} array fields must be Arrays`);
+        }
+
+        const validConfidences = ['HIGH', 'MEDIUM', 'LOW', 'INSUFFICIENT'];
+        if (!validConfidences.includes(raw.confidence)) {
+          throw new Error(`Invalid confidence ${raw.confidence} in criterion ${key} for vehicle ${p.vehicleId}`);
+        }
+
+        const criterionAllowList = allowedFactIdsByCriterion[key] || new Set<string>();
+
+        if (criterionAllowList.size === 0 && raw.score !== null) {
+          throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} has score ${raw.score} but criterion allowlist is empty`);
+        }
+
+        if (key === 'VALUE_FOR_MONEY') {
+          if (!verifiedPriceEvidence || !hasTrimEvidence) {
+            if (raw.score !== null) {
+              throw new Error(`VALUE_FOR_MONEY non-null score for vehicle ${p.vehicleId} REJECTED because valid backend price snapshot or trim evidence is missing`);
+            }
+            raw.score = null;
+            raw.insufficientData = true;
+            raw.confidence = 'INSUFFICIENT';
+            raw.marketPriceEvidence = undefined;
+          } else {
+            raw.marketPriceEvidence = verifiedPriceEvidence;
+          }
+        }
+
+        if (raw.score === null) {
+          if (raw.insufficientData !== true) {
+            throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} has score:null but insufficientData is not true`);
+          }
+          if (raw.confidence !== 'INSUFFICIENT') {
+            throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} has score:null but confidence is not INSUFFICIENT`);
+          }
+        } else {
+          if (typeof raw.score !== 'number' || raw.score < 0 || raw.score > 100) {
+            throw new Error(`Invalid score ${raw.score} in criterion ${key} for vehicle ${p.vehicleId}`);
+          }
+
+          if (raw.insufficientData !== false) {
+            throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} has non-null score but insufficientData is not false`);
+          }
+
+          const factIds: string[] = raw.supportingFactIds;
+          if (factIds.length === 0) {
+            throw new Error(`Non-null score in ${key} for vehicle ${p.vehicleId} REQUIRES non-empty supportingFactIds`);
+          }
+
+          if (dossierFactIds.size === 0) {
+            throw new Error(`Non-null score in ${key} for vehicle ${p.vehicleId} rejected because vehicle dossier has empty fact list`);
+          }
+
+          const hasInvalidFactId = factIds.some(fid => !criterionAllowList.has(fid));
+          if (hasInvalidFactId) {
+            throw new Error(`Invalid supportingFactId in ${key} for vehicle ${p.vehicleId}: Fact ID is not allowed for criterion ${key}`);
+          }
+
+          if (key !== 'VALUE_FOR_MONEY' && raw.marketPriceEvidence) {
+            throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} MUST NOT contain marketPriceEvidence`);
+          }
+        }
+      }
+    }
+
+    const vehicleEvaluations: VehicleCriterionEvaluation[] = profiles.map((p) => {
+      const vAssessments = parsed.criterionAssessments[p.vehicleId];
+      return computeBackendCriterionMetrics(vAssessments, p.vehicleId, p.displayName);
+    });
+
+    const criterionResult = this.buildComparisonCriterionResult(vehicleEvaluations);
+    parsed.criterionResult = criterionResult;
+
+    const validation = validateComparisonSemantics(parsed, profiles);
+    if (!validation.isValid) {
+      diagnostics.validationFailed = true;
+      diagnostics.validationErrors = validation.errors;
+      throw new Error(`Semantic validation failed: ${validation.errors.join('; ')}`);
+    }
+
+    const defaultEmptyNarrative = 'Bu bölüm için yeterli doğrulanmış veri bulunmuyor.';
+
+    const rawResult: VehicleComparisonResult = {
+      comparisonId: diagnostics.comparisonId,
+      schemaVersion: '6.0',
+      promptVersion: '6',
+      engineVersion: 'comparison-v6',
+      generationMode: 'AI',
+      generatedAt: new Date().toISOString(),
+      sourceDataVersion,
+      selectedPriority: priority,
+      headline: parsed.headline || `${profiles.length} Araç Karşılaştırma Analizi`,
+      executiveSummary: parsed.executiveSummary || 'Araçların teknik verileri ve kronik durumları detaylıca incelenmiştir.',
+      overallRecommendation: parsed.overallRecommendation || {
+        label: 'Net Kazanan İçin Yeterli Veri Yok',
+        reasoning: 'Gerekçeli kazanan analizi tamamlananamıştır.',
+        confidence: 'INSUFFICIENT',
+      },
+      scenarioRecommendations: parsed.scenarioRecommendations || [],
+      vehicleVerdicts: parsed.vehicleVerdicts || [],
+      criterionResult,
+      riskComparison: parsed.riskComparison || { narrative: 'Kronik arıza kayıtları kıyaslanmıştır.' },
+      recallComparison: profiles.flatMap(p => 
+        (p.reliability.recalls || []).map(r => ({
+          vehicleId: p.vehicleId,
+          vehicleName: p.displayName,
+          title: r.title,
+          description: r.description,
+          safetyImpact: r.safetyRisk,
+          verificationInstruction: 'Bu geri çağırma kampanyasının uygulanıp uygulanmadığını yetkili servisten şasi numarası sorgulatarak doğrulayın.',
+        }))
+      ),
+      ownershipCostComparison: parsed.ownershipCostComparison || { narrative: defaultEmptyNarrative },
+      narrativeRecommendation: parsed.narrativeRecommendation || defaultEmptyNarrative,
+      decisionMatrix: parsed.decisionMatrix || [],
+      finalDecisionGuide: parsed.finalDecisionGuide || [],
+      dataWarnings: parsed.dataWarnings || [],
+    };
+
+    return sanitizeComparisonResult(rawResult);
+  }
+
+  private buildFallbackCautions(p: ComparisonVehicleProfile): string[] {
+    const cautions: string[] = [];
+
+    if (p.reliability.problems.length > 0) {
+      p.reliability.problems.forEach(prob => cautions.push(`${prob.title} (${prob.severity} risk seviyesi)`));
+    }
+
+    if (p.efficiency.combinedConsumption) {
+      cautions.push(`Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi`);
+    }
+
+    if (p.practicality.bootLitres && p.practicality.bootLitres < 400) {
+      cautions.push(`${p.practicality.bootLitres} Litre bagaj hacmi`);
+    }
+
+    return cautions;
+  }
+
+  private async generateFallbackResult(
+    profiles: ComparisonVehicleProfile[],
+    priority: ComparisonPriority,
+    sourceDataVersion: string,
+  ): Promise<VehicleComparisonResult> {
+    const vehicleEvaluations: VehicleCriterionEvaluation[] = await Promise.all(
+      profiles.map(async (p) => {
+        const fallbackAssessments = await this.buildFallbackCriterionAssessments(p);
+        return computeBackendCriterionMetrics(fallbackAssessments, p.vehicleId, p.displayName);
+      })
+    );
+
+    const criterionResult = this.buildComparisonCriterionResult(vehicleEvaluations);
+
+    // REQUIREMENT 2: Remove default generic fallback strings!
+    const vehicleCards = profiles.map(p => ({
+      vehicleId: p.vehicleId,
+      vehicleName: p.displayName,
+      identity: {
+        year: p.identity.year,
+        engine: p.identity.engine,
+        transmission: p.identity.transmission,
+        trim: p.identity.trim,
+      },
+      characterSummary: p.dossier?.executiveSummary?.oneSentenceSummary || `${p.displayName} veritabanı verileriyle analiz edilmiştir.`,
+      strengths: p.efficiency.combinedConsumption ? [`${p.efficiency.combinedConsumption} L/100km fabrika tüketim verisi`] : [],
+      cautions: this.buildFallbackCautions(p),
+      bestFor: [],
+      notIdealFor: [],
+      criticalRisks: p.reliability.problems.slice(0, 2).map(prob => ({
+        title: prob.title,
+        severity: (prob.severity || 'MEDIUM') as any,
+        shortExplanation: prob.inspectionHint || prob.preventiveAction,
+      })),
+      prePurchaseChecks: p.inspectionChecklist.slice(0, 3),
+      supportingFacts: (p.dossier?.dataQuality?.supportingFacts || []).map((f: any) => f.factKey).filter(Boolean),
+      evidenceConfidence: 'LOW' as const,
+    }));
+
+    const defaultEmptyNarrative = 'Bu bölüm için yeterli doğrulanmış veri bulunmuyor.';
+
+    return {
+      comparisonId: `comp_fallback_${Date.now()}`,
+      schemaVersion: '6.0',
+      promptVersion: '6',
+      engineVersion: 'comparison-v6',
+      generationMode: 'FALLBACK',
+      generatedAt: new Date().toISOString(),
+      sourceDataVersion,
+      selectedPriority: priority,
+      headline: `${profiles.length} Araç Teknik Veri Karşılaştırması (AI Servis Geçici Devre Dışı)`,
+      executiveSummary: 'AI karşılaştırması tamamlanamadı; teknik veriler listeleniyor.',
+      overallRecommendation: {
+        label: 'Net Kazanan İçin Yeterli Veri Yok',
+        reasoning: 'Canlı AI servisine erişilemediği için veritabanı kayıtlarından genel kazanan belirlenmemiştir.',
+        confidence: 'INSUFFICIENT',
+      },
+      vehicleCards,
+      scenarioRecommendations: [],
+      vehicleVerdicts: profiles.map(p => ({
+        vehicleId: p.vehicleId,
+        vehicleName: p.displayName,
+        characterSummary: p.dossier?.executiveSummary?.oneSentenceSummary || `${p.displayName} teknik özellikleri doğrulanmıştır.`,
+        bestFor: [],
+        notIdealFor: [],
+        gains: [],
+        compromises: [],
+        criticalRisks: p.reliability.problems.map(prob => prob.title),
+        prePurchaseChecks: p.inspectionChecklist.slice(0, 3),
+        evidenceConfidence: 'LOW' as const,
+      })),
+      criterionResult,
+      riskComparison: {
+        narrative: 'Kronik arıza kayıtları veritabanındaki onaylı veriler doğrultusunda listelenmiştir.',
+        items: profiles.flatMap(p => p.reliability.problems.map(prob => ({
+          vehicleId: p.vehicleId,
+          vehicleName: p.displayName,
+          problemTitle: prob.title,
+          severity: (prob.severity || 'MEDIUM') as any,
+          frequency: prob.frequency,
+          detectability: 'MODERATE' as const,
+          narrative: `${prob.title}: ${prob.preventiveAction || prob.inspectionHint || 'Ekspertiz kontrolü önerilir.'}`,
+        }))),
+      },
+      ownershipCostComparison: {
+        narrative: defaultEmptyNarrative,
+      },
+      narrativeRecommendation: defaultEmptyNarrative,
+      decisionMatrix: [],
+      finalDecisionGuide: [],
+      dataWarnings: [
+        {
+          section: 'GENERAL',
+          message: 'AI karşılaştırması tamamlanamadı; teknik veriler listeleniyor.',
+          severity: 'INFO',
+        },
+      ],
     };
   }
 }
