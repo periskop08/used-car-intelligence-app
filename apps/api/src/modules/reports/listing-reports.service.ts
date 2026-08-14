@@ -404,19 +404,33 @@ export class ListingReportsService {
     const duplicateCollisionListings = await runCheck('duplicateCollisionListings', 'Mükerrer / Çakışan Aktif İlanlar', async () => {
       const activeListings = await this.prisma.vehicleListing.findMany({
         where: { status: 'ACTIVE' },
-        select: { id: true, sellerId: true, vehicleVariantId: true, kilometers: true, priceAmount: true, modelYear: true },
+        select: { id: true, sellerId: true, vehicleVariantId: true, kilometers: true, priceAmount: true, modelYear: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
       });
-      const groups = new Map<string, number>();
-      let collisionsCount = 0;
-      for (const l of activeListings) {
-        if (!l.sellerId || !l.vehicleVariantId) continue;
-        const key = `${l.sellerId}_${l.vehicleVariantId}_${l.modelYear}_${l.kilometers}_${l.priceAmount}`;
-        const prev = groups.get(key) || 0;
-        groups.set(key, prev + 1);
-        if (prev === 1) collisionsCount += 2;
-        else if (prev > 1) collisionsCount += 1;
+      const collisionIds = new Set<string>();
+      for (let i = 0; i < activeListings.length; i++) {
+        for (let j = i + 1; j < activeListings.length; j++) {
+          const a = activeListings[i];
+          const b = activeListings[j];
+          if (
+            a.sellerId &&
+            a.sellerId === b.sellerId &&
+            a.vehicleVariantId &&
+            a.vehicleVariantId === b.vehicleVariantId &&
+            a.modelYear === b.modelYear &&
+            a.kilometers === b.kilometers &&
+            Number(a.priceAmount) === Number(b.priceAmount)
+          ) {
+            // Check if created within 2 minutes (120,000 ms)
+            const timeDiff = Math.abs(a.createdAt.getTime() - b.createdAt.getTime());
+            if (timeDiff <= 120000) {
+              collisionIds.add(a.id);
+              collisionIds.add(b.id);
+            }
+          }
+        }
       }
-      return { count: collisionsCount, issues: [] };
+      return { count: collisionIds.size, issues: [] };
     });
 
     const checks = {
@@ -559,23 +573,33 @@ export class ListingReportsService {
       const activeListings = await this.prisma.vehicleListing.findMany({
         where: { status: 'ACTIVE' },
         include: { seller: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'asc' },
       });
-      const groups = new Map<string, any[]>();
-      for (const l of activeListings) {
-        if (!l.sellerId || !l.vehicleVariantId) continue;
-        const key = `${l.sellerId}_${l.vehicleVariantId}_${l.modelYear}_${l.kilometers}_${l.priceAmount}`;
-        const list = groups.get(key) || [];
-        list.push(l);
-        groups.set(key, list);
-      }
-      const collisions: any[] = [];
-      groups.forEach((group) => {
-        if (group.length > 1) {
-          group.forEach((l) => collisions.push(l));
+      const collisionsMap = new Map<string, any>();
+      for (let i = 0; i < activeListings.length; i++) {
+        for (let j = i + 1; j < activeListings.length; j++) {
+          const a = activeListings[i];
+          const b = activeListings[j];
+          if (
+            a.sellerId &&
+            a.sellerId === b.sellerId &&
+            a.vehicleVariantId &&
+            a.vehicleVariantId === b.vehicleVariantId &&
+            a.modelYear === b.modelYear &&
+            a.kilometers === b.kilometers &&
+            Number(a.priceAmount) === Number(b.priceAmount)
+          ) {
+            const timeDiff = Math.abs(a.createdAt.getTime() - b.createdAt.getTime());
+            if (timeDiff <= 120000) {
+              collisionsMap.set(a.id, a);
+              collisionsMap.set(b.id, b);
+            }
+          }
         }
-      });
-      issues = collisions.slice(0, 50).map((l) => formatIssueItem(l, 'Aynı satıcı tarafından tamamen aynı araç özellikleri ve fiyat ile aynı anda oluşturulmuş mükerrer teknik aktif kayıt.'));
+      }
+      issues = Array.from(collisionsMap.values()).map((l) =>
+        formatIssueItem(l, 'Teknik olarak aynı ilan kimliğine bağlanan birden fazla aktif kayıt (2 dakika içinde oluşturulmuş mükerrer teknik çakışma).'),
+      );
     }
 
     return {
