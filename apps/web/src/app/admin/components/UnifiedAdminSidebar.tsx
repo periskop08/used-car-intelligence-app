@@ -66,7 +66,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     children: [
       { key: 'LISTING_MODERATION', label: 'İlan Moderasyonu', href: '/admin/listings' },
       { key: 'LISTING_PERFORMANCE', label: 'İlan Performansı', href: '/admin/listings/performance' },
-      { key: 'LISTING_QUALITY', label: 'Kalite Denetimi', href: '/admin/listings/quality' },
+      { key: 'LISTING_QUALITY', label: 'İlan Veri Sağlığı', href: '/admin/listings/quality' },
     ],
   },
   {

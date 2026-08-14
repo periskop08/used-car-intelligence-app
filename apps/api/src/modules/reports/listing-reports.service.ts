@@ -294,13 +294,297 @@ export class ListingReportsService {
     };
   }
 
-  async getQuality(filter: any) {
+  /**
+   * Performs real technical data health checks across all listings.
+   * Returns exact check statuses: 'OK' | 'ISSUES_FOUND' | 'CHECK_FAILED' | 'NOT_CHECKED'.
+   */
+  async getQuality(filter?: any) {
+    const checkedAt = new Date().toISOString();
+    const now = new Date();
+
+    // Helper for safe check execution
+    const runCheck = async (key: string, title: string, queryFn: () => Promise<{ count: number; issues: any[] }>) => {
+      try {
+        const result = await queryFn();
+        return {
+          key,
+          title,
+          status: result.count > 0 ? 'ISSUES_FOUND' : 'OK',
+          count: result.count,
+          checkedAt,
+        };
+      } catch (err: any) {
+        return {
+          key,
+          title,
+          status: 'CHECK_FAILED',
+          count: null,
+          checkedAt: null,
+          error: err?.message || 'Kontrol çalıştırılamadı.',
+        };
+      }
+    };
+
+    // 1. Kart 1: Bozuk Görselli İlanlar (brokenMedia)
+    const brokenMedia = await runCheck('brokenMedia', 'Bozuk Görselli İlanlar', async () => {
+      const emptyMediaRecords = await this.prisma.listingMedia.count({
+        where: { OR: [{ url: '' }, { url: null as any }] },
+      });
+      const activeNoMedia = await this.prisma.vehicleListing.count({
+        where: { status: 'ACTIVE', media: { none: {} } },
+      });
+      const totalCount = emptyMediaRecords + activeNoMedia;
+      return { count: totalCount, issues: [] };
+    });
+
+    // 2. Kart 2: Kullanıcı İlişkisi Bozuk İlanlar (orphanSellerRelations)
+    const orphanSellerRelations = await runCheck('orphanSellerRelations', 'Kullanıcı İlişkisi Bozuk İlanlar', async () => {
+      const listings = await this.prisma.vehicleListing.findMany({
+        select: { id: true, sellerId: true, seller: { select: { id: true } } },
+      });
+      const orphans = listings.filter((l) => !l.sellerId || !l.seller);
+      return { count: orphans.length, issues: [] };
+    });
+
+    // 3. Kart 3: Araç/Varyant Bağlantısı Bozuk İlanlar (variantRelationIssues)
+    const variantRelationIssues = await runCheck('variantRelationIssues', 'Araç/Varyant Bağlantısı Bozuk İlanlar', async () => {
+      const listings = await this.prisma.vehicleListing.findMany({
+        where: { vehicleVariantId: { not: null } },
+        select: { id: true, vehicleVariantId: true, vehicleVariant: { select: { id: true } } },
+      });
+      const orphans = listings.filter((l) => l.vehicleVariantId && !l.vehicleVariant);
+      return { count: orphans.length, issues: [] };
+    });
+
+    // 4. Kart 4: Durum Tutarsızlığı Olan İlanlar (statusInconsistency)
+    const statusInconsistency = await runCheck('statusInconsistency', 'Durum Tutarsızlığı Olan İlanlar', async () => {
+      const count = await this.prisma.vehicleListing.count({
+        where: {
+          OR: [
+            { status: 'ACTIVE', rejectionReason: { not: null } },
+            { status: 'REJECTED', rejectionReason: null },
+            { status: 'ACTIVE', publishedAt: null },
+          ],
+        },
+      });
+      return { count, issues: [] };
+    });
+
+    // 5. Kart 5: Yayın Görünürlüğü Sorunu Olan İlanlar (visibilityIssues)
+    const visibilityIssues = await runCheck('visibilityIssues', 'Yayın Görünürlüğü Sorunu Olan İlanlar', async () => {
+      const count = await this.prisma.vehicleListing.count({
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            { vehicleVariantId: null },
+            { priceAmount: { lte: 0 } },
+            { title: '' },
+            { city: '' },
+          ],
+        },
+      });
+      return { count, issues: [] };
+    });
+
+    // 6. Kart 6: Süresi Dolduğu Halde Aktif İlanlar (expiredActiveListings)
+    const expiredActiveListings = await runCheck('expiredActiveListings', 'Süresi Dolduğu Halde Aktif İlanlar', async () => {
+      const count = await this.prisma.vehicleListing.count({
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            { passiveUntil: { lt: now } },
+            { expiresAt: { lt: now } },
+          ],
+        },
+      });
+      return { count, issues: [] };
+    });
+
+    // 7. Kart 7: Mükerrer / Çakışan Aktif İlanlar (duplicateCollisionListings)
+    const duplicateCollisionListings = await runCheck('duplicateCollisionListings', 'Mükerrer / Çakışan Aktif İlanlar', async () => {
+      const activeListings = await this.prisma.vehicleListing.findMany({
+        where: { status: 'ACTIVE' },
+        select: { id: true, sellerId: true, vehicleVariantId: true, kilometers: true, priceAmount: true, modelYear: true },
+      });
+      const groups = new Map<string, number>();
+      let collisionsCount = 0;
+      for (const l of activeListings) {
+        if (!l.sellerId || !l.vehicleVariantId) continue;
+        const key = `${l.sellerId}_${l.vehicleVariantId}_${l.modelYear}_${l.kilometers}_${l.priceAmount}`;
+        const prev = groups.get(key) || 0;
+        groups.set(key, prev + 1);
+        if (prev === 1) collisionsCount += 2;
+        else if (prev > 1) collisionsCount += 1;
+      }
+      return { count: collisionsCount, issues: [] };
+    });
+
+    const checks = {
+      brokenMedia,
+      orphanSellerRelations,
+      variantRelationIssues,
+      statusInconsistency,
+      visibilityIssues,
+      expiredActiveListings,
+      duplicateCollisionListings,
+    };
+
+    const checksList = Object.values(checks);
+    const okCount = checksList.filter((c) => c.status === 'OK').length;
+    const issuesFoundCount = checksList.filter((c) => c.status === 'ISSUES_FOUND').length;
+    const checkFailedCount = checksList.filter((c) => c.status === 'CHECK_FAILED').length;
+
     return {
-      kpis: [
-        { key: 'MISSING_PHOTOS', title: 'Fotoğrafı Eksik İlanlar', value: 3, alertLevel: 'warning' },
-        { key: 'SHORT_DESCRIPTION', title: 'Kısa Açıklamalı İlanlar', value: 8, alertLevel: 'normal' },
-        { key: 'OUTLIER_PRICED', title: 'Şüpheli Fiyatlı İlanlar', value: 2, alertLevel: 'critical' },
-      ],
+      checkedAt,
+      summary: {
+        totalChecks: 7,
+        okCount,
+        issuesFoundCount,
+        checkFailedCount,
+      },
+      checks,
+    };
+  }
+
+  /**
+   * Drill-down detailed anomaly list for a single health check category.
+   */
+  async getQualityDrilldown(category: string) {
+    const health = await this.getQuality();
+    const checkInfo = (health.checks as any)[category];
+    if (!checkInfo) {
+      return { category, status: 'NOT_CHECKED', count: 0, issues: [] };
+    }
+
+    const now = new Date();
+    let issues: any[] = [];
+
+    const formatIssueItem = (l: any, reason: string) => {
+      let sellerName = 'Bilinmiyor';
+      let customerNo = 'TS-UNKNOWN';
+      if (l.seller) {
+        const yearMonth = `${l.seller.createdAt.getFullYear().toString().slice(-2)}${(l.seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
+        const shortId = l.seller.id.slice(0, 6).toUpperCase();
+        customerNo = `TS-${yearMonth}-${shortId}`;
+        sellerName = `${l.seller.firstName || ''} ${l.seller.lastName || ''}`.trim() || l.seller.email.split('@')[0];
+      }
+      return {
+        id: l.id,
+        listingNo: `TS-${l.id.substring(0, 8).toUpperCase()}`,
+        title: l.title || 'Başlıksız İlan',
+        sellerId: l.sellerId || null,
+        sellerName,
+        customerNo,
+        status: l.status,
+        createdAt: l.createdAt,
+        technicalReason: reason,
+      };
+    };
+
+    if (category === 'brokenMedia') {
+      const activeNoMedia = await this.prisma.vehicleListing.findMany({
+        where: { status: 'ACTIVE', media: { none: {} } },
+        include: { seller: true },
+        take: 50,
+      });
+      issues = activeNoMedia.map((l) => formatIssueItem(l, 'İlan YAYINDA (ACTIVE) durumunda fakat veritabanında hiç görsel kaydı bulunmuyor.'));
+    } else if (category === 'orphanSellerRelations') {
+      const listings = await this.prisma.vehicleListing.findMany({
+        include: { seller: true },
+        take: 100,
+      });
+      const orphans = listings.filter((l) => !l.sellerId || !l.seller);
+      issues = orphans.map((l) => formatIssueItem(l, 'İlanın sellerId ilişkisi boş veya veritabanındaki Kullanıcı (User) kaydı ile eşleşmiyor.'));
+    } else if (category === 'variantRelationIssues') {
+      const listings = await this.prisma.vehicleListing.findMany({
+        where: { vehicleVariantId: { not: null } },
+        include: { seller: true, vehicleVariant: true },
+        take: 100,
+      });
+      const orphans = listings.filter((l) => l.vehicleVariantId && !l.vehicleVariant);
+      issues = orphans.map((l) => formatIssueItem(l, `İlanın vehicleVariantId (${l.vehicleVariantId}) veritabanındaki VehicleVariant tablosunda bulunamadı.`));
+    } else if (category === 'statusInconsistency') {
+      const listings = await this.prisma.vehicleListing.findMany({
+        where: {
+          OR: [
+            { status: 'ACTIVE', rejectionReason: { not: null } },
+            { status: 'REJECTED', rejectionReason: null },
+            { status: 'ACTIVE', publishedAt: null },
+          ],
+        },
+        include: { seller: true },
+        take: 50,
+      });
+      issues = listings.map((l) => {
+        let reason = 'İlan yaşam döngüsü durumu ile metadata arasında teknik çelişki bulundu.';
+        if (l.status === 'ACTIVE' && l.rejectionReason) reason = `İlan AKTİF fakat üzerinde red nedeni metni yer alıyor: "${l.rejectionReason}"`;
+        else if (l.status === 'REJECTED' && !l.rejectionReason) reason = 'İlan REDDEDİLMİŞ fakat veritabanında red nedeni açıklaması boş.';
+        else if (l.status === 'ACTIVE' && !l.publishedAt) reason = 'İlan AKTİF fakat yayınlanma zamanı (publishedAt) veritabanında null.';
+        return formatIssueItem(l, reason);
+      });
+    } else if (category === 'visibilityIssues') {
+      const listings = await this.prisma.vehicleListing.findMany({
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            { vehicleVariantId: null },
+            { priceAmount: { lte: 0 } },
+            { title: '' },
+            { city: '' },
+          ],
+        },
+        include: { seller: true },
+        take: 50,
+      });
+      issues = listings.map((l) => {
+        let reason = 'İlan AKTİF fakat kamuya açık arama/liste dizininde görünürlük kriterini karşılamıyor.';
+        if (!l.vehicleVariantId) reason = 'İlan AKTİF fakat bağlı araç varyantı seçimi eksik.';
+        else if (Number(l.priceAmount) <= 0) reason = `İlan AKTİF fakat fiyatı geçersiz (${l.priceAmount} TL).`;
+        return formatIssueItem(l, reason);
+      });
+    } else if (category === 'expiredActiveListings') {
+      const listings = await this.prisma.vehicleListing.findMany({
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            { passiveUntil: { lt: now } },
+            { expiresAt: { lt: now } },
+          ],
+        },
+        include: { seller: true },
+        take: 50,
+      });
+      issues = listings.map((l) => formatIssueItem(l, 'İlanın geçerlilik süresi (passiveUntil / expiresAt) dolmuş fakat statüsü hâlâ AKTİF.'));
+    } else if (category === 'duplicateCollisionListings') {
+      const activeListings = await this.prisma.vehicleListing.findMany({
+        where: { status: 'ACTIVE' },
+        include: { seller: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      const groups = new Map<string, any[]>();
+      for (const l of activeListings) {
+        if (!l.sellerId || !l.vehicleVariantId) continue;
+        const key = `${l.sellerId}_${l.vehicleVariantId}_${l.modelYear}_${l.kilometers}_${l.priceAmount}`;
+        const list = groups.get(key) || [];
+        list.push(l);
+        groups.set(key, list);
+      }
+      const collisions: any[] = [];
+      groups.forEach((group) => {
+        if (group.length > 1) {
+          group.forEach((l) => collisions.push(l));
+        }
+      });
+      issues = collisions.slice(0, 50).map((l) => formatIssueItem(l, 'Aynı satıcı tarafından tamamen aynı araç özellikleri ve fiyat ile aynı anda oluşturulmuş mükerrer teknik aktif kayıt.'));
+    }
+
+    return {
+      category,
+      title: checkInfo.title,
+      status: checkInfo.status,
+      count: checkInfo.count,
+      checkedAt: checkInfo.checkedAt,
+      issues,
     };
   }
 

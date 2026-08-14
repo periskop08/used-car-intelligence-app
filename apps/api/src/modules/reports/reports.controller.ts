@@ -170,10 +170,19 @@ export class ReportsController {
     return this.listingService.getPerformanceDrilldown(metric || 'views', range || '30d');
   }
 
-  @Get('listings/quality')
+  @Get(['listings/quality', 'admin/listings/quality', 'admin/listings/health'])
   async getListingsQuality(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
     return this.listingService.getQuality(filter);
+  }
+
+  @Get(['listings/quality/drilldown', 'admin/listings/quality/drilldown', 'admin/listings/health/drilldown'])
+  async getListingsQualityDrilldown(
+    @Query('category') category: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.listingService.getQualityDrilldown(category || 'brokenMedia');
   }
 
   @Get('listings/showcase')
