@@ -314,27 +314,30 @@ export class ListingReportsService {
           checkedAt,
         };
       } catch (err: any) {
+        console.error(`[DataHealthCheck] ${key} failed:`, err?.message || err);
         return {
           key,
           title,
           status: 'CHECK_FAILED',
           count: null,
           checkedAt: null,
-          error: err?.message || 'Kontrol çalıştırılamadı.',
+          error: 'Görsel bütünlüğü kontrolü sırasında teknik bir hata oluştu.',
         };
       }
     };
 
     // 1. Kart 1: Bozuk Görselli İlanlar (brokenMedia)
     const brokenMedia = await runCheck('brokenMedia', 'Bozuk Görselli İlanlar', async () => {
-      const emptyMediaRecords = await this.prisma.listingMedia.count({
-        where: { OR: [{ url: '' }, { url: null as any }] },
+      const affectedListings = await this.prisma.vehicleListing.findMany({
+        where: {
+          OR: [
+            { media: { some: { OR: [{ url: '' }, { storageKey: '' }] } } },
+            { status: 'ACTIVE', media: { none: {} } },
+          ],
+        },
+        select: { id: true },
       });
-      const activeNoMedia = await this.prisma.vehicleListing.count({
-        where: { status: 'ACTIVE', media: { none: {} } },
-      });
-      const totalCount = emptyMediaRecords + activeNoMedia;
-      return { count: totalCount, issues: [] };
+      return { count: affectedListings.length, issues: [] };
     });
 
     // 2. Kart 2: Kullanıcı İlişkisi Bozuk İlanlar (orphanSellerRelations)
@@ -496,12 +499,24 @@ export class ListingReportsService {
     };
 
     if (category === 'brokenMedia') {
-      const activeNoMedia = await this.prisma.vehicleListing.findMany({
-        where: { status: 'ACTIVE', media: { none: {} } },
-        include: { seller: true },
+      const affectedListings = await this.prisma.vehicleListing.findMany({
+        where: {
+          OR: [
+            { media: { some: { OR: [{ url: '' }, { storageKey: '' }] } } },
+            { status: 'ACTIVE', media: { none: {} } },
+          ],
+        },
+        include: { seller: true, media: true },
         take: 50,
       });
-      issues = activeNoMedia.map((l) => formatIssueItem(l, 'İlan YAYINDA (ACTIVE) durumunda fakat veritabanında hiç görsel kaydı bulunmuyor.'));
+      issues = affectedListings.map((l) => {
+        let reason = 'İlan YAYINDA (ACTIVE) durumunda fakat veritabanında hiç görsel kaydı bulunmuyor.';
+        if (l.media && l.media.some((m) => m.url === '' || m.storageKey === '')) {
+          const countEmpty = l.media.filter((m) => m.url === '' || m.storageKey === '').length;
+          reason = `İlanda ${countEmpty} adet geçersiz / boş görsel kaydı tespit edildi.`;
+        }
+        return formatIssueItem(l, reason);
+      });
     } else if (category === 'orphanSellerRelations') {
       const listings = await this.prisma.vehicleListing.findMany({
         include: { seller: true },
