@@ -575,6 +575,21 @@ export class ListingController {
       throw new NotFoundException('İlan bulunamadı.');
     }
 
+    // Record buyer listing view (excludes admin inspection views)
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || req.headers['x-admin-inspection'] === 'true';
+    if (!isAdmin) {
+      const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+      const userAgent = req.headers['user-agent'] || '';
+      this.listingService['prisma'].listingView.create({
+        data: {
+          listingId: id,
+          userId: user?.id || null,
+          ipHash: rawIp,
+          userAgent: userAgent.slice(0, 200),
+        },
+      }).catch(() => {});
+    }
+
     let isFavorited = false;
     let isSellerFavorited = false;
     if (user?.id) {

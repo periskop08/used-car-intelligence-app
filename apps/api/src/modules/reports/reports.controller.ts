@@ -154,10 +154,20 @@ export class ReportsController {
     return this.listingService.getOverview(filter);
   }
 
-  @Get('listings/performance')
+  @Get(['listings/performance', 'admin/listings/performance'])
   async getListingsPerformance(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
     return this.listingService.getPerformance(filter);
+  }
+
+  @Get(['listings/performance/drilldown', 'admin/listings/performance/drilldown'])
+  async getListingsPerformanceDrilldown(
+    @Query('metric') metric: string,
+    @Query('range') range: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.listingService.getPerformanceDrilldown(metric || 'views', range || '30d');
   }
 
   @Get('listings/quality')
