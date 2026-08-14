@@ -215,9 +215,9 @@ export class ListingReportsService {
     }
 
     if (metric === 'favorites') {
-      const topFavorited = [...enrichedListings].sort((a, b) => b.favorites - a.favorites).slice(0, 10);
-      const topFavoriteRate = [...enrichedListings].filter((l) => l.views >= 1).sort((a, b) => b.favoriteRate - a.favoriteRate).slice(0, 10);
-      const highViewLowFav = [...enrichedListings].filter((l) => l.views >= 1).sort((a, b) => a.favoriteRate - b.favoriteRate).slice(0, 10);
+      const favoritedListings = enrichedListings
+        .filter((l) => l.favorites > 0)
+        .sort((a, b) => b.favorites - a.favorites || b.favoriteRate - a.favoriteRate || b.views - a.views);
 
       return {
         metric,
@@ -225,9 +225,8 @@ export class ListingReportsService {
           totalFavorites: periodData.totalFavorites,
           favoriteRate: periodData.favoriteRate,
         },
-        topListings: topFavorited,
-        topFavoriteRateListings: topFavoriteRate,
-        highViewLowFavListings: highViewLowFav,
+        listings: favoritedListings,
+        topListings: favoritedListings.slice(0, 10),
       };
     }
 

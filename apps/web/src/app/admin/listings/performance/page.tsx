@@ -12,12 +12,9 @@ import {
   HelpCircle,
   X,
   User,
-  ExternalLink,
   ChevronRight,
   BarChart3,
   Calendar,
-  AlertCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { AdminUserDrawer } from '../../components/AdminUserDrawer';
@@ -28,6 +25,26 @@ const TIME_RANGES = [
   { key: '90d', label: 'Son 90 Gün' },
   { key: 'all', label: 'Tüm Zamanlar' },
 ];
+
+const METRIC_DISPLAY_LABELS: Record<string, string> = {
+  totalFavorites: 'Toplam Favoriye Ekleme',
+  favoriteRate: 'Favoriye Alma Oranı',
+  totalViews: 'Toplam Görüntülenme',
+  uniqueViews: 'Tekil Görüntülenme',
+  totalLeads: 'Toplam İletişim',
+  conversionRate: 'Dönüşüm Oranı',
+  averageViewsPerListing: 'İlan Başına Ortalama Görüntülenme',
+  activeListings: 'Aktif İlanlar',
+  newlyPublishedInPeriod: 'Dönemde Yeni Yayınlanan',
+  totalActiveListings: 'Toplam Aktif İlan',
+  averageLeadsPerListing: 'İlan Başına Ortalama İletişim',
+};
+
+function formatSummaryValue(key: string, val: any) {
+  if (val === null || val === undefined) return '0';
+  if (key === 'favoriteRate' || key === 'conversionRate') return `%${val}`;
+  return val;
+}
 
 function PerformanceContent() {
   const router = useRouter();
@@ -132,7 +149,7 @@ function PerformanceContent() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 font-sans">
       {/* HEADER & TIME RANGE CONTROLS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
@@ -250,7 +267,7 @@ function PerformanceContent() {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Toplam İletişim / Lead
+                Toplam İletişim
               </span>
               <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 group-hover:scale-110 transition-transform">
                 <MessageSquare className="w-5 h-5" />
@@ -343,7 +360,7 @@ function PerformanceContent() {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Aktif İlan
+                Aktif İlanlar
               </span>
               <div className="p-2 bg-orange-500/10 rounded-xl text-orange-400 group-hover:scale-110 transition-transform">
                 <Tag className="w-5 h-5" />
@@ -374,15 +391,15 @@ function PerformanceContent() {
               <div>
                 <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-orange-500" />
-                  {activeDrilldown === 'views' && 'İlan Görüntülenme Analizi (Drill-Down)'}
-                  {activeDrilldown === 'favorites' && 'Favori Analizi & İlan Sıralaması (Drill-Down)'}
-                  {activeDrilldown === 'leads' && 'Satıcı İletişim / Lead Analizi (Drill-Down)'}
-                  {activeDrilldown === 'avgViews' && 'Ortalama Görüntülenme & Dağılım Kovaları'}
-                  {activeDrilldown === 'conversion' && 'Dönüşüm Oranı & Lead Performans Listesi'}
-                  {activeDrilldown === 'active' && 'Aktif İlanlar Performans Listesi (Drill-Down)'}
+                  {activeDrilldown === 'views' && 'İlan Görüntülenme Analizi'}
+                  {activeDrilldown === 'favorites' && 'Favori Analizi ve İlan Sıralaması'}
+                  {activeDrilldown === 'leads' && 'Satıcı İletişim Analizi'}
+                  {activeDrilldown === 'avgViews' && 'Ortalama Görüntülenme ve Dağılım Kovaları'}
+                  {activeDrilldown === 'conversion' && 'Dönüşüm Oranı ve İletişim Performansı'}
+                  {activeDrilldown === 'active' && 'Aktif İlanlar Performans Listesi'}
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5 font-mono">
-                  Dönem: {stats?.periodLabel || 'Son 30 Gün'} — Gerçek DB Kayıtları
+                  Dönem: {stats?.periodLabel || 'Son 30 Gün'} — Gerçek Veritabanı Analitiği
                 </p>
               </div>
 
@@ -408,10 +425,10 @@ function PerformanceContent() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
                       {Object.entries(drilldownData.summary).map(([k, v]: [string, any]) => (
                         <div key={k} className="p-3 bg-slate-900 border border-white/5 rounded-xl">
-                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">
-                            {k}
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">
+                            {METRIC_DISPLAY_LABELS[k] || k}
                           </span>
-                          <span className="text-lg font-black text-white">{v}</span>
+                          <span className="text-lg font-black text-white">{formatSummaryValue(k, v)}</span>
                         </div>
                       ))}
                     </div>
@@ -421,7 +438,7 @@ function PerformanceContent() {
                   {drilldownData.buckets && (
                     <div className="p-4 bg-slate-900/90 border border-white/10 rounded-xl space-y-2 font-mono">
                       <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                        İlan Görüntülenme Dağılım Kovaları (Distribution Buckets)
+                        İlan Görüntülenme Dağılım Kovaları
                       </span>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
                         <div className="p-2.5 bg-slate-950 rounded-lg text-center">
@@ -449,86 +466,92 @@ function PerformanceContent() {
                   )}
 
                   {/* Listings Table */}
-                  <div className="space-y-3 font-mono">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                        İlan Performans Tablosu
-                      </h3>
-                      <span className="text-[11px] text-slate-500">
-                        İlana tıkla ➔ Read-Only İncele | Satıcıya tıkla ➔ AdminUserDrawer
-                      </span>
+                  {activeDrilldown === 'favorites' && (!drilldownData.listings || drilldownData.listings.length === 0) ? (
+                    <div className="p-12 text-center text-slate-400 font-mono text-xs bg-slate-900/60 rounded-xl border border-white/5">
+                      Seçilen dönemde favoriye eklenen ilan bulunmuyor.
                     </div>
+                  ) : (
+                    <div className="space-y-3 font-mono">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                          İlan Performans Tablosu
+                        </h3>
+                        <span className="text-[11px] text-slate-500">
+                          İlana tıkla ➔ Read-Only İncele | Satıcıya tıkla ➔ AdminUserDrawer
+                        </span>
+                      </div>
 
-                    <div className="overflow-x-auto border border-white/10 rounded-xl bg-slate-900/60">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-slate-950/80 border-b border-white/10 text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                            <th className="p-3">İlan No & Başlık</th>
-                            <th className="p-3">Satıcı</th>
-                            <th className="p-3 text-right">Görüntülenme</th>
-                            <th className="p-3 text-right">Favori</th>
-                            <th className="p-3 text-right">Lead</th>
-                            <th className="p-3 text-right">Dönüşüm</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5 text-slate-300">
-                          {(
-                            drilldownData.listings ||
-                            drilldownData.topListings ||
-                            drilldownData.highViewZeroLeadListings ||
-                            []
-                          ).map((item: any) => (
-                            <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                              {/* Listing Title & No */}
-                              <td className="p-3">
-                                <button
-                                  onClick={() => openListingInspection(item.id)}
-                                  className="text-left font-bold text-white hover:text-orange-400 transition-colors flex items-center gap-1.5 cursor-pointer"
-                                >
-                                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded border border-white/10 text-orange-400 font-mono">
-                                    {item.listingNo}
-                                  </span>
-                                  <span className="truncate max-w-xs">{item.title}</span>
-                                </button>
-                              </td>
-
-                              {/* Seller */}
-                              <td className="p-3">
-                                <button
-                                  onClick={() => openSellerDrawer(item.sellerId, item.customerNo)}
-                                  className="text-slate-400 hover:text-orange-400 transition-colors text-[11px] flex items-center gap-1 cursor-pointer"
-                                >
-                                  <User className="w-3 h-3" />
-                                  <span>{item.sellerName}</span>
-                                  <span className="text-[10px] text-slate-500 font-mono">({item.customerNo})</span>
-                                </button>
-                              </td>
-
-                              {/* Views */}
-                              <td className="p-3 text-right font-bold text-white">
-                                {item.views}
-                              </td>
-
-                              {/* Favorites */}
-                              <td className="p-3 text-right font-bold text-rose-400">
-                                {item.favorites}
-                              </td>
-
-                              {/* Leads */}
-                              <td className="p-3 text-right font-bold text-emerald-400">
-                                {item.leads}
-                              </td>
-
-                              {/* Conversion Rate */}
-                              <td className="p-3 text-right font-bold text-purple-400">
-                                %{item.conversionRate}
-                              </td>
+                      <div className="overflow-x-auto border border-white/10 rounded-xl bg-slate-900/60">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-950/80 border-b border-white/10 text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                              <th className="p-3">İlan No & Başlık</th>
+                              <th className="p-3">Satıcı</th>
+                              <th className="p-3 text-right">Görüntülenme</th>
+                              <th className="p-3 text-right">Favori</th>
+                              <th className="p-3 text-right">İletişim</th>
+                              <th className="p-3 text-right">Dönüşüm</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-slate-300">
+                            {(
+                              drilldownData.listings ||
+                              drilldownData.topListings ||
+                              drilldownData.highViewZeroLeadListings ||
+                              []
+                            ).map((item: any) => (
+                              <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                                {/* Listing Title & No */}
+                                <td className="p-3">
+                                  <button
+                                    onClick={() => openListingInspection(item.id)}
+                                    className="text-left font-bold text-white hover:text-orange-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded border border-white/10 text-orange-400 font-mono">
+                                      {item.listingNo}
+                                    </span>
+                                    <span className="truncate max-w-xs">{item.title}</span>
+                                  </button>
+                                </td>
+
+                                {/* Seller */}
+                                <td className="p-3">
+                                  <button
+                                    onClick={() => openSellerDrawer(item.sellerId, item.customerNo)}
+                                    className="text-slate-400 hover:text-orange-400 transition-colors text-[11px] flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <User className="w-3 h-3" />
+                                    <span>{item.sellerName}</span>
+                                    <span className="text-[10px] text-slate-500 font-mono">({item.customerNo})</span>
+                                  </button>
+                                </td>
+
+                                {/* Views */}
+                                <td className="p-3 text-right font-bold text-white">
+                                  {item.views}
+                                </td>
+
+                                {/* Favorites */}
+                                <td className="p-3 text-right font-bold text-rose-400">
+                                  {item.favorites}
+                                </td>
+
+                                {/* Leads */}
+                                <td className="p-3 text-right font-bold text-emerald-400">
+                                  {item.leads}
+                                </td>
+
+                                {/* Conversion Rate */}
+                                <td className="p-3 text-right font-bold text-purple-400">
+                                  %{item.conversionRate}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               ) : (
                 <div className="p-12 text-center text-slate-500 font-mono text-xs">
@@ -543,7 +566,7 @@ function PerformanceContent() {
       {/* READ-ONLY LISTING INSPECTION MODAL */}
       {inspectionListingId && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto font-mono">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <h3 className="text-lg font-black text-white">İlan İnceleme (Read-Only)</h3>
               <button
@@ -555,7 +578,7 @@ function PerformanceContent() {
             </div>
 
             {inspectionLoading ? (
-              <div className="p-8 text-center text-slate-400 font-mono text-xs">İlan yükleniyor...</div>
+              <div className="p-8 text-center text-slate-400 text-xs">İlan yükleniyor...</div>
             ) : inspectionData ? (
               <div className="space-y-4 text-xs font-mono">
                 <div className="p-4 bg-slate-900 border border-white/5 rounded-xl space-y-2">
@@ -602,7 +625,7 @@ function PerformanceContent() {
 
 export default function AdminListingsPerformancePage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-slate-400">Performans yükleniyor...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-slate-400 font-mono text-xs">Performans yükleniyor...</div>}>
       <PerformanceContent />
     </Suspense>
   );
