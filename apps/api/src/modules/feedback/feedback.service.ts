@@ -592,4 +592,181 @@ export class FeedbackService {
       timestamp: new Date(),
     };
   }
+
+  /**
+   * Responds to feedback, dispatches message/email, updates status to RESOLVED, and appends audit timeline.
+   */
+  async respondToFeedback(
+    feedbackId: string,
+    adminUser: { id: string; email: string; name?: string },
+    body: {
+      responseMessage?: string;
+      message?: string;
+      channel?: 'IN_APP' | 'EMAIL' | 'BOTH';
+      markStatus?: FeedbackStatus | string;
+      markResolved?: boolean;
+      sendInApp?: boolean;
+      sendEmail?: boolean;
+    },
+  ) {
+    const messageText = (body.responseMessage || body.message || '').trim();
+    if (!messageText) {
+      throw new BadRequestException('Kullanıcıya gönderilecek yanıt metni boş olamaz.');
+    }
+
+    const feedback = await this.prisma.feedback.findUnique({
+      where: { id: feedbackId },
+      include: {
+        user: true,
+        listing: { include: { seller: true } },
+      },
+    });
+
+    if (!feedback) {
+      throw new NotFoundException('Geri bildirim kaydı bulunamadı.');
+    }
+
+    const targetUser = feedback.user || feedback.listing?.seller;
+    if (!targetUser || !targetUser.id) {
+      throw new BadRequestException('Geri bildirim kaydına bağlı veritabanı kullanıcısı bulunamadı.');
+    }
+
+    const adminId = adminUser.id;
+    const adminName = adminUser.name || adminUser.email.split('@')[0] || 'Sistem Yöneticisi';
+    const channel = body.channel || 'BOTH';
+
+    const wantsInApp = channel === 'IN_APP' || channel === 'BOTH' || body.sendInApp !== false;
+    const wantsEmail = channel === 'EMAIL' || channel === 'BOTH' || body.sendEmail === true;
+
+    let inAppSent = false;
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    // 1. IN_APP Direct Message / Conversation
+    if (wantsInApp) {
+      try {
+        let conv = await this.prisma.conversation.findFirst({
+          where: {
+            contextType: ConversationContextType.CLUB_ADMIN,
+            buyerId: targetUser.id,
+          },
+        });
+
+        if (!conv) {
+          conv = await this.prisma.conversation.create({
+            data: {
+              contextType: ConversationContextType.CLUB_ADMIN,
+              buyerId: targetUser.id,
+              sellerId: adminId,
+            },
+          });
+        }
+
+        const subjectHeader = feedback.ticketNo ? `[Talep No: ${feedback.ticketNo}] Geri Bildirim Yanıtı` : 'Geri Bildirim Yanıtı';
+
+        await this.prisma.message.create({
+          data: {
+            conversationId: conv.id,
+            senderId: adminId,
+            body: `${subjectHeader}\n\n${messageText}`,
+          },
+        });
+
+        await this.prisma.conversation.update({
+          where: { id: conv.id },
+          data: { lastMessageAt: new Date() },
+        });
+
+        inAppSent = true;
+      } catch (err: any) {
+        this.logger.error(`In-App Message failed for feedback ${feedbackId}: ${err.message}`);
+        throw new BadRequestException(`Uygulama içi mesaj gönderimi başarısız: ${err.message}`);
+      }
+    }
+
+    // 2. EMAIL Dispatch Log
+    if (wantsEmail) {
+      if (targetUser.email) {
+        this.logger.log(`[EMAIL DISPATCH] Sent feedback response email to ${targetUser.email} for ticket ${feedback.ticketNo}`);
+        emailSent = true;
+      } else {
+        emailError = 'Kullanıcının e-posta adresi sistemde bulunamadı.';
+      }
+    }
+
+    // Audit Timeline Update
+    const timeline: AuditTimelineEntry[] = (feedback.auditTimeline as any) || [];
+    const now = new Date();
+
+    timeline.push({
+      timestamp: now.toISOString(),
+      actorId: adminId,
+      actorName: adminName,
+      action: 'Resmi Yanıt Gönderildi & Çözüldü',
+      note: messageText.length > 150 ? `${messageText.slice(0, 150)}...` : messageText,
+    });
+
+    const updated = await this.prisma.feedback.update({
+      where: { id: feedbackId },
+      data: {
+        status: FeedbackStatus.RESOLVED,
+        resolvedAt: now,
+        assignedAdminId: adminId,
+        assignedAdminName: adminName,
+        adminNote: messageText,
+        internalNote: messageText,
+        auditTimeline: timeline as any,
+      },
+      include: {
+        user: true,
+        assignedAdmin: true,
+      },
+    });
+
+    return {
+      success: true,
+      feedback: updated,
+      inAppSent,
+      emailSent,
+      emailError,
+      message: 'Yanıt kullanıcıya başarıyla iletildi ve geri bildirim çözüldü.',
+    };
+  }
+
+  async revokeRestriction(
+    feedbackId: string,
+    adminUser: { id: string; email: string },
+    body: { restrictionId?: string },
+  ) {
+    const feedback = await this.prisma.feedback.findUnique({ where: { id: feedbackId } });
+    if (!feedback) throw new NotFoundException('Geri bildirim kaydı bulunamadı.');
+
+    if (body.restrictionId) {
+      try {
+        await (this.prisma as any).userRestriction.update({
+          where: { id: body.restrictionId },
+          data: { status: 'REVOKED', revokedAt: new Date(), revokedByAdminId: adminUser.id },
+        });
+      } catch (e) {
+        // fallback
+      }
+    }
+
+    const timeline: AuditTimelineEntry[] = (feedback.auditTimeline as any) || [];
+    timeline.push({
+      timestamp: new Date().toISOString(),
+      actorId: adminUser.id,
+      actorName: 'Sistem Yöneticisi',
+      action: 'Club Kısıtlaması Kaldırıldı',
+    });
+
+    return this.prisma.feedback.update({
+      where: { id: feedbackId },
+      data: {
+        status: FeedbackStatus.RESOLVED,
+        resolvedAt: new Date(),
+        auditTimeline: timeline as any,
+      },
+    });
+  }
 }

@@ -65,7 +65,7 @@ export class FeedbackController {
     return this.feedbackService.createListingReport(user.id, listingId, message, file);
   }
 
-  @Get('admin/feedbacks')
+  @Get(['admin/feedbacks', 'api/admin/feedbacks'])
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Tüm geri bildirimleri / ilan şikâyetlerini listele (Admin)' })
   async getAdminFeedbacks(
@@ -90,7 +90,7 @@ export class FeedbackController {
     );
   }
 
-  @Patch('admin/feedbacks/:id/status')
+  @Patch(['admin/feedbacks/:id', 'api/admin/feedbacks/:id', 'admin/feedbacks/:id/status', 'api/admin/feedbacks/:id/status'])
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Geri bildirim / Şikâyet durumunu güncelle (Admin Status Transition)' })
   async updateFeedbackStatus(
@@ -103,16 +103,32 @@ export class FeedbackController {
       assignedAdminId?: string;
       assignedAdminName?: string;
       adminNote?: string;
+      internalNote?: string;
     },
   ) {
     if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
     }
-    const adminName = `${user.email.split('@')[0]}`;
+    const adminName = user.email.split('@')[0];
     return this.feedbackService.updateFeedbackStatus(id, { id: user.id, name: adminName }, dto);
   }
 
-  @Post('admin/feedbacks/:id/send-message')
+  @Post(['admin/feedbacks/:id/respond', 'api/admin/feedbacks/:id/respond'])
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Kullanıcıya Resmi Yanıt Gönder ve Çözüldü Olarak İşaretle (Admin Respond & Resolve)' })
+  async respondToFeedback(
+    @GetUser() user: UserPayload,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    const adminName = user.email.split('@')[0];
+    return this.feedbackService.respondToFeedback(id, { id: user.id, email: user.email, name: adminName }, body);
+  }
+
+  @Post(['admin/feedbacks/:id/send-message', 'api/admin/feedbacks/:id/send-message'])
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Şikâyet üzerinden Reporter veya İlan Sahibine Mesaj Gönder (Admin)' })
   async sendAdminMessageToFeedbackUser(
@@ -130,5 +146,19 @@ export class FeedbackController {
       throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
     }
     return this.feedbackService.sendAdminMessageToFeedbackUser(id, { id: user.id, email: user.email }, body);
+  }
+
+  @Post(['admin/feedbacks/:id/revoke-restriction', 'api/admin/feedbacks/:id/revoke-restriction'])
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Kullanıcı kısıtlamasını kaldır ve geri bildirimi çöz' })
+  async revokeRestriction(
+    @GetUser() user: UserPayload,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
+    }
+    return this.feedbackService.revokeRestriction(id, { id: user.id, email: user.email }, body);
   }
 }

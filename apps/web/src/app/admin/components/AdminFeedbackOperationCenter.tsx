@@ -182,7 +182,7 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
   const handleUpdateFeedback = async (id: string, dto: any) => {
     setActionLoadingId(id);
     try {
-      const res = await fetch(`${API_URL}/api/admin/feedbacks/${id}`, {
+      const res = await fetch(`${API_URL}/admin/feedbacks/${id}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -191,7 +191,10 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
         body: JSON.stringify(dto),
       });
 
-      if (!res.ok) throw new Error("Güncelleme başarısız.");
+      if (!res.ok) {
+        const errObj = await res.json().catch(() => ({}));
+        throw new Error(errObj.message || "Güncelleme başarısız.");
+      }
       await fetchFeedbacks();
     } catch (err: any) {
       alert(err.message || "İşlem yapılırken hata oluştu.");
@@ -215,7 +218,7 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
 
     setActionLoadingId(id);
     try {
-      const res = await fetch(`${API_URL}/api/admin/feedbacks/${id}/respond`, {
+      const res = await fetch(`${API_URL}/admin/feedbacks/${id}/respond`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -224,11 +227,15 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
         body: JSON.stringify({
           responseMessage,
           channel,
-          markStatus: markStatus || "ACTION_TAKEN",
+          markStatus: markStatus || "RESOLVED",
+          markResolved: true,
         }),
       });
 
-      if (!res.ok) throw new Error("Yanıt gönderilemedi.");
+      if (!res.ok) {
+        const errObj = await res.json().catch(() => ({}));
+        throw new Error(errObj.message || "Yanıt gönderilemedi.");
+      }
       alert("Kullanıcıya resmi yanıt başarıyla gönderildi ve bildirim iletildi.");
       await fetchFeedbacks();
     } catch (err: any) {
@@ -245,7 +252,7 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
 
     setActionLoadingId(feedbackId);
     try {
-      const res = await fetch(`${API_URL}/api/admin/feedbacks/${feedbackId}/revoke-restriction`, {
+      const res = await fetch(`${API_URL}/admin/feedbacks/${feedbackId}/revoke-restriction`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -254,7 +261,10 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
         body: JSON.stringify({ restrictionId }),
       });
 
-      if (!res.ok) throw new Error("Kısıtlama kaldırılamadı.");
+      if (!res.ok) {
+        const errObj = await res.json().catch(() => ({}));
+        throw new Error(errObj.message || "Kısıtlama kaldırılamadı.");
+      }
       alert("Kısıtlama kaldırıldı ve kullanıcıya bilgilendirme yanıtı iletildi!");
       await fetchFeedbacks();
     } catch (err: any) {
