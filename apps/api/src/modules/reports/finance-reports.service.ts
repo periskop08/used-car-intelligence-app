@@ -243,93 +243,290 @@ export class FinanceReportsService {
       };
     }
 
-    if (metric === 'oneTime' || metric === 'collected') {
-      const buyerPurchasesRaw = await this.prisma.buyerPackagePurchase.findMany({
-        where: { createdAt: { gte: startDate, lte: endDate } },
-        include: { user: true },
-        orderBy: { createdAt: 'desc' },
-      });
-      const buyerPurchases = buyerPurchasesRaw.filter((p) => (p.price || 0) > 0);
-
-      const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
-        where: { createdAt: { gte: startDate, lte: endDate } },
-        orderBy: { createdAt: 'desc' },
-      });
-      const promoPurchases = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p));
-
-      const buyerTx = buyerPurchases.map((p) => {
-        const u = p.user;
-        const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
-        const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
-        return {
-          id: p.id,
-          transactionNo: `TX-${p.id.substring(0, 8).toUpperCase()}`,
-          date: p.createdAt,
-          userId: p.userId,
-          userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : 'Müşteri',
-          customerNo: `TS-${yearMonth}-${shortId}`,
-          productName: `Alıcı Paket (${p.packageCode})`,
-          productType: 'ONE_TIME_PACKAGE',
-          grossPrice: p.price,
-          amountPaid: p.price,
-          currency: 'TRY',
-          status: 'COMPLETED',
-          paymentProvider: 'PAYMENT_GATEWAY',
-        };
-      });
-
-      const promoTx = promoPurchases.map((p) => {
-        const netRevenue = this.getNetPromotionRevenue(p);
-        return {
-          id: p.id,
-          transactionNo: `TX-PROMO-${p.id.substring(0, 8).toUpperCase()}`,
-          date: p.createdAt,
-          userId: p.userId || '',
-          userName: p.buyerReferenceSnapshot || 'Promosyon Alıcısı',
-          customerNo: `TS-PROMO-${p.id.substring(0, 6).toUpperCase()}`,
-          productName: `Promosyon (${p.productSku})`,
-          productType: 'PROMOTION_PURCHASE',
-          grossPrice: Number(p.priceAmount) || 0,
-          amountPaid: netRevenue,
-          currency: p.currency || 'TRY',
-          status: p.paymentStatus,
-          paymentProvider: p.paymentProvider || 'PAYMENT_GATEWAY',
-        };
-      });
-
-      const transactions = [...buyerTx, ...promoTx].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      return {
-        metric,
-        periodLabel: overview.periodLabel,
-        summary: {
-          oneTimeRevenue: overview.oneTimeRevenue,
-          totalCollected: overview.totalCollected,
-        },
-        transactions,
-      };
-    }
-
-    if (metric === 'margin') {
-      return {
-        metric: 'margin',
-        periodLabel: overview.periodLabel,
-        summary: {
-          totalRevenue: overview.totalCollected,
-          knownCostsTotal: overview.knownCostsTotal,
-          grossProfit: overview.grossProfit,
-          grossMarginPct: overview.grossMarginPct,
-          grossMarginStatus: overview.grossMarginStatus,
-          missingCosts: overview.missingCosts,
-        },
-        costBreakdown: [
-          { name: 'AI Araç Riski Rapor Üretimi', amount: Number((overview.knownCostsTotal * 0.8).toFixed(2)), provider: 'Analytics Log' },
-          { name: 'Gemini Chatbot Mesajlaşması', amount: Number((overview.knownCostsTotal * 0.2).toFixed(2)), provider: 'Analytics Log' },
-        ],
-      };
-    }
-
     return { metric, periodLabel: overview.periodLabel, summary: overview };
+  }
+
+  /**
+   * Dedicated Dashboard service method for /admin/finance/packages (Tek Seferlik Paketler) page.
+   * Supports date filtering (period: 7d, 30d, ytd, custom with startDate/endDate),
+   * search, and server-side pagination.
+   */
+  async getOneTimePackagesDashboard(filter?: {
+    period?: string;
+    startDate?: string;
+    endDate?: string;
+    q?: string;
+  }) {
+    const period = filter?.period || '30d';
+    let start: Date;
+    let end: Date = new Date();
+
+    if (period === '7d') {
+      start = new Date();
+      start.setDate(end.getDate() - 7);
+    } else if (period === 'ytd') {
+      start = new Date(end.getFullYear(), 0, 1);
+    } else if (period === 'custom' && filter?.startDate) {
+      start = new Date(filter.startDate);
+      if (filter?.endDate) end = new Date(filter.endDate);
+    } else {
+      // Default: 30d
+      start = new Date();
+      start.setDate(end.getDate() - 30);
+    }
+
+    // 1. Fetch Real Paid Buyer Package Purchases (price > 0)
+    const paidBuyerPurchases = await this.prisma.buyerPackagePurchase.findMany({
+      where: {
+        createdAt: { gte: start, lte: end },
+        price: { gt: 0 },
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 2. Fetch Admin Granted Buyer Package Purchases (price = 0) OR AdminAuditLog entries
+    const adminBuyerGrantAudits = await this.prisma.adminAuditLog.findMany({
+      where: {
+        entityType: 'BuyerPackagePurchase',
+        action: 'USER_BUYER_PACKAGE_GRANTED',
+        createdAt: { gte: start, lte: end },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const adminBuyerGrantPurchases = await this.prisma.buyerPackagePurchase.findMany({
+      where: {
+        createdAt: { gte: start, lte: end },
+        price: 0,
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Merge Admin Buyer Grants
+    const adminGrantedBuyerPackagesList = adminBuyerGrantPurchases.map((p) => {
+      const u = p.user;
+      const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
+      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
+      const audit = adminBuyerGrantAudits.find((a) => a.entityId === p.id);
+      const metadata = audit ? (audit.metadata as any) || {} : {};
+
+      return {
+        id: p.id,
+        userId: p.userId,
+        customerNo: `TS-${yearMonth}-${shortId}`,
+        userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : 'Müşteri',
+        userEmail: u?.email || '—',
+        packageCode: p.packageCode,
+        packageName: p.packageCode === 'ALICI_MINI' ? 'Alıcı Mini Ek Hak Paketi' : p.packageCode === 'ALICI_MAX' ? 'Alıcı Max Ek Hak Paketi' : 'Alıcı Plus Ek Hak Paketi',
+        grantedAt: p.createdAt,
+        grantedByAdmin: audit ? audit.adminEmail || 'Admin' : 'Sistem Yöneticisi',
+        reason: metadata.reason || metadata.reasonCode || 'Yönetim Kararı',
+        adminNote: metadata.adminNote || null,
+        financialRevenue: 0,
+        rightsGranted: {
+          aiReportLimit: p.aiReportLimit,
+          chatbotMessageLimit: p.chatbotMessageLimit,
+          validityDays: p.validityDays,
+        },
+        expiresAt: p.expiresAt,
+        status: 'ACTIVE',
+      };
+    });
+
+    // 3. Fetch Real Paid Listing Promotion Purchases
+    const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
+      where: {
+        createdAt: { gte: start, lte: end },
+      },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+        listing: { select: { id: true, title: true, priceAmount: true, status: true, isUrgent: true, isFeatured: true } },
+        entitlements: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const realPaidPromotions = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p as any));
+
+    // Categorize Promotion Purchases (URGENT_LISTING vs SHOWCASE_FEED)
+    const urgentPromotions = realPaidPromotions.filter((p) => p.promotionType === 'URGENT_LISTING' || p.productSku === 'URGENT_LISTING');
+    const showcasePromotions = realPaidPromotions.filter((p) => p.promotionType === 'SHOWCASE_FEED' || p.productSku === 'SHOWCASE_FEED');
+
+    // 4. Refunds & Reversals
+    const refundedPromotions = realPaidPromotions.filter((p) => (p.paymentStatus as any) === 'REFUNDED' || (p.paymentStatus as any) === 'PARTIALLY_REFUNDED' || p.refundedAt !== null);
+
+    // 5. Delivery Issues (Payment SUCCESS but product/rights missing or not applied)
+    const deliveryIssuePromotions = realPaidPromotions.filter((p) => {
+      if ((p.paymentStatus as any) !== 'PAID' && (p.paymentStatus as any) !== 'SUCCESS') return false;
+      const hasActiveEntitlement = p.entitlements.some((e) => e.lifecycleStatus === 'ACTIVE');
+      const isUrgentApplied = p.promotionType === 'URGENT_LISTING' ? p.listing?.isUrgent : true;
+      const isFeaturedApplied = p.promotionType === 'SHOWCASE_FEED' ? p.listing?.isFeatured : true;
+      return !hasActiveEntitlement || !isUrgentApplied || !isFeaturedApplied;
+    });
+
+    // Format Main Transaction Items
+    const buyerItems = paidBuyerPurchases.map((p) => {
+      const u = p.user;
+      const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
+      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
+      return {
+        id: p.id,
+        transactionNo: `TX-BUYER-${p.id.substring(0, 8).toUpperCase()}`,
+        date: p.createdAt,
+        userId: p.userId,
+        userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : 'Müşteri',
+        userEmail: u?.email || '—',
+        userPhone: u?.phone || '—',
+        customerNo: `TS-${yearMonth}-${shortId}`,
+        productName: p.packageCode === 'ALICI_MINI' ? 'Alıcı Mini Ek Hak Paketi' : p.packageCode === 'ALICI_MAX' ? 'Alıcı Max Ek Hak Paketi' : 'Alıcı Plus Ek Hak Paketi',
+        productCode: p.packageCode,
+        productType: 'BUYER_PACKAGE',
+        productTypeLabel: 'Alıcı Paketi',
+        grossPrice: p.price,
+        amountPaid: p.price,
+        currency: 'TRY',
+        paymentStatus: 'PAID',
+        paymentStatusLabel: 'BAŞARILI (ÖDENDİ)',
+        paymentProvider: 'IYZICO / BANK',
+        deliveryStatus: 'DELIVERED',
+        deliveryStatusLabel: 'TESLİM EDİLDİ',
+        rightsInfo: {
+          aiReportLimit: p.aiReportLimit,
+          aiReportUsed: p.aiReportUsed,
+          chatbotMessageLimit: p.chatbotMessageLimit,
+          chatbotMessageUsed: p.chatbotMessageUsed,
+          validityDays: p.validityDays,
+          expiresAt: p.expiresAt,
+        },
+        listing: null,
+        refund: null,
+      };
+    });
+
+    const promoItems = realPaidPromotions.map((p) => {
+      const u = p.user;
+      const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
+      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'PROMO';
+      const isUrgent = p.promotionType === 'URGENT_LISTING' || p.productSku === 'URGENT_LISTING';
+      const netPaid = this.getNetPromotionRevenue(p as any);
+      const isRefunded = (p.paymentStatus as any) === 'REFUNDED' || p.refundedAt !== null;
+      const isDeliveryIssue = deliveryIssuePromotions.some((d) => d.id === p.id);
+
+      return {
+        id: p.id,
+        transactionNo: `TX-PROMO-${p.id.substring(0, 8).toUpperCase()}`,
+        date: p.createdAt,
+        userId: p.userId || '',
+        userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || p.buyerReferenceSnapshot || 'Müşteri' : p.buyerReferenceSnapshot || 'Müşteri',
+        userEmail: u?.email || '—',
+        userPhone: u?.phone || '—',
+        customerNo: `TS-${yearMonth}-${shortId}`,
+        productName: isUrgent ? 'Acil İlan Paketi' : 'Vitrin + Keşfet Paketi',
+        productCode: p.productSku,
+        productType: isUrgent ? 'PROMOTION_URGENT' : 'PROMOTION_SHOWCASE',
+        productTypeLabel: isUrgent ? 'Acil İlan Promosyonu' : 'Vitrin + Keşfet Promosyonu',
+        grossPrice: Number(p.priceAmount) || 0,
+        amountPaid: netPaid,
+        currency: p.currency || 'TRY',
+        paymentStatus: p.paymentStatus,
+        paymentStatusLabel: isRefunded ? 'İADE EDİLDİ' : p.paymentStatus === 'PAID' ? 'BAŞARILI (ÖDENDİ)' : p.paymentStatus,
+        paymentProvider: p.paymentProvider || 'IYZICO / CREDIT_CARD',
+        deliveryStatus: isDeliveryIssue ? 'DELIVERY_FAILED' : 'DELIVERED',
+        deliveryStatusLabel: isDeliveryIssue ? 'TESLİM EDİLEMEDİ' : 'AKTİF UYGULANDI',
+        rightsInfo: {
+          promotionType: p.promotionType,
+          activatedAt: p.activatedAt,
+          expiresAt: p.expiresAt,
+        },
+        listing: p.listing
+          ? {
+              id: p.listing.id,
+              title: p.listing.title,
+              price: Number(p.listing.priceAmount) || 0,
+              status: p.listing.status,
+              isUrgent: p.listing.isUrgent,
+              isFeatured: p.listing.isFeatured,
+            }
+          : null,
+        refund: isRefunded
+          ? {
+              refundedAt: p.refundedAt,
+              refundedAmount: Number(p.refundedAmount) || Number(p.priceAmount) || 0,
+              refundReason: p.refundReason || 'Müşteri Talebi',
+            }
+          : null,
+      };
+    });
+
+    const allMainTransactions = [...buyerItems, ...promoItems].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    // Apply optional search query
+    let filteredTransactions = allMainTransactions;
+    if (filter?.q) {
+      const qLower = filter.q.toLowerCase();
+      filteredTransactions = allMainTransactions.filter(
+        (t) =>
+          t.transactionNo.toLowerCase().includes(qLower) ||
+          t.customerNo.toLowerCase().includes(qLower) ||
+          t.userName.toLowerCase().includes(qLower) ||
+          t.userEmail.toLowerCase().includes(qLower) ||
+          t.productName.toLowerCase().includes(qLower) ||
+          (t.listing && t.listing.id.toLowerCase().includes(qLower)) ||
+          (t.listing && t.listing.title.toLowerCase().includes(qLower))
+      );
+    }
+
+    // 6. Calculate Top 7 KPIs
+    const totalOneTimeSalesCount = allMainTransactions.length;
+    const totalOneTimeRevenue = allMainTransactions.reduce((acc, t) => acc + t.amountPaid, 0);
+    const buyerPackageSalesCount = buyerItems.length;
+    const promotionSalesCount = promoItems.length;
+    const urgentPromotionsCount = urgentPromotions.length;
+    const showcasePromotionsCount = showcasePromotions.length;
+    const refundedTransactionsCount = refundedPromotions.length;
+    const deliveryIssuesCount = deliveryIssuePromotions.length;
+    const adminGrantedBuyerPackagesCount = adminGrantedBuyerPackagesList.length;
+
+    // Revenue distribution by product category
+    const buyerPackagesRevenue = buyerItems.reduce((acc, t) => acc + t.amountPaid, 0);
+    const urgentPromotionsRevenue = promoItems.filter((t) => t.productType === 'PROMOTION_URGENT').reduce((acc, t) => acc + t.amountPaid, 0);
+    const showcasePromotionsRevenue = promoItems.filter((t) => t.productType === 'PROMOTION_SHOWCASE').reduce((acc, t) => acc + t.amountPaid, 0);
+
+    return {
+      kpis: {
+        totalOneTimeSalesCount,
+        totalOneTimeRevenue,
+        buyerPackageSalesCount,
+        promotionSalesCount,
+        urgentPromotionsCount,
+        showcasePromotionsCount,
+        refundedTransactionsCount,
+        deliveryIssuesCount,
+        adminGrantedBuyerPackagesCount,
+        revenueBreakdown: {
+          buyerPackagesRevenue,
+          urgentPromotionsRevenue,
+          showcasePromotionsRevenue,
+        },
+      },
+      transactions: filteredTransactions,
+      adminGrantedBuyerPackages: adminGrantedBuyerPackagesList,
+      refundedTransactions: promoItems.filter((t) => t.refund !== null),
+      deliveryIssueTransactions: promoItems.filter((t) => t.deliveryStatus === 'DELIVERY_FAILED'),
+    };
+  }
+
+  // Backward compatible alias
+  async getOneTimePackages(filter?: any) {
+    return this.getOneTimePackagesDashboard(filter);
   }
 
   /**
@@ -487,24 +684,7 @@ export class FinanceReportsService {
     };
   }
 
-  async getOneTimePackages(filter: any) {
-    const miniPurchases = await this.prisma.analyticsEvent.count({ where: { eventType: 'PACKAGE_PURCHASED', entityId: 'BUYER_MINI' } });
-    const plusPurchases = await this.prisma.analyticsEvent.count({ where: { eventType: 'PACKAGE_PURCHASED', entityId: 'BUYER_PLUS' } });
-    const maxPurchases = await this.prisma.analyticsEvent.count({ where: { eventType: 'PACKAGE_PURCHASED', entityId: 'BUYER_MAX' } });
 
-    const totalRevenue = (miniPurchases * 149) + (plusPurchases * 249) + (maxPurchases * 399);
-
-    return {
-      kpis: [
-        { key: 'ONE_TIME_REVENUE', title: 'Tek Seferlik Paket Geliri', value: totalRevenue, formattedValue: `₺${totalRevenue.toLocaleString('tr-TR')}`, trend: 'up' },
-      ],
-      packageBreakdown: [
-        { package: 'Alıcı Mini (149 TL)', count: miniPurchases, revenue: miniPurchases * 149 },
-        { package: 'Alıcı Plus (249 TL)', count: plusPurchases, revenue: plusPurchases * 249 },
-        { package: 'Alıcı Max (399 TL)', count: maxPurchases, revenue: maxPurchases * 399 },
-      ],
-    };
-  }
 
   async getCosts(filter: any) {
     const aiReportsCount = await this.prisma.analyticsEvent.count({ where: { eventType: 'AI_REPORT_COMPLETED' } });

@@ -233,10 +233,10 @@ export class ReportsController {
     return this.financeService.getRevenue(filter);
   }
 
-  @Get('finance/one-time-packages')
+  @Get(['finance/one-time-packages', 'admin/finance/one-time-packages', 'admin/finance/packages'])
   async getFinanceOneTimePackages(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
-    return this.financeService.getOneTimePackages(filter);
+    return this.financeService.getOneTimePackagesDashboard(filter);
   }
 
   @Get('finance/costs')
