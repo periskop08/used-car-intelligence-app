@@ -34,6 +34,44 @@ export class FinanceReportsService {
   }
 
   /**
+   * Helper to verify if a ListingPromotionPurchase is a real, non-mock, non-admin-grant paid transaction.
+   */
+  private isRealPaidPromotion(p: any): boolean {
+    if (!p) return false;
+    // 1. Payment status must be PAID or REFUNDED (if partial refund)
+    if (p.paymentStatus !== 'PAID' && p.paymentStatus !== 'REFUNDED') return false;
+
+    // 2. Source must be PAYMENT (not ADMIN_GRANT)
+    if (p.source === 'ADMIN_GRANT' || p.grantedByAdminId) return false;
+
+    // 3. Payment Provider must exist and NOT be a mock/test provider keyword
+    if (!p.paymentProvider) return false;
+    const provider = String(p.paymentProvider).toUpperCase();
+    if (
+      provider.includes('MOCK') ||
+      provider.includes('TEST') ||
+      provider.includes('DEMO')
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Calculates net captured revenue for a ListingPromotionPurchase considering refunds.
+   */
+  private getNetPromotionRevenue(p: any): number {
+    if (!this.isRealPaidPromotion(p)) return 0;
+    const gross = Number(p.priceAmount) || 0;
+    if (p.paymentStatus === 'REFUNDED' && (!p.refundedAmount || Number(p.refundedAmount) >= gross)) {
+      return 0; // Fully refunded
+    }
+    const refund = Number(p.refundedAmount) || 0;
+    return Math.max(0, gross - refund);
+  }
+
+  /**
    * Main Finance Overview dashboard endpoint service.
    */
   async getFinanceOverview(range?: string, from?: string, to?: string) {
@@ -58,19 +96,22 @@ export class FinanceReportsService {
     const arr = mrr * 12;
 
     // 2. Period-Flow Metrics (Between startDate and endDate)
-    const buyerPurchases = await this.prisma.buyerPackagePurchase.findMany({
+    const buyerPurchasesRaw = await this.prisma.buyerPackagePurchase.findMany({
       where: { createdAt: { gte: startDate, lte: endDate } },
       include: { user: true },
     });
+    // Filter real buyer package purchases (price > 0)
+    const buyerPurchases = buyerPurchasesRaw.filter((p) => (p.price || 0) > 0);
     const buyerOneTimeRevenue = buyerPurchases.reduce((sum, p) => sum + (p.price || 0), 0);
 
-    const promoPurchases = await this.prisma.listingPromotionPurchase.findMany({
+    const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
-        paymentStatus: 'PAID',
       },
     });
-    const promoOneTimeRevenue = promoPurchases.reduce((sum, p) => sum + (Number(p.priceAmount) || 0), 0);
+    // Filter real paid promotion transactions (excludes ADMIN_GRANT, MOCK_PAYMENT, PENDING, FAILED)
+    const promoPurchases = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p));
+    const promoOneTimeRevenue = promoPurchases.reduce((sum, p) => sum + this.getNetPromotionRevenue(p), 0);
 
     const oneTimeRevenue = buyerOneTimeRevenue + promoOneTimeRevenue;
 
@@ -203,14 +244,20 @@ export class FinanceReportsService {
     }
 
     if (metric === 'oneTime' || metric === 'collected') {
-      const buyerPurchases = await this.prisma.buyerPackagePurchase.findMany({
+      const buyerPurchasesRaw = await this.prisma.buyerPackagePurchase.findMany({
         where: { createdAt: { gte: startDate, lte: endDate } },
         include: { user: true },
         orderBy: { createdAt: 'desc' },
-        take: 50,
       });
+      const buyerPurchases = buyerPurchasesRaw.filter((p) => (p.price || 0) > 0);
 
-      const transactions = buyerPurchases.map((p) => {
+      const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
+        where: { createdAt: { gte: startDate, lte: endDate } },
+        orderBy: { createdAt: 'desc' },
+      });
+      const promoPurchases = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p));
+
+      const buyerTx = buyerPurchases.map((p) => {
         const u = p.user;
         const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
         const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
@@ -227,9 +274,30 @@ export class FinanceReportsService {
           amountPaid: p.price,
           currency: 'TRY',
           status: 'COMPLETED',
-          paymentProvider: 'IYZICO / BANK',
+          paymentProvider: 'PAYMENT_GATEWAY',
         };
       });
+
+      const promoTx = promoPurchases.map((p) => {
+        const netRevenue = this.getNetPromotionRevenue(p);
+        return {
+          id: p.id,
+          transactionNo: `TX-PROMO-${p.id.substring(0, 8).toUpperCase()}`,
+          date: p.createdAt,
+          userId: p.userId || '',
+          userName: p.buyerReferenceSnapshot || 'Promosyon Alıcısı',
+          customerNo: `TS-PROMO-${p.id.substring(0, 6).toUpperCase()}`,
+          productName: `Promosyon (${p.productSku})`,
+          productType: 'PROMOTION_PURCHASE',
+          grossPrice: Number(p.priceAmount) || 0,
+          amountPaid: netRevenue,
+          currency: p.currency || 'TRY',
+          status: p.paymentStatus,
+          paymentProvider: p.paymentProvider || 'PAYMENT_GATEWAY',
+        };
+      });
+
+      const transactions = [...buyerTx, ...promoTx].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return {
         metric,
