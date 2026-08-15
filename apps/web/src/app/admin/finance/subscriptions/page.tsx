@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
   CheckSquare,
   Square,
+  ShoppingBag,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { AdminUserDrawer } from '../../components/AdminUserDrawer';
@@ -56,10 +57,18 @@ export default function AdminFinanceSubscriptionsPage() {
   const [grantUsersList, setGrantUsersList] = useState<any[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
-  // Grant Form Fields
+  // Package Mode State (ABONELİK PAKETİ vs ALICI PAKETİ)
+  const [packageGroup, setPackageGroup] = useState<'SUBSCRIPTION' | 'BUYER'>('SUBSCRIPTION');
+
+  // Subscription Tier State
   const [selectedTier, setSelectedTier] = useState<'STANDARD' | 'PRO'>('PRO');
   const [durationDays, setDurationDays] = useState<number>(30);
   const [isUnlimitedDuration, setIsUnlimitedDuration] = useState<boolean>(false);
+
+  // Buyer Package State
+  const [selectedBuyerCode, setSelectedBuyerCode] = useState<'ALICI_MINI' | 'ALICI_PLUS' | 'ALICI_MAX'>('ALICI_PLUS');
+
+  // Shared Grant Form Fields
   const [reasonCode, setReasonCode] = useState<string>('YONETIM_KARARI');
   const [customReason, setCustomReason] = useState<string>('');
   const [adminNote, setAdminNote] = useState<string>('');
@@ -113,6 +122,7 @@ export default function AdminFinanceSubscriptionsPage() {
     e.stopPropagation(); // Prevents card body click from firing
     setIsGrantModalOpen(true);
     setGrantStep('SELECT_USERS');
+    setPackageGroup('SUBSCRIPTION');
     setSelectedUserIds([]);
     setGrantResult(null);
     fetchGrantUsers('');
@@ -149,10 +159,11 @@ export default function AdminFinanceSubscriptionsPage() {
         },
         body: JSON.stringify({
           targetUserIds: selectedUserIds,
-          packageGroup: 'SUBSCRIPTION',
-          tier: selectedTier,
-          durationDays: isUnlimitedDuration ? 36500 : durationDays,
-          isUnlimited: isUnlimitedDuration,
+          packageGroup,
+          tier: packageGroup === 'SUBSCRIPTION' ? selectedTier : undefined,
+          buyerPackageCode: packageGroup === 'BUYER' ? selectedBuyerCode : undefined,
+          durationDays: packageGroup === 'SUBSCRIPTION' ? (isUnlimitedDuration ? 36500 : durationDays) : undefined,
+          isUnlimited: packageGroup === 'SUBSCRIPTION' ? isUnlimitedDuration : undefined,
           reasonCode,
           reason: customReason || reasonCode,
           adminNote,
@@ -438,11 +449,11 @@ export default function AdminFinanceSubscriptionsPage() {
                 {/* '+' BUTTON (HANDLES EVENT PROPAGATION SEPARATELY) */}
                 <button
                   onClick={handleOpenGrantModal}
-                  title="Yeni Abonelik Tanımla (+)"
+                  title="Yönetici Tarafından Paket Tanımla (+)"
                   className="p-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl font-bold transition-all shadow-lg shadow-amber-500/20 cursor-pointer flex items-center gap-1 text-xs"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>Abonelik Tanımla</span>
+                  <span>Paket Tanımla</span>
                 </button>
               </div>
 
@@ -451,7 +462,7 @@ export default function AdminFinanceSubscriptionsPage() {
                   {data?.kpis?.adminGrantedSubscriptionsCount || 0}
                 </div>
                 <div className="text-[11px] text-amber-300/80 mt-1 font-mono">
-                  Manuel Tanımlanan Paket Hakları (Finansal MRR = ₺0)
+                  Manuel Tanımlanan Abonelik Hakları (Finansal MRR = ₺0)
                 </div>
               </div>
 
@@ -581,7 +592,7 @@ export default function AdminFinanceSubscriptionsPage() {
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5 font-mono">
                   {activeDrilldown === 'adminGranted'
-                    ? 'Yalnızca yönetici tarafından manuel tanımlanan paket hakları (Finansal Gelir = ₺0)'
+                    ? 'Yalnızca yönetici tarafından manuel tanımlanan abonelik paket hakları (Finansal Gelir = ₺0)'
                     : 'Gerçek recurring ödemesi doğrulanmış abonelik kayıtları'}
                 </p>
               </div>
@@ -711,7 +722,7 @@ export default function AdminFinanceSubscriptionsPage() {
         </div>
       )}
 
-      {/* ABONELİK TANIMLA (+) MULTI-USER GRANT MODAL */}
+      {/* PAKET TANIMLA (+) MULTI-USER GRANT MODAL (SUPPORTING ABONELİK PAKETİ & ALICI PAKETİ MODES) */}
       {isGrantModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-2xl w-full p-6 space-y-6 font-mono text-xs">
@@ -719,10 +730,10 @@ export default function AdminFinanceSubscriptionsPage() {
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  Yönetici Tarafından Abonelik Tanımla (+)
+                  Yönetici Tarafından Paket Tanımla (+)
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Manuel tanımlanan abonelikler kullanıcının haklarını günceller ancak MRR/Gelir üretmez.
+                  Abonelik veya Alıcı Paketi manuel olarak tanımlanabilir. Manuel tanımlamalar kullanıcı haklarını günceller ancak ödeme/gelir oluşturmaz.
                 </p>
               </div>
 
@@ -734,6 +745,7 @@ export default function AdminFinanceSubscriptionsPage() {
               </button>
             </div>
 
+            {/* STEP 1: SELECT USERS */}
             {grantStep === 'SELECT_USERS' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
@@ -823,74 +835,175 @@ export default function AdminFinanceSubscriptionsPage() {
               </div>
             )}
 
+            {/* STEP 2: CONFIGURE PACKAGE & DURATION */}
             {grantStep === 'CONFIGURE' && (
-              <div className="space-y-4">
-                {/* PACKAGE SELECTION */}
+              <div className="space-y-5">
+                {/* PACKAGE GROUP MODE SELECTOR (ABONELİK PAKETİ vs ALICI PAKETİ) */}
                 <div className="space-y-2">
-                  <label className="text-slate-400 font-bold block">Tanımlanacak Abonelik Paketi</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <label className="text-slate-400 font-bold block">Tanımlanacak Paket Türü</label>
+                  <div className="flex items-center gap-2 p-1 bg-slate-900 border border-white/10 rounded-xl">
                     <button
                       type="button"
-                      onClick={() => setSelectedTier('STANDARD')}
-                      className={`p-4 border rounded-xl font-bold text-left transition-all cursor-pointer ${
-                        selectedTier === 'STANDARD'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
-                          : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                      onClick={() => setPackageGroup('SUBSCRIPTION')}
+                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        packageGroup === 'SUBSCRIPTION'
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <div className="text-sm font-bold text-emerald-400">Yetkin Paket</div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-mono">Standart İlan Özellikleri</div>
+                      <CreditCard className="w-4 h-4" />
+                      <span>Abonelik Paketi</span>
                     </button>
-
                     <button
                       type="button"
-                      onClick={() => setSelectedTier('PRO')}
-                      className={`p-4 border rounded-xl font-bold text-left transition-all cursor-pointer ${
-                        selectedTier === 'PRO'
-                          ? 'border-cyan-500 bg-cyan-500/10 text-white'
-                          : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                      onClick={() => setPackageGroup('BUYER')}
+                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        packageGroup === 'BUYER'
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
-                      <div className="text-sm font-bold text-cyan-400">Profesyonel Paket</div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-mono">Gelişmiş Analiz & Ön Plana Çıkarma</div>
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>Alıcı Paketi (Ek Hak)</span>
                     </button>
                   </div>
                 </div>
 
-                {/* DURATION SELECTION */}
-                <div className="space-y-2">
-                  <label className="text-slate-400 font-bold block">Geçerlilik Süresi</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[7, 30, 90, 180, 365].map((d) => (
+                {/* MODE 1: ABONELİK PAKETİ CHOICES */}
+                {packageGroup === 'SUBSCRIPTION' ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-slate-400 font-bold block">Abonelik Paketi Seçimi</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTier('STANDARD')}
+                          className={`p-4 border rounded-xl font-bold text-left transition-all cursor-pointer ${
+                            selectedTier === 'STANDARD'
+                              ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                              : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="text-sm font-bold text-emerald-400">Yetkin Paket</div>
+                          <div className="text-[10px] text-slate-400 mt-1 font-mono">Standart İlan Özellikleri</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTier('PRO')}
+                          className={`p-4 border rounded-xl font-bold text-left transition-all cursor-pointer ${
+                            selectedTier === 'PRO'
+                              ? 'border-cyan-500 bg-cyan-500/10 text-white'
+                              : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="text-sm font-bold text-cyan-400">Profesyonel Paket</div>
+                          <div className="text-[10px] text-slate-400 mt-1 font-mono">Gelişmiş Analiz & Ön Plana Çıkarma</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-slate-400 font-bold block">Geçerlilik Süresi</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[7, 30, 90, 180, 365].map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              setDurationDays(d);
+                              setIsUnlimitedDuration(false);
+                            }}
+                            className={`p-2.5 border rounded-xl font-bold text-xs cursor-pointer ${
+                              durationDays === d && !isUnlimitedDuration
+                                ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                                : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                            }`}
+                          >
+                            {d === 7 ? '7 Gün' : d === 30 ? '30 Gün (1 Ay)' : d === 90 ? '3 Ay' : d === 180 ? '6 Ay' : '1 Yıl'}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setIsUnlimitedDuration(true)}
+                          className={`p-2.5 border rounded-xl font-bold text-xs cursor-pointer ${
+                            isUnlimitedDuration
+                              ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                              : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                          }`}
+                        >
+                          Süresiz
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* MODE 2: ALICI PAKETİ CHOICES (REAL CATALOG) */
+                  <div className="space-y-2">
+                    <label className="text-slate-400 font-bold block">Alıcı Ek Hak Paketi Seçimi</label>
+                    <div className="grid grid-cols-1 gap-3">
                       <button
-                        key={d}
                         type="button"
-                        onClick={() => {
-                          setDurationDays(d);
-                          setIsUnlimitedDuration(false);
-                        }}
-                        className={`p-2.5 border rounded-xl font-bold text-xs cursor-pointer ${
-                          durationDays === d && !isUnlimitedDuration
-                            ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                        onClick={() => setSelectedBuyerCode('ALICI_MINI')}
+                        className={`p-4 border rounded-xl text-left transition-all cursor-pointer flex items-center justify-between ${
+                          selectedBuyerCode === 'ALICI_MINI'
+                            ? 'border-amber-500 bg-amber-500/10 text-white'
                             : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
                         }`}
                       >
-                        {d === 7 ? '7 Gün' : d === 30 ? '30 Gün (1 Ay)' : d === 90 ? '3 Ay' : d === 180 ? '6 Ay' : '1 Yıl'}
+                        <div>
+                          <div className="text-sm font-bold text-amber-400">Alıcı Mini Ek Hak Paketi</div>
+                          <div className="text-[11px] text-slate-300 mt-1 font-mono">
+                            +5 AI Araç Riski Raporu • +20 Chatbot Mesajı
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 bg-white/10 rounded text-[10px] font-bold text-slate-300">
+                          30 Gün Geçerli
+                        </span>
                       </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setIsUnlimitedDuration(true)}
-                      className={`p-2.5 border rounded-xl font-bold text-xs cursor-pointer ${
-                        isUnlimitedDuration
-                          ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                          : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
-                      }`}
-                    >
-                      Süresiz
-                    </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBuyerCode('ALICI_PLUS')}
+                        className={`p-4 border rounded-xl text-left transition-all cursor-pointer flex items-center justify-between ${
+                          selectedBuyerCode === 'ALICI_PLUS'
+                            ? 'border-amber-500 bg-amber-500/10 text-white'
+                            : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-bold text-amber-400">Alıcı Plus Ek Hak Paketi</div>
+                          <div className="text-[11px] text-slate-300 mt-1 font-mono">
+                            +15 AI Araç Riski Raporu • +50 Chatbot Mesajı
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 bg-white/10 rounded text-[10px] font-bold text-slate-300">
+                          30 Gün Geçerli
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBuyerCode('ALICI_MAX')}
+                        className={`p-4 border rounded-xl text-left transition-all cursor-pointer flex items-center justify-between ${
+                          selectedBuyerCode === 'ALICI_MAX'
+                            ? 'border-amber-500 bg-amber-500/10 text-white'
+                            : 'border-white/10 bg-slate-900 text-slate-400 hover:bg-white/5'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-bold text-amber-400">Alıcı Max Ek Hak Paketi</div>
+                          <div className="text-[11px] text-slate-300 mt-1 font-mono">
+                            +30 AI Araç Riski Raporu • +100 Chatbot Mesajı
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 bg-white/10 rounded text-[10px] font-bold text-slate-300">
+                          45 Gün Geçerli
+                        </span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* REASON SELECTION */}
                 <div className="space-y-2">
@@ -937,7 +1050,7 @@ export default function AdminFinanceSubscriptionsPage() {
                     id="notifyUser"
                     checked={notifyUser}
                     onChange={(e) => setNotifyUser(e.target.checked)}
-                    className="rounded text-amber-500 bg-slate-900 border-white/10"
+                    className="rounded text-amber-500 bg-slate-900 border-white/10 cursor-pointer"
                   />
                   <label htmlFor="notifyUser" className="text-slate-300 text-xs cursor-pointer">
                     Kullanıcıya bildirim mesajı gönder
@@ -961,6 +1074,7 @@ export default function AdminFinanceSubscriptionsPage() {
               </div>
             )}
 
+            {/* STEP 3: CONFIRMATION */}
             {grantStep === 'CONFIRM' && (
               <div className="space-y-4">
                 <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
@@ -968,12 +1082,37 @@ export default function AdminFinanceSubscriptionsPage() {
                   <p className="text-slate-300 text-xs">
                     Seçilen <strong className="text-white">{selectedUserIds.length} kullanıcıya</strong>{' '}
                     <strong className="text-amber-400">
-                      {selectedTier === 'PRO' ? 'Profesyonel Paket' : 'Yetkin Paket'}
+                      {packageGroup === 'BUYER'
+                        ? selectedBuyerCode === 'ALICI_MINI'
+                          ? 'Alıcı Mini Ek Hak Paketi'
+                          : selectedBuyerCode === 'ALICI_MAX'
+                          ? 'Alıcı Max Ek Hak Paketi'
+                          : 'Alıcı Plus Ek Hak Paketi'
+                        : selectedTier === 'PRO'
+                        ? 'Profesyonel Abonelik Paketi'
+                        : 'Yetkin Abonelik Paketi'}
                     </strong>{' '}
-                    ({isUnlimitedDuration ? 'Süresiz' : `${durationDays} Gün`}) tanımlanacaktır.
+                    tanımlanacaktır.
                   </p>
+
+                  {packageGroup === 'BUYER' && (
+                    <div className="text-slate-300 text-[11px] space-y-0.5 pt-1 border-t border-amber-500/20">
+                      <div>
+                        Tanımlanacak Haklar:{' '}
+                        <strong>
+                          {selectedBuyerCode === 'ALICI_MINI'
+                            ? '+5 AI Rapor / +20 Chatbot (30 Gün)'
+                            : selectedBuyerCode === 'ALICI_MAX'
+                            ? '+30 AI Rapor / +100 Chatbot (45 Gün)'
+                            : '+15 AI Rapor / +50 Chatbot (30 Gün)'}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-slate-400 text-[11px]">
-                    Neden: <strong>{reasonCode}</strong> | Finansal Gelir Değişimi: <strong>₺0 (MRR artmaz)</strong>
+                    Neden: <strong>{reasonCode}</strong> | Finansal Gelir Değişimi:{' '}
+                    <strong>₺0 (Yönetici tanımlaması gelir/MRR üretmez)</strong>
                   </p>
                 </div>
 
@@ -997,12 +1136,13 @@ export default function AdminFinanceSubscriptionsPage() {
               </div>
             )}
 
+            {/* STEP 4: RESULT */}
             {grantStep === 'RESULT' && (
               <div className="space-y-4 text-center py-4">
                 <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-bold text-white">Abonelik Tanımlaması Başarıyla Tamamlandı</h4>
+                <h4 className="text-base font-bold text-white">Paket Tanımlaması Başarıyla Tamamlandı</h4>
                 <p className="text-xs text-slate-400">
                   Toplu İşlem Sonucu: <strong className="text-emerald-400">{grantResult?.successCount || 0} Başarılı</strong>,{' '}
                   <strong className="text-rose-400">{grantResult?.failureCount || 0} Başarısız</strong>.
