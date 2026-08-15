@@ -276,37 +276,51 @@ export class FinanceReportsService {
     }
 
     // 1. Fetch Real Paid Buyer Package Purchases (price > 0)
-    const paidBuyerPurchases = await this.prisma.buyerPackagePurchase.findMany({
-      where: {
-        createdAt: { gte: start, lte: end },
-        price: { gt: 0 },
-      },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let paidBuyerPurchases: any[] = [];
+    try {
+      paidBuyerPurchases = await this.prisma.buyerPackagePurchase.findMany({
+        where: {
+          createdAt: { gte: start, lte: end },
+          price: { gt: 0 },
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (e) {
+      console.warn('[FinanceReports] Error querying buyerPackagePurchase:', e);
+      paidBuyerPurchases = [];
+    }
 
     // 2. Fetch Admin Granted Buyer Package Purchases (price = 0) OR AdminAuditLog entries
-    const adminBuyerGrantAudits = await this.prisma.adminAuditLog.findMany({
-      where: {
-        entityType: 'BuyerPackagePurchase',
-        action: 'USER_BUYER_PACKAGE_GRANTED',
-        createdAt: { gte: start, lte: end },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let adminBuyerGrantAudits: any[] = [];
+    let adminBuyerGrantPurchases: any[] = [];
+    try {
+      adminBuyerGrantAudits = await this.prisma.adminAuditLog.findMany({
+        where: {
+          entityType: 'BuyerPackagePurchase',
+          action: 'USER_BUYER_PACKAGE_GRANTED',
+          createdAt: { gte: start, lte: end },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
-    const adminBuyerGrantPurchases = await this.prisma.buyerPackagePurchase.findMany({
-      where: {
-        createdAt: { gte: start, lte: end },
-        price: 0,
-      },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+      adminBuyerGrantPurchases = await this.prisma.buyerPackagePurchase.findMany({
+        where: {
+          createdAt: { gte: start, lte: end },
+          price: 0,
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (e) {
+      console.warn('[FinanceReports] Error querying admin buyer grants:', e);
+      adminBuyerGrantAudits = [];
+      adminBuyerGrantPurchases = [];
+    }
 
     // Merge Admin Buyer Grants
     const adminGrantedBuyerPackagesList = adminBuyerGrantPurchases.map((p) => {
@@ -340,17 +354,23 @@ export class FinanceReportsService {
     });
 
     // 3. Fetch Real Paid Listing Promotion Purchases
-    const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
-      where: {
-        createdAt: { gte: start, lte: end },
-      },
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
-        listing: { select: { id: true, title: true, priceAmount: true, status: true, isUrgent: true, isFeatured: true } },
-        entitlements: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let promoPurchasesRaw: any[] = [];
+    try {
+      promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
+        where: {
+          createdAt: { gte: start, lte: end },
+        },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true } },
+          listing: { select: { id: true, title: true, priceAmount: true, status: true, isUrgent: true, isFeatured: true } },
+          entitlements: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (e) {
+      console.warn('[FinanceReports] Error querying listingPromotionPurchase:', e);
+      promoPurchasesRaw = [];
+    }
 
     const realPaidPromotions = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p as any));
 

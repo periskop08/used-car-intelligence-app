@@ -87,7 +87,7 @@ export default function AdminFinancePackagesPage() {
     setLoading(true);
     setError(null);
     try {
-      let url = `${API_BASE_URL}/admin/finance/packages?period=${period}`;
+      let url = `${API_BASE_URL}/admin/reports/finance/one-time-packages?period=${period}`;
       if (period === 'custom' && startDate) {
         url += `&startDate=${startDate}&endDate=${endDate || ''}`;
       }
