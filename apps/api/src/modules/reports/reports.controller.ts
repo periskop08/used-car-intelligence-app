@@ -198,6 +198,29 @@ export class ReportsController {
   }
 
   // FINANCE REPORTS
+  @Get(['finance/overview', 'admin/finance/overview'])
+  async getFinanceOverview(
+    @Query('range') range: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.financeService.getFinanceOverview(range, from, to);
+  }
+
+  @Get(['finance/overview/drilldown', 'admin/finance/overview/drilldown'])
+  async getFinanceOverviewDrilldown(
+    @Query('metric') metric: string,
+    @Query('range') range: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.financeService.getFinanceOverviewDrilldown(metric || 'mrr', range, from, to);
+  }
+
   @Get('finance/subscriptions')
   async getFinanceSubscriptions(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
