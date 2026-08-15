@@ -7,7 +7,19 @@ import { API_BASE_URL } from '@/utils/apiConfig';
 import { ClubCommentDrawer } from '../components/ClubCommentDrawer';
 import { ClubPostDrawer } from '../components/ClubPostDrawer';
 import { AdminUserDrawer } from '../../components/AdminUserDrawer';
-import { MessageSquare, ChevronDown, ChevronRight, Eye, EyeOff, User } from 'lucide-react';
+import {
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  User,
+  AlertCircle,
+  CheckCircle2,
+  RotateCcw,
+  Loader2,
+  X,
+} from 'lucide-react';
 
 interface PostGroup {
   post: {
@@ -72,6 +84,11 @@ export default function AdminClubCommentsPage() {
   const [postCommentsMap, setPostCommentsMap] = useState<Record<string, any[]>>({});
   const [loadingCommentsMap, setLoadingCommentsMap] = useState<Record<string, boolean>>({});
 
+  // Action Loading & Toast State
+  const [actingCommentId, setActingCommentId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Drawer States
   const [selectedComment, setSelectedComment] = useState<any | null>(null);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -98,16 +115,11 @@ export default function AdminClubCommentsPage() {
         const norm = normalizeCommentGroups(data);
         setGroups(norm);
 
-        const initialMap: Record<string, any[]> = {};
-        norm.forEach((g) => {
-          if (g.commentsList && g.commentsList.length > 0) {
-            initialMap[g.post.id] = g.commentsList;
-          }
-        });
-        setPostCommentsMap((prev) => ({ ...initialMap, ...prev }));
-
+        // Fetch comments for expanded posts under current status filter
         if (norm.length > 0) {
-          setExpandedPostIds(new Set([norm[0].post.id]));
+          const firstPostId = norm[0].post.id;
+          setExpandedPostIds(new Set([firstPostId]));
+          fetchPostComments(firstPostId);
         }
       }
     } catch (e) {
@@ -117,9 +129,89 @@ export default function AdminClubCommentsPage() {
     }
   };
 
+  const fetchPostComments = async (postId: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) return;
+
+    setLoadingCommentsMap((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const comments = Array.isArray(data) ? data : data.comments || [];
+        setPostCommentsMap((prev) => ({ ...prev, [postId]: comments }));
+      }
+    } catch (e) {
+      console.error('Fetch post comments error:', e);
+    } finally {
+      setLoadingCommentsMap((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
   useEffect(() => {
+    // Reset cache on status filter change
+    setPostCommentsMap({});
     fetchGroups();
   }, [statusFilter]);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleRowAction = async (
+    e: React.MouseEvent,
+    comment: any,
+    targetStatus: 'VISIBLE' | 'PENDING_REVIEW' | 'HIDDEN'
+  ) => {
+    e.stopPropagation();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token || actingCommentId) return;
+
+    setActingCommentId(comment.id);
+    try {
+      let endpoint = 'publish';
+      let body: any = undefined;
+      let feedback = 'Yorum yeniden yayına alındı.';
+
+      if (targetStatus === 'PENDING_REVIEW') {
+        endpoint = 'review';
+        feedback = 'Yorum incelemeye alındı.';
+      } else if (targetStatus === 'HIDDEN') {
+        endpoint = 'hide';
+        body = JSON.stringify({ reason: 'Moderatör tarafından gizlendi' });
+        feedback = 'Yorum gizlendi.';
+      } else if (targetStatus === 'VISIBLE') {
+        endpoint = 'publish';
+        feedback = comment.status === 'PENDING_REVIEW' ? 'İnceleme iptal edildi, yorum yeniden yayında.' : 'Yorum yeniden yayına alındı.';
+      }
+
+      const res = await fetch(`${API_BASE_URL}/admin/club/comments/${comment.id}/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+      });
+
+      if (res.ok) {
+        showToast(feedback);
+        // Clear cached comments map and refetch fresh groups
+        setPostCommentsMap({});
+        fetchGroups();
+      } else {
+        alert('İşlem gerçekleştirilemedi.');
+      }
+    } catch (err) {
+      alert('Hata oluştu.');
+    } finally {
+      setActingCommentId(null);
+    }
+  };
 
   const toggleExpandPost = async (postId: string) => {
     const next = new Set(expandedPostIds);
@@ -130,37 +222,35 @@ export default function AdminClubCommentsPage() {
     setExpandedPostIds(next);
 
     if (willOpen && !postCommentsMap[postId]) {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) return;
-
-      setLoadingCommentsMap((prev) => ({ ...prev, [postId]: true }));
-      try {
-        const res = await fetch(
-          `${API_BASE_URL}/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setPostCommentsMap((prev) => ({ ...prev, [postId]: data.comments || data }));
-        }
-      } catch (e) {
-        console.error('Fetch post comments error:', e);
-      } finally {
-        setLoadingCommentsMap((prev) => ({ ...prev, [postId]: false }));
-      }
+      fetchPostComments(postId);
     }
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-mono text-xs">
-      <div className="pb-4 border-b border-white/10">
-        <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
-          Tork Scout Club — Yorumlar & Moderasyon
-        </h1>
-        <p className="text-xs text-slate-400 font-sans mt-1">
-          Gönderi bazında gruplanmış topluluk yorumları, onay onaylama kuyruğu ve içerik gizleme eylemleri.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
+            Tork Scout Club — Yorumlar & Moderasyon Operasyonu
+          </h1>
+          <p className="text-xs text-slate-400 font-sans mt-1">
+            Gönderi bazında gruplanmış topluluk yorumları, onay inceleme kuyruğu ve doğrudan satır içi moderasyon aksiyonları.
+          </p>
+        </div>
       </div>
+
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-between font-sans">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{toastMsg}</span>
+          </div>
+          <button onClick={() => setToastMsg(null)} className="text-slate-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -173,7 +263,7 @@ export default function AdminClubCommentsPage() {
           <Link
             key={tab.key}
             href={`/admin/club/comments?status=${tab.key}`}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               statusFilter === tab.key
                 ? 'bg-orange-500 text-white shadow-md'
                 : 'bg-slate-900 text-slate-400 border border-white/5 hover:text-white'
@@ -188,7 +278,7 @@ export default function AdminClubCommentsPage() {
       {loading ? (
         <div className="p-12 text-center text-slate-400 font-medium">Yorum grupları yükleniyor...</div>
       ) : groups.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 font-medium text-xs bg-slate-900/60 rounded-2xl border border-white/10">
+        <div className="p-12 text-center text-slate-500 font-medium text-xs bg-slate-900/60 rounded-2xl border border-white/10 font-sans">
           Seçili kısıt altında yorum bulunmuyor.
         </div>
       ) : (
@@ -235,62 +325,134 @@ export default function AdminClubCommentsPage() {
 
                 {/* Accordion Body */}
                 {isExpanded && (
-                  <div className="p-4 bg-slate-900/40">
+                  <div className="p-4 bg-slate-900/40 space-y-3">
                     {isLoadingComments ? (
-                      <div className="p-6 text-center text-slate-400">Yorumlar yükleniyor...</div>
+                      <div className="p-6 text-center text-slate-400 font-mono">Yorumlar yükleniyor...</div>
                     ) : comments.length === 0 ? (
-                      <div className="p-6 text-center text-slate-500 text-xs">
-                        Bu gönderiye ait yorum bulunmuyor.
+                      <div className="p-6 text-center text-slate-500 text-xs font-sans">
+                        Bu gönderiye ait seçili filtre altında yorum bulunmuyor.
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {comments.map((comment: any) => {
-                          const isHidden = comment.status === 'HIDDEN';
-                          const isPending = comment.status === 'PENDING_REVIEW';
+                      comments.map((comment: any) => {
+                        const isVisible = comment.status === 'VISIBLE';
+                        const isPending = comment.status === 'PENDING_REVIEW';
+                        const isHidden = comment.status === 'HIDDEN';
+                        const isActing = actingCommentId === comment.id;
 
-                          return (
-                            <div
-                              key={comment.id}
-                              onClick={() => setSelectedComment(comment)}
-                              className="p-3 bg-slate-950/80 hover:bg-slate-950 rounded-xl border border-white/5 hover:border-orange-500/40 transition cursor-pointer space-y-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-white font-sans text-xs">
-                                    {comment.authorFormatted || comment.author?.name || 'Kullanıcı'}
+                        return (
+                          <div
+                            key={comment.id}
+                            onClick={() => setSelectedComment(comment)}
+                            className="p-3.5 bg-slate-950/90 hover:bg-slate-950 rounded-xl border border-white/5 hover:border-orange-500/40 transition cursor-pointer space-y-2 font-sans"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-bold text-white text-xs">
+                                    {comment.authorFormatted || comment.author?.username || 'Kullanıcı'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    ({comment.author?.customerNo || 'TS-MEMBER'})
                                   </span>
                                   {comment.badge && (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
                                       {comment.badge.label}
                                     </span>
                                   )}
                                 </div>
-
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                      isHidden
-                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                        : isPending
-                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    }`}
-                                  >
-                                    {isHidden ? 'GİZLENDİ' : isPending ? 'İNCELEMEDE' : 'YAYINDA'}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    {new Date(comment.createdAt).toLocaleString('tr-TR')}
-                                  </span>
-                                </div>
+                                <p className="text-slate-200 text-xs leading-relaxed whitespace-pre-wrap">
+                                  {comment.content}
+                                </p>
                               </div>
 
-                              <p className="text-slate-300 font-sans text-xs whitespace-pre-wrap leading-relaxed">
-                                {comment.content}
-                              </p>
+                              {/* Row Right: Status Badge & Actions */}
+                              <div className="flex flex-col items-end gap-2 whitespace-nowrap">
+                                <div className="flex items-center gap-2 font-mono">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isVisible
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : isPending
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                    }`}
+                                  >
+                                    {isVisible ? 'YAYINDA' : isPending ? 'İNCELEMEDE' : 'GİZLİ'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    {new Date(comment.createdAt).toLocaleDateString('tr-TR')}
+                                  </span>
+                                </div>
+
+                                {/* Row Level Moderation Buttons */}
+                                <div className="flex items-center gap-1.5 font-mono">
+                                  {isActing ? (
+                                    <span className="px-3 py-1 text-slate-400 text-[11px] font-bold flex items-center gap-1">
+                                      <Loader2 className="w-3 h-3 animate-spin" /> İşleniyor...
+                                    </span>
+                                  ) : (
+                                    <>
+                                      {/* STATE: VISIBLE (Yayında) */}
+                                      {isVisible && (
+                                        <>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'PENDING_REVIEW')}
+                                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <AlertCircle className="w-3 h-3" /> İncelemeye Al
+                                          </button>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'HIDDEN')}
+                                            className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <EyeOff className="w-3 h-3" /> Yorumu Gizle
+                                          </button>
+                                        </>
+                                      )}
+
+                                      {/* STATE: PENDING_REVIEW (İncelemede) */}
+                                      {isPending && (
+                                        <>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'VISIBLE')}
+                                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <RotateCcw className="w-3 h-3" /> İncelemeyi İptal Et / Yayına Al
+                                          </button>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'HIDDEN')}
+                                            className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <EyeOff className="w-3 h-3" /> Yorumu Gizle
+                                          </button>
+                                        </>
+                                      )}
+
+                                      {/* STATE: HIDDEN (Gizli) */}
+                                      {isHidden && (
+                                        <>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'VISIBLE')}
+                                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <RotateCcw className="w-3 h-3" /> Yayına Geri Al
+                                          </button>
+                                          <button
+                                            onClick={(e) => handleRowAction(e, comment, 'PENDING_REVIEW')}
+                                            className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <AlertCircle className="w-3 h-3" /> İncelemeye Al
+                                          </button>
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -305,7 +467,10 @@ export default function AdminClubCommentsPage() {
         comment={selectedComment}
         isOpen={!!selectedComment}
         onClose={() => setSelectedComment(null)}
-        onRefresh={fetchGroups}
+        onRefresh={() => {
+          setPostCommentsMap({});
+          fetchGroups();
+        }}
         onOpenUserDrawer={(userId) => setSelectedUserId(userId)}
         onOpenPostDrawer={(post) => setSelectedPost(post)}
       />
@@ -314,7 +479,10 @@ export default function AdminClubCommentsPage() {
         post={selectedPost}
         isOpen={!!selectedPost}
         onClose={() => setSelectedPost(null)}
-        onRefresh={fetchGroups}
+        onRefresh={() => {
+          setPostCommentsMap({});
+          fetchGroups();
+        }}
         onOpenUserDrawer={(userId) => setSelectedUserId(userId)}
       />
 
@@ -323,7 +491,10 @@ export default function AdminClubCommentsPage() {
           userId={selectedUserId}
           isOpen={!!selectedUserId}
           onClose={() => setSelectedUserId(null)}
-          onRefresh={fetchGroups}
+          onRefresh={() => {
+            setPostCommentsMap({});
+            fetchGroups();
+          }}
         />
       )}
     </div>

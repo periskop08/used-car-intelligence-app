@@ -27,21 +27,21 @@ export default function PendingCommentsTable({
 }: PendingCommentsTableProps) {
   const [actingId, setActingId] = useState<string | null>(null);
 
-  const handleAction = async (e: React.MouseEvent, commentId: string, action: 'review' | 'hide') => {
+  const handleAction = async (e: React.MouseEvent, commentId: string, action: 'publish' | 'hide') => {
     e.stopPropagation();
-    const token = localStorage.getItem('accessToken');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
 
     setActingId(commentId);
     try {
-      const endpoint = action === 'review' ? 'review' : 'hide';
+      const endpoint = action === 'publish' ? 'publish' : 'hide';
       const res = await fetch(`${API_BASE_URL}/admin/club/comments/${commentId}/${endpoint}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: action === 'hide' ? JSON.stringify({ reason: 'Uygunsuz içerik' }) : undefined,
+        body: action === 'hide' ? JSON.stringify({ reason: 'Moderatör tarafından gizlendi' }) : undefined,
       });
       if (res.ok) {
         if (onRefresh) onRefresh();
@@ -112,11 +112,11 @@ export default function PendingCommentsTable({
                 <td className="p-3 text-slate-300 font-sans max-w-xs truncate">{comment.content}</td>
                 <td className="p-3 text-right space-x-2 whitespace-nowrap">
                   <button
-                    onClick={(e) => handleAction(e, comment.id, 'review')}
+                    onClick={(e) => handleAction(e, comment.id, 'publish')}
                     disabled={actingId === comment.id}
                     className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-[11px] hover:bg-emerald-500/30 transition disabled:opacity-50 cursor-pointer"
                   >
-                    Onayla
+                    Onayla / Yayına Al
                   </button>
                   <button
                     onClick={(e) => handleAction(e, comment.id, 'hide')}

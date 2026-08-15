@@ -1127,17 +1127,41 @@ export class ClubService implements OnModuleInit {
   }
 
   async reviewComment(commentId: string, actorId: string, actorRole: string) {
-    return this.prisma.clubComment.update({
+    const comment = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: { status: ClubCommentStatus.PENDING_REVIEW },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId,
+        actorRole,
+        actionType: 'COMMENT_UNDER_REVIEW',
+        targetUserId: comment.authorId,
+        commentId,
+      },
+    });
+
+    return comment;
   }
 
   async restoreComment(commentId: string, actorId: string, actorRole: string) {
-    return this.prisma.clubComment.update({
+    const comment = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: { status: ClubCommentStatus.VISIBLE },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId,
+        actorRole,
+        actionType: 'COMMENT_PUBLISHED',
+        targetUserId: comment.authorId,
+        commentId,
+      },
+    });
+
+    return comment;
   }
 
   async muteUser(userId: string, actorId: string, actorRole: string, dto: MuteUserDto) {
