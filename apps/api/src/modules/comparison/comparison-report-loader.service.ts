@@ -14,6 +14,60 @@ function generateDerivedFactId(reportId: string, criterion: string, sourcePath: 
   return `CMP_${criterion}_${hash}`;
 }
 
+export function formatProfileSuitabilityItem(item: any): string | null {
+  if (!item) return null;
+
+  if (typeof item === 'string') {
+    const trimmed = item.trim();
+    if (
+      !trimmed ||
+      trimmed === '[object Object]' ||
+      trimmed.toLowerCase() === 'undefined' ||
+      trimmed.toLowerCase() === 'null'
+    ) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  if (typeof item === 'object' && item !== null) {
+    const profile = typeof item.profile === 'string'
+      ? item.profile.trim()
+      : (typeof item.targetUser === 'string' ? item.targetUser.trim() : (typeof item.title === 'string' ? item.title.trim() : ''));
+
+    const explanation = typeof item.explanation === 'string'
+      ? item.explanation.trim()
+      : (typeof item.reason === 'string' ? item.reason.trim() : (typeof item.description === 'string' ? item.description.trim() : ''));
+
+    if (profile === '[object Object]' || explanation === '[object Object]') return null;
+
+    if (profile && explanation) {
+      return `${profile}: ${explanation}`;
+    } else if (profile) {
+      return profile;
+    } else if (explanation) {
+      return explanation;
+    }
+  }
+
+  return null;
+}
+
+export function formatProfileSuitabilityList(val: any): string | null {
+  if (!val) return null;
+
+  if (Array.isArray(val)) {
+    const formattedList = val
+      .map(formatProfileSuitabilityItem)
+      .filter((s): s is string => typeof s === 'string' && s.length > 0 && !s.includes('[object Object]'));
+
+    if (formattedList.length === 0) return null;
+    return formattedList.join(', ');
+  }
+
+  return formatProfileSuitabilityItem(val);
+}
+
 export function deriveComparisonFactsFromStoredReport(
   reportId: string,
   reportData: Record<string, any>,
@@ -35,7 +89,17 @@ export function deriveComparisonFactsFromStoredReport(
     if (val === null || val === undefined) return;
     if (typeof val === 'string') {
       const trimmed = val.trim();
-      if (!trimmed || trimmed === '0' || trimmed.toLowerCase() === 'yok' || trimmed.toLowerCase() === 'bilinmiyor') return;
+      if (
+        !trimmed ||
+        trimmed === '0' ||
+        trimmed.toLowerCase() === 'yok' ||
+        trimmed.toLowerCase() === 'bilinmiyor' ||
+        trimmed.includes('[object Object]') ||
+        trimmed.toLowerCase() === 'undefined' ||
+        trimmed.toLowerCase() === 'null'
+      ) {
+        return;
+      }
     }
     if (typeof val === 'number' && isNaN(val)) return;
 
@@ -206,17 +270,17 @@ export function deriveComparisonFactsFromStoredReport(
     }
   });
 
-  const bestFor = synthesis.suitableFor || reportData.executiveSummary?.bestFor;
+  const bestFor = synthesis.suitableFor || reportData.executiveSummary?.bestFor || reportData.suitableFor;
   if (bestFor) {
-    const bestVal = Array.isArray(bestFor) ? bestFor.filter(Boolean).join(', ') : (typeof bestFor === 'string' ? bestFor.trim() : '');
+    const bestVal = formatProfileSuitabilityList(bestFor);
     if (bestVal) {
       addFact('USAGE_SUITABILITY', 'En Uygun Kullanıcı Profili', bestVal, 'expertDecisionSynthesis.suitableFor');
     }
   }
 
-  const notIdealFor = synthesis.notSuitableFor || reportData.executiveSummary?.notIdealFor;
+  const notIdealFor = synthesis.notSuitableFor || reportData.executiveSummary?.notIdealFor || reportData.notSuitableFor;
   if (notIdealFor) {
-    const notVal = Array.isArray(notIdealFor) ? notIdealFor.filter(Boolean).join(', ') : (typeof notIdealFor === 'string' ? notIdealFor.trim() : '');
+    const notVal = formatProfileSuitabilityList(notIdealFor);
     if (notVal) {
       addFact('USAGE_SUITABILITY', 'Uygun Olmayan Kullanıcı Profili', notVal, 'expertDecisionSynthesis.notSuitableFor');
     }

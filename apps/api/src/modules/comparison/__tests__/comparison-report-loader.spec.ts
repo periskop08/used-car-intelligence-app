@@ -443,5 +443,44 @@ describe('ComparisonReportLoaderService', () => {
 
       expect(clone).toEqual(fixtureReportData);
     });
+
+    it('J: should correctly format object[] suitableFor and notSuitableFor into profile: explanation text', () => {
+      const dataWithProfileObjects = JSON.parse(JSON.stringify(fixtureReportData));
+      dataWithProfileObjects.expertDecisionSynthesis.suitableFor = [
+        { profile: 'Aileler', explanation: 'Geniş iç hacmi nedeniyle uygundur.' },
+        { profile: 'Uzun Yol Sürücüleri', explanation: 'Düşük yakıt tüketimi sunar.' },
+      ];
+      dataWithProfileObjects.expertDecisionSynthesis.notSuitableFor = [
+        { profile: 'Genç Sürücüler', explanation: 'Yüksek sigorta ve kasko maliyeti.' },
+      ];
+
+      const derived = deriveComparisonFactsFromStoredReport('rep_profiles', dataWithProfileObjects);
+
+      const suitableFact = derived.find(f => f.label === 'En Uygun Kullanıcı Profili');
+      expect(suitableFact).toBeDefined();
+      expect(suitableFact?.value).toBe('Aileler: Geniş iç hacmi nedeniyle uygundur., Uzun Yol Sürücüleri: Düşük yakıt tüketimi sunar.');
+
+      const notSuitableFact = derived.find(f => f.label === 'Uygun Olmayan Kullanıcı Profili');
+      expect(notSuitableFact).toBeDefined();
+      expect(notSuitableFact?.value).toBe('Genç Sürücüler: Yüksek sigorta ve kasko maliyeti.');
+    });
+
+    it('K: should NEVER produce any derived Fact containing [object Object]', () => {
+      const dataWithComplexObjects = JSON.parse(JSON.stringify(fixtureReportData));
+      dataWithComplexObjects.expertDecisionSynthesis.suitableFor = [
+        { profile: 'Şehir İçi Sürücüler', explanation: 'Pratik park' },
+        {},
+        null,
+      ];
+      dataWithComplexObjects.expertDecisionSynthesis.notSuitableFor = { profile: 'Offroad Sürücüleri', explanation: '4x4 sistemi yok' };
+
+      const derived = deriveComparisonFactsFromStoredReport('rep_no_obj', dataWithComplexObjects);
+
+      derived.forEach(f => {
+        expect(f.value).not.toContain('[object Object]');
+        expect(f.value).not.toBe('undefined');
+        expect(f.value).not.toBe('null');
+      });
+    });
   });
 });

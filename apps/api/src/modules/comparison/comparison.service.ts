@@ -526,6 +526,9 @@ KATI TALİMATLAR:
       (dossier.usageScenarios || [])
         .flatMap(s => s.supportingFactIds || [])
         .forEach(id => addIfInCatalog(usageFacts, id));
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => f.factKey.startsWith('CMP_USAGE_SUITABILITY_') || f.factKey.toLowerCase().includes('usage') || f.factKey.toLowerCase().includes('suitability'))
+        .forEach(f => usageFacts.add(f.factKey));
 
       // 4. SAFETY
       (dossier.dataQuality?.supportingFacts || [])
@@ -986,6 +989,28 @@ KATI TALİMATLAR:
    - insufficientData: boolean (score null ise true, non-null ise false).
 6. Kriter 8 ("EQUIPMENT_TECHNOLOGY"): Seçilen donanım paketine ait konfor, multimedya, bağlantı ve günlük kullanım teknolojilerini değerlendir. Fiyat verisi VEYA piyasa fiyatı tahmini KULLANILAMAZ. Donanım paketine özel kanıt yoksa score null olmalıdır.
 7. "marketPriceEvidence" alanı hiçbir kriterde üretilmeyecektir.
+8. USAGE_SUITABILITY KRİTERİ PUANLAMA KURALI VE SÖZLEŞMESİ:
+USAGE_SUITABILITY puanı üretilirken şu 5 alt bileşenin ağırlıkları dikkate alınmalıdır (Toplam %100):
+- Şehir içi günlük kullanım uygunluğu: %25
+- Otoyol ve uzun yol uygunluğu: %25
+- Yoğun trafik, dur-kalk ve kullanım kolaylığı: %20
+- Hitap ettiği kullanıcı profillerinin genişliği: %15
+- Kullanım senaryolarındaki tavizlerin ağırlığı: %15
+
+Puan Bantları:
+- 90–100: Tüm temel senaryolarda güçlü, önemli kullanıcı kısıtı yok.
+- 75–89: Senaryoların çoğunda güçlü, sınırlı tavizler var.
+- 60–74: Bazı senaryolarda başarılı, belirgin sınırlamalar mevcut.
+- 40–59: Dar kullanım profiline uygun.
+- 0–39: Temel kullanım senaryolarının çoğunda önemli sınırlamalar var.
+
+Kurallar:
+- MÜKEMMEL/İYİ kelimesini tek başına otomatik puana çevirme.
+- Bagaj ve kabin ölçülerini tekrar puanlama; PRACTICALITY'ye aittir.
+- Koltuk, süspansiyon ve yalıtımı tekrar puanlama; COMFORT'a aittir.
+- HP, tork ve hız değerlerini tekrar puanlama; PERFORMANCE'a aittir.
+- KULLANICI ÖNCELİĞİ (selectedPriority) temel USAGE_SUITABILITY puanını değiştirmemelidir; temel kriter puanı bağımsız üretilmelidir.
+- Puan yalnız rapordaki olumlu kullanım kanıtları ve tavizler birlikte değerlendirilerek üretilmelidir.
 
 Lütfen SADECE geçerli JSON yanıt ver:
 {
@@ -1220,6 +1245,70 @@ Lütfen SADECE geçerli JSON yanıt ver:
           const hasInvalidFactId = factIds.some(fid => !criterionAllowList.has(fid));
           if (hasInvalidFactId) {
             throw new Error(`Invalid supportingFactId in ${key} for vehicle ${p.vehicleId}: Fact ID is not allowed for criterion ${key}`);
+          }
+
+          if (key === 'USAGE_SUITABILITY') {
+            const supportingFacts = p.dossier?.dataQuality?.supportingFacts || [];
+            const factMap = new Map<string, any>();
+            supportingFacts.forEach((f: any) => {
+              if (f.factKey) factMap.set(f.factKey, f);
+              if (f.id) factMap.set(f.id, f);
+            });
+
+            let hasCityUse = false;
+            let hasHighwayUse = false;
+            let hasTrafficBehavior = false;
+            let hasScenarioOrProfile = false;
+
+            for (const fid of factIds) {
+              const f = factMap.get(fid);
+              const sp = (f?.sourcePath || '').toLowerCase();
+              const lbl = (f?.label || '').toLowerCase();
+              const lowerFid = fid.toLowerCase();
+
+              if (
+                sp.includes('cityuse') ||
+                lbl.includes('şehir içi kullanım uyumu') ||
+                lbl.includes('şehir içi kullanım') ||
+                lowerFid.includes('city')
+              ) {
+                hasCityUse = true;
+              }
+              if (
+                sp.includes('highwayuse') ||
+                lbl.includes('otoyol kullanım uyumu') ||
+                lbl.includes('otoyol kullanım') ||
+                lowerFid.includes('highway')
+              ) {
+                hasHighwayUse = true;
+              }
+              if (
+                sp.includes('trafficbehavior') ||
+                lbl.includes('yoğun trafik') ||
+                lbl.includes('trafik davranışı') ||
+                lowerFid.includes('traffic')
+              ) {
+                hasTrafficBehavior = true;
+              }
+              if (
+                sp.includes('usagescenarios') ||
+                sp.includes('suitablefor') ||
+                sp.includes('notsuitablefor') ||
+                lbl.includes('kullanım senaryosu') ||
+                lbl.includes('kullanıcı profili') ||
+                lowerFid.includes('scenario') ||
+                lowerFid.includes('suitable') ||
+                lowerFid.includes('profile')
+              ) {
+                hasScenarioOrProfile = true;
+              }
+            }
+
+            if (!hasCityUse || !hasHighwayUse || !hasTrafficBehavior || !hasScenarioOrProfile) {
+              throw new Error(
+                `Non-null USAGE_SUITABILITY score for vehicle ${p.vehicleId} REQUIRES all 4 mandatory evidence categories (cityUse, highwayUse, trafficBehavior, and scenario/profile)`
+              );
+            }
           }
         }
       }
