@@ -8,17 +8,19 @@ import {
 
 describe('TorqueScout Comparison-v7: 8-Criteria & Mandatory 8/8 Coverage Rules', () => {
   // Requirement 1 & 14: Sum of 8 criteria weights must equal 100
-  it('TEST 1: Sum of 8 criteria weights must equal 100 with EQUIPMENT_TECHNOLOGY', () => {
+  // Requirement 1 & 14: Sum of 8 criteria weights must equal 100
+  it('TEST 1: Sum of 8 criteria weights must equal 100 with USAGE_SUITABILITY', () => {
     const totalWeight = Object.values(CRITERIA_WEIGHTS).reduce((acc, w) => acc + w, 0);
     expect(totalWeight).toBe(100);
     expect(CRITERIA_WEIGHTS.RELIABILITY).toBe(20);
     expect(CRITERIA_WEIGHTS.FAILURE_SEVERITY).toBe(15);
     expect(CRITERIA_WEIGHTS.FUEL_EFFICIENCY).toBe(10);
-    expect(CRITERIA_WEIGHTS.SAFETY).toBe(15);
+    expect(CRITERIA_WEIGHTS.USAGE_SUITABILITY).toBe(15);
     expect(CRITERIA_WEIGHTS.PERFORMANCE).toBe(10);
     expect(CRITERIA_WEIGHTS.COMFORT).toBe(10);
     expect(CRITERIA_WEIGHTS.PRACTICALITY).toBe(10);
     expect(CRITERIA_WEIGHTS.EQUIPMENT_TECHNOLOGY).toBe(10);
+    expect((CRITERIA_WEIGHTS as any).SAFETY).toBeUndefined();
     expect((CRITERIA_WEIGHTS as any).VALUE_FOR_MONEY).toBeUndefined();
   });
 
@@ -29,7 +31,7 @@ describe('TorqueScout Comparison-v7: 8-Criteria & Mandatory 8/8 Coverage Rules',
         RELIABILITY: { criterionKey: 'RELIABILITY', score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         FAILURE_SEVERITY: { criterionKey: 'FAILURE_SEVERITY', score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         FUEL_EFFICIENCY: { criterionKey: 'FUEL_EFFICIENCY', score: 90, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
-        SAFETY: { criterionKey: 'SAFETY', score: 70, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
+        USAGE_SUITABILITY: { criterionKey: 'USAGE_SUITABILITY', score: 70, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         PERFORMANCE: { criterionKey: 'PERFORMANCE', score: 75, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         COMFORT: { criterionKey: 'COMFORT', score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         PRACTICALITY: { criterionKey: 'PRACTICALITY', score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
@@ -52,7 +54,7 @@ describe('TorqueScout Comparison-v7: 8-Criteria & Mandatory 8/8 Coverage Rules',
         RELIABILITY: { criterionKey: 'RELIABILITY', score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         FAILURE_SEVERITY: { criterionKey: 'FAILURE_SEVERITY', score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         FUEL_EFFICIENCY: { criterionKey: 'FUEL_EFFICIENCY', score: 90, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
-        SAFETY: { criterionKey: 'SAFETY', score: 70, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
+        USAGE_SUITABILITY: { criterionKey: 'USAGE_SUITABILITY', score: 70, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         PERFORMANCE: { criterionKey: 'PERFORMANCE', score: 75, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         COMFORT: { criterionKey: 'COMFORT', score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
         PRACTICALITY: { criterionKey: 'PRACTICALITY', score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], negativeFactors: [], supportingFactIds: [], missingInputs: [], insufficientData: false },

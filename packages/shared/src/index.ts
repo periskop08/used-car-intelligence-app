@@ -250,13 +250,14 @@ export type ComparisonPriority =
   | 'HIGHWAY'
   | 'RESALE_VALUE';
 
-// 8 Evidence-Based Criteria Definitions
+// 8 Evidence-Based Criteria Definitions (v8)
 export type CriterionKey =
   | 'RELIABILITY'           // 1. Mekanik güvenilirlik ve kronik risk (%20)
   | 'FAILURE_SEVERITY'      // 2. Arıza ciddiyeti ve mekanik dayanıklılık (%15)
   | 'SEVERITY_DURABILITY'   // Alias for backwards compatibility
   | 'FUEL_EFFICIENCY'       // 3. Yakıt tüketimi ve verimlilik (%10)
-  | 'SAFETY'                // 4. Güvenlik seviyesi (%15)
+  | 'USAGE_SUITABILITY'     // 4. Kullanım Senaryosu ve Kullanıcı Uyumu (%15)
+  | 'SAFETY'                // Legacy criterion / unrated info
   | 'PERFORMANCE'           // 5. Motor, şanzıman ve sürüş performansı (%10)
   | 'COMFORT'               // 6. Konfor ve sürüş kalitesi (%10)
   | 'PRACTICALITY'          // 7. Kullanışlılık ve yaşam alanı (%10)
@@ -267,7 +268,7 @@ export const CRITERIA_WEIGHTS: Record<string, number> = {
   RELIABILITY: 20,
   FAILURE_SEVERITY: 15,
   FUEL_EFFICIENCY: 10,
-  SAFETY: 15,
+  USAGE_SUITABILITY: 15,
   PERFORMANCE: 10,
   COMFORT: 10,
   PRACTICALITY: 10,
@@ -544,9 +545,9 @@ export interface FinalDecisionGuideRow {
 
 export interface VehicleComparisonResult {
   comparisonId: string;
-  schemaVersion: '5.0' | '6.0' | '7.0';
-  promptVersion: '5' | '6' | '7';
-  engineVersion: 'comparison-v5' | 'comparison-v6' | 'comparison-v7';
+  schemaVersion: '5.0' | '6.0' | '7.0' | '8.0';
+  promptVersion: '5' | '6' | '7' | '8';
+  engineVersion: 'comparison-v5' | 'comparison-v6' | 'comparison-v7' | 'comparison-v8';
   generationMode: 'AI' | 'FALLBACK';
   generatedAt: string;
   sourceDataVersion: string;
@@ -600,7 +601,7 @@ export function computeBackendCriterionMetrics(
     'RELIABILITY',
     'FAILURE_SEVERITY',
     'FUEL_EFFICIENCY',
-    'SAFETY',
+    'USAGE_SUITABILITY',
     'PERFORMANCE',
     'COMFORT',
     'PRACTICALITY',

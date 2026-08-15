@@ -180,12 +180,45 @@ export function deriveComparisonFactsFromStoredReport(
     }
   });
 
-  if (reportData.safety && typeof reportData.safety === 'object') {
-    if (reportData.safety.ncapRating) {
-      addFact('SAFETY', 'Euro NCAP Güvenlik Puanı', reportData.safety.ncapRating, 'safety.ncapRating');
+  // 4. USAGE_SUITABILITY (v8)
+  const dailyUse = synthesis.dailyUseAssessment || reportData.dailyUseAssessment;
+  if (dailyUse && typeof dailyUse === 'object') {
+    if (dailyUse.cityUse && typeof dailyUse.cityUse === 'string' && dailyUse.cityUse.trim()) {
+      addFact('USAGE_SUITABILITY', 'Şehir İçi Kullanım Uyumu', dailyUse.cityUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment.cityUse');
     }
-    if (Array.isArray(reportData.safety.activeSafetySystems) && reportData.safety.activeSafetySystems.length > 0) {
-      addFact('SAFETY', 'Aktif Güvenlik Sistemleri', reportData.safety.activeSafetySystems.join(', '), 'safety.activeSafetySystems');
+    if (dailyUse.highwayUse && typeof dailyUse.highwayUse === 'string' && dailyUse.highwayUse.trim()) {
+      addFact('USAGE_SUITABILITY', 'Otoyol Kullanım Uyumu', dailyUse.highwayUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment.highwayUse');
+    }
+    if (dailyUse.trafficBehavior && typeof dailyUse.trafficBehavior === 'string' && dailyUse.trafficBehavior.trim()) {
+      addFact('USAGE_SUITABILITY', 'Yoğun Trafik Kullanım Uyum Değerlendirmesi', dailyUse.trafficBehavior.trim(), 'expertDecisionSynthesis.dailyUseAssessment.trafficBehavior');
+    }
+  }
+
+  const scenarios = Array.isArray(reportData.usageScenarios) ? reportData.usageScenarios : [];
+  scenarios.forEach((scen: any, idx: number) => {
+    if (scen && typeof scen === 'object' && scen.reasoning && typeof scen.reasoning === 'string' && scen.reasoning.trim()) {
+      addFact(
+        'USAGE_SUITABILITY',
+        `Kullanım Senaryosu Uyumu: ${scen.title || scen.scenarioKey || idx + 1}`,
+        `${scen.suitability ? scen.suitability + ': ' : ''}${scen.reasoning.trim()}`,
+        `usageScenarios[${idx}].reasoning`,
+      );
+    }
+  });
+
+  const bestFor = synthesis.suitableFor || reportData.executiveSummary?.bestFor;
+  if (bestFor) {
+    const bestVal = Array.isArray(bestFor) ? bestFor.filter(Boolean).join(', ') : (typeof bestFor === 'string' ? bestFor.trim() : '');
+    if (bestVal) {
+      addFact('USAGE_SUITABILITY', 'En Uygun Kullanıcı Profili', bestVal, 'expertDecisionSynthesis.suitableFor');
+    }
+  }
+
+  const notIdealFor = synthesis.notSuitableFor || reportData.executiveSummary?.notIdealFor;
+  if (notIdealFor) {
+    const notVal = Array.isArray(notIdealFor) ? notIdealFor.filter(Boolean).join(', ') : (typeof notIdealFor === 'string' ? notIdealFor.trim() : '');
+    if (notVal) {
+      addFact('USAGE_SUITABILITY', 'Uygun Olmayan Kullanıcı Profili', notVal, 'expertDecisionSynthesis.notSuitableFor');
     }
   }
 
@@ -213,24 +246,46 @@ export function deriveComparisonFactsFromStoredReport(
   }
 
   // 6. COMFORT
-  const dailyUse = synthesis.dailyUseAssessment || reportData.dailyUseAssessment;
   if (dailyUse) {
     if (typeof dailyUse === 'string' && dailyUse.trim()) {
       addFact('COMFORT', 'Günlük Kullanım ve Konfor Değerlendirmesi', dailyUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment');
     } else if (typeof dailyUse === 'object') {
-      if (dailyUse.cityComfort && typeof dailyUse.cityComfort === 'string') {
+      if (dailyUse.comfortAssessment && typeof dailyUse.comfortAssessment === 'string' && dailyUse.comfortAssessment.trim()) {
+        addFact('COMFORT', 'Konfor ve Sürüş Kalitesi Değerlendirmesi', dailyUse.comfortAssessment.trim(), 'expertDecisionSynthesis.dailyUseAssessment.comfortAssessment');
+      }
+      if (dailyUse.overallComfortAssessment && typeof dailyUse.overallComfortAssessment === 'string' && dailyUse.overallComfortAssessment.trim()) {
+        addFact('COMFORT', 'Genel Konfor Analizi', dailyUse.overallComfortAssessment.trim(), 'expertDecisionSynthesis.dailyUseAssessment.overallComfortAssessment');
+      }
+      if (dailyUse.cityComfort && typeof dailyUse.cityComfort === 'string' && dailyUse.cityComfort.trim()) {
         addFact('COMFORT', 'Şehir İçi Sürüş Konforu', dailyUse.cityComfort.trim(), 'expertDecisionSynthesis.dailyUseAssessment.cityComfort');
       }
-      if (dailyUse.highwayComfort && typeof dailyUse.highwayComfort === 'string') {
+      if (dailyUse.highwayComfort && typeof dailyUse.highwayComfort === 'string' && dailyUse.highwayComfort.trim()) {
         addFact('COMFORT', 'Otoyol Konforu ve Yalıtım', dailyUse.highwayComfort.trim(), 'expertDecisionSynthesis.dailyUseAssessment.highwayComfort');
       }
-      if (dailyUse.overallComfortAssessment && typeof dailyUse.overallComfortAssessment === 'string') {
-        addFact('COMFORT', 'Genel Konfor Analizi', dailyUse.overallComfortAssessment.trim(), 'expertDecisionSynthesis.dailyUseAssessment.overallComfortAssessment');
+      if (dailyUse.suspensionComfort && typeof dailyUse.suspensionComfort === 'string' && dailyUse.suspensionComfort.trim()) {
+        addFact('COMFORT', 'Süspansiyon Konforu', dailyUse.suspensionComfort.trim(), 'expertDecisionSynthesis.dailyUseAssessment.suspensionComfort');
+      }
+      if (dailyUse.nvhAssessment && typeof dailyUse.nvhAssessment === 'string' && dailyUse.nvhAssessment.trim()) {
+        addFact('COMFORT', 'Kabin Ses Yalıtımı (NVH)', dailyUse.nvhAssessment.trim(), 'expertDecisionSynthesis.dailyUseAssessment.nvhAssessment');
+      }
+
+      // Check cityUse / highwayUse ONLY if explicit comfort terms exist
+      const comfortKeywords = ['koltuk', 'süspansiyon', 'kabin', 'yol sesi', 'rüzgâr', 'yalıtım', 'nvh', 'sürüş kalitesi', 'sürüş rahatlığı', 'konfor', 'sessiz', 'rahat'];
+      if (dailyUse.cityUse && typeof dailyUse.cityUse === 'string') {
+        const lower = dailyUse.cityUse.toLowerCase();
+        if (comfortKeywords.some(kw => lower.includes(kw))) {
+          addFact('COMFORT', 'Şehir İçi Konfor Analizi', dailyUse.cityUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment.cityUse#comfort');
+        }
+      }
+      if (dailyUse.highwayUse && typeof dailyUse.highwayUse === 'string') {
+        const lower = dailyUse.highwayUse.toLowerCase();
+        if (comfortKeywords.some(kw => lower.includes(kw))) {
+          addFact('COMFORT', 'Otoyol Konfor Analizi', dailyUse.highwayUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment.highwayUse#comfort');
+        }
       }
     }
   }
 
-  const scenarios = Array.isArray(reportData.usageScenarios) ? reportData.usageScenarios : [];
   scenarios.forEach((scen: any, idx: number) => {
     if (scen && typeof scen === 'object' && scen.reasoning && typeof scen.reasoning === 'string') {
       const lower = (scen.scenarioKey || scen.title || scen.reasoning).toLowerCase();
@@ -240,14 +295,13 @@ export function deriveComparisonFactsFromStoredReport(
         lower.includes('sessiz') ||
         lower.includes('nvh') ||
         lower.includes('sürüş kalitesi') ||
-        scen.scenarioKey === 'longTrip' ||
-        scen.scenarioKey === 'cityUse'
+        lower.includes('sürüş rahatlığı')
       ) {
         addFact(
           'COMFORT',
           `Kullanım Senaryosu Konforu: ${scen.title || scen.scenarioKey || idx + 1}`,
           `${scen.suitability ? scen.suitability + ': ' : ''}${scen.reasoning.trim()}`,
-          `usageScenarios[${idx}].reasoning`,
+          `usageScenarios[${idx}].reasoning#comfort`,
         );
       }
     }

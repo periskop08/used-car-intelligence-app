@@ -373,7 +373,7 @@ describe('ComparisonReportLoaderService', () => {
       expect(categories.has('RELIABILITY')).toBe(true);
       expect(categories.has('FAILURE_SEVERITY')).toBe(true);
       expect(categories.has('FUEL_EFFICIENCY')).toBe(true);
-      expect(categories.has('SAFETY')).toBe(true);
+      expect(categories.has('USAGE_SUITABILITY')).toBe(true);
       expect(categories.has('PERFORMANCE')).toBe(true);
       expect(categories.has('COMFORT')).toBe(true);
       expect(categories.has('PRACTICALITY')).toBe(true);
@@ -399,15 +399,11 @@ describe('ComparisonReportLoaderService', () => {
       expect(run1[0].factKey).not.toEqual(run2[0].factKey);
     });
 
-    it('D: should NOT produce CMP_SAFETY fact if report has no recalls or explicit safety fields', () => {
-      const dataWithoutSafety = JSON.parse(JSON.stringify(fixtureReportData));
-      delete dataWithoutSafety.recalls;
-      delete dataWithoutSafety.safety;
-
-      const derived = deriveComparisonFactsFromStoredReport('rep_nosafety', dataWithoutSafety);
-      const safetyFacts = derived.filter(f => (f as any).criterion === 'SAFETY');
-
-      expect(safetyFacts.length).toBe(0);
+    it('D: should derive USAGE_SUITABILITY facts from scenarios, dailyUse, and suitableFor', () => {
+      const derived = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+      const usageFacts = derived.filter(f => (f as any).criterion === 'USAGE_SUITABILITY');
+      expect(usageFacts.length).toBeGreaterThan(0);
+      expect(usageFacts.some(f => f.factKey.startsWith('CMP_USAGE_SUITABILITY_'))).toBe(true);
     });
 
     it('E: should NOT produce CMP_EQUIPMENT_TECHNOLOGY fact if trimPackageComparison only has trim names without features/narrative', () => {
@@ -440,6 +436,10 @@ describe('ComparisonReportLoaderService', () => {
         expect((f as any).winner).toBeUndefined();
       });
     });
+
+    it('I: should NOT mutate source reportData', () => {
+      const clone = JSON.parse(JSON.stringify(fixtureReportData));
+      deriveComparisonFactsFromStoredReport('rep_kia', clone);
 
       expect(clone).toEqual(fixtureReportData);
     });

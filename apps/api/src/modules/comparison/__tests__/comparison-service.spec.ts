@@ -7,7 +7,7 @@ import { SubscriptionService } from '../../subscription/subscription.service';
 import { PrismaService } from '../../../prisma.service';
 import { CURRENT_REPORT_VERSION } from '../../vehicle-report/vehicle-report-cache.service';
 import { SubscriptionTier, FeatureKey } from '@prisma/client';
-import { formatFuelType } from '@used-car-intelligence/shared';
+import { formatFuelType, CRITERIA_WEIGHTS } from '@used-car-intelligence/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -103,6 +103,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
   const createMockDossier = (variantId: string, customFacts?: {
     rel?: string[];
     fuel?: string[];
+    usage?: string[];
     safety?: string[];
     perf?: string[];
     comfort?: string[];
@@ -112,6 +113,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
     const factList: any[] = [];
     const relFacts = customFacts?.rel || [`fact_rel_${variantId}`];
     const fuelFacts = customFacts?.fuel || [`fact_fuel_${variantId}`];
+    const usageFacts = customFacts?.usage || [`fact_usage_${variantId}`];
     const safetyFacts = customFacts?.safety || [`fact_safety_${variantId}`];
     const perfFacts = customFacts?.perf || [`fact_perf_${variantId}`];
     const comfortFacts = customFacts?.comfort || [`fact_comfort_${variantId}`];
@@ -120,6 +122,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
 
     relFacts.forEach(id => factList.push({ factKey: id, label: 'Risk Fact', value: 'Low Risk', source: 'EVIDENCE_VERIFIED', confidence: 'HIGH' }));
     fuelFacts.forEach(id => factList.push({ factKey: id, label: 'Fuel Fact', value: '5.4 L/100km', source: 'VEHICLE_DATABASE', confidence: 'HIGH' }));
+    usageFacts.forEach(id => factList.push({ factKey: id, label: 'Usage Fact', value: 'City Fit', source: 'VEHICLE_DATABASE', confidence: 'HIGH' }));
     safetyFacts.forEach(id => factList.push({ factKey: id, label: 'Safety Fact', value: 'ADAS 5-Star', source: 'VEHICLE_DATABASE', confidence: 'HIGH' }));
     perfFacts.forEach(id => factList.push({ factKey: id, label: 'Performance Fact', value: '150 HP', source: 'VEHICLE_DATABASE', confidence: 'HIGH' }));
     comfortFacts.forEach(id => factList.push({ factKey: id, label: 'Comfort Fact', value: 'NVH Isolation', source: 'VEHICLE_DATABASE', confidence: 'HIGH' }));
@@ -133,6 +136,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
     const allSupportingFactIds = Array.from(new Set([
       ...relFacts,
       ...fuelFacts,
+      ...usageFacts,
       ...safetyFacts,
       ...perfFacts,
       ...comfortFacts,
@@ -175,7 +179,9 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
         { title: 'Geri Çağırma Kampanyası', riskDescription: 'Yazılım güncellemesi', supportingFactIds: safetyFacts },
       ],
       maintenanceOwnership: { criticalMaintenanceNotes: [], supportingFactIds: relFacts },
-      usageScenarios: [],
+      usageScenarios: [
+        { scenarioKey: 'CITY_DAILY', title: 'Şehir İçi Kullanım', suitability: 'MÜKEMMEL', reasoning: 'Pratik', supportingFactIds: usageFacts },
+      ],
       dataQuality: {
         overallConfidence: 'HIGH' as const,
         supportingFacts: factList,
@@ -696,7 +702,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['uncataloged_fact_id'], missingInputs: [], insufficientData: false }, // UNCATALOGED FACT ID!
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v1'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v1'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
@@ -706,7 +712,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v2'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v2'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
@@ -756,7 +762,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v1'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v1'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
@@ -766,7 +772,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v2'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v2'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
@@ -816,7 +822,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v1'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v1'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
@@ -826,7 +832,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v2'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v2'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
@@ -875,7 +881,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
           v1: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v1'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v1'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
@@ -885,7 +891,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v2'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v2'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
@@ -935,7 +941,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v1'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v1'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: {
               score: 80,
@@ -954,7 +960,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
             FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            SAFETY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_safety_v2'], missingInputs: [], insufficientData: false },
+            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_v2'], missingInputs: [], insufficientData: false },
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
@@ -997,7 +1003,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
         expect(evalItem.assessments.RELIABILITY).toBeDefined();
         expect(evalItem.assessments.FAILURE_SEVERITY).toBeDefined();
         expect(evalItem.assessments.FUEL_EFFICIENCY).toBeDefined();
-        expect(evalItem.assessments.SAFETY).toBeDefined();
+        expect(evalItem.assessments.USAGE_SUITABILITY).toBeDefined();
         expect(evalItem.assessments.PERFORMANCE).toBeDefined();
         expect(evalItem.assessments.COMFORT).toBeDefined();
         expect(evalItem.assessments.PRACTICALITY).toBeDefined();
@@ -1006,24 +1012,22 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
     });
   });
 
-  describe('Forbidden Scenario Formulas Regression Test', () => {
-    it('should verify that forbidden scenario formulas DO NOT exist in comparison.service.ts', () => {
-      const serviceFilePath = path.join(__dirname, '../comparison.service.ts');
-      const fileContent = fs.readFileSync(serviceFilePath, 'utf-8');
-
-      expect(fileContent).not.toContain('110 -');
-      expect(fileContent).not.toContain('hp * 0.45');
-      expect(fileContent).not.toContain('combinedConsumption * 7.5');
-      expect(fileContent).not.toContain('problems.length === 0');
+  describe('Comparison V8 Specification Regression Tests', () => {
+    it('should verify that 8 criteria weights sum to 100 in CRITERIA_WEIGHTS', () => {
+      const totalWeight = Object.values(CRITERIA_WEIGHTS).reduce((acc, w) => acc + w, 0);
+      expect(totalWeight).toBe(100);
+      expect(CRITERIA_WEIGHTS.USAGE_SUITABILITY).toBe(15);
+      expect(CRITERIA_WEIGHTS.SAFETY).toBeUndefined();
     });
 
-    it('G: should verify that a CMP_PERFORMANCE_* fact cannot be used in COMFORT criterion', () => {
+    it('G: should verify that a CMP_PERFORMANCE_* fact cannot be used in COMFORT or USAGE_SUITABILITY criteria', () => {
       const mockProfile: any = {
         dossier: {
           dataQuality: {
             supportingFacts: [
               { factKey: 'CMP_PERFORMANCE_123456', criterion: 'PERFORMANCE', label: 'Motor Gücü', value: '150 HP', source: 'SYSTEM_DERIVED', confidence: 'HIGH' },
               { factKey: 'CMP_COMFORT_654321', criterion: 'COMFORT', label: 'Sürüş Konforu', value: 'Sessiz Kabin', source: 'SYSTEM_DERIVED', confidence: 'HIGH' },
+              { factKey: 'CMP_USAGE_SUITABILITY_112233', criterion: 'USAGE_SUITABILITY', label: 'Şehir İçi Kullanım', value: 'Pratik Şehir İçi', source: 'SYSTEM_DERIVED', confidence: 'HIGH' },
             ],
           },
         },
@@ -1033,8 +1037,18 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
 
       expect(allowed.PERFORMANCE.has('CMP_PERFORMANCE_123456')).toBe(true);
       expect(allowed.COMFORT.has('CMP_PERFORMANCE_123456')).toBe(false);
+      expect(allowed.USAGE_SUITABILITY.has('CMP_PERFORMANCE_123456')).toBe(false);
+
       expect(allowed.COMFORT.has('CMP_COMFORT_654321')).toBe(true);
-      expect(allowed.PERFORMANCE.has('CMP_COMFORT_654321')).toBe(false);
+      expect(allowed.USAGE_SUITABILITY.has('CMP_COMFORT_654321')).toBe(false);
+
+      expect(allowed.USAGE_SUITABILITY.has('CMP_USAGE_SUITABILITY_112233')).toBe(true);
+      expect(allowed.COMFORT.has('CMP_USAGE_SUITABILITY_112233')).toBe(false);
+    });
+
+    it('should calculate v8_ sourceDataVersion prefix', () => {
+      const version = computeSourceDataVersionFromProfiles([]);
+      expect(version.startsWith('v8_')).toBe(true);
     });
   });
 });

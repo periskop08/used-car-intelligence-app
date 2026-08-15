@@ -115,7 +115,7 @@ export function computeSourceDataVersionFromProfiles(profiles: ComparisonVehicle
 
   const rawFingerprint = fingerprintParts.join('||');
   const hash = crypto.createHash('sha256').update(rawFingerprint).digest('hex').substring(0, 16);
-  return `v7_${hash}`;
+  return `v8_${hash}`;
 }
 
 export function calculateComparisonSourceDataVersion(profiles: ComparisonVehicleProfile[]): string {
@@ -471,6 +471,7 @@ KATI TALİMATLAR:
     const relFacts = new Set<string>();
     const failFacts = new Set<string>();
     const fuelFacts = new Set<string>();
+    const usageFacts = new Set<string>();
     const safetyFacts = new Set<string>();
     const perfFacts = new Set<string>();
     const comfortFacts = new Set<string>();
@@ -521,7 +522,12 @@ KATI TALİMATLAR:
         .flatMap(s => s.supportingFactIds || [])
         .forEach(id => addIfInCatalog(fuelFacts, id));
 
-      // 3. SAFETY
+      // 3. USAGE_SUITABILITY
+      (dossier.usageScenarios || [])
+        .flatMap(s => s.supportingFactIds || [])
+        .forEach(id => addIfInCatalog(usageFacts, id));
+
+      // 4. SAFETY
       (dossier.dataQuality?.supportingFacts || [])
         .filter(f => {
           const k = f.factKey.toLowerCase();
@@ -529,7 +535,7 @@ KATI TALİMATLAR:
         })
         .forEach(f => safetyFacts.add(f.factKey));
 
-      // 4. PERFORMANCE
+      // 5. PERFORMANCE
       (dossier.engineTransmission?.supportingFactIds || []).forEach(id => addIfInCatalog(perfFacts, id));
       (dossier.performanceUsage?.supportingFactIds || [])
         .filter(id => {
@@ -538,7 +544,7 @@ KATI TALİMATLAR:
         })
         .forEach(id => addIfInCatalog(perfFacts, id));
 
-      // 5. COMFORT
+      // 6. COMFORT
       (dossier.dataQuality?.supportingFacts || [])
         .filter(f => {
           const k = f.factKey.toLowerCase();
@@ -546,7 +552,7 @@ KATI TALİMATLAR:
         })
         .forEach(f => comfortFacts.add(f.factKey));
 
-      // 6. PRACTICALITY
+      // 7. PRACTICALITY
       (dossier.dataQuality?.supportingFacts || [])
         .filter(f => {
           const k = f.factKey.toLowerCase();
@@ -557,8 +563,7 @@ KATI TALİMATLAR:
         .filter(id => id.toLowerCase().includes('boot') || id.toLowerCase().includes('trunk') || id.toLowerCase().includes('bagaj'))
         .forEach(id => addIfInCatalog(pracFacts, id));
 
-      // 7. EQUIPMENT_TECHNOLOGY
-      // 7. EQUIPMENT_TECHNOLOGY
+      // 8. EQUIPMENT_TECHNOLOGY
       if (dossier.trimPackageComparison || dossier.expertDecisionSynthesis?.trimPackageComparison) {
         (dossier.supportingFactIds || [])
           .filter(id => {
@@ -576,7 +581,7 @@ KATI TALİMATLAR:
         })
         .forEach(f => equipTechFacts.add(f.factKey));
 
-      // 8. STRICT CMP_* DERIVED FACT ROUTING TO CRITERION SETS
+      // 9. STRICT CMP_* DERIVED FACT ROUTING TO CRITERION SETS
       (dossier.dataQuality?.supportingFacts || []).forEach((f: any) => {
         const key = f.factKey || f.id;
         if (!key) return;
@@ -587,6 +592,8 @@ KATI TALİMATLAR:
           failFacts.add(key);
         } else if (key.startsWith('CMP_FUEL_EFFICIENCY_') || f.criterion === 'FUEL_EFFICIENCY') {
           fuelFacts.add(key);
+        } else if (key.startsWith('CMP_USAGE_SUITABILITY_') || f.criterion === 'USAGE_SUITABILITY') {
+          usageFacts.add(key);
         } else if (key.startsWith('CMP_SAFETY_') || f.criterion === 'SAFETY') {
           safetyFacts.add(key);
         } else if (key.startsWith('CMP_PERFORMANCE_') || f.criterion === 'PERFORMANCE') {
@@ -606,6 +613,7 @@ KATI TALİMATLAR:
       FAILURE_SEVERITY: failFacts,
       SEVERITY_DURABILITY: failFacts,
       FUEL_EFFICIENCY: fuelFacts,
+      USAGE_SUITABILITY: usageFacts,
       SAFETY: safetyFacts,
       PERFORMANCE: perfFacts,
       COMFORT: comfortFacts,
@@ -827,6 +835,7 @@ KATI TALİMATLAR:
       FAILURE_SEVERITY: emptyCriterion('FAILURE_SEVERITY', 'Arıza ciddiyeti'),
       SEVERITY_DURABILITY: emptyCriterion('SEVERITY_DURABILITY', 'Arıza ciddiyeti'),
       FUEL_EFFICIENCY: emptyCriterion('FUEL_EFFICIENCY', 'Yakıt verimliliği'),
+      USAGE_SUITABILITY: emptyCriterion('USAGE_SUITABILITY', 'Kullanım senaryosu ve kullanıcı uyumu'),
       SAFETY: emptyCriterion('SAFETY', 'Güvenlik'),
       PERFORMANCE: emptyCriterion('PERFORMANCE', 'Motor performansı'),
       COMFORT: emptyCriterion('COMFORT', 'Kabin konforu'),
@@ -843,11 +852,11 @@ KATI TALİMATLAR:
       'RELIABILITY',
       'FAILURE_SEVERITY',
       'FUEL_EFFICIENCY',
-      'SAFETY',
+      'USAGE_SUITABILITY',
       'PERFORMANCE',
       'COMFORT',
       'PRACTICALITY',
-      'VALUE_FOR_MONEY',
+      'EQUIPMENT_TECHNOLOGY',
     ];
 
     const rankings: Record<CriterionKey, any> = {} as any;
@@ -965,7 +974,7 @@ KATI TALİMATLAR:
 1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. ("Kullanım amacınıza göre değişir", "En doğru araç bütçenize uygun olandır" gibi jenerik cümleler ASLA KULLANILAMAZ).
 2. JSON alanlarında MARKDOWN İŞARETLERİ (**bold**, ### başlık, satır başı -) KULLANMA. Düz metin üret.
 3. Kriterlerin hiçbirinde TL, ₺, tamir fiyatı tahmini, parça ücreti, işçilik tahmini veya piyasa fiyatı ASLA KULLANMA. Arızanın büyüklüğünü parasal değil teknik sonuç olarak tanımla.
-4. "criterionAssessments" objesinde SEÇİLEN TÜM ${profiles.length} ARAÇ VE HER ARAÇ İÇİN TAM 8 KRİTER ("RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "SAFETY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "EQUIPMENT_TECHNOLOGY") DÖNDÜRÜLMELİDİR.
+4. "criterionAssessments" objesinde SEÇİLEN TÜM ${profiles.length} ARAÇ VE HER ARAÇ İÇİN TAM 8 KRİTER ("RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "USAGE_SUITABILITY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "EQUIPMENT_TECHNOLOGY") DÖNDÜRÜLMELİDİR.
 5. Her kriter için:
    - score: 0-100 arasında tamsayı VEYA kanıt yetersizse null. (Score non-null ise supportingFactIds BOŞ OLAMAZ!).
    - confidence: "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT".
@@ -1012,7 +1021,7 @@ Lütfen SADECE geçerli JSON yanıt ver:
         "insufficientData": true
       },
       "FUEL_EFFICIENCY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
-      "SAFETY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
+      "USAGE_SUITABILITY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Kullanım senaryosu ve kullanıcı uyumu verisi bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
       "PERFORMANCE": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
       "COMFORT": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
       "PRACTICALITY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
@@ -1135,7 +1144,7 @@ Lütfen SADECE geçerli JSON yanıt ver:
         'RELIABILITY',
         'FAILURE_SEVERITY',
         'FUEL_EFFICIENCY',
-        'SAFETY',
+        'USAGE_SUITABILITY',
         'PERFORMANCE',
         'COMFORT',
         'PRACTICALITY',
@@ -1254,9 +1263,9 @@ Lütfen SADECE geçerli JSON yanıt ver:
 
     const rawResult: VehicleComparisonResult = {
       comparisonId: diagnostics.comparisonId,
-      schemaVersion: '7.0',
-      promptVersion: '7',
-      engineVersion: 'comparison-v7',
+      schemaVersion: '8.0',
+      promptVersion: '8',
+      engineVersion: 'comparison-v8',
       generationMode: 'AI',
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
@@ -1350,9 +1359,9 @@ Lütfen SADECE geçerli JSON yanıt ver:
 
     return {
       comparisonId: `comp_fallback_${Date.now()}`,
-      schemaVersion: '7.0',
-      promptVersion: '7',
-      engineVersion: 'comparison-v7',
+      schemaVersion: '8.0',
+      promptVersion: '8',
+      engineVersion: 'comparison-v8',
       generationMode: 'FALLBACK',
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
