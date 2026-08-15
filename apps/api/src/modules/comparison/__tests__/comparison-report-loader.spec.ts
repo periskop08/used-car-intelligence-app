@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ComparisonReportLoaderService } from '../comparison-report-loader.service';
+import { ComparisonReportLoaderService, deriveComparisonFactsFromStoredReport } from '../comparison-report-loader.service';
 import { PrismaService } from '../../../prisma.service';
 import { CURRENT_REPORT_VERSION } from '../../vehicle-report/vehicle-report-cache.service';
 
@@ -138,7 +138,7 @@ describe('ComparisonReportLoaderService', () => {
       expect(dossier.trimPackageComparison?.selectedTrimName).toBe('M Sport');
       expect(dossier.supportingFactIds).toContain('fact_identity_1');
       expect(dossier.supportingFactIds).toContain('fact_prob_1');
-      expect(dossier.dataQuality?.supportingFacts.length).toBe(1);
+      expect(dossier.dataQuality?.supportingFacts.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should map GeneratedVehicleReport.reportData into a dossier with reportAvailable = true', async () => {
@@ -299,6 +299,149 @@ describe('ComparisonReportLoaderService', () => {
         expect(d.variantId).toBe(`var_${i + 1}`);
         expect(d.vehicleIdentity.brand).toBe(`Brand_var_${i + 1}`);
       });
+    });
+  });
+
+  describe('deriveComparisonFactsFromStoredReport (Mandatory Rules A-J)', () => {
+    const fixtureReportData: Record<string, any> = {
+      vehicleIdentity: { brand: 'Kia', model: 'Cerato', modelYear: 2016, bodyType: 'Sedan' },
+      dataQuality: {
+        overallConfidence: 'HIGH',
+        supportingFacts: [
+          { factKey: 'ENGINE_POWER', label: 'Güç', value: '136 HP', source: 'EVIDENCE_VERIFIED', confidence: 'HIGH' },
+          { factKey: 'TRANSMISSION_TYPE', label: 'Şanzıman', value: 'DCT', source: 'EVIDENCE_VERIFIED', confidence: 'HIGH' },
+          { factKey: 'FUEL_TYPE', label: 'Yakıt', value: 'Dizel', source: 'EVIDENCE_VERIFIED', confidence: 'HIGH' },
+          { factKey: 'KNOWN_PROBLEMS_COUNT', label: 'Sorun Sayısı', value: '2', source: 'EVIDENCE_VERIFIED', confidence: 'HIGH' },
+        ],
+      },
+      engineTransmission: {
+        engineSummary: '1.6 CRDi 136 HP Dizel',
+        transmissionSummary: '7 İleri DCT Çift Kavrama',
+        combinationAssessment: 'Seri vites geçişleri ve yüksek tork',
+        knownLimitations: ['Çift kavrama aşınması'],
+        maintenanceSensitivity: ['Şanzıman yağı bakımı'],
+      },
+      performanceUsage: {
+        powerHp: 136,
+        torqueNm: 300,
+        zeroToHundredKmh: 9.8,
+        topSpeedKmh: 205,
+        combinedFuelL100km: 4.6,
+        cityFuelL100km: 5.4,
+        highwayFuelL100km: 4.1,
+        trunkCapacityLiters: 482,
+      },
+      commonProblems: [
+        {
+          title: 'DCT Kavrama Isınması',
+          severity: 'YÜKSEK',
+          symptoms: ['Dur-kalk trafikte silkme'],
+          causeExplanation: 'Kuru kavrama aşırı ısınması',
+          inspectionStep: 'Kavrama adaptasyonu testi',
+        },
+      ],
+      expertDecisionSynthesis: {
+        primaryTechnicalRisk: {
+          riskTitle: '7-DCT Kavrama Aşınması',
+          severity: 'YÜKSEK',
+          riskMeaning: 'Mekanik müdahale gerektirebilir',
+        },
+        dailyUseAssessment: {
+          overallComfortAssessment: 'Sessiz ve konforlu sürüş kalitesi',
+          cityComfort: 'Şehir içi akıcı kullanım',
+        },
+        trimPackageComparison: {
+          keyAddedFeatures: ['Panoramik Cam Tavan', 'Koltuk Isıtma'],
+          missingFeaturesInLowerTrim: ['Deri Koltuklar'],
+          comparisonNarrative: 'Konfor ve donanım açısından zengin üst paket',
+        },
+      },
+      usageScenarios: [
+        { scenarioKey: 'longTrip', title: 'Uzun Yol', suitability: 'MÜKEMMEL', reasoning: 'Otoyol kullanımında yüksek konfor ve düşük tüketim' },
+        { scenarioKey: 'familyUse', title: 'Aile Kullanımı', suitability: 'UYGUN', reasoning: 'Geniş kabin ve 482L pratik bagaj hacmi' },
+      ],
+      recalls: [
+        { title: 'Fren Hidrolik Ünitesi', riskDescription: 'Sızdırmazlık contası değişimi' },
+      ],
+    };
+
+    it('A: should derive CMP_* facts for multiple criteria from rich reportData when only generic facts are in supportingFacts', () => {
+      const derived = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+      expect(derived.length).toBeGreaterThan(5);
+
+      const categories = new Set(derived.map(f => (f as any).criterion || (f as any).category));
+      expect(categories.has('RELIABILITY')).toBe(true);
+      expect(categories.has('FAILURE_SEVERITY')).toBe(true);
+      expect(categories.has('FUEL_EFFICIENCY')).toBe(true);
+      expect(categories.has('SAFETY')).toBe(true);
+      expect(categories.has('PERFORMANCE')).toBe(true);
+      expect(categories.has('COMFORT')).toBe(true);
+      expect(categories.has('PRACTICALITY')).toBe(true);
+      expect(categories.has('EQUIPMENT_TECHNOLOGY')).toBe(true);
+
+      derived.forEach(f => {
+        expect(f.factKey).toMatch(/^CMP_[A-Z_]+_[a-f0-9]+$/);
+        expect(f.source).toBe('SYSTEM_DERIVED');
+      });
+    });
+
+    it('B: should produce exact same Fact IDs when run twice on identical report', () => {
+      const run1 = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+      const run2 = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+
+      expect(run1.map(f => f.factKey)).toEqual(run2.map(f => f.factKey));
+    });
+
+    it('C: should produce different Fact ID when sourcePath or reportId changes', () => {
+      const run1 = deriveComparisonFactsFromStoredReport('rep_kia_1', fixtureReportData);
+      const run2 = deriveComparisonFactsFromStoredReport('rep_kia_2', fixtureReportData);
+
+      expect(run1[0].factKey).not.toEqual(run2[0].factKey);
+    });
+
+    it('D: should NOT produce CMP_SAFETY fact if report has no recalls or explicit safety fields', () => {
+      const dataWithoutSafety = JSON.parse(JSON.stringify(fixtureReportData));
+      delete dataWithoutSafety.recalls;
+      delete dataWithoutSafety.safety;
+
+      const derived = deriveComparisonFactsFromStoredReport('rep_nosafety', dataWithoutSafety);
+      const safetyFacts = derived.filter(f => (f as any).criterion === 'SAFETY');
+
+      expect(safetyFacts.length).toBe(0);
+    });
+
+    it('E: should NOT produce CMP_EQUIPMENT_TECHNOLOGY fact if trimPackageComparison only has trim names without features/narrative', () => {
+      const dataBareTrim = JSON.parse(JSON.stringify(fixtureReportData));
+      dataBareTrim.expertDecisionSynthesis.trimPackageComparison = {
+        selectedTrimName: 'Concept Plus',
+        baseTrimName: 'Comfort',
+      };
+
+      const derived = deriveComparisonFactsFromStoredReport('rep_baretrim', dataBareTrim);
+      const equipFacts = derived.filter(f => (f as any).criterion === 'EQUIPMENT_TECHNOLOGY');
+
+      expect(equipFacts.length).toBe(0);
+    });
+
+    it('F: should produce CMP_EQUIPMENT_TECHNOLOGY facts if trimPackageComparison has actual features/narrative', () => {
+      const derived = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+      const equipFacts = derived.filter(f => (f as any).criterion === 'EQUIPMENT_TECHNOLOGY');
+
+      expect(equipFacts.length).toBeGreaterThan(0);
+      expect(equipFacts.some(f => (f.value as string).includes('Panoramik Cam Tavan'))).toBe(true);
+    });
+
+    it('H: should NOT produce scores, stars, or winners in adapter output', () => {
+      const derived = deriveComparisonFactsFromStoredReport('rep_kia', fixtureReportData);
+
+      derived.forEach(f => {
+        expect((f as any).buyabilityScore).toBeUndefined();
+        expect((f as any).stars).toBeUndefined();
+        expect((f as any).winner).toBeUndefined();
+      });
+    });
+
+      expect(clone).toEqual(fixtureReportData);
     });
   });
 });

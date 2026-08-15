@@ -3,6 +3,322 @@ import { PrismaService } from '../../prisma.service';
 import { CURRENT_REPORT_VERSION } from '../vehicle-report/vehicle-report-cache.service';
 import { ApprovalStatus } from '@prisma/client';
 import { ExpertDecisionSynthesis, ReportSupportingFact } from '@used-car-intelligence/shared';
+import * as crypto from 'crypto';
+
+function generateDerivedFactId(reportId: string, criterion: string, sourcePath: string): string {
+  const hash = crypto
+    .createHash('sha256')
+    .update(`${reportId}_${criterion}_${sourcePath}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `CMP_${criterion}_${hash}`;
+}
+
+export function deriveComparisonFactsFromStoredReport(
+  reportId: string,
+  reportData: Record<string, any>,
+): ReportSupportingFact[] {
+  if (!reportId || !reportData || typeof reportData !== 'object') {
+    return [];
+  }
+
+  const derivedFacts: ReportSupportingFact[] = [];
+  const dataQuality = reportData.dataQuality || {};
+  const overallConfidence = (dataQuality.overallConfidence as 'LOW' | 'MEDIUM' | 'HIGH') || 'HIGH';
+
+  const addFact = (
+    criterion: string,
+    label: string,
+    val: string | number | boolean | null | undefined,
+    sourcePath: string,
+  ) => {
+    if (val === null || val === undefined) return;
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed || trimmed === '0' || trimmed.toLowerCase() === 'yok' || trimmed.toLowerCase() === 'bilinmiyor') return;
+    }
+    if (typeof val === 'number' && isNaN(val)) return;
+
+    const factId = generateDerivedFactId(reportId, criterion, sourcePath);
+    derivedFacts.push({
+      factKey: factId,
+      id: factId,
+      criterion,
+      category: criterion,
+      label,
+      value: val,
+      sourcePath,
+      source: 'SYSTEM_DERIVED',
+      confidence: overallConfidence,
+      reportId,
+    } as any);
+  };
+
+  // 1. RELIABILITY
+  const problems = Array.isArray(reportData.commonProblems) ? reportData.commonProblems : [];
+  problems.forEach((prob: any, idx: number) => {
+    if (prob && typeof prob === 'object') {
+      if (prob.title && typeof prob.title === 'string' && prob.title.trim()) {
+        const titleStr = prob.title.trim();
+        const sysStr = prob.system && typeof prob.system === 'string' ? prob.system.trim() : '';
+        addFact(
+          'RELIABILITY',
+          `Kronik Sorun: ${titleStr}`,
+          `${titleStr}${sysStr ? ' (' + sysStr + ')' : ''}`,
+          `commonProblems[${idx}].title`,
+        );
+      }
+    }
+  });
+
+  const engineTrans = reportData.engineTransmission || {};
+  if (Array.isArray(engineTrans.knownLimitations)) {
+    engineTrans.knownLimitations.forEach((lim: any, idx: number) => {
+      if (typeof lim === 'string' && lim.trim()) {
+        addFact('RELIABILITY', `Motor/Şanzıman Sınırlaması: ${lim.trim()}`, lim.trim(), `engineTransmission.knownLimitations[${idx}]`);
+      }
+    });
+  }
+
+  if (Array.isArray(engineTrans.maintenanceSensitivity)) {
+    engineTrans.maintenanceSensitivity.forEach((sens: any, idx: number) => {
+      if (typeof sens === 'string' && sens.trim()) {
+        addFact('RELIABILITY', `Bakım Hassasiyeti: ${sens.trim()}`, sens.trim(), `engineTransmission.maintenanceSensitivity[${idx}]`);
+      }
+    });
+  }
+
+  const synthesis = reportData.expertDecisionSynthesis || {};
+  if (synthesis.primaryTechnicalRisk && typeof synthesis.primaryTechnicalRisk === 'object') {
+    const ptr = synthesis.primaryTechnicalRisk;
+    if (ptr.riskTitle || ptr.severity || ptr.riskMeaning) {
+      const riskVal = `${ptr.riskTitle || 'Teknik Risk'}${ptr.severity ? ' (' + ptr.severity + ')' : ''}${ptr.riskMeaning ? ' - ' + ptr.riskMeaning : ''}`.trim();
+      if (riskVal) {
+        addFact('RELIABILITY', 'Birincil Teknik Risk', riskVal, 'expertDecisionSynthesis.primaryTechnicalRisk');
+      }
+    }
+  }
+
+  if (Array.isArray(synthesis.secondaryTechnicalRisks)) {
+    synthesis.secondaryTechnicalRisks.forEach((sec: any, idx: number) => {
+      if (sec && typeof sec === 'object') {
+        if (sec.riskTitle || sec.severity || sec.riskMeaning) {
+          const riskVal = `${sec.riskTitle || 'İkincil Risk'}${sec.severity ? ' (' + sec.severity + ')' : ''}${sec.riskMeaning ? ' - ' + sec.riskMeaning : ''}`.trim();
+          if (riskVal) {
+            addFact('RELIABILITY', `İkincil Teknik Risk ${idx + 1}`, riskVal, `expertDecisionSynthesis.secondaryTechnicalRisks[${idx}]`);
+          }
+        }
+      }
+    });
+  }
+
+  // 2. FAILURE_SEVERITY
+  problems.forEach((prob: any, idx: number) => {
+    if (prob && typeof prob === 'object') {
+      const hasSev = prob.severity && typeof prob.severity === 'string';
+      const hasCause = prob.causeExplanation && typeof prob.causeExplanation === 'string';
+      const hasInsp = prob.inspectionStep && typeof prob.inspectionStep === 'string';
+      if (hasSev || hasCause || hasInsp) {
+        const parts: string[] = [];
+        if (hasSev) parts.push(`Şiddet: ${prob.severity.trim()}`);
+        if (hasCause) parts.push(`Neden: ${prob.causeExplanation.trim()}`);
+        if (hasInsp) parts.push(`Kontrol: ${prob.inspectionStep.trim()}`);
+        addFact(
+          'FAILURE_SEVERITY',
+          `Arıza Şiddeti ve Analizi: ${prob.title || 'Sorun ' + (idx + 1)}`,
+          parts.join('. '),
+          `commonProblems[${idx}].severity`,
+        );
+      }
+    }
+  });
+
+  if (synthesis.primaryTechnicalRisk && typeof synthesis.primaryTechnicalRisk === 'object') {
+    const ptr = synthesis.primaryTechnicalRisk;
+    if (ptr.severity || ptr.riskMeaning) {
+      addFact(
+        'FAILURE_SEVERITY',
+        `Birincil Risk Şiddeti: ${ptr.riskTitle || 'Teknik Risk'}`,
+        `Şiddet: ${ptr.severity || 'ORTA'}${ptr.riskMeaning ? '. Açıklama: ' + ptr.riskMeaning : ''}`,
+        'expertDecisionSynthesis.primaryTechnicalRisk.severity',
+      );
+    }
+  }
+
+  if (Array.isArray(synthesis.secondaryTechnicalRisks)) {
+    synthesis.secondaryTechnicalRisks.forEach((sec: any, idx: number) => {
+      if (sec && typeof sec === 'object' && (sec.severity || sec.riskMeaning)) {
+        addFact(
+          'FAILURE_SEVERITY',
+          `İkincil Risk Şiddeti: ${sec.riskTitle || idx + 1}`,
+          `Şiddet: ${sec.severity || 'ORTA'}${sec.riskMeaning ? '. Açıklama: ' + sec.riskMeaning : ''}`,
+          `expertDecisionSynthesis.secondaryTechnicalRisks[${idx}].severity`,
+        );
+      }
+    });
+  }
+
+  // 3. FUEL_EFFICIENCY
+  const perf = reportData.performanceUsage || {};
+  if (typeof perf.combinedFuelL100km === 'number' && perf.combinedFuelL100km > 0) {
+    addFact('FUEL_EFFICIENCY', 'Ortalama Yakıt Tüketimi', `${perf.combinedFuelL100km} L/100km`, 'performanceUsage.combinedFuelL100km');
+  }
+  if (typeof perf.cityFuelL100km === 'number' && perf.cityFuelL100km > 0) {
+    addFact('FUEL_EFFICIENCY', 'Şehir İçi Yakıt Tüketimi', `${perf.cityFuelL100km} L/100km`, 'performanceUsage.cityFuelL100km');
+  }
+  if (typeof perf.highwayFuelL100km === 'number' && perf.highwayFuelL100km > 0) {
+    addFact('FUEL_EFFICIENCY', 'Şehir Dışı Yakıt Tüketimi', `${perf.highwayFuelL100km} L/100km`, 'performanceUsage.highwayFuelL100km');
+  }
+
+  // 4. SAFETY
+  const recalls = Array.isArray(reportData.recalls) ? reportData.recalls : [];
+  recalls.forEach((rec: any, idx: number) => {
+    if (rec && typeof rec === 'object' && rec.title && typeof rec.title === 'string' && rec.title.trim()) {
+      const recTitle = rec.title.trim();
+      const recDesc = rec.riskDescription && typeof rec.riskDescription === 'string' ? rec.riskDescription.trim() : '';
+      addFact('SAFETY', `Geri Çağırma (Recall): ${recTitle}`, `${recTitle}${recDesc ? ': ' + recDesc : ''}`, `recalls[${idx}].title`);
+    }
+  });
+
+  if (reportData.safety && typeof reportData.safety === 'object') {
+    if (reportData.safety.ncapRating) {
+      addFact('SAFETY', 'Euro NCAP Güvenlik Puanı', reportData.safety.ncapRating, 'safety.ncapRating');
+    }
+    if (Array.isArray(reportData.safety.activeSafetySystems) && reportData.safety.activeSafetySystems.length > 0) {
+      addFact('SAFETY', 'Aktif Güvenlik Sistemleri', reportData.safety.activeSafetySystems.join(', '), 'safety.activeSafetySystems');
+    }
+  }
+
+  // 5. PERFORMANCE
+  if (typeof perf.powerHp === 'number' && perf.powerHp > 0) {
+    addFact('PERFORMANCE', 'Motor Gücü', `${perf.powerHp} HP`, 'performanceUsage.powerHp');
+  }
+  if (typeof perf.torqueNm === 'number' && perf.torqueNm > 0) {
+    addFact('PERFORMANCE', 'Motor Torku', `${perf.torqueNm} Nm`, 'performanceUsage.torqueNm');
+  }
+  if (typeof perf.zeroToHundredKmh === 'number' && perf.zeroToHundredKmh > 0) {
+    addFact('PERFORMANCE', '0-100 km/s Hızlanma', `${perf.zeroToHundredKmh} saniye`, 'performanceUsage.zeroToHundredKmh');
+  }
+  if (typeof perf.topSpeedKmh === 'number' && perf.topSpeedKmh > 0) {
+    addFact('PERFORMANCE', 'Maksimum Hız', `${perf.topSpeedKmh} km/s`, 'performanceUsage.topSpeedKmh');
+  }
+  if (engineTrans.engineSummary && typeof engineTrans.engineSummary === 'string' && engineTrans.engineSummary.trim()) {
+    addFact('PERFORMANCE', 'Motor Özeti', engineTrans.engineSummary.trim(), 'engineTransmission.engineSummary');
+  }
+  if (engineTrans.transmissionSummary && typeof engineTrans.transmissionSummary === 'string' && engineTrans.transmissionSummary.trim()) {
+    addFact('PERFORMANCE', 'Şanzıman Özeti', engineTrans.transmissionSummary.trim(), 'engineTransmission.transmissionSummary');
+  }
+  if (engineTrans.combinationAssessment && typeof engineTrans.combinationAssessment === 'string' && engineTrans.combinationAssessment.trim()) {
+    addFact('PERFORMANCE', 'Motor-Şanzıman Uyum Değerlendirmesi', engineTrans.combinationAssessment.trim(), 'engineTransmission.combinationAssessment');
+  }
+
+  // 6. COMFORT
+  const dailyUse = synthesis.dailyUseAssessment || reportData.dailyUseAssessment;
+  if (dailyUse) {
+    if (typeof dailyUse === 'string' && dailyUse.trim()) {
+      addFact('COMFORT', 'Günlük Kullanım ve Konfor Değerlendirmesi', dailyUse.trim(), 'expertDecisionSynthesis.dailyUseAssessment');
+    } else if (typeof dailyUse === 'object') {
+      if (dailyUse.cityComfort && typeof dailyUse.cityComfort === 'string') {
+        addFact('COMFORT', 'Şehir İçi Sürüş Konforu', dailyUse.cityComfort.trim(), 'expertDecisionSynthesis.dailyUseAssessment.cityComfort');
+      }
+      if (dailyUse.highwayComfort && typeof dailyUse.highwayComfort === 'string') {
+        addFact('COMFORT', 'Otoyol Konforu ve Yalıtım', dailyUse.highwayComfort.trim(), 'expertDecisionSynthesis.dailyUseAssessment.highwayComfort');
+      }
+      if (dailyUse.overallComfortAssessment && typeof dailyUse.overallComfortAssessment === 'string') {
+        addFact('COMFORT', 'Genel Konfor Analizi', dailyUse.overallComfortAssessment.trim(), 'expertDecisionSynthesis.dailyUseAssessment.overallComfortAssessment');
+      }
+    }
+  }
+
+  const scenarios = Array.isArray(reportData.usageScenarios) ? reportData.usageScenarios : [];
+  scenarios.forEach((scen: any, idx: number) => {
+    if (scen && typeof scen === 'object' && scen.reasoning && typeof scen.reasoning === 'string') {
+      const lower = (scen.scenarioKey || scen.title || scen.reasoning).toLowerCase();
+      if (
+        lower.includes('konfor') ||
+        lower.includes('süspansiyon') ||
+        lower.includes('sessiz') ||
+        lower.includes('nvh') ||
+        lower.includes('sürüş kalitesi') ||
+        scen.scenarioKey === 'longTrip' ||
+        scen.scenarioKey === 'cityUse'
+      ) {
+        addFact(
+          'COMFORT',
+          `Kullanım Senaryosu Konforu: ${scen.title || scen.scenarioKey || idx + 1}`,
+          `${scen.suitability ? scen.suitability + ': ' : ''}${scen.reasoning.trim()}`,
+          `usageScenarios[${idx}].reasoning`,
+        );
+      }
+    }
+  });
+
+  // 7. PRACTICALITY
+  if (typeof perf.trunkCapacityLiters === 'number' && perf.trunkCapacityLiters > 0) {
+    addFact('PRACTICALITY', 'Bagaj Hacmi', `${perf.trunkCapacityLiters} Litre`, 'performanceUsage.trunkCapacityLiters');
+  }
+  const identity = reportData.vehicleIdentity || {};
+  if (identity.bodyType && typeof identity.bodyType === 'string' && identity.bodyType.trim()) {
+    addFact('PRACTICALITY', 'Kasa Tipi Yapısı', identity.bodyType.trim(), 'vehicleIdentity.bodyType');
+  }
+  scenarios.forEach((scen: any, idx: number) => {
+    if (scen && typeof scen === 'object' && scen.reasoning && typeof scen.reasoning === 'string') {
+      const lower = (scen.scenarioKey || scen.title || scen.reasoning).toLowerCase();
+      if (
+        lower.includes('aile') ||
+        lower.includes('bagaj') ||
+        lower.includes('kabin') ||
+        lower.includes('yaşam alanı') ||
+        lower.includes('genişlik') ||
+        lower.includes('pratik') ||
+        scen.scenarioKey === 'familyUse' ||
+        scen.scenarioKey === 'luggage'
+      ) {
+        addFact(
+          'PRACTICALITY',
+          `Kullanım Senaryosu Pratikliği: ${scen.title || scen.scenarioKey || idx + 1}`,
+          `${scen.suitability ? scen.suitability + ': ' : ''}${scen.reasoning.trim()}`,
+          `usageScenarios[${idx}].reasoning`,
+        );
+      }
+    }
+  });
+
+  // 8. EQUIPMENT_TECHNOLOGY
+  const trimComp = synthesis.trimPackageComparison || reportData.trimPackageComparison;
+  if (trimComp && typeof trimComp === 'object') {
+    const hasAdded = Array.isArray(trimComp.keyAddedFeatures) && trimComp.keyAddedFeatures.length > 0;
+    const hasMissing = Array.isArray(trimComp.missingFeaturesInLowerTrim) && trimComp.missingFeaturesInLowerTrim.length > 0;
+    const hasNarrative = trimComp.comparisonNarrative && typeof trimComp.comparisonNarrative === 'string' && trimComp.comparisonNarrative.trim();
+
+    if (hasAdded) {
+      addFact(
+        'EQUIPMENT_TECHNOLOGY',
+        'Öne Çıkan Paket Donanımları',
+        trimComp.keyAddedFeatures.join(', '),
+        'expertDecisionSynthesis.trimPackageComparison.keyAddedFeatures',
+      );
+    }
+    if (hasMissing) {
+      addFact(
+        'EQUIPMENT_TECHNOLOGY',
+        'Alt Pakette Olmayan Donanımlar',
+        trimComp.missingFeaturesInLowerTrim.join(', '),
+        'expertDecisionSynthesis.trimPackageComparison.missingFeaturesInLowerTrim',
+      );
+    }
+    if (hasNarrative) {
+      addFact(
+        'EQUIPMENT_TECHNOLOGY',
+        'Donanım Karşılaştırma Analizi',
+        trimComp.comparisonNarrative.trim(),
+        'expertDecisionSynthesis.trimPackageComparison.comparisonNarrative',
+      );
+    }
+  }
+
+  return derivedFacts;
+}
 
 export interface VehicleComparisonDossierScoring {
   buyabilityScore: number | null;
@@ -228,7 +544,24 @@ export class ComparisonReportLoaderService {
     ];
 
     const uniqueFactIds = Array.from(new Set(sectionFactIds));
-    const supportingFacts = Array.isArray(dataQuality.supportingFacts) ? dataQuality.supportingFacts : [];
+    const originalSupportingFacts = Array.isArray(dataQuality.supportingFacts) ? dataQuality.supportingFacts : [];
+    const derivedSupportingFacts = deriveComparisonFactsFromStoredReport(report.id, data);
+
+    const factMap = new Map<string, ReportSupportingFact>();
+    for (const f of originalSupportingFacts) {
+      const key = f.factKey || (f as any).id;
+      if (key) factMap.set(key, f);
+    }
+    for (const f of derivedSupportingFacts) {
+      const key = f.factKey || (f as any).id;
+      if (key && !factMap.has(key)) {
+        factMap.set(key, f);
+      }
+    }
+    const supportingFacts = Array.from(factMap.values());
+    const combinedFactIds = Array.from(
+      new Set([...uniqueFactIds, ...supportingFacts.map(f => f.factKey || (f as any).id).filter(Boolean)])
+    );
 
     return {
       variantId,
@@ -342,7 +675,7 @@ export class ComparisonReportLoaderService {
         supportingFacts,
       },
 
-      supportingFactIds: uniqueFactIds,
+      supportingFactIds: combinedFactIds,
     };
   }
 

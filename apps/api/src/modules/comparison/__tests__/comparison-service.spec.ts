@@ -1016,5 +1016,25 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
       expect(fileContent).not.toContain('combinedConsumption * 7.5');
       expect(fileContent).not.toContain('problems.length === 0');
     });
+
+    it('G: should verify that a CMP_PERFORMANCE_* fact cannot be used in COMFORT criterion', () => {
+      const mockProfile: any = {
+        dossier: {
+          dataQuality: {
+            supportingFacts: [
+              { factKey: 'CMP_PERFORMANCE_123456', criterion: 'PERFORMANCE', label: 'Motor Gücü', value: '150 HP', source: 'SYSTEM_DERIVED', confidence: 'HIGH' },
+              { factKey: 'CMP_COMFORT_654321', criterion: 'COMFORT', label: 'Sürüş Konforu', value: 'Sessiz Kabin', source: 'SYSTEM_DERIVED', confidence: 'HIGH' },
+            ],
+          },
+        },
+      };
+
+      const allowed = (service as any).buildAllowedFactIdsByCriterion(mockProfile);
+
+      expect(allowed.PERFORMANCE.has('CMP_PERFORMANCE_123456')).toBe(true);
+      expect(allowed.COMFORT.has('CMP_PERFORMANCE_123456')).toBe(false);
+      expect(allowed.COMFORT.has('CMP_COMFORT_654321')).toBe(true);
+      expect(allowed.PERFORMANCE.has('CMP_COMFORT_654321')).toBe(false);
+    });
   });
 });

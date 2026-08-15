@@ -558,7 +558,7 @@ KATI TALİMATLAR:
         .forEach(id => addIfInCatalog(pracFacts, id));
 
       // 7. EQUIPMENT_TECHNOLOGY
-      const equipTechFacts = new Set<string>();
+      // 7. EQUIPMENT_TECHNOLOGY
       if (dossier.trimPackageComparison || dossier.expertDecisionSynthesis?.trimPackageComparison) {
         (dossier.supportingFactIds || [])
           .filter(id => {
@@ -575,6 +575,30 @@ KATI TALİMATLAR:
                  !k.includes('power') && !k.includes('hp') && !k.includes('torque') && !k.includes('fuel') && !k.includes('engine') && !k.includes('price');
         })
         .forEach(f => equipTechFacts.add(f.factKey));
+
+      // 8. STRICT CMP_* DERIVED FACT ROUTING TO CRITERION SETS
+      (dossier.dataQuality?.supportingFacts || []).forEach((f: any) => {
+        const key = f.factKey || f.id;
+        if (!key) return;
+
+        if (key.startsWith('CMP_RELIABILITY_') || f.criterion === 'RELIABILITY') {
+          relFacts.add(key);
+        } else if (key.startsWith('CMP_FAILURE_SEVERITY_') || f.criterion === 'FAILURE_SEVERITY') {
+          failFacts.add(key);
+        } else if (key.startsWith('CMP_FUEL_EFFICIENCY_') || f.criterion === 'FUEL_EFFICIENCY') {
+          fuelFacts.add(key);
+        } else if (key.startsWith('CMP_SAFETY_') || f.criterion === 'SAFETY') {
+          safetyFacts.add(key);
+        } else if (key.startsWith('CMP_PERFORMANCE_') || f.criterion === 'PERFORMANCE') {
+          perfFacts.add(key);
+        } else if (key.startsWith('CMP_COMFORT_') || f.criterion === 'COMFORT') {
+          comfortFacts.add(key);
+        } else if (key.startsWith('CMP_PRACTICALITY_') || f.criterion === 'PRACTICALITY') {
+          pracFacts.add(key);
+        } else if (key.startsWith('CMP_EQUIPMENT_TECHNOLOGY_') || f.criterion === 'EQUIPMENT_TECHNOLOGY') {
+          equipTechFacts.add(key);
+        }
+      });
     }
 
     return {
