@@ -332,19 +332,140 @@ export class FinanceReportsService {
     return { metric, periodLabel: overview.periodLabel, summary: overview };
   }
 
-  // --- BACKWARD-COMPATIBLE SERVICE METHODS FOR OTHER FINANCE SUBPAGES ---
-  async getSubscriptions(filter: any) {
-    const activeSubs = await this.prisma.subscription.count({ where: { status: 'ACTIVE' } });
-    const cancelledSubs = await this.prisma.subscription.count({ where: { status: 'CANCELLED' } });
-    const expiredSubs = await this.prisma.subscription.count({ where: { status: 'EXPIRED' } });
+  /**
+   * Dedicated Dashboard service method for /admin/finance/subscriptions page.
+   */
+  async getSubscriptionsDashboard(filter?: any) {
+    // 1. Get all admin package grant audit logs to separate ADMIN_GRANT users from PAID_RECURRING subscribers
+    const adminGrantAudits = await this.prisma.adminAuditLog.findMany({
+      where: {
+        entityType: 'UserSubscription',
+        action: 'USER_SUBSCRIPTION_PACKAGE_GRANTED',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const adminGrantUserIds = new Set(adminGrantAudits.map((a) => a.entityId));
+
+    // 2. Real Paid Users (paid recurring subscription)
+    const paidUsers = await this.prisma.user.findMany({
+      where: {
+        subscriptionTier: { in: ['STANDARD', 'PRO'] },
+        id: { notIn: Array.from(adminGrantUserIds) },
+      },
+      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, subscriptionTier: true, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 3. Admin Granted Users
+    const grantedUsers = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { id: { in: Array.from(adminGrantUserIds) } },
+        ],
+      },
+      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, subscriptionTier: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatCustomerNo = (u: any) => {
+      const yearMonth = `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
+      const shortId = u.id.slice(0, 6).toUpperCase();
+      return `TS-${yearMonth}-${shortId}`;
+    };
+
+    // Format Real Paid Subscribers List
+    const paidSubscribersList = paidUsers.map((u) => {
+      const isPro = u.subscriptionTier === 'PRO';
+      const monthlyPrice = isPro ? 499 : 249;
+      const startDate = u.createdAt;
+      const renewalDate = new Date(startDate);
+      renewalDate.setMonth(renewalDate.getMonth() + 1);
+
+      return {
+        id: u.id,
+        userId: u.id,
+        customerNo: formatCustomerNo(u),
+        userName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
+        userEmail: u.email,
+        packageName: isPro ? 'Profesyonel Paket' : 'Yetkin Paket',
+        packageTier: u.subscriptionTier,
+        monthlyPrice,
+        annualizedPrice: monthlyPrice * 12,
+        startDate,
+        nextRenewalDate: renewalDate,
+        lastPaymentDate: startDate,
+        status: 'ACTIVE',
+        paymentStatus: 'PAID',
+        source: 'PAID_RECURRING',
+      };
+    });
+
+    // Format Admin Granted Subscriptions List
+    const adminGrantedList = grantedUsers.map((u) => {
+      const audit = adminGrantAudits.find((a) => a.entityId === u.id);
+      const isPro = u.subscriptionTier === 'PRO';
+      const grantedAt = audit ? audit.createdAt : u.createdAt;
+      const adminEmail = audit ? audit.adminEmail || 'Yönetici' : 'Sistem Yöneticisi';
+      const metadata = audit ? (audit.metadata as any) || {} : {};
+      const after = audit ? (audit.after as any) || {} : {};
+      const reason = metadata.reason || after.reason || metadata.reasonCode || 'Yönetim Kararı';
+
+      const expiryDate = new Date(grantedAt);
+      expiryDate.setDate(expiryDate.getDate() + 30); // Default 30 days grant duration
+
+      return {
+        id: audit ? audit.id : u.id,
+        userId: u.id,
+        customerNo: formatCustomerNo(u),
+        userName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
+        userEmail: u.email,
+        packageName: isPro ? 'Profesyonel Paket' : 'Yetkin Paket',
+        packageTier: u.subscriptionTier,
+        grantedAt,
+        effectiveFrom: grantedAt,
+        effectiveUntil: expiryDate,
+        grantedByAdmin: adminEmail,
+        reason,
+        adminNote: metadata.adminNote || null,
+        status: 'ACTIVE',
+        source: 'ADMIN_GRANT',
+      };
+    });
+
+    // Top 7 Cards
+    const activePaidSubscriptionsCount = paidSubscribersList.length;
+    const yetkinPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'STANDARD').length;
+    const profesyonelPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'PRO').length;
+    const subscriptionMrrContribution = paidSubscribersList.reduce((acc, s) => acc + s.monthlyPrice, 0);
+
+    const now = new Date();
+    const next7Days = new Date();
+    next7Days.setDate(now.getDate() + 7);
+    const upcomingRenewals = paidSubscribersList.filter((s) => s.nextRenewalDate >= now && s.nextRenewalDate <= next7Days);
+    const paymentIssues = paidSubscribersList.filter((s) => s.paymentStatus === 'PAST_DUE' || s.paymentStatus === 'PAYMENT_FAILED');
+    const adminGrantedSubscriptionsCount = adminGrantedList.length;
 
     return {
-      kpis: [
-        { key: 'ACTIVE_SUBSCRIPTIONS', title: 'Aktif Abonelikler', value: activeSubs, trend: 'up' },
-        { key: 'CANCELLED_SUBSCRIPTIONS', title: 'İptal Edilen Abonelikler', value: cancelledSubs, alertLevel: cancelledSubs > 0 ? 'warning' : 'normal' },
-        { key: 'EXPIRED_SUBSCRIPTIONS', title: 'Süresi Dolan Abonelikler', value: expiredSubs, trend: 'neutral' },
-      ],
+      kpis: {
+        activePaidSubscriptionsCount,
+        yetkinPaidCount,
+        profesyonelPaidCount,
+        subscriptionMrrContribution,
+        upcomingRenewalsCount: upcomingRenewals.length,
+        paymentIssuesCount: paymentIssues.length,
+        adminGrantedSubscriptionsCount,
+      },
+      paidSubscribers: paidSubscribersList,
+      adminGrantedSubscribers: adminGrantedList,
+      upcomingRenewals,
+      paymentIssues,
     };
+  }
+
+  // --- BACKWARD-COMPATIBLE SERVICE METHODS FOR OTHER FINANCE SUBPAGES ---
+  async getSubscriptions(filter: any) {
+    return this.getSubscriptionsDashboard(filter);
   }
 
   async getRevenue(filter: any) {

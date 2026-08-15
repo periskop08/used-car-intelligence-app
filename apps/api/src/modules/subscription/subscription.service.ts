@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { SubscriptionTier, SubscriptionStatus, Role, FeatureKey, UsagePeriodType } from '@prisma/client';
 
@@ -425,5 +425,117 @@ export class SubscriptionService {
     }
 
     return this.getSubscriptionSummary(targetUserId);
+  }
+
+  async bulkGrantPackagesToUsers(
+    adminUser: { id: string; email: string },
+    dto: {
+      targetUserIds: string[];
+      packageGroup?: 'SUBSCRIPTION' | 'BUYER';
+      tier?: SubscriptionTier;
+      buyerPackageCode?: 'ALICI_MINI' | 'ALICI_PLUS' | 'ALICI_MAX';
+      durationDays?: number;
+      isUnlimited?: boolean;
+      reasonCode: string;
+      reason?: string;
+      adminNote?: string;
+      notifyUser?: boolean;
+    }
+  ) {
+    const userIds = dto.targetUserIds || [];
+    if (!userIds.length) throw new BadRequestException('En az 1 kullanıcı seçilmelidir.');
+
+    let successCount = 0;
+    let failureCount = 0;
+    const failures: Array<{ userId: string; error: string }> = [];
+
+    for (const targetUserId of userIds) {
+      try {
+        await this.grantPackageToUser(adminUser, targetUserId, {
+          packageGroup: dto.packageGroup || 'SUBSCRIPTION',
+          tier: dto.tier || SubscriptionTier.PROFESYONEL,
+          buyerPackageCode: dto.buyerPackageCode,
+          reasonCode: dto.reasonCode || 'ADMIN_GRANT',
+          reason: dto.reason,
+          notifyUser: dto.notifyUser ?? true,
+        });
+
+        if (dto.adminNote) {
+          await this.prisma.adminUserNote.create({
+            data: {
+              userId: targetUserId,
+              createdByAdminId: adminUser.id,
+              adminEmail: adminUser.email || 'Admin',
+              content: `Abonelik Grant Notu: ${dto.adminNote}`,
+            },
+          }).catch(() => null);
+        }
+
+        successCount++;
+      } catch (err: any) {
+        failureCount++;
+        failures.push({ userId: targetUserId, error: err.message || 'Paket tanımlanamadı.' });
+      }
+    }
+
+    return {
+      total: userIds.length,
+      successCount,
+      failureCount,
+      failures,
+    };
+  }
+
+  async searchUsersForGrant(query: { q?: string; page?: number; limit?: number }) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const q = (query.q || '').trim();
+
+    const whereClause: any = {};
+    if (q) {
+      whereClause.OR = [
+        { email: { contains: q, mode: 'insensitive' } },
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q, mode: 'insensitive' } },
+        { id: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where: whereClause }),
+      this.prisma.user.findMany({
+        where: whereClause,
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true, subscriptionTier: true, isActive: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const formattedUsers = users.map((u) => {
+      const yearMonth = `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
+      const shortId = u.id.slice(0, 6).toUpperCase();
+      return {
+        id: u.id,
+        customerNo: `TS-${yearMonth}-${shortId}`,
+        name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
+        email: u.email,
+        phone: u.phone || '—',
+        subscriptionTier: u.subscriptionTier,
+        packageName: u.subscriptionTier === 'PRO' ? 'Profesyonel Paket' : u.subscriptionTier === 'STANDARD' ? 'Yetkin Paket' : 'Tanışma Paketi',
+        isActive: u.isActive,
+        createdAt: u.createdAt,
+      };
+    });
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      users: formattedUsers,
+    };
   }
 }

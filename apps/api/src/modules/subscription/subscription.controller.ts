@@ -35,6 +35,40 @@ export class SubscriptionController {
 export class AdminPackageGrantController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  @Get('search-for-grant')
+  @Permissions(AdminPermission.USER_PACKAGE_MANAGE)
+  async searchUsersForGrant(@Request() req: any) {
+    const user = req.user;
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && !user.permissions?.includes(AdminPermission.USER_PACKAGE_MANAGE)) {
+      throw new ForbiddenException('Kullanıcı arama yetkiniz bulunmamaktadır.');
+    }
+    return this.subscriptionService.searchUsersForGrant(req.query);
+  }
+
+  @Post('bulk-package-grants')
+  @Permissions(AdminPermission.USER_PACKAGE_MANAGE)
+  async bulkGrantPackages(
+    @Request() req: any,
+    @Body() body: {
+      targetUserIds: string[];
+      packageGroup?: 'SUBSCRIPTION' | 'BUYER';
+      tier?: SubscriptionTier;
+      buyerPackageCode?: 'ALICI_MINI' | 'ALICI_PLUS' | 'ALICI_MAX';
+      durationDays?: number;
+      isUnlimited?: boolean;
+      reasonCode: string;
+      reason?: string;
+      adminNote?: string;
+      notifyUser?: boolean;
+    }
+  ) {
+    const user = req.user;
+    if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && !user.permissions?.includes(AdminPermission.USER_PACKAGE_MANAGE)) {
+      throw new ForbiddenException('Kullanıcıya paket tanımlama yetkiniz bulunmamaktadır.');
+    }
+    return this.subscriptionService.bulkGrantPackagesToUsers(user, body);
+  }
+
   @Post(':userId/package-grants')
   @Permissions(AdminPermission.USER_PACKAGE_MANAGE)
   async grantPackage(
