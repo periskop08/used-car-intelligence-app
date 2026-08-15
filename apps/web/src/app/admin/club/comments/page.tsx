@@ -1,10 +1,13 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { API_BASE_URL } from '@/utils/apiConfig';
+import { ClubCommentDrawer } from '../components/ClubCommentDrawer';
+import { ClubPostDrawer } from '../components/ClubPostDrawer';
+import { AdminUserDrawer } from '../../components/AdminUserDrawer';
+import { MessageSquare, ChevronDown, ChevronRight, Eye, EyeOff, User } from 'lucide-react';
 
 interface PostGroup {
   post: {
@@ -27,19 +30,16 @@ interface PostGroup {
 function normalizeCommentGroups(data: any): PostGroup[] {
   if (!data || !Array.isArray(data)) return [];
 
-  // Case A: Data is already grouped by post ({ post: {...}, counts: {...} })
   if (data.length > 0 && data[0]?.post && data[0]?.counts) {
     return data.filter((g) => g && g.post && g.post.id);
   }
 
-  // Case B: Data is a flat array of comments ([{ id, content, post: { id, title } }])
   const groupMap: Record<string, PostGroup & { commentsList: any[] }> = {};
-
   for (const c of data) {
     if (!c) continue;
-    const pId = c.post?.id || c.postId || "general";
-    const pTitle = c.post?.title || "Genel Topluluk Gönderisi";
-    const pStatus = c.post?.status || "PUBLISHED";
+    const pId = c.post?.id || c.postId || 'general';
+    const pTitle = c.post?.title || 'Genel Topluluk Gönderisi';
+    const pStatus = c.post?.status || 'PUBLISHED';
     const pDate = c.post?.createdAt || c.createdAt;
 
     if (!groupMap[pId]) {
@@ -51,10 +51,10 @@ function normalizeCommentGroups(data: any): PostGroup[] {
     }
 
     groupMap[pId].counts.total++;
-    if (c.status === "VISIBLE") groupMap[pId].counts.visible++;
-    else if (c.status === "PENDING_REVIEW") groupMap[pId].counts.pendingReview++;
-    else if (c.status === "HIDDEN") groupMap[pId].counts.hidden++;
-    else if (c.status === "DELETED") groupMap[pId].counts.deleted++;
+    if (c.status === 'VISIBLE') groupMap[pId].counts.visible++;
+    else if (c.status === 'PENDING_REVIEW') groupMap[pId].counts.pendingReview++;
+    else if (c.status === 'HIDDEN') groupMap[pId].counts.hidden++;
+    else if (c.status === 'DELETED') groupMap[pId].counts.deleted++;
 
     groupMap[pId].commentsList.push(c);
   }
@@ -64,7 +64,7 @@ function normalizeCommentGroups(data: any): PostGroup[] {
 
 export default function AdminClubCommentsPage() {
   const searchParams = useSearchParams();
-  const statusFilter = searchParams.get("status") || "ALL";
+  const statusFilter = searchParams.get('status') || 'ALL';
 
   const [groups, setGroups] = useState<PostGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,66 +72,46 @@ export default function AdminClubCommentsPage() {
   const [postCommentsMap, setPostCommentsMap] = useState<Record<string, any[]>>({});
   const [loadingCommentsMap, setLoadingCommentsMap] = useState<Record<string, boolean>>({});
 
-  const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set());
-  const [bulkActing, setBulkActing] = useState(false);
+  const [selectedComment, setSelectedComment] = useState<any | null>(null);
+  const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const fetchGroups = async () => {
-    const token = localStorage.getItem("accessToken");
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
 
     setLoading(true);
     try {
       let res = await fetch(
-        `${API_URL}/api/admin/club/comments/groups?status=${encodeURIComponent(statusFilter)}`,
+        `${API_BASE_URL}/admin/club/comments/groups?status=${encodeURIComponent(statusFilter)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (!res.ok) {
-        res = await fetch(
-          `${API_URL}/admin/club/comments/groups?status=${encodeURIComponent(statusFilter)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        res = await fetch(`${API_BASE_URL}/admin/club/comments?status=${encodeURIComponent(statusFilter)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
-      if (!res.ok) {
-        res = await fetch(
-          `${API_URL}/api/admin/club/comments?status=${encodeURIComponent(statusFilter)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      }
-      if (!res.ok) {
-        res = await fetch(
-          `${API_URL}/admin/club/comments?status=${encodeURIComponent(statusFilter)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      }
-
       if (res.ok) {
         const data = await res.json();
-        const normalized = normalizeCommentGroups(data);
-        setGroups(normalized);
+        const norm = normalizeCommentGroups(data);
+        setGroups(norm);
 
-        // Pre-populate postCommentsMap if normalized groups contain inline commentsList
-        const initialCommentsMap: Record<string, any[]> = {};
-        normalized.forEach((g) => {
+        const initialMap: Record<string, any[]> = {};
+        norm.forEach((g) => {
           if (g.commentsList && g.commentsList.length > 0) {
-            initialCommentsMap[g.post.id] = g.commentsList;
+            initialMap[g.post.id] = g.commentsList;
           }
         });
-        if (Object.keys(initialCommentsMap).length > 0) {
-          setPostCommentsMap((prev) => ({ ...initialCommentsMap, ...prev }));
+        setPostCommentsMap((prev) => ({ ...initialMap, ...prev }));
+
+        if (norm.length > 0) {
+          setExpandedPostIds(new Set([norm[0].post.id]));
         }
-      } else {
-        setGroups([]);
       }
     } catch (e) {
-      setGroups([]);
+      console.error('Fetch comment groups error:', e);
     } finally {
       setLoading(false);
     }
@@ -139,197 +119,64 @@ export default function AdminClubCommentsPage() {
 
   useEffect(() => {
     fetchGroups();
-    setSelectedCommentIds(new Set());
   }, [statusFilter]);
 
-  const toggleAccordion = async (postId: string) => {
+  const toggleExpandPost = async (postId: string) => {
     const next = new Set(expandedPostIds);
-    if (next.has(postId)) {
-      next.delete(postId);
-      setExpandedPostIds(next);
-      return;
-    }
+    const willOpen = !next.has(postId);
 
-    next.add(postId);
+    if (willOpen) next.add(postId);
+    else next.delete(postId);
     setExpandedPostIds(next);
 
-    if (!postCommentsMap[postId] || postCommentsMap[postId].length === 0) {
-      fetchCommentsForPost(postId);
-    }
-  };
+    if (willOpen && !postCommentsMap[postId]) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) return;
 
-  const fetchCommentsForPost = async (postId: string) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    setLoadingCommentsMap((prev) => ({ ...prev, [postId]: true }));
-    try {
-      let res = await fetch(
-        `${API_URL}/api/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (!res.ok) {
-        res = await fetch(
-          `${API_URL}/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+      setLoadingCommentsMap((prev) => ({ ...prev, [postId]: true }));
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/admin/club/posts/${postId}/comments?status=${encodeURIComponent(statusFilter)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
+        if (res.ok) {
+          const data = await res.json();
+          setPostCommentsMap((prev) => ({ ...prev, [postId]: data.comments || data }));
+        }
+      } catch (e) {
+        console.error('Fetch post comments error:', e);
+      } finally {
+        setLoadingCommentsMap((prev) => ({ ...prev, [postId]: false }));
       }
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : Array.isArray(data?.comments) ? data.comments : [];
-        setPostCommentsMap((prev) => ({ ...prev, [postId]: list }));
-      }
-    } catch (e) {
-    } finally {
-      setLoadingCommentsMap((prev) => ({ ...prev, [postId]: false }));
-    }
-  };
-
-  const handleAction = async (commentId: string, action: "hide" | "review" | "restore", postId: string) => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    try {
-      let res = await fetch(`${API_URL}/api/admin/club/comments/${commentId}/${action}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: action === "hide" ? JSON.stringify({ reason: "Moderasyon kararı" }) : undefined,
-      });
-      if (!res.ok) {
-        res = await fetch(`${API_URL}/admin/club/comments/${commentId}/${action}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: action === "hide" ? JSON.stringify({ reason: "Moderasyon kararı" }) : undefined,
-        });
-      }
-      if (res.ok) {
-        fetchCommentsForPost(postId);
-        fetchGroups();
-      }
-    } catch (e) {
-      alert("Hata oluştu.");
-    }
-  };
-
-  const toggleSelectComment = (commentId: string) => {
-    const next = new Set(selectedCommentIds);
-    if (next.has(commentId)) next.delete(commentId);
-    else next.add(commentId);
-    setSelectedCommentIds(next);
-  };
-
-  const handleBulkStatusChange = async (targetStatus: "VISIBLE" | "HIDDEN" | "PENDING_REVIEW") => {
-    if (selectedCommentIds.size === 0) return;
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    setBulkActing(true);
-    try {
-      let res = await fetch(`${API_URL}/api/admin/club/comments/bulk-status`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          commentIds: Array.from(selectedCommentIds),
-          targetStatus,
-        }),
-      });
-      if (!res.ok) {
-        res = await fetch(`${API_URL}/admin/club/comments/bulk-status`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            commentIds: Array.from(selectedCommentIds),
-            targetStatus,
-          }),
-        });
-      }
-      if (res.ok) {
-        setSelectedCommentIds(new Set());
-        fetchGroups();
-        expandedPostIds.forEach((pId) => fetchCommentsForPost(pId));
-      }
-    } catch (e) {
-      alert("Toplu işlem sırasında hata oluştu.");
-    } finally {
-      setBulkActing(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-white">Yorum Moderasyonu (Gönderi Accordion Yapısı)</h2>
-          <p className="text-xs text-slate-400">
-            Topluluk yorumlarını gönderilere göre filtrelenmiş açılır gruplar hâlinde inceleyin ve yönetin.
-          </p>
-        </div>
-
-        {selectedCommentIds.size > 0 && (
-          <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl">
-            <span className="text-xs font-bold text-orange-400">{selectedCommentIds.size} Yorum Seçildi</span>
-            <button
-              disabled={bulkActing}
-              onClick={() => handleBulkStatusChange("PENDING_REVIEW")}
-              className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold hover:bg-amber-500/30"
-            >
-              İncelemeye Al
-            </button>
-            <button
-              disabled={bulkActing}
-              onClick={() => handleBulkStatusChange("VISIBLE")}
-              className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30"
-            >
-              Görünür Yap
-            </button>
-            <button
-              disabled={bulkActing}
-              onClick={() => handleBulkStatusChange("HIDDEN")}
-              className="px-2.5 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold hover:bg-rose-500/30"
-            >
-              Gizle
-            </button>
-            <button
-              onClick={() => setSelectedCommentIds(new Set())}
-              className="text-xs text-slate-400 hover:text-white underline ml-1"
-            >
-              Temizle
-            </button>
-          </div>
-        )}
+    <div className="space-y-6 max-w-7xl mx-auto font-mono text-xs">
+      <div className="pb-4 border-b border-white/10">
+        <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
+          Tork Scout Club — Yorumlar & Moderasyon
+        </h1>
+        <p className="text-xs text-slate-400 font-sans mt-1">
+          Gönderi bazında gruplanmış topluluk yorumları, onay onaylama kuyruğu ve içerik gizleme eylemleri.
+        </p>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-3 flex-wrap">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2">
         {[
-          { key: "ALL", label: "Tümü" },
-          { key: "PENDING_REVIEW", label: "⏳ İncelemede Bekleyenler" },
-          { key: "VISIBLE", label: "✅ Yayındakiler" },
-          { key: "HIDDEN", label: "🙈 Gizlenenler" },
+          { key: 'ALL', label: 'Tüm Yorumlar' },
+          { key: 'PENDING_REVIEW', label: 'İncelemede Bekleyenler' },
+          { key: 'VISIBLE', label: 'Yayındakiler' },
+          { key: 'HIDDEN', label: 'Gizlenenler' },
         ].map((tab) => (
           <Link
             key={tab.key}
             href={`/admin/club/comments?status=${tab.key}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               statusFilter === tab.key
-                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'bg-slate-900 text-slate-400 border border-white/5 hover:text-white'
             }`}
           >
             {tab.label}
@@ -337,140 +184,113 @@ export default function AdminClubCommentsPage() {
         ))}
       </div>
 
+      {/* Accordion Group List */}
       {loading ? (
-        <div className="p-12 text-center text-slate-400">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-orange-500 mx-auto mb-3"></div>
-          <p className="text-xs font-bold">Gönderi Grupları Yükleniyor...</p>
-        </div>
+        <div className="p-12 text-center text-slate-400 font-medium">Yorum grupları yükleniyor...</div>
       ) : groups.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-white/10 bg-slate-900/60 text-center space-y-1">
-          <span className="text-2xl block">✅</span>
-          <p className="text-xs font-bold text-slate-300">Filtreye Uygun Gönderi Yorum Grubu Bulunmadı</p>
-          <p className="text-[11px] text-slate-500">Seçilen duruma ait yorum içeren gönderi kaydı yok.</p>
+        <div className="p-12 text-center text-slate-500 font-medium text-xs bg-slate-900/60 rounded-2xl border border-white/10">
+          Seçili kısıt altında yorum bulunmuyor.
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((grp) => {
-            if (!grp || !grp.post) return null;
-            const isExpanded = expandedPostIds.has(grp.post.id);
-            const comments = postCommentsMap[grp.post.id] || [];
-            const isCommentsLoading = loadingCommentsMap[grp.post.id];
+          {groups.map((group) => {
+            const isExpanded = expandedPostIds.has(group.post.id);
+            const comments = postCommentsMap[group.post.id] || group.commentsList || [];
+            const isLoadingComments = loadingCommentsMap[group.post.id];
 
             return (
               <div
-                key={grp.post.id}
-                className="rounded-2xl border border-white/10 bg-slate-900/60 overflow-hidden transition"
+                key={group.post.id}
+                className="rounded-2xl border border-white/10 bg-slate-900/60 overflow-hidden"
               >
                 {/* Accordion Header */}
-                <button
-                  onClick={() => toggleAccordion(grp.post.id)}
-                  className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition gap-4"
+                <div
+                  onClick={() => toggleExpandPost(group.post.id)}
+                  className="p-4 bg-slate-950/60 hover:bg-slate-950 transition flex items-center justify-between cursor-pointer border-b border-white/5"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-white">{grp.post.title || "Başlıksız Gönderi"}</span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
-                        {grp.post.status || "PUBLISHED"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                      <span>Toplam: {grp.counts?.total ?? 0}</span>
-                      <span className="text-emerald-400">Görünür: {grp.counts?.visible ?? 0}</span>
-                      <span className="text-amber-400">İncelemede: {grp.counts?.pendingReview ?? 0}</span>
-                      <span className="text-rose-400">Gizli: {grp.counts?.hidden ?? 0}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="p-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-white text-sm font-sans">{group.post.title}</h3>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400 font-mono">
+                        <span>Toplam: {group.counts.total}</span>
+                        {group.counts.pendingReview > 0 && (
+                          <span className="text-amber-400 font-bold font-sans">
+                            · {group.counts.pendingReview} Bekliyor
+                          </span>
+                        )}
+                        {group.counts.hidden > 0 && (
+                          <span className="text-rose-400">· {group.counts.hidden} Gizlendi</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                    <span>{isExpanded ? "Yorumları Gizle ▲" : "Yorumları Göster ▼"}</span>
-                  </div>
-                </button>
+                  <span className="text-orange-400 text-xs font-bold font-mono">
+                    {isExpanded ? 'Yorumları Kapat ▲' : 'Yorumları Göster ▼'}
+                  </span>
+                </div>
 
                 {/* Accordion Body */}
                 {isExpanded && (
-                  <div className="border-t border-white/10 p-4 bg-slate-950/50 space-y-3">
-                    {isCommentsLoading ? (
-                      <div className="py-6 text-center text-xs text-slate-400">
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-orange-500 mx-auto mb-2"></div>
-                        Yorumlar yükleniyor...
-                      </div>
+                  <div className="p-4 bg-slate-900/40">
+                    {isLoadingComments ? (
+                      <div className="p-6 text-center text-slate-400">Yorumlar yükleniyor...</div>
                     ) : comments.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic py-2">Bu gönderide filtrenize uyan yorum yok.</p>
+                      <div className="p-6 text-center text-slate-500 text-xs">
+                        Bu gönderiye ait yorum bulunmuyor.
+                      </div>
                     ) : (
-                      comments.map((c) => {
-                        if (!c) return null;
-                        const authorDisplay = c.authorFormatted || c.author?.firstName || "Topluluk Üyesi";
-                        return (
-                          <div
-                            key={c.id}
-                            className="p-3.5 rounded-xl border border-white/5 bg-slate-900/80 flex flex-col sm:flex-row items-start justify-between gap-4"
-                          >
-                            <div className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedCommentIds.has(c.id)}
-                                onChange={() => toggleSelectComment(c.id)}
-                                className="mt-1 rounded border-white/20 text-orange-500 focus:ring-orange-500"
-                              />
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-bold text-white">{authorDisplay}</span>
-                                  {c.badge && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                      {typeof c.badge === "object" ? c.badge.label || c.badge.code : c.badge}
+                      <div className="space-y-3">
+                        {comments.map((comment: any) => {
+                          const isHidden = comment.status === 'HIDDEN';
+                          const isPending = comment.status === 'PENDING_REVIEW';
+
+                          return (
+                            <div
+                              key={comment.id}
+                              onClick={() => setSelectedComment(comment)}
+                              className="p-3 bg-slate-950/80 hover:bg-slate-950 rounded-xl border border-white/5 hover:border-orange-500/40 transition cursor-pointer space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white font-sans text-xs">
+                                    {comment.authorFormatted || comment.author?.name || 'Kullanıcı'}
+                                  </span>
+                                  {comment.badge && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                      {comment.badge.label}
                                     </span>
                                   )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
                                   <span
-                                    className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                                      c.status === "VISIBLE"
-                                        ? "bg-emerald-500/20 text-emerald-400"
-                                        : c.status === "PENDING_REVIEW"
-                                        ? "bg-amber-500/20 text-amber-400"
-                                        : "bg-rose-500/20 text-rose-400"
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isHidden
+                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                        : isPending
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                     }`}
                                   >
-                                    {c.status}
+                                    {isHidden ? 'GİZLENDİ' : isPending ? 'İNCELEMEDE' : 'YAYINDA'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    {new Date(comment.createdAt).toLocaleString('tr-TR')}
                                   </span>
                                 </div>
-                                <p className="text-xs text-slate-200">{c.content}</p>
-                                <span className="text-[10px] font-mono text-slate-500 block">
-                                  {c.createdAt ? new Date(c.createdAt).toLocaleString("tr-TR") : ""}
-                                </span>
                               </div>
+
+                              <p className="text-slate-300 font-sans text-xs whitespace-pre-wrap leading-relaxed">
+                                {comment.content}
+                              </p>
                             </div>
-
-                            <div className="flex items-center gap-1.5 self-end sm:self-center">
-                              {c.status === "VISIBLE" && (
-                                <button
-                                  onClick={() => handleAction(c.id, "review", grp.post.id)}
-                                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-bold hover:bg-amber-500/30 transition"
-                                >
-                                  İncelemeye Al
-                                </button>
-                              )}
-
-                              {c.status === "PENDING_REVIEW" && (
-                                <button
-                                  onClick={() => handleAction(c.id, "restore", grp.post.id)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold hover:bg-emerald-500/30 transition"
-                                >
-                                  İncelemeden Kaldır
-                                </button>
-                              )}
-
-                              {c.status !== "HIDDEN" && (
-                                <button
-                                  onClick={() => handleAction(c.id, "hide", grp.post.id)}
-                                  className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[11px] font-bold hover:bg-rose-500/30 transition"
-                                >
-                                  Gizle
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 )}
@@ -478,6 +298,33 @@ export default function AdminClubCommentsPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Drawers */}
+      <ClubCommentDrawer
+        comment={selectedComment}
+        isOpen={!!selectedComment}
+        onClose={() => setSelectedComment(null)}
+        onRefresh={fetchGroups}
+        onOpenUserDrawer={(userId) => setSelectedUserId(userId)}
+        onOpenPostDrawer={(post) => setSelectedPost(post)}
+      />
+
+      <ClubPostDrawer
+        post={selectedPost}
+        isOpen={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        onRefresh={fetchGroups}
+        onOpenUserDrawer={(userId) => setSelectedUserId(userId)}
+      />
+
+      {selectedUserId && (
+        <AdminUserDrawer
+          userId={selectedUserId}
+          isOpen={!!selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onRefresh={fetchGroups}
+        />
       )}
     </div>
   );

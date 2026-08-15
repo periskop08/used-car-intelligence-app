@@ -171,9 +171,9 @@ export class ClubService implements OnModuleInit {
     switch (tier) {
       case SubscriptionTier.YETKIN:
       case SubscriptionTier.STANDARD:
-      case SubscriptionTier.PRO:
         return { code: 'YETKIN', label: 'Yetkin' };
 
+      case SubscriptionTier.PRO:
       case SubscriptionTier.PROFESYONEL:
       case SubscriptionTier.PREMIUM:
         return { code: 'PROFESYONEL', label: 'Profesyonel' };

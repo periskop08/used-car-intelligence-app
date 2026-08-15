@@ -1,45 +1,42 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { API_BASE_URL } from '@/utils/apiConfig';
+import { ClubRestrictionDrawer } from '../components/ClubRestrictionDrawer';
+import { AdminUserDrawer } from '../../components/AdminUserDrawer';
+import { ShieldAlert, RotateCcw, User } from 'lucide-react';
 
 export default function AdminClubRestrictionsPage() {
   const searchParams = useSearchParams();
-  const typeFilter = searchParams.get("type") || "ALL";
-  const statusFilter = searchParams.get("status") || "ALL";
+  const typeFilter = searchParams.get('type') || 'ALL';
+  const statusFilter = searchParams.get('status') || 'ALL';
 
   const [restrictions, setRestrictions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalItem, setModalItem] = useState<any | null>(null);
-  const [acting, setActing] = useState(false);
+
+  const [selectedRestriction, setSelectedRestriction] = useState<any | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const fetchRestrictions = async () => {
-    const token = localStorage.getItem("accessToken");
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
 
+    setLoading(true);
     try {
-      let res = await fetch(
-        `${API_URL}/api/admin/club/restrictions?type=${encodeURIComponent(typeFilter)}&status=${encodeURIComponent(statusFilter)}`,
+      const res = await fetch(
+        `${API_BASE_URL}/admin/club/restrictions?type=${encodeURIComponent(typeFilter)}&status=${encodeURIComponent(statusFilter)}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (!res.ok && res.status === 404) {
-        res = await fetch(
-          `${API_URL}/admin/club/restrictions?type=${encodeURIComponent(typeFilter)}&status=${encodeURIComponent(statusFilter)}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      }
       if (res.ok) {
         const data = await res.json();
-        setRestrictions(data);
+        setRestrictions(Array.isArray(data) ? data : []);
       }
     } catch (e) {
+      console.error('Fetch restrictions error:', e);
     } finally {
       setLoading(false);
     }
@@ -49,202 +46,177 @@ export default function AdminClubRestrictionsPage() {
     fetchRestrictions();
   }, [typeFilter, statusFilter]);
 
-  const handleRevoke = async () => {
-    if (!modalItem) return;
-    const token = localStorage.getItem("accessToken");
+  const handleRevoke = async (e: React.MouseEvent, resId: string, isBan: boolean) => {
+    e.stopPropagation();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
-
-    setActing(true);
-    const endpointsToTry = [
-      `${API_URL}/api/admin/club/restrictions/${modalItem.id}/revoke`,
-      `${API_URL}/admin/club/restrictions/${modalItem.id}/revoke`,
-      `${API_URL}/api/admin/club/users/${modalItem.userId}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
-      `${API_URL}/admin/club/users/${modalItem.userId}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
-      `${API_URL}/api/admin/club/restrictions/${modalItem.id}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
-      `${API_URL}/admin/club/restrictions/${modalItem.id}/${modalItem.type === "BAN" ? "unban" : "unmute"}`,
-    ];
+    const msg = isBan ? 'Bu kullanıcının yasağını kaldırmak istediğinize emin misiniz?' : 'Bu kullanıcının susturmasını kaldırmak istediğinize emin misiniz?';
+    if (!confirm(msg)) return;
 
     try {
-      let res: Response | null = null;
-      for (const endpoint of endpointsToTry) {
-        res = await fetch(endpoint, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok || res.status !== 404) break;
-      }
-
-      if (res && res.ok) {
-        setModalItem(null);
-        fetchRestrictions();
-      } else {
-        const err = res ? await res.json().catch(() => ({})) : {};
-        alert(err.message || "Kısıtlama kaldırma işlemi gerçekleştirilemedi.");
-      }
+      const res = await fetch(`${API_BASE_URL}/admin/club/restrictions/${resId}/revoke`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) fetchRestrictions();
     } catch (e) {
-      alert("Hata oluştu.");
-    } finally {
-      setActing(false);
+      alert('İşlem başarısız.');
     }
-  };
-
-  const getStatusBadge = (item: any) => {
-    if (item.revokedAt) {
-      return (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-          KALDIRILDI
-        </span>
-      );
-    }
-    if (item.expiresAt && new Date(item.expiresAt) < new Date()) {
-      return (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/10">
-          SÜRESİ DOLDU
-        </span>
-      );
-    }
-    return (
-      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-        AKTİF
-      </span>
-    );
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-black text-white">Susturma (Mute) ve Ban Yönetimi</h2>
-        <p className="text-xs text-slate-400">
-          Geçici susturulmuş veya kalıcı banlanmış kullanıcı kısıtlamalarını inceleyin ve kaldırın.
+    <div className="space-y-6 max-w-7xl mx-auto font-mono text-xs">
+      <div className="pb-4 border-b border-white/10">
+        <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
+          Tork Scout Club — Susturma ve Ban Yönetimi
+        </h1>
+        <p className="text-xs text-slate-400 font-sans mt-1">
+          Görgü kuralları veya spam ihlali nedeniyle kısıtlanmış Club hesapları ve aktif kısıtlamalar.
         </p>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-3 flex-wrap">
-        {["ALL", "MUTE", "BAN"].map((t) => (
-          <Link
-            key={t}
-            href={`/admin/club/restrictions?type=${t}${statusFilter !== "ALL" ? `&status=${statusFilter}` : ""}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              typeFilter === t
-                ? "bg-white/15 text-white border border-white/20"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            {t === "ALL" ? "Tüm Türler" : t === "MUTE" ? "🔇 Mute (Susturma)" : "🚫 Ban (Yasaklama)"}
-          </Link>
-        ))}
-
-        <div className="ml-auto flex items-center gap-2">
-          {["ALL", "ACTIVE"].map((st) => (
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          {[
+            { key: 'ALL', label: 'Tüm Kısıtlama Türleri' },
+            { key: 'MUTE', label: 'Susturma (Mute)' },
+            { key: 'BAN', label: 'Yasaklama (Ban)' },
+          ].map((tab) => (
             <Link
-              key={st}
-              href={`/admin/club/restrictions?type=${typeFilter}&status=${st}`}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                statusFilter === st
-                  ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                  : "text-slate-400 hover:text-slate-200"
+              key={tab.key}
+              href={`/admin/club/restrictions?type=${tab.key}&status=${statusFilter}`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                typeFilter === tab.key
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-slate-900 text-slate-400 border border-white/5 hover:text-white'
               }`}
             >
-              {st === "ALL" ? "Tüm Kayıtlar" : "Sadece Aktifler"}
+              {tab.label}
+            </Link>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {[
+            { key: 'ALL', label: 'Tüm Kayıtlar' },
+            { key: 'ACTIVE', label: 'Sadece Aktifler' },
+          ].map((s) => (
+            <Link
+              key={s.key}
+              href={`/admin/club/restrictions?type=${typeFilter}&status=${s.key}`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                statusFilter === s.key
+                  ? 'bg-white/20 text-white border border-white/30'
+                  : 'bg-slate-900 text-slate-400 border border-white/5 hover:text-white'
+              }`}
+            >
+              {s.label}
             </Link>
           ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="p-12 text-center text-slate-400">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-orange-500 mx-auto mb-3"></div>
-          <p className="text-xs font-bold">Kısıtlamalar Yükleniyor...</p>
-        </div>
-      ) : restrictions.length === 0 ? (
-        <div className="p-12 rounded-2xl border border-white/10 bg-slate-900/60 text-center space-y-1">
-          <span className="text-2xl block">✅</span>
-          <p className="text-xs font-bold text-slate-300">Filtreye Uygun Kısıtlama Bulunmadı</p>
-          <p className="text-[11px] text-slate-500">Şu anda sistemde aktif veya geçmiş kısıtlama kaydı bulunmuyor.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {restrictions.map((item) => {
-            const isActive = !item.revokedAt && (!item.expiresAt || new Date(item.expiresAt) > new Date());
-            return (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl border border-white/10 bg-slate-900/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                        item.type === "BAN"
-                          ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                          : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                      }`}
-                    >
-                      {item.type === "BAN" ? "CLUB YASAĞI" : "SUSTURMA (MUTE)"}
-                    </span>
-
-                    {getStatusBadge(item)}
-
-                    <span className="text-xs font-bold text-white">{item.userFormatted}</span>
-                  </div>
-
-                  <p className="text-xs text-slate-300">Sebep: {item.reason || "Belirtilmedi"}</p>
-                  <p className="text-[11px] text-slate-500">
-                    Uygulayan: {item.createdByFormatted} • Başlangıç:{" "}
-                    {new Date(item.createdAt).toLocaleDateString("tr-TR")}{" "}
-                    {item.expiresAt && `• Bitiş: ${new Date(item.expiresAt).toLocaleDateString("tr-TR")}`}
-                  </p>
-                </div>
-
-                {isActive && (
-                  <button
-                    onClick={() => setModalItem(item)}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/30 transition whitespace-nowrap"
-                  >
-                    {item.type === "BAN" ? "Club'dan Yasağı Kaldır" : "Susturmayı Kaldır"}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {modalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md p-6 rounded-3xl border border-white/10 bg-slate-900 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <h3 className="text-base font-black text-white">
-                {modalItem.type === "BAN" ? "Club Yasağını Kaldır" : "Susturmayı Kaldır"}
-              </h3>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              <strong>{modalItem.userFormatted}</strong> kullanıcısına uygulanan{" "}
-              {modalItem.type === "BAN" ? "Club yasağını" : "geçici susturmayı"} kaldırmak istediğinizden emin misiniz? Kullanıcı topluluğa yeniden erişim kazanacaktır.
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                disabled={acting}
-                onClick={() => setModalItem(null)}
-                className="px-4 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/5 transition"
-              >
-                İptal
-              </button>
-              <button
-                disabled={acting}
-                onClick={handleRevoke}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition shadow-lg shadow-emerald-600/20"
-              >
-                {acting ? "Kaldırılıyor..." : modalItem.type === "BAN" ? "Yasağı Kaldır" : "Susturmayı Kaldır"}
-              </button>
-            </div>
+      {/* Restrictions Main Table */}
+      <div className="bg-slate-900/60 rounded-2xl border border-white/10 overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center text-slate-400 font-medium">Kısıtlamalar yükleniyor...</div>
+        ) : restrictions.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 font-medium text-xs">
+            Seçili kısıt altında kısıtlama kaydı bulunmuyor.
           </div>
-        </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-white/5 font-mono">
+                <tr>
+                  <th className="p-4">Kullanıcı (Müşteri No — İsim)</th>
+                  <th className="p-4">Tür</th>
+                  <th className="p-4">Neden / Açıklama</th>
+                  <th className="p-4">Uygulayan</th>
+                  <th className="p-4">Tarih</th>
+                  <th className="p-4">Durum</th>
+                  <th className="p-4 text-right">Aksiyon</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 font-sans">
+                {restrictions.map((item) => {
+                  const isMute = item.type === 'MUTE';
+                  const isActive = !item.revokedAt;
+
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => setSelectedRestriction(item)}
+                      className="hover:bg-white/[0.04] transition cursor-pointer"
+                    >
+                      <td className="p-4 font-bold text-white font-mono">
+                        {item.userFormatted || item.user?.username || 'Kullanıcı'}
+                      </td>
+                      <td className="p-4 font-mono">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isMute
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                          }`}
+                        >
+                          {isMute ? 'SUSTURMA' : 'BAN'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-300 max-w-xs truncate">{item.reason || '—'}</td>
+                      <td className="p-4 text-slate-400 font-mono text-[11px]">
+                        {item.createdByFormatted || item.createdBy?.username || 'Sistem'}
+                      </td>
+                      <td className="p-4 font-mono text-slate-400 text-[11px]">
+                        {new Date(item.createdAt).toLocaleDateString('tr-TR')}
+                      </td>
+                      <td className="p-4 font-mono">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isActive
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-slate-700/40 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          {isActive ? 'AKTİF' : 'KALDIRILDI'}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono whitespace-nowrap">
+                        {isActive && (
+                          <button
+                            onClick={(e) => handleRevoke(e, item.id, item.type === 'BAN')}
+                            className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                          >
+                            Kısıtlamayı Kaldır
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Drawers */}
+      <ClubRestrictionDrawer
+        restriction={selectedRestriction}
+        isOpen={!!selectedRestriction}
+        onClose={() => setSelectedRestriction(null)}
+        onRefresh={fetchRestrictions}
+        onOpenUserDrawer={(userId) => setSelectedUserId(userId)}
+      />
+
+      {selectedUserId && (
+        <AdminUserDrawer
+          userId={selectedUserId}
+          isOpen={!!selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onRefresh={fetchRestrictions}
+        />
       )}
     </div>
   );

@@ -299,10 +299,10 @@ export class AdminClubController {
     return this.clubService.getAdminStats();
   }
 
-  @Get('moderation-log')
+  @Get(['moderation-log', 'activity', 'audit-log'])
   async getModerationLogs(@Query('limit') limit?: string, @Req() req?: any) {
     await this.verifyAdminOnly(req);
-    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
     return this.clubService.getModerationLogs(parsedLimit);
   }
 
