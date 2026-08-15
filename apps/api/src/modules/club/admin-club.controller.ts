@@ -100,7 +100,7 @@ export class AdminClubController {
     return this.clubService.reviewComment(commentId, req.user.id, role);
   }
 
-  @Post('comments/:commentId/restore')
+  @Post(['comments/:commentId/restore', 'comments/:commentId/publish', 'comments/:commentId/approve'])
   async restoreComment(@Param('commentId') commentId: string, @Req() req: any) {
     const role = await this.verifyModeratorOrAdmin(req);
     return this.clubService.restoreComment(commentId, req.user.id, role);
