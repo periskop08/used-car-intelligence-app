@@ -700,7 +700,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
           v2: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
@@ -710,7 +710,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
         },
       };
@@ -760,7 +760,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
           v2: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
@@ -770,7 +770,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
         },
       };
@@ -820,7 +820,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
           v2: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
@@ -830,7 +830,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
         },
       };
@@ -879,7 +879,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
           v2: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
@@ -889,7 +889,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
         },
       };
@@ -948,7 +948,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
               insufficientData: false,
             },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
           v2: {
             RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
@@ -958,7 +958,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
             PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
             COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
             PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            VALUE_FOR_MONEY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
+            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
           },
         },
       };
@@ -1001,7 +1001,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
         expect(evalItem.assessments.PERFORMANCE).toBeDefined();
         expect(evalItem.assessments.COMFORT).toBeDefined();
         expect(evalItem.assessments.PRACTICALITY).toBeDefined();
-        expect(evalItem.assessments.VALUE_FOR_MONEY).toBeDefined();
+        expect(evalItem.assessments.EQUIPMENT_TECHNOLOGY).toBeDefined();
       });
     });
   });

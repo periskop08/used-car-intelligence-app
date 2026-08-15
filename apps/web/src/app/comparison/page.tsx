@@ -907,6 +907,8 @@ export default function ComparisonPage() {
           {/* Section 0: NEW 8-Criteria Assessment Matrix & Top Decision Summary Cards */}
           <CriterionAssessmentMatrix
             criterionResult={comparisonResult.comparisonResult.criterionResult}
+            generationMode={comparisonResult.comparisonResult.generationMode}
+            vehicles={comparisonResult.vehicles}
           />
 
           {/* Section 1: Unified Vehicle Cards (1 Card Per Selected Vehicle!) */}

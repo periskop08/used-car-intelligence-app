@@ -29,7 +29,7 @@ export default function RiskComparison({ riskComparison }: Props) {
           <span className="text-xl">⚠️</span>
           <div>
             <h3 className="text-xs md:text-sm font-black text-white uppercase tracking-wider">
-              Kronik Sorunlar ve Masraf Riski
+              Kronik Sorunlar ve Teknik Risk
             </h3>
             <span className="text-[10px] text-slate-400">
               Onaylı arıza kayıtları, şiddet seviyeleri ve tespit edilebilirlik analizi

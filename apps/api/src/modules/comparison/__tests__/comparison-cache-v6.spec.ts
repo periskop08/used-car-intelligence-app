@@ -53,11 +53,11 @@ describe('TorqueScout v6 Comparison Cache & History Infrastructure', () => {
       const variantIdsAsc = profilesAsc.map(p => p.vehicleId).sort().join('_');
       const variantIdsDesc = profilesDesc.map(p => p.vehicleId).sort().join('_');
 
-      const cacheKeyAsc = `comparison:v6:TR:tr-TR:priority=BALANCED:variants=${variantIdsAsc}:data=${hashAsc}`;
-      const cacheKeyDesc = `comparison:v6:TR:tr-TR:priority=BALANCED:variants=${variantIdsDesc}:data=${hashDesc}`;
+      const cacheKeyAsc = `comparison:v7:TR:tr-TR:priority=BALANCED:variants=${variantIdsAsc}:data=${hashAsc}`;
+      const cacheKeyDesc = `comparison:v7:TR:tr-TR:priority=BALANCED:variants=${variantIdsDesc}:data=${hashDesc}`;
 
       expect(cacheKeyAsc).toBe(cacheKeyDesc);
-      expect(cacheKeyAsc).toContain('comparison:v6:');
+      expect(cacheKeyAsc).toContain('comparison:v7:');
     });
 
     it('should produce a different cache key when reportVersion or reportId changes', () => {

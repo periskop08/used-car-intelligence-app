@@ -110,18 +110,12 @@ export function computeSourceDataVersionFromProfiles(profiles: ComparisonVehicle
       .sort()
       .join('|');
 
-    const priceSnapshot = (p as any).priceSnapshot;
-    const verifiedPrice = getVerifiedMarketPriceEvidence(priceSnapshot);
-    const priceStr = verifiedPrice
-      ? `${priceSnapshot.calculatedAt ? new Date(priceSnapshot.calculatedAt).getTime() : 0}:${verifiedPrice.minPrice}:${verifiedPrice.maxPrice}:${verifiedPrice.sampleCount}`
-      : 'no-valid-price';
-
-    return `${p.vehicleId}:${reportId}:${reportVersion}:${completedAt}:${probs}:${detailedFacts}:${priceStr}`;
+    return `${p.vehicleId}:${reportId}:${reportVersion}:${completedAt}:${probs}:${detailedFacts}`;
   });
 
   const rawFingerprint = fingerprintParts.join('||');
   const hash = crypto.createHash('sha256').update(rawFingerprint).digest('hex').substring(0, 16);
-  return `v6_${hash}`;
+  return `v7_${hash}`;
 }
 
 export function calculateComparisonSourceDataVersion(profiles: ComparisonVehicleProfile[]): string {
@@ -313,6 +307,9 @@ export class ComparisonService {
         transmission: p.identity.transmission,
         fuelType: formatFuelType(p.identity.fuelType),
         problemsCount: p.reliability.problems.length,
+        reportAvailable: p.dossier?.reportAvailable ?? false,
+        reportVersion: p.dossier?.reportVersion || undefined,
+        reportIsStale: p.dossier?.isStaleReport || undefined,
       })),
       remainingChatbotMessages,
       userTier,
@@ -478,7 +475,7 @@ KATI TALİMATLAR:
     const perfFacts = new Set<string>();
     const comfortFacts = new Set<string>();
     const pracFacts = new Set<string>();
-    const vfmFacts = new Set<string>();
+    const equipTechFacts = new Set<string>();
 
     if (dossier) {
       // REQUIREMENT 1: SOLE Fact catalog is dossier.dataQuality.supportingFacts!
@@ -560,12 +557,24 @@ KATI TALİMATLAR:
         .filter(id => id.toLowerCase().includes('boot') || id.toLowerCase().includes('trunk') || id.toLowerCase().includes('bagaj'))
         .forEach(id => addIfInCatalog(pracFacts, id));
 
-      // 7. VALUE_FOR_MONEY
+      // 7. EQUIPMENT_TECHNOLOGY
+      const equipTechFacts = new Set<string>();
       if (dossier.trimPackageComparison || dossier.expertDecisionSynthesis?.trimPackageComparison) {
         (dossier.supportingFactIds || [])
-          .filter(id => id.toLowerCase().includes('trim') || id.toLowerCase().includes('package') || id.toLowerCase().includes('donanim') || id.toLowerCase().includes('price'))
-          .forEach(id => addIfInCatalog(vfmFacts, id));
+          .filter(id => {
+            const k = id.toLowerCase();
+            return (k.includes('trim') || k.includes('package') || k.includes('donanim') || k.includes('equip') || k.includes('tech')) &&
+                   !k.includes('power') && !k.includes('hp') && !k.includes('torque') && !k.includes('fuel') && !k.includes('engine');
+          })
+          .forEach(id => addIfInCatalog(equipTechFacts, id));
       }
+      (dossier.dataQuality?.supportingFacts || [])
+        .filter(f => {
+          const k = f.factKey.toLowerCase();
+          return (f.category === 'EQUIPMENT' || k.includes('equipment') || k.includes('equip') || k.includes('tech') || k.includes('trim') || k.includes('feature')) &&
+                 !k.includes('power') && !k.includes('hp') && !k.includes('torque') && !k.includes('fuel') && !k.includes('engine') && !k.includes('price');
+        })
+        .forEach(f => equipTechFacts.add(f.factKey));
     }
 
     return {
@@ -577,7 +586,8 @@ KATI TALİMATLAR:
       PERFORMANCE: perfFacts,
       COMFORT: comfortFacts,
       PRACTICALITY: pracFacts,
-      VALUE_FOR_MONEY: vfmFacts,
+      EQUIPMENT_TECHNOLOGY: equipTechFacts,
+      VALUE_FOR_MONEY: equipTechFacts,
     };
   }
 
@@ -771,21 +781,21 @@ KATI TALİMATLAR:
       insufficientData: true,
     });
 
-    const vfmValid = !!(verifiedPriceEvidence && hasTrimEvidence);
-    const valueForMoney: CriterionAssessment = {
-      criterionKey: 'VALUE_FOR_MONEY',
-      score: null,
-      stars: null,
-      confidence: 'INSUFFICIENT',
-      summary: vfmValid
-        ? `${p.displayName} piyasa fiyatı ${verifiedPriceEvidence!.minPrice?.toLocaleString('tr-TR')} - ${verifiedPriceEvidence!.maxPrice?.toLocaleString('tr-TR')} TL aralığındadır.`
-        : 'Güncel piyasa fiyat verisi bulunmamaktadır.',
-      positiveFactors: [],
+    const equipTechFacts = Array.from(allowedFactIds['EQUIPMENT_TECHNOLOGY'] || allowedFactIds['VALUE_FOR_MONEY'] || []);
+    const equipTechValid = hasTrimEvidence && equipTechFacts.length > 0;
+    const equipTech: CriterionAssessment = {
+      criterionKey: 'EQUIPMENT_TECHNOLOGY',
+      score: equipTechValid ? 70 : null,
+      stars: equipTechValid ? 3.5 : null,
+      confidence: equipTechValid ? 'MEDIUM' : 'INSUFFICIENT',
+      summary: equipTechValid
+        ? `${p.displayName} donanım paketi (${p.identity.trim || 'Standart'}) doğrulanmış konfor ve teknoloji özelliklerine sahiptir.`
+        : 'Seçili donanım paketine özel doğrulanmış detaylı teknoloji verisi bulunmamaktadır.',
+      positiveFactors: equipTechValid ? [`${p.identity.trim || 'Donanım'} paketi özellikleri doğrulanmıştır.`] : [],
       compromises: [],
-      supportingFactIds: vfmValid ? Array.from(allowedFactIds['VALUE_FOR_MONEY'] || []) : [],
-      missingInputs: ['Fiyat/donanım oran puanlama kanıtı eksik'],
-      insufficientData: true,
-      marketPriceEvidence: vfmValid ? verifiedPriceEvidence : undefined,
+      supportingFactIds: equipTechValid ? equipTechFacts : [],
+      missingInputs: equipTechValid ? [] : ['Donanım ve teknoloji kanıtı eksik'],
+      insufficientData: !equipTechValid,
     };
 
     return {
@@ -797,7 +807,8 @@ KATI TALİMATLAR:
       PERFORMANCE: emptyCriterion('PERFORMANCE', 'Motor performansı'),
       COMFORT: emptyCriterion('COMFORT', 'Kabin konforu'),
       PRACTICALITY: emptyCriterion('PRACTICALITY', 'Kullanışlılık'),
-      VALUE_FOR_MONEY: valueForMoney,
+      EQUIPMENT_TECHNOLOGY: equipTech,
+      VALUE_FOR_MONEY: equipTech,
     };
   }
 
@@ -929,8 +940,8 @@ ${summaryList}
 KATI TALİMATLAR:
 1. JENERİK VEYA BOŞ ŞABLON CÜMLE KULLANMAK KESİNLİKLE YASAKTIR. ("Kullanım amacınıza göre değişir", "En doğru araç bütçenize uygun olandır" gibi jenerik cümleler ASLA KULLANILAMAZ).
 2. JSON alanlarında MARKDOWN İŞARETLERİ (**bold**, ### başlık, satır başı -) KULLANMA. Düz metin üret.
-3. Kriter 1-7 ve arıza anlatımlarında TL, ₺, tamir fiyatı tahmini, parça ücreti veya işçilik tahmini ASLA KULLANMA. Arızanın büyüklüğünü parasal değil teknik sonuç olarak tanımla.
-4. "criterionAssessments" objesinde SEÇİLEN TÜM ${profiles.length} ARAÇ VE HER ARAÇ İÇİN TAM 8 KRİTER ("RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "SAFETY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "VALUE_FOR_MONEY") DÖNDÜRÜLMELİDİR.
+3. Kriterlerin hiçbirinde TL, ₺, tamir fiyatı tahmini, parça ücreti, işçilik tahmini veya piyasa fiyatı ASLA KULLANMA. Arızanın büyüklüğünü parasal değil teknik sonuç olarak tanımla.
+4. "criterionAssessments" objesinde SEÇİLEN TÜM ${profiles.length} ARAÇ VE HER ARAÇ İÇİN TAM 8 KRİTER ("RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "SAFETY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "EQUIPMENT_TECHNOLOGY") DÖNDÜRÜLMELİDİR.
 5. Her kriter için:
    - score: 0-100 arasında tamsayı VEYA kanıt yetersizse null. (Score non-null ise supportingFactIds BOŞ OLAMAZ!).
    - confidence: "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT".
@@ -940,7 +951,8 @@ KATI TALİMATLAR:
    - supportingFactIds: YALNIZCA o aracın verilerinde tanımlanmış ve O KRİTERE UYGUN geçerli Fact ID'lerini içeren dizi. (Non-null puan için geçerli Fact ID zorunludur!).
    - missingInputs: Eksik veriler dizisi.
    - insufficientData: boolean (score null ise true, non-null ise false).
-6. Fiyat verisi yalnızca Kriter 8 ("VALUE_FOR_MONEY") içinde backend verisine dayanılarak verilebilir. Fiyat tahminini AI olarak sıfırdan UYDURMA. Donanım paketi karşılaştırması veya fiyat kanıtı yoksa score null olmalıdır.
+6. Kriter 8 ("EQUIPMENT_TECHNOLOGY"): Seçilen donanım paketine ait konfor, multimedya, bağlantı ve günlük kullanım teknolojilerini değerlendir. Fiyat verisi VEYA piyasa fiyatı tahmini KULLANILAMAZ. Donanım paketine özel kanıt yoksa score null olmalıdır.
+7. "marketPriceEvidence" alanı hiçbir kriterde üretilmeyecektir.
 
 Lütfen SADECE geçerli JSON yanıt ver:
 {
@@ -980,10 +992,10 @@ Lütfen SADECE geçerli JSON yanıt ver:
       "PERFORMANCE": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
       "COMFORT": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
       "PRACTICALITY": { "score": null, "confidence": "INSUFFICIENT", "summary": "Veri bekleniyor.", "positiveFactors": [], "compromises": [], "supportingFactIds": [], "missingInputs": [], "insufficientData": true },
-      "VALUE_FOR_MONEY": {
+      "EQUIPMENT_TECHNOLOGY": {
         "score": null,
         "confidence": "INSUFFICIENT",
-        "summary": "Piyasa fiyatı ve donanım verisi bekleniyor.",
+        "summary": "Donanım ve teknoloji verisi bekleniyor.",
         "positiveFactors": [],
         "compromises": [],
         "supportingFactIds": [],
@@ -1103,7 +1115,7 @@ Lütfen SADECE geçerli JSON yanıt ver:
         'PERFORMANCE',
         'COMFORT',
         'PRACTICALITY',
-        'VALUE_FOR_MONEY',
+        'EQUIPMENT_TECHNOLOGY',
       ];
 
       // REQUIREMENT 1: Authoritative dossierFactIds MUST come ONLY from dataQuality.supportingFacts!
@@ -1112,16 +1124,12 @@ Lütfen SADECE geçerli JSON yanıt ver:
       );
 
       const allowedFactIdsByCriterion = this.buildAllowedFactIdsByCriterion(p);
-      const hasTrimEvidence = !!(p.dossier?.trimPackageComparison || p.dossier?.expertDecisionSynthesis?.trimPackageComparison);
-
-      const priceSnapshot = (p as any).priceSnapshot || await this.prisma.vehicleVariantPriceSnapshot.findUnique({
-        where: { vehicleVariantId: p.vehicleId },
-      }).catch(() => null);
-
-      const verifiedPriceEvidence = getVerifiedMarketPriceEvidence(priceSnapshot);
 
       for (const key of requiredKeys) {
-        const raw = vAssessments[key] || (key === 'FAILURE_SEVERITY' ? vAssessments['SEVERITY_DURABILITY'] : undefined);
+        const raw = vAssessments[key] ||
+          (key === 'FAILURE_SEVERITY' ? vAssessments['SEVERITY_DURABILITY'] : undefined) ||
+          (key === 'EQUIPMENT_TECHNOLOGY' ? vAssessments['VALUE_FOR_MONEY'] : undefined);
+
         if (!raw) {
           throw new Error(`Vehicle ${p.vehicleId} is missing criterion: ${key}`);
         }
@@ -1140,24 +1148,15 @@ Lütfen SADECE geçerli JSON yanıt ver:
           throw new Error(`Invalid confidence ${raw.confidence} in criterion ${key} for vehicle ${p.vehicleId}`);
         }
 
+        // Clean up legacy marketPriceEvidence in comparison-v7
+        if (raw.marketPriceEvidence) {
+          delete raw.marketPriceEvidence;
+        }
+
         const criterionAllowList = allowedFactIdsByCriterion[key] || new Set<string>();
 
         if (criterionAllowList.size === 0 && raw.score !== null) {
           throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} has score ${raw.score} but criterion allowlist is empty`);
-        }
-
-        if (key === 'VALUE_FOR_MONEY') {
-          if (!verifiedPriceEvidence || !hasTrimEvidence) {
-            if (raw.score !== null) {
-              throw new Error(`VALUE_FOR_MONEY non-null score for vehicle ${p.vehicleId} REJECTED because valid backend price snapshot or trim evidence is missing`);
-            }
-            raw.score = null;
-            raw.insufficientData = true;
-            raw.confidence = 'INSUFFICIENT';
-            raw.marketPriceEvidence = undefined;
-          } else {
-            raw.marketPriceEvidence = verifiedPriceEvidence;
-          }
         }
 
         if (raw.score === null) {
@@ -1189,10 +1188,6 @@ Lütfen SADECE geçerli JSON yanıt ver:
           if (hasInvalidFactId) {
             throw new Error(`Invalid supportingFactId in ${key} for vehicle ${p.vehicleId}: Fact ID is not allowed for criterion ${key}`);
           }
-
-          if (key !== 'VALUE_FOR_MONEY' && raw.marketPriceEvidence) {
-            throw new Error(`Criterion ${key} for vehicle ${p.vehicleId} MUST NOT contain marketPriceEvidence`);
-          }
         }
       }
     }
@@ -1205,6 +1200,25 @@ Lütfen SADECE geçerli JSON yanıt ver:
     const criterionResult = this.buildComparisonCriterionResult(vehicleEvaluations);
     parsed.criterionResult = criterionResult;
 
+    // Requirement 4: Mandatory 8/8 Coverage Enforcement
+    const anyVehicleIncomplete = vehicleEvaluations.some(ev => ev.coverageTooLow || ev.overallScore === null);
+    if (anyVehicleIncomplete) {
+      const minValidCount = Math.min(...vehicleEvaluations.map(ev => {
+        return Object.values(ev.assessments || {}).filter(a => !a.insufficientData && a.score !== null).length;
+      }));
+      parsed.overallRecommendation = {
+        vehicleId: undefined,
+        vehicleName: undefined,
+        label: 'Net Kazanan İçin Yeterli Veri Yok',
+        reasoning: `Genel değerlendirme için 8 kriterin tamamında doğrulanmış veri gerekiyor — ${minValidCount}/8 mevcut.`,
+        confidence: 'INSUFFICIENT',
+      };
+      parsed.scenarioRecommendations = [];
+      if (parsed.riskComparison) {
+        parsed.riskComparison.lowestRiskVehicleId = undefined;
+      }
+    }
+
     const validation = validateComparisonSemantics(parsed, profiles);
     if (!validation.isValid) {
       diagnostics.validationFailed = true;
@@ -1216,9 +1230,9 @@ Lütfen SADECE geçerli JSON yanıt ver:
 
     const rawResult: VehicleComparisonResult = {
       comparisonId: diagnostics.comparisonId,
-      schemaVersion: '6.0',
-      promptVersion: '6',
-      engineVersion: 'comparison-v6',
+      schemaVersion: '7.0',
+      promptVersion: '7',
+      engineVersion: 'comparison-v7',
       generationMode: 'AI',
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
@@ -1261,14 +1275,6 @@ Lütfen SADECE geçerli JSON yanıt ver:
       p.reliability.problems.forEach(prob => cautions.push(`${prob.title} (${prob.severity} risk seviyesi)`));
     }
 
-    if (p.efficiency.combinedConsumption) {
-      cautions.push(`Ortalama ${p.efficiency.combinedConsumption} L/100km fabrika tüketimi`);
-    }
-
-    if (p.practicality.bootLitres && p.practicality.bootLitres < 400) {
-      cautions.push(`${p.practicality.bootLitres} Litre bagaj hacmi`);
-    }
-
     return cautions;
   }
 
@@ -1286,7 +1292,12 @@ Lütfen SADECE geçerli JSON yanıt ver:
 
     const criterionResult = this.buildComparisonCriterionResult(vehicleEvaluations);
 
-    // REQUIREMENT 2: Remove default generic fallback strings!
+    // Requirement 4: Mandatory 8/8 Coverage Enforcement for fallback
+    const anyIncomplete = vehicleEvaluations.some(ev => ev.coverageTooLow || ev.overallScore === null);
+    const minValidCount = Math.min(...vehicleEvaluations.map(ev => {
+      return Object.values(ev.assessments || {}).filter(a => !a.insufficientData && a.score !== null).length;
+    }));
+
     const vehicleCards = profiles.map(p => ({
       vehicleId: p.vehicleId,
       vehicleName: p.displayName,
@@ -1297,7 +1308,7 @@ Lütfen SADECE geçerli JSON yanıt ver:
         trim: p.identity.trim,
       },
       characterSummary: p.dossier?.executiveSummary?.oneSentenceSummary || `${p.displayName} veritabanı verileriyle analiz edilmiştir.`,
-      strengths: p.efficiency.combinedConsumption ? [`${p.efficiency.combinedConsumption} L/100km fabrika tüketim verisi`] : [],
+      strengths: [],
       cautions: this.buildFallbackCautions(p),
       bestFor: [],
       notIdealFor: [],
@@ -1315,9 +1326,9 @@ Lütfen SADECE geçerli JSON yanıt ver:
 
     return {
       comparisonId: `comp_fallback_${Date.now()}`,
-      schemaVersion: '6.0',
-      promptVersion: '6',
-      engineVersion: 'comparison-v6',
+      schemaVersion: '7.0',
+      promptVersion: '7',
+      engineVersion: 'comparison-v7',
       generationMode: 'FALLBACK',
       generatedAt: new Date().toISOString(),
       sourceDataVersion,
@@ -1326,7 +1337,9 @@ Lütfen SADECE geçerli JSON yanıt ver:
       executiveSummary: 'AI karşılaştırması tamamlanamadı; teknik veriler listeleniyor.',
       overallRecommendation: {
         label: 'Net Kazanan İçin Yeterli Veri Yok',
-        reasoning: 'Canlı AI servisine erişilemediği için veritabanı kayıtlarından genel kazanan belirlenmemiştir.',
+        reasoning: anyIncomplete
+          ? `Genel değerlendirme için 8 kriterin tamamında doğrulanmış veri gerekiyor — ${minValidCount}/8 mevcut.`
+          : 'Canlı AI servisine erişilemediği için veritabanı kayıtlarından genel kazanan belirlenmemiştir.',
         confidence: 'INSUFFICIENT',
       },
       vehicleCards,

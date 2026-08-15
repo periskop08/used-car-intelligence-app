@@ -260,7 +260,8 @@ export type CriterionKey =
   | 'PERFORMANCE'           // 5. Motor, şanzıman ve sürüş performansı (%10)
   | 'COMFORT'               // 6. Konfor ve sürüş kalitesi (%10)
   | 'PRACTICALITY'          // 7. Kullanışlılık ve yaşam alanı (%10)
-  | 'VALUE_FOR_MONEY';      // 8. Donanım, teknoloji ve fiyatına göre sunduğu değer (%10)
+  | 'EQUIPMENT_TECHNOLOGY'  // 8. Donanım ve teknoloji seviyesi (%10)
+  | 'VALUE_FOR_MONEY';      // Legacy alias for backwards compatibility
 
 export const CRITERIA_WEIGHTS: Record<string, number> = {
   RELIABILITY: 20,
@@ -270,7 +271,7 @@ export const CRITERIA_WEIGHTS: Record<string, number> = {
   PERFORMANCE: 10,
   COMFORT: 10,
   PRACTICALITY: 10,
-  VALUE_FOR_MONEY: 10,
+  EQUIPMENT_TECHNOLOGY: 10,
 };
 
 export interface MarketPriceEvidence {
@@ -543,9 +544,9 @@ export interface FinalDecisionGuideRow {
 
 export interface VehicleComparisonResult {
   comparisonId: string;
-  schemaVersion: '5.0' | '6.0';
-  promptVersion: '5' | '6';
-  engineVersion: 'comparison-v5' | 'comparison-v6';
+  schemaVersion: '5.0' | '6.0' | '7.0';
+  promptVersion: '5' | '6' | '7';
+  engineVersion: 'comparison-v5' | 'comparison-v6' | 'comparison-v7';
   generationMode: 'AI' | 'FALLBACK';
   generatedAt: string;
   sourceDataVersion: string;
@@ -603,7 +604,7 @@ export function computeBackendCriterionMetrics(
     'PERFORMANCE',
     'COMFORT',
     'PRACTICALITY',
-    'VALUE_FOR_MONEY',
+    'EQUIPMENT_TECHNOLOGY',
   ];
 
   let weightedSum = 0;
@@ -613,8 +614,11 @@ export function computeBackendCriterionMetrics(
   const processedAssessments: Record<string, CriterionAssessment> = {};
 
   for (const key of keys) {
-    // Check key or legacy alias SEVERITY_DURABILITY
-    const raw = evaluations[key] || (key === 'FAILURE_SEVERITY' ? evaluations['SEVERITY_DURABILITY'] : undefined);
+    // Check key or legacy aliases
+    const raw = evaluations[key] ||
+      (key === 'FAILURE_SEVERITY' ? evaluations['SEVERITY_DURABILITY'] : undefined) ||
+      (key === 'EQUIPMENT_TECHNOLOGY' ? evaluations['VALUE_FOR_MONEY'] : undefined);
+
     const rawScore = (raw && typeof raw.score === 'number' && !isNaN(raw.score)) ? raw.score : null;
     const isInsufficient = rawScore === null || raw?.insufficientData === true || raw?.confidence === 'INSUFFICIENT';
 
@@ -637,7 +641,6 @@ export function computeBackendCriterionMetrics(
       supportingFactIds: Array.isArray(raw?.supportingFactIds) ? raw!.supportingFactIds : [],
       missingInputs: Array.isArray(raw?.missingInputs) ? raw!.missingInputs : [],
       insufficientData: isInsufficient,
-      ...(key === 'VALUE_FOR_MONEY' && raw?.marketPriceEvidence ? { marketPriceEvidence: raw.marketPriceEvidence } : {}),
     };
 
     if (!isInsufficient && rawScore !== null) {
@@ -648,14 +651,17 @@ export function computeBackendCriterionMetrics(
     }
   }
 
+  // Requirement 4: Mandatory 8/8 coverage. Overall score & stars generated ONLY IF all 8 criteria are non-null and verified.
+  const hasFull8Coverage = validCount === 8;
+
   return {
     vehicleId,
     vehicleName,
     assessments: processedAssessments,
-    overallScore: (validCount / 8 >= 0.60 && validWeightSum > 0) ? Math.round((weightedSum / validWeightSum) * 10) / 10 : null,
-    overallStars: (validCount / 8 >= 0.60 && validWeightSum > 0) ? Math.max(0.5, Math.min(5, Math.round(((weightedSum / validWeightSum) / 20) * 2) / 2)) : null,
+    overallScore: (hasFull8Coverage && validWeightSum > 0) ? Math.round((weightedSum / validWeightSum) * 10) / 10 : null,
+    overallStars: (hasFull8Coverage && validWeightSum > 0) ? Math.max(0.5, Math.min(5, Math.round(((weightedSum / validWeightSum) / 20) * 2) / 2)) : null,
     coveragePct: Math.round((validCount / 8) * 100),
-    coverageTooLow: (validCount / 8) < 0.60,
+    coverageTooLow: !hasFull8Coverage,
   };
 }
 

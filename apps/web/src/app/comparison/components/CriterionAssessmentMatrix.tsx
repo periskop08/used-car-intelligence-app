@@ -10,8 +10,18 @@ import {
   CRITERIA_WEIGHTS,
 } from "@used-car-intelligence/shared";
 
+interface VehicleItemInfo {
+  id: string;
+  name?: string;
+  reportAvailable?: boolean;
+  reportVersion?: string;
+  reportIsStale?: boolean;
+}
+
 interface CriterionAssessmentMatrixProps {
   criterionResult?: ComparisonCriterionResult;
+  generationMode?: string;
+  vehicles?: VehicleItemInfo[];
 }
 
 const CRITERIA_METADATA: Record<CriterionKey, { title: string; weightStr: string; tooltip: string; icon: string }> = {
@@ -63,10 +73,16 @@ const CRITERIA_METADATA: Record<CriterionKey, { title: string; weightStr: string
     tooltip: "Bagaj hacmi, kabin genişliği, saklama alanları ve kullanım pratikliği.",
     icon: "🧳",
   },
-  VALUE_FOR_MONEY: {
-    title: "Donanım ve Fiyat Değeri",
+  EQUIPMENT_TECHNOLOGY: {
+    title: "Donanım ve Teknoloji Seviyesi",
     weightStr: "%10 Ağırlık",
-    tooltip: "Yüksek değerli donanımlar ve onaylı ikinci el piyasa fiyat bandı.",
+    tooltip: "Seçilen donanım paketi; konfor, multimedya, bağlantı ve günlük kullanım teknolojileri zenginliği.",
+    icon: "💎",
+  },
+  VALUE_FOR_MONEY: {
+    title: "Donanım ve Teknoloji Seviyesi",
+    weightStr: "%10 Ağırlık",
+    tooltip: "Seçilen donanım paketi; konfor, multimedya, bağlantı ve günlük kullanım teknolojileri zenginliği.",
     icon: "💎",
   },
 };
@@ -79,7 +95,7 @@ const CRITERIA_KEYS: CriterionKey[] = [
   "PERFORMANCE",
   "COMFORT",
   "PRACTICALITY",
-  "VALUE_FOR_MONEY",
+  "EQUIPMENT_TECHNOLOGY",
 ];
 
 function renderStars(stars: number | null) {
@@ -97,7 +113,14 @@ function renderStars(stars: number | null) {
   );
 }
 
-function renderConfidenceBadge(confidence?: string) {
+function renderConfidenceBadge(confidence?: string, reportAvailable?: boolean) {
+  if (reportAvailable === false) {
+    return (
+      <span className="bg-slate-800/80 text-slate-400 border border-slate-700/50 text-[10px] font-bold px-1.5 py-0.5 rounded">
+        RAPOR BULUNAMADI
+      </span>
+    );
+  }
   if (confidence === "HIGH") {
     return <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded">YÜKSEK GÜVEN</span>;
   }
@@ -107,7 +130,11 @@ function renderConfidenceBadge(confidence?: string) {
   return <span className="bg-slate-700/50 text-slate-400 border border-slate-600/30 text-[10px] font-bold px-1.5 py-0.5 rounded">DÜŞÜK GÜVEN</span>;
 }
 
-export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessmentMatrixProps) {
+export function CriterionAssessmentMatrix({
+  criterionResult,
+  generationMode,
+  vehicles,
+}: CriterionAssessmentMatrixProps) {
   const [expandedCell, setExpandedCell] = useState<string | null>(null);
 
   if (!criterionResult || !criterionResult.vehicleEvaluations || criterionResult.vehicleEvaluations.length === 0) {
@@ -116,12 +143,51 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
 
   const evaluations = criterionResult.vehicleEvaluations;
 
-  // Calculate ranks across vehicles by overallScore
-  const sortedEvaluations = [...evaluations].sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0));
+  const vehicleInfoMap = new Map<string, VehicleItemInfo>();
+  if (vehicles && Array.isArray(vehicles)) {
+    vehicles.forEach(v => {
+      if (v && v.id) vehicleInfoMap.set(v.id, v);
+    });
+  }
+
+  // Calculate ranks across eligible vehicles ONLY (coverageTooLow must be false, overallScore != null, coveragePct >= 60)
+  const eligibleEvaluations = evaluations.filter(
+    e => e.overallScore !== null && e.overallScore !== undefined && !e.coverageTooLow && (e.coveragePct ?? 0) >= 60
+  );
+  eligibleEvaluations.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0));
+
   const rankMap = new Map<string, number>();
-  sortedEvaluations.forEach((e, idx) => {
+  eligibleEvaluations.forEach((e, idx) => {
     rankMap.set(e.vehicleId, idx + 1);
   });
+
+  // Calculate dynamic header disclaimer based on generationMode AND report availability
+  let headerDisclaimer = "Karşılaştırma sonucu mevcut doğrulanmış verilerle gösteriliyor.";
+  if (!vehicles || vehicles.length === 0 || generationMode === undefined) {
+    headerDisclaimer = "Karşılaştırma sonucu mevcut doğrulanmış verilerle gösteriliyor.";
+  } else {
+    const hasReportFlags = vehicles.some(v => typeof v.reportAvailable === "boolean");
+    if (!hasReportFlags) {
+      headerDisclaimer = "Karşılaştırma sonucu mevcut doğrulanmış verilerle gösteriliyor.";
+    } else {
+      const anyReport = vehicles.some(v => v.reportAvailable === true);
+      const allReports = vehicles.every(v => v.reportAvailable === true);
+
+      if (!anyReport) {
+        headerDisclaimer = "Seçilen araçlar için kapsamlı rapor bulunmadığından yalnız mevcut doğrulanmış teknik kayıtlar gösteriliyor.";
+      } else if (!allReports) {
+        headerDisclaimer = "Bazı araçlar için kapsamlı rapor bulunmadığından karşılaştırma yalnız ortak doğrulanmış veri kapsamıyla sınırlandırılmıştır.";
+      } else {
+        if (generationMode === "AI") {
+          headerDisclaimer = "Kapsamlı araç raporlarından üretilen kanıta dayalı 8 kriter analizi.";
+        } else if (generationMode === "FALLBACK") {
+          headerDisclaimer = "AI çapraz analizi tamamlanamadığından raporlardaki doğrulanmış bilgiler güvenli analiz modunda gösteriliyor.";
+        } else {
+          headerDisclaimer = "Karşılaştırma sonucu mevcut doğrulanmış verilerle gösteriliyor.";
+        }
+      }
+    }
+  }
 
   const toggleExpand = (vehicleId: string, key: CriterionKey) => {
     const cellId = `${vehicleId}_${key}`;
@@ -141,7 +207,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Yapay zekâ rapor verilerinden türetilen kanıta dayalı puanlama ve 0.5 adımlı yıldız sistemi.
+            {headerDisclaimer}
           </p>
         </div>
 
@@ -160,15 +226,17 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
       {/* Top Summary Cards Grid (For 2, 5, or 10 Vehicles) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {evaluations.map(ev => {
-          const rank = rankMap.get(ev.vehicleId) || 1;
+          const rank = rankMap.get(ev.vehicleId);
+          const rankText = rank !== undefined ? `Seçilenler arasında ${rank}. sırada` : "Genel sıralamaya dahil edilmedi";
+          const vInfo = vehicleInfoMap.get(ev.vehicleId);
 
-          // Find strongest criterion
+          // REQUIREMENT 1: Evaluate eligibility PER VEHICLE!
+          const isVehicleEligible = ev.overallScore !== null && ev.overallScore !== undefined && !ev.coverageTooLow && (ev.coveragePct ?? 0) >= 60;
           const validAssessments = Object.values(ev.assessments).filter(a => a.score !== null && !a.insufficientData);
           validAssessments.sort((a, b) => (b.score || 0) - (a.score || 0));
-          const strongest = validAssessments[0];
 
-          // Find worst criterion / technical risk
-          const worst = validAssessments[validAssessments.length - 1];
+          const strongest = isVehicleEligible ? validAssessments[0] : undefined;
+          const worst = isVehicleEligible ? validAssessments[validAssessments.length - 1] : undefined;
 
           return (
             <div
@@ -178,11 +246,11 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-bold text-sm text-slate-100">{ev.vehicleName}</h3>
-                  <div className="text-[11px] text-amber-400 font-bold mt-0.5">
-                    Seçilenler arasında {rank}. sırada
+                  <div className={`text-[11px] font-bold mt-0.5 ${rank !== undefined ? "text-amber-400" : "text-slate-400 italic"}`}>
+                    {rankText}
                   </div>
                 </div>
-                {renderConfidenceBadge(ev.assessments.RELIABILITY?.confidence || "MEDIUM")}
+                {renderConfidenceBadge(ev.assessments.RELIABILITY?.confidence, vInfo?.reportAvailable)}
               </div>
 
               {/* Overall Stars or Insufficient Data */}
@@ -192,7 +260,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                 </div>
                 {ev.coverageTooLow || ev.overallStars === null ? (
                   <div className="text-xs font-semibold text-amber-400/90 flex items-center gap-1.5">
-                    <span>⚠️</span> Genel puan için veri yetersiz ({ev.coveragePct}% kapsama)
+                    <span>⚠️</span> Genel değerlendirme için 8 kriterin tamamında doğrulanmış veri gerekiyor — {Object.values(ev.assessments).filter(a => !a.insufficientData && a.score !== null).length}/8 mevcut.
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -240,12 +308,13 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                 8 Karşılaştırma Kriteri
               </th>
               {evaluations.map(ev => {
-                const rank = rankMap.get(ev.vehicleId) || 1;
+                const rank = rankMap.get(ev.vehicleId);
+                const rankText = rank !== undefined ? `Seçilenler arasında ${rank}.` : "Genel sıralamaya dahil edilmedi";
                 return (
                   <th key={ev.vehicleId} className="p-4 min-w-[240px] font-bold text-slate-200 border-l border-white/5">
                     <div>{ev.vehicleName}</div>
-                    <div className="text-[11px] text-amber-400 font-mono font-semibold">
-                      Seçilenler arasında {rank}.
+                    <div className={`text-[11px] font-mono font-semibold ${rank !== undefined ? "text-amber-400" : "text-slate-400 font-normal italic"}`}>
+                      {rankText}
                     </div>
                   </th>
                 );
@@ -275,6 +344,11 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                       const cellId = `${ev.vehicleId}_${key}`;
                       const isExpanded = expandedCell === cellId;
                       const isInsufficient = !assessment || assessment.score === null || assessment.insufficientData;
+                      const vInfo = vehicleInfoMap.get(ev.vehicleId);
+                      const isReportAvail = vInfo?.reportAvailable;
+                      const cellInsufficientText = isReportAvail === false
+                        ? "Kapsamlı araç raporu bulunamadı"
+                        : "Bu kriter için doğrulanmış kanıt bulunamadı";
 
                       return (
                         <td
@@ -286,7 +360,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                         >
                           {isInsufficient ? (
                             <div className="text-slate-500 font-semibold text-xs italic">
-                              — Veri yetersiz
+                              — {cellInsufficientText}
                             </div>
                           ) : (
                             <div className="space-y-1.5">
@@ -297,7 +371,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                {renderConfidenceBadge(assessment.confidence)}
+                                {renderConfidenceBadge(assessment.confidence, vInfo?.reportAvailable)}
                                 <span className="text-[10px] text-amber-400 underline font-semibold">
                                   {isExpanded ? "Detayı Kapat" : "Detay Gör"}
                                 </span>
@@ -420,14 +494,16 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
       {/* Mobile Collapsible View (Visible on screens smaller than MD) */}
       <div className="block md:hidden space-y-4">
         {evaluations.map(ev => {
-          const rank = rankMap.get(ev.vehicleId) || 1;
+          const rank = rankMap.get(ev.vehicleId);
+          const rankText = rank !== undefined ? `(Sıra: ${rank}.)` : "(Genel sıralamaya dahil edilmedi)";
+          const vInfo = vehicleInfoMap.get(ev.vehicleId);
           return (
             <details key={ev.vehicleId} className="group glass p-4 rounded-2xl border border-white/10 space-y-3">
               <summary className="font-bold text-sm text-slate-100 flex items-center justify-between cursor-pointer list-none">
                 <div>
                   <span>{ev.vehicleName}</span>
-                  <span className="ml-2 text-xs text-amber-400 font-mono font-semibold">
-                    (Sıra: {rank}.)
+                  <span className={`ml-2 text-xs font-mono font-semibold ${rank !== undefined ? "text-amber-400" : "text-slate-400 font-normal italic"}`}>
+                    {rankText}
                   </span>
                 </div>
                 <span className="text-xs text-amber-400 group-open:rotate-180 transition-transform">
@@ -440,6 +516,10 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                   const meta = CRITERIA_METADATA[key];
                   const assessment = ev.assessments[key];
                   const isInsufficient = !assessment || assessment.score === null || assessment.insufficientData;
+                  const isReportAvail = vInfo?.reportAvailable;
+                  const cellInsufficientText = isReportAvail === false
+                    ? "Kapsamlı araç raporu bulunamadı"
+                    : "Bu kriter için doğrulanmış kanıt bulunamadı";
 
                   return (
                     <div key={key} className="p-3 bg-slate-950/80 rounded-xl border border-white/5 space-y-1.5">
@@ -448,7 +528,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                           <span>{meta.icon}</span> {meta.title}
                         </span>
                         {isInsufficient ? (
-                          <span className="text-slate-500 italic text-[11px]">— Veri yetersiz</span>
+                          <span className="text-slate-500 italic text-[11px]">— {cellInsufficientText}</span>
                         ) : (
                           <span className="font-mono font-bold text-slate-100">{assessment.score} / 100</span>
                         )}
@@ -458,7 +538,7 @@ export function CriterionAssessmentMatrix({ criterionResult }: CriterionAssessme
                         <>
                           <div className="flex items-center justify-between">
                             {renderStars(assessment.stars)}
-                            {renderConfidenceBadge(assessment.confidence)}
+                            {renderConfidenceBadge(assessment.confidence, vInfo?.reportAvailable)}
                           </div>
                           <p className="text-[11px] text-slate-300 leading-relaxed">
                             {assessment.summary}

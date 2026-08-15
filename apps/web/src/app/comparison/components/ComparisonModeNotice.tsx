@@ -14,7 +14,7 @@ export const ComparisonModeNotice: React.FC<ComparisonModeNoticeProps> = ({ gene
       <div className="flex items-center gap-3">
         <span className="text-lg">ℹ️</span>
         <div>
-          <span className="font-bold">Doğrulanmış Teknik Analiz Modu:</span> Bu değerlendirme veritabanındaki onaylı teknik veriler ve kayıtlı riskler üzerinden hazırlanmıştır. Gelişmiş AI yorumu geçici olarak devrededir.
+          <span className="font-bold">Doğrulanmış Teknik Analiz Modu:</span> Bu değerlendirme veritabanındaki onaylı teknik veriler ve kayıtlı riskler üzerinden hazırlanmıştır. Gelişmiş AI yorumu geçici olarak devre dışıdır.
         </div>
       </div>
       <button
