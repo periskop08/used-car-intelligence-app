@@ -2,15 +2,22 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { AdminUserDrawer } from '../../components/AdminUserDrawer';
-import { Search, User, ShieldAlert, CheckCircle2, MessageSquare } from 'lucide-react';
+import { ClubAddRestrictionModal } from '../components/ClubAddRestrictionModal';
+import { ClubAssignModeratorModal } from '../components/ClubAssignModeratorModal';
+import { Search, User, ShieldAlert, ShieldCheck, MessageSquare, Plus } from 'lucide-react';
 
 export default function AdminClubUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [restrictionUserId, setRestrictionUserId] = useState<string | null>(null);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   const fetchUsers = async () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -27,7 +34,7 @@ export default function AdminClubUsersPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setUsers(data.users || []);
+        setUsers(Array.isArray(data) ? data : data.users || []);
       }
     } catch (e) {
       console.error('Fetch club users error:', e);
@@ -53,9 +60,16 @@ export default function AdminClubUsersPage() {
             Tork Scout Club — Kullanıcı Listesi & Yönetimi
           </h1>
           <p className="text-xs text-slate-400 font-sans mt-1">
-            Club topluluk üyelerinin müşteri numaraları, aktif paket durumları ve kısıtlamaları.
+            Canonical Club üyelerinin müşteri numaraları, erişim durumları, yorum sayıları ve kısıtlama geçmişi.
           </p>
         </div>
+
+        <button
+          onClick={() => setShowAssignModal(true)}
+          className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-4 py-2.5 rounded-xl transition flex items-center gap-2 self-start sm:self-auto cursor-pointer font-mono"
+        >
+          <Plus className="w-4 h-4" /> + Moderatör Ata
+        </button>
       </div>
 
       {/* Search Bar */}
@@ -73,7 +87,7 @@ export default function AdminClubUsersPage() {
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl transition cursor-pointer disabled:opacity-50"
+          className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl transition cursor-pointer disabled:opacity-50 font-mono"
         >
           Filtrele
         </button>
@@ -82,29 +96,31 @@ export default function AdminClubUsersPage() {
       {/* Users Table */}
       <div className="bg-slate-900/60 rounded-2xl border border-white/10 overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 font-medium">Kullanıcılar yükleniyor...</div>
+          <div className="p-12 text-center text-slate-400 font-medium">Club üyeleri yükleniyor...</div>
         ) : users.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 font-medium text-xs">
+          <div className="p-12 text-center text-slate-500 font-medium text-xs font-sans">
             Arama kriterine uygun Club kullanıcısı bulunamadı.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-white/5">
+              <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-white/5 font-mono">
                 <tr>
                   <th className="p-4">Müşteri No</th>
-                  <th className="p-4">Kullanıcı (Ad Soyad — E-posta)</th>
+                  <th className="p-4">Ad Soyad / Kullanıcı</th>
                   <th className="p-4">Aktif Paket</th>
+                  <th className="p-4">Club Durumu</th>
                   <th className="p-4">Toplam Yorum</th>
-                  <th className="p-4">Kayıt Tarihi</th>
-                  <th className="p-4">Moderasyon Durumu</th>
-                  <th className="p-4 text-right">Aksiyon</th>
+                  <th className="p-4">Moderatör Durumu</th>
+                  <th className="p-4">Kısıtlama Durumu</th>
+                  <th className="p-4 text-right">Aksiyonlar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-sans">
                 {users.map((u) => {
                   const isMuted = u.isMuted;
                   const isBanned = u.isBanned;
+                  const isMod = u.isModerator;
 
                   return (
                     <tr
@@ -124,9 +140,24 @@ export default function AdminClubUsersPage() {
                           </span>
                         )}
                       </td>
-                      <td className="p-4 font-mono text-slate-300">{u.commentCount || 0}</td>
-                      <td className="p-4 font-mono text-slate-400 text-[11px]">
-                        {new Date(u.createdAt).toLocaleDateString('tr-TR')}
+                      <td className="p-4 font-mono text-slate-300">
+                        {isBanned ? (
+                          <span className="text-rose-400 font-bold">Club Engelli</span>
+                        ) : isMuted ? (
+                          <span className="text-amber-400 font-bold">Susturuldu</span>
+                        ) : (
+                          <span className="text-emerald-400 font-bold">Aktif Üye</span>
+                        )}
+                      </td>
+                      <td className="p-4 font-mono text-slate-300">{u.commentCount || 0} Yorum</td>
+                      <td className="p-4 font-mono">
+                        {isMod ? (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                            MODERATÖR
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-[11px]">Üye</span>
+                        )}
                       </td>
                       <td className="p-4 font-mono">
                         {isBanned ? (
@@ -139,13 +170,28 @@ export default function AdminClubUsersPage() {
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                            AKTİF (TEMİZ)
+                            TEMİZ
                           </span>
                         )}
                       </td>
-                      <td className="p-4 text-right font-mono">
-                        <button className="px-3 py-1 bg-white/5 hover:bg-white/10 text-orange-400 rounded-lg text-[11px] font-bold transition">
-                          Kullanıcıyı Gör ➔
+                      <td className="p-4 text-right font-mono space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUserId(u.id);
+                          }}
+                          className="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-orange-400 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                        >
+                          Kullanıcıyı Gör
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRestrictionUserId(u.id);
+                          }}
+                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                        >
+                          Kısıtla
                         </button>
                       </td>
                     </tr>
@@ -157,7 +203,22 @@ export default function AdminClubUsersPage() {
         )}
       </div>
 
-      {/* Reusable Admin User Drawer */}
+      {/* Modals and Drawers */}
+      <ClubAssignModeratorModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        onRefresh={fetchUsers}
+      />
+
+      {restrictionUserId && (
+        <ClubAddRestrictionModal
+          isOpen={!!restrictionUserId}
+          preselectedUserId={restrictionUserId}
+          onClose={() => setRestrictionUserId(null)}
+          onRefresh={fetchUsers}
+        />
+      )}
+
       {selectedUserId && (
         <AdminUserDrawer
           userId={selectedUserId}

@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { ClubRestrictionDrawer } from '../components/ClubRestrictionDrawer';
+import { ClubAddRestrictionModal } from '../components/ClubAddRestrictionModal';
 import { AdminUserDrawer } from '../../components/AdminUserDrawer';
-import { ShieldAlert, RotateCcw, User } from 'lucide-react';
+import { ShieldAlert, RotateCcw, User, Plus } from 'lucide-react';
 
 export default function AdminClubRestrictionsPage() {
   const searchParams = useSearchParams();
@@ -18,6 +19,7 @@ export default function AdminClubRestrictionsPage() {
 
   const [selectedRestriction, setSelectedRestriction] = useState<any | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const fetchRestrictions = async () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -66,13 +68,22 @@ export default function AdminClubRestrictionsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto font-mono text-xs">
-      <div className="pb-4 border-b border-white/10">
-        <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
-          Tork Scout Club — Susturma ve Ban Yönetimi
-        </h1>
-        <p className="text-xs text-slate-400 font-sans mt-1">
-          Görgü kuralları veya spam ihlali nedeniyle kısıtlanmış Club hesapları ve aktif kısıtlamalar.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
+            Tork Scout Club — Susturma ve Ban Yönetimi
+          </h1>
+          <p className="text-xs text-slate-400 font-sans mt-1">
+            Görgü kuralları veya spam ihlali nedeniyle kısıtlanmış Club hesapları ve aktif kısıtlamalar.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-orange-500 hover:bg-orange-600 text-slate-950 font-black px-4 py-2.5 rounded-xl transition flex items-center gap-2 self-start sm:self-auto cursor-pointer font-mono"
+        >
+          <Plus className="w-4 h-4" /> + Kısıtlama Ekle
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -123,7 +134,7 @@ export default function AdminClubRestrictionsPage() {
           <div className="p-12 text-center text-slate-400 font-medium">Kısıtlamalar yükleniyor...</div>
         ) : restrictions.length === 0 ? (
           <div className="p-12 text-center text-slate-500 font-medium text-xs">
-            Seçili kısıt altında kısıtlama kaydı bulunmuyor.
+            Seçili kısıt altında kısıtlama kaydı bulunmuyor. Gösterilen "+ Kısıtlama Ekle" butonu ile yeni kısıtlama ekleyebilirsiniz.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -188,7 +199,7 @@ export default function AdminClubRestrictionsPage() {
                             onClick={(e) => handleRevoke(e, item.id, item.type === 'BAN')}
                             className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
                           >
-                            Kısıtlamayı Kaldır
+                            {isMute ? 'Susturmayı Kaldır' : 'Banı Kaldır'}
                           </button>
                         )}
                       </td>
@@ -201,7 +212,13 @@ export default function AdminClubRestrictionsPage() {
         )}
       </div>
 
-      {/* Drawers */}
+      {/* Drawers and Modals */}
+      <ClubAddRestrictionModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onRefresh={fetchRestrictions}
+      />
+
       <ClubRestrictionDrawer
         restriction={selectedRestriction}
         isOpen={!!selectedRestriction}
