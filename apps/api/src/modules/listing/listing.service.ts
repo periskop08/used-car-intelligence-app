@@ -303,6 +303,26 @@ export class ListingService {
     });
   }
 
+  // Seller draft listing deletion handler
+  async deleteDraftListing(id: string, userId: string) {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+    });
+
+    if (!listing) throw new NotFoundException('İlan bulunamadı.');
+    if (listing.sellerId !== userId) throw new ForbiddenException('Bu ilanı silme yetkiniz yok.');
+    if (listing.status !== ListingStatus.DRAFT) {
+      throw new BadRequestException('Sadece TASLAK (DRAFT) durumundaki ilanlar silinebilir.');
+    }
+
+    return this.prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        status: ListingStatus.DELETED,
+      },
+    });
+  }
+
   // Add media and enforce rules
   async addMedia(id: string, userId: string, file: { buffer: Buffer; size: number; mimetype: string }) {
     const listing = await this.prisma.vehicleListing.findUnique({

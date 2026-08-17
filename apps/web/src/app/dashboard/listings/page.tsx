@@ -60,7 +60,11 @@ function SellerDashboardContent() {
   const [activeTab, setActiveTab] = useState<"active" | "past">(initialTab);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
   const [publishWarningModal, setPublishWarningModal] = useState<PublishWarningModalState | null>(null);
+  const [deleteDraftModalListing, setDeleteDraftModalListing] = useState<any | null>(null);
+
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [listings, setListings] = useState<any[]>([]);
   const [quota, setQuota] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +261,49 @@ function SellerDashboardContent() {
       });
   };
 
+  const handleExecuteDeleteDraft = () => {
+    if (!deleteDraftModalListing) return;
+    const listingId = deleteDraftModalListing.id;
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
+    if (!activeToken) return;
+
+    setActionError("");
+    setActionSuccess("");
+    setDeletingId(listingId);
+
+    fetch(`${API_URL}/listings/${listingId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${activeToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return fetch(`${API_URL}/listings/${listingId}/delete`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${activeToken}` },
+          }).then((altRes) => {
+            if (!altRes.ok) {
+              return altRes.json().then((err) => {
+                throw new Error(err.message || "Taslak ilan silinemedi.");
+              });
+            }
+            return altRes.json();
+          });
+        }
+        return res.json();
+      })
+      .then(() => {
+        setActionSuccess("Taslak ilan silindi.");
+        setDeleteDraftModalListing(null);
+        refreshListings();
+      })
+      .catch((err: any) => {
+        setActionError(err.message || "Taslak ilan silinemedi.");
+      })
+      .finally(() => {
+        setDeletingId(null);
+      });
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
     const d = new Date(dateString);
@@ -447,9 +494,8 @@ function SellerDashboardContent() {
       ) : (
         <div className="flex flex-col gap-6">
           {displayedListings.map((listing) => {
-            const hasLeads = listing.leads && listing.leads.length > 0;
-            const isLeadsExpanded = expandedLeads[listing.id];
             const isPublishing = publishingId === listing.id;
+            const isDeleting = deletingId === listing.id;
 
             return (
               <div
@@ -550,11 +596,22 @@ function SellerDashboardContent() {
                     {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
                       <button
                         onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
-                        disabled={isPublishing}
+                        disabled={isPublishing || isDeleting}
                         className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         {isPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                         Yayınla
+                      </button>
+                    )}
+
+                    {listing.status === "DRAFT" && (
+                      <button
+                        onClick={() => setDeleteDraftModalListing(listing)}
+                        disabled={isDeleting || isPublishing}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-rose-600/10 border border-rose-500/20 text-rose-400 hover:bg-rose-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 font-sans"
+                      >
+                        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        Sil
                       </button>
                     )}
 
@@ -592,7 +649,7 @@ function SellerDashboardContent() {
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal for General Status Changes */}
       {confirmModal && confirmModal.isOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
@@ -620,7 +677,48 @@ function SellerDashboardContent() {
         </div>
       )}
 
-      {/* Publish Warning Modal (Clear feedback on why publish failed/requires action) */}
+      {/* Delete Draft Listing Confirmation Modal */}
+      {deleteDraftModalListing && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                <Trash2 className="w-5 h-5" />
+              </span>
+              <h4 className="font-bold text-white text-base font-sans">Taslak İlanı Sil</h4>
+            </div>
+
+            <p className="text-slate-300 font-sans text-xs leading-relaxed">
+              Bu taslak ilan kalıcı olarak silinecek. Bu işlem geri alınamaz.
+            </p>
+
+            <div className="p-3 bg-slate-900/80 border border-white/5 rounded-xl text-[11px] font-sans text-slate-400">
+              <span className="font-bold text-white block mb-0.5">Silinecek Taslak:</span>
+              "{deleteDraftModalListing.title}"
+            </div>
+
+            <div className="flex justify-end gap-2 font-sans pt-2">
+              <button
+                onClick={() => setDeleteDraftModalListing(null)}
+                disabled={deletingId === deleteDraftModalListing.id}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer font-sans"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={handleExecuteDeleteDraft}
+                disabled={deletingId === deleteDraftModalListing.id}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 font-sans"
+              >
+                {deletingId === deleteDraftModalListing.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                İlanı Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish Warning Modal */}
       {publishWarningModal && publishWarningModal.isOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
@@ -657,6 +755,7 @@ function SellerDashboardContent() {
         </div>
       )}
 
+      {/* Promotions Management Modal */}
       {promotionModalListing && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-slate-950 border border-white/10 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">

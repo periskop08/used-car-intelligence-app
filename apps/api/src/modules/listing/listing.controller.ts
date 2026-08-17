@@ -687,7 +687,10 @@ export class ListingController {
   @ApiOperation({ summary: 'Satıcının kendi tüm ilanlarını listele' })
   async getMyListings(@GetUser() user: UserPayload) {
     const items = await this.listingService['prisma'].vehicleListing.findMany({
-      where: { sellerId: user.id },
+      where: {
+        sellerId: user.id,
+        status: { notIn: [ListingStatus.DELETED, ListingStatus.ARCHIVED] },
+      },
       include: {
         _count: {
           select: { favorites: true },
@@ -753,6 +756,18 @@ export class ListingController {
     @Body() dto: UpdateListingStatusDto,
   ) {
     return this.listingService.updateListingStatus(id, user.id, dto.status);
+  }
+
+  @Delete('listings/:id')
+  @Post('listings/:id/delete')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Taslak ilanı sil' })
+  async deleteDraftListing(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.listingService.deleteDraftListing(id, user.id);
   }
 
   @Post('listings/:id/media')
