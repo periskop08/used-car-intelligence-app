@@ -15,6 +15,8 @@ import {
   ExternalLink,
   RotateCcw,
   ShieldCheck,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -25,6 +27,7 @@ interface ClubCommentDrawerProps {
   onRefresh?: () => void;
   onOpenUserDrawer?: (userId: string) => void;
   onOpenPostDrawer?: (post: any) => void;
+  onDeleteComment?: (comment: any) => void;
 }
 
 export function ClubCommentDrawer({
@@ -34,11 +37,13 @@ export function ClubCommentDrawer({
   onRefresh,
   onOpenUserDrawer,
   onOpenPostDrawer,
+  onDeleteComment,
 }: ClubCommentDrawerProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reasonInput, setReasonInput] = useState('Topluluk Kuralları İhlali');
   const [showHideModal, setShowHideModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   if (!isOpen || !comment) return null;
 
@@ -49,7 +54,7 @@ export function ClubCommentDrawer({
     setActionLoading(true);
     setError(null);
     try {
-      let endpoint = 'publish';
+      let endpoint = 'restore';
       let body: any = undefined;
       if (targetStatus === 'PENDING_REVIEW') endpoint = 'review';
       else if (targetStatus === 'HIDDEN') {
@@ -67,6 +72,34 @@ export function ClubCommentDrawer({
       });
       if (!res.ok) throw new Error('Yorum durumu güncellenemedi.');
       setShowHideModal(false);
+      onRefresh?.();
+      onClose();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExecutePermanentDelete = async () => {
+    if (!token) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/club/comments/${comment.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const altRes = await fetch(`${API_BASE_URL}/admin/club/comments/${comment.id}/delete`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!altRes.ok) throw new Error('Yorum silinemedi.');
+      }
+
+      setShowDeleteModal(false);
       onRefresh?.();
       onClose();
     } catch (e: any) {
@@ -190,7 +223,7 @@ export function ClubCommentDrawer({
         </div>
 
         {/* Footer Actions — Full State Machine Controls */}
-        <div className="p-4 border-t border-white/10 bg-slate-900/80 flex items-center justify-end gap-2 font-sans">
+        <div className="p-4 border-t border-white/10 bg-slate-900/80 flex items-center justify-end gap-2 font-sans flex-wrap">
           {isVisible && (
             <>
               <button
@@ -245,6 +278,13 @@ export function ClubCommentDrawer({
               >
                 <AlertCircle className="w-3.5 h-3.5" /> İncelemeye Al
               </button>
+              <button
+                onClick={() => (onDeleteComment ? onDeleteComment(comment) : setShowDeleteModal(true))}
+                disabled={actionLoading}
+                className="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-600/40 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50 text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Kalıcı Sil
+              </button>
             </>
           )}
         </div>
@@ -273,6 +313,47 @@ export function ClubCommentDrawer({
                   className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold cursor-pointer"
                 >
                   Gizle & Audit Log Yaz
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Permanent Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
+              <div className="flex items-center gap-3">
+                <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <Trash2 className="w-5 h-5" />
+                </span>
+                <h4 className="font-bold text-white text-base font-sans">Yorumu Kalıcı Sil</h4>
+              </div>
+
+              <p className="text-slate-300 font-sans text-xs leading-relaxed">
+                Bu işlem yalnızca seçili yorumu kaldıracaktır. Kullanıcının hesabı, Club üyeliği veya diğer içerikleri etkilenmeyecektir. Silinen yorum tekrar yayına alınamaz.
+              </p>
+
+              <div className="p-3 bg-slate-900/80 border border-white/5 rounded-xl text-[11px] font-sans text-slate-400">
+                <span className="font-bold text-white block mb-0.5">Silinecek Yorum:</span>
+                "{comment.content}"
+              </div>
+
+              <div className="flex justify-end gap-2 font-sans pt-2">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={handleExecutePermanentDelete}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Yorumu Kalıcı Sil
                 </button>
               </div>
             </div>

@@ -607,13 +607,27 @@ export class ClubService implements OnModuleInit {
       throw new ForbiddenException('Bu yorumu silme yetkiniz yok.');
     }
 
-    return this.prisma.clubComment.update({
+    const updated = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: {
         status: ClubCommentStatus.DELETED,
         deletedAt: new Date(),
       },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId: userId,
+        actorRole: userRole,
+        actionType: 'COMMENT_DELETED',
+        targetUserId: comment.authorId,
+        commentId: comment.id,
+        postId: comment.postId,
+        reason: 'Admin tarafından kalıcı silindi',
+      },
+    });
+
+    return updated;
   }
 
   async togglePostLike(postId: string, userId: string) {

@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Loader2,
   X,
+  Trash2,
 } from 'lucide-react';
 
 interface PostGroup {
@@ -87,6 +88,10 @@ export default function AdminClubCommentsPage() {
   // Action Loading & Toast State
   const [actingCommentId, setActingCommentId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Permanent Delete Confirmation Modal State
+  const [deleteConfirmComment, setDeleteConfirmComment] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Drawer States
   const [selectedComment, setSelectedComment] = useState<any | null>(null);
@@ -173,7 +178,7 @@ export default function AdminClubCommentsPage() {
 
     setActingCommentId(comment.id);
     try {
-      let endpoint = 'publish';
+      let endpoint = 'restore';
       let body: any = undefined;
       let feedback = 'Yorum yeniden yayına alındı.';
 
@@ -185,7 +190,7 @@ export default function AdminClubCommentsPage() {
         body = JSON.stringify({ reason: 'Moderatör tarafından gizlendi' });
         feedback = 'Yorum gizlendi.';
       } else if (targetStatus === 'VISIBLE') {
-        endpoint = 'publish';
+        endpoint = 'restore';
         feedback = comment.status === 'PENDING_REVIEW' ? 'İnceleme iptal edildi, yorum yeniden yayında.' : 'Yorum yeniden yayına alındı.';
       }
 
@@ -210,6 +215,45 @@ export default function AdminClubCommentsPage() {
       alert('Hata oluştu.');
     } finally {
       setActingCommentId(null);
+    }
+  };
+
+  const openDeleteConfirmModal = (e: React.MouseEvent, comment: any) => {
+    e.stopPropagation();
+    setDeleteConfirmComment(comment);
+  };
+
+  const handleExecutePermanentDelete = async () => {
+    if (!deleteConfirmComment) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/club/comments/${deleteConfirmComment.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const altRes = await fetch(`${API_BASE_URL}/admin/club/comments/${deleteConfirmComment.id}/delete`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!altRes.ok) throw new Error('Yorum silinemedi.');
+      }
+
+      showToast('Yorum kalıcı olarak silindi.');
+      setDeleteConfirmComment(null);
+      if (selectedComment?.id === deleteConfirmComment.id) {
+        setSelectedComment(null);
+      }
+      setPostCommentsMap({});
+      fetchGroups();
+    } catch (err) {
+      alert('Yorum silinirken hata oluştu.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -443,6 +487,12 @@ export default function AdminClubCommentsPage() {
                                           >
                                             <AlertCircle className="w-3 h-3" /> İncelemeye Al
                                           </button>
+                                          <button
+                                            onClick={(e) => openDeleteConfirmModal(e, comment)}
+                                            className="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-600/30 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                                          >
+                                            <Trash2 className="w-3 h-3" /> Kalıcı Sil
+                                          </button>
                                         </>
                                       )}
                                     </>
@@ -462,11 +512,55 @@ export default function AdminClubCommentsPage() {
         </div>
       )}
 
+      {/* Confirmation Modal for Permanent Delete */}
+      {deleteConfirmComment && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                <Trash2 className="w-5 h-5" />
+              </span>
+              <h4 className="font-bold text-white text-base font-sans">Yorumu Kalıcı Sil</h4>
+            </div>
+
+            <p className="text-slate-300 font-sans text-xs leading-relaxed">
+              Bu işlem yalnızca seçili yorumu kaldıracaktır. Kullanıcının hesabı, Club üyeliği veya diğer içerikleri etkilenmeyecektir. Silinen yorum tekrar yayına alınamaz.
+            </p>
+
+            <div className="p-3 bg-slate-900/80 border border-white/5 rounded-xl text-[11px] font-sans text-slate-400">
+              <span className="font-bold text-white block mb-0.5">Silinecek Yorum:</span>
+              "{deleteConfirmComment.content}"
+            </div>
+
+            <div className="flex justify-end gap-2 font-sans pt-2">
+              <button
+                onClick={() => setDeleteConfirmComment(null)}
+                disabled={deleting}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={handleExecutePermanentDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Yorumu Kalıcı Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Drawers */}
       <ClubCommentDrawer
         comment={selectedComment}
         isOpen={!!selectedComment}
         onClose={() => setSelectedComment(null)}
+        onDeleteComment={(comment) => {
+          setDeleteConfirmComment(comment);
+        }}
         onRefresh={() => {
           setPostCommentsMap({});
           fetchGroups();

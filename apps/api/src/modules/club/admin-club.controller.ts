@@ -106,6 +106,13 @@ export class AdminClubController {
     return this.clubService.restoreComment(commentId, req.user.id, role);
   }
 
+  @Delete('comments/:commentId')
+  @Post('comments/:commentId/delete')
+  async deleteCommentAdmin(@Param('commentId') commentId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.deleteComment(commentId, req.user.id, role);
+  }
+
   @Post('users/:userId/mute')
   async muteUser(
     @Param('userId') userId: string,
