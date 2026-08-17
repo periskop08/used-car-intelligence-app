@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TURKEY_CITIES, getDistrictsForCity } from "@used-car-intelligence/shared";
+import { TURKEY_CITIES, getDistrictsForCity, resolveHorsepower } from "@used-car-intelligence/shared";
 import { AlertCircle, AlertTriangle } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -238,8 +238,8 @@ export default function CreateListing() {
   const availablePowers = Array.from(
     new Set(
       finalCandidates
-        .map((v) => v.engine?.horsepower || (typeof v.specs?.specs === 'object' ? v.specs?.specs?.enginePower : v.specs?.enginePower))
-        .filter(Boolean)
+        .map((v) => resolveHorsepower(v))
+        .filter(Boolean) as number[]
     )
   );
 
@@ -277,7 +277,7 @@ export default function CreateListing() {
       const disp = exact.engine?.displacement || exact.engine?.displacementCc || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.engineDisplacement : exact.specs?.engineDisplacement);
       if (disp) setEngineDisplacement(String(disp));
 
-      const hp = exact.engine?.horsepower || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.enginePower : exact.specs?.enginePower);
+      const hp = resolveHorsepower(exact);
       if (hp) setEnginePower(String(hp));
 
       const dt = typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.drivetrain : exact.specs?.drivetrain;

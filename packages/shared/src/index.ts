@@ -594,5 +594,6 @@ export * from './utils/validateComparisonSemantics';
 export * from './types/reports';
 export * from './types/vehicle-report';
 export * from './turkeyLocations';
+export * from './utils/resolveHorsepower';
 
 
