@@ -7,6 +7,8 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
   "1.4 FIRE": 95,
   "1.4 T-JET": 120,
   "1.6 MPI": 110,
+  "1.6 ETORQ": 110,
+  "1.6 E-TORQ": 110,
   "1.3 MULTIJET": 95,
   "1.6 MULTIJET": 120,
   "2.0 MULTIJET": 165,
@@ -123,7 +125,7 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
 
 /**
  * Resolves exact Horsepower (HP) for a vehicle variant based on DB specs,
- * engine codes, title strings, and Turkish market canonical lookup tables.
+ * engine codes, title strings, displacement heuristics, and Turkish market lookup tables.
  */
 export function resolveHorsepower(v: any): number | null {
   if (!v) return null;
@@ -146,23 +148,7 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 2. Direct TechnicalSpec JSON check
-  const specsObj = typeof v.specs?.specs === "object" && v.specs?.specs ? v.specs.specs : v.specs;
-  if (specsObj) {
-    const candidatePower = specsObj.enginePower || specsObj.enginePowerHp || specsObj.maxPowerHp || specsObj.horsepower;
-    if (typeof candidatePower === "number" && candidatePower >= 40 && candidatePower <= 1000) {
-      return candidatePower;
-    }
-    if (typeof candidatePower === "string") {
-      const match = candidatePower.match(/(\d{2,3})/);
-      if (match) {
-        const parsed = parseInt(match[1], 10);
-        if (parsed >= 40 && parsed <= 1000) return parsed;
-      }
-    }
-  }
-
-  // 3. Engine code matching with canonical Turkish market HP dictionary
+  // 2. Engine code matching with canonical Turkish market HP dictionary
   const rawCode = (v.engine?.code || v.engine?.name || "").trim().toUpperCase();
   if (rawCode) {
     for (const [key, hp] of Object.entries(CANONICAL_ENGINE_HP_MAP)) {
@@ -181,7 +167,53 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 4. DB Engine horsepower field fallback if between 40 and 1000
+  // 3. Displacement & Fuel Type Heuristics for Common Turkish Market Vehicles
+  const displacement = Number(v.engine?.displacement || v.engine?.displacementCc || (typeof v.specs?.specs === "object" ? v.specs?.specs?.engineDisplacement : v.specs?.engineDisplacement)) || 0;
+  const fuelType = String(v.fuelType || v.engine?.fuelType || "").toUpperCase();
+
+  if (displacement > 0) {
+    if (displacement >= 1580 && displacement <= 1610) {
+      if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 120;
+      return 110; // 1.6 MPI / E-Torq / Petrol -> 110 HP
+    }
+    if (displacement >= 1350 && displacement <= 1380) {
+      return 95; // 1.4 Fire -> 95 HP
+    }
+    if (displacement >= 1230 && displacement <= 1260) {
+      return 95; // 1.3 Multijet -> 95 HP
+    }
+    if (displacement >= 1450 && displacement <= 1475) {
+      return 110; // 1.5 dCi -> 110 HP
+    }
+    if (displacement >= 1180 && displacement <= 1210) {
+      return 130; // 1.2 PureTech / TSI -> 130 HP
+    }
+    if (displacement >= 1485 && displacement <= 1510) {
+      if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 130; // 1.5 BlueHDi -> 130 HP
+      return 150; // 1.5 TSI / EcoBoost -> 150 HP
+    }
+    if (displacement >= 980 && displacement <= 1010) {
+      return 110; // 1.0 TSI / T-GDI -> 110 HP
+    }
+  }
+
+  // 4. Direct TechnicalSpec JSON check
+  const specsObj = typeof v.specs?.specs === "object" && v.specs?.specs ? v.specs.specs : v.specs;
+  if (specsObj) {
+    const candidatePower = specsObj.enginePower || specsObj.enginePowerHp || specsObj.maxPowerHp || specsObj.horsepower;
+    if (typeof candidatePower === "number" && candidatePower >= 40 && candidatePower <= 1000) {
+      return candidatePower;
+    }
+    if (typeof candidatePower === "string") {
+      const match = candidatePower.match(/(\d{2,3})/);
+      if (match) {
+        const parsed = parseInt(match[1], 10);
+        if (parsed >= 40 && parsed <= 1000) return parsed;
+      }
+    }
+  }
+
+  // 5. DB Engine horsepower field fallback if between 40 and 1000
   if (typeof v.engine?.horsepower === "number" && v.engine.horsepower >= 40 && v.engine.horsepower <= 1000) {
     return v.engine.horsepower;
   }
