@@ -247,19 +247,13 @@ export default function CreateListing() {
 
   useEffect(() => {
     if (!useCustomVariant && availableDisplacements.length > 0) {
-      const firstDisp = String(availableDisplacements[0]);
-      if (availableDisplacements.length === 1 || !engineDisplacement || !availableDisplacements.map(String).includes(String(engineDisplacement))) {
-        setEngineDisplacement(firstDisp);
-      }
+      setEngineDisplacement(String(availableDisplacements[0]));
     }
   }, [availableDisplacements, useCustomVariant]);
 
   useEffect(() => {
     if (!useCustomVariant && availablePowers.length > 0) {
-      const firstHp = String(availablePowers[0]);
-      if (availablePowers.length === 1 || !enginePower || !availablePowers.map(String).includes(String(enginePower))) {
-        setEnginePower(firstHp);
-      }
+      setEnginePower(String(availablePowers[0]));
     }
   }, [availablePowers, useCustomVariant]);
 

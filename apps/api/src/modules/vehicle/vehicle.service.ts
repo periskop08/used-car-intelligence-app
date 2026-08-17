@@ -4,6 +4,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
 import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
 import { getFuelTypeTr } from './vehicle-filters.controller';
+import { resolveHorsepower } from '@used-car-intelligence/shared';
 
 
 
@@ -56,7 +57,7 @@ export class VehicleService {
   }
 
   async getVariants(modelId: string) {
-    return this.prisma.vehicleVariant.findMany({
+    const list = await this.prisma.vehicleVariant.findMany({
       where: { modelId, status: ApprovalStatus.APPROVED },
       include: {
         brand: true,
@@ -69,6 +70,20 @@ export class VehicleService {
         specs: true,
       },
       orderBy: { year: 'desc' },
+    });
+
+    return list.map((v) => {
+      const resolvedHp = resolveHorsepower(v);
+      if (resolvedHp && v.engine) {
+        return {
+          ...v,
+          engine: {
+            ...v.engine,
+            horsepower: resolvedHp,
+          },
+        };
+      }
+      return v;
     });
   }
 
