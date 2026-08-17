@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
-import { AlertCircle, Trash2, X, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, Trash2, X, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 
 interface ConfirmModalState {
   isOpen: boolean;
@@ -54,10 +54,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 function SellerDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "past" ? "past" : "active";
+
+  const getInitialTab = (): "active" | "correction" | "past" => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "past") return "past";
+    if (tabParam === "correction") return "correction";
+    return "active";
+  };
 
   // Data states
-  const [activeTab, setActiveTab] = useState<"active" | "past">(initialTab);
+  const [activeTab, setActiveTab] = useState<"active" | "correction" | "past">(getInitialTab());
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
   const [publishWarningModal, setPublishWarningModal] = useState<PublishWarningModalState | null>(null);
   const [deleteDraftModalListing, setDeleteDraftModalListing] = useState<any | null>(null);
@@ -67,17 +73,17 @@ function SellerDashboardContent() {
 
   const [listings, setListings] = useState<any[]>([]);
   const [quota, setQuota] = useState<any>(null);
+  const [hasUnreadCorrection, setHasUnreadCorrection] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
-  const [expandedLeads, setExpandedLeads] = useState<Record<string, boolean>>({});
-  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [promotionModalListing, setPromotionModalListing] = useState<any | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam === "past") setActiveTab("past");
+    else if (tabParam === "correction") setActiveTab("correction");
     else if (tabParam === "active") setActiveTab("active");
   }, [searchParams]);
 
@@ -91,10 +97,21 @@ function SellerDashboardContent() {
       fetch(`${API_URL}/me/listing-quota`, {
         headers: { Authorization: `Bearer ${activeToken}` },
       }).then((res) => res.json()),
+      fetch(`${API_URL}/me/messages`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).then((res) => res.ok ? res.json() : []).catch(() => []),
     ])
-      .then(([listingsData, quotaData]) => {
+      .then(([listingsData, quotaData, messagesData]) => {
         setListings(Array.isArray(listingsData) ? listingsData : []);
         setQuota(quotaData);
+
+        // Check if there are unread correction notifications
+        if (Array.isArray(messagesData)) {
+          const unread = messagesData.some(
+            (m: any) => m.subject?.includes("düzeltme") && (!m.isRead && m.isRead !== true)
+          );
+          setHasUnreadCorrection(unread);
+        }
       })
       .catch((err) => console.error("Error refreshing listings:", err));
   };
@@ -107,7 +124,7 @@ function SellerDashboardContent() {
     }
     setToken(savedToken);
 
-    // Fetch user listings & quota
+    // Fetch user listings & quota & messages
     Promise.all([
       fetch(`${API_URL}/me/listings`, {
         headers: { Authorization: `Bearer ${savedToken}` },
@@ -115,10 +132,19 @@ function SellerDashboardContent() {
       fetch(`${API_URL}/me/listing-quota`, {
         headers: { Authorization: `Bearer ${savedToken}` },
       }).then((res) => res.json()),
+      fetch(`${API_URL}/me/messages`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      }).then((res) => res.ok ? res.json() : []).catch(() => []),
     ])
-      .then(([listingsData, quotaData]) => {
+      .then(([listingsData, quotaData, messagesData]) => {
         setListings(Array.isArray(listingsData) ? listingsData : []);
         setQuota(quotaData);
+        if (Array.isArray(messagesData)) {
+          const unread = messagesData.some(
+            (m: any) => m.subject?.includes("düzeltme") && (!m.isRead && m.isRead !== true)
+          );
+          setHasUnreadCorrection(unread);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -164,33 +190,6 @@ function SellerDashboardContent() {
     } else {
       handleStatusChange(listing.id, targetStatus);
     }
-  };
-
-  const handleRenew = (listingId: string) => {
-    setActionError("");
-    setActionSuccess("");
-
-    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
-
-    fetch(`${API_URL}/listings/${listingId}/renew`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${activeToken}` },
-    })
-      .then((res) => {
-        if (!res.ok) {
-          return res.json().then((err) => {
-            throw new Error(err.message || "İlan yenilenemedi.");
-          });
-        }
-        return res.json();
-      })
-      .then(() => {
-        setActionSuccess("İlanınız başarıyla tekrar aktif edildi!");
-        refreshListings();
-      })
-      .catch((err) => {
-        setActionError(err.message);
-      });
   };
 
   const handleStatusChange = (listingId: string, newStatus: string) => {
@@ -316,49 +315,38 @@ function SellerDashboardContent() {
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
-  const handleSendReply = (listingId: string, leadId: string) => {
-    const textToSend = replyTexts[leadId];
-    if (!textToSend) return;
-
-    setActionError("");
-    setActionSuccess("");
-
-    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
-
-    fetch(`${API_URL}/listings/${listingId}/leads/${leadId}/reply`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${activeToken}`,
-      },
-      body: JSON.stringify({ replyMessage: textToSend }),
-    })
-      .then((res) => {
-        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
-        return res.json();
-      })
-      .then(() => {
-        setActionSuccess("Mesaj yanıtınız başarıyla kaydedildi!");
-        setReplyTexts(prev => ({ ...prev, [leadId]: "" }));
-        refreshListings();
-      })
-      .catch((err) => {
-        setActionError(err.message);
-      });
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
         <span className="animate-spin text-4xl">⏳</span>
-        <span className="text-slate-400 font-bold text-base">Dashboard yükleniyor...</span>
+        <span className="text-slate-400 font-bold text-base font-sans">Dashboard yükleniyor...</span>
       </div>
     );
   }
 
-  const activeListings = listings.filter((l) => ["ACTIVE", "DRAFT", "PENDING_REVIEW", "PASSIVE"].includes(l.status));
+  // Categorize Listings Strictly
+  const correctionListings = listings.filter(
+    (l) =>
+      l.status === "REVISION_REQUIRED" ||
+      (l.status === "PASSIVE" && !!l.rejectionReason) ||
+      (l.status === "PENDING_REVIEW" && !!l.rejectionReason)
+  );
+
+  const activeListings = listings.filter(
+    (l) =>
+      ["ACTIVE", "DRAFT"].includes(l.status) ||
+      (l.status === "PASSIVE" && !l.rejectionReason) ||
+      (l.status === "PENDING_REVIEW" && !l.rejectionReason)
+  );
+
   const pastListings = listings.filter((l) => ["SOLD", "EXPIRED", "REJECTED"].includes(l.status));
-  const displayedListings = activeTab === "past" ? pastListings : activeListings;
+
+  const displayedListings =
+    activeTab === "correction"
+      ? correctionListings
+      : activeTab === "past"
+      ? pastListings
+      : activeListings;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-10">
@@ -366,11 +354,17 @@ function SellerDashboardContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-200 tracking-tight">
-            {activeTab === "past" ? "📜 Geçmiş İlanlarım" : "Satıcı Paneli"}
+            {activeTab === "past"
+              ? "📜 Geçmiş İlanlarım"
+              : activeTab === "correction"
+              ? "⚠️ Düzeltme İstenen İlanlarım"
+              : "Satıcı Paneli"}
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             {activeTab === "past"
               ? "Satıldı veya süresi doldu olarak işaretlenmiş geçmiş araç ilanlarınız."
+              : activeTab === "correction"
+              ? "Moderasyon ekibi tarafından düzeltme talep edilen ve incelemedeki ilanlarınız."
               : "İlanlarınızı, yayın durumlarını ve aktif kota haklarınızı yönetin."}
           </p>
         </div>
@@ -388,7 +382,7 @@ function SellerDashboardContent() {
             <AlertCircle className="w-4 h-4 text-red-400" />
             <span>{actionError}</span>
           </div>
-          <button onClick={() => setActionError("")} className="text-slate-400 hover:text-white">
+          <button onClick={() => setActionError("")} className="text-slate-400 hover:text-white cursor-pointer">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -399,7 +393,7 @@ function SellerDashboardContent() {
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{actionSuccess}</span>
           </div>
-          <button onClick={() => setActionSuccess("")} className="text-slate-400 hover:text-white">
+          <button onClick={() => setActionSuccess("")} className="text-slate-400 hover:text-white cursor-pointer">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -440,10 +434,10 @@ function SellerDashboardContent() {
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+      <div className="flex items-center gap-3 border-b border-white/5 pb-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab("active")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeTab === "active"
               ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
               : "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-slate-200"
@@ -456,8 +450,31 @@ function SellerDashboardContent() {
         </button>
 
         <button
+          onClick={() => {
+            setActiveTab("correction");
+            setHasUnreadCorrection(false);
+          }}
+          className={`relative flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            activeTab === "correction"
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20"
+              : "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-slate-200"
+          }`}
+        >
+          <span>⚠️ DÜZELTME İSTENEN İLANLAR</span>
+          <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black">
+            {correctionListings.length}
+          </span>
+          {hasUnreadCorrection && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-950 rounded-full animate-ping" />
+          )}
+          {hasUnreadCorrection && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 border-2 border-slate-950 rounded-full" />
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab("past")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeTab === "past"
               ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
               : "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-slate-200"
@@ -472,14 +489,20 @@ function SellerDashboardContent() {
 
       {/* Listings List */}
       {displayedListings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-16 bg-slate-900/10 border border-white/5 rounded-3xl gap-4 text-center">
+        <div className="flex flex-col items-center justify-center p-16 bg-slate-900/10 border border-white/5 rounded-3xl gap-4 text-center font-sans">
           <span className="text-5xl">🚗</span>
           <h3 className="text-lg font-bold text-slate-300">
-            {activeTab === "past" ? "Geçmiş ilanınız bulunmuyor" : "Henüz yayınlanmış bir ilanınız yok"}
+            {activeTab === "past"
+              ? "Geçmiş ilanınız bulunmuyor"
+              : activeTab === "correction"
+              ? "Düzeltme istenen ilanınız bulunmuyor."
+              : "Henüz yayınlanmış bir ilanınız yok"}
           </h3>
           <p className="text-xs text-slate-500 max-w-sm">
             {activeTab === "past"
               ? "Satılan veya pasife alınan ilanlarınız burada listelenir."
+              : activeTab === "correction"
+              ? "Moderasyon ekibi tarafından düzeltme istenen herhangi bir ilanınız bulunmamaktadır."
               : "Aracınızı TorqueScout üzerinde binlerce potansiyel alıcıya ulaştırmak için hemen bir ilan oluşturun."}
           </p>
           {activeTab === "active" && (
@@ -496,14 +519,15 @@ function SellerDashboardContent() {
           {displayedListings.map((listing) => {
             const isPublishing = publishingId === listing.id;
             const isDeleting = deletingId === listing.id;
+            const isResubmitted = listing.status === "PENDING_REVIEW" && !!listing.rejectionReason;
 
             return (
               <div
                 key={listing.id}
-                className="flex flex-col bg-slate-900/20 border border-white/5 rounded-3xl overflow-hidden hover:border-white/10 transition"
+                className="flex flex-col bg-slate-900/20 border border-white/5 rounded-3xl overflow-hidden hover:border-white/10 transition p-6 gap-4"
               >
                 {/* Main Row */}
-                <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   {/* Thumbnail & Info */}
                   <div className="flex items-center gap-5 flex-1 min-w-0">
                     <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 flex-shrink-0 border border-white/5">
@@ -524,12 +548,14 @@ function SellerDashboardContent() {
                         {listing.isUrgent && <UrgentListingBadge size="small" />}
                         <span
                           className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                            listing.status === "ACTIVE"
+                            isResubmitted
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                              : listing.status === "REVISION_REQUIRED" || listing.rejectionReason
+                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                              : listing.status === "ACTIVE"
                               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                               : listing.status === "DRAFT"
                               ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                              : listing.status === "PENDING_REVIEW"
-                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                               : listing.status === "PASSIVE"
                               ? "bg-slate-700/40 text-slate-400 border border-white/10"
                               : listing.status === "SOLD"
@@ -537,7 +563,11 @@ function SellerDashboardContent() {
                               : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                           }`}
                         >
-                          {listing.status === "ACTIVE"
+                          {isResubmitted
+                            ? "TEKRAR İNCELEMEDE"
+                            : listing.status === "REVISION_REQUIRED" || listing.rejectionReason
+                            ? "DÜZELTME İSTENİYOR"
+                            : listing.status === "ACTIVE"
                             ? "AKTİF"
                             : listing.status === "DRAFT"
                             ? "TASLAK (DRAFT)"
@@ -593,7 +623,8 @@ function SellerDashboardContent() {
                       </button>
                     )}
 
-                    {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
+                    {/* Show Yayınla only for DRAFT / REJECTED when NOT in correction flow */}
+                    {(listing.status === "DRAFT" || listing.status === "REJECTED") && !listing.rejectionReason && (
                       <button
                         onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
                         disabled={isPublishing || isDeleting}
@@ -643,6 +674,19 @@ function SellerDashboardContent() {
                     )}
                   </div>
                 </div>
+
+                {/* Moderation Reason Banner on Card */}
+                {listing.rejectionReason && (
+                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col gap-1 font-sans text-xs">
+                    <span className="font-bold text-rose-400 flex items-center gap-1.5 text-xs">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      Düzeltme Nedeni:
+                    </span>
+                    <p className="text-slate-200 font-mono text-[11px] bg-slate-950/50 p-2.5 rounded-xl border border-white/5 leading-relaxed">
+                      {listing.rejectionReason}
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}

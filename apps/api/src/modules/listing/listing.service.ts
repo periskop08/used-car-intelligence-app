@@ -323,6 +323,23 @@ export class ListingService {
     });
   }
 
+  // Seller resubmit correction listing for moderation review
+  async resubmitListingForReview(id: string, userId: string) {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+    });
+
+    if (!listing) throw new NotFoundException('İlan bulunamadı.');
+    if (listing.sellerId !== userId) throw new ForbiddenException('Bu işlem için yetkiniz yok.');
+
+    return this.prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        status: ListingStatus.PENDING_REVIEW,
+      },
+    });
+  }
+
   // Add media and enforce rules
   async addMedia(id: string, userId: string, file: { buffer: Buffer; size: number; mimetype: string }) {
     const listing = await this.prisma.vehicleListing.findUnique({

@@ -496,7 +496,10 @@ export class ListingModerationService implements OnModuleInit {
 
     const updated = await this.prisma.vehicleListing.update({
       where: { id: listingId },
-      data: { status: 'REVISION_REQUIRED' as any },
+      data: {
+        status: 'REVISION_REQUIRED' as any,
+        rejectionReason: sellerMessage,
+      },
     });
 
     try {
@@ -512,7 +515,23 @@ export class ListingModerationService implements OnModuleInit {
           sellerMessage: sellerMessage || null,
           internalNote: internalNote || null,
           emailStatus: 'SENT',
-          notificationStatus: 'SENT',
+          notificationStatus: 'UNREAD',
+        },
+      });
+    } catch (e) {
+      // fallback
+    }
+
+    try {
+      await this.prisma.adminUserMessage.create({
+        data: {
+          userId: l.sellerId,
+          createdByAdminId: adminUser?.id || 'system-moderator',
+          adminEmail: adminUser?.email || 'moderation@torquescout.com',
+          subject: 'İlanınız için düzeltme gerekiyor',
+          message: `"${l.title}" ilanınız moderasyon ekibi tarafından düzeltme için geçici olarak yayından kaldırıldı.\n\nDüzeltme Nedeni: ${sellerMessage}`,
+          sendInApp: true,
+          sendEmail: true,
         },
       });
     } catch (e) {

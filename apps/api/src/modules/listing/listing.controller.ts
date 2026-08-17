@@ -770,6 +770,17 @@ export class ListingController {
     return this.listingService.deleteDraftListing(id, user.id);
   }
 
+  @Post('listings/:id/resubmit')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Düzeltilen ilanı tekrar moderasyon incelemesine gönder' })
+  async resubmitListingForReview(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.listingService.resubmitListingForReview(id, user.id);
+  }
+
   @Post('listings/:id/media')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
