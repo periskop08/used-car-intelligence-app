@@ -66,6 +66,7 @@ export class VehicleService {
         transmission: true,
         trim: true,
         country: true,
+        specs: true,
       },
       orderBy: { year: 'desc' },
     });

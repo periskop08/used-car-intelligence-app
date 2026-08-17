@@ -227,6 +227,34 @@ export default function CreateListing() {
       )
     : trimCandidates;
 
+  const availableDisplacements = Array.from(
+    new Set(
+      finalCandidates
+        .map((v) => v.engine?.displacementCc || v.specs?.engineDisplacement)
+        .filter(Boolean)
+    )
+  );
+
+  const availablePowers = Array.from(
+    new Set(
+      finalCandidates
+        .map((v) => v.specs?.enginePower || (v.engine?.name?.match(/(\d+)\s*hp/i)?.[1]))
+        .filter(Boolean)
+    )
+  );
+
+  useEffect(() => {
+    if (!useCustomVariant && availableDisplacements.length === 1 && !engineDisplacement) {
+      setEngineDisplacement(String(availableDisplacements[0]));
+    }
+  }, [availableDisplacements, engineDisplacement, useCustomVariant]);
+
+  useEffect(() => {
+    if (!useCustomVariant && availablePowers.length === 1 && !enginePower) {
+      setEnginePower(String(availablePowers[0]));
+    }
+  }, [availablePowers, enginePower, useCustomVariant]);
+
   // Exact Variant Resolution Effect
   useEffect(() => {
     if (useCustomVariant) return;
@@ -893,23 +921,49 @@ export default function CreateListing() {
             <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
-                <input
-                  type="number"
-                  value={engineDisplacement}
-                  onChange={(e) => setEngineDisplacement(e.target.value)}
-                  placeholder="Örn: 1598"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                {!useCustomVariant && availableDisplacements.length > 0 ? (
+                  <select
+                    value={engineDisplacement}
+                    onChange={(e) => setEngineDisplacement(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  >
+                    <option value="">Motor Hacmi Seçiniz...</option>
+                    {availableDisplacements.map((disp) => (
+                      <option key={disp} value={String(disp)}>{disp} cc</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    value={engineDisplacement}
+                    onChange={(e) => setEngineDisplacement(e.target.value)}
+                    placeholder="Örn: 1598"
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
-                <input
-                  type="number"
-                  value={enginePower}
-                  onChange={(e) => setEnginePower(e.target.value)}
-                  placeholder="Örn: 110"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                {!useCustomVariant && availablePowers.length > 0 ? (
+                  <select
+                    value={enginePower}
+                    onChange={(e) => setEnginePower(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  >
+                    <option value="">Motor Gücü Seçiniz...</option>
+                    {availablePowers.map((hp) => (
+                      <option key={hp} value={String(hp)}>{hp} HP</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="number"
+                    value={enginePower}
+                    onChange={(e) => setEnginePower(e.target.value)}
+                    placeholder="Örn: 110"
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
