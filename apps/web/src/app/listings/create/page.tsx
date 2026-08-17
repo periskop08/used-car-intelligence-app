@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TURKEY_CITIES, getDistrictsForCity } from "@used-car-intelligence/shared";
+import { AlertCircle, AlertTriangle } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -10,6 +12,29 @@ const PAINTED_COMPONENTS = [
   "LEFT_FRONT_DOOR", "LEFT_REAR_DOOR", "RIGHT_FRONT_DOOR", "RIGHT_REAR_DOOR",
   "LEFT_FRONT_FENDER", "LEFT_REAR_FENDER", "RIGHT_FRONT_FENDER", "RIGHT_REAR_FENDER"
 ];
+
+const BODY_TYPE_LABELS: Record<string, string> = {
+  SEDAN: "Sedan",
+  HATCHBACK: "Hatchback",
+  SUV: "SUV",
+  COUPE: "Coupe",
+  CABRIO: "Cabrio / Convertible",
+  STATION_WAGON: "Station Wagon",
+  MINIVAN: "Minivan / MPV",
+  PICKUP: "Pick-up",
+  VAN: "Panelvan / Minibüs"
+};
+
+const formatNumberInput = (val: string | number) => {
+  if (val === "" || val === undefined || val === null) return "";
+  const numStr = String(val).replace(/\D/g, "");
+  if (!numStr) return "";
+  return parseInt(numStr, 10).toLocaleString("tr-TR");
+};
+
+const parseNumberInput = (val: string): string => {
+  return val.replace(/\D/g, "");
+};
 
 import QuotaBadge from "@/components/QuotaBadge";
 import ListingPromotionCards, { PromotionSku } from "@/components/listings/ListingPromotionCards";
@@ -30,19 +55,25 @@ export default function CreateListing() {
   const [paymentRecoveryOpen, setPaymentRecoveryOpen] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
-  // Step 1: Vehicle & Variant selection
+  // Step 1: Vehicle selection (Marka, Model, Yıl)
   const [brands, setBrands] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedVariant, setSelectedVariant] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState(""); // Exact vehicleVariantId
 
   // Custom details fallback if variant doesn't exist
   const [useCustomVariant, setUseCustomVariant] = useState(false);
   const [customBrand, setCustomBrand] = useState("");
   const [customModel, setCustomModel] = useState("");
   const [customYear, setCustomYear] = useState("");
+
+  // Step 2: Canonical Vehicle Attributes
+  const [selectedBodyType, setSelectedBodyType] = useState("");
+  const [selectedTrim, setSelectedTrim] = useState("");
+  const [selectedEngineVariant, setSelectedEngineVariant] = useState("");
 
   // Step 2: Basic Details
   const [title, setTitle] = useState("");
@@ -102,31 +133,125 @@ export default function CreateListing() {
       .catch((e) => console.error("Error fetching brands:", e));
   }, []);
 
-  // Fetch models
+  // Fetch models on Brand change
   useEffect(() => {
+    setSelectedModel("");
+    setSelectedYear("");
+    setVariants([]);
+    setSelectedVariant("");
+    setSelectedBodyType("");
+    setSelectedTrim("");
+    setSelectedEngineVariant("");
+
     if (!selectedBrand) {
       setModels([]);
-      setSelectedModel("");
       return;
     }
+
     fetch(`${API_URL}/vehicles/models?brandId=${selectedBrand}`)
       .then((res) => res.json())
       .then((data) => setModels(Array.isArray(data) ? data : []))
       .catch((e) => console.error("Error fetching models:", e));
   }, [selectedBrand]);
 
-  // Fetch variants
+  // Fetch variants on Model change
   useEffect(() => {
+    setSelectedYear("");
+    setSelectedVariant("");
+    setSelectedBodyType("");
+    setSelectedTrim("");
+    setSelectedEngineVariant("");
+
     if (!selectedModel) {
       setVariants([]);
-      setSelectedVariant("");
       return;
     }
+
     fetch(`${API_URL}/vehicles/variants?modelId=${selectedModel}`)
       .then((res) => res.json())
       .then((data) => setVariants(Array.isArray(data) ? data : []))
       .catch((e) => console.error("Error fetching variants:", e));
   }, [selectedModel]);
+
+  // Compute available years from variants
+  const availableYears = Array.from(
+    new Set(variants.map((v) => v.year).filter(Boolean))
+  ).sort((a, b) => Number(b) - Number(a));
+
+  // Step 2 Candidates Filtering
+  const yearCandidates = variants.filter(
+    (v) => String(v.year) === String(selectedYear)
+  );
+
+  const availableBodyTypes = Array.from(
+    new Set(yearCandidates.map((v) => v.bodyType || "SEDAN").filter(Boolean))
+  );
+
+  useEffect(() => {
+    if (availableBodyTypes.length === 1 && !selectedBodyType) {
+      setSelectedBodyType(availableBodyTypes[0]);
+    }
+  }, [availableBodyTypes, selectedBodyType]);
+
+  const bodyCandidates = yearCandidates.filter(
+    (v) => (v.bodyType || "SEDAN") === selectedBodyType
+  );
+
+  const availableTrims = Array.from(
+    new Set(bodyCandidates.map((v) => v.trim?.name).filter(Boolean))
+  );
+
+  useEffect(() => {
+    if (availableTrims.length === 1 && !selectedTrim) {
+      setSelectedTrim(availableTrims[0]);
+    }
+  }, [availableTrims, selectedTrim]);
+
+  const trimCandidates = bodyCandidates.filter(
+    (v) => !selectedTrim || v.trim?.name === selectedTrim
+  );
+
+  const availableEngineVariants = Array.from(
+    new Set(
+      trimCandidates
+        .map((v) => `${v.engine?.code || v.engine?.name || ""} (${v.transmission?.name || ""})`.trim())
+        .filter(Boolean)
+    )
+  );
+
+  const finalCandidates = selectedEngineVariant
+    ? trimCandidates.filter(
+        (v) =>
+          `${v.engine?.code || v.engine?.name || ""} (${v.transmission?.name || ""})`.trim() ===
+          selectedEngineVariant
+      )
+    : trimCandidates;
+
+  // Exact Variant Resolution Effect
+  useEffect(() => {
+    if (useCustomVariant) return;
+
+    if (finalCandidates.length === 1) {
+      const exact = finalCandidates[0];
+      setSelectedVariant(exact.id);
+
+      // Auto populate / sync technical fields
+      if (exact.fuelType) setFuelType(exact.fuelType);
+      if (exact.transmission?.type) setTransmission(exact.transmission.type);
+      if (exact.bodyType) setBodyType(exact.bodyType);
+
+      const disp = exact.engine?.displacementCc || exact.specs?.engineDisplacement;
+      if (disp) setEngineDisplacement(String(disp));
+
+      const hp = exact.specs?.enginePower;
+      if (hp) setEnginePower(String(hp));
+
+      const dt = exact.specs?.drivetrain;
+      if (dt) setDrivetrain(dt);
+    } else {
+      setSelectedVariant("");
+    }
+  }, [finalCandidates, useCustomVariant]);
 
   // Fetch quota info when arriving at Step 5
   useEffect(() => {
@@ -144,6 +269,69 @@ export default function CreateListing() {
     }
   }, [step, token]);
 
+  // State to hold temporary listing ID created during photo upload
+  const [createdListingId, setCreatedListingId] = useState<string | null>(null);
+
+  const createDraftListingOrGetId = async (): Promise<string> => {
+    if (createdListingId) return createdListingId;
+
+    const parsedPrice = parseNumberInput(priceAmount);
+    const parsedKm = parseNumberInput(kilometers);
+
+    const brandObj = brands.find((b) => b.id === selectedBrand);
+    const modelObj = models.find((m) => m.id === selectedModel);
+
+    const draftPayload = {
+      title: title || `${brandObj?.name || customBrand} ${modelObj?.name || customModel}`,
+      description: description || "Henüz açıklama girilmedi.",
+      priceAmount: parsedPrice ? parseFloat(parsedPrice) : 0,
+      currency: "TRY",
+      countryCode: "TR",
+      city: city || "İstanbul",
+      district: district || "Kadıköy",
+      modelYear: parseInt(selectedYear || customYear || "2020", 10),
+      kilometers: parsedKm ? parseInt(parsedKm, 10) : 0,
+      fuelType,
+      transmission,
+      bodyType: selectedBodyType || bodyType,
+      color: color || "Belirtilmedi",
+      vehicleStatus,
+      hasWarranty,
+      heavyDamage,
+      plateType,
+      sellerType,
+      exchangeable,
+      engineDisplacement: engineDisplacement ? parseInt(engineDisplacement, 10) : null,
+      enginePower: enginePower ? parseInt(enginePower, 10) : null,
+      drivetrain,
+      damageRecord,
+      tramerAmount: parseInt(tramerAmount, 10) || 0,
+      paintedParts,
+      changedParts,
+      localPaintedParts,
+      maintenanceHistory,
+      vehicleVariantId: !useCustomVariant ? selectedVariant : null,
+    };
+
+    const res = await fetch(`${API_URL}/listings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(draftPayload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Taslak oluşturulamadı.");
+    }
+
+    const created = await res.json();
+    setCreatedListingId(created.id);
+    return created.id;
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMediaError("");
     const file = e.target.files?.[0];
@@ -159,131 +347,44 @@ export default function CreateListing() {
       return;
     }
 
-    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedMimeTypes.includes(file.type)) {
-      setMediaError("Desteklenen formatlar JPEG, PNG ve WebP'dir.");
-      return;
-    }
-
     setUploading(true);
-    // Mimic R2/S3 upload in NestJS server, using multipart/form-data
     const formData = new FormData();
     formData.append("file", file);
 
-    // Create a temporary listing record in background first if not created yet,
-    // or upload to a temporary handler. For simplicity, we create a draft listing on first photo upload.
-    // If no listing exists yet, we create a basic draft first.
-    createDraftListingOrGetId().then((listingId) => {
-      fetch(`${API_URL}/listings/${listingId}/media`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-        .then((res) => {
-          if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
-          return res.json();
-        })
-        .then((mediaRecord) => {
-          setUploadedPhotos((prev) => [...prev, mediaRecord]);
-          setUploading(false);
-        })
-        .catch((err) => {
-          setMediaError(`Yükleme hatası: ${err.message}`);
-          setUploading(false);
+    createDraftListingOrGetId()
+      .then((listingId) => {
+        return fetch(`${API_URL}/listings/${listingId}/media`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
         });
-    });
+      })
+      .then((res) => {
+        if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
+        return res.json();
+      })
+      .then((mediaRecord) => {
+        setUploadedPhotos((prev) => [...prev, mediaRecord]);
+        setUploading(false);
+      })
+      .catch((err) => {
+        setMediaError(err.message || "Fotoğraf yüklenirken bir hata oluştu.");
+        setUploading(false);
+      });
   };
 
-  const deletePhoto = (mediaId: string, listingId: string) => {
-    fetch(`${API_URL}/listings/${listingId}/media/${mediaId}`, {
+  const handleDeletePhoto = (mediaId: string) => {
+    if (!createdListingId) return;
+    fetch(`${API_URL}/listings/${createdListingId}/media/${mediaId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Silinemedi.");
-        setUploadedPhotos((prev) => prev.filter((photo) => photo.id !== mediaId));
+        if (res.ok) {
+          setUploadedPhotos((prev) => prev.filter((p) => p.id !== mediaId));
+        }
       })
-      .catch((err) => setMediaError(err.message));
-  };
-
-  // State to hold temporary listing ID created during photo upload
-  const [createdListingId, setCreatedListingId] = useState<string | null>(null);
-
-  const createDraftListingOrGetId = async (): Promise<string> => {
-    if (createdListingId) return createdListingId;
-
-    // Create a barebones draft listing
-    const response = await fetch(`${API_URL}/listings`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: title || "Yeni Araç İlanı",
-        priceAmount: Number(priceAmount) || 0,
-        city: city || "Belirtilmedi",
-        modelYear: Number(customYear) || 2020,
-        kilometers: Number(kilometers) || 0,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Geçici ilan kaydı oluşturulamadı.");
-    }
-    const data = await response.json();
-    setCreatedListingId(data.id);
-    return data.id;
-  };
-
-  const [hoveredPart, setHoveredPart] = useState("");
-
-  const PART_LABELS: Record<string, string> = {
-    FRONT_BUMPER: "Ön Tampon",
-    LEFT_FRONT_FENDER: "Sol Ön Çamurluk",
-    HOOD: "Kaput (Motor Kaputu)",
-    RIGHT_FRONT_FENDER: "Sağ Ön Çamurluk",
-    LEFT_FRONT_DOOR: "Sol Ön Kapı",
-    ROOF: "Tavan",
-    RIGHT_FRONT_DOOR: "Sağ Ön Kapı",
-    LEFT_REAR_DOOR: "Sol Arka Kapı",
-    RIGHT_REAR_DOOR: "Sağ Arka Kapı",
-    LEFT_REAR_FENDER: "Sol Arka Çamurluk",
-    TRUNK: "Bagaj Kapağı",
-    RIGHT_REAR_FENDER: "Sağ Arka Çamurluk",
-    REAR_BUMPER: "Arka Tampon"
-  };
-
-  const getPartColorClass = (partKey: string) => {
-    if (changedParts.includes(partKey)) {
-      return "fill-red-500/25 stroke-red-500/50 hover:fill-red-500/40";
-    }
-    if (paintedParts.includes(partKey)) {
-      return "fill-blue-500/25 stroke-blue-500/50 hover:fill-blue-500/40";
-    }
-    if (localPaintedParts.includes(partKey)) {
-      return "fill-orange-500/25 stroke-orange-500/50 hover:fill-orange-500/40";
-    }
-    return "fill-slate-900/50 stroke-white/10 hover:fill-slate-800/60";
-  };
-
-  const handlePartClick = (part: string) => {
-    let current = "ORIGINAL";
-    if (changedParts.includes(part)) current = "CHANGED";
-    else if (paintedParts.includes(part)) current = "PAINTED";
-    else if (localPaintedParts.includes(part)) current = "LOCAL_PAINTED";
-
-    if (current === "ORIGINAL") {
-      setLocalPaintedParts((prev) => [...prev, part]);
-    } else if (current === "LOCAL_PAINTED") {
-      setLocalPaintedParts((prev) => prev.filter((x) => x !== part));
-      setPaintedParts((prev) => [...prev, part]);
-    } else if (current === "PAINTED") {
-      setPaintedParts((prev) => prev.filter((x) => x !== part));
-      setChangedParts((prev) => [...prev, part]);
-    } else if (current === "CHANGED") {
-      setChangedParts((prev) => prev.filter((x) => x !== part));
-    }
+      .catch((e) => console.error("Error deleting photo:", e));
   };
 
   const handleTogglePart = (part: string, type: "painted" | "changed") => {
@@ -296,43 +397,37 @@ export default function CreateListing() {
     }
   };
 
-  const handleSaveAndPublish = (asDraft: boolean) => {
+  const handleFinalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     setErrorMsg("");
+
+    if (!responsibilityAccepted) {
+      setErrorMsg("Lütfen ilan yayınlama kurallarını ve sorumluluk beyanını kabul edin.");
+      return;
+    }
+
     setSaving(true);
 
-    if (!asDraft && !responsibilityAccepted) {
-      setErrorMsg("Yayınlamak için sorumluluk onay kutusunu işaretlemelisiniz.");
-      setSaving(false);
-      return;
-    }
+    const parsedPrice = parseNumberInput(priceAmount);
+    const parsedKm = parseNumberInput(kilometers);
 
-    if (!asDraft && selectedPromotionSku && !promotionTermsAccepted) {
-      setErrorMsg("Seçtiğiniz promosyon hizmetini satın almak için ek hizmet onay kutusunu kabul etmeniz gerekmektedir.");
-      setSaving(false);
-      return;
-    }
+    const brandObj = brands.find((b) => b.id === selectedBrand);
+    const modelObj = models.find((m) => m.id === selectedModel);
 
     const payload = {
       title,
       description,
-      priceAmount: parseFloat(priceAmount),
-      kilometers: parseInt(kilometers, 10),
+      priceAmount: parseFloat(parsedPrice) || 0,
+      currency: "TRY",
+      countryCode: "TR",
       city,
       district,
+      modelYear: parseInt(selectedYear || customYear, 10),
+      kilometers: parseInt(parsedKm, 10) || 0,
       fuelType,
       transmission,
-      bodyType,
+      bodyType: selectedBodyType || bodyType,
       color,
-      tramerAmount: parseInt(tramerAmount, 10),
-      damageRecord,
-      paintedParts,
-      changedParts,
-      localPaintedParts,
-      maintenanceHistory,
-      vehicleVariantId: useCustomVariant ? null : selectedVariant || null,
-      customBrand: useCustomVariant ? customBrand : null,
-      customModel: useCustomVariant ? customModel : null,
-      customYear: useCustomVariant ? parseInt(customYear, 10) : null,
       vehicleStatus,
       hasWarranty,
       heavyDamage,
@@ -342,125 +437,124 @@ export default function CreateListing() {
       engineDisplacement: engineDisplacement ? parseInt(engineDisplacement, 10) : null,
       enginePower: enginePower ? parseInt(enginePower, 10) : null,
       drivetrain,
+      damageRecord,
+      tramerAmount: parseInt(tramerAmount, 10) || 0,
+      paintedParts,
+      changedParts,
+      localPaintedParts,
+      maintenanceHistory,
+      vehicleVariantId: !useCustomVariant ? selectedVariant : null,
+      customBrand: useCustomVariant ? customBrand : undefined,
+      customModel: useCustomVariant ? customModel : undefined,
+      customYear: useCustomVariant ? parseInt(customYear, 10) : undefined,
     };
 
-    createDraftListingOrGetId().then((listingId) => {
-      // 1. Update listing details
-      fetch(`${API_URL}/listings/${listingId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-        .then((res) => {
-          if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
-          return res.json();
+    const savePromise = createdListingId
+      ? fetch(`${API_URL}/listings/${createdListingId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
         })
-        .then(async () => {
-          if (asDraft) {
-            router.push("/dashboard/listings");
-          } else {
-            // If Promotion SKU is selected, run quote & checkout first
-            if (selectedPromotionSku) {
-              try {
-                const quoteRes = await fetch(`${API_URL}/listing-promotions/quotes`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    listingId,
-                    productSku: selectedPromotionSku,
-                  }),
-                });
-                const quoteData = await quoteRes.json();
-                if (!quoteRes.ok) throw new Error(quoteData.message || "Promosyon teklifi alınamadı.");
-
-                const idempotencyKey = `chk_${listingId}_${selectedPromotionSku}_${Date.now()}`;
-                const checkoutRes = await fetch(`${API_URL}/listing-promotions/checkout/${listingId}`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    quoteId: quoteData.quoteId,
-                    idempotencyKey,
-                    termsAccepted: true,
-                    termsVersion: quoteData.termsVersion || "v1",
-                    entryPoint: "LISTING_CREATE_STEP_5",
-                  }),
-                });
-                const checkoutData = await checkoutRes.json();
-                if (!checkoutRes.ok) throw new Error(checkoutData.message || "Ödeme checkout işlemi başlatılamadı.");
-
-                const mockRes = await fetch(`${API_URL}/listing-promotions/webhooks/mock`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    eventType: "payment.success",
-                    purchaseId: checkoutData.purchaseId,
-                    paymentReferenceId: `PAY_${checkoutData.purchaseId}`,
-                  }),
-                });
-                if (!mockRes.ok) throw new Error("Ödeme doğrulaması tamamlanamadı.");
-              } catch (checkoutErr: any) {
-                setPaymentError(checkoutErr.message || "Ödeme checkout işlemi başarısız.");
-                setPaymentRecoveryOpen(true);
-                setSaving(false);
-                return;
-              }
-            }
-
-            // 2. Publish (Transition status to PENDING_REVIEW)
-            fetch(`${API_URL}/listings/${listingId}/status`, {
-              method: "PATCH",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ status: "PENDING_REVIEW" }),
-            })
-              .then((res) => {
-                if (!res.ok) return res.json().then((err) => { throw new Error(err.message); });
-                return res.json();
-              })
-              .then(() => {
-                router.push("/dashboard/listings");
-              })
-              .catch((err) => {
-                setErrorMsg(err.message);
-                setSaving(false);
-              });
-          }
-        })
-        .catch((err) => {
-          setErrorMsg(err.message);
-          setSaving(false);
+      : fetch(`${API_URL}/listings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
         });
-    });
+
+    savePromise
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((err) => {
+            throw new Error(err.message || "İlan kaydedilemedi.");
+          });
+        }
+        return res.json();
+      })
+      .then((listing) => {
+        return fetch(`${API_URL}/listings/${listing.id}/status`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: "PENDING_REVIEW" }),
+        }).then((res) => {
+          if (!res.ok) {
+            return res.json().then((err) => {
+              throw new Error(err.message || "İlan incelemeye gönderilemedi.");
+            });
+          }
+          return listing;
+        });
+      })
+      .then((listing) => {
+        if (selectedPromotionSku) {
+          return fetch(`${API_URL}/listing-promotions/purchase`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              listingId: listing.id,
+              sku: selectedPromotionSku,
+              termsAccepted: true,
+            }),
+          })
+            .then((res) => res.json())
+            .then((purchaseRes) => {
+              setSaving(false);
+              router.push(purchaseRes.redirectUrl || "/dashboard/listings?tab=active");
+            })
+            .catch(() => {
+              setSaving(false);
+              router.push("/dashboard/listings?tab=active");
+            });
+        } else {
+          setSaving(false);
+          router.push("/dashboard/listings?tab=active");
+        }
+      })
+      .catch((err) => {
+        setErrorMsg(err.message || "İlan oluşturulurken bir hata oluştu.");
+        setSaving(false);
+      });
   };
 
-  return (
-    <div className="w-full max-w-3xl mx-auto px-6 py-12 flex flex-col gap-8">
-      <QuotaBadge feature="activeListings" />
+  const handleCityChange = (newCity: string) => {
+    setCity(newCity);
+    setDistrict(""); // Reset district when city changes
+  };
 
-      {/* Step Indicator Header */}
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-black text-slate-200">Araç İlanı Ekle</h1>
-        <div className="flex items-center gap-2 w-full bg-slate-950/40 p-1.5 rounded-full border border-white/5">
+  const availableDistricts = getDistrictsForCity(city);
+
+  return (
+    <div className="w-full max-w-4xl mx-auto px-6 py-12 flex flex-col gap-8 font-sans">
+      {/* Page Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-200 tracking-tight">➕ Yeni İlan Ver</h1>
+          <p className="text-sm text-slate-400 mt-1">Aracınızı TorqueScout ilan ağına ekleyin.</p>
+        </div>
+        <QuotaBadge feature="activeListings" />
+      </div>
+
+      {/* Step Progress Bar */}
+      <div className="flex items-center justify-between bg-slate-900/30 border border-white/5 p-4 rounded-2xl">
+        <div className="grid grid-cols-5 gap-2 w-full">
           {[1, 2, 3, 4, 5].map((s) => (
             <div
               key={s}
-              className={`flex-1 text-center text-[10px] font-bold py-1.5 rounded-full transition ${
-                step === s ? "bg-orange-600 text-white shadow" : "text-slate-500"
+              className={`h-2 rounded-full transition-all duration-300 ${
+                s <= step ? "bg-orange-500" : "bg-slate-800"
               }`}
-            >
-              Adım {s}
-            </div>
+            />
           ))}
         </div>
       </div>
@@ -468,8 +562,8 @@ export default function CreateListing() {
       {/* STEP 1: Select Vehicle / Variant */}
       {step === 1 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
-          <h2 className="text-lg font-bold text-slate-200">🚗 Adım 1: Araç Varyant Seçimi</h2>
-          <p className="text-xs text-slate-400">Aracınızın teknik özelliklerinin ve varyant analizlerinin eşleşmesi için varyant seçiniz.</p>
+          <h2 className="text-lg font-bold text-slate-200">🚗 Adım 1: Araç Seçimi</h2>
+          <p className="text-xs text-slate-400">Aracınızın veritabanı kaydına bağlanabilmesi için Marka, Model ve Model Yılı seçiniz.</p>
 
           <div className="flex items-center gap-2 cursor-pointer bg-slate-900/40 p-4 rounded-xl border border-white/5">
             <input
@@ -506,7 +600,7 @@ export default function CreateListing() {
                   value={selectedModel}
                   disabled={!selectedBrand}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
                 >
                   <option value="">Seçiniz...</option>
                   {models.map((m) => (
@@ -516,18 +610,16 @@ export default function CreateListing() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Varyant (Motor/Şanzıman)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
                 <select
-                  value={selectedVariant}
-                  disabled={!selectedModel}
-                  onChange={(e) => setSelectedVariant(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  value={selectedYear}
+                  disabled={!selectedModel || availableYears.length === 0}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
                 >
                   <option value="">Seçiniz...</option>
-                  {variants.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.year} - {v.engine.code} - {v.transmission.name} ({v.trim.name})
-                    </option>
+                  {availableYears.map((y) => (
+                    <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
               </div>
@@ -570,8 +662,8 @@ export default function CreateListing() {
 
           <button
             onClick={() => setStep(2)}
-            disabled={!useCustomVariant ? !selectedVariant : !customBrand || !customModel || !customYear}
-            className="w-full mt-4 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition"
+            disabled={!useCustomVariant ? (!selectedBrand || !selectedModel || !selectedYear) : (!customBrand || !customModel || !customYear)}
+            className="w-full mt-4 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
           >
             Devam Et
           </button>
@@ -583,6 +675,74 @@ export default function CreateListing() {
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
           <h2 className="text-lg font-bold text-slate-200">📝 Adım 2: İlan Detayları</h2>
 
+          {!useCustomVariant && (
+            <div className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col gap-3">
+              <span className="text-xs font-bold text-orange-400">🚗 Seçilen Araç Kombinasyonu:</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
+                  <select
+                    value={selectedBodyType}
+                    onChange={(e) => setSelectedBodyType(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  >
+                    <option value="">Kasa Tipi Seçiniz...</option>
+                    {availableBodyTypes.map((bt) => (
+                      <option key={bt} value={bt}>{BODY_TYPE_LABELS[bt] || bt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
+                  <select
+                    value={selectedTrim}
+                    onChange={(e) => setSelectedTrim(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  >
+                    <option value="">Donanım Paketi Seçiniz...</option>
+                    {availableTrims.map((tr) => (
+                      <option key={tr} value={tr}>{tr}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {availableEngineVariants.length > 1 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
+                  <select
+                    value={selectedEngineVariant}
+                    onChange={(e) => setSelectedEngineVariant(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  >
+                    <option value="">Motor Versiyonu Seçiniz...</option>
+                    {availableEngineVariants.map((ev) => (
+                      <option key={ev} value={ev}>{ev}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Match Resolution Banner */}
+              {finalCandidates.length === 0 ? (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                  <span>Seçilen araç kombinasyonu araç veritabanıyla eşleştirilemedi. Lütfen araç bilgilerini kontrol edin.</span>
+                </div>
+              ) : finalCandidates.length === 1 ? (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: (ID: {finalCandidates[0].id.slice(0, 8)}...)</span>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <span>ℹ️ Tam araç eşleşmesi için lütfen Donanım Paketi / Motor Versiyonunu seçiniz ({finalCandidates.length} aday eşleşti).</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase">İlan Başlığı</label>
@@ -590,7 +750,7 @@ export default function CreateListing() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Örn: Hatasız Düşük Kilometreli Egea"
+                placeholder="Örn: Hatasız Düşük Kilometreli Araç"
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
               />
             </div>
@@ -599,45 +759,54 @@ export default function CreateListing() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Fiyat (TL)</label>
                 <input
-                  type="number"
-                  value={priceAmount}
-                  onChange={(e) => setPriceAmount(e.target.value)}
-                  placeholder="Örn: 750000"
+                  type="text"
+                  value={formatNumberInput(priceAmount)}
+                  onChange={(e) => setPriceAmount(parseNumberInput(e.target.value))}
+                  placeholder="Örn: 1.000.000"
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Kilometre</label>
                 <input
-                  type="number"
-                  value={kilometers}
-                  onChange={(e) => setKilometers(e.target.value)}
-                  placeholder="Örn: 85000"
+                  type="text"
+                  value={formatNumberInput(kilometers)}
+                  onChange={(e) => setKilometers(parseNumberInput(e.target.value))}
+                  placeholder="Örn: 128.500"
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                 />
               </div>
             </div>
 
+            {/* City & District Dependent Dropdowns */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Şehir</label>
-                <input
-                  type="text"
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Şehir (81 İl)</label>
+                <select
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Örn: İstanbul"
+                  onChange={(e) => handleCityChange(e.target.value)}
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                >
+                  <option value="">Şehir Seçiniz...</option>
+                  {TURKEY_CITIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">İlçe</label>
-                <input
-                  type="text"
+                <select
                   value={district}
+                  disabled={!city || availableDistricts.length === 0}
                   onChange={(e) => setDistrict(e.target.value)}
-                  placeholder="Örn: Kadıköy"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                >
+                  <option value="">İlçe Seçiniz...</option>
+                  {availableDistricts.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -647,7 +816,8 @@ export default function CreateListing() {
                 <select
                   value={fuelType}
                   onChange={(e) => setFuelType(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  disabled={!useCustomVariant && finalCandidates.length === 1}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500 disabled:opacity-60"
                 >
                   <option value="PETROL">Benzin</option>
                   <option value="DIESEL">Dizel</option>
@@ -661,7 +831,8 @@ export default function CreateListing() {
                 <select
                   value={transmission}
                   onChange={(e) => setTransmission(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  disabled={!useCustomVariant && finalCandidates.length === 1}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500 disabled:opacity-60"
                 >
                   <option value="MANUAL">Manuel</option>
                   <option value="AUTOMATIC">Otomatik</option>
@@ -712,27 +883,14 @@ export default function CreateListing() {
                   onChange={(e) => setPlateType(e.target.value)}
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
                 >
-                  <option value="TR_PLATE">TR Plakalı</option>
-                  <option value="MA_PLATE">Mavi Plakalı (MA)</option>
-                  <option value="SPECIAL_PLATE">Özel Plaka</option>
+                  <option value="TR_PLATE">Türkiye (TR) Plakalı</option>
+                  <option value="MA_PLATE">MA (Misafir) Plakalı</option>
+                  <option value="SPECIAL_PLATE">Özel / Yabancı Plaka</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
-                <select
-                  value={drivetrain}
-                  onChange={(e) => setDrivetrain(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
-                >
-                  <option value="FWD">Önden Çekiş</option>
-                  <option value="RWD">Arkadan İtiş</option>
-                  <option value="4WD">4WD (Sürekli)</option>
-                  <option value="AWD">AWD (Elektronik)</option>
-                </select>
-              </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
                 <input
@@ -753,499 +911,296 @@ export default function CreateListing() {
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                 />
               </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                <select
+                  value={drivetrain}
+                  onChange={(e) => setDrivetrain(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                >
+                  <option value="FWD">Önden Çekiş</option>
+                  <option value="RWD">Arkadan İtiş</option>
+                  <option value="AWD">Dört Çeker (AWD / 4x4)</option>
+                </select>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 bg-slate-950/20 p-4 border border-white/5 rounded-2xl">
-              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+            <div className="flex items-center gap-6 pt-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={hasWarranty}
                   onChange={(e) => setHasWarranty(e.target.checked)}
                   className="accent-orange-500 rounded border-white/10"
                 />
-                <span>Garanti Kapsamında</span>
+                Garanti Kapsamında
               </label>
-              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+
+              <label className="flex items-center gap-2 text-xs font-bold text-rose-400 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={heavyDamage}
                   onChange={(e) => setHeavyDamage(e.target.checked)}
-                  className="accent-orange-500 rounded border-white/10"
+                  className="accent-rose-500 rounded border-white/10"
                 />
-                <span>Ağır Hasar Kaydı Var</span>
+                Ağır Hasar Kaydı Var
               </label>
-              <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-slate-300">
+
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={exchangeable}
                   onChange={(e) => setExchangeable(e.target.checked)}
                   className="accent-orange-500 rounded border-white/10"
                 />
-                <span>Takasa Uygun (Takaslı)</span>
+                Takasa Uygun
               </label>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Açıklama</label>
-              <textarea
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Araç kondisyonu, ekstra aksesuarlar hakkında detay yazın..."
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
-              />
             </div>
           </div>
 
-          <div className="flex items-center gap-4 mt-4">
+          <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(1)}
-              className="flex-1 border border-white/10 text-slate-300 font-bold py-3 rounded-2xl hover:bg-white/5 transition"
+              className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
               onClick={() => setStep(3)}
-              disabled={!title || !priceAmount || !kilometers || !city}
-              className="flex-1 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 rounded-2xl transition"
+              disabled={
+                !title ||
+                !priceAmount ||
+                !kilometers ||
+                !city ||
+                !district ||
+                (!useCustomVariant && !selectedVariant)
+              }
+              className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
-              Devam Et
+              Devam Et (Boya & Hasar Adımı)
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 3: Appraisal & Painted Parts */}
+      {/* STEP 3: Condition & Paint checklist */}
       {step === 3 && (
-        <div className="glass p-8 rounded-3xl flex flex-col gap-6">
-          <h2 className="text-lg font-bold text-slate-200">🛠️ Adım 3: Boya, Değişen ve Tramer Durumu</h2>
+        <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
+          <h2 className="text-lg font-bold text-slate-200">🛠️ Adım 3: Boya, Değişen ve Tramer Bilgisi</h2>
+          <p className="text-xs text-slate-400">Aracınızın kaporta ve ekspertiz durumunu şeffafça işaretleyin.</p>
 
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Tramer Hasar Tutarı (TL)</label>
-                <input
-                  type="number"
-                  value={tramerAmount}
-                  onChange={(e) => setTramerAmount(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Hasar Detay Kaydı</label>
-                <input
-                  type="text"
-                  value={damageRecord}
-                  onChange={(e) => setDamageRecord(e.target.value)}
-                  placeholder="Örn: Arka çamurluk sürtme kaydı"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Tramer Hasar Kaydı Tutarı (TL)</label>
+              <input
+                type="number"
+                value={tramerAmount}
+                onChange={(e) => setTramerAmount(e.target.value)}
+                placeholder="Örn: 5000"
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+              />
             </div>
-
-            {/* Visual Car Parts Selector */}
-            <div className="flex flex-col gap-4 bg-slate-950/20 p-6 border border-white/5 rounded-3xl mt-2">
-              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">Boyalı veya Değişen Parça Seçimi</span>
-              
-              <div className="flex items-center gap-4 text-xs font-bold mt-1">
-                <span className="flex items-center gap-1.5 text-slate-400">
-                  <span className="w-3.5 h-3.5 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
-                </span>
-                <span className="flex items-center gap-1.5 text-orange-400">
-                  <span className="w-3.5 h-3.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
-                </span>
-                <span className="flex items-center gap-1.5 text-blue-400">
-                  <span className="w-3.5 h-3.5 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
-                </span>
-                <span className="flex items-center gap-1.5 text-red-400">
-                  <span className="w-3.5 h-3.5 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center mt-4">
-                {/* 1. Car Visual Silhouette (SVG) */}
-                <div className="md:col-span-6 flex flex-col items-center gap-2">
-                  <div className="relative w-full max-w-[260px] p-4 bg-slate-950/40 border border-white/5 rounded-3xl flex justify-center shadow-xl">
-                    <svg viewBox="0 0 200 380" className="w-full h-auto">
-                      {/* Static Tires */}
-                      <rect x="23" y="55" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="163" y="55" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="23" y="280" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="163" y="280" width="14" height="32" rx="4" fill="#1e293b" />
-
-                      {/* FRONT BUMPER */}
-                      <path
-                        d="M 50 35 Q 100 20 150 35 L 142 45 Q 100 35 58 45 Z"
-                        onClick={() => handlePartClick("FRONT_BUMPER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["FRONT_BUMPER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("FRONT_BUMPER")}`}
-                      />
-
-                      {/* HOOD */}
-                      <path
-                        d="M 58 45 Q 100 35 142 45 L 135 110 L 65 110 Z"
-                        onClick={() => handlePartClick("HOOD")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["HOOD"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("HOOD")}`}
-                      />
-
-                      {/* LEFT FRONT FENDER */}
-                      <path
-                        d="M 50 35 L 58 45 L 65 110 L 38 110 C 34 85 36 55 50 35 Z"
-                        onClick={() => handlePartClick("LEFT_FRONT_FENDER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_FRONT_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("LEFT_FRONT_FENDER")}`}
-                      />
-
-                      {/* RIGHT FRONT FENDER */}
-                      <path
-                        d="M 150 35 C 164 55 166 85 162 110 L 135 110 L 142 45 Z"
-                        onClick={() => handlePartClick("RIGHT_FRONT_FENDER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_FRONT_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("RIGHT_FRONT_FENDER")}`}
-                      />
-
-                      {/* LEFT FRONT DOOR */}
-                      <path
-                        d="M 38 110 L 65 110 L 65 180 L 38 180 Z"
-                        onClick={() => handlePartClick("LEFT_FRONT_DOOR")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_FRONT_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("LEFT_FRONT_DOOR")}`}
-                      />
-
-                      {/* RIGHT FRONT DOOR */}
-                      <path
-                        d="M 135 110 L 162 110 L 162 180 L 135 180 Z"
-                        onClick={() => handlePartClick("RIGHT_FRONT_DOOR")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_FRONT_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("RIGHT_FRONT_DOOR")}`}
-                      />
-
-                      {/* ROOF */}
-                      <rect
-                        x="65" y="110" width="70" height="140" rx="8"
-                        onClick={() => handlePartClick("ROOF")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["ROOF"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("ROOF")}`}
-                      />
-
-                      {/* LEFT REAR DOOR */}
-                      <path
-                        d="M 38 180 L 65 180 L 65 250 L 38 250 Z"
-                        onClick={() => handlePartClick("LEFT_REAR_DOOR")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_REAR_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("LEFT_REAR_DOOR")}`}
-                      />
-
-                      {/* RIGHT REAR DOOR */}
-                      <path
-                        d="M 135 180 L 162 180 L 162 250 L 135 250 Z"
-                        onClick={() => handlePartClick("RIGHT_REAR_DOOR")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_REAR_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("RIGHT_REAR_DOOR")}`}
-                      />
-
-                      {/* LEFT REAR FENDER */}
-                      <path
-                        d="M 38 250 L 65 250 L 60 330 L 53 340 C 36 320 34 280 38 250 Z"
-                        onClick={() => handlePartClick("LEFT_REAR_FENDER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_REAR_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("LEFT_REAR_FENDER")}`}
-                      />
-
-                      {/* TRUNK */}
-                      <path
-                        d="M 65 250 L 135 250 L 140 330 Q 100 340 60 330 Z"
-                        onClick={() => handlePartClick("TRUNK")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["TRUNK"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("TRUNK")}`}
-                      />
-
-                      {/* RIGHT REAR FENDER */}
-                      <path
-                        d="M 135 250 L 162 250 C 166 280 164 320 147 340 L 140 330 Z"
-                        onClick={() => handlePartClick("RIGHT_REAR_FENDER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_REAR_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("RIGHT_REAR_FENDER")}`}
-                      />
-
-                      {/* REAR BUMPER */}
-                      <path
-                        d="M 53 340 Q 100 350 147 340 L 152 350 Q 100 365 48 350 Z"
-                        onClick={() => handlePartClick("REAR_BUMPER")}
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["REAR_BUMPER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`cursor-pointer transition duration-200 ${getPartColorClass("REAR_BUMPER")}`}
-                      />
-
-                      {/* Headlights and Tail lights */}
-                      <ellipse cx="61" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(-10 61 41)" opacity="0.9" pointerEvents="none" />
-                      <ellipse cx="139" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(10 139 41)" opacity="0.9" pointerEvents="none" />
-                      <rect x="52" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" pointerEvents="none" />
-                      <rect x="138" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" pointerEvents="none" />
-                    </svg>
-                  </div>
-                  
-                  {/* Hover status label indicator */}
-                  <span className="text-[11px] font-bold text-slate-400 min-h-[16px] block text-center mt-1">
-                    {hoveredPart ? hoveredPart : "Durumu değiştirmek için parçaya tıklayın"}
-                  </span>
-                </div>
-
-                {/* 2. Side Lists: Summarizing current selections */}
-                <div className="md:col-span-6 grid grid-cols-2 gap-4 h-full align-top">
-                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
-                    <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
-                      {localPaintedParts.map(p => (
-                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-1 rounded-md text-[10px] border border-orange-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-orange-400">Lokal Boya</span>
-                        </li>
-                      ))}
-                      {paintedParts.map(p => (
-                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-1 rounded-md text-[10px] border border-blue-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-blue-400">Boyalı</span>
-                        </li>
-                      ))}
-                      {localPaintedParts.length === 0 && paintedParts.length === 0 && (
-                        <span className="text-slate-500 font-bold text-[10px] italic">Hiç seçilmedi.</span>
-                      )}
-                    </ul>
-                  </div>
-
-                  <div className="flex flex-col gap-2 bg-slate-950/45 p-4 border border-white/5 rounded-2xl h-fit">
-                    <span className="text-[10px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
-                    <ul className="text-[11px] text-slate-300 flex flex-col gap-1.5">
-                      {changedParts.map(p => (
-                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-1 rounded-md text-[10px] border border-red-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-red-400">Değişen</span>
-                        </li>
-                      ))}
-                      {changedParts.length === 0 && (
-                        <span className="text-slate-500 font-bold text-[10px] italic">Hiç seçilmedi.</span>
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5 mt-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Bakım & Servis Geçmişi</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Hasar Kaydı Açıklaması</label>
               <input
                 type="text"
-                value={maintenanceHistory}
-                onChange={(e) => setMaintenanceHistory(e.target.value)}
-                placeholder="Örn: Son 90bin bakımı yetkili serviste yapıldı."
+                value={damageRecord}
+                onChange={(e) => setDamageRecord(e.target.value)}
+                placeholder="Örn: Sol ön çamurluk değişti"
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4 mt-4">
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-slate-300">Boya & Değişen Parçaları Seçin:</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {PAINTED_COMPONENTS.map((part) => {
+                const isPainted = paintedParts.includes(part);
+                const isChanged = changedParts.includes(part);
+                return (
+                  <div key={part} className="flex flex-col gap-1 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+                    <span className="text-[11px] font-bold text-slate-300 truncate">{part.replace(/_/g, " ")}</span>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePart(part, "painted")}
+                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                          isPainted ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        Boyalı
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePart(part, "changed")}
+                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                          isChanged ? "bg-rose-500 text-white" : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        Değişen
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase">Bakım Geçmişi & Notlar</label>
+            <textarea
+              value={maintenanceHistory}
+              onChange={(e) => setMaintenanceHistory(e.target.value)}
+              placeholder="Son yağ bakımı, triger değişimi vb. detayları yazabilirsiniz..."
+              rows={3}
+              className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
+            />
+          </div>
+
+          <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(2)}
-              className="flex-1 border border-white/10 text-slate-300 font-bold py-3 rounded-2xl hover:bg-white/5 transition"
+              className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
               onClick={() => setStep(4)}
-              className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-2xl transition"
+              className="w-2/3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
-              Devam Et
+              Devam Et (Fotoğraf Yükleme)
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4: Photo upload */}
+      {/* STEP 4: Photo uploads */}
       {step === 4 && (
-        <div className="glass p-8 rounded-3xl flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-slate-200">📷 Adım 4: Görsel Yükle</h2>
-            <span className="text-xs font-bold text-slate-400 bg-slate-850 px-2.5 py-1 rounded-lg">
-              {uploadedPhotos.length} / 10 Fotoğraf
-            </span>
-          </div>
+        <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
+          <h2 className="text-lg font-bold text-slate-200">📸 Adım 4: Araç Fotoğrafları</h2>
+          <p className="text-xs text-slate-400">İlanınız için en fazla 10 fotoğraf yükleyebilirsiniz. En az 1 görsel gereklidir.</p>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Aracınızın ön, arka, yan açılardan ve kadran / iç kabin detaylarını gösteren fotoğraflarını yükleyin. Minimum 1 fotoğraf olmadan ilan PENDING_REVIEW aşamasına geçemez.
-          </p>
-
-          {/* Upload Input Area */}
-          <div className="relative border-2 border-dashed border-white/10 hover:border-orange-500/40 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 bg-slate-950/20 transition cursor-pointer">
-            <input
-              type="file"
-              onChange={handlePhotoUpload}
-              disabled={uploading}
-              accept="image/jpeg,image/png,image/webp"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            />
-            <span className="text-3xl">{uploading ? "⏳" : "📤"}</span>
-            <span className="text-xs font-bold text-slate-300">
-              {uploading ? "Fotoğraf yükleniyor..." : "Dosya Seçin ya da Sürükleyin"}
-            </span>
-            <span className="text-[10px] text-slate-500">Maksimum 5MB • JPEG, PNG, WebP</span>
-          </div>
-
-          {mediaError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl font-bold">{mediaError}</p>}
-
-          {/* Grid of uploaded photos */}
-          {uploadedPhotos.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
-              {uploadedPhotos.map((photo, index) => (
-                <div key={photo.id} className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/10 group">
-                  <img src={formatImageUrl(photo.url || photo.thumbnailUrl || photo.mediumUrl)} alt="Uploaded car" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={() => deletePhoto(photo.id, photo.listingId)}
-                      className="bg-red-600 text-white rounded-lg p-1.5 text-[10px] font-bold hover:bg-red-500 transition"
-                    >
-                      Sil
-                    </button>
-                  </div>
-                  {index === 0 && (
-                    <span className="absolute bottom-2 left-2 text-[8px] bg-orange-600 text-white font-bold px-1.5 py-0.5 rounded">
-                      Kapak Görseli
-                    </span>
-                  )}
-                </div>
-              ))}
+          {mediaError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold">
+              {mediaError}
             </div>
           )}
 
-          <div className="flex items-center gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {uploadedPhotos.map((photo, idx) => (
+              <div key={photo.id || idx} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 group">
+                <img src={photo.url} alt="Uploaded" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => handleDeletePhoto(photo.id)}
+                  className="absolute top-2 right-2 p-1.5 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+            {uploadedPhotos.length < 10 && (
+              <label className="aspect-square rounded-2xl border-2 border-dashed border-white/10 hover:border-orange-500/50 flex flex-col items-center justify-center cursor-pointer transition bg-slate-900/30">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  disabled={uploading}
+                  className="hidden"
+                />
+                {uploading ? (
+                  <span className="text-xs text-slate-400 animate-pulse">Yükleniyor...</span>
+                ) : (
+                  <>
+                    <span className="text-2xl">➕</span>
+                    <span className="text-[11px] font-bold text-slate-400 mt-1">Fotoğraf Yükle</span>
+                  </>
+                )}
+              </label>
+            )}
+          </div>
+
+          <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(3)}
-              className="flex-1 border border-white/10 text-slate-300 font-bold py-3 rounded-2xl hover:bg-white/5 transition"
+              className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
               onClick={() => setStep(5)}
-              className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-2xl transition"
+              disabled={uploadedPhotos.length === 0}
+              className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
-              Devam Et
+              Devam Et (Onay ve Yayınlama)
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 5: Quota Check, Terms and Confirmation */}
+      {/* STEP 5: Quota & Confirm */}
       {step === 5 && (
-        <div className="glass p-8 rounded-3xl flex flex-col gap-6">
-          <h2 className="text-lg font-bold text-slate-200">🚀 Adım 5: Yayınlama Onayı</h2>
+        <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
+          <h2 className="text-lg font-bold text-slate-200">🚀 Adım 5: İlanı İncelemeye Gönder</h2>
 
-          {/* Quota indicator box */}
           {loadingQuota ? (
-            <div className="p-4 rounded-2xl border border-white/5 bg-slate-950/20 text-center text-xs text-slate-400">Quota verileri yükleniyor...</div>
+            <div className="text-xs text-slate-400">Kota bilgisi kontrol ediliyor...</div>
           ) : quota ? (
-            <div className="p-5 rounded-2xl border border-white/5 bg-slate-900/10 flex flex-col gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktif Yayın Limitiniz</span>
-              <div className="flex items-center justify-between text-sm mt-1">
-                <span className="text-slate-300 font-medium">Abonelik Tipi: <strong className="text-slate-100">{quota.tier}</strong></span>
-                <span className="font-bold text-slate-200">{quota.activeCount} / {quota.limit} İlan</span>
-              </div>
-              <div className="w-full bg-slate-950 rounded-full h-1.5 mt-2">
-                <div
-                  className="bg-orange-600 h-1.5 rounded-full"
-                  style={{ width: `${Math.min(100, (quota.activeCount / quota.limit) * 100)}%` }}
-                />
-              </div>
-              {quota.remaining === 0 && (
-                <p className="text-[10px] text-amber-500 italic mt-2">
-                  ⚠️ Limitiniz dolmuştur. İlanı şimdilik taslak (DRAFT) olarak kaydedebilirsiniz. Yayınlamak için paketi yükseltmeniz gerekir.
-                </p>
-              )}
+            <div className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col gap-2">
+              <span className="text-xs text-slate-400 font-bold">Mevcut Paketiniz: <strong className="text-orange-400">{quota.tier}</strong></span>
+              <span className="text-xs text-slate-400 font-bold">Aktif İlan Kullanımınız: <strong className="text-white">{quota.activeCount} / {quota.limit}</strong></span>
             </div>
           ) : null}
 
-          {/* 3 Option Promotion Cards */}
-          <ListingPromotionCards
-            selectedSku={selectedPromotionSku}
-            onSelectSku={setSelectedPromotionSku}
-            termsAccepted={promotionTermsAccepted}
-            onTermsAcceptedChange={setPromotionTermsAccepted}
-            pricingDetails={promotionPricingDetails}
-            isCreateFlow={true}
-          />
+          {/* Promotion Selection */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-slate-200">İlanınızı Öne Çıkarın (Opsiyonel)</h3>
+            <ListingPromotionCards
+              selectedSku={selectedPromotionSku}
+              onSelectSku={(sku) => setSelectedPromotionSku(sku)}
+              termsAccepted={promotionTermsAccepted}
+              onTermsAcceptedChange={setPromotionTermsAccepted}
+            />
+          </div>
 
-          {/* Legal check */}
-          <div className="flex items-start gap-3 cursor-pointer bg-slate-900/40 p-5 rounded-2xl border border-white/5">
+          {errorMsg && (
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl text-xs font-bold">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 cursor-pointer pt-2">
             <input
               type="checkbox"
               id="responsibilityCheckbox"
               checked={responsibilityAccepted}
               onChange={(e) => setResponsibilityAccepted(e.target.checked)}
-              className="accent-orange-500 rounded border-white/10 mt-1"
+              className="accent-orange-500 rounded border-white/10"
             />
-            <label htmlFor="responsibilityCheckbox" className="text-xs text-slate-300 cursor-pointer select-none leading-relaxed">
-              İlanda paylaştığım kilometre, hasar, boya, değişen, tramer, bakım ve açıklama bilgilerinin doğruluğundan ben sorumluyum. TorqueScout bu bilgileri doğrulamış sayılmaz.
+            <label htmlFor="responsibilityCheckbox" className="text-xs text-slate-300 cursor-pointer select-none">
+              İlan verdiğim aracın ruhsat sahibi/yetkili satıcısı olduğumu ve doğru bilgi verdiğimi beyan ederim.
             </label>
           </div>
 
-          {errorMsg && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl font-bold">{errorMsg}</p>}
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 mt-4">
+          <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(4)}
-              className="w-full sm:w-1/3 border border-white/10 text-slate-300 font-bold py-3.5 rounded-2xl hover:bg-white/5 transition text-sm"
+              className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
-              onClick={() => handleSaveAndPublish(true)}
-              disabled={saving}
-              className="w-full sm:w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3.5 rounded-2xl transition text-sm"
+              onClick={handleFinalSubmit}
+              disabled={saving || !responsibilityAccepted}
+              className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
             >
-              Taslak Olarak Kaydet
-            </button>
-            <button
-              onClick={() => handleSaveAndPublish(false)}
-              disabled={saving || (quota ? quota.remaining === 0 : false)}
-              className={`w-full sm:w-1/3 text-white font-bold py-3.5 rounded-2xl transition text-sm shadow-lg ${
-                selectedPromotionSku
-                  ? "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 shadow-orange-500/20"
-                  : "bg-orange-600 hover:bg-orange-500 shadow-orange-600/15"
-              } disabled:bg-slate-950 disabled:text-slate-600 disabled:cursor-not-allowed`}
-            >
-              {saving ? "Yayınlanıyor..." : selectedPromotionSku ? "Öde ve İncelemeye Gönder" : "İncelemeye Gönder"}
+              {saving ? "Kaydediliyor..." : "İlanı İncelemeye Gönder ➔"}
             </button>
           </div>
         </div>
       )}
-
-      {/* Payment Failure Recovery Modal */}
-      <UrgentListingPaymentRecovery
-        isOpen={paymentRecoveryOpen}
-        errorMessage={paymentError}
-        onRetry={() => {
-          setPaymentRecoveryOpen(false);
-          handleSaveAndPublish(false);
-        }}
-        onContinueAsNormal={() => {
-          setPaymentRecoveryOpen(false);
-          setSelectedPromotionSku(null);
-          handleSaveAndPublish(false);
-        }}
-      />
     </div>
   );
 }
