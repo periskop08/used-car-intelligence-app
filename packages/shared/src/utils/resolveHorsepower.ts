@@ -6,13 +6,11 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
   // Fiat / Alfa / Lancia
   "1.4 FIRE": 95,
   "1.4 T-JET": 120,
-  "1.6 MPI": 110,
   "1.6 ETORQ": 110,
   "1.6 E-TORQ": 110,
   "1.3 MULTIJET": 95,
   "1.6 MULTIJET": 120,
   "2.0 MULTIJET": 165,
-  "1.5 HYBRID": 130,
 
   // Renault / Dacia
   "0.9 TCE": 90,
@@ -46,8 +44,6 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
   "1.6 BLUEHDI": 120,
   "1.5 BLUEHDI": 130,
   "2.0 BLUEHDI": 180,
-  "1.4 BENZIN": 90,
-  "1.4 DIESEL": 90,
 
   // Ford
   "1.0 ECOBOOST": 125,
@@ -76,7 +72,6 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
   "1.6 I-VTEC": 125,
   "1.5 VTEC TURBO": 182,
   "1.6 I-DTEC": 120,
-  "2.0 VTEC": 155,
 
   // Toyota
   "1.0 VVT-I": 72,
@@ -105,9 +100,6 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
   "C 200": 184,
   "E 180": 156,
   "E 200": 197,
-  "A 180 D": 116,
-  "C 200 D": 160,
-  "E 220 D": 194,
 
   // Nissan
   "1.2 DIG-T": 115,
@@ -125,7 +117,7 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
 
 /**
  * Resolves exact Horsepower (HP) for a vehicle variant based on DB specs,
- * engine codes, title strings, displacement heuristics, and Turkish market lookup tables.
+ * brand + engine rules, displacement heuristics, and Turkish market lookup tables.
  */
 export function resolveHorsepower(v: any): number | null {
   if (!v) return null;
@@ -148,17 +140,58 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 2. Engine code matching with canonical Turkish market HP dictionary
-  const rawCode = (v.engine?.code || v.engine?.name || "").trim().toUpperCase();
-  if (rawCode) {
+  // 2. Brand & Engine Specific Priority Rules
+  const brandName = (v.brand?.name || v.brandName || "").trim().toUpperCase();
+  const engineCode = (v.engine?.code || v.engine?.name || "").trim().toUpperCase();
+
+  if (brandName.includes("KIA") || brandName.includes("HYUNDAI")) {
+    if (engineCode.includes("1.6 MPI") || engineCode.includes("1.6MPI") || engineCode.includes("GAMMA") || engineCode.includes("SMARTSTREAM")) {
+      return 128; // Kia Cerato / Hyundai Elantra 1.6 MPI -> 128 HP
+    }
+    if (engineCode.includes("1.4 MPI")) return 100;
+    if (engineCode.includes("1.2 MPI")) return 84;
+    if (engineCode.includes("1.0 MPI")) return 67;
+    if (engineCode.includes("1.6 GDI")) return 135;
+    if (engineCode.includes("1.6 T-GDI") || engineCode.includes("1.6TGDI")) return 177;
+    if (engineCode.includes("1.6 CRDI")) return 136;
+  }
+
+  if (brandName.includes("FIAT")) {
+    if (engineCode.includes("1.6 MPI") || engineCode.includes("1.6 ETORQ") || engineCode.includes("1.6 E-TORQ")) {
+      return 110; // Fiat Egea 1.6 MPI -> 110 HP
+    }
+    if (engineCode.includes("1.4 FIRE")) return 95;
+    if (engineCode.includes("1.3 MULTIJET")) return 95;
+    if (engineCode.includes("1.6 MULTIJET")) return 120;
+  }
+
+  if (brandName.includes("TOYOTA")) {
+    if (engineCode.includes("1.6") && (engineCode.includes("VALVEMATIC") || engineCode.includes("VVT"))) return 132;
+    if (engineCode.includes("1.5") && engineCode.includes("DYNAMIC")) return 125;
+    if (engineCode.includes("1.4 D-4D")) return 90;
+  }
+
+  if (brandName.includes("HONDA")) {
+    if (engineCode.includes("1.6 I-VTEC")) return 125;
+    if (engineCode.includes("1.5 VTEC")) return 182;
+    if (engineCode.includes("1.6 I-DTEC")) return 120;
+  }
+
+  if (brandName.includes("OPEL")) {
+    if (engineCode.includes("1.6 CDTI")) return 136;
+    if (engineCode.includes("1.4 TURBO")) return 140;
+  }
+
+  // 3. Engine code matching with canonical Turkish market HP dictionary
+  if (engineCode) {
     for (const [key, hp] of Object.entries(CANONICAL_ENGINE_HP_MAP)) {
-      if (rawCode.includes(key) || key.includes(rawCode)) {
+      if (engineCode.includes(key) || key.includes(engineCode)) {
         return hp;
       }
     }
 
     // Try substring matching without punctuation
-    const cleanCode = rawCode.replace(/[^A-Z0-9\s]/g, "");
+    const cleanCode = engineCode.replace(/[^A-Z0-9\s]/g, "");
     for (const [key, hp] of Object.entries(CANONICAL_ENGINE_HP_MAP)) {
       const cleanKey = key.replace(/[^A-Z0-9\s]/g, "");
       if (cleanCode.includes(cleanKey)) {
@@ -167,37 +200,38 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 3. Displacement & Fuel Type Heuristics for Common Turkish Market Vehicles
+  // 4. Displacement & Fuel Type Heuristics for Common Turkish Market Vehicles
   const displacement = Number(v.engine?.displacement || v.engine?.displacementCc || (typeof v.specs?.specs === "object" ? v.specs?.specs?.engineDisplacement : v.specs?.engineDisplacement)) || 0;
   const fuelType = String(v.fuelType || v.engine?.fuelType || "").toUpperCase();
 
   if (displacement > 0) {
     if (displacement >= 1580 && displacement <= 1610) {
+      if (brandName.includes("KIA") || brandName.includes("HYUNDAI")) return 128;
       if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 120;
-      return 110; // 1.6 MPI / E-Torq / Petrol -> 110 HP
+      return 110;
     }
     if (displacement >= 1350 && displacement <= 1380) {
-      return 95; // 1.4 Fire -> 95 HP
+      return 95;
     }
     if (displacement >= 1230 && displacement <= 1260) {
-      return 95; // 1.3 Multijet -> 95 HP
+      return 95;
     }
     if (displacement >= 1450 && displacement <= 1475) {
-      return 110; // 1.5 dCi -> 110 HP
+      return 110;
     }
     if (displacement >= 1180 && displacement <= 1210) {
-      return 130; // 1.2 PureTech / TSI -> 130 HP
+      return 130;
     }
     if (displacement >= 1485 && displacement <= 1510) {
-      if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 130; // 1.5 BlueHDi -> 130 HP
-      return 150; // 1.5 TSI / EcoBoost -> 150 HP
+      if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 130;
+      return 150;
     }
     if (displacement >= 980 && displacement <= 1010) {
-      return 110; // 1.0 TSI / T-GDI -> 110 HP
+      return 110;
     }
   }
 
-  // 4. Direct TechnicalSpec JSON check
+  // 5. Direct TechnicalSpec JSON check
   const specsObj = typeof v.specs?.specs === "object" && v.specs?.specs ? v.specs.specs : v.specs;
   if (specsObj) {
     const candidatePower = specsObj.enginePower || specsObj.enginePowerHp || specsObj.maxPowerHp || specsObj.horsepower;
@@ -213,7 +247,7 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 5. DB Engine horsepower field fallback if between 40 and 1000
+  // 6. DB Engine horsepower field fallback if between 40 and 1000
   if (typeof v.engine?.horsepower === "number" && v.engine.horsepower >= 40 && v.engine.horsepower <= 1000) {
     return v.engine.horsepower;
   }

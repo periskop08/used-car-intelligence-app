@@ -235,10 +235,12 @@ export default function CreateListing() {
     )
   );
 
+  const brandObj = brands.find((b) => b.id === selectedBrand);
+
   const availablePowers = Array.from(
     new Set(
       finalCandidates
-        .map((v) => resolveHorsepower(v))
+        .map((v) => resolveHorsepower({ ...v, brandName: v.brand?.name || brandObj?.name }))
         .filter(Boolean) as number[]
     )
   );
@@ -277,7 +279,7 @@ export default function CreateListing() {
       const disp = exact.engine?.displacement || exact.engine?.displacementCc || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.engineDisplacement : exact.specs?.engineDisplacement);
       if (disp) setEngineDisplacement(String(disp));
 
-      const hp = resolveHorsepower(exact);
+      const hp = resolveHorsepower({ ...exact, brandName: exact.brand?.name || brandObj?.name });
       if (hp) setEnginePower(String(hp));
 
       const dt = typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.drivetrain : exact.specs?.drivetrain;
