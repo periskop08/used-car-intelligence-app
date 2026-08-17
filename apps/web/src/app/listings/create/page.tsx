@@ -230,7 +230,7 @@ export default function CreateListing() {
   const availableDisplacements = Array.from(
     new Set(
       finalCandidates
-        .map((v) => v.engine?.displacementCc || v.specs?.engineDisplacement)
+        .map((v) => v.engine?.displacement || v.engine?.displacementCc || (typeof v.specs?.specs === 'object' ? v.specs?.specs?.engineDisplacement : v.specs?.engineDisplacement))
         .filter(Boolean)
     )
   );
@@ -238,22 +238,28 @@ export default function CreateListing() {
   const availablePowers = Array.from(
     new Set(
       finalCandidates
-        .map((v) => v.specs?.enginePower || (v.engine?.name?.match(/(\d+)\s*hp/i)?.[1]))
+        .map((v) => v.engine?.horsepower || (typeof v.specs?.specs === 'object' ? v.specs?.specs?.enginePower : v.specs?.enginePower))
         .filter(Boolean)
     )
   );
 
   useEffect(() => {
-    if (!useCustomVariant && availableDisplacements.length === 1 && !engineDisplacement) {
-      setEngineDisplacement(String(availableDisplacements[0]));
+    if (!useCustomVariant && availableDisplacements.length > 0) {
+      const firstDisp = String(availableDisplacements[0]);
+      if (availableDisplacements.length === 1 || !engineDisplacement || !availableDisplacements.map(String).includes(String(engineDisplacement))) {
+        setEngineDisplacement(firstDisp);
+      }
     }
-  }, [availableDisplacements, engineDisplacement, useCustomVariant]);
+  }, [availableDisplacements, useCustomVariant]);
 
   useEffect(() => {
-    if (!useCustomVariant && availablePowers.length === 1 && !enginePower) {
-      setEnginePower(String(availablePowers[0]));
+    if (!useCustomVariant && availablePowers.length > 0) {
+      const firstHp = String(availablePowers[0]);
+      if (availablePowers.length === 1 || !enginePower || !availablePowers.map(String).includes(String(enginePower))) {
+        setEnginePower(firstHp);
+      }
     }
-  }, [availablePowers, enginePower, useCustomVariant]);
+  }, [availablePowers, useCustomVariant]);
 
   // Exact Variant Resolution Effect
   useEffect(() => {
@@ -268,13 +274,13 @@ export default function CreateListing() {
       if (exact.transmission?.type) setTransmission(exact.transmission.type);
       if (exact.bodyType) setBodyType(exact.bodyType);
 
-      const disp = exact.engine?.displacementCc || exact.specs?.engineDisplacement;
+      const disp = exact.engine?.displacement || exact.engine?.displacementCc || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.engineDisplacement : exact.specs?.engineDisplacement);
       if (disp) setEngineDisplacement(String(disp));
 
-      const hp = exact.specs?.enginePower;
+      const hp = exact.engine?.horsepower || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.enginePower : exact.specs?.enginePower);
       if (hp) setEnginePower(String(hp));
 
-      const dt = exact.specs?.drivetrain;
+      const dt = typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.drivetrain : exact.specs?.drivetrain;
       if (dt) setDrivetrain(dt);
     } else {
       setSelectedVariant("");
