@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
+import { AlertCircle, Trash2, X, CheckCircle2, Loader2 } from "lucide-react";
 
 interface ConfirmModalState {
   isOpen: boolean;
@@ -14,6 +15,14 @@ interface ConfirmModalState {
   message: string;
   confirmBtnText: string;
   confirmBtnClass: string;
+}
+
+interface PublishWarningModalState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  actionUrl: string;
+  actionText: string;
 }
 
 const translateFuelType = (fuel: string) => {
@@ -50,6 +59,8 @@ function SellerDashboardContent() {
   // Data states
   const [activeTab, setActiveTab] = useState<"active" | "past">(initialTab);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
+  const [publishWarningModal, setPublishWarningModal] = useState<PublishWarningModalState | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [listings, setListings] = useState<any[]>([]);
   const [quota, setQuota] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +76,52 @@ function SellerDashboardContent() {
     if (tabParam === "past") setActiveTab("past");
     else if (tabParam === "active") setActiveTab("active");
   }, [searchParams]);
+
+  const refreshListings = () => {
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
+    if (!activeToken) return;
+    Promise.all([
+      fetch(`${API_URL}/me/listings`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).then((res) => res.json()),
+      fetch(`${API_URL}/me/listing-quota`, {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).then((res) => res.json()),
+    ])
+      .then(([listingsData, quotaData]) => {
+        setListings(Array.isArray(listingsData) ? listingsData : []);
+        setQuota(quotaData);
+      })
+      .catch((err) => console.error("Error refreshing listings:", err));
+  };
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (!savedToken) {
+      router.push("/login?redirect=/dashboard/listings");
+      return;
+    }
+    setToken(savedToken);
+
+    // Fetch user listings & quota
+    Promise.all([
+      fetch(`${API_URL}/me/listings`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      }).then((res) => res.json()),
+      fetch(`${API_URL}/me/listing-quota`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      }).then((res) => res.json()),
+    ])
+      .then(([listingsData, quotaData]) => {
+        setListings(Array.isArray(listingsData) ? listingsData : []);
+        setQuota(quotaData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard load failed:", err);
+        setLoading(false);
+      });
+  }, []);
 
   const requestStatusChange = (listing: any, targetStatus: string) => {
     if (targetStatus === "PASSIVE") {
@@ -105,58 +162,15 @@ function SellerDashboardContent() {
     }
   };
 
-  const refreshListings = () => {
-    const activeToken = token || localStorage.getItem("accessToken");
-    if (!activeToken) return;
-    Promise.all([
-      fetch(`${API_URL}/me/listings`, {
-        headers: { Authorization: `Bearer ${activeToken}` },
-      }).then((res) => res.json()),
-      fetch(`${API_URL}/me/listing-quota`, {
-        headers: { Authorization: `Bearer ${activeToken}` },
-      }).then((res) => res.json()),
-    ])
-      .then(([listingsData, quotaData]) => {
-        setListings(Array.isArray(listingsData) ? listingsData : []);
-        setQuota(quotaData);
-      })
-      .catch((err) => console.error("Error refreshing listings:", err));
-  };
-  useEffect(() => {
-    const savedToken = localStorage.getItem("accessToken");
-    if (!savedToken) {
-      router.push("/login?redirect=/dashboard/listings");
-      return;
-    }
-    setToken(savedToken);
-
-    // Fetch user listings & quota
-    Promise.all([
-      fetch(`${API_URL}/me/listings`, {
-        headers: { Authorization: `Bearer ${savedToken}` },
-      }).then((res) => res.json()),
-      fetch(`${API_URL}/me/listing-quota`, {
-        headers: { Authorization: `Bearer ${savedToken}` },
-      }).then((res) => res.json()),
-    ])
-      .then(([listingsData, quotaData]) => {
-        setListings(Array.isArray(listingsData) ? listingsData : []);
-        setQuota(quotaData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Dashboard load failed:", err);
-        setLoading(false);
-      });
-  }, []);
-
   const handleRenew = (listingId: string) => {
     setActionError("");
     setActionSuccess("");
 
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
+
     fetch(`${API_URL}/listings/${listingId}/renew`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${activeToken}` },
     })
       .then((res) => {
         if (!res.ok) {
@@ -168,19 +182,7 @@ function SellerDashboardContent() {
       })
       .then(() => {
         setActionSuccess("İlanınız başarıyla tekrar aktif edildi!");
-        // Refresh page data
-        return Promise.all([
-          fetch(`${API_URL}/me/listings`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-          fetch(`${API_URL}/me/listing-quota`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-        ]);
-      })
-      .then(([listingsData, quotaData]) => {
-        setListings(listingsData);
-        setQuota(quotaData);
+        refreshListings();
       })
       .catch((err) => {
         setActionError(err.message);
@@ -191,11 +193,19 @@ function SellerDashboardContent() {
     setActionError("");
     setActionSuccess("");
 
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
+    if (!activeToken) {
+      router.push("/login?redirect=/dashboard/listings");
+      return;
+    }
+
+    setPublishingId(listingId);
+
     fetch(`${API_URL}/listings/${listingId}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${activeToken}`,
       },
       body: JSON.stringify({ status: newStatus }),
     })
@@ -209,22 +219,41 @@ function SellerDashboardContent() {
       })
       .then(() => {
         setActionSuccess("İlan durumu başarıyla güncellendi!");
-        // Refresh page data
-        return Promise.all([
-          fetch(`${API_URL}/me/listings`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-          fetch(`${API_URL}/me/listing-quota`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-        ]);
+        refreshListings();
       })
-      .then(([listingsData, quotaData]) => {
-        setListings(listingsData);
-        setQuota(quotaData);
+      .catch((err: any) => {
+        const errorMsg = err.message || "İlan durumu güncellenemedi.";
+        setActionError(errorMsg);
+
+        // Open warning modal with exact reason & direct navigation action
+        if (errorMsg.includes("görsel") || errorMsg.includes("fotoğraf") || errorMsg.includes("varyant")) {
+          setPublishWarningModal({
+            isOpen: true,
+            title: "İlan İçeriği Eksik",
+            message: `${errorMsg} İlanınızı yayınlayabilmek için eksik fotoğrafları veya araç verilerini tamamlamanız gerekmektedir.`,
+            actionUrl: `/listings/${listingId}/edit`,
+            actionText: "İlanı Düzenle & Fotoğraf Ekle",
+          });
+        } else if (errorMsg.includes("kota") || errorMsg.includes("paket")) {
+          setPublishWarningModal({
+            isOpen: true,
+            title: "İlan Yayınlama Kotası Doldu",
+            message: `${errorMsg} Yayınlama sınırınız dolmuştur. Paketinizi yükseltebilir veya mevcut aktif bir ilanınızı pasife alabilirsiniz.`,
+            actionUrl: "/pricing",
+            actionText: "Paketleri İncele",
+          });
+        } else {
+          setPublishWarningModal({
+            isOpen: true,
+            title: "Yayınlama Uyarısı",
+            message: errorMsg,
+            actionUrl: `/listings/${listingId}/edit`,
+            actionText: "İlan Detayını Düzenle",
+          });
+        }
       })
-      .catch((err) => {
-        setActionError(err.message);
+      .finally(() => {
+        setPublishingId(null);
       });
   };
 
@@ -247,11 +276,13 @@ function SellerDashboardContent() {
     setActionError("");
     setActionSuccess("");
 
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "");
+
     fetch(`${API_URL}/listings/${listingId}/leads/${leadId}/reply`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${activeToken}`,
       },
       body: JSON.stringify({ replyMessage: textToSend }),
     })
@@ -262,18 +293,7 @@ function SellerDashboardContent() {
       .then(() => {
         setActionSuccess("Mesaj yanıtınız başarıyla kaydedildi!");
         setReplyTexts(prev => ({ ...prev, [leadId]: "" }));
-        return Promise.all([
-          fetch(`${API_URL}/me/listings`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-          fetch(`${API_URL}/me/listing-quota`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then((res) => res.json()),
-        ]);
-      })
-      .then(([listingsData, quotaData]) => {
-        setListings(listingsData);
-        setQuota(quotaData);
+        refreshListings();
       })
       .catch((err) => {
         setActionError(err.message);
@@ -288,6 +308,10 @@ function SellerDashboardContent() {
       </div>
     );
   }
+
+  const activeListings = listings.filter((l) => ["ACTIVE", "DRAFT", "PENDING_REVIEW", "PASSIVE"].includes(l.status));
+  const pastListings = listings.filter((l) => ["SOLD", "EXPIRED", "REJECTED"].includes(l.status));
+  const displayedListings = activeTab === "past" ? pastListings : activeListings;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-10">
@@ -305,364 +329,283 @@ function SellerDashboardContent() {
         </div>
         <button
           onClick={() => router.push("/listings/create")}
-          className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-2xl transition text-sm shadow-lg shadow-orange-500/10"
+          className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 px-6 rounded-2xl transition text-sm shadow-lg shadow-orange-500/10 cursor-pointer"
         >
           ➕ Yeni İlan Ekle
         </button>
       </div>
 
-      {actionError && <p className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{actionError}</p>}
-      {actionSuccess && <p className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl">{actionSuccess}</p>}
+      {actionError && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl flex items-center justify-between font-sans text-xs font-bold">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400" />
+            <span>{actionError}</span>
+          </div>
+          <button onClick={() => setActionError("")} className="text-slate-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+      {actionSuccess && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-between font-sans text-xs font-bold">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{actionSuccess}</span>
+          </div>
+          <button onClick={() => setActionSuccess("")} className="text-slate-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Quota Summary & Package Info Card */}
       {quota && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-slate-500 font-black uppercase">Aktif Paket</span>
-            <span className="text-xl font-black text-orange-400 mt-0.5">{quota.tier} Paket</span>
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Mevcut Paketiniz</span>
+            <span className="text-xl font-black text-orange-400">{quota.tierName || "Ücretsiz"}</span>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-slate-500 font-black uppercase">Kullanılan İlan Kotası</span>
-            <span className="text-xl font-black text-slate-200 mt-0.5">{quota.activeCount} / {quota.limit} İlan</span>
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Aktif İlan Kullanımı</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-black text-slate-200">
+                {quota.usedActiveListings} / {quota.maxActiveListings}
+              </span>
+              <span className="text-xs text-slate-400">
+                ({quota.maxActiveListings - quota.usedActiveListings} İlan Hakkınız Var)
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-slate-500 font-black uppercase">Kalan İlan Hakkı</span>
-            <span className="text-xl font-black text-emerald-400 mt-0.5">{quota.remaining} İlan</span>
+          <div className="flex flex-col gap-1 justify-center">
+            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (quota.usedActiveListings / (quota.maxActiveListings || 1)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Listings list with Tabs */}
-      <div className="flex flex-col gap-5">
-        {/* Tabs */}
-        <div className="flex items-center gap-3 border-b border-white/10 pb-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("active");
-              router.push("/dashboard/listings");
-            }}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-              activeTab === "active"
-                ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-                : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
-            }`}
-          >
-            <span>🚗</span> Yayındaki & Aktif İlanlarım
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              activeTab === "active" ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
-            }`}>
-              {listings.filter((l) => l.status !== "SOLD" && l.status !== "EXPIRED").length}
-            </span>
-          </button>
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+        <button
+          onClick={() => setActiveTab("active")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+            activeTab === "active"
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
+              : "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-slate-200"
+          }`}
+        >
+          <span>🚀 Yayındaki & Aktif İlanlarım</span>
+          <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black">
+            {activeListings.length}
+          </span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("past");
-              router.push("/dashboard/listings?tab=past");
-            }}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-              activeTab === "past"
-                ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-                : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
-            }`}
-          >
-            <span>📜</span> Geçmiş İlanlarım (Satılan & Doldu)
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-              activeTab === "past" ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
-            }`}>
-              {listings.filter((l) => l.status === "SOLD" || l.status === "EXPIRED").length}
-            </span>
-          </button>
-        </div>
-
-        {(() => {
-          const displayedListings = activeTab === "active"
-            ? listings.filter((l) => l.status !== "SOLD" && l.status !== "EXPIRED")
-            : listings.filter((l) => l.status === "SOLD" || l.status === "EXPIRED");
-
-          if (displayedListings.length === 0) {
-            return (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 border border-dashed border-white/10 rounded-3xl bg-slate-950/5">
-                <span className="text-4xl">{activeTab === "active" ? "🚗" : "📜"}</span>
-                <span className="text-slate-300 font-bold text-sm">
-                  {activeTab === "active"
-                    ? "Henüz aktif bir ilanınız bulunmamaktadır."
-                    : "Geçmişte satılan veya süresi dolan ilanınız bulunmamaktadır."}
-                </span>
-                {activeTab === "active" && (
-                  <button
-                    onClick={() => router.push("/listings/create")}
-                    className="text-xs text-orange-500 font-bold hover:underline mt-1"
-                  >
-                    Hemen yeni ilan ekleyin
-                  </button>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <div className="grid grid-cols-1 gap-4">
-              {displayedListings.map((listing) => {
-                const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                const remDays = getRemainingDays(listing.expiresAt);
-                const passiveRemDays = getRemainingDays(listing.passiveUntil);
-
-                return (
-                  <div key={listing.id} className="flex flex-col p-6 bg-slate-900/40 border border-white/5 rounded-3xl gap-4 hover:border-white/10 transition">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                      <div className="flex flex-col md:flex-row items-center gap-6">
-                        {/* Cover Photo */}
-                        <div className="w-24 aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex-shrink-0">
-                          <img src={coverImg} alt={listing.title} className="w-full h-full object-cover" />
-                        </div>
-
-                        {/* Listing Summary Info */}
-                        <div className="flex flex-col text-center md:text-left gap-1">
-                          <div className="flex items-center justify-center md:justify-start gap-2">
-                            <h4 className="font-extrabold text-slate-200 text-sm line-clamp-1">{listing.title}</h4>
-                            {listing.isUrgent && <UrgentListingBadge size="small" animated />}
-                            <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
-                              listing.status === "ACTIVE"
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : listing.status === "PENDING_REVIEW"
-                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                : listing.status === "PASSIVE"
-                                ? "bg-slate-800 text-slate-400"
-                                : listing.status === "SOLD"
-                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                                : "bg-red-500/20 text-red-400 border border-red-500/30"
-                            }`}>
-                              {listing.status === "SOLD" ? "🤝 SATILDI" : listing.status}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-400 font-medium flex-wrap">
-                            <span>{listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city}</span>
-                            <span className="inline-flex items-center gap-1 font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full text-[10px]">
-                              ❤️ {listing.favoriteCount || 0} Favoriye Eklendi
-                            </span>
-                          </div>
-
-                          {/* Dynamic Duration Badges */}
-                          <div className="mt-2 text-xs flex flex-col gap-0.5">
-                            {listing.status === "ACTIVE" && (
-                              <span className="text-emerald-400 font-bold">
-                                🟢 Yayında • Kalan süre: {remDays} gün (Bitiş: {formatDate(listing.expiresAt)})
-                              </span>
-                            )}
-                            {listing.status === "SOLD" && (
-                              <span className="text-purple-400 font-bold">
-                                🤝 Bu araç satıldı olarak işaretlenmiştir. İlanınız yayından kaldırılmıştır.
-                              </span>
-                            )}
-                            {listing.status === "PASSIVE" && (
-                              <div className="flex flex-col gap-1.5 mt-1">
-                                <span className="text-slate-400 font-medium">
-                                  ⚪ Pasifte • Yenilemek için kalan süre: {passiveRemDays} gün (Son gün: {formatDate(listing.passiveUntil)})
-                                </span>
-                                <button
-                                  onClick={() => handleRenew(listing.id)}
-                                  className="w-fit bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition"
-                                >
-                                  Tekrar Yayına Al (Yenile)
-                                </button>
-                              </div>
-                            )}
-                            {listing.status === "EXPIRED" && (
-                              <span className="text-red-400 font-bold">
-                                🔴 Süresi doldu • Yeniden yayınlamak için tekrar yayınlama akışını başlatın.
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions Column */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => router.push(`/listings/${listing.id}`)}
-                          className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition"
-                        >
-                          İlanı Gör
-                        </button>
-                        <button
-                          onClick={() => router.push(`/listings/${listing.id}/edit`)}
-                          className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600/10 border border-orange-500/20 text-orange-400 hover:bg-orange-600/20 transition"
-                        >
-                          Düzenle
-                        </button>
-                        {listing.status === "ACTIVE" && (
-                          <button
-                            type="button"
-                            onClick={() => setPromotionModalListing(listing)}
-                            className="text-xs font-black px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer"
-                          >
-                            🚀 Öne Çıkar
-                          </button>
-                        )}
-                        {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
-                          <button
-                            onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
-                            className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition"
-                          >
-                            Yayınla
-                          </button>
-                        )}
-                        {listing.status === "ACTIVE" && (
-                          <button
-                            onClick={() => requestStatusChange(listing, "PASSIVE")}
-                            className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-750 transition"
-                          >
-                            Pasife Al
-                          </button>
-                        )}
-                        {listing.status === "ACTIVE" && (
-                          <button
-                            onClick={() => requestStatusChange(listing, "SOLD")}
-                            className="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition"
-                          >
-                            Satıldı İşaretle
-                          </button>
-                        )}
-                        {listing.status === "SOLD" && (
-                          <button
-                            onClick={() => requestStatusChange(listing, "ACTIVE")}
-                            className="text-xs font-black px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition shadow-lg shadow-orange-600/20 cursor-pointer"
-                          >
-                            ↩️ Tekrar Yayına Al (Satılmadı)
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Leads Dropdown Section */}
-                    {expandedLeads[listing.id] && listing.leads && listing.leads.length > 0 && (
-                      <div className="mt-4 border-t border-white/5 pt-4 flex flex-col gap-3">
-                        <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">İlanınıza Gelen İletişim Talepleri</span>
-                        <div className="grid grid-cols-1 gap-3">
-                          {listing.leads.map((lead: any) => (
-                            <div key={lead.id} className="p-4 bg-slate-950/40 border border-white/5 rounded-2xl flex flex-col gap-2 text-xs">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                                <span>Müşteri: <strong className="text-slate-200">{lead.buyerName}</strong></span>
-                                <span>Tarih: {formatDate(lead.createdAt)}</span>
-                              </div>
-                              <div className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] text-slate-450 border-b border-white/5 pb-2">
-                                <span>Telefon: <a href={`tel:${lead.buyerPhone}`} className="text-orange-400 hover:underline">{lead.buyerPhone}</a></span>
-                                <span>E-posta: <a href={`mailto:${lead.buyerEmail}`} className="text-orange-400 hover:underline">{lead.buyerEmail}</a></span>
-                              </div>
-                              <p className="text-slate-300 italic leading-relaxed whitespace-pre-wrap">
-                                "{lead.message}"
-                              </p>
-                              
-                              {lead.replyMessage ? (
-                                <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-1 text-[11px]">
-                                  <span className="font-bold text-emerald-400">🟢 Yanıtınız:</span>
-                                  <p className="text-slate-200">{lead.replyMessage}</p>
-                                  <span className="text-[9px] text-slate-500 text-right mt-1">{formatDate(lead.repliedAt)}</span>
-                                </div>
-                              ) : (
-                                <form
-                                  onSubmit={(e) => {
-                                    e.preventDefault();
-                                    handleSendReply(listing.id, lead.id);
-                                  }}
-                                  className="mt-3 flex gap-2"
-                                >
-                                  <input
-                                    type="text"
-                                    placeholder="Müşteriye yanıt yazın..."
-                                    value={replyTexts[lead.id] || ""}
-                                    required
-                                    onChange={(e) => setReplyTexts(prev => ({ ...prev, [lead.id]: e.target.value }))}
-                                    className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-250 outline-none focus:border-orange-500 transition"
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="bg-orange-650 hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs transition"
-                                  >
-                                    Cevapla
-                                  </button>
-                                </form>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+        <button
+          onClick={() => setActiveTab("past")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition cursor-pointer ${
+            activeTab === "past"
+              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
+              : "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-slate-200"
+          }`}
+        >
+          <span>📜 Geçmiş İlanlarım (Satılan & Doldu)</span>
+          <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black">
+            {pastListings.length}
+          </span>
+        </button>
       </div>
 
-      {/* Promotion Management Modal */}
-      {promotionModalListing && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="relative w-full max-w-4xl bg-[#0b0f19] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
-              <div>
-                <span className="text-[10px] font-black uppercase text-orange-400 tracking-wider">İlan Promosyon Yönetimi</span>
-                <h3 className="text-lg font-black text-white mt-0.5">{promotionModalListing.title}</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  {promotionModalListing.modelYear} • {promotionModalListing.kilometers?.toLocaleString('tr-TR')} km • {promotionModalListing.city}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPromotionModalListing(null)}
-                className="w-8 h-8 rounded-full bg-slate-900 border border-white/10 text-slate-400 hover:text-white flex items-center justify-center transition text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {/* Listings List */}
+      {displayedListings.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-16 bg-slate-900/10 border border-white/5 rounded-3xl gap-4 text-center">
+          <span className="text-5xl">🚗</span>
+          <h3 className="text-lg font-bold text-slate-300">
+            {activeTab === "past" ? "Geçmiş ilanınız bulunmuyor" : "Henüz yayınlanmış bir ilanınız yok"}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-sm">
+            {activeTab === "past"
+              ? "Satılan veya pasife alınan ilanlarınız burada listelenir."
+              : "Aracınızı TorqueScout üzerinde binlerce potansiyel alıcıya ulaştırmak için hemen bir ilan oluşturun."}
+          </p>
+          {activeTab === "active" && (
+            <button
+              onClick={() => router.push("/listings/create")}
+              className="mt-2 bg-orange-600 hover:bg-orange-500 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition cursor-pointer"
+            >
+              ➕ Hemen İlan Verme Adımına Git
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {displayedListings.map((listing) => {
+            const hasLeads = listing.leads && listing.leads.length > 0;
+            const isLeadsExpanded = expandedLeads[listing.id];
+            const isPublishing = publishingId === listing.id;
 
-            {/* Promotion Cards Component */}
-            <ListingPromotionsManagement
-              listingId={promotionModalListing.id}
-              token={token}
-              onSuccess={() => {
-                setActionSuccess("Promosyon ilanınıza başarıyla uygulandı!");
-                refreshListings();
-              }}
-            />
-          </div>
+            return (
+              <div
+                key={listing.id}
+                className="flex flex-col bg-slate-900/20 border border-white/5 rounded-3xl overflow-hidden hover:border-white/10 transition"
+              >
+                {/* Main Row */}
+                <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  {/* Thumbnail & Info */}
+                  <div className="flex items-center gap-5 flex-1 min-w-0">
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 flex-shrink-0 border border-white/5">
+                      {listing.media && listing.media.length > 0 ? (
+                        <img
+                          src={listing.media[0].url}
+                          alt={listing.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-3xl">🚗</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-base font-bold text-slate-200 truncate">{listing.title}</h2>
+                        {listing.isUrgent && <UrgentListingBadge size="small" />}
+                        <span
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            listing.status === "ACTIVE"
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : listing.status === "DRAFT"
+                              ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              : listing.status === "PENDING_REVIEW"
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                              : listing.status === "PASSIVE"
+                              ? "bg-slate-700/40 text-slate-400 border border-white/10"
+                              : listing.status === "SOLD"
+                              ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                              : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                          }`}
+                        >
+                          {listing.status === "ACTIVE"
+                            ? "AKTİF"
+                            : listing.status === "DRAFT"
+                            ? "TASLAK (DRAFT)"
+                            : listing.status === "PENDING_REVIEW"
+                            ? "İNCELEMEDE"
+                            : listing.status === "PASSIVE"
+                            ? "PASİF"
+                            : listing.status === "SOLD"
+                            ? "SATILDI"
+                            : listing.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                        <span>
+                          {listing.year} • {listing.mileage?.toLocaleString("tr-TR")} km • {listing.locationCity || "Şehir Belirtilmedi"}
+                        </span>
+                        <span className="text-rose-400 font-bold flex items-center gap-1">
+                          ❤️ {listing._count?.favorites || listing.favoriteCount || 0} Favoriye Eklendi
+                        </span>
+                      </div>
+
+                      {listing.status === "ACTIVE" && listing.expiresAt && (
+                        <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-bold mt-1">
+                          <span>🟢 Yayında • Kalan süre: {getRemainingDays(listing.expiresAt)} gün (Bitiş: {formatDate(listing.expiresAt)})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Column */}
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={() => router.push(`/listings/${listing.id}`)}
+                      className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition cursor-pointer"
+                    >
+                      İlanı Gör
+                    </button>
+                    <button
+                      onClick={() => router.push(`/listings/${listing.id}/edit`)}
+                      className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600/10 border border-orange-500/20 text-orange-400 hover:bg-orange-600/20 transition cursor-pointer"
+                    >
+                      Düzenle
+                    </button>
+
+                    {listing.status === "ACTIVE" && (
+                      <button
+                        type="button"
+                        onClick={() => setPromotionModalListing(listing)}
+                        className="text-xs font-black px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white transition shadow-lg shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        🚀 Öne Çıkar
+                      </button>
+                    )}
+
+                    {(listing.status === "DRAFT" || listing.status === "REJECTED") && (
+                      <button
+                        onClick={() => handleStatusChange(listing.id, "PENDING_REVIEW")}
+                        disabled={isPublishing}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Yayınla
+                      </button>
+                    )}
+
+                    {listing.status === "ACTIVE" && (
+                      <button
+                        onClick={() => requestStatusChange(listing, "PASSIVE")}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:bg-slate-750 transition cursor-pointer"
+                      >
+                        Pasife Al
+                      </button>
+                    )}
+
+                    {listing.status === "ACTIVE" && (
+                      <button
+                        onClick={() => requestStatusChange(listing, "SOLD")}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition cursor-pointer"
+                      >
+                        Satıldı İşaretle
+                      </button>
+                    )}
+
+                    {listing.status === "SOLD" && (
+                      <button
+                        onClick={() => requestStatusChange(listing, "ACTIVE")}
+                        className="text-xs font-black px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition shadow-lg shadow-orange-600/20 cursor-pointer"
+                      >
+                        ↩️ Tekrar Yayına Al (Satılmadı)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Status Confirmation Modal */}
+      {/* Confirmation Modal */}
       {confirmModal && confirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="relative w-full max-w-md bg-[#0b0f19] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-base font-black text-white flex items-center gap-2">{confirmModal.title}</h3>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
+            <h4 className="font-bold text-white text-base font-sans">{confirmModal.title}</h4>
+            <p className="text-slate-300 font-sans text-xs leading-relaxed">{confirmModal.message}</p>
+            <div className="flex justify-end gap-2 font-sans pt-2">
               <button
-                type="button"
                 onClick={() => setConfirmModal(null)}
-                className="text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed font-medium">
-              {confirmModal.message}
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/5 transition cursor-pointer"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Vazgeç
               </button>
               <button
-                type="button"
                 onClick={() => {
                   const { listingId, targetStatus } = confirmModal;
                   setConfirmModal(null);
@@ -676,13 +619,71 @@ function SellerDashboardContent() {
           </div>
         </div>
       )}
+
+      {/* Publish Warning Modal (Clear feedback on why publish failed/requires action) */}
+      {publishWarningModal && publishWarningModal.isOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl font-mono text-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                <AlertCircle className="w-5 h-5" />
+              </span>
+              <h4 className="font-bold text-white text-base font-sans">{publishWarningModal.title}</h4>
+            </div>
+
+            <p className="text-slate-300 font-sans text-xs leading-relaxed">
+              {publishWarningModal.message}
+            </p>
+
+            <div className="flex justify-end gap-2 font-sans pt-2">
+              <button
+                onClick={() => setPublishWarningModal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Kapat
+              </button>
+              <button
+                onClick={() => {
+                  const url = publishWarningModal.actionUrl;
+                  setPublishWarningModal(null);
+                  router.push(url);
+                }}
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl text-xs transition cursor-pointer flex items-center gap-1"
+              >
+                {publishWarningModal.actionText} ➔
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promotionModalListing && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-950 border border-white/10 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setPromotionModalListing(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-xl bg-white/5 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <ListingPromotionsManagement
+              listingId={promotionModalListing.id}
+              token={token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "")}
+              onSuccess={() => {
+                setPromotionModalListing(null);
+                refreshListings();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function SellerDashboard() {
+export default function SellerDashboardPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-32 text-slate-400 text-xs font-bold">Dashboard Yükleniyor...</div>}>
+    <Suspense fallback={<div className="p-12 text-center text-slate-400 font-mono text-xs">Yükleniyor...</div>}>
       <SellerDashboardContent />
     </Suspense>
   );
