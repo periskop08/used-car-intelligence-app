@@ -242,11 +242,13 @@ export default function CreateListing() {
     new Set(
       finalCandidates
         .map((v) =>
-          resolveHorsepower({
-            ...v,
-            brandName: v.brand?.name || brandObj?.name,
-            modelName: v.model?.name || modelObj?.name,
-          })
+          v.powerEnrichment?.verificationStatus === 'VERIFIED' && v.powerEnrichment.powerHp
+            ? v.powerEnrichment.powerHp
+            : resolveHorsepower({
+                ...v,
+                brandName: v.brand?.name || brandObj?.name,
+                modelName: v.model?.name || modelObj?.name,
+              })
         )
         .filter(Boolean) as number[]
     )
@@ -956,7 +958,19 @@ export default function CreateListing() {
                 )}
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
+                  {finalCandidates.length === 1 && finalCandidates[0].powerEnrichment?.verificationStatus === 'VERIFIED' && (
+                    <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      TR/EU Katalog Doğrulandı
+                    </span>
+                  )}
+                  {(!useCustomVariant && availablePowers.length === 0) && (
+                    <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      Doğrulanıyor
+                    </span>
+                  )}
+                </div>
                 {!useCustomVariant && availablePowers.length > 0 ? (
                   <select
                     value={enginePower}
@@ -973,7 +987,7 @@ export default function CreateListing() {
                     type="number"
                     value={enginePower}
                     onChange={(e) => setEnginePower(e.target.value)}
-                    placeholder="Örn: 110"
+                    placeholder="Örn: 128"
                     className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                   />
                 )}

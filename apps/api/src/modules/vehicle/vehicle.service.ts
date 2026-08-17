@@ -68,12 +68,14 @@ export class VehicleService {
         trim: true,
         country: true,
         specs: true,
+        powerEnrichment: true,
       },
       orderBy: { year: 'desc' },
     });
 
     return list.map((v) => {
-      const resolvedHp = resolveHorsepower(v);
+      const sideCarHp = v.powerEnrichment?.verificationStatus === 'VERIFIED' ? v.powerEnrichment.powerHp : null;
+      const resolvedHp = sideCarHp || resolveHorsepower(v);
       if (resolvedHp && v.engine) {
         return {
           ...v,
