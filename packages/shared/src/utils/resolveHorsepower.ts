@@ -117,7 +117,7 @@ const CANONICAL_ENGINE_HP_MAP: Record<string, number> = {
 
 /**
  * Resolves exact Horsepower (HP) for a vehicle variant based on DB specs,
- * brand + engine rules, displacement heuristics, and Turkish market lookup tables.
+ * model/brand + engine rules, displacement heuristics, and Turkish market lookup tables.
  */
 export function resolveHorsepower(v: any): number | null {
   if (!v) return null;
@@ -140,13 +140,37 @@ export function resolveHorsepower(v: any): number | null {
     }
   }
 
-  // 2. Brand & Engine Specific Priority Rules
-  const brandName = (v.brand?.name || v.brandName || "").trim().toUpperCase();
+  // 2. Brand & Model Specific Priority Rules
+  const brandName = (v.brand?.name || v.model?.brand?.name || v.brandName || "").trim().toUpperCase();
+  const modelName = (v.model?.name || v.modelName || "").trim().toUpperCase();
   const engineCode = (v.engine?.code || v.engine?.name || "").trim().toUpperCase();
 
+  // Model-specific hard overrides (e.g. Cerato / Elantra / Ceed)
+  if (modelName.includes("CERATO") || modelName.includes("ELANTRA")) {
+    if (engineCode.includes("1.6") || engineCode.includes("MPI") || engineCode.includes("SMARTSTREAM")) {
+      if (engineCode.includes("CRDI") || engineCode.includes("DIESEL")) return 136;
+      return 128; // Kia Cerato 1.6 MPI / Smartstream -> 128 HP
+    }
+  }
+
+  if (modelName.includes("CEED") || modelName.includes("I30")) {
+    if (engineCode.includes("1.6 CRDI") || engineCode.includes("CRDI")) return 136;
+    if (engineCode.includes("1.0")) return 120;
+    if (engineCode.includes("1.4")) return 140;
+    if (engineCode.includes("1.5")) return 160;
+  }
+
+  if (modelName.includes("EGEA")) {
+    if (engineCode.includes("1.6 MPI") || engineCode.includes("1.6 ETORQ") || engineCode.includes("1.6 E-TORQ")) return 110;
+    if (engineCode.includes("1.4 FIRE") || engineCode.includes("1.4")) return 95;
+    if (engineCode.includes("1.3 MULTIJET") || engineCode.includes("1.3")) return 95;
+    if (engineCode.includes("1.6 MULTIJET")) return 120;
+  }
+
   if (brandName.includes("KIA") || brandName.includes("HYUNDAI")) {
-    if (engineCode.includes("1.6 MPI") || engineCode.includes("1.6MPI") || engineCode.includes("GAMMA") || engineCode.includes("SMARTSTREAM")) {
-      return 128; // Kia Cerato / Hyundai Elantra 1.6 MPI -> 128 HP
+    if (engineCode.includes("1.6 MPI") || engineCode.includes("1.6MPI") || engineCode.includes("1.6") || engineCode.includes("GAMMA") || engineCode.includes("SMARTSTREAM")) {
+      if (engineCode.includes("CRDI") || engineCode.includes("DIESEL")) return 136;
+      return 128; // Kia / Hyundai 1.6 MPI -> 128 HP
     }
     if (engineCode.includes("1.4 MPI")) return 100;
     if (engineCode.includes("1.2 MPI")) return 84;
@@ -165,21 +189,22 @@ export function resolveHorsepower(v: any): number | null {
     if (engineCode.includes("1.6 MULTIJET")) return 120;
   }
 
-  if (brandName.includes("TOYOTA")) {
-    if (engineCode.includes("1.6") && (engineCode.includes("VALVEMATIC") || engineCode.includes("VVT"))) return 132;
-    if (engineCode.includes("1.5") && engineCode.includes("DYNAMIC")) return 125;
+  if (brandName.includes("TOYOTA") || modelName.includes("COROLLA")) {
+    if (engineCode.includes("1.6")) return 132;
+    if (engineCode.includes("1.5")) return 125;
+    if (engineCode.includes("1.8")) return 122;
     if (engineCode.includes("1.4 D-4D")) return 90;
   }
 
-  if (brandName.includes("HONDA")) {
-    if (engineCode.includes("1.6 I-VTEC")) return 125;
-    if (engineCode.includes("1.5 VTEC")) return 182;
-    if (engineCode.includes("1.6 I-DTEC")) return 120;
+  if (brandName.includes("HONDA") || modelName.includes("CIVIC")) {
+    if (engineCode.includes("1.6")) return 125;
+    if (engineCode.includes("1.5")) return 182;
   }
 
-  if (brandName.includes("OPEL")) {
+  if (brandName.includes("OPEL") || modelName.includes("ASTRA")) {
     if (engineCode.includes("1.6 CDTI")) return 136;
     if (engineCode.includes("1.4 TURBO")) return 140;
+    if (engineCode.includes("1.2")) return 130;
   }
 
   // 3. Engine code matching with canonical Turkish market HP dictionary
@@ -206,7 +231,7 @@ export function resolveHorsepower(v: any): number | null {
 
   if (displacement > 0) {
     if (displacement >= 1580 && displacement <= 1610) {
-      if (brandName.includes("KIA") || brandName.includes("HYUNDAI")) return 128;
+      if (brandName.includes("KIA") || brandName.includes("HYUNDAI") || modelName.includes("CERATO") || modelName.includes("ELANTRA")) return 128;
       if (fuelType.includes("DIESEL") || fuelType.includes("DIZEL")) return 120;
       return 110;
     }
