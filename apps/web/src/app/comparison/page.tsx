@@ -9,8 +9,8 @@ import { RecallComparison } from "./components/RecallComparison";
 import { ContextualDataWarning } from "./components/ContextualDataWarning";
 import { ComparisonVehicleCards } from "./components/ComparisonVehicleCards";
 import { CriterionAssessmentMatrix } from "./components/CriterionAssessmentMatrix";
+import { DecisionSummary } from "./components/DecisionSummary";
 import ScenarioCards from "./components/ScenarioCards";
-import RiskComparison from "./components/RiskComparison";
 import PrePurchaseChecks from "./components/PrePurchaseChecks";
 import TechnicalComparisonTable from "./components/TechnicalComparisonTable";
 import QuotaBadge from "@/components/QuotaBadge";
@@ -911,11 +911,11 @@ export default function ComparisonPage() {
             vehicles={comparisonResult.vehicles}
           />
 
-          {/* Chronic Risks (Rendered ONLY if verified chronic risks exist) */}
-          {comparisonResult.comparisonResult.riskComparison?.items &&
-            comparisonResult.comparisonResult.riskComparison.items.length > 0 && (
-              <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
-            )}
+          {/* Karar Özeti & Tercih Sıralaması (AI Decision Summary Card) */}
+          <DecisionSummary
+            comparisonResult={comparisonResult.comparisonResult}
+            vehicles={comparisonResult.vehicles}
+          />
 
           {/* Recalls (Rendered ONLY if recalls exist) */}
           {comparisonResult.comparisonResult.recallComparison &&
