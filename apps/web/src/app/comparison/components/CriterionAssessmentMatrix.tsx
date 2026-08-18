@@ -416,12 +416,19 @@ export function CriterionAssessmentMatrix({
                     <span>⚠️</span> Genel değerlendirme için 8 kriterin tamamında doğrulanmış veri gerekiyor — {Object.values(ev.assessments).filter(a => !a.insufficientData && a.score !== null).length}/8 mevcut.
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    {renderStars(ev.overallStars ?? (ev.overallScore ? ev.overallScore / 20 : null), "lg")}
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      · {ev.coveragePct === 100 ? "8/8 rapor kapsamı" : `%${ev.coveragePct} rapor kapsamı`}
-                    </span>
-                  </div>
+                  (() => {
+                    const overallStarsVal = ev.overallStars ?? (ev.overallScore ? ev.overallScore / 20 : null);
+                    return (
+                      <div className="flex items-center gap-2">
+                        {renderStars(overallStarsVal, "lg")}
+                        {overallStarsVal !== null && (
+                          <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg shadow-sm">
+                            {overallStarsVal.toFixed(1)} / 5
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
@@ -516,9 +523,19 @@ export function CriterionAssessmentMatrix({
                               — {cellInsufficientText}
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center">
-                              {renderStars(assessment.stars ?? (assessment.score ? assessment.score / 20 : null), "md")}
-                            </div>
+                            (() => {
+                              const starVal = assessment.stars ?? (assessment.score ? assessment.score / 20 : null);
+                              return (
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {renderStars(starVal, "md")}
+                                  {starVal !== null && (
+                                    <span className="text-[11px] font-bold text-amber-400 font-mono">
+                                      {starVal.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()
                           )}
                         </td>
                       );
@@ -677,7 +694,19 @@ export function CriterionAssessmentMatrix({
                         {isInsufficient ? (
                           <span className="text-slate-500 italic text-[11px]">— {cellInsufficientText}</span>
                         ) : (
-                          renderStars(assessment.stars ?? (assessment.score ? assessment.score / 20 : null), "md")
+                          (() => {
+                            const starVal = assessment.stars ?? (assessment.score ? assessment.score / 20 : null);
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                {renderStars(starVal, "md")}
+                                {starVal !== null && (
+                                  <span className="text-[11px] font-bold text-amber-400 font-mono">
+                                    {starVal.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
                         )}
                       </div>
 
