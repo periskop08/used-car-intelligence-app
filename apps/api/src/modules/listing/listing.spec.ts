@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma.service';
 import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 
+import { R2Service } from './r2.service';
+
 describe('Listing Module Tests', () => {
   let listingService: ListingService;
 
@@ -32,6 +34,7 @@ describe('Listing Module Tests', () => {
       providers: [
         ListingService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: R2Service, useValue: { deleteObject: jest.fn(), generatePresignedUploadUrl: jest.fn() } },
       ],
     }).compile();
 
@@ -113,6 +116,14 @@ describe('Listing Module Tests', () => {
       mockPrisma.vehicleVariant.findUnique.mockResolvedValue({
         id: 'variant-1',
         status: 'APPROVED',
+        brand: { name: 'Volkswagen' },
+        model: { name: 'Golf' },
+        year: 2016,
+        bodyType: 'Hatchback',
+        engine: { code: '1.4 TSI' },
+        fuelType: 'Benzin',
+        transmission: { name: 'DSG' },
+        trim: { name: 'Comfortline' },
       });
 
       await expect(listingService.validateListingCanBecomeActive('listing-1')).rejects.toThrow(
@@ -140,6 +151,14 @@ describe('Listing Module Tests', () => {
       mockPrisma.vehicleVariant.findUnique.mockResolvedValue({
         id: 'variant-1',
         status: 'APPROVED',
+        brand: { name: 'Volkswagen' },
+        model: { name: 'Golf' },
+        year: 2016,
+        bodyType: 'Hatchback',
+        engine: { code: '1.4 TSI' },
+        fuelType: 'Benzin',
+        transmission: { name: 'DSG' },
+        trim: { name: 'Comfortline' },
       });
 
       await expect(listingService.validateListingCanBecomeActive('listing-1')).resolves.toBe(true);
@@ -203,7 +222,7 @@ describe('Listing Module Tests', () => {
       });
 
       await expect(listingService.validateListingCanBecomeActive('listing-1')).rejects.toThrow(
-        new BadRequestException('Bağlı vehicleVariant status değeri APPROVED olmalı.'),
+        new BadRequestException('Bu kombinasyon için net varyant verisi bulunamadı. Lütfen seçimleri kontrol edin.'),
       );
     });
   });
@@ -225,7 +244,18 @@ describe('Listing Module Tests', () => {
           { id: 'media-1', moderationStatus: MediaModerationStatus.APPROVED },
         ],
       });
-      mockPrisma.vehicleVariant.findUnique.mockResolvedValue({ id: 'variant-1', status: 'APPROVED' });
+      mockPrisma.vehicleVariant.findUnique.mockResolvedValue({
+        id: 'variant-1',
+        status: 'APPROVED',
+        brand: { name: 'Volkswagen' },
+        model: { name: 'Golf' },
+        year: 2016,
+        bodyType: 'Hatchback',
+        engine: { code: '1.4 TSI' },
+        fuelType: 'Benzin',
+        transmission: { name: 'DSG' },
+        trim: { name: 'Comfortline' },
+      });
 
       await listingService.validateListingCanBecomeActive('listing-free');
       expect(mockPrisma.vehicleListing.update).toHaveBeenCalledWith(

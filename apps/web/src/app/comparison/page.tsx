@@ -904,40 +904,26 @@ export default function ComparisonPage() {
             <ComparisonModeNotice generationMode={comparisonResult.comparisonResult.generationMode} />
           )}
 
-          {/* Section 0: NEW 8-Criteria Assessment Matrix & Top Decision Summary Cards */}
+          {/* 8-Criteria Assessment Matrix & Star Rating System */}
           <CriterionAssessmentMatrix
             criterionResult={comparisonResult.comparisonResult.criterionResult}
             generationMode={comparisonResult.comparisonResult.generationMode}
             vehicles={comparisonResult.vehicles}
           />
 
-          {/* Section 1: Unified Vehicle Cards (1 Card Per Selected Vehicle!) */}
-          <ComparisonVehicleCards
-            cards={adaptLegacyComparisonResult(comparisonResult.comparisonResult)}
-          />
-
-          {/* Section 2: Quick Scenario Category Winners */}
-          <ScenarioCards scenarios={comparisonResult.comparisonResult.scenarioRecommendations} />
-
-          {/* Section 3: Chronic Risks (Rendered ONLY if verified chronic risks exist) */}
+          {/* Chronic Risks (Rendered ONLY if verified chronic risks exist) */}
           {comparisonResult.comparisonResult.riskComparison?.items &&
             comparisonResult.comparisonResult.riskComparison.items.length > 0 && (
               <RiskComparison riskComparison={comparisonResult.comparisonResult.riskComparison} />
             )}
 
-          {/* Section 4: Recalls (Rendered ONLY if recalls exist) */}
+          {/* Recalls (Rendered ONLY if recalls exist) */}
           {comparisonResult.comparisonResult.recallComparison &&
             comparisonResult.comparisonResult.recallComparison.length > 0 && (
               <RecallComparison recalls={comparisonResult.comparisonResult.recallComparison} />
             )}
 
-          {/* Section 5: Pre-Purchase Inspection Checks (Accordion) */}
-          <PrePurchaseChecks verdicts={comparisonResult.comparisonResult.vehicleVerdicts} />
-
-          {/* Section 6: Detailed Technical Specs Table (Accordion) */}
-          <TechnicalComparisonTable vehicles={comparisonResult.vehicles || []} />
-
-          {/* Section 7: Context-Aware Live AI Chatbot */}
+          {/* Context-Aware Live AI Chatbot */}
           <ComparisonChatbot
             variantIds={matchedVariantIds}
             vehicleNames={(comparisonResult.vehicles || []).map((v: any) => v.name)}

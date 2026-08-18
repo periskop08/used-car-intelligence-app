@@ -285,11 +285,19 @@ export interface MarketPriceEvidence {
   sourceType?: 'LISTING_ANALYSIS' | 'SNAPSHOT' | 'VERIFIED_DATABASE' | 'INSUFFICIENT';
 }
 
+export interface EquipmentFeatureStatus {
+  featureKey: string;
+  status: 'PRESENT' | 'ABSENT' | 'NOT_MENTIONED';
+  evidenceText: string | null;
+  supportingFactIds: string[];
+}
+
 export interface CriterionAssessment {
   criterionKey: CriterionKey;
   score: number | null; // 0–100 or null if data insufficient
   stars: number | null; // Calculated by backend: rounded to nearest 0.5 stars
   confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+  evidenceGrade?: 'VERIFIED' | 'REPORT_DERIVED';
   summary: string;
   positiveFactors: string[];
   compromises?: string[];
@@ -298,6 +306,7 @@ export interface CriterionAssessment {
   missingInputs?: string[];
   insufficientData?: boolean;
   marketPriceEvidence?: MarketPriceEvidence; // ONLY for Criterion 8
+  equipmentFeatureStatuses?: EquipmentFeatureStatus[]; // Structural feature matrix for Criterion 8
 }
 
 export interface VehicleCriterionEvaluation {
@@ -630,18 +639,29 @@ export function computeBackendCriterionMetrics(
       ? raw!.compromises
       : (Array.isArray(raw?.negativeFactors) ? raw!.negativeFactors : []);
 
+    const supportingFactIds = Array.isArray(raw?.supportingFactIds) ? raw!.supportingFactIds : [];
+    const evidenceGrade: 'VERIFIED' | 'REPORT_DERIVED' = (raw as any)?.evidenceGrade || 
+      (supportingFactIds.length > 0 ? 'VERIFIED' : 'REPORT_DERIVED');
+
+    let confidence = (raw?.confidence as any) || (isInsufficient ? 'INSUFFICIENT' : 'MEDIUM');
+    if (evidenceGrade === 'REPORT_DERIVED' && confidence === 'HIGH') {
+      confidence = 'MEDIUM';
+    }
+
     processedAssessments[key] = {
       criterionKey: key as CriterionKey,
       score: isInsufficient ? null : rawScore,
       stars,
-      confidence: (raw?.confidence as any) || (isInsufficient ? 'INSUFFICIENT' : 'MEDIUM'),
+      confidence,
+      evidenceGrade,
       summary: raw?.summary || (isInsufficient ? 'Bu kriter için yeterli veri bulunmuyor.' : ''),
       positiveFactors,
       compromises,
       negativeFactors: compromises,
-      supportingFactIds: Array.isArray(raw?.supportingFactIds) ? raw!.supportingFactIds : [],
+      supportingFactIds,
       missingInputs: Array.isArray(raw?.missingInputs) ? raw!.missingInputs : [],
       insufficientData: isInsufficient,
+      equipmentFeatureStatuses: key === 'EQUIPMENT_TECHNOLOGY' ? raw?.equipmentFeatureStatuses : undefined,
     };
 
     if (!isInsufficient && rawScore !== null) {

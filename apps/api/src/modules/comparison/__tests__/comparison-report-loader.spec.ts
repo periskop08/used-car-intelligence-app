@@ -482,5 +482,132 @@ describe('ComparisonReportLoaderService', () => {
         expect(f.value).not.toBe('null');
       });
     });
+
+    describe('L: Strict Equivalent Variant Report Lookup', () => {
+      let mockPrisma: any;
+      let loader: ComparisonReportLoaderService;
+
+      const targetVariant = {
+        id: 'af2e5edd-cefc-48b6-9052-81d40adfe0c8',
+        brandId: 'brand_kia',
+        modelId: 'model_cerato',
+        year: 2022,
+        fuelType: 'PETROL',
+        brand: { name: 'Kia' },
+        model: { name: 'Cerato' },
+        trim: { name: 'Prestige' },
+        engine: { code: '1.6 MPI' },
+        transmission: { name: 'Otomatik' },
+      };
+
+      const equivalentVariant = {
+        id: '7255c14c-fd64-4503-8480-7bbea02f8ae6',
+        brandId: 'brand_kia',
+        modelId: 'model_cerato',
+        year: 2022,
+        fuelType: 'PETROL',
+        brand: { name: 'Kia' },
+        model: { name: 'Cerato' },
+        trim: { name: 'Prestige' },
+        engine: { code: '1.6  MPI' },
+        transmission: { name: 'Otomatik' },
+      };
+
+      const equivalentReport = {
+        id: 'cmst575w9000em5uzo4tf1dq6',
+        variantId: '7255c14c-fd64-4503-8480-7bbea02f8ae6',
+        status: 'COMPLETED',
+        provider: 'OPENAI',
+        mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+        reportVersion: 'v6_standard',
+        reportData: fixtureReportData,
+      };
+
+      beforeEach(() => {
+        mockPrisma = {
+          generatedVehicleReport: {
+            findFirst: jest.fn().mockImplementation((args: any) => {
+              if (args.where?.variantId === 'target_exact_id') {
+                return Promise.resolve({ id: 'exact_report_id', variantId: 'target_exact_id', reportData: fixtureReportData });
+              }
+              if (args.where?.variantId === equivalentVariant.id) {
+                return Promise.resolve(equivalentReport);
+              }
+              return Promise.resolve(null);
+            }),
+          },
+          vehicleVariant: {
+            findUnique: jest.fn().mockImplementation((args: any) => {
+              if (args.where?.id === targetVariant.id) return Promise.resolve(targetVariant);
+              if (args.where?.id === 'target_exact_id') return Promise.resolve({ ...targetVariant, id: 'target_exact_id' });
+              return Promise.resolve(null);
+            }),
+            findMany: jest.fn().mockImplementation((args: any) => {
+              if (args.where?.brandId === 'brand_kia') {
+                return Promise.resolve([equivalentVariant]);
+              }
+              return Promise.resolve([]);
+            }),
+          },
+        };
+        loader = new ComparisonReportLoaderService(mockPrisma);
+      });
+
+      it('L1: should prioritize exact variant report over equivalent variant lookup', async () => {
+        const report = await loader.findLatestGeneratedReport('target_exact_id');
+        expect(report).toBeDefined();
+        expect(report?.id).toBe('exact_report_id');
+      });
+
+      it('L2: should accept "1.6 MPI" and "1.6  MPI" as equivalent variants', async () => {
+        const report = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report).toBeDefined();
+        expect(report?.id).toBe(equivalentReport.id);
+      });
+
+      it('L3: should REJECT candidate if year is different', async () => {
+        mockPrisma.vehicleVariant.findMany.mockResolvedValueOnce([{ ...equivalentVariant, year: 2021 }]);
+        const report = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report).toBeNull();
+      });
+
+      it('L4: should REJECT candidate if engine is different', async () => {
+        mockPrisma.vehicleVariant.findMany.mockResolvedValueOnce([{ ...equivalentVariant, engine: { code: '1.6 GDI' } }]);
+        const report = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report).toBeNull();
+      });
+
+      it('L5: should REJECT candidate if trim is different', async () => {
+        mockPrisma.vehicleVariant.findMany.mockResolvedValueOnce([{ ...equivalentVariant, trim: { name: 'Comfort' } }]);
+        const report = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report).toBeNull();
+      });
+
+      it('L6: should REJECT candidate if transmission or fuelType is different', async () => {
+        mockPrisma.vehicleVariant.findMany.mockResolvedValueOnce([{ ...equivalentVariant, transmission: { name: 'Manuel' } }]);
+        const report1 = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report1).toBeNull();
+
+        mockPrisma.vehicleVariant.findMany.mockResolvedValueOnce([{ ...equivalentVariant, fuelType: 'DIESEL' }]);
+        const report2 = await loader.findLatestGeneratedReport(targetVariant.id);
+        expect(report2).toBeNull();
+      });
+
+      it('L7: should load equivalent report into dossier while retaining original vehicleId af2e5edd...', async () => {
+        const dossier = await loader.loadDossierForVariant(targetVariant.id);
+        expect(dossier.reportAvailable).toBe(true);
+        expect(dossier.variantId).toBe(targetVariant.id);
+        expect(dossier.reportId).toBe(equivalentReport.id);
+      });
+
+      it('L8: should provide 8/8 criterion fact coverage for equivalent Kia dossier', async () => {
+        const dossier = await loader.loadDossierForVariant(targetVariant.id);
+        const facts = dossier.dataQuality?.supportingFacts || [];
+        const v8Criteria = ['RELIABILITY', 'FAILURE_SEVERITY', 'FUEL_EFFICIENCY', 'USAGE_SUITABILITY', 'PERFORMANCE', 'COMFORT', 'PRACTICALITY', 'EQUIPMENT_TECHNOLOGY'];
+        const coveredV8Criteria = new Set(facts.map((f: any) => f.criterion).filter((c: string) => v8Criteria.includes(c)));
+        expect(dossier.reportAvailable).toBe(true);
+        expect(coveredV8Criteria.size).toBe(8);
+      });
+    });
   });
 });

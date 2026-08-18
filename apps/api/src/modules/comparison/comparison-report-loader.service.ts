@@ -554,6 +554,22 @@ export interface VehicleComparisonDossier {
   supportingFactIds: string[];
 }
 
+export function normalizeIdentityString(val: string | null | undefined): string {
+  if (!val) return '';
+  let s = val.toString().toLowerCase();
+  s = s
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'i');
+  s = s.replace(/[^a-z0-9.]/g, ' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
 @Injectable()
 export class ComparisonReportLoaderService {
   constructor(private prisma: PrismaService) {}
@@ -561,6 +577,7 @@ export class ComparisonReportLoaderService {
   /**
    * Fetches the latest valid GeneratedVehicleReport for a variantId
    * according to TorqueScout report selection rules.
+   * If no exact report exists for variantId, performs a strict equivalent-variant lookup.
    */
   async findLatestGeneratedReport(variantId: string) {
     if (!variantId) return null;
@@ -592,7 +609,99 @@ export class ComparisonReportLoaderService {
       orderBy: { completedAt: 'desc' },
     }).catch(() => null);
 
-    return fallbackVersionReport;
+    if (fallbackVersionReport) {
+      return fallbackVersionReport;
+    }
+
+    return this.findEquivalentVariantReport(variantId);
+  }
+
+  /**
+   * Finds a GeneratedVehicleReport from a strict equivalent variant if exact variant lacks a report.
+   * Equivalence requires matching normalized brand, model, year, trim, engine, transmission, fuelType.
+   */
+  async findEquivalentVariantReport(variantId: string) {
+    if (!variantId) return null;
+
+    const target = await this.prisma.vehicleVariant.findUnique({
+      where: { id: variantId },
+      include: {
+        brand: true,
+        model: true,
+        trim: true,
+        engine: true,
+        transmission: true,
+      },
+    }).catch(() => null);
+
+    if (!target) return null;
+
+    const targetBrand = normalizeIdentityString(target.brand?.name);
+    const targetModel = normalizeIdentityString(target.model?.name);
+    const targetYear = target.year;
+    const targetTrim = normalizeIdentityString(target.trim?.name);
+    const targetEngine = normalizeIdentityString(target.engine?.code || (target as any).engineCode);
+    const targetTrans = normalizeIdentityString(target.transmission?.name || target.transmission?.code || (target as any).transmission);
+    const targetFuel = normalizeIdentityString(target.fuelType);
+
+    if (!targetYear || !targetFuel) return null;
+    if (typeof this.prisma.vehicleVariant?.findMany !== 'function') return null;
+
+    const candidates = await this.prisma.vehicleVariant.findMany({
+      where: {
+        brandId: target.brandId,
+        modelId: target.modelId,
+        year: target.year,
+        fuelType: target.fuelType,
+        id: { not: variantId },
+      },
+      include: {
+        brand: true,
+        model: true,
+        trim: true,
+        engine: true,
+        transmission: true,
+      },
+    }).catch(() => []);
+
+    for (const cand of candidates) {
+      const cBrand = normalizeIdentityString(cand.brand?.name);
+      const cModel = normalizeIdentityString(cand.model?.name);
+      const cYear = cand.year;
+      const cTrim = normalizeIdentityString(cand.trim?.name);
+      const cEngine = normalizeIdentityString(cand.engine?.code || (cand as any).engineCode);
+      const cTrans = normalizeIdentityString(cand.transmission?.name || cand.transmission?.code || (cand as any).transmission);
+      const cFuel = normalizeIdentityString(cand.fuelType);
+
+      const isMatch = (
+        cBrand === targetBrand &&
+        cModel === targetModel &&
+        cYear === targetYear &&
+        cTrim === targetTrim &&
+        cEngine === targetEngine &&
+        cTrans === targetTrans &&
+        cFuel === targetFuel
+      );
+
+      if (isMatch) {
+        const candidateReport = await this.prisma.generatedVehicleReport.findFirst({
+          where: {
+            variantId: cand.id,
+            status: 'COMPLETED',
+            archivedAt: null,
+            provider: { not: 'DETERMINISTIC_FALLBACK' },
+            mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT'] },
+          },
+          orderBy: { completedAt: 'desc' },
+        }).catch(() => null);
+
+        if (candidateReport) {
+          return candidateReport;
+        }
+      }
+    }
+
+    return null;
   }
 
   /**

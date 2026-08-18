@@ -7,12 +7,17 @@ import { PrismaService } from '../../prisma.service';
 import { EvidenceRulesService } from './evidence-rules.service';
 import { AiReportGeneratorService } from './ai-report-generator.service';
 import { SourceKind, ApprovalStatus, DataCoverage } from '@used-car-intelligence/shared';
+import { VehicleCharacterResearchService } from './vehicle-character-research.service';
 
 describe('Research Module Tests', () => {
   let researchService: ResearchService;
   let coverageService: CoverageService;
 
   const mockPrisma = {
+    researchCache: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
     vehicleVariant: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -37,6 +42,7 @@ describe('Research Module Tests', () => {
         WebSearchProvider,
         EvidenceRulesService,
         AiReportGeneratorService,
+        VehicleCharacterResearchService,
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();
