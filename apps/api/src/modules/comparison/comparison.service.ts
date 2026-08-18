@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { ComparisonReportLoaderService, VehicleComparisonDossier, generateDerivedFactId } from './comparison-report-loader.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { VehicleReportService } from '../vehicle-report/vehicle-report.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
 import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
 import OpenAI from 'openai';
@@ -132,6 +133,7 @@ export class ComparisonService {
     private reportLoaderService: ComparisonReportLoaderService,
     private featureLimitService: FeatureLimitService,
     private subscriptionService: SubscriptionService,
+    private vehicleReportService: VehicleReportService,
   ) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
@@ -254,7 +256,7 @@ export class ComparisonService {
 
     const priority = (dto.selectedPriority as ComparisonPriority) || 'BALANCED';
 
-    const profiles = await this.loadVehicleProfiles(requestedIds);
+    const profiles = await this.loadVehicleProfiles(requestedIds, userId);
 
     const sourceDataVersion = computeSourceDataVersionFromProfiles(profiles);
     const cacheKey = `v11_final_${sourceDataVersion}_${priority}`;
@@ -674,7 +676,23 @@ KATI TALİMATLAR:
     };
   }
 
-  private async loadVehicleProfiles(variantIds: string[]): Promise<ComparisonVehicleProfile[]> {
+  private async loadVehicleProfiles(variantIds: string[], userId?: string): Promise<ComparisonVehicleProfile[]> {
+    // STAGE 1: Ensure all selected vehicle variants have a completed GeneratedVehicleReport in DB.
+    // If a report does not exist for a variant, auto-generate a full live report using Araç Sorgula pipeline!
+    for (const id of variantIds) {
+      const existingReport = await this.reportLoaderService.findLatestGeneratedReport(id);
+      if (!existingReport && this.vehicleReportService) {
+        console.log(`[ComparisonService] Variant ${id} has no pre-stored GeneratedVehicleReport. Auto-generating live report via Araç Sorgula pipeline...`);
+        await this.vehicleReportService.createVehicleReport(userId || 'guest_user', {
+          variantId: id,
+          idempotencyKey: `auto_comp_${id}_${Date.now()}`,
+          forceRefresh: false,
+        }).catch(err => {
+          console.warn(`[ComparisonService] Live report auto-generation notice for ${id}: ${err?.message || err}`);
+        });
+      }
+    }
+
     const profiles: ComparisonVehicleProfile[] = [];
 
     for (const id of variantIds) {

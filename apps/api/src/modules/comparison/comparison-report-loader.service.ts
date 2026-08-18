@@ -989,75 +989,6 @@ export class ComparisonReportLoaderService {
       maintenanceNotes.push(`${variant.brand?.name} ${variant.model?.name} periyodik motor yağı ve arıza kontrolü`);
     }
 
-    // Generate derived supporting facts for all 8 criteria so AI comparison has 100% valid evidence
-    const derivedFacts: ReportSupportingFact[] = [];
-    const addDbFact = (criterion: string, label: string, val: string | number, sourcePath: string) => {
-      const factId = generateDerivedFactId(`db_${variantId}`, criterion, sourcePath);
-      derivedFacts.push({
-        factKey: factId,
-        id: factId,
-        criterion,
-        category: criterion,
-        label,
-        value: val,
-        sourcePath,
-        source: 'SYSTEM_DERIVED',
-        confidence: 'MEDIUM',
-        reportId: `db_${variantId}`,
-      } as any);
-    };
-
-    // 1. RELIABILITY
-    if (problems.length > 0) {
-      problems.forEach((p, idx) => {
-        addDbFact('RELIABILITY', `Kronik Sorun Kaydı: ${p.title}`, p.title, `variant.problems[${idx}].title`);
-      });
-    } else {
-      addDbFact('RELIABILITY', `Veritabanı Güvenilirlik Verisi (${variant.brand?.name} ${variant.model?.name})`, `${variant.brand?.name} ${variant.model?.name} kronik arıza kayıtları`, 'variant.reliability');
-    }
-
-    // 2. FAILURE_SEVERITY
-    if (problems.length > 0) {
-      problems.forEach((p, idx) => {
-        addDbFact('FAILURE_SEVERITY', `Arıza Ciddiyet Riski: ${p.title}`, `${p.title} (${p.severity})`, `variant.problems[${idx}].severity`);
-      });
-    } else {
-      addDbFact('FAILURE_SEVERITY', `Veritabanı Arıza Ciddiyet Verisi`, `${variant.engine?.code || 'Motor'} ve ${variant.transmission?.name || 'Şanzıman'} arıza riski`, 'variant.failure_severity');
-    }
-
-    // 3. FUEL_EFFICIENCY
-    if (combinedFuel) {
-      addDbFact('FUEL_EFFICIENCY', `Karma Yakıt Tüketimi`, `${combinedFuel} L/100km`, 'specs.averageFuelConsumption');
-    } else {
-      addDbFact('FUEL_EFFICIENCY', `Yakıt Türü`, variant.fuelType || 'Benzin', 'variant.fuelType');
-    }
-
-    // 4. USAGE_SUITABILITY (Crucial 4 mandatory categories!)
-    addDbFact('USAGE_SUITABILITY', `Şehir İçi Kullanım Uyum Uyum`, `${variant.brand?.name} ${variant.model?.name} şehir içi pratiklik`, 'usage.cityUse');
-    addDbFact('USAGE_SUITABILITY', `Otoyol Kullanım Uyum Uyum`, `${variant.brand?.name} ${variant.model?.name} otoyol stabilite`, 'usage.highwayUse');
-    addDbFact('USAGE_SUITABILITY', `Yoğun Trafik Davranışı`, `${variant.transmission?.name || 'Şanzıman'} yoğun trafik davranışı`, 'usage.trafficBehavior');
-    addDbFact('USAGE_SUITABILITY', `Kullanım Senaryosu ve Sürücü Profili`, `${variant.generation?.bodyType || 'Binek'} araç sürücü profili`, 'usage.scenarioProfile');
-
-    // 5. PERFORMANCE
-    if (hp) addDbFact('PERFORMANCE', `Motor Gücü`, `${hp} HP`, 'specs.horsepower');
-    if (torque) addDbFact('PERFORMANCE', `Tork Değeri`, `${torque} Nm`, 'specs.torqueNm');
-    if (!hp && !torque) addDbFact('PERFORMANCE', `Motor Tipi`, `${variant.engine?.code || 'Motor'} performans verisi`, 'variant.engine');
-
-    // 6. COMFORT
-    addDbFact('COMFORT', `Sürüş Konforu ve Kabin İzolasyonu`, `${variant.trim?.name || 'Standart'} donanım kabin konforu`, 'comfort.cabin');
-
-    // 7. PRACTICALITY
-    if (bootLitres) {
-      addDbFact('PRACTICALITY', `Bagaj Hacmi`, `${bootLitres} Litre`, 'specs.luggageCapacity');
-    } else {
-      addDbFact('PRACTICALITY', `Kullanım Pratikliği`, `${variant.generation?.bodyType || 'Binek'} kasa yaşam alanı`, 'variant.bodyType');
-    }
-
-    // 8. EQUIPMENT_TECHNOLOGY
-    addDbFact('EQUIPMENT_TECHNOLOGY', `Donanım Paketi Özellikleri`, `${variant.trim?.name || 'Standart'} paketi donanım detayları`, 'variant.trim');
-
-    const derivedFactIds = derivedFacts.map(f => f.factKey);
-
     return {
       variantId,
       reportAvailable: false,
@@ -1072,7 +1003,7 @@ export class ComparisonReportLoaderService {
         fuelType: variant.fuelType,
         transmissionName: variant.transmission?.name,
         trimName: variant.trim?.name,
-        supportingFactIds: derivedFactIds,
+        supportingFactIds: [],
       },
       scoring: {
         buyabilityScore: legacyReport?.buyabilityScore ?? null,
@@ -1085,7 +1016,7 @@ export class ComparisonReportLoaderService {
         combinationAssessment: `${variant.brand?.name} ${variant.engine?.code || ''} motor ve ${variant.transmission?.name || ''} şanzıman veritabanı verisi.`,
         maintenanceSensitivity: [],
         knownLimitations: [],
-        supportingFactIds: derivedFactIds.filter(id => id.includes('RELIABILITY') || id.includes('PERFORMANCE')),
+        supportingFactIds: [],
       },
       performanceUsage: {
         powerHp: hp,
@@ -1094,13 +1025,13 @@ export class ComparisonReportLoaderService {
         topSpeedKmh: topSpeed,
         combinedFuelL100km: combinedFuel,
         trunkCapacityLiters: bootLitres,
-        supportingFactIds: derivedFactIds.filter(id => id.includes('PERFORMANCE') || id.includes('FUEL_EFFICIENCY') || id.includes('PRACTICALITY')),
+        supportingFactIds: [],
       },
       commonProblems: problems,
       recalls: recalls,
       maintenanceOwnership: {
         criticalMaintenanceNotes: maintenanceNotes,
-        supportingFactIds: derivedFactIds.filter(id => id.includes('RELIABILITY')),
+        supportingFactIds: [],
       },
       usageScenarios: [],
       executiveSummary: {
@@ -1116,13 +1047,13 @@ export class ComparisonReportLoaderService {
         bestFor: [],
         avoidIf: [],
         topThreeActions: [],
-        supportingFactIds: derivedFactIds,
+        supportingFactIds: [],
       },
       dataQuality: {
-        overallConfidence: 'MEDIUM',
-        supportingFacts: derivedFacts,
+        overallConfidence: 'LOW',
+        supportingFacts: [],
       },
-      supportingFactIds: derivedFactIds,
+      supportingFactIds: [],
     };
   }
 }

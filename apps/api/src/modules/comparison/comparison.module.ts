@@ -7,9 +7,10 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { PrismaService } from '../../prisma.service';
 import { ResearchModule } from '../research/research.module';
 import { VehicleModule } from '../vehicle/vehicle.module';
+import { VehicleReportModule } from '../vehicle-report/vehicle-report.module';
 
 @Module({
-  imports: [ResearchModule, VehicleModule],
+  imports: [ResearchModule, VehicleModule, VehicleReportModule],
   controllers: [ComparisonController],
   providers: [ComparisonService, ComparisonReportLoaderService, FeatureLimitService, SubscriptionService, PrismaService],
   exports: [ComparisonService, ComparisonReportLoaderService],

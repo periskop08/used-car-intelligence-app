@@ -6,12 +6,13 @@ import { FeatureLimitService } from '../../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../../subscription/subscription.service';
 import { PrismaService } from '../../../prisma.service';
 import { CURRENT_REPORT_VERSION } from '../../vehicle-report/vehicle-report-cache.service';
+import { VehicleReportService } from '../../vehicle-report/vehicle-report.service';
 import { SubscriptionTier, FeatureKey } from '@prisma/client';
 import { formatFuelType, CRITERIA_WEIGHTS } from '@used-car-intelligence/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 
-describe('ComparisonService Real Service Integration & Comprehensive Regression Tests', () => {
+describe('ComparisonService Unit Tests', () => {
   let service: ComparisonService;
   let loaderService: ComparisonReportLoaderService;
   let featureLimitService: FeatureLimitService;
@@ -66,6 +67,10 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
     getEffectiveTier: jest.fn().mockResolvedValue(SubscriptionTier.TANISMA),
   };
 
+  const mockVehicleReportService = {
+    createVehicleReport: jest.fn().mockResolvedValue({ reportId: 'rep_1', status: 'COMPLETED' }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -76,6 +81,7 @@ describe('ComparisonService Real Service Integration & Comprehensive Regression 
         { provide: ComparisonReportLoaderService, useValue: mockLoaderService },
         { provide: FeatureLimitService, useValue: mockFeatureLimitService },
         { provide: SubscriptionService, useValue: mockSubscriptionService },
+        { provide: VehicleReportService, useValue: mockVehicleReportService },
       ],
     }).compile();
 
