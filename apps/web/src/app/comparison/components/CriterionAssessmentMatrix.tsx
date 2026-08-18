@@ -425,27 +425,6 @@ export function CriterionAssessmentMatrix({
                 )}
               </div>
 
-              {/* Strongest & Major Risk Highlights */}
-              <div className="space-y-1.5 text-xs">
-                {strongest && strongest.score !== null && (
-                  <div className="text-emerald-400 flex items-center gap-1.5 truncate">
-                    <span className="shrink-0">💪</span>
-                    <span className="truncate flex items-center gap-1">
-                      <strong>En Güçlü:</strong> {CRITERIA_METADATA[strongest.criterionKey]?.title}
-                      <span className="shrink-0">{renderStars(strongest.stars ?? (strongest.score ? strongest.score / 20 : null), "sm")}</span>
-                    </span>
-                  </div>
-                )}
-                {worst && worst.score !== null && worst.negativeFactors && worst.negativeFactors.length > 0 && (
-                  <div className="text-rose-400 flex items-center gap-1.5 truncate">
-                    <span className="shrink-0">⚠️</span>
-                    <span className="truncate">
-                      <strong>Kritik Risk:</strong> {worst.negativeFactors[0]}
-                    </span>
-                  </div>
-                )}
-              </div>
-
               {/* Vehicle Report Action Button */}
               <div className="pt-2.5 border-t border-white/10 mt-1">
                 {rank === 1 ? (
