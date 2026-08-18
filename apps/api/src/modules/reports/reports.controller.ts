@@ -154,16 +154,35 @@ export class ReportsController {
     return this.listingService.getOverview(filter);
   }
 
-  @Get('listings/performance')
+  @Get(['listings/performance', 'admin/listings/performance'])
   async getListingsPerformance(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
     return this.listingService.getPerformance(filter);
   }
 
-  @Get('listings/quality')
+  @Get(['listings/performance/drilldown', 'admin/listings/performance/drilldown'])
+  async getListingsPerformanceDrilldown(
+    @Query('metric') metric: string,
+    @Query('range') range: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.listingService.getPerformanceDrilldown(metric || 'views', range || '30d');
+  }
+
+  @Get(['listings/quality', 'admin/listings/quality', 'admin/listings/health'])
   async getListingsQuality(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
     return this.listingService.getQuality(filter);
+  }
+
+  @Get(['listings/quality/drilldown', 'admin/listings/quality/drilldown', 'admin/listings/health/drilldown'])
+  async getListingsQualityDrilldown(
+    @Query('category') category: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.listingService.getQualityDrilldown(category || 'brokenMedia');
   }
 
   @Get('listings/showcase')
@@ -179,6 +198,29 @@ export class ReportsController {
   }
 
   // FINANCE REPORTS
+  @Get(['finance/overview', 'admin/finance/overview'])
+  async getFinanceOverview(
+    @Query('range') range: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.financeService.getFinanceOverview(range, from, to);
+  }
+
+  @Get(['finance/overview/drilldown', 'admin/finance/overview/drilldown'])
+  async getFinanceOverviewDrilldown(
+    @Query('metric') metric: string,
+    @Query('range') range: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Req() req: any,
+  ) {
+    this.verifyAdminAccess(req);
+    return this.financeService.getFinanceOverviewDrilldown(metric || 'mrr', range, from, to);
+  }
+
   @Get('finance/subscriptions')
   async getFinanceSubscriptions(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
@@ -191,10 +233,10 @@ export class ReportsController {
     return this.financeService.getRevenue(filter);
   }
 
-  @Get('finance/one-time-packages')
+  @Get(['finance/one-time-packages', 'admin/finance/one-time-packages', 'admin/finance/packages'])
   async getFinanceOneTimePackages(@Query() filter: any, @Req() req: any) {
     this.verifyAdminAccess(req);
-    return this.financeService.getOneTimePackages(filter);
+    return this.financeService.getOneTimePackagesDashboard(filter);
   }
 
   @Get('finance/costs')

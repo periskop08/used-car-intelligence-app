@@ -575,6 +575,21 @@ export class ListingController {
       throw new NotFoundException('İlan bulunamadı.');
     }
 
+    // Record buyer listing view (excludes admin inspection views)
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || req.headers['x-admin-inspection'] === 'true';
+    if (!isAdmin) {
+      const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+      const userAgent = req.headers['user-agent'] || '';
+      this.listingService['prisma'].listingView.create({
+        data: {
+          listingId: id,
+          userId: user?.id || null,
+          ipHash: rawIp,
+          userAgent: userAgent.slice(0, 200),
+        },
+      }).catch(() => {});
+    }
+
     let isFavorited = false;
     let isSellerFavorited = false;
     if (user?.id) {
@@ -672,7 +687,10 @@ export class ListingController {
   @ApiOperation({ summary: 'Satıcının kendi tüm ilanlarını listele' })
   async getMyListings(@GetUser() user: UserPayload) {
     const items = await this.listingService['prisma'].vehicleListing.findMany({
-      where: { sellerId: user.id },
+      where: {
+        sellerId: user.id,
+        status: { notIn: [ListingStatus.DELETED, ListingStatus.ARCHIVED] },
+      },
       include: {
         _count: {
           select: { favorites: true },
@@ -738,6 +756,29 @@ export class ListingController {
     @Body() dto: UpdateListingStatusDto,
   ) {
     return this.listingService.updateListingStatus(id, user.id, dto.status);
+  }
+
+  @Delete('listings/:id')
+  @Post('listings/:id/delete')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Taslak ilanı sil' })
+  async deleteDraftListing(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.listingService.deleteDraftListing(id, user.id);
+  }
+
+  @Post('listings/:id/resubmit')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Düzeltilen ilanı tekrar moderasyon incelemesine gönder' })
+  async resubmitListingForReview(
+    @Param('id') id: string,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.listingService.resubmitListingForReview(id, user.id);
   }
 
   @Post('listings/:id/media')

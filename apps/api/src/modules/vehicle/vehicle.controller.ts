@@ -7,12 +7,15 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 
 
+import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.service';
+
 @ApiTags('Vehicles')
 @Controller('vehicles')
 export class VehicleController {
   constructor(
     private vehicleService: VehicleService,
     private jwtService: JwtService,
+    private powerEnrichmentService: VehiclePowerEnrichmentService,
   ) {}
 
   @Get('brands')
@@ -40,6 +43,25 @@ export class VehicleController {
       throw new BadRequestException('modelId query parametresi gereklidir.');
     }
     return this.vehicleService.getVariants(modelId);
+  }
+
+  @Get('variants/:id/power-enrichment')
+  @ApiOperation({ summary: 'Varyanta Ait Side-Car Motor Gücü Enrichment Verisini Al' })
+  getPowerEnrichment(@Param('id') id: string) {
+    return this.powerEnrichmentService.getEnrichmentByVariantId(id);
+  }
+
+  @Post('variants/:id/research-power')
+  @ApiOperation({ summary: 'Varyant İçin Motor Gücü Araştırmasını Başlat' })
+  researchVariantPower(@Param('id') id: string) {
+    return this.powerEnrichmentService.researchVariantPower(id);
+  }
+
+  @Post('admin/power-enrichment/batch')
+  @ApiOperation({ summary: 'Motor Gücü Batch Araştırma Runner' })
+  runBatchEnrichment(@Query('limit') limit?: string) {
+    const lim = limit ? parseInt(limit, 10) : 30;
+    return this.powerEnrichmentService.runInitialBatchEnrichment(lim);
   }
 
   @Get('variants/:id')

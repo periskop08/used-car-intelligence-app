@@ -100,10 +100,17 @@ export class AdminClubController {
     return this.clubService.reviewComment(commentId, req.user.id, role);
   }
 
-  @Post('comments/:commentId/restore')
+  @Post(['comments/:commentId/restore', 'comments/:commentId/publish', 'comments/:commentId/approve'])
   async restoreComment(@Param('commentId') commentId: string, @Req() req: any) {
     const role = await this.verifyModeratorOrAdmin(req);
     return this.clubService.restoreComment(commentId, req.user.id, role);
+  }
+
+  @Delete('comments/:commentId')
+  @Post('comments/:commentId/delete')
+  async deleteCommentAdmin(@Param('commentId') commentId: string, @Req() req: any) {
+    const role = await this.verifyModeratorOrAdmin(req);
+    return this.clubService.deleteComment(commentId, req.user.id, role);
   }
 
   @Post('users/:userId/mute')
@@ -299,10 +306,10 @@ export class AdminClubController {
     return this.clubService.getAdminStats();
   }
 
-  @Get('moderation-log')
+  @Get(['moderation-log', 'activity', 'audit-log'])
   async getModerationLogs(@Query('limit') limit?: string, @Req() req?: any) {
     await this.verifyAdminOnly(req);
-    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    const parsedLimit = limit ? parseInt(limit, 10) : 100;
     return this.clubService.getModerationLogs(parsedLimit);
   }
 

@@ -171,9 +171,9 @@ export class ClubService implements OnModuleInit {
     switch (tier) {
       case SubscriptionTier.YETKIN:
       case SubscriptionTier.STANDARD:
-      case SubscriptionTier.PRO:
         return { code: 'YETKIN', label: 'Yetkin' };
 
+      case SubscriptionTier.PRO:
       case SubscriptionTier.PROFESYONEL:
       case SubscriptionTier.PREMIUM:
         return { code: 'PROFESYONEL', label: 'Profesyonel' };
@@ -607,13 +607,27 @@ export class ClubService implements OnModuleInit {
       throw new ForbiddenException('Bu yorumu silme yetkiniz yok.');
     }
 
-    return this.prisma.clubComment.update({
+    const updated = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: {
         status: ClubCommentStatus.DELETED,
         deletedAt: new Date(),
       },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId: userId,
+        actorRole: userRole,
+        actionType: 'COMMENT_DELETED',
+        targetUserId: comment.authorId,
+        commentId: comment.id,
+        postId: comment.postId,
+        reason: 'Admin tarafından kalıcı silindi',
+      },
+    });
+
+    return updated;
   }
 
   async togglePostLike(postId: string, userId: string) {
@@ -1127,17 +1141,41 @@ export class ClubService implements OnModuleInit {
   }
 
   async reviewComment(commentId: string, actorId: string, actorRole: string) {
-    return this.prisma.clubComment.update({
+    const comment = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: { status: ClubCommentStatus.PENDING_REVIEW },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId,
+        actorRole,
+        actionType: 'COMMENT_UNDER_REVIEW',
+        targetUserId: comment.authorId,
+        commentId,
+      },
+    });
+
+    return comment;
   }
 
   async restoreComment(commentId: string, actorId: string, actorRole: string) {
-    return this.prisma.clubComment.update({
+    const comment = await this.prisma.clubComment.update({
       where: { id: commentId },
       data: { status: ClubCommentStatus.VISIBLE },
     });
+
+    await this.prisma.clubModerationLog.create({
+      data: {
+        actorId,
+        actorRole,
+        actionType: 'COMMENT_PUBLISHED',
+        targetUserId: comment.authorId,
+        commentId,
+      },
+    });
+
+    return comment;
   }
 
   async muteUser(userId: string, actorId: string, actorRole: string, dto: MuteUserDto) {

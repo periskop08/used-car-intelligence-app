@@ -1,35 +1,41 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { API_BASE_URL } from '@/utils/apiConfig';
+import { AdminUserDrawer } from '../../components/AdminUserDrawer';
+import { MessageSquare, Send, User, CheckCircle2, Search } from 'lucide-react';
 
 export default function AdminClubMessagesPage() {
   const searchParams = useSearchParams();
-  const preselected = searchParams.get("selected");
+  const preselected = searchParams.get('selected');
 
   const [users, setUsers] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUserForDrawer, setSelectedUserForDrawer] = useState<string | null>(null);
 
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
-  const [bulkContent, setBulkContent] = useState("");
+  const [bulkContent, setBulkContent] = useState('');
   const [sendingBulk, setSendingBulk] = useState(false);
-  const [bulkJobResult, setBulkJobResult] = useState<any | null>(null);
+
+  // Single Direct Message State
+  const [activeConversationUser, setActiveConversationUser] = useState<any | null>(null);
+  const [directMessageText, setDirectMessageText] = useState('');
+  const [sendingDirect, setSendingDirect] = useState(false);
 
   const fetchData = async () => {
-    const token = localStorage.getItem("accessToken");
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
 
     setLoading(true);
     try {
       const [convRes, usersRes] = await Promise.all([
-        fetch(`${API_URL}/api/admin/club/conversations`, {
+        fetch(`${API_BASE_URL}/admin/club/conversations`, {
           headers: { Authorization: `Bearer ${token}` },
         }).then((r) => (r.ok ? r.json() : [])),
-        fetch(`${API_URL}/api/admin/club/users?limit=50&sort=CREATED_AT_ASC`, {
+        fetch(`${API_BASE_URL}/admin/club/users?limit=50`, {
           headers: { Authorization: `Bearer ${token}` },
         }).then((r) => (r.ok ? r.json() : { users: [] })),
       ]);
@@ -38,11 +44,12 @@ export default function AdminClubMessagesPage() {
       setUsers(usersRes.users || []);
 
       if (preselected) {
-        const ids = preselected.split(",").filter(Boolean);
+        const ids = preselected.split(',').filter(Boolean);
         setSelectedUserIds(new Set(ids));
         setShowBulkModal(true);
       }
     } catch (e) {
+      console.error('Fetch messaging data error:', e);
     } finally {
       setLoading(false);
     }
@@ -52,25 +59,50 @@ export default function AdminClubMessagesPage() {
     fetchData();
   }, []);
 
-  const toggleSelectUser = (userId: string) => {
-    const next = new Set(selectedUserIds);
-    if (next.has(userId)) next.delete(userId);
-    else next.add(userId);
-    setSelectedUserIds(next);
+  const handleSendDirectMessage = async () => {
+    if (!activeConversationUser || !directMessageText.trim()) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) return;
+
+    setSendingDirect(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/club/users/${activeConversationUser.id}/message`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: directMessageText.trim(),
+          sendNotification: true,
+        }),
+      });
+
+      if (res.ok) {
+        setDirectMessageText('');
+        fetchData();
+      } else {
+        alert('Mesaj gönderilemedi.');
+      }
+    } catch (e) {
+      alert('Hata oluştu.');
+    } finally {
+      setSendingDirect(false);
+    }
   };
 
   const handleSendBulkMessage = async () => {
     if (selectedUserIds.size === 0 || !bulkContent.trim()) return;
-    const token = localStorage.getItem("accessToken");
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!token) return;
 
     setSendingBulk(true);
     try {
-      let res = await fetch(`${API_URL}/api/admin/club/messages/bulk`, {
-        method: "POST",
+      const res = await fetch(`${API_BASE_URL}/admin/club/messages/bulk`, {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           userIds: Array.from(selectedUserIds),
@@ -78,218 +110,177 @@ export default function AdminClubMessagesPage() {
           sendNotification: true,
         }),
       });
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${API_URL}/admin/club/messages/bulk`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userIds: Array.from(selectedUserIds),
-            content: bulkContent.trim(),
-            sendNotification: true,
-          }),
-        });
-      }
+
       if (res.ok) {
-        const job = await res.json();
-        setBulkJobResult(job);
         setShowBulkModal(false);
-        setBulkContent("");
+        setBulkContent('');
         setSelectedUserIds(new Set());
         fetchData();
       } else {
-        const err = await res.json();
-        alert(err.message || "Toplu mesaj gönderilemedi.");
+        alert('Toplu mesaj gönderilemedi.');
       }
     } catch (e) {
-      alert("Hata oluştu.");
+      alert('Hata oluştu.');
     } finally {
       setSendingBulk(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto font-mono text-xs">
+      <div className="flex items-center justify-between pb-4 border-b border-white/10">
         <div>
-          <h2 className="text-lg font-black text-white">Toplu ve Bireysel Yönetici Mesajlaşması</h2>
-          <p className="text-xs text-slate-400">
-            Kullanıcıları otomatik listeden seçerek her alıcıya özel 1-e-1 mesaj gönderin.
+          <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-sans">
+            Tork Scout Club — Mesajlaşma Operasyon Merkezi
+          </h1>
+          <p className="text-xs text-slate-400 font-sans mt-1">
+            Club üyeleri ile 1-to-1 direkt bildirim ve mesajlaşma iletişimi.
           </p>
         </div>
 
         {selectedUserIds.size > 0 && (
           <button
             onClick={() => setShowBulkModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white font-black text-xs transition shadow-lg shadow-orange-600/20"
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl transition flex items-center gap-2 cursor-pointer"
           >
-            Seçilen {selectedUserIds.size} Kullanıcıya Mesaj Gönder ✉️
+            <MessageSquare className="w-4 h-4" /> Toplu Mesaj Gönder ({selectedUserIds.size} Seçili)
           </button>
         )}
       </div>
 
-      {/* Mesaj Alıcısı Aday Kullanıcılar */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-          <span className="text-lg">👥</span>
-          <h3 className="text-sm font-black text-white">Alıcı Kullanıcı Listesi (Eskiden Yeniye)</h3>
-        </div>
+      {/* Main Messaging Interface */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-900/60 rounded-2xl border border-white/10 overflow-hidden min-h-[500px]">
+        {/* Left / Conversation List */}
+        <div className="lg:col-span-4 border-r border-white/10 flex flex-col bg-slate-950/40">
+          <div className="p-3 border-b border-white/10 font-bold text-slate-300 text-xs font-sans flex items-center justify-between">
+            <span>Yönetici Konuşmaları & Üyeler</span>
+            <span className="text-[10px] text-slate-500 font-mono">{users.length} Üye</span>
+          </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-slate-400 text-xs font-bold">Kullanıcılar Yükleniyor...</div>
-        ) : users.length === 0 ? (
-          <p className="text-xs text-slate-500 py-2">Kullanıcı bulunamadı.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/60">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5 text-slate-400 font-bold">
-                  <th className="p-3 w-10 text-center">Seç</th>
-                  <th className="p-3">Müşteri No & Kullanıcı</th>
-                  <th className="p-3">Paket</th>
-                  <th className="p-3">Kayıt Tarihi</th>
-                  <th className="p-3 text-center">Durum</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-slate-200">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-white/5 transition">
-                    <td className="p-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.has(u.id)}
-                        onChange={() => toggleSelectUser(u.id)}
-                        className="rounded border-white/20 text-orange-500 focus:ring-orange-500"
-                      />
-                    </td>
-                    <td className="p-3 font-bold text-white">
-                      {u.customerNo} — {u.displayName}
-                    </td>
-                    <td className="p-3">
-                      {u.badge && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                          {typeof u.badge === "object" ? u.badge.label || u.badge.code : u.badge}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 font-mono text-slate-400">
-                      {new Date(u.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                    <td className="p-3 text-center">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                        AKTİF
+          <div className="flex-1 overflow-y-auto divide-y divide-white/5">
+            {loading ? (
+              <div className="p-6 text-center text-slate-400">Yükleniyor...</div>
+            ) : users.length === 0 ? (
+              <div className="p-6 text-center text-slate-500 text-xs">Kullanıcı bulunamadı.</div>
+            ) : (
+              users.map((u) => {
+                const isSelected = activeConversationUser?.id === u.id;
+
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => setActiveConversationUser(u)}
+                    className={`p-3 transition cursor-pointer flex items-center justify-between ${
+                      isSelected ? 'bg-orange-500/10 border-l-2 border-orange-500' : 'hover:bg-white/[0.03]'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-bold text-white font-sans text-xs block">{u.displayName}</span>
+                      <span className="text-[11px] text-slate-400 font-mono">{u.email || u.customerNo}</span>
+                    </div>
+                    {u.badge && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        {u.badge.label}
                       </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Geçmiş Konuşmalar */}
-      <div className="space-y-4 pt-4 border-t border-white/10">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">💬</span>
-          <h3 className="text-sm font-black text-white">Son Yönetici Konuşmaları ({conversations.length})</h3>
         </div>
 
-        {conversations.length === 0 ? (
-          <div className="p-8 rounded-2xl border border-white/10 bg-slate-900/60 text-center text-xs text-slate-400">
-            Henüz yönetici mesajı gönderilmemiş.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {conversations.map((c) => (
-              <div
-                key={c.id}
-                className="p-4 rounded-2xl border border-white/10 bg-slate-900/60 flex items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-white block">{c.userFormatted}</span>
-                  <p className="text-xs text-slate-300 line-clamp-1">{c.lastMessage || "Mesaj içeriği yok"}</p>
+        {/* Right / Direct Message Thread */}
+        <div className="lg:col-span-8 flex flex-col p-6 space-y-4">
+          {activeConversationUser ? (
+            <>
+              <div className="p-4 bg-slate-950 rounded-xl border border-white/10 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white font-sans text-sm">
+                    {activeConversationUser.displayName} ile İletişim
+                  </h3>
+                  <p className="text-slate-400 text-xs">{activeConversationUser.email || activeConversationUser.customerNo}</p>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap">
-                  {new Date(c.lastMessageAt || c.updatedAt).toLocaleDateString("tr-TR")}
-                </span>
+
+                <button
+                  onClick={() => setSelectedUserForDrawer(activeConversationUser.id)}
+                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-orange-400 border border-white/10 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" /> Kullanıcıyı Gör
+                </button>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="flex-1 bg-slate-950/80 rounded-xl border border-white/10 p-4 space-y-3 font-sans text-xs overflow-y-auto">
+                <div className="text-center text-slate-500 text-[11px]">
+                  Bu kullanıcıya gönderilecek mesajlar kullanıcının bildirim ve iletişim merkezine iletilir.
+                </div>
+              </div>
+
+              {/* Input Area */}
+              <div className="flex gap-2">
+                <textarea
+                  value={directMessageText}
+                  onChange={(e) => setDirectMessageText(e.target.value)}
+                  placeholder="Mesajınızı buraya yazın..."
+                  className="flex-1 bg-slate-950 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 font-sans h-20"
+                />
+                <button
+                  onClick={handleSendDirectMessage}
+                  disabled={sendingDirect || !directMessageText.trim()}
+                  className="px-5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" /> Gönder
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 space-y-2">
+              <MessageSquare className="w-8 h-8 text-slate-600" />
+              <p className="text-xs font-sans">İletişim kurmak istediğiniz Club üyesini soldaki listeden seçin.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bulk Message Modal */}
       {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-lg p-6 rounded-3xl border border-white/10 bg-slate-900 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white">
-                {selectedUserIds.size} Kullanıcıya Özel Mesaj Gönder
-              </h3>
-              <button
-                onClick={() => setShowBulkModal(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Mesajınız seçilen her kullanıcıya ayrı ve özel 1-e-1 yönetici mesajı olarak iletilecektir. Kullanıcılar bir grup sohbeti oluşturmayacaktır.
-            </p>
-
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="font-bold text-white text-sm font-sans">
+              Toplu Mesaj Gönder ({selectedUserIds.size} Kullanıcı)
+            </h3>
             <textarea
-              rows={4}
               value={bulkContent}
               onChange={(e) => setBulkContent(e.target.value)}
-              placeholder="Mesaj içeriğini buraya yazın..."
-              className="w-full bg-slate-950 border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
+              placeholder="Seçili tüm üyelere gönderilecek duyuru veya bilgi mesajı..."
+              className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 h-32 font-sans"
             />
-
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-2">
               <button
-                disabled={sendingBulk}
                 onClick={() => setShowBulkModal(false)}
-                className="px-4 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/5 transition"
+                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold text-xs"
               >
                 İptal
               </button>
               <button
-                disabled={sendingBulk || !bulkContent.trim()}
                 onClick={handleSendBulkMessage}
-                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-black transition shadow-lg shadow-orange-600/20"
+                disabled={sendingBulk || !bulkContent.trim()}
+                className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black rounded-xl text-xs disabled:opacity-50"
               >
-                {sendingBulk ? "Gönderiliyor..." : "Mesajları Gönder ✉️"}
+                Gönder & Bildirim Oluştur
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Message Job Status Modal */}
-      {bulkJobResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md p-6 rounded-3xl border border-white/10 bg-slate-900 shadow-2xl space-y-4">
-            <h3 className="text-base font-black text-white">Toplu Mesaj Gönderim Sonucu</h3>
-            <div className="text-xs font-mono space-y-1">
-              <p className="text-slate-300">Durum: <strong className="text-orange-400">{bulkJobResult.status}</strong></p>
-              <p className="text-emerald-400">✅ Başarılı Alıcı: {bulkJobResult.successCount}</p>
-              <p className="text-rose-400">❌ Başarısız Alıcı: {bulkJobResult.failureCount}</p>
-            </div>
-
-            <div className="text-right pt-2">
-              <button
-                onClick={() => setBulkJobResult(null)}
-                className="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs rounded-xl"
-              >
-                Tamam
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* User Drawer */}
+      {selectedUserForDrawer && (
+        <AdminUserDrawer
+          userId={selectedUserForDrawer}
+          isOpen={!!selectedUserForDrawer}
+          onClose={() => setSelectedUserForDrawer(null)}
+        />
       )}
     </div>
   );

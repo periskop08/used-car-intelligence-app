@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto';
 import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier } from '@prisma/client';
 import { R2Service } from './r2.service';
+import { isValidCityAndDistrict } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -208,6 +209,12 @@ export class ListingService {
     // If creating directly with ACTIVE/PENDING_REVIEW status, check quota first
     await this.checkQuota(userId);
 
+    if (dto.city && dto.district) {
+      if (!isValidCityAndDistrict(dto.city, dto.district)) {
+        throw new BadRequestException(`Geçersiz Şehir/İlçe eşleşmesi: ${dto.city} - ${dto.district}`);
+      }
+    }
+
     const isAiReady = false; // Will set to true if connected to approved variant
 
     return this.prisma.vehicleListing.create({
@@ -257,6 +264,16 @@ export class ListingService {
     if (!listing) throw new NotFoundException('Listing not found.');
     if (listing.sellerId !== userId) throw new ForbiddenException('Not authorized.');
 
+    if (dto.city || dto.district) {
+      const targetCity = dto.city !== undefined ? dto.city : listing.city;
+      const targetDistrict = dto.district !== undefined ? dto.district : listing.district;
+      if (targetCity && targetDistrict) {
+        if (!isValidCityAndDistrict(targetCity, targetDistrict)) {
+          throw new BadRequestException(`Geçersiz Şehir/İlçe eşleşmesi: ${targetCity} - ${targetDistrict}`);
+        }
+      }
+    }
+
     const dataToUpdate: any = { ...dto };
     if (listing.status === ListingStatus.REJECTED) {
       dataToUpdate.status = ListingStatus.PENDING_REVIEW;
@@ -300,6 +317,43 @@ export class ListingService {
     return this.prisma.vehicleListing.update({
       where: { id },
       data: dataToUpdate,
+    });
+  }
+
+  // Seller draft listing deletion handler
+  async deleteDraftListing(id: string, userId: string) {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+    });
+
+    if (!listing) throw new NotFoundException('İlan bulunamadı.');
+    if (listing.sellerId !== userId) throw new ForbiddenException('Bu ilanı silme yetkiniz yok.');
+    if (listing.status !== ListingStatus.DRAFT) {
+      throw new BadRequestException('Sadece TASLAK (DRAFT) durumundaki ilanlar silinebilir.');
+    }
+
+    return this.prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        status: ListingStatus.DELETED,
+      },
+    });
+  }
+
+  // Seller resubmit correction listing for moderation review
+  async resubmitListingForReview(id: string, userId: string) {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+    });
+
+    if (!listing) throw new NotFoundException('İlan bulunamadı.');
+    if (listing.sellerId !== userId) throw new ForbiddenException('Bu işlem için yetkiniz yok.');
+
+    return this.prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        status: ListingStatus.PENDING_REVIEW,
+      },
     });
   }
 

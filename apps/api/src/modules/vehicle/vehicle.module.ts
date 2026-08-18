@@ -8,10 +8,19 @@ import { PrismaService } from '../../prisma.service';
 
 import { DataQualityController } from './data-quality.controller';
 import { DataQualityService } from './data-quality.service';
+import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.service';
+import { WebSearchProvider } from '../research/providers/web-search.provider';
 
 @Module({
   controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController, DataQualityController],
-  providers: [VehicleService, SubscriptionService, PrismaService, DataQualityService],
-  exports: [VehicleService, DataQualityService],
+  providers: [
+    VehicleService,
+    SubscriptionService,
+    PrismaService,
+    DataQualityService,
+    VehiclePowerEnrichmentService,
+    WebSearchProvider,
+  ],
+  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService],
 })
 export class VehicleModule {}

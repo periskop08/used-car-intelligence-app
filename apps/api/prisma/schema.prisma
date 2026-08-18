@@ -522,6 +522,7 @@ model VehicleVariant {
   mappedCards           VehicleDiscoveryCardVariant[]
   profileMappings       VehicleProfileVariant[]
   priceSnapshot         VehicleVariantPriceSnapshot?
+  powerEnrichment       VehiclePowerEnrichment?
 
   @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
   @@index([brandId])
@@ -3073,5 +3074,70 @@ model DataQualitySnapshot {
   issuesJson      Json
   createdAt       DateTime @default(now())
 }
+
+enum PowerVerificationStatus {
+  PENDING
+  RESEARCHING
+  VERIFIED
+  CONFLICT
+  MISSING
+  FAILED
+}
+
+enum PowerSourceMarket {
+  TURKEY
+  EUROPE
+}
+
+enum PowerMarketResolution {
+  TR_PRIMARY
+  EU_FALLBACK
+}
+
+model VehiclePowerEnrichment {
+  id                   String                  @id @default(uuid())
+  vehicleVariantId     String                  @unique
+  powerKw              Float?
+  powerPs              Float?
+  powerHp              Float?
+  sourceReportedValue  Float?
+  sourceReportedUnit   String?
+  verificationStatus   PowerVerificationStatus @default(PENDING)
+  sourceMarket         PowerSourceMarket?
+  marketResolution     PowerMarketResolution?
+  confidenceScore      Float                   @default(1.0)
+  identityFingerprint  String?
+  identitySnapshot     Json?
+  researchedAt         DateTime?
+  verifiedAt           DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  variant              VehicleVariant          @relation(fields: [vehicleVariantId], references: [id], onDelete: Cascade)
+  evidences            VehiclePowerEvidence[]
+
+  @@index([vehicleVariantId])
+  @@index([verificationStatus])
+  @@index([sourceMarket])
+}
+
+model VehiclePowerEvidence {
+  id              String                 @id @default(uuid())
+  enrichmentId    String
+  sourceUrl       String
+  sourceDomain    String
+  sourceKind      String?
+  sourceMarket    PowerSourceMarket
+  reportedValue   Float
+  reportedUnit    String
+  title           String?
+  evidenceExcerpt String?
+  retrievedAt     DateTime               @default(now())
+
+  enrichment      VehiclePowerEnrichment @relation(fields: [enrichmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrichmentId])
+}
+
 
 

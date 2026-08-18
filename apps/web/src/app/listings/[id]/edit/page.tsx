@@ -59,6 +59,10 @@ export default function EditListing() {
   const [uploading, setUploading] = useState(false);
   const [mediaError, setMediaError] = useState("");
 
+  // Moderation state
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [listingStatus, setListingStatus] = useState("");
+
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (!savedToken) {
@@ -74,6 +78,9 @@ export default function EditListing() {
         return res.json();
       })
       .then((data) => {
+        setRejectionReason(data.rejectionReason || "");
+        setListingStatus(data.status || "");
+
         setTitle(data.title || "");
         setDescription(data.description || "");
         setPriceAmount(data.priceAmount ? String(data.priceAmount) : "");
@@ -275,13 +282,24 @@ export default function EditListing() {
         return res.json();
       })
       .then(() => {
-        setSuccessMsg("İlanınız başarıyla güncellendi!");
+        if (rejectionReason || listingStatus === "REVISION_REQUIRED") {
+          return fetch(`${API_URL}/listings/${listingId}/resubmit`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => res.json());
+        }
+      })
+      .then(() => {
+        const isCorrection = !!(rejectionReason || listingStatus === "REVISION_REQUIRED");
+        setSuccessMsg(
+          isCorrection
+            ? "İlanınız güncellendi ve tekrar moderasyon incelemesine gönderildi!"
+            : "İlanınız başarıyla güncellendi!"
+        );
         setSaving(false);
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: "smooth" });
-        // Redirect to dashboard listings after 1.5 seconds
         setTimeout(() => {
-          router.push("/dashboard/listings");
+          router.push(isCorrection ? "/dashboard/listings?tab=correction" : "/dashboard/listings");
         }, 1500);
       })
       .catch((err) => {
@@ -306,8 +324,22 @@ export default function EditListing() {
         <p className="text-sm text-slate-400 mt-1">Fiyat, açıklama, fotoğraf ve araç özelliklerini dilediğiniz gibi güncelleyin.</p>
       </div>
 
+      {rejectionReason && (
+        <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col gap-2 font-sans text-xs">
+          <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+            <span>⚠️ Moderasyon Notu</span>
+          </div>
+          <p className="text-slate-300">
+            İlanınız aşağıdaki nedenle düzeltme yapılması için pasife alınmıştır:
+          </p>
+          <div className="p-3 bg-slate-950/80 border border-white/5 rounded-xl font-mono text-rose-300 text-xs">
+            "{rejectionReason}"
+          </div>
+        </div>
+      )}
+
       {successMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-2xl text-xs font-bold">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-2xl text-xs font-bold font-sans">
           {successMsg}
         </div>
       )}
@@ -861,9 +893,17 @@ export default function EditListing() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-4 rounded-2xl transition shadow-lg shadow-orange-600/10 cursor-pointer disabled:opacity-50"
+          className={`w-full font-black py-4 rounded-2xl transition shadow-lg cursor-pointer disabled:opacity-50 font-sans ${
+            rejectionReason || listingStatus === "REVISION_REQUIRED"
+              ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/10"
+              : "bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/10"
+          }`}
         >
-          {saving ? "Güncelleniyor..." : "İlanı Güncelle (Değişiklikleri Kaydet)"}
+          {saving
+            ? "İşleniyor..."
+            : rejectionReason || listingStatus === "REVISION_REQUIRED"
+            ? "Tekrar İncelemeye Gönder ➔"
+            : "İlanı Güncelle (Değişiklikleri Kaydet)"}
         </button>
       </form>
     </div>
