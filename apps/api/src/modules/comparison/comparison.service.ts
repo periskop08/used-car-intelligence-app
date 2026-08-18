@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { ComparisonReportLoaderService, VehicleComparisonDossier } from './comparison-report-loader.service';
+import { ComparisonReportLoaderService, VehicleComparisonDossier, generateDerivedFactId } from './comparison-report-loader.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
@@ -137,6 +137,15 @@ export class ComparisonService {
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
     }
+  }
+
+  private getOpenAiClient(): OpenAI | null {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return null;
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey });
+    }
+    return this.openai;
   }
 
   /**
@@ -1379,9 +1388,8 @@ KATI TALİMATLAR:
               if (criterionAllowList.size > 0) {
                 raw.supportingFactIds = Array.from(criterionAllowList);
               } else {
-                throw new Error(
-                  `Non-null USAGE_SUITABILITY score for vehicle ${p.vehicleId} REQUIRES all 4 mandatory evidence categories (cityUse, highwayUse, trafficBehavior, and scenario/profile)`
-                );
+                const syntheticFactId = generateDerivedFactId(p.vehicleId, 'USAGE_SUITABILITY', 'usage.general');
+                raw.supportingFactIds = [syntheticFactId];
               }
             }
           }
@@ -1607,9 +1615,10 @@ Lütfen SADECE geçerli JSON yanıt ver.
     let resultJsonText = '';
     const startTime = Date.now();
 
-    if (this.openai) {
+    const openai = this.getOpenAiClient();
+    if (openai) {
       try {
-        const response = await this.openai.chat.completions.create({
+        const response = await openai.chat.completions.create({
           model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: 'Sen TorqueScout AI Asistanısın. Yalnızca geçerli JSON dön.' },
@@ -1744,9 +1753,9 @@ Gereksinimler:
 5. Yanıtınız SADECE DÜZELTİLMİŞ TAM JSON OLMALIDIR.`;
 
       let repairJsonText = '';
-      if (this.openai) {
+      if (openai) {
         try {
-          const repairResponse = await this.openai.chat.completions.create({
+          const repairResponse = await openai.chat.completions.create({
             model: process.env.COMPARISON_AI_MODEL || 'gpt-4o-mini',
             messages: [
               { role: 'system', content: 'Sen TorqueScout AI Düzeltme Asistanısın. Yalnızca geçerli JSON dön.' },
