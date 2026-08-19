@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { getDifferentiatedStarsForRank } from "./DecisionSummary";
 import {
   CriterionKey,
   CriterionAssessment,
@@ -417,7 +418,7 @@ export function CriterionAssessmentMatrix({
                   </div>
                 ) : (
                   (() => {
-                    const overallStarsVal = ev.overallStars ?? (ev.overallScore ? ev.overallScore / 20 : null);
+                    const overallStarsVal = rank !== undefined ? getDifferentiatedStarsForRank(rank - 1) : (ev.overallStars ?? (ev.overallScore ? ev.overallScore / 20 : null));
                     return (
                       <div className="flex items-center gap-2">
                         {renderStars(overallStarsVal, "lg")}

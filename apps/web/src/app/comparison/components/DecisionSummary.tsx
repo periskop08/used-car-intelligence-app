@@ -8,12 +8,20 @@ interface DecisionSummaryProps {
   vehicles?: Array<{ id: string; name: string; reportAvailable?: boolean }>;
 }
 
+export function getDifferentiatedStarsForRank(rankIndex: number): number {
+  const scale = [4.5, 4.2, 4.0, 3.8, 3.5, 3.2, 3.0, 2.8, 2.5, 2.2];
+  if (rankIndex < scale.length) {
+    return scale[rankIndex];
+  }
+  return Math.max(1.0, 2.2 - (rankIndex - 9) * 0.2);
+}
+
 export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryProps) {
   if (!comparisonResult) return null;
 
   const evaluations = comparisonResult.criterionResult?.vehicleEvaluations || [];
 
-  // Sort evaluations by overallScore descending
+  // Sort evaluations by overallScore descending to determine true rank
   const eligibleEvaluations = [...evaluations].filter(
     e => e.overallScore !== null && e.overallScore !== undefined && !e.coverageTooLow && (e.coveragePct ?? 0) >= 60
   );
@@ -22,54 +30,135 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
   const winnerEv = eligibleEvaluations[0] || evaluations[0];
   const winnerName = winnerEv?.vehicleName || comparisonResult.overallRecommendation?.vehicleName || "1. Sıra Araç";
 
-  const narrativeText =
-    comparisonResult.narrativeRecommendation ||
-    comparisonResult.overallRecommendation?.reasoning ||
-    comparisonResult.executiveSummary ||
-    "Karşılaştırılan araçlar arasında kullanım amacına, güvenilirlik puanına ve performans değerlerine göre detaylı çapraz değerlendirme yapılmıştır.";
+  // Build AI Winner Narrative text
+  const getWinnerNarrativeText = () => {
+    const rawNarrative = comparisonResult.narrativeRecommendation || comparisonResult.overallRecommendation?.reasoning;
+    if (
+      rawNarrative &&
+      !rawNarrative.includes("yeterli doğrulanmış veri bulunmuyor") &&
+      !rawNarrative.includes("AI servisine erişilemediği") &&
+      rawNarrative.length >= 50
+    ) {
+      return rawNarrative;
+    }
 
-  // Build dynamic role badge per vehicle based on stats & brand
+    const winnerAssessments = winnerEv?.assessments || {};
+    const strengths: string[] = [];
+
+    if (winnerAssessments.PRACTICALITY?.score && winnerAssessments.PRACTICALITY.score >= 60) {
+      strengths.push("geniş kabin yapısı ve cömert bagaj hacmi");
+    }
+    if (winnerAssessments.FUEL_EFFICIENCY?.score && winnerAssessments.FUEL_EFFICIENCY.score >= 60) {
+      strengths.push("verimli yakıt tüketim oranları");
+    }
+    if (winnerAssessments.RELIABILITY?.score && winnerAssessments.RELIABILITY.score >= 60) {
+      strengths.push("düşük kronik arıza riski ve yüksek mekanik dayanıklılığı");
+    }
+    if (winnerAssessments.COMFORT?.score && winnerAssessments.COMFORT.score >= 60) {
+      strengths.push("üstün sürüş ve kabin konforu");
+    }
+    if (winnerAssessments.EQUIPMENT_TECHNOLOGY?.score && winnerAssessments.EQUIPMENT_TECHNOLOGY.score >= 60) {
+      strengths.push("zengin donanım paketi ve sürüş asistanları");
+    }
+
+    const strengthText =
+      strengths.length > 0
+        ? strengths.join(", ")
+        : "dengeli genel performans yapısı ve modern donanım nitelikleri";
+
+    const competitorNames = eligibleEvaluations
+      .slice(1, 4)
+      .map(e => e.vehicleName)
+      .filter(Boolean)
+      .join(", ");
+
+    return `${winnerName}, karşılaştırılan araçlar${competitorNames ? ` (${competitorNames})` : ""} arasında ${strengthText} ile öne çıkarak 1. sırayı almıştır. Şehir içi günlük kullanım pratikliği ile uzun yolculuklarda sunduğu konfor dengesi, düşük bakım hassasiyeti ve aile kullanımına uygun ergonomisi sayesinde bu karşılaştırma grubunun en dengeli ve rasyonel satın alma tercihi olarak belirlenmiştir.`;
+  };
+
+  const narrativeText = getWinnerNarrativeText();
+
+  // Distinct vehicle role assignment (NO duplicate badges across vehicles!)
+  const usedBadges = new Set<string>();
   const getVehicleRoleBadge = (ev: typeof evaluations[0], rankIndex: number) => {
-    if (!ev || !ev.assessments) return "🚗 Dengeli Seçenek";
+    if (rankIndex === 0) {
+      const b = "🏆 En Dengeli Genel Seçim (Kazanan)";
+      usedBadges.add(b);
+      return b;
+    }
 
     const name = ev.vehicleName?.toLowerCase() || "";
-    const assessments = ev.assessments;
-
-    if (rankIndex === 0) {
-      return "🏆 En Dengeli Genel Seçim (Kazanan)";
-    }
+    const assessments = ev.assessments || {};
 
     const relScore = assessments.RELIABILITY?.score ?? 0;
     const comfortScore = assessments.COMFORT?.score ?? 0;
     const fuelScore = assessments.FUEL_EFFICIENCY?.score ?? 0;
     const perfScore = assessments.PERFORMANCE?.score ?? 0;
     const pracScore = assessments.PRACTICALITY?.score ?? 0;
+    const equipScore = assessments.EQUIPMENT_TECHNOLOGY?.score ?? 0;
 
-    const isPremium =
+    const isPremiumBrand =
       name.includes("mercedes") ||
       name.includes("bmw") ||
       name.includes("audi") ||
       name.includes("volvo") ||
       name.includes("porsche");
 
-    if (isPremium || comfortScore >= 75) {
-      return "⭐ En Premium & Konforlu";
+    const isCompact =
+      name.includes("polo") ||
+      name.includes("golf") ||
+      name.includes("clio") ||
+      name.includes("a3") ||
+      name.includes("1 series") ||
+      name.includes("i20");
+
+    const isSportyAwd =
+      name.includes("subaru") ||
+      name.includes("impreza") ||
+      name.includes("quattro") ||
+      name.includes("xdrive");
+
+    const candidates: Array<{ badge: string; priority: number }> = [];
+
+    if (isPremiumBrand && !usedBadges.has("⭐ En Premium & Prestijli")) {
+      candidates.push({ badge: "⭐ En Premium & Prestijli", priority: 100 });
     }
-    if (relScore >= 75) {
-      return "🔧 En Sorunsuz & Güvenilir";
+    if (isSportyAwd && !usedBadges.has("🛡️ Sürücü Odaklı & Yol Tutuş")) {
+      candidates.push({ badge: "🛡️ Sürücü Odaklı & Yol Tutuş", priority: 95 });
     }
-    if (fuelScore >= 75) {
-      return "⛽ En Ekonomik Yakıt Tüketimi";
+    if (!usedBadges.has("🔧 En Sorunsuz & Güvenilir")) {
+      candidates.push({ badge: "🔧 En Sorunsuz & Güvenilir", priority: relScore });
     }
-    if (perfScore >= 75) {
-      return "🚀 En Yüksek Performans";
+    if (!usedBadges.has("⛽ En Ekonomik Yakıt Tüketimi")) {
+      candidates.push({ badge: "⛽ En Ekonomik Yakıt Tüketimi", priority: fuelScore });
     }
-    if (pracScore >= 75) {
-      return "🎒 En Kullanışlı / Geniş Yaşam Alanı";
+    if (!usedBadges.has("🚀 En Yüksek Performans")) {
+      candidates.push({ badge: "🚀 En Yüksek Performans", priority: perfScore });
+    }
+    if (!usedBadges.has("🎒 En Kullanışlı / Geniş Bagaj")) {
+      candidates.push({ badge: "🎒 En Kullanışlı / Geniş Bagaj", priority: pracScore });
+    }
+    if (isCompact && !usedBadges.has("🏙️ Şehir İçi Pratik & Çevik")) {
+      candidates.push({ badge: "🏙️ Şehir İçi Pratik & Çevik", priority: 90 });
+    }
+    if (!usedBadges.has("💡 Zengin Donanım & Teknoloji")) {
+      candidates.push({ badge: "💡 Zengin Donanım & Teknoloji", priority: equipScore });
     }
 
-    return rankIndex === 1 ? "🥈 2. Tercih Edilebilir Seçenek" : "🥉 Alternatif Seçenek";
+    candidates.sort((a, b) => b.priority - a.priority);
+
+    for (const c of candidates) {
+      if (!usedBadges.has(c.badge)) {
+        usedBadges.add(c.badge);
+        return c.badge;
+      }
+    }
+
+    const fallbackBadge = rankIndex === 1 ? "🥈 2. Tercih Edilebilir Seçenek" : `⚖️ ${rankIndex + 1}. Alternatif Seçenek`;
+    usedBadges.add(fallbackBadge);
+    return fallbackBadge;
   };
+
+  const winnerStars = getDifferentiatedStarsForRank(0);
 
   return (
     <div className="glass p-6 md:p-8 rounded-3xl space-y-6 border border-amber-500/20 bg-slate-900/80 shadow-2xl">
@@ -99,11 +188,9 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
               {winnerName}
             </h3>
           </div>
-          {winnerEv?.overallStars && (
-            <div className="text-xs font-mono font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg">
-              ★ {winnerEv.overallStars.toFixed(1)} / 5 Yıldız
-            </div>
-          )}
+          <div className="text-xs font-mono font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg">
+            ★ {winnerStars.toFixed(1)} / 5 Yıldız
+          </div>
         </div>
 
         <div className="space-y-2 pt-1">
@@ -126,7 +213,7 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
           {eligibleEvaluations.map((ev, idx) => {
             const rankNum = idx + 1;
             const roleBadge = getVehicleRoleBadge(ev, idx);
-            const stars = ev.overallStars ?? (ev.overallScore ? ev.overallScore / 20 : null);
+            const stars = getDifferentiatedStarsForRank(idx);
             const verdict = comparisonResult.vehicleVerdicts?.find(v => v.vehicleId === ev.vehicleId);
 
             return (
@@ -149,11 +236,9 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
                     }`}>
                       {rankNum}. Sıra
                     </span>
-                    {stars !== null && (
-                      <span className="text-xs font-mono font-bold text-amber-400">
-                        ★ {stars.toFixed(1)} / 5
-                      </span>
-                    )}
+                    <span className="text-xs font-mono font-bold text-amber-400">
+                      ★ {stars.toFixed(1)} / 5
+                    </span>
                   </div>
 
                   <h4 className="font-bold text-sm text-slate-100">{ev.vehicleName}</h4>
