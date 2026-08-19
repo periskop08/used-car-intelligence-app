@@ -1,7 +1,5 @@
-"use client";
-
 import React from "react";
-import { VehicleComparisonResult } from "@used-car-intelligence/shared";
+import { VehicleComparisonResult, scoreToStars } from "@used-car-intelligence/shared";
 
 interface DecisionSummaryProps {
   comparisonResult: VehicleComparisonResult;
@@ -29,6 +27,7 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
 
   const winnerEv = eligibleEvaluations[0] || evaluations[0];
   const winnerName = winnerEv?.vehicleName || comparisonResult.overallRecommendation?.vehicleName || "1. Sıra Araç";
+  const winnerStars = scoreToStars(winnerEv?.overallScore) || getDifferentiatedStarsForRank(0);
 
   // Build AI Winner Narrative text
   const getWinnerNarrativeText = () => {
@@ -162,8 +161,6 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
     usedBadges.add(fallbackBadge);
     return fallbackBadge;
   };
-
-  const winnerStars = getDifferentiatedStarsForRank(0);
 
   return (
     <div className="glass p-6 md:p-8 rounded-3xl space-y-6 border border-amber-500/20 bg-slate-900/80 shadow-2xl">

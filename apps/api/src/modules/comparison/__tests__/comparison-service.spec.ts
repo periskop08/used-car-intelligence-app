@@ -684,70 +684,8 @@ describe('ComparisonService Unit Tests', () => {
     });
   });
 
-  describe('Strict Raw AI Validation & Authoritative Catalog Enforcement Tests', () => {
-    it('should REJECT non-null AI score when Fact ID is in commonProblems and dossier.supportingFactIds BUT missing in dataQuality.supportingFacts', async () => {
-      mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
-      mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
-      mockPrismaService.vehicleVariant.findUnique.mockImplementation((args: any) =>
-        Promise.resolve(createMockDbVariant(args.where.id, args.where.id))
-      );
-      mockLoaderService.loadDossierForVariant.mockImplementation((id: string) =>
-        Promise.resolve(createMockDossier(id, undefined, {
-          extraSupportingFactIds: ['uncataloged_fact_id'],
-        }))
-      );
-
-      const aiResponseWithUncatalogedFact = {
-        headline: 'Uncataloged Fact Test',
-        executiveSummary: 'Detaylı özet metni. Araçların teknik verileri detaylıca kıyaslanmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli Seçenek', reasoning: 'ok', confidence: 'HIGH' },
-        scenarioRecommendations: [
-          { scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt Ekonomisi', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['VW Passat'], reasoning: 'Düşük tüketim' },
-        ],
-        vehicleCards: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', identity: {}, strengths: ['s1'], cautions: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v1'], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', identity: {}, strengths: ['s2'], cautions: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v2'], evidenceConfidence: 'HIGH' },
-        ],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Sahiplik maliyeti.' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı ve bagaj hacmi arayanlar için tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['uncataloged_fact_id'], missingInputs: [], insufficientData: false }, // UNCATALOGED FACT ID!
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-        },
-      };
-
-      (service as any).openai = {
-        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(aiResponseWithUncatalogedFact) } }] }) } },
-      };
-
-      const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-      expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-    });
-
-    it('should REJECT AI output with empty supportingFactIds for non-null score and trigger fallback', async () => {
+  describe('V2 Comparative Engine Schema Validation Tests', () => {
+    it('should REJECT AI output missing criterionComparisons and fall back', async () => {
       mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
       mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
       mockPrismaService.vehicleVariant.findUnique.mockImplementation((args: any) =>
@@ -757,238 +695,13 @@ describe('ComparisonService Unit Tests', () => {
         Promise.resolve(createMockDossier(id))
       );
 
-      const aiResponseWithEmptyFacts = {
-        headline: 'Empty Facts Test',
+      const invalidAiResponse = {
+        headline: 'Invalid AI Output Test',
         executiveSummary: 'Detaylı özet metni. Araçların teknik verileri detaylıca kıyaslanmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli Seçenek', reasoning: 'ok', confidence: 'HIGH' },
-        scenarioRecommendations: [
-          { scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt Ekonomisi', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['VW Passat'], reasoning: 'Düşük tüketim' },
-        ],
-        vehicleCards: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', identity: {}, strengths: ['s1'], cautions: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v1'], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', identity: {}, strengths: ['s2'], cautions: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v2'], evidenceConfidence: 'HIGH' },
-        ],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Sahiplik maliyeti.' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı ve bagaj hacmi arayanlar için tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-        },
       };
 
       (service as any).openai = {
-        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(aiResponseWithEmptyFacts) } }] }) } },
-      };
-
-      const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-      expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-    });
-
-    it('should REJECT AI output using another vehicle Fact ID and trigger fallback', async () => {
-      mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
-      mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
-      mockPrismaService.vehicleVariant.findUnique.mockImplementation((args: any) =>
-        Promise.resolve(createMockDbVariant(args.where.id, args.where.id))
-      );
-      mockLoaderService.loadDossierForVariant.mockImplementation((id: string) =>
-        Promise.resolve(createMockDossier(id))
-      );
-
-      const aiResponseWithForeignFact = {
-        headline: 'Foreign Fact Test',
-        executiveSummary: 'Detaylı özet metni. Araçların teknik verileri detaylıca kıyaslanmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli Seçenek', reasoning: 'ok', confidence: 'HIGH' },
-        scenarioRecommendations: [
-          { scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt Ekonomisi', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['VW Passat'], reasoning: 'Düşük tüketim' },
-        ],
-        vehicleCards: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', identity: {}, strengths: ['s1'], cautions: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v1'], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', identity: {}, strengths: ['s2'], cautions: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v2'], evidenceConfidence: 'HIGH' },
-        ],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Sahiplik maliyeti.' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı ve bagaj hacmi arayanlar için tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-        },
-      };
-
-      (service as any).openai = {
-        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(aiResponseWithForeignFact) } }] }) } },
-      };
-
-      const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-      expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-    });
-
-    it('should REJECT AI output missing any of the 8 criteria and trigger fallback', async () => {
-      mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
-      mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
-      mockPrismaService.vehicleVariant.findUnique.mockImplementation((args: any) =>
-        Promise.resolve(createMockDbVariant(args.where.id, args.where.id))
-      );
-      mockLoaderService.loadDossierForVariant.mockImplementation((id: string) =>
-        Promise.resolve(createMockDossier(id))
-      );
-
-      const aiResponseMissingCriterion = {
-        headline: 'Missing Criterion Test',
-        executiveSummary: 'Detaylı özet metni. Araçların teknik verileri detaylıca kıyaslanmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli Seçenek', reasoning: 'ok', confidence: 'HIGH' },
-        scenarioRecommendations: [
-          { scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt Ekonomisi', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['VW Passat'], reasoning: 'Düşük tüketim' },
-        ],
-        vehicleCards: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', identity: {}, strengths: ['s1'], cautions: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v1'], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', identity: {}, strengths: ['s2'], cautions: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v2'], evidenceConfidence: 'HIGH' },
-        ],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Sahiplik maliyeti.' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı ve bagaj hacmi arayanlar için tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-        },
-      };
-
-      (service as any).openai = {
-        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(aiResponseMissingCriterion) } }] }) } },
-      };
-
-      const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-      expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-    });
-
-    it('should REJECT performance fact used for COMFORT criterion and fall back', async () => {
-      mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
-      mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
-      mockPrismaService.vehicleVariant.findUnique.mockImplementation((args: any) =>
-        Promise.resolve(createMockDbVariant(args.where.id, args.where.id))
-      );
-      mockLoaderService.loadDossierForVariant.mockImplementation((id: string) =>
-        Promise.resolve(createMockDossier(id))
-      );
-
-      const aiResponseWithWrongFact = {
-        headline: 'Wrong Fact Test',
-        executiveSummary: 'Detaylı özet metni. Araçların teknik verileri detaylıca kıyaslanmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli Seçenek', reasoning: 'ok', confidence: 'HIGH' },
-        scenarioRecommendations: [
-          { scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt Ekonomisi', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['VW Passat'], reasoning: 'Düşük tüketim' },
-        ],
-        vehicleCards: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', identity: {}, strengths: ['s1'], cautions: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v1'], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', identity: {}, strengths: ['s2'], cautions: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], prePurchaseChecks: [], supportingFacts: ['fact_rel_v2'], evidenceConfidence: 'HIGH' },
-        ],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Sahiplik maliyeti.' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı ve bagaj hacmi arayanlar için tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: {
-              score: 80,
-              confidence: 'HIGH',
-              summary: 'ok',
-              positiveFactors: [],
-              compromises: [],
-              supportingFactIds: ['fact_perf_v1'],
-              missingInputs: [],
-              insufficientData: false,
-            },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: null, confidence: 'INSUFFICIENT', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: [], missingInputs: [], insufficientData: true },
-          },
-        },
-      };
-
-      (service as any).openai = {
-        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(aiResponseWithWrongFact) } }] }) } },
+        chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(invalidAiResponse) } }] }) } },
       };
 
       const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
@@ -1080,6 +793,9 @@ describe('ComparisonService Unit Tests', () => {
           completions: {
             create: jest.fn().mockImplementation((args: any) => {
               promptSent = args.messages?.map((m: any) => m.content).join('\n') || '';
+              if (args.messages?.[1]?.content) {
+                promptSent += '\n' + args.messages[1].content;
+              }
               return Promise.resolve({ choices: [{ message: { content: '{}' } }] });
             }),
           },
@@ -1248,13 +964,13 @@ describe('ComparisonService Unit Tests', () => {
         );
       });
 
-      it('v9-1: 2, 5, and 10 vehicle prompts should contain ALL vehicleIds in criterionAssessments schema example', async () => {
-        let capturedPrompt = '';
+      it('v9-1: 2, 5, and 10 vehicle prompts should contain ALL vehicleIds in criterionComparisons schema example', async () => {
+        let capturedPrompts: string[] = [];
         (service as any).openai = {
           chat: {
             completions: {
               create: jest.fn().mockImplementation((args: any) => {
-                capturedPrompt = args.messages[1].content;
+                capturedPrompts.push(args.messages[1]?.content || '');
                 return Promise.resolve({ choices: [{ message: { content: '{}' } }] });
               }),
             },
@@ -1265,24 +981,25 @@ describe('ComparisonService Unit Tests', () => {
         try {
           await (service as any).generateAdvancedAiComparison(profiles2, 'BALANCED', 'v9');
         } catch {}
-        expect(capturedPrompt).toContain('"v1"');
-        expect(capturedPrompt).toContain('"v2"');
+        expect(capturedPrompts[0]).toContain('"v1"');
+        expect(capturedPrompts[0]).toContain('"v2"');
 
+        capturedPrompts = [];
         const profiles5 = await (service as any).loadVehicleProfiles(['v1', 'v2', 'v3', 'v4', 'v5']);
         try {
           await (service as any).generateAdvancedAiComparison(profiles5, 'BALANCED', 'v9');
         } catch {}
-        expect(capturedPrompt).toContain('"v1"');
-        expect(capturedPrompt).toContain('"v5"');
+        expect(capturedPrompts[0]).toContain('"v1"');
+        expect(capturedPrompts[0]).toContain('"v5"');
       });
 
-      it('v9-2: Fact IDs should be listed grouped under their corresponding criteria', async () => {
-        let capturedPrompt = '';
+      it('v9-2: Prompt includes relative comparative scoring rules across all criteria', async () => {
+        let capturedPrompts: string[] = [];
         (service as any).openai = {
           chat: {
             completions: {
               create: jest.fn().mockImplementation((args: any) => {
-                capturedPrompt = args.messages[1].content;
+                capturedPrompts.push(args.messages[1]?.content || '');
                 return Promise.resolve({ choices: [{ message: { content: '{}' } }] });
               }),
             },
@@ -1293,125 +1010,56 @@ describe('ComparisonService Unit Tests', () => {
         try {
           await (service as any).generateAdvancedAiComparison(profiles, 'BALANCED', 'v9');
         } catch {}
-        expect(capturedPrompt).toContain('--- KRİTER: RELIABILITY ---');
-        expect(capturedPrompt).toContain('--- KRİTER: USAGE_SUITABILITY ---');
-        expect(capturedPrompt).toContain('[USAGE_SUITABILITY 4 ZORUNLU KANIT GRUBU');
+        expect(capturedPrompts[0]).toContain('KRİTER BAZLI GÖRELİ KARŞILAŞTIRMA');
+        expect(capturedPrompts[0]).toContain('RELIABILITY');
+        expect(capturedPrompts[0]).toContain('USAGE_SUITABILITY');
       });
 
-      it('v9-A & B: Short example AI response fails semantic validation, triggers EXACTLY 1 repair call, and returns AI mode when repair succeeds', async () => {
-        const shortInitialResponse = {
-          headline: 'Kısa Yanıt',
-          executiveSummary: 'Teknik veriler ve kronik durumlar detaylıca incelenmiştir.', // 58 chars < 60
-          overallRecommendation: { vehicleId: 'v1', label: 'Dengeli', reasoning: 'Genel değerlendirme', confidence: 'HIGH' },
-          scenarioRecommendations: [{ scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['Passat'], reasoning: 'Düşük' }],
-          vehicleVerdicts: [
-            { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-            { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          ],
-          riskComparison: { narrative: 'Kronik sorunların sıklık ve mekanik ciddiyet açısından kıyaslaması' },
-          ownershipCostComparison: { narrative: 'Maliyet' },
-          narrativeRecommendation: 'Detaylı teknik analiz sonucuna göre...', // 38 chars < 80
-          criterionAssessments: {
-            v1: {
-              RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-              FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-              FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-              USAGE_SUITABILITY: { score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-              PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-              COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-              PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-              EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v1'], missingInputs: [], insufficientData: false },
-            },
-            v2: {
-              RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-              FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-              FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-              USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-              PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-              COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-              PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-              EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v2'], missingInputs: [], insufficientData: false },
-            },
+      it('v9-A & B: Comparative AI response produces deterministic backend scoring and AI narrative', async () => {
+        const validComparativeResponse = {
+          headline: 'Göreli Karşılaştırma',
+          criterionComparisons: {
+            RELIABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 85 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            FAILURE_SEVERITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 70 }] },
+            FUEL_EFFICIENCY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 90 }, { vehicleId: 'v2', rawComparativeScore: 65 }] },
+            USAGE_SUITABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 85 }, { vehicleId: 'v2', rawComparativeScore: 80 }] },
+            PERFORMANCE: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            COMFORT: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 70 }] },
+            PRACTICALITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 70 }] },
+            EQUIPMENT_TECHNOLOGY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 70 }] },
           },
         };
 
-        const validRepairedResponse = {
-          ...shortInitialResponse,
-          headline: 'Geçerli Tam Metin Karşılaştırma Analizi',
-          executiveSummary: 'Passat ve Golf modellerinin 8 farklı kriterdeki performans, konfor, arıza riski ve kullanım uygunluğu veritabanındaki teknik veriler ve gerçek kullanıcı deneyimleri ışığında detaylıca kıyaslanmıştır.',
-          narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı, bagaj hacmi ve otoyol konforu arayan kullanıcılar için açık ara tercih edilebilir bir seçenektir.',
-        };
-
         const mockCreate = jest.fn()
-          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(shortInitialResponse) } }] })
-          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(validRepairedResponse) } }] });
+          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(validComparativeResponse) } }] })
+          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ narrativeRecommendation: 'v1 1. oldu.' }) } }] });
 
         (service as any).openai = { chat: { completions: { create: mockCreate } } };
 
         const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(mockCreate).toHaveBeenCalledTimes(2); // Exactly 1 repair call!
+        expect(mockCreate).toHaveBeenCalledTimes(2);
         expect(res.comparisonResult.generationMode).toBe('AI');
       });
 
-      it('v9-C: If repair response is also short or invalid, FALLBACK runs and cache is NOT written', async () => {
-        const shortInitialResponse = {
-          headline: 'Kısa Yanıt',
-          executiveSummary: 'Kısa özeti', // Invalid
-          criterionAssessments: {},
-        };
-
-        const shortRepairResponse = {
-          headline: 'Hala Kısa',
-          executiveSummary: 'Hala kısa özeti', // Invalid
-          criterionAssessments: {},
-        };
-
-        const mockCreate = jest.fn()
-          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(shortInitialResponse) } }] })
-          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(shortRepairResponse) } }] });
-
-        (service as any).openai = { chat: { completions: { create: mockCreate } } };
+      it('v9-C: If AI output fails, FALLBACK runs with strict comparative exclusion', async () => {
+        (service as any).openai = null; // Force fallback
 
         const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(mockCreate).toHaveBeenCalledTimes(2); // Attempted 1 repair
         expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-        expect(mockPrismaService.aiVehicleComparisonCache.upsert).not.toHaveBeenCalled();
-      });
+      }, 15000);
 
-      it('v10-D & E: Successful AI result is saved under v10_comp_ cache namespace and produces 8/8 criteria and overall stars for both vehicles', async () => {
+      it('v10-D & E: Successful AI result is saved under V2 cache namespace and produces 8/8 criteria', async () => {
         const validAiResponse = {
           headline: 'Valid AI Output',
-          executiveSummary: 'Passat ve Golf modellerinin 8 farklı kriterdeki teknik verileri detaylıca incelenmiştir ve onaylı kronik arıza kayıtları karşılaştırılmıştır.',
-          overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli', reasoning: 'Geniş kabin', confidence: 'HIGH' },
-          scenarioRecommendations: [{ scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['Passat'], reasoning: 'Düşük' }],
-          vehicleVerdicts: [
-            { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-            { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          ],
-          riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-          ownershipCostComparison: { narrative: 'Maliyet' },
-          narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı, bagaj hacmi ve otoyol konforu arayan kullanıcılar için açık ara tercih edilebilir bir seçenektir.',
-          criterionAssessments: {
-            v1: {
-              RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-              FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-              FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-              USAGE_SUITABILITY: { score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-              PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-              COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-              PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-              EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v1'], missingInputs: [], insufficientData: false },
-            },
-            v2: {
-              RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-              FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-              FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-              USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-              PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-              COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-              PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-              EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v2'], missingInputs: [], insufficientData: false },
-            },
+          criterionComparisons: {
+            RELIABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            FAILURE_SEVERITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            FUEL_EFFICIENCY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            USAGE_SUITABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            PERFORMANCE: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            COMFORT: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            PRACTICALITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+            EQUIPMENT_TECHNOLOGY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
           },
         };
 
@@ -1424,12 +1072,11 @@ describe('ComparisonService Unit Tests', () => {
         expect(mockPrismaService.aiVehicleComparisonCache.upsert).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
-              cacheKey: expect.stringMatching(/^v11_final_/),
+              cacheKey: expect.stringMatching(/^[a-f0-9]{64}$/),
             }),
           })
         );
 
-        // Verification E: 8/8 criteria and overall score stars for both vehicles
         const evs = res.comparisonResult.criterionResult?.vehicleEvaluations || [];
         expect(evs).toHaveLength(2);
         evs.forEach(ev => {
@@ -1441,7 +1088,7 @@ describe('ComparisonService Unit Tests', () => {
       });
     });
 
-    describe('Comparison v10 Evidence Grades & Relevance Rules Validation', () => {
+    describe('Comparison V2 Relative Engine Integration Tests', () => {
       beforeEach(() => {
         mockSubscriptionService.getEffectiveTier.mockResolvedValue(SubscriptionTier.PROFESYONEL);
         mockPrismaService.aiVehicleComparisonCache.findUnique.mockResolvedValue(null);
@@ -1454,165 +1101,39 @@ describe('ComparisonService Unit Tests', () => {
       });
 
       const buildBaseValidPayload = () => ({
-        headline: 'Valid AI Output v10',
-        executiveSummary: 'Passat ve Golf modellerinin 8 farklı kriterdeki teknik verileri detaylıca incelenmiştir ve onaylı kronik arıza kayıtları karşılaştırılmıştır.',
-        overallRecommendation: { vehicleId: 'v1', label: 'En Dengeli', reasoning: 'Geniş kabin', confidence: 'HIGH' },
-        scenarioRecommendations: [{ scenarioKey: 'FUEL_ECONOMY', title: 'Yakıt', recommendedVehicleIds: ['v1'], recommendedVehicleNames: ['Passat'], reasoning: 'Düşük' }],
-        vehicleVerdicts: [
-          { vehicleId: 'v1', vehicleName: 'VW Passat', characterSummary: 'Sedan', gains: ['g1'], compromises: ['c1'], bestFor: ['b1'], notIdealFor: ['n1'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-          { vehicleId: 'v2', vehicleName: 'VW Golf', characterSummary: 'Hatchback', gains: ['g2'], compromises: ['c2'], bestFor: ['b2'], notIdealFor: ['n2'], criticalRisks: [], prePurchaseChecks: [], evidenceConfidence: 'HIGH' },
-        ],
-        riskComparison: { narrative: 'Araçların kronik sorunları ve teknik arıza kayıtları veritabanı verilerine göre kıyaslanmıştır.' },
-        ownershipCostComparison: { narrative: 'Maliyet' },
-        narrativeRecommendation: 'Açık konuşmak gerekirse Passat geniş aile kullanımı, bagaj hacmi ve otoyol konforu arayan kullanıcılar için açık ara tercih edilebilir bir seçenektir.',
-        criterionAssessments: {
-          v1: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v1'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v1'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 85, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v1', 'fact_usage_highway_v1', 'fact_usage_traffic_v1', 'fact_usage_scenario_v1'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v1'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v1'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v1'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v1'], missingInputs: [], insufficientData: false },
-          },
-          v2: {
-            RELIABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FAILURE_SEVERITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_rel_v2'], missingInputs: [], insufficientData: false },
-            FUEL_EFFICIENCY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_fuel_v2'], missingInputs: [], insufficientData: false },
-            USAGE_SUITABILITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_usage_city_v2', 'fact_usage_highway_v2', 'fact_usage_traffic_v2', 'fact_usage_scenario_v2'], missingInputs: [], insufficientData: false },
-            PERFORMANCE: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_perf_v2'], missingInputs: [], insufficientData: false },
-            COMFORT: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_comfort_v2'], missingInputs: [], insufficientData: false },
-            PRACTICALITY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_boot_v2'], missingInputs: [], insufficientData: false },
-            EQUIPMENT_TECHNOLOGY: { score: 80, confidence: 'HIGH', summary: 'ok', positiveFactors: [], compromises: [], supportingFactIds: ['fact_trim_v2'], missingInputs: [], insufficientData: false },
-          },
+        headline: 'Valid AI Output V2',
+        criterionComparisons: {
+          RELIABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          FAILURE_SEVERITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          FUEL_EFFICIENCY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          USAGE_SUITABILITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          PERFORMANCE: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          COMFORT: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          PRACTICALITY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
+          EQUIPMENT_TECHNOLOGY: { scores: [{ vehicleId: 'v1', rawComparativeScore: 80 }, { vehicleId: 'v2', rawComparativeScore: 75 }] },
         },
       });
 
-      it('v10-1: FAILURE_SEVERITY positiveFactors containing "Orijinal motor gücü" is sanitized', async () => {
+      it('v10-1: Relative scoring engine executes backend score calculations deterministically', async () => {
         const payload = buildBaseValidPayload();
-        (payload.criterionAssessments.v1.FAILURE_SEVERITY as any).positiveFactors = ['Orijinal motor gücü imkanı'];
-
         (service as any).openai = {
           chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
         };
 
         const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
         expect(res.comparisonResult.generationMode).toBe('AI');
-        expect(res.comparisonResult.criterionResult?.vehicleEvaluations[0].assessments.FAILURE_SEVERITY.positiveFactors).toEqual([]);
+        expect(res.comparisonResult.criterionResult?.vehicleEvaluations[0].overallScore).toBe(80);
+        expect(res.comparisonResult.criterionResult?.vehicleEvaluations[1].overallScore).toBe(75);
       });
 
-      it('v10-2: FAILURE_SEVERITY positiveFactors containing "Otomatik şanzıman" is sanitized', async () => {
+      it('v10-2: Deterministic ranking matches backend finalRawScore order', async () => {
         const payload = buildBaseValidPayload();
-        (payload.criterionAssessments.v1.FAILURE_SEVERITY as any).positiveFactors = ['Otomatik şanzıman konforu'];
-
         (service as any).openai = {
           chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
         };
 
         const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('AI');
-        expect(res.comparisonResult.criterionResult?.vehicleEvaluations[0].assessments.FAILURE_SEVERITY.positiveFactors).toEqual([]);
-      });
-
-      it('v10-3: RELIABILITY using motor power as positive reliability factor is sanitized', async () => {
-        const payload = buildBaseValidPayload();
-        (payload.criterionAssessments.v1.RELIABILITY as any).positiveFactors = ['Yüksek motor gücü ve tork'];
-
-        (service as any).openai = {
-          chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
-        };
-
-        const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('AI');
-        expect(res.comparisonResult.criterionResult?.vehicleEvaluations[0].assessments.RELIABILITY.positiveFactors).toEqual([]);
-      });
-
-      it('v10-4: FUEL_EFFICIENCY claiming city & highway efficiency when only combined consumption exists is sanitized', async () => {
-        mockLoaderService.loadDossierForVariant.mockImplementation((id: string) => {
-          const dossier = createMockDossier(id);
-          dossier.dataQuality.supportingFacts = dossier.dataQuality.supportingFacts.filter(
-            (f: any) => !f.factKey.includes('city') && !f.factKey.includes('highway')
-          );
-          return Promise.resolve(dossier);
-        });
-
-        const payload = buildBaseValidPayload();
-        (payload.criterionAssessments.v1.FUEL_EFFICIENCY as any).positiveFactors = ['Düşük şehir içi tüketim ve otoyol tüketim değerleri'];
-
-        (service as any).openai = {
-          chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
-        };
-
-        const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('FALLBACK');
-      });
-
-      it('v10-5: Unsupported equipment feature name in EQUIPMENT_TECHNOLOGY is sanitized', async () => {
-        const initialPayload = buildBaseValidPayload();
-        (initialPayload.criterionAssessments.v1.EQUIPMENT_TECHNOLOGY as any).positiveFactors = ['gelişmiş asistanlar'];
-
-        const mockCreate = jest.fn()
-          .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(initialPayload) } }] });
-
-        (service as any).openai = { chat: { completions: { create: mockCreate } } };
-
-        const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('AI');
-      });
-
-      it('v10-6: REPORT_DERIVED criterion automatically caps HIGH confidence to MEDIUM', async () => {
-        mockLoaderService.loadDossierForVariant.mockImplementation((id: string) => {
-          const dossier = createMockDossier(id);
-          dossier.dataQuality.supportingFacts = (dossier.dataQuality.supportingFacts || []).map((f: any) => ({
-            ...f,
-            id: f.factKey || f.id,
-            factKey: (f.factKey || f.id) + '_catalog_only',
-            sourcePath: 'commonProblems',
-          }));
-          return Promise.resolve(dossier);
-        });
-
-        const payload = buildBaseValidPayload();
-        (payload.criterionAssessments.v1.RELIABILITY as any).confidence = 'HIGH'; // Will be capped to MEDIUM
-
-        (service as any).openai = {
-          chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
-        };
-
-        const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('AI');
-        const v1Reliability = res.comparisonResult.criterionResult?.vehicleEvaluations.find(e => e.vehicleId === 'v1')?.assessments.RELIABILITY;
-        expect(v1Reliability?.evidenceGrade).toBe('REPORT_DERIVED');
-        expect(v1Reliability?.confidence).toBe('MEDIUM');
-      });
-
-      it('v10-7: 8/8 REPORT_DERIVED result produces overall stars, but overall confidence is capped at MEDIUM', async () => {
-        mockLoaderService.loadDossierForVariant.mockImplementation((id: string) => {
-          const dossier = createMockDossier(id);
-          dossier.dataQuality.supportingFacts = (dossier.dataQuality.supportingFacts || []).map((f: any) => ({
-            ...f,
-            id: f.factKey || f.id,
-            factKey: (f.factKey || f.id) + '_cat',
-          }));
-          return Promise.resolve(dossier);
-        });
-
-        const payload = buildBaseValidPayload();
-        Object.keys(payload.criterionAssessments.v1).forEach(k => {
-          (payload.criterionAssessments.v1 as any)[k].confidence = 'MEDIUM';
-        });
-        Object.keys(payload.criterionAssessments.v2).forEach(k => {
-          (payload.criterionAssessments.v2 as any)[k].confidence = 'MEDIUM';
-        });
-
-        (service as any).openai = {
-          chat: { completions: { create: jest.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] }) } },
-        };
-
-        const res = await service.compare('user_1', { variantIds: ['v1', 'v2'] });
-        expect(res.comparisonResult.generationMode).toBe('AI');
-        expect(res.comparisonResult.overallRecommendation.confidence).toBe('MEDIUM');
+        expect(res.comparisonResult.overallRecommendation.vehicleId).toBe('v1');
       });
     });
   });

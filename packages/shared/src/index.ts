@@ -321,7 +321,16 @@ export interface VehicleCriterionEvaluation {
 
 export interface ComparisonCriterionResult {
   vehicleEvaluations: VehicleCriterionEvaluation[];
-  criterionRankings: Record<string, {
+  ranking?: {
+    rank: number;
+    vehicleId: string;
+    vehicleName: string;
+    score: number;
+    stars: number;
+    summary?: string;
+  }[];
+  disclaimer?: string;
+  criterionRankings?: Record<string, {
     winnerVehicleIds: string[];
     winnerVehicleNames: string[];
     isTie: boolean;
@@ -594,6 +603,215 @@ export interface VehicleComparisonResult {
   decisionMatrix: DecisionMatrixRow[];
   finalDecisionGuide: FinalDecisionGuideRow[];
   dataWarnings: DataWarning[];
+}
+
+/**
+ * Single canonical conversion helper from raw score (0-100) to stars (0.5 - 5.0).
+ */
+export function scoreToStars(rawScore: number | null | undefined): number | null {
+  if (rawScore === null || rawScore === undefined || isNaN(rawScore)) return null;
+  return Math.max(0.5, Math.min(5.0, Math.round((rawScore / 20) * 10) / 10));
+}
+
+export interface VehicleComparativeScoreInput {
+  vehicleId: string;
+  vehicleName: string;
+  assessments: Record<string, Partial<CriterionAssessment>>;
+}
+
+export interface CriterionComparisonResult {
+  criterionKey: CriterionKey;
+  configuredWeight: number;
+  effectiveWeight: number;
+  status: 'INCLUDED' | 'EXCLUDED_INSUFFICIENT_COMPARABLE_EVIDENCE';
+  scores: Record<string, {
+    rawScore: number | null;
+    displayStars: number | null;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH' | 'INSUFFICIENT';
+    evidenceGrade: 'VERIFIED' | 'REPORT_DERIVED';
+    summary: string;
+    positiveFactors: string[];
+    compromises: string[];
+    supportingFactIds: string[];
+  }>;
+}
+
+export interface VehicleFinalScore {
+  vehicleId: string;
+  vehicleName: string;
+  finalRawScore: number | null;
+  finalDisplayStars: number | null;
+  rank: number;
+  coveragePct: number;
+  coverageTooLow: boolean;
+}
+
+export interface ComparisonScoringResult {
+  criteria: Record<string, CriterionComparisonResult>;
+  excludedCriteria: CriterionKey[];
+  effectiveWeights: Record<CriterionKey, number>;
+  vehicleScores: VehicleFinalScore[];
+  ranking: VehicleFinalScore[];
+  winnerVehicleId: string | null;
+}
+
+export function computeComparativeScoring(
+  vehicleInputs: VehicleComparativeScoreInput[],
+): ComparisonScoringResult {
+  const keys: CriterionKey[] = [
+    'RELIABILITY',
+    'FAILURE_SEVERITY',
+    'FUEL_EFFICIENCY',
+    'USAGE_SUITABILITY',
+    'PERFORMANCE',
+    'COMFORT',
+    'PRACTICALITY',
+    'EQUIPMENT_TECHNOLOGY',
+  ];
+
+  const excludedCriteria: CriterionKey[] = [];
+  const includedCriteria: CriterionKey[] = [];
+
+  // Lock 2 & Lock B: Single-Vehicle Exclusion Rule!
+  // If even ONE vehicle lacks comparable evidence for a criterion, exclude for ALL vehicles.
+  for (const key of keys) {
+    let allVehiclesValid = true;
+    for (const vInput of vehicleInputs) {
+      const raw = vInput.assessments[key] ||
+        (key === 'FAILURE_SEVERITY' ? vInput.assessments['SEVERITY_DURABILITY'] : undefined) ||
+        (key === 'EQUIPMENT_TECHNOLOGY' ? vInput.assessments['VALUE_FOR_MONEY'] : undefined);
+
+      const rawScore = (raw && typeof raw.score === 'number' && !isNaN(raw.score)) ? raw.score : null;
+      const isInsufficient = rawScore === null || raw?.insufficientData === true || raw?.confidence === 'INSUFFICIENT';
+      if (isInsufficient) {
+        allVehiclesValid = false;
+        break;
+      }
+    }
+
+    if (allVehiclesValid) {
+      includedCriteria.push(key);
+    } else {
+      excludedCriteria.push(key);
+    }
+  }
+
+  // Renormalize effective weights among INCLUDED criteria so they sum to 100% (1.0)
+  const totalConfiguredIncludedWeight = includedCriteria.reduce((sum, k) => sum + (CRITERIA_WEIGHTS[k] || 10), 0);
+  const effectiveWeights: Record<CriterionKey, number> = {} as any;
+
+  for (const key of keys) {
+    if (includedCriteria.includes(key) && totalConfiguredIncludedWeight > 0) {
+      effectiveWeights[key] = (CRITERIA_WEIGHTS[key] || 10) / totalConfiguredIncludedWeight;
+    } else {
+      effectiveWeights[key] = 0;
+    }
+  }
+
+  const criteriaResults: Record<string, CriterionComparisonResult> = {};
+
+  for (const key of keys) {
+    const isIncluded = includedCriteria.includes(key);
+    const scoresMap: CriterionComparisonResult['scores'] = {};
+
+    for (const vInput of vehicleInputs) {
+      const raw = vInput.assessments[key] ||
+        (key === 'FAILURE_SEVERITY' ? vInput.assessments['SEVERITY_DURABILITY'] : undefined) ||
+        (key === 'EQUIPMENT_TECHNOLOGY' ? vInput.assessments['VALUE_FOR_MONEY'] : undefined);
+
+      const rawScore = isIncluded && raw && typeof raw.score === 'number' ? raw.score : null;
+      const displayStars = scoreToStars(rawScore);
+
+      scoresMap[vInput.vehicleId] = {
+        rawScore,
+        displayStars,
+        confidence: isIncluded ? (raw?.confidence as any || 'MEDIUM') : 'INSUFFICIENT',
+        evidenceGrade: (raw as any)?.evidenceGrade || (raw?.supportingFactIds?.length ? 'VERIFIED' : 'REPORT_DERIVED'),
+        summary: isIncluded ? (raw?.summary || '') : 'Bu kriter için tüm araçlarda karşılaştırılabilir doğrulanmış veri bulunamadı.',
+        positiveFactors: isIncluded && Array.isArray(raw?.positiveFactors) ? raw!.positiveFactors : [],
+        compromises: isIncluded && Array.isArray(raw?.compromises) ? raw!.compromises : [],
+        supportingFactIds: isIncluded && Array.isArray(raw?.supportingFactIds) ? raw!.supportingFactIds : [],
+      };
+    }
+
+    criteriaResults[key] = {
+      criterionKey: key,
+      configuredWeight: CRITERIA_WEIGHTS[key] || 10,
+      effectiveWeight: effectiveWeights[key],
+      status: isIncluded ? 'INCLUDED' : 'EXCLUDED_INSUFFICIENT_COMPARABLE_EVIDENCE',
+      scores: scoresMap,
+    };
+  }
+
+  // Calculate Final Raw Weighted Score per vehicle
+  const vehicleScores: VehicleFinalScore[] = vehicleInputs.map(vInput => {
+    let weightedSum = 0;
+    let validWeightSum = 0;
+
+    for (const key of includedCriteria) {
+      const rawScore = criteriaResults[key]?.scores[vInput.vehicleId]?.rawScore;
+      if (rawScore !== null && rawScore !== undefined) {
+        const weight = effectiveWeights[key];
+        weightedSum += rawScore * weight;
+        validWeightSum += weight;
+      }
+    }
+
+    const finalRawScore = (includedCriteria.length > 0 && validWeightSum > 0)
+      ? Math.round(weightedSum * 100) / 100
+      : null;
+
+    const finalDisplayStars = scoreToStars(finalRawScore);
+
+    return {
+      vehicleId: vInput.vehicleId,
+      vehicleName: vInput.vehicleName,
+      finalRawScore,
+      finalDisplayStars,
+      rank: 1, // Will be set after sorting
+      coveragePct: Math.round((includedCriteria.length / 8) * 100),
+      coverageTooLow: includedCriteria.length === 0,
+    };
+  });
+
+  // Sort vehicles deterministically by finalRawScore descending
+  // Lock 9 & Lock C: Backend owns tie handling and deterministic ranking order!
+  const sortedScores = [...vehicleScores].sort((a, b) => {
+    const diff = (b.finalRawScore || 0) - (a.finalRawScore || 0);
+    if (Math.abs(diff) > 0.001) return diff;
+    return a.vehicleId.localeCompare(b.vehicleId); // Deterministic tie-breaker
+  });
+
+  for (let i = 0; i < sortedScores.length; i++) {
+    if (i > 0) {
+      const prev = sortedScores[i - 1];
+      const curr = sortedScores[i];
+      if (prev.finalRawScore !== null && curr.finalRawScore !== null && Math.abs(prev.finalRawScore - curr.finalRawScore) < 0.001) {
+        curr.rank = prev.rank; // Tied rank
+      } else {
+        curr.rank = i + 1;
+      }
+    } else {
+      sortedScores[i].rank = 1;
+    }
+  }
+
+  // Update ranks back in vehicleScores array
+  vehicleScores.forEach(vs => {
+    const matched = sortedScores.find(s => s.vehicleId === vs.vehicleId);
+    if (matched) vs.rank = matched.rank;
+  });
+
+  const winnerVehicleId = sortedScores.length > 0 && sortedScores[0].finalRawScore !== null ? sortedScores[0].vehicleId : null;
+
+  return {
+    criteria: criteriaResults,
+    excludedCriteria,
+    effectiveWeights,
+    vehicleScores,
+    ranking: sortedScores,
+    winnerVehicleId,
+  };
 }
 
 /**
