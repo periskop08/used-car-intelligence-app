@@ -1660,23 +1660,36 @@ Lütfen SADECE geçerli JSON yanıt ver.
     if (!resultJsonText && process.env.NODE_ENV !== 'test') {
       const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY;
       if (geminiApiKey) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-          const res = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' },
-            }),
-          });
+        const geminiModels = [
+          process.env.GEMINI_REPORT_MODEL || 'gemini-2.5-flash',
+          'gemini-2.0-flash',
+          'gemini-1.5-flash',
+        ];
 
-          if (res.ok) {
-            const geminiData = await res.json();
-            resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        for (const modelName of geminiModels) {
+          try {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+            const res = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: 'application/json' },
+              }),
+            });
+
+            if (res.ok) {
+              const geminiData = await res.json();
+              resultJsonText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (resultJsonText) {
+                diagnostics.provider = 'GoogleGemini';
+                diagnostics.model = modelName;
+                break;
+              }
+            }
+          } catch (err: any) {
+            console.warn(`Gemini API (${modelName}) comparison call warning:`, err?.message || 'Gemini request failed');
           }
-        } catch (err: any) {
-          console.warn('Gemini API comparison call warning:', err?.message || 'Gemini request failed');
         }
       }
     }
