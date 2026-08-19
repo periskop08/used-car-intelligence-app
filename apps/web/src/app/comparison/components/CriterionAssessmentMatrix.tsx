@@ -681,42 +681,72 @@ export function CriterionAssessmentMatrix({
                   </div>
 
                   {/* Summary Narrative */}
-                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-1">
-                    <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-                      📋 Kriter Özet Analizi:
-                    </div>
-                    <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium">
-                      {assessment?.summary || "Bu kriter için detaylı kanıt özeti bulunuyor."}
-                    </p>
-                  </div>
+                  {(() => {
+                    const rawSummary = assessment?.summary || "Bu kriter için detaylı kanıt özeti bulunuyor.";
+                    const cleanSummary = rawSummary
+                      .replace(/([A-Z_]+)\s+kriterinde\s+göreli\s+karşılaştırma\s+gerekçesi/gi, (match, enumKey) => {
+                        const title = CRITERIA_METADATA[enumKey as CriterionKey]?.title || meta.title;
+                        return `${title} değerlendirmesi`;
+                      })
+                      .replace(/USAGE_SUITABILITY/gi, "Kullanım Senaryosu ve Kullanıcı Uyumu")
+                      .replace(/RELIABILITY/gi, "Mekanik Güvenilirlik")
+                      .replace(/FAILURE_SEVERITY/gi, "Arıza Ciddiyeti")
+                      .replace(/FUEL_EFFICIENCY/gi, "Yakıt Tüketimi ve Verimlilik")
+                      .replace(/PERFORMANCE/gi, "Performans")
+                      .replace(/COMFORT/gi, "Konfor ve Sürüş Kalitesi")
+                      .replace(/PRACTICALITY/gi, "Kullanışlılık ve Yaşam Alanı")
+                      .replace(/EQUIPMENT_TECHNOLOGY/gi, "Donanım ve Teknoloji");
 
-                  {/* Positive Factors */}
-                  {assessment?.positiveFactors && assessment.positiveFactors.length > 0 && (
-                    <div className="p-4 bg-emerald-950/20 rounded-2xl border border-emerald-500/20 space-y-1.5">
-                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                        <span>✓</span> Olumlu Faktörler & Avantajlar:
-                      </div>
-                      <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
-                        {assessment.positiveFactors.map((pf, i) => (
-                          <li key={i}>{pf}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    const compromises = (assessment?.compromises && assessment.compromises.length > 0)
+                      ? assessment.compromises
+                      : (assessment?.negativeFactors || []);
 
-                  {/* Negative Factors */}
-                  {assessment?.negativeFactors && assessment.negativeFactors.length > 0 && (
-                    <div className="p-4 bg-rose-950/20 rounded-2xl border border-rose-500/20 space-y-1.5">
-                      <div className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                        <span>⚠️</span> Riskler & Olumsuzlar:
-                      </div>
-                      <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
-                        {assessment.negativeFactors.map((nf, i) => (
-                          <li key={i}>{nf}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    return (
+                      <>
+                        <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-1">
+                          <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                            📋 Kriter Özet Analizi:
+                          </div>
+                          <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium">
+                            {cleanSummary}
+                          </p>
+                        </div>
+
+                        {/* Positive Factors */}
+                        {assessment?.positiveFactors && assessment.positiveFactors.length > 0 && (
+                          <div className="p-4 bg-emerald-950/20 rounded-2xl border border-emerald-500/20 space-y-1.5">
+                            <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                              <span>✓</span> Olumlu Faktörler & Avantajlar:
+                            </div>
+                            <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
+                              {assessment.positiveFactors.map((pf, i) => (
+                                <li key={i}>{pf}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Compromises / Negative Factors */}
+                        {compromises && compromises.length > 0 && (
+                          <div className="p-4 bg-rose-950/20 rounded-2xl border border-rose-500/20 space-y-1.5">
+                            <div className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                              <span>⚠️</span> Riskler, Dezavantajlar & Kısıtlar:
+                            </div>
+                            <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
+                              {compromises.map((nf, i) => (
+                                <li key={i}>{nf}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Equipment Matrix if EQUIPMENT_TECHNOLOGY */}
+                        {matchingKey === "EQUIPMENT_TECHNOLOGY" && assessment?.equipmentFeatureStatuses && (
+                          renderEquipmentFeatureMatrix(assessment.equipmentFeatureStatuses)
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Missing Inputs */}
                   {assessment?.missingInputs && assessment.missingInputs.length > 0 && (

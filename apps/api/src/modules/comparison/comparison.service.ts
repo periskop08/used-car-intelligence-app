@@ -1559,11 +1559,18 @@ ${recallsText}`;
       criterionExampleObject[cKey] = {
         scores: profiles.map(p => ({
           vehicleId: p.vehicleId,
-          rawComparativeScore: 80,
+          rawComparativeScore: 82,
           confidence: 'HIGH',
-          summary: `${p.displayName} için ${cKey} kriterinde göreli karşılaştırma gerekçesi.`,
-          positiveFactors: ['Doğrulanmış teknik avantaj'],
-          compromises: ['Belirlenen kısıtlar'],
+          summary: `${p.displayName} modeli, 150 HP gücündeki turbo motoru ve 510 Litre bagaj hacmi sayesinde rakipleri karşısında hem ivmelenme performansında hem de aile içi kullanım uygunluğunda belirgin bir üstünlük sergilemektedir.`,
+          positiveFactors: [
+            `${p.displayName} modelinin 510 Litre geniş bagaj hacmi ve yüksek kabin ergonomisi`,
+            `150 HP turbo benzinli motorun düşük devirlerden itibaren sunduğu yüksek tork yanıtı`,
+            `Donanım paketindeki adaptif hız sabitleyici ve şerit takip asistanı`,
+          ],
+          compromises: [
+            `Sert süspansiyon yapısı nedeniyle bozuk zeminlerde hissedilen konfor kaybı`,
+            `Şehir içi dur-kalk trafikte 8.2 L/100km seviyesine çıkabilen yakıt tüketimi`,
+          ],
           supportingFactIds: [],
         })),
       };
@@ -1580,7 +1587,12 @@ MİMARİ VE PUANLAMA KURALLARI:
 3. Kural: Her kriter altında seçilen TÜM ${profiles.length} ARAÇ (${profiles.map(p => `"${p.vehicleId}"`).join(', ')}) EKSİKSİZ YER ALMALIDIR.
 4. "criterionComparisons" objesi aşağıdaki 8 kriterin TAMAMINI içermelidir:
    "RELIABILITY", "FAILURE_SEVERITY", "FUEL_EFFICIENCY", "USAGE_SUITABILITY", "PERFORMANCE", "COMFORT", "PRACTICALITY", "EQUIPMENT_TECHNOLOGY"
-5. Kriterlerin hiçbirinde TL, ₺, tamir fiyatı tahmini, parça ücreti veya piyasa fiyatı ASLA KULLANMA.
+5. KRİTER ÖZETİ VE FAKTÖR KALİTE ZORUNLULUĞU:
+   - "summary" alanı ASLA "[Araç] için [KRİTER] kriterinde göreli karşılaştırma gerekçesi" veya "Lüks ve konfor sunar" GİBİ ŞABLONİK VE YÜZEYSEL METİNLER ÜRETEMEZ.
+   - Her bir "summary" metni en az 2-3 CÜMLELİK, ZENGİN, DETAYLI VE SOMUT OTOMOTİV İSTİHBARATI içermelidir.
+   - Analizlerde mutlaka motor gücü (HP), tork (Nm), 0-100 sn ivmelenme, bagaj litresi, yakıt tüketimi (L/100km), donanım paketi detayları (Sunroof, Koltuk Isıtma, Hayalet Gösterge vb.) ve kronik arıza risklerine somut atıflar yapılmalıdır.
+   - "positiveFactors" ve "compromises" listeleri en az 2-3 maddelik somut teknik ifadelerden oluşmalıdır.
+6. Kriterlerin hiçbirinde TL, ₺, tamir fiyatı tahmini, parça ücreti veya piyasa fiyatı ASLA KULLANMA.
 
 ARAÇ VERİLERİ VE İZİNLİ KANIT ID'LERİ:
 ${summaryList}
