@@ -1592,7 +1592,7 @@ Kurallar:
 - Eğer bir araç için sadece karma yakıt tüketimi verisi mevcutsa, FUEL_EFFICIENCY summary ve positiveFactors alanlarında "şehir içi" ve "şehir dışı/otoyol" kelimelerini BİRLİKTE KULLANMAYIN. Yalnızca karma tüketim verisini değerlendirin.
 USAGE_SUITABILITY non-null puanı verilebilmesi için supportingFactIds dizisinde o araca ait 4 kanıt grubunun (1. cityUse, 2. highwayUse, 3. trafficBehavior ve 4. scenario/profile) HER BİRİNDEN EN AZ BİRER GEÇERLİ FACT ID YER ALMALIDIR.
 9. "executiveSummary": En az 120 karakter uzunluğunda olmalıdır. Karşılaştırılan araçların isimlerini, öne çıkan teknik farklarını ve kronik arıza/risk durumlarını araçlara özgü, teknik ve karşılaştırmalı dille özetlemelidir. Jenerik cümleler KESİNLİKLE YASAKTIR.
-10. "narrativeRecommendation": En az 160 karakter uzunluğunda olmalıdır. Araç adlarını, kullanım amacına göre belirgin avantaj/taviz farklarını ve doğrulanmış teknik gerekçeleri içeren detaylı nihai tavsiye metni yazılmalıdır.
+10. "narrativeRecommendation": En az 200 karakter uzunluğunda olmalıdır. Karşılaştırılan TÜM ${profiles.length} aracın (${profiles.map(p => p.displayName).join(', ')}) adlarını eksiksiz anarak, 1. sırayı alan kazanan aracın (${profiles[0].displayName}) NEDEN 1. OLDUĞUNU (motor gücü, yakıt tüketimi, bagaj hacmi, kronik arıza riski ve donanım üstünlüklerini rapor verilerine dayanarak detaylandırarak) anlaşılır, akıcı ve profesyonel bir dille açıklayan özel bir analiz yazılmalıdır.
 
 Lütfen SADECE geçerli JSON yanıt ver.
 ŞEMA VE TÜM SEÇİLEN ${profiles.length} ARAÇ İÇİN JSON ÖRNEĞİ:

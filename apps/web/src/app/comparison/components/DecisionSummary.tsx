@@ -45,34 +45,39 @@ export function DecisionSummary({ comparisonResult, vehicles }: DecisionSummaryP
     const winnerAssessments = winnerEv?.assessments || {};
     const strengths: string[] = [];
 
-    if (winnerAssessments.PRACTICALITY?.score && winnerAssessments.PRACTICALITY.score >= 60) {
+    // Extract actual report positive factors for winner
+    Object.values(winnerAssessments).forEach(a => {
+      if (a && a.positiveFactors && a.positiveFactors.length > 0 && a.score && a.score >= 60) {
+        const pf = a.positiveFactors[0];
+        if (pf && !strengths.includes(pf)) {
+          strengths.push(pf);
+        }
+      }
+    });
+
+    if (winnerAssessments.PRACTICALITY?.score && winnerAssessments.PRACTICALITY.score >= 65) {
       strengths.push("geniş kabin yapısı ve cömert bagaj hacmi");
     }
-    if (winnerAssessments.FUEL_EFFICIENCY?.score && winnerAssessments.FUEL_EFFICIENCY.score >= 60) {
+    if (winnerAssessments.FUEL_EFFICIENCY?.score && winnerAssessments.FUEL_EFFICIENCY.score >= 65) {
       strengths.push("verimli yakıt tüketim oranları");
     }
-    if (winnerAssessments.RELIABILITY?.score && winnerAssessments.RELIABILITY.score >= 60) {
-      strengths.push("düşük kronik arıza riski ve yüksek mekanik dayanıklılığı");
-    }
-    if (winnerAssessments.COMFORT?.score && winnerAssessments.COMFORT.score >= 60) {
-      strengths.push("üstün sürüş ve kabin konforu");
-    }
-    if (winnerAssessments.EQUIPMENT_TECHNOLOGY?.score && winnerAssessments.EQUIPMENT_TECHNOLOGY.score >= 60) {
-      strengths.push("zengin donanım paketi ve sürüş asistanları");
+    if (winnerAssessments.RELIABILITY?.score && winnerAssessments.RELIABILITY.score >= 65) {
+      strengths.push("düşük kronik arıza riski ve mekanik dayanıklılığı");
     }
 
     const strengthText =
       strengths.length > 0
-        ? strengths.join(", ")
+        ? Array.from(new Set(strengths)).slice(0, 4).join(", ")
         : "dengeli genel performans yapısı ve modern donanım nitelikleri";
 
+    // Include ALL competitor vehicle names (do NOT slice to 3!)
     const competitorNames = eligibleEvaluations
-      .slice(1, 4)
+      .slice(1)
       .map(e => e.vehicleName)
       .filter(Boolean)
       .join(", ");
 
-    return `${winnerName}, karşılaştırılan araçlar${competitorNames ? ` (${competitorNames})` : ""} arasında ${strengthText} ile öne çıkarak 1. sırayı almıştır. Şehir içi günlük kullanım pratikliği ile uzun yolculuklarda sunduğu konfor dengesi, düşük bakım hassasiyeti ve aile kullanımına uygun ergonomisi sayesinde bu karşılaştırma grubunun en dengeli ve rasyonel satın alma tercihi olarak belirlenmiştir.`;
+    return `${winnerName}, karşılaştırılan diğer ${eligibleEvaluations.length - 1} araç${competitorNames ? ` (${competitorNames})` : ""} arasında ${strengthText} ile öne çıkarak 1. sırayı almıştır. Şehir içi günlük kullanım pratikliği ile uzun yolculuklarda sunduğu konfor dengesi, düşük bakım hassasiyeti ve aile kullanımına uygun ergonomisi sayesinde bu karşılaştırma grubunun en dengeli ve rasyonel satın alma tercihi olarak belirlenmiştir.`;
   };
 
   const narrativeText = getWinnerNarrativeText();
