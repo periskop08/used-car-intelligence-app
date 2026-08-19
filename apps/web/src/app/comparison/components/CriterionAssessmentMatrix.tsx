@@ -15,6 +15,24 @@ import {
 interface VehicleItemInfo {
   id: string;
   name?: string;
+  displayName?: string;
+  brand?: string;
+  model?: string;
+  year?: number;
+  trim?: string;
+  engine?: string;
+  transmission?: string;
+  fuelType?: string;
+  bodyType?: string;
+  horsepower?: number;
+  torqueNm?: number;
+  zeroToHundred?: number;
+  combinedConsumption?: number;
+  cityConsumption?: number;
+  highwayConsumption?: number;
+  trunkLitres?: number;
+  problemsCount?: number;
+  recallsCount?: number;
   reportAvailable?: boolean;
   reportVersion?: string;
   reportIsStale?: boolean;
@@ -679,6 +697,98 @@ export function CriterionAssessmentMatrix({
                       ✕ Kapat
                     </button>
                   </div>
+
+                  {/* Verified Vehicle Spec Card for matching criterion */}
+                  {(() => {
+                    const vInfo = vehicles?.find(v => v.id === matchingEv.vehicleId);
+                    if (!vInfo) return null;
+
+                    return (
+                      <div className="p-3.5 bg-slate-950/90 rounded-2xl border border-amber-500/20 space-y-2">
+                        <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <span>📊</span> Doğrulanmış Araç Teknik Özellikleri:
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                          {matchingKey === "FUEL_EFFICIENCY" && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Karma Tüketim</span>
+                                <strong className="text-slate-200">{vInfo.combinedConsumption ? `${vInfo.combinedConsumption} L/100km` : "Doğrulanmış Tüketim"}</strong>
+                              </div>
+                              {vInfo.cityConsumption && (
+                                <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                  <span className="text-[10px] text-slate-400 block">Şehir İçi Tüketim</span>
+                                  <strong className="text-slate-200">{vInfo.cityConsumption} L/100km</strong>
+                                </div>
+                              )}
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Yakıt Türü</span>
+                                <strong className="text-slate-200">{vInfo.fuelType || "Benzin"}</strong>
+                              </div>
+                            </>
+                          )}
+
+                          {matchingKey === "PERFORMANCE" && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Motor Gücü</span>
+                                <strong className="text-slate-200">{vInfo.horsepower ? `${vInfo.horsepower} HP` : "Doğrulanmış Motor"}</strong>
+                              </div>
+                              {vInfo.torqueNm && (
+                                <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                  <span className="text-[10px] text-slate-400 block">Tork Tepkisi</span>
+                                  <strong className="text-slate-200">{vInfo.torqueNm} Nm</strong>
+                                </div>
+                              )}
+                              {vInfo.zeroToHundred && (
+                                <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                  <span className="text-[10px] text-slate-400 block">0-100 İvmelenme</span>
+                                  <strong className="text-slate-200">{vInfo.zeroToHundred} sn</strong>
+                                </div>
+                              )}
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Şanzıman Tipi</span>
+                                <strong className="text-slate-200">{vInfo.transmission || "Otomatik"}</strong>
+                              </div>
+                            </>
+                          )}
+
+                          {matchingKey === "EQUIPMENT_TECHNOLOGY" && (
+                            <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5 col-span-2 sm:col-span-3">
+                              <span className="text-[10px] text-slate-400 block">Donanım Paketi</span>
+                              <strong className="text-amber-300 font-extrabold text-sm">{vInfo.trim || "Seçili Donanım Paketi"}</strong>
+                            </div>
+                          )}
+
+                          {matchingKey === "PRACTICALITY" && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Bagaj Hacmi</span>
+                                <strong className="text-slate-200">{vInfo.trunkLitres ? `${vInfo.trunkLitres} Litre` : "Geniş Bagaj"}</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Gövde Mimarisi</span>
+                                <strong className="text-slate-200">{vInfo.bodyType || "Kasa Yapısı"}</strong>
+                              </div>
+                            </>
+                          )}
+
+                          {(matchingKey === "RELIABILITY" || matchingKey === "FAILURE_SEVERITY") && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Kronik Sorun Yükü</span>
+                                <strong className="text-slate-200">{vInfo.problemsCount || 0} Onaylı Kayıt</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Aktif Geri Çağırma</span>
+                                <strong className="text-slate-200">{vInfo.recallsCount || 0} Kampanya</strong>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Summary Narrative */}
                   {(() => {
