@@ -773,6 +773,40 @@ export function CriterionAssessmentMatrix({
                             </>
                           )}
 
+                          {matchingKey === "USAGE_SUITABILITY" && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Motor Gücü & Hacmi</span>
+                                <strong className="text-slate-200">{vInfo.horsepower ? `${vInfo.horsepower} HP` : vInfo.engine || "Motor Verisi"}</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Şanzıman</span>
+                                <strong className="text-slate-200">{vInfo.transmission || "Otomatik / Manuel"}</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Gövde Tipi</span>
+                                <strong className="text-slate-200">{vInfo.bodyType || "Kasa Yapısı"}</strong>
+                              </div>
+                            </>
+                          )}
+
+                          {matchingKey === "COMFORT" && (
+                            <>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Donanım Paketi</span>
+                                <strong className="text-slate-200">{vInfo.trim || "Standart"}</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Kabin Yalıtımı / Gövde</span>
+                                <strong className="text-slate-200">{vInfo.bodyType || "Kasa Mimarisi"}</strong>
+                              </div>
+                              <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">
+                                <span className="text-[10px] text-slate-400 block">Şanzıman Konforu</span>
+                                <strong className="text-slate-200">{vInfo.transmission || "Otomatik"}</strong>
+                              </div>
+                            </>
+                          )}
+
                           {(matchingKey === "RELIABILITY" || matchingKey === "FAILURE_SEVERITY") && (
                             <>
                               <div className="p-2 bg-slate-900/80 rounded-xl border border-white/5">

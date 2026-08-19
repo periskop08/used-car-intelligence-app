@@ -264,7 +264,7 @@ export class ComparisonService {
 
     const sourceDataVersion = computeSourceDataVersionFromProfiles(profiles);
     const sortedVariantIds = [...requestedIds].sort();
-    const rawCacheKey = `comp_v2_relative_market_TR_locale_trTR_priority_${priority}_data_${sourceDataVersion}_variants_${sortedVariantIds.join('_')}`;
+    const rawCacheKey = `comp_v3_rich_relative_v8_market_TR_locale_trTR_priority_${priority}_data_${sourceDataVersion}_variants_${sortedVariantIds.join('_')}`;
     const cacheKey = crypto.createHash('sha256').update(rawCacheKey).digest('hex');
 
     const cached = await this.prisma.aiVehicleComparisonCache.findUnique({
