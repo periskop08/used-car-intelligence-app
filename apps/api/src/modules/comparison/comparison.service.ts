@@ -678,20 +678,22 @@ KATI TALİMATLAR:
 
   private async loadVehicleProfiles(variantIds: string[], userId?: string): Promise<ComparisonVehicleProfile[]> {
     // STAGE 1: Ensure all selected vehicle variants have a completed GeneratedVehicleReport in DB.
-    // If a report does not exist for a variant, auto-generate a full live report using Araç Sorgula pipeline!
-    for (const id of variantIds) {
-      const existingReport = await this.reportLoaderService.findLatestGeneratedReport(id);
-      if (!existingReport && this.vehicleReportService) {
-        console.log(`[ComparisonService] Variant ${id} has no pre-stored GeneratedVehicleReport. Auto-generating live report via Araç Sorgula pipeline...`);
-        await this.vehicleReportService.createVehicleReport(userId || 'guest_user', {
-          variantId: id,
-          idempotencyKey: `auto_comp_${id}_${Date.now()}`,
-          forceRefresh: false,
-        }).catch(err => {
-          console.warn(`[ComparisonService] Live report auto-generation notice for ${id}: ${err?.message || err}`);
-        });
-      }
-    }
+    // Auto-generate missing reports concurrently in parallel for maximum speed!
+    await Promise.all(
+      variantIds.map(async (id) => {
+        const existingReport = await this.reportLoaderService.findLatestGeneratedReport(id);
+        if (!existingReport && this.vehicleReportService) {
+          console.log(`[ComparisonService] Variant ${id} has no pre-stored GeneratedVehicleReport. Auto-generating live report concurrently...`);
+          await this.vehicleReportService.createVehicleReport(userId || 'guest_user', {
+            variantId: id,
+            idempotencyKey: `auto_comp_${id}_${Date.now()}`,
+            forceRefresh: false,
+          }).catch(err => {
+            console.warn(`[ComparisonService] Live report auto-generation notice for ${id}: ${err?.message || err}`);
+          });
+        }
+      })
+    );
 
     const profiles: ComparisonVehicleProfile[] = [];
 
