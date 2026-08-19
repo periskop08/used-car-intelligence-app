@@ -542,113 +542,6 @@ export function CriterionAssessmentMatrix({
                       );
                     })}
                   </tr>
-
-                  {/* Expanded Detail Row for clicked cell */}
-                  {evaluations.some(ev => expandedCell === `${ev.vehicleId}_${key}`) && (
-                    <tr className="bg-slate-900/90 border-b border-amber-500/30">
-                      <td colSpan={evaluations.length + 1} className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {evaluations.map(ev => {
-                            const assessment = ev.assessments[key];
-                            if (expandedCell !== `${ev.vehicleId}_${key}`) return null;
-
-                            return (
-                              <div key={ev.vehicleId} className="p-4 bg-slate-950 rounded-xl border border-amber-500/20 space-y-3 col-span-full">
-                                <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                  <h4 className="font-bold text-amber-400 text-sm">
-                                    {ev.vehicleName} — {meta.title} Detay Analizi
-                                  </h4>
-                                  <button
-                                    onClick={() => setExpandedCell(null)}
-                                    className="text-xs text-slate-400 hover:text-slate-200"
-                                  >
-                                    ✕ Kapat
-                                  </button>
-                                </div>
-
-                                <p className="text-xs text-slate-200 leading-relaxed font-medium">
-                                  {assessment?.summary || "Bu kriter için detaylı kanıt özeti bulunuyor."}
-                                </p>
-
-                                {/* Positive Factors */}
-                                {assessment?.positiveFactors && assessment.positiveFactors.length > 0 && (
-                                  <div className="space-y-1">
-                                    <div className="text-[11px] font-bold text-emerald-400">✓ Olumlu Faktörler:</div>
-                                    <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
-                                      {assessment.positiveFactors.map((pf, i) => (
-                                        <li key={i}>{pf}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {/* Negative Factors */}
-                                {assessment?.negativeFactors && assessment.negativeFactors.length > 0 && (
-                                  <div className="space-y-1">
-                                    <div className="text-[11px] font-bold text-rose-400">⚠️ Riskler & Olumsuzlar:</div>
-                                    <ul className="list-disc list-inside text-xs text-slate-300 space-y-0.5">
-                                      {assessment.negativeFactors.map((nf, i) => (
-                                        <li key={i}>{nf}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {/* Missing Inputs */}
-                                {assessment?.missingInputs && assessment.missingInputs.length > 0 && (
-                                  <div className="text-[11px] text-slate-400 italic">
-                                    ℹ️ Eksik Veriler: {assessment.missingInputs.join(", ")}
-                                  </div>
-                                )}
-
-                                {/* Criterion 8 Price Evidence Band */}
-                                {key === "VALUE_FOR_MONEY" && assessment?.marketPriceEvidence && (
-                                  <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 space-y-1.5 text-xs text-amber-300">
-                                    <div className="font-bold flex items-center gap-1.5 text-amber-400">
-                                      <span>🏷️</span> Doğrulanmış Piyasa Fiyat Bandı Verisi
-                                    </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-[11px]">
-                                      <div>
-                                        <span className="text-slate-400 block">Fiyat Bandı:</span>
-                                        <strong>
-                                          {assessment.marketPriceEvidence.minPrice?.toLocaleString("tr-TR")} TL — {assessment.marketPriceEvidence.maxPrice?.toLocaleString("tr-TR")} TL
-                                        </strong>
-                                      </div>
-                                      <div>
-                                        <span className="text-slate-400 block">Örneklem Sayısı:</span>
-                                        <strong>{assessment.marketPriceEvidence.sampleCount || 1} İlan / Snapshot</strong>
-                                      </div>
-                                      <div>
-                                        <span className="text-slate-400 block">Veri Tarihi:</span>
-                                        <strong>
-                                          {assessment.marketPriceEvidence.asOfDate ? new Date(assessment.marketPriceEvidence.asOfDate).toLocaleDateString("tr-TR") : "Güncel"}
-                                        </strong>
-                                      </div>
-                                      <div>
-                                        <span className="text-slate-400 block">Eşleşme Kalitesi:</span>
-                                         <strong>
-                                           {assessment.marketPriceEvidence.matchQuality === "EXACT"
-                                             ? "Birebir Varyant"
-                                             : assessment.marketPriceEvidence.matchQuality === "COMPARABLE"
-                                             ? "Karşılaştırılabilir Model"
-                                             : "Genel Model Tahmini"}
-                                         </strong>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Criterion 8 Equipment Feature Matrix */}
-                                {(key === "EQUIPMENT_TECHNOLOGY" || key === "VALUE_FOR_MONEY") &&
-                                  assessment?.equipmentFeatureStatuses &&
-                                  renderEquipmentFeatureMatrix(assessment.equipmentFeatureStatuses)}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
                 </React.Fragment>
               );
             })}
@@ -738,6 +631,147 @@ export function CriterionAssessmentMatrix({
           );
         })}
       </div>
+
+      {/* Floating Modal Popover for Cell Detail Analysis */}
+      {expandedCell && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
+          onClick={() => setExpandedCell(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] overflow-y-auto glass p-6 rounded-3xl border border-amber-500/40 bg-slate-900/95 shadow-2xl space-y-4 text-slate-100"
+            onClick={e => e.stopPropagation()}
+          >
+            {(() => {
+              const matchingEv = evaluations.find(ev =>
+                CRITERIA_KEYS.some(k => expandedCell === `${ev.vehicleId}_${k}`)
+              );
+              const matchingKey = CRITERIA_KEYS.find(k =>
+                evaluations.some(ev => expandedCell === `${ev.vehicleId}_${k}`)
+              );
+
+              if (!matchingEv || !matchingKey) return null;
+
+              const meta = CRITERIA_METADATA[matchingKey];
+              const assessment = matchingEv.assessments[matchingKey];
+
+              return (
+                <div className="space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xl text-amber-400 shrink-0">
+                        {meta.icon}
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-amber-300 text-base md:text-lg">
+                          {matchingEv.vehicleName}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {meta.title} ({meta.weightStr}) Detay Analiz Raporu
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setExpandedCell(null)}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-xl border border-white/10 transition flex items-center gap-1 font-bold shadow-sm"
+                    >
+                      ✕ Kapat
+                    </button>
+                  </div>
+
+                  {/* Summary Narrative */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 space-y-1">
+                    <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                      📋 Kriter Özet Analizi:
+                    </div>
+                    <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium">
+                      {assessment?.summary || "Bu kriter için detaylı kanıt özeti bulunuyor."}
+                    </p>
+                  </div>
+
+                  {/* Positive Factors */}
+                  {assessment?.positiveFactors && assessment.positiveFactors.length > 0 && (
+                    <div className="p-4 bg-emerald-950/20 rounded-2xl border border-emerald-500/20 space-y-1.5">
+                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <span>✓</span> Olumlu Faktörler & Avantajlar:
+                      </div>
+                      <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
+                        {assessment.positiveFactors.map((pf, i) => (
+                          <li key={i}>{pf}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Negative Factors */}
+                  {assessment?.negativeFactors && assessment.negativeFactors.length > 0 && (
+                    <div className="p-4 bg-rose-950/20 rounded-2xl border border-rose-500/20 space-y-1.5">
+                      <div className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                        <span>⚠️</span> Riskler & Olumsuzlar:
+                      </div>
+                      <ul className="list-disc list-inside text-xs text-slate-200 space-y-1 font-medium">
+                        {assessment.negativeFactors.map((nf, i) => (
+                          <li key={i}>{nf}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Missing Inputs */}
+                  {assessment?.missingInputs && assessment.missingInputs.length > 0 && (
+                    <div className="text-xs text-slate-400 italic">
+                      ℹ️ Eksik Veriler: {assessment.missingInputs.join(", ")}
+                    </div>
+                  )}
+
+                  {/* Criterion 8 Price Evidence Band */}
+                  {matchingKey === "VALUE_FOR_MONEY" && assessment?.marketPriceEvidence && (
+                    <div className="p-4 bg-amber-500/10 rounded-2xl border border-amber-500/30 space-y-2 text-xs text-amber-300">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-400">
+                        <span>🏷️</span> Doğrulanmış Piyasa Fiyat Bandı Verisi
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block">Fiyat Bandı:</span>
+                          <strong>
+                            {assessment.marketPriceEvidence.minPrice?.toLocaleString("tr-TR")} TL — {assessment.marketPriceEvidence.maxPrice?.toLocaleString("tr-TR")} TL
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Örneklem Sayısı:</span>
+                          <strong>{assessment.marketPriceEvidence.sampleCount || 1} İlan / Snapshot</strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Veri Tarihi:</span>
+                          <strong>
+                            {assessment.marketPriceEvidence.asOfDate ? new Date(assessment.marketPriceEvidence.asOfDate).toLocaleDateString("tr-TR") : "Güncel"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Eşleşme Kalitesi:</span>
+                          <strong>
+                            {assessment.marketPriceEvidence.matchQuality === "EXACT"
+                              ? "Birebir Varyant"
+                              : assessment.marketPriceEvidence.matchQuality === "COMPARABLE"
+                              ? "Karşılaştırılabilir Model"
+                              : "Genel Model Tahmini"}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Equipment Feature Matrix */}
+                  {(matchingKey === "EQUIPMENT_TECHNOLOGY" || matchingKey === "VALUE_FOR_MONEY") &&
+                    assessment?.equipmentFeatureStatuses &&
+                    renderEquipmentFeatureMatrix(assessment.equipmentFeatureStatuses)}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
     </div>
   );
