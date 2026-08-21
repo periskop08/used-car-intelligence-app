@@ -758,11 +758,11 @@ brandModels.forEach((item) => {
       },
       {
         factType: GuideFactType.BUYING_TIP,
-        titleTr: "Bakım Geçmişini İnceleyin",
-        titleEn: "Check Service History",
-        descTr: "Alırken şanzıman yağı değişim periyotlarına ve yetkili servis kayıtlarına özellikle dikkat edilmelidir.",
-        descEn: "When buying, pay close attention to transmission fluid change intervals and authorized service logs.",
-        iconKey: "calendar"
+        titleTr: "Şasi Karakteri ve Sürüş Dengesi",
+        titleEn: "Chassis Character & Driving Balance",
+        descTr: "Gövde rijitliği, direksiyon geri bildirimi ve yüksek hızlardaki rüzgar yalıtımı ile sınıfının en dengeli karakterini sunar.",
+        descEn: "Offers balanced dynamics with solid chassis rigidity, precise steering feedback, and quiet high-speed cruising.",
+        iconKey: "suspension"
       },
       {
         factType: GuideFactType.USER_EXPERIENCE,
