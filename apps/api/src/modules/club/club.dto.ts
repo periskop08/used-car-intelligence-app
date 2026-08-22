@@ -58,6 +58,8 @@ export class UpdatePollEndTimeDto {
   endsAt: string;
 }
 
+import { ClubPostStatus } from '@prisma/client';
+
 export class CreateClubPostDto {
   @IsOptional()
   @IsString()
@@ -83,6 +85,14 @@ export class CreateClubPostDto {
   @IsOptional()
   @IsInt()
   pinnedOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  publishImmediately?: boolean;
+
+  @IsOptional()
+  @IsEnum(ClubPostStatus)
+  status?: ClubPostStatus;
 
   @IsOptional()
   @ValidateNested()

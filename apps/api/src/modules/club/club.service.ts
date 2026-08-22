@@ -995,7 +995,7 @@ export class ClubService implements OnModuleInit {
 
   async createPost(adminId: string, dto: CreateClubPostDto) {
     try {
-      const { title, content, mediaUrls, commentsEnabled, isPinned, pinnedOrder, poll } = dto;
+      const { title, content, mediaUrls, commentsEnabled, isPinned, pinnedOrder, poll, publishImmediately, status } = dto;
 
       const hasTitle = !!title?.trim();
       const hasContent = !!content?.trim();
@@ -1006,17 +1006,22 @@ export class ClubService implements OnModuleInit {
         throw new BadRequestException('Gönderi yayınlamak için başlık, içerik, fotoğraf veya anket alanlarından en az birini doldurmalısınız.');
       }
 
+      const postStatus = publishImmediately === false || status === ClubPostStatus.DRAFT
+        ? ClubPostStatus.DRAFT
+        : ClubPostStatus.PUBLISHED;
+      const publishedAt = postStatus === ClubPostStatus.PUBLISHED ? new Date() : null;
+
       const result = await this.prisma.$transaction(async (tx) => {
         const newPost = await tx.clubPost.create({
           data: {
             authorId: adminId,
             title: title || null,
             content: content || '',
-            status: ClubPostStatus.PUBLISHED,
+            status: postStatus,
             commentsEnabled: commentsEnabled ?? true,
             isPinned: isPinned ?? false,
             pinnedOrder: pinnedOrder ?? null,
-            publishedAt: new Date(),
+            publishedAt,
           },
         });
 
