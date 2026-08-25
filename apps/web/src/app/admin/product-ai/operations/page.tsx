@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Activity,
@@ -22,6 +22,8 @@ import {
   ShieldAlert,
   ChevronRight,
   X,
+  FileText,
+  Info,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -43,10 +45,10 @@ const TIME_RANGES: { key: TimeRangeKey; label: string }[] = [
 ];
 
 export default function AdminAiOperationsPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-
+  const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab') as TabKey | null;
+
   const [activeTab, setActiveTab] = useState<TabKey>(
     tabParam && ['live', 'queue', 'errors', 'cost-tokens', 'provider-health'].includes(tabParam)
       ? tabParam
@@ -65,6 +67,13 @@ export default function AdminAiOperationsPage() {
   const [costData, setCostData] = useState<any>(null);
   const [providerData, setProviderData] = useState<any[]>([]);
   const [queueJobs, setQueueJobs] = useState<any[]>([]);
+
+  // Queue Tab States & Race condition ref
+  const [queueInitialLoading, setQueueInitialLoading] = useState(true);
+  const [queueRefreshing, setQueueRefreshing] = useState(false);
+  const [queueStatusFilter, setQueueStatusFilter] = useState<string>('ALL');
+  const [selectedQueueJob, setSelectedQueueJob] = useState<any>(null);
+  const queueRequestIdRef = useRef(0);
 
   // Filters & Modal
   const [opTypeFilter, setOpTypeFilter] = useState('ALL');
@@ -182,22 +191,33 @@ export default function AdminAiOperationsPage() {
     }
   }, [timeRange]);
 
-  const fetchQueueJobs = useCallback(async () => {
-    setQueueLoading(true);
+  const fetchQueueJobs = useCallback(async (isSilent = false) => {
+    const reqId = ++queueRequestIdRef.current;
+    if (!isSilent && queueJobs.length === 0) {
+      setQueueInitialLoading(true);
+    }
+    setQueueRefreshing(true);
+
     try {
       const res = await fetch(`${API_BASE_URL}/research/jobs`, {
         headers: getHeaders(),
       });
       if (res.ok) {
         const data = await res.json();
-        setQueueJobs(Array.isArray(data) ? data : []);
+        // Prevent race condition: only apply if this is the latest request
+        if (reqId === queueRequestIdRef.current) {
+          setQueueJobs(Array.isArray(data) ? data : []);
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.error('Queue fetch error:', e);
     } finally {
-      setQueueLoading(false);
+      if (reqId === queueRequestIdRef.current) {
+        setQueueInitialLoading(false);
+        setQueueRefreshing(false);
+      }
     }
-  }, []);
+  }, [queueJobs.length]);
 
   const loadAllTabData = useCallback(async () => {
     setLoading(true);
@@ -236,7 +256,7 @@ export default function AdminAiOperationsPage() {
         fetchLiveMetrics();
         fetchLiveStream();
       } else if (activeTab === 'queue') {
-        fetchQueueJobs();
+        fetchQueueJobs(true);
       } else if (activeTab === 'provider-health') {
         fetchProviderStatus();
       }
@@ -597,77 +617,180 @@ export default function AdminAiOperationsPage() {
 
       {/* TAB 2: KUYRUK */}
       {activeTab === 'queue' && (
-        <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
-          <div className="p-4 border-b border-white/5 flex items-center justify-between">
+        <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden space-y-0">
+          <div className="p-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider">AI Araştırma İş Kuyruğu</h3>
+              <h3 className="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                <span>AI Araştırma İş Kuyruğu</span>
+                {queueRefreshing && (
+                  <span className="text-[10px] text-cyan-400 font-normal flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin" /> Arka planda güncelleniyor...
+                  </span>
+                )}
+              </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Araç kronik sorunları ve web araştırma işlerinin canlı kuyruk durumu ({queueJobs.length} iş).
+                Araç kronik sorunları ve web araştırma işlerinin canlı kuyruk durumu ({queueJobs.length} toplam kayıt).
               </p>
             </div>
-            <button
-              onClick={fetchQueueJobs}
-              disabled={queueLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-xl text-xs font-bold text-slate-300 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${queueLoading ? 'animate-spin' : ''}`} />
-              <span>Yenile</span>
-            </button>
+
+            <div className="flex items-center gap-3">
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-white/5 text-[11px]">
+                {[
+                  { key: 'ALL', label: 'Tümü' },
+                  { key: 'ACTIVE', label: 'Aktif' },
+                  { key: 'QUEUED', label: 'Bekleyen' },
+                  { key: 'IN_PROGRESS', label: 'Çalışan' },
+                  { key: 'COMPLETED', label: 'Tamamlanan' },
+                  { key: 'FAILED', label: 'Hatalı' },
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setQueueStatusFilter(f.key)}
+                    className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${
+                      queueStatusFilter === f.key
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => fetchQueueJobs(false)}
+                disabled={queueRefreshing}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-xl text-xs font-bold text-slate-300 transition cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${queueRefreshing ? 'animate-spin' : ''}`} />
+                <span>Yenile</span>
+              </button>
+            </div>
           </div>
 
-          {queueLoading ? (
-            <div className="p-12 text-center text-slate-400 font-medium text-xs">Kuyruktaki işler yükleniyor...</div>
-          ) : queueJobs.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 font-medium text-xs">Kuyrukta aktif veya bekleyen araştırma işi bulunmuyor.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-slate-950 text-slate-400 font-bold border-b border-white/5 uppercase text-[10px]">
-                  <tr>
-                    <th className="p-3">İş ID</th>
-                    <th className="p-3">Varyant ID</th>
-                    <th className="p-3">Durum</th>
-                    <th className="p-3">Öncelik</th>
-                    <th className="p-3">Deneme</th>
-                    <th className="p-3">Oluşturulma</th>
-                    <th className="p-3 text-right">Eylem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
-                  {queueJobs.map((job) => (
-                    <tr key={job.id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 text-cyan-400 font-bold">{job.id.substring(0, 8)}...</td>
-                      <td className="p-3 text-slate-300">{job.vehicleVariantId}</td>
-                      <td className="p-3">{getStatusBadge(job.status)}</td>
-                      <td className="p-3 font-semibold text-slate-400">{job.priority || 'MEDIUM'}</td>
-                      <td className="p-3 font-semibold">{job.attemptCount} / {job.maxAttempts}</td>
-                      <td className="p-3 text-slate-400">{new Date(job.createdAt).toLocaleString('tr-TR')}</td>
-                      <td className="p-3 text-right flex items-center justify-end gap-2">
-                        {job.status === 'FAILED' && (
-                          <button
-                            onClick={() => handleRetryJob(job.id)}
-                            disabled={actionLoading === job.id}
-                            className="px-2 py-1 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 rounded text-[10px] font-bold cursor-pointer"
-                          >
-                            Yeniden Başlat
-                          </button>
-                        )}
-                        {job.status === 'QUEUED' && (
-                          <button
-                            onClick={() => handleCancelJob(job.id)}
-                            disabled={actionLoading === job.id}
-                            className="px-2 py-1 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 rounded text-[10px] font-bold cursor-pointer"
-                          >
-                            İptal Et
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {queueInitialLoading && queueJobs.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 font-medium text-xs flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+              <span>Kuyruktaki işler yükleniyor...</span>
             </div>
-          )}
+          ) : (() => {
+            const filteredJobs = queueJobs.filter((job) => {
+              if (queueStatusFilter === 'ACTIVE') return job.status === 'QUEUED' || job.status === 'IN_PROGRESS';
+              if (queueStatusFilter === 'QUEUED') return job.status === 'QUEUED';
+              if (queueStatusFilter === 'IN_PROGRESS') return job.status === 'IN_PROGRESS';
+              if (queueStatusFilter === 'COMPLETED') return job.status === 'COMPLETED';
+              if (queueStatusFilter === 'FAILED') return job.status === 'FAILED';
+              return true;
+            });
+
+            if (filteredJobs.length === 0) {
+              return (
+                <div className="p-12 text-center text-slate-500 font-medium text-xs">
+                  {queueStatusFilter === 'ACTIVE' && 'Şu anda çalışan veya bekleyen işlem bulunmuyor.'}
+                  {queueStatusFilter === 'COMPLETED' && 'Tamamlanmış işlem bulunmuyor.'}
+                  {queueStatusFilter === 'FAILED' && 'Hatalı işlem bulunmuyor.'}
+                  {queueStatusFilter === 'QUEUED' && 'Bekleyen işlem bulunmuyor.'}
+                  {queueStatusFilter === 'IN_PROGRESS' && 'Şu an çalışan işlem bulunmuyor.'}
+                  {queueStatusFilter === 'ALL' && 'Henüz kuyruk işlemi bulunmuyor.'}
+                </div>
+              );
+            }
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-slate-950 text-slate-400 font-bold border-b border-white/5 uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3">İşlem Tipi</th>
+                      <th className="p-3">Hedef Araç</th>
+                      <th className="p-3">Durum</th>
+                      <th className="p-3">Deneme</th>
+                      <th className="p-3">Süre</th>
+                      <th className="p-3">Oluşturulma</th>
+                      <th className="p-3 text-right">Detay / Eylem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-slate-300">
+                    {filteredJobs.map((job) => {
+                      const v = job.variant;
+                      const vehicleTitle = v
+                        ? `${v.brand?.name || ''} ${v.model?.name || ''} ${v.year ? `(${v.year})` : ''}`.trim()
+                        : null;
+                      const vehicleSub = v
+                        ? [v.engine?.code, v.transmission?.name, v.trim?.name].filter(Boolean).join(' • ')
+                        : null;
+
+                      let scopeLabel = 'Araç Araştırma İşlemi';
+                      if (job.researchScope === 'FULL_REPORT') scopeLabel = 'Tam Rapor Araştırması';
+                      if (job.researchScope === 'CHRONIC_PROBLEMS') scopeLabel = 'Kronik Problem Araştırması';
+                      if (job.researchScope === 'TECHNICAL_SPECS') scopeLabel = 'Teknik Veri Araştırması';
+
+                      let durationText = '—';
+                      if (job.updatedAt && (job.lockedAt || job.createdAt)) {
+                        const start = new Date(job.lockedAt || job.createdAt).getTime();
+                        const end = new Date(job.updatedAt).getTime();
+                        if (end > start) {
+                          durationText = `${((end - start) / 1000).toFixed(1)} sn`;
+                        }
+                      }
+
+                      return (
+                        <tr key={job.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3">
+                            <span className="font-bold text-white block">{scopeLabel}</span>
+                            <span className="text-[10px] text-slate-500">Öncelik: {job.priority || 'MEDIUM'}</span>
+                          </td>
+                          <td className="p-3">
+                            {vehicleTitle ? (
+                              <div>
+                                <span className="font-bold text-cyan-300 block">{vehicleTitle}</span>
+                                {vehicleSub && <span className="text-[10px] text-slate-400 block">{vehicleSub}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 italic">Araç bilgisi bulunamadı</span>
+                            )}
+                          </td>
+                          <td className="p-3">{getStatusBadge(job.status)}</td>
+                          <td className="p-3 font-semibold">{job.attemptCount} / {job.maxAttempts || 3}</td>
+                          <td className="p-3 text-slate-300">{durationText}</td>
+                          <td className="p-3 text-slate-400">{new Date(job.createdAt).toLocaleString('tr-TR')}</td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedQueueJob(job)}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer"
+                              >
+                                Detay
+                              </button>
+                              {job.status === 'FAILED' && (
+                                <button
+                                  onClick={() => handleRetryJob(job.id)}
+                                  disabled={actionLoading === job.id}
+                                  className="px-2 py-1 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 rounded text-[10px] font-bold cursor-pointer"
+                                >
+                                  Yeniden Başlat
+                                </button>
+                              )}
+                              {job.status === 'QUEUED' && (
+                                <button
+                                  onClick={() => handleCancelJob(job.id)}
+                                  disabled={actionLoading === job.id}
+                                  className="px-2 py-1 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 rounded text-[10px] font-bold cursor-pointer"
+                                >
+                                  İptal Et
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -971,6 +1094,100 @@ export default function AdminAiOperationsPage() {
                   <div className="text-slate-200 text-xs">{selectedTrace.vehicleVariantId}</div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUEUE JOB DETAIL DRAWER MODAL */}
+      {selectedQueueJob && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
+          <div className="w-full max-w-xl bg-slate-950 border-l border-white/10 h-full p-6 overflow-y-auto space-y-6 text-xs font-mono text-slate-200">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div>
+                <span className="text-[10px] text-cyan-400 font-bold uppercase">Kuyruk İş Detayı</span>
+                <h3 className="text-sm font-bold text-white mt-0.5">{selectedQueueJob.id}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedQueueJob(null)}
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">İşlem Kapsamı:</span>
+                  <strong className="text-white">{selectedQueueJob.researchScope || 'FULL_REPORT'}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Durum:</span>
+                  {getStatusBadge(selectedQueueJob.status)}
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Öncelik:</span>
+                  <strong className="text-amber-400">{selectedQueueJob.priority || 'MEDIUM'}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Deneme Sayısı:</span>
+                  <strong className="text-cyan-400">{selectedQueueJob.attemptCount} / {selectedQueueJob.maxAttempts || 3}</strong>
+                </div>
+              </div>
+
+              {selectedQueueJob.variant && (
+                <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-2">
+                  <span className="text-[10px] text-cyan-400 uppercase font-bold">Hedef Araç Bilgileri</span>
+                  <div className="text-white font-bold text-sm">
+                    {selectedQueueJob.variant.brand?.name} {selectedQueueJob.variant.model?.name} {selectedQueueJob.variant.year && `(${selectedQueueJob.variant.year})`}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {[selectedQueueJob.variant.engine?.code, selectedQueueJob.variant.transmission?.name, selectedQueueJob.variant.trim?.name].filter(Boolean).join(' • ') || '—'}
+                  </div>
+                  <div className="text-slate-500 text-[11px] pt-1">
+                    Varyant ID: <code className="text-slate-300">{selectedQueueJob.vehicleVariantId}</code>
+                  </div>
+                </div>
+              )}
+
+              {selectedQueueJob.errorMessage && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1 text-rose-300">
+                  <span className="text-[10px] font-bold uppercase">Hata Günlüğü</span>
+                  <p className="text-xs font-sans whitespace-pre-wrap">{selectedQueueJob.errorMessage}</p>
+                </div>
+              )}
+
+              <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-2">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Zaman Çizelgesi</span>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Oluşturuldu:</span>
+                  <span>{new Date(selectedQueueJob.createdAt).toLocaleString('tr-TR')}</span>
+                </div>
+                {selectedQueueJob.lockedAt && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Kilitlendi (Başladı):</span>
+                    <span>{new Date(selectedQueueJob.lockedAt).toLocaleString('tr-TR')}</span>
+                  </div>
+                )}
+                {selectedQueueJob.updatedAt && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Son Güncelleme:</span>
+                    <span>{new Date(selectedQueueJob.updatedAt).toLocaleString('tr-TR')}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-900/60 rounded-xl border border-white/5 space-y-2 text-slate-400 text-[11px]">
+                <div className="flex justify-between">
+                  <span>Ülke / Dil:</span>
+                  <span className="text-white">{selectedQueueJob.countryCode || 'TR'} / {selectedQueueJob.languageCode || 'tr'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pazar Bölgesi:</span>
+                  <span className="text-white">{selectedQueueJob.marketRegion || 'EU_TR'}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -82,12 +82,18 @@ export class ResearchController {
   @Get('jobs')
   async listJobs() {
     return this.prisma.vehicleResearchJob.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
       include: {
         variant: {
           include: {
             brand: true,
             model: true,
+            trim: true,
+            engine: true,
+            transmission: true,
           },
         },
       },
