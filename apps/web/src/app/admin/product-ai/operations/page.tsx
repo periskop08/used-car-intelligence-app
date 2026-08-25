@@ -818,55 +818,88 @@ export default function AdminAiOperationsPage() {
 
       {/* TAB 5: PROVIDER DURUMU */}
       {activeTab === 'provider-health' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {providerData.map((srv) => (
-            <div key={srv.name} className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{srv.type}</span>
-                  <h3 className="font-bold text-sm text-white mt-0.5">{srv.name}</h3>
-                </div>
-                {srv.status === 'HEALTHY' && (
-                  <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> SAĞLIKLI
-                  </span>
-                )}
-                {srv.status === 'DEGRADED' && (
-                  <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> PERFORMANS DÜŞÜK
-                  </span>
-                )}
-                {srv.status === 'UNHEALTHY' && (
-                  <span className="px-2.5 py-1 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
-                    <XCircle className="w-3 h-3" /> HATALI
-                  </span>
-                )}
-                {(srv.status === 'NO_DATA' || srv.status === 'NOT_CONFIGURED') && (
-                  <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-white/10 rounded-lg font-bold text-[10px] flex items-center gap-1">
-                    VERİ YERSİZ / BİLİNMİYOR
-                  </span>
-                )}
-              </div>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+            {providerData.map((srv) => (
+              <div key={srv.name} className="p-6 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">{srv.type}</span>
+                    <h3 className="font-bold text-sm text-white mt-0.5">{srv.name}</h3>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/5 font-mono text-xs">
-                <div className="p-2.5 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-500 text-[10px] block">Ort. Latency</span>
-                  <strong className="text-cyan-400">{srv.avgLatencyMs !== null ? `${srv.avgLatencyMs}ms` : 'Ölçülmedi'}</strong>
-                </div>
-                <div className="p-2.5 bg-slate-950 rounded-xl border border-white/5">
-                  <span className="text-slate-500 text-[10px] block">Başarı Oranı</span>
-                  <strong className="text-emerald-400">{srv.successRate !== null ? `%${srv.successRate}` : '—'}</strong>
-                </div>
-              </div>
+                  {/* Dual Badges: Configuration & Operational Status */}
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 border rounded font-bold text-[10px] uppercase ${
+                      srv.isConfigured
+                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                        : 'bg-slate-800 text-slate-400 border-white/10'
+                    }`}>
+                      {srv.configText || (srv.isConfigured ? 'Yapılandırılmış' : 'Yapılandırılmamış')}
+                    </span>
 
-              <div className="text-[11px] text-slate-400 space-y-1 font-mono">
-                <div>Son Başarılı İstek: {srv.lastSuccess ? new Date(srv.lastSuccess).toLocaleString('tr-TR') : 'Mevcut değil'}</div>
-                {srv.lastError && (
-                  <div className="text-rose-400">Son Hata: {srv.lastError.message || 'Belirtilmedi'}</div>
-                )}
+                    {srv.healthStatus === 'HEALTHY' && (
+                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> {srv.healthText || 'Çalışıyor'}
+                      </span>
+                    )}
+                    {srv.healthStatus === 'DEGRADED' && (
+                      <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {srv.healthText || 'Performans Düşük'}
+                      </span>
+                    )}
+                    {srv.healthStatus === 'UNHEALTHY' && (
+                      <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg font-bold text-[10px] flex items-center gap-1">
+                        <XCircle className="w-3 h-3" /> {srv.healthText || 'Erişilemiyor'}
+                      </span>
+                    )}
+                    {srv.healthStatus === 'INSUFFICIENT_DATA' && (
+                      <span className="px-2.5 py-0.5 bg-slate-800 text-slate-400 border border-white/10 rounded-lg font-bold text-[10px] flex items-center gap-1">
+                        {srv.healthText || 'Veri Yetersiz'}
+                      </span>
+                    )}
+                    {srv.healthStatus === 'NOT_CONFIGURED' && (
+                      <span className="px-2.5 py-0.5 bg-slate-800/80 text-slate-500 border border-white/5 rounded-lg font-bold text-[10px]">
+                        Yapılandırılmamış
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/5 font-mono text-xs">
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-white/5">
+                    <span className="text-slate-500 text-[10px] block">İstek Sayısı</span>
+                    <strong className="text-white">{srv.totalRequests !== null ? srv.totalRequests : '—'}</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-white/5">
+                    <span className="text-slate-500 text-[10px] block">Başarı Oranı</span>
+                    <strong className="text-emerald-400">{srv.successRate !== null ? `%${srv.successRate}` : '—'}</strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-white/5">
+                    <span className="text-slate-500 text-[10px] block">Ort. Latency</span>
+                    <strong className="text-cyan-400">{srv.avgLatencyMs !== null ? `${srv.avgLatencyMs}ms` : '—'}</strong>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400 space-y-1 font-mono pt-1">
+                  <div className="flex justify-between">
+                    <span>Son Başarılı İstek:</span>
+                    <span className="text-slate-200">{srv.lastSuccess ? new Date(srv.lastSuccess).toLocaleString('tr-TR') : '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Son Hata:</span>
+                    <span className={srv.lastError ? 'text-rose-400 font-semibold' : 'text-slate-500'}>
+                      {srv.lastError ? srv.lastError.message : '—'}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          <div className="p-4 bg-slate-900/40 rounded-xl border border-white/5 text-[11px] text-slate-400 text-center font-sans">
+            Provider durumları gerçek kullanım verileri ve mevcut sağlık kontrollerinden hesaplanır. Yeterli ölçüm bulunmayan servislerde tahmini durum gösterilmez.
+          </div>
         </div>
       )}
 

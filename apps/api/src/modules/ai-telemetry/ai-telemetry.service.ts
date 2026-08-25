@@ -395,6 +395,7 @@ export class AiTelemetryService {
   /**
    * Health metrics for active project dependencies only (Gemini, OpenAI, PostgreSQL, Cloudflare R2).
    * Strictly NO Tavily or unconfigured services.
+   * Strictly separates configuration state from operational health state.
    */
   async getProviderStatusMetrics(rangeKey: TimeRangeKey = 'LAST_24_HOURS') {
     const { startDate, endDate } = this.getDateRange(rangeKey);
@@ -413,75 +414,87 @@ export class AiTelemetryService {
 
     // Check DB live state
     let dbStatus = 'HEALTHY';
+    let dbHealthText = 'Çalışıyor';
     let dbLatency: number | null = null;
     try {
       const dbStart = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
       dbLatency = Date.now() - dbStart;
     } catch {
-      dbStatus = 'DEGRADED';
+      dbStatus = 'UNHEALTHY';
+      dbHealthText = 'Erişilemiyor';
     }
 
-    // Determine R2 configured state from ENV
+    // Determine configured state from ENV
+    const geminiConfigured = !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_AI_API_KEY);
+    const openAiConfigured = !!process.env.OPENAI_API_KEY;
     const r2Configured = !!(process.env.R2_ACCOUNT_ID || process.env.R2_BUCKET_NAME || process.env.AWS_S3_ENDPOINT);
 
-    // Active services defined in codebase
     const services = [
-      { id: 'gemini', name: 'Google Gemini API', type: 'AI Provider' },
-      { id: 'openai', name: 'OpenAI API', type: 'AI Provider' },
-      { id: 'postgres', name: 'Neon Serverless PostgreSQL DB', type: 'Database' },
-      { id: 'r2', name: 'Cloudflare R2 Storage', type: 'Object Storage' },
+      { id: 'gemini', name: 'Google Gemini API', type: 'AI Provider', isConfigured: geminiConfigured },
+      { id: 'openai', name: 'OpenAI API', type: 'AI Provider', isConfigured: openAiConfigured },
+      { id: 'postgres', name: 'Neon Serverless PostgreSQL DB', type: 'Database', isConfigured: true },
+      { id: 'r2', name: 'Cloudflare R2 Storage', type: 'Object Storage', isConfigured: r2Configured },
     ];
 
     const result = services.map((srv) => {
       if (srv.id === 'postgres') {
         return {
+          id: srv.id,
           name: srv.name,
           type: srv.type,
-          status: dbStatus,
+          isConfigured: true,
+          configText: 'Bağlı',
+          healthStatus: dbStatus,
+          healthText: dbHealthText,
           avgLatencyMs: dbLatency,
           lastSuccess: new Date().toISOString(),
           lastError: null,
           totalRequests: null,
-          successRate: 100,
-          dataSufficient: true,
+          successRate: dbStatus === 'HEALTHY' ? 100 : 0,
         };
       }
 
       if (srv.id === 'r2') {
         return {
+          id: srv.id,
           name: srv.name,
           type: srv.type,
-          status: r2Configured ? 'HEALTHY' : 'NOT_CONFIGURED',
-          avgLatencyMs: null,
-          lastSuccess: r2Configured ? new Date().toISOString() : null,
-          lastError: null,
-          totalRequests: null,
-          successRate: r2Configured ? 100 : null,
-          dataSufficient: r2Configured,
-        };
-      }
-
-      // For Gemini & OpenAI, check telemetry
-      const matched = logs.filter((l) => l.provider?.toLowerCase().includes(srv.id));
-      if (matched.length === 0) {
-        return {
-          name: srv.name,
-          type: srv.type,
-          status: 'NO_DATA',
-          statusText: 'Son dönemde istek yok / Durum bilinmiyor',
+          isConfigured: r2Configured,
+          configText: r2Configured ? 'Yapılandırılmış' : 'Yapılandırılmamış',
+          healthStatus: r2Configured ? 'INSUFFICIENT_DATA' : 'NOT_CONFIGURED',
+          healthText: r2Configured ? 'Veri Yetersiz' : 'Yapılandırılmamış',
           avgLatencyMs: null,
           lastSuccess: null,
           lastError: null,
           totalRequests: 0,
           successRate: null,
-          dataSufficient: false,
+        };
+      }
+
+      // For Gemini & OpenAI, check telemetry
+      const matched = logs.filter((l) => l.provider?.toLowerCase().includes(srv.id));
+      const totalReqs = matched.length;
+
+      if (totalReqs === 0) {
+        return {
+          id: srv.id,
+          name: srv.name,
+          type: srv.type,
+          isConfigured: srv.isConfigured,
+          configText: srv.isConfigured ? 'Yapılandırılmış' : 'Yapılandırılmamış',
+          healthStatus: srv.isConfigured ? 'INSUFFICIENT_DATA' : 'NOT_CONFIGURED',
+          healthText: srv.isConfigured ? 'Veri Yetersiz' : 'Yapılandırılmamış',
+          avgLatencyMs: null,
+          lastSuccess: null,
+          lastError: null,
+          totalRequests: 0,
+          successRate: null,
         };
       }
 
       const successLogs = matched.filter((l) => l.status === AiOperationStatus.SUCCESS || l.status === AiOperationStatus.SUCCESS_WITH_FALLBACK);
       const failedLogs = matched.filter((l) => l.status === AiOperationStatus.FAILED);
-      const totalReqs = matched.length;
       const successRate = totalReqs > 0 ? Number(((successLogs.length / totalReqs) * 100).toFixed(1)) : 0;
 
       const latencies = matched.map((l) => l.durationMs).filter((d): d is number => typeof d === 'number');
@@ -490,20 +503,30 @@ export class AiTelemetryService {
       const lastSuccess = successLogs.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())[0]?.startedAt || null;
       const lastErrorLog = failedLogs.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())[0];
 
-      let status = 'HEALTHY';
-      if (successRate < 80) status = 'DEGRADED';
-      if (successRate < 50) status = 'UNHEALTHY';
+      let healthStatus = 'HEALTHY';
+      let healthText = 'Çalışıyor';
+      if (successRate < 80) {
+        healthStatus = 'DEGRADED';
+        healthText = 'Performans Düşük';
+      }
+      if (successRate < 50) {
+        healthStatus = 'UNHEALTHY';
+        healthText = 'Erişilemiyor';
+      }
 
       return {
+        id: srv.id,
         name: srv.name,
         type: srv.type,
-        status,
+        isConfigured: srv.isConfigured,
+        configText: srv.isConfigured ? 'Yapılandırılmış' : 'Yapılandırılmamış',
+        healthStatus,
+        healthText,
         avgLatencyMs,
         lastSuccess: lastSuccess ? lastSuccess.toISOString() : null,
-        lastError: lastErrorLog ? { message: lastErrorLog.errorMessage, time: lastErrorLog.startedAt.toISOString() } : null,
+        lastError: lastErrorLog ? { message: lastErrorLog.errorMessage || 'Bilinmeyen hata', time: lastErrorLog.startedAt.toISOString() } : null,
         totalRequests: totalReqs,
         successRate,
-        dataSufficient: true,
       };
     });
 
