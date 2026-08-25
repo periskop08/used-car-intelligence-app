@@ -225,7 +225,7 @@ export class ReportService {
         operationType: AiOperationType.VEHICLE_CHATBOT,
         status: AiOperationStatus.SUCCESS,
         stage: 'Vehicle Chatbot Provider',
-        provider: result.provider || 'Google Gemini API',
+        provider: (result as any).provider || result.providerName || 'Google Gemini API',
         primaryProvider: 'Google Gemini API',
         durationMs: Date.now() - chatStart,
         vehicleVariantId: variant.id,
