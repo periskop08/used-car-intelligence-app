@@ -4,6 +4,7 @@ import {
   AiOperationType,
   AiOperationStatus,
   AiCacheStatus,
+  ApprovalStatus,
 } from '@prisma/client';
 
 export interface RecordTraceOptions {
@@ -531,5 +532,156 @@ export class AiTelemetryService {
     });
 
     return { services: result };
+  }
+
+  /**
+   * Returns REAL claim / evidence quality records from CommonProblem and Recall database models.
+   * Supports server-side pagination, search, and status filtering.
+   */
+  async getEvidenceQualityItems(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    statusFilter?: string;
+  }) {
+    const page = Math.max(1, params.page || 1);
+    const limit = Math.min(100, Math.max(1, params.limit || 20));
+    const search = params.search?.trim().toLowerCase() || '';
+    const statusFilter = params.statusFilter || '';
+
+    let approvalStatus: ApprovalStatus | undefined;
+    if (statusFilter === 'VERIFIED') approvalStatus = ApprovalStatus.APPROVED;
+    if (statusFilter === 'REJECTED') approvalStatus = ApprovalStatus.REJECTED;
+    if (statusFilter === 'INSUFFICIENT_EVIDENCE') approvalStatus = ApprovalStatus.PENDING;
+
+    const problemWhere: any = {};
+    const recallWhere: any = {};
+
+    if (approvalStatus) {
+      problemWhere.status = approvalStatus;
+      recallWhere.status = approvalStatus;
+    }
+
+    const [problems, recalls] = await Promise.all([
+      this.prisma.commonProblem.findMany({
+        where: problemWhere,
+        include: {
+          variant: {
+            include: {
+              brand: true,
+              model: true,
+              trim: true,
+              engine: true,
+              transmission: true,
+            },
+          },
+          sources: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.recall.findMany({
+        where: recallWhere,
+        include: {
+          variant: {
+            include: {
+              brand: true,
+              model: true,
+              trim: true,
+              engine: true,
+              transmission: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    const allItems: any[] = [];
+
+    for (const p of problems) {
+      const v = p.variant;
+      const vehicleVariant = v
+        ? `${v.brand?.name || ''} ${v.model?.name || ''} ${v.year ? `(${v.year})` : ''} ${v.trim?.name || ''}`.trim()
+        : 'Araç bilgisi bulunamadı';
+
+      let verificationStatus = 'INSUFFICIENT_EVIDENCE';
+      if (p.status === ApprovalStatus.APPROVED) verificationStatus = 'VERIFIED';
+      if (p.status === ApprovalStatus.REJECTED) verificationStatus = 'REJECTED';
+
+      const sourceUrls = p.sources.map((s) => s.sourceUrl).filter((u): u is string => Boolean(u));
+      if (p.sourceUrl && !sourceUrls.includes(p.sourceUrl)) {
+        sourceUrls.unshift(p.sourceUrl);
+      }
+
+      allItems.push({
+        id: p.id,
+        rawId: p.id,
+        vehicleVariant,
+        vehicleVariantId: p.variantId,
+        claimType: p.problemType || 'CHRONIC_PROBLEM',
+        claimText: `${p.title}: ${p.description}`,
+        verificationStatus,
+        confidenceScore: p.confidenceScore ? Number(p.confidenceScore) : 0.85,
+        sourceCount: sourceUrls.length || p.sourceCount || 1,
+        sources: sourceUrls.length > 0 ? sourceUrls : ['Veritabanı Analiz Kaydı'],
+        evidenceExcerpt: p.evidenceSummary || p.symptoms || p.inspectionAdvice || p.description,
+        rejectedReason: p.rejectedReason || null,
+        researchedAt: p.createdAt.toISOString(),
+      });
+    }
+
+    for (const r of recalls) {
+      const v = r.variant;
+      const vehicleVariant = v
+        ? `${v.brand?.name || ''} ${v.model?.name || ''} ${v.year ? `(${v.year})` : ''} ${v.trim?.name || ''}`.trim()
+        : 'Araç bilgisi bulunamadı';
+
+      let verificationStatus = 'INSUFFICIENT_EVIDENCE';
+      if (r.status === ApprovalStatus.APPROVED) verificationStatus = 'VERIFIED';
+      if (r.status === ApprovalStatus.REJECTED) verificationStatus = 'REJECTED';
+
+      const sourceUrls = [r.officialSourceUrl, r.sourceUrl, r.officialCheckUrl].filter((u): u is string => Boolean(u));
+
+      allItems.push({
+        id: r.id,
+        rawId: r.id,
+        vehicleVariant,
+        vehicleVariantId: r.variantId,
+        claimType: 'RECALL_ISSUE',
+        claimText: `${r.title}: ${r.description}`,
+        verificationStatus,
+        confidenceScore: 0.95,
+        sourceCount: sourceUrls.length || 1,
+        sources: sourceUrls.length > 0 ? sourceUrls : ['Resmi Geri Çağırma Bülteni'],
+        evidenceExcerpt: r.safetyRisk || r.remedy || r.description,
+        rejectedReason: r.rejectedReason || null,
+        researchedAt: r.createdAt.toISOString(),
+      });
+    }
+
+    allItems.sort((a, b) => new Date(b.researchedAt).getTime() - new Date(a.researchedAt).getTime());
+
+    const filteredItems = search
+      ? allItems.filter(
+          (item) =>
+            item.claimText.toLowerCase().includes(search) ||
+            item.vehicleVariant.toLowerCase().includes(search) ||
+            item.id.toLowerCase().includes(search) ||
+            item.sources.some((s: string) => s.toLowerCase().includes(search)),
+        )
+      : allItems;
+
+    const total = filteredItems.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedItems = filteredItems.slice(startIndex, startIndex + limit);
+
+    return {
+      items: paginatedItems,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 }

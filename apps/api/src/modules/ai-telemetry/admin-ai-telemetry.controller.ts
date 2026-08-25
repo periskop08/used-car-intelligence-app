@@ -102,4 +102,22 @@ export class AdminAiTelemetryController {
     await this.verifyAdminOnly(req);
     return this.telemetryService.getProviderStatusMetrics(range || 'LAST_24_HOURS');
   }
+
+  @Get('evidence-quality')
+  @ApiOperation({ summary: 'Gerçek Claim ve Evidence Kalite Listesi (Paginated)' })
+  async getEvidenceQuality(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('statusFilter') statusFilter?: string,
+  ) {
+    await this.verifyAdminOnly(req);
+    return this.telemetryService.getEvidenceQualityItems({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      statusFilter,
+    });
+  }
 }
