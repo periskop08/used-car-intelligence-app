@@ -54,18 +54,24 @@ export class CanonicalDisplayService implements OnModuleInit {
         return;
       }
 
-      // 3. Resolve Asset Path (supports both src and compiled dist/ runtime paths)
-      let assetPath = path.join(__dirname, '../../data/canonical-display/phase2p2-v2.json');
-      if (!fs.existsSync(assetPath)) {
-        assetPath = path.join(__dirname, '../data/canonical-display/phase2p2-v2.json');
-      }
+      // 3. Resolve Asset Path (supports src, dist, cwd, and monorepo root candidate paths)
+      const candidatePaths = [
+        path.join(__dirname, '../../data/canonical-display/phase2p2-v2.json'),
+        path.join(__dirname, '../data/canonical-display/phase2p2-v2.json'),
+        path.join(process.cwd(), 'src/data/canonical-display/phase2p2-v2.json'),
+        path.join(process.cwd(), 'dist/src/data/canonical-display/phase2p2-v2.json'),
+        path.join(process.cwd(), 'apps/api/src/data/canonical-display/phase2p2-v2.json'),
+        path.join(process.cwd(), 'apps/api/dist/src/data/canonical-display/phase2p2-v2.json'),
+      ];
 
-      if (!fs.existsSync(assetPath)) {
-        this.logger.warn(`Canonical policy asset missing at ${assetPath}. Fallback to raw DB display.`);
+      let assetPath = candidatePaths.find(p => fs.existsSync(p));
+      if (!assetPath) {
+        this.logger.warn(`Canonical policy asset missing. Fallback to raw DB display.`);
         this.featureFlagEnabled = false;
         this.isLoadedSuccessfully = false;
         return;
       }
+
 
       const assetContent = fs.readFileSync(assetPath, 'utf8');
       const assetData: CanonicalAssetData = JSON.parse(assetContent);
