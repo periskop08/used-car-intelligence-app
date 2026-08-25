@@ -10,6 +10,7 @@ import { DataQualityController } from './data-quality.controller';
 import { DataQualityService } from './data-quality.service';
 import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.service';
 import { WebSearchProvider } from '../research/providers/web-search.provider';
+import { CanonicalDisplayService } from './canonical-display.service';
 
 @Module({
   controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController, DataQualityController],
@@ -20,7 +21,8 @@ import { WebSearchProvider } from '../research/providers/web-search.provider';
     DataQualityService,
     VehiclePowerEnrichmentService,
     WebSearchProvider,
+    CanonicalDisplayService,
   ],
-  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService],
+  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService, CanonicalDisplayService],
 })
 export class VehicleModule {}

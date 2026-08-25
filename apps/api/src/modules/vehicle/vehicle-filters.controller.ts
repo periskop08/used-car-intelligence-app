@@ -1,6 +1,7 @@
 import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.service';
+import { CanonicalDisplayService } from './canonical-display.service';
 
 export function getBodyTypeTr(bt: string): string {
   if (!bt) return 'Sedan';
@@ -66,7 +67,10 @@ export function getTransmissionTr(name: string): string {
 @ApiTags('Vehicle Filters')
 @Controller('vehicle-filters')
 export class VehicleFiltersController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private canonicalDisplayService: CanonicalDisplayService,
+  ) {}
 
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
@@ -205,9 +209,19 @@ export class VehicleFiltersController {
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
       },
-      select: { engine: { select: { code: true } } },
+      select: { id: true, engine: { select: { code: true } } },
     });
-    const enginesSet = new Set(variants.map(v => v.engine?.code).filter(Boolean));
+
+    const enginesSet = new Set(
+      variants
+        .map(v => {
+          const rawCode = v.engine?.code;
+          if (!rawCode) return null;
+          return this.canonicalDisplayService.getProjectedEngineCode(v.id, rawCode);
+        })
+        .filter(Boolean) as string[],
+    );
+
     const sortedEngines = Array.from(enginesSet).sort();
     return {
       success: true,
@@ -241,6 +255,23 @@ export class VehicleFiltersController {
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
+
+    let engineFilterClause: any = {};
+    if (targetEngine) {
+      const candidates = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          year: Number(year),
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+      const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
+      engineFilterClause = { engine: { code: { in: rawCodes } } };
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -248,7 +279,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: targetEngine } } : {}),
+        ...engineFilterClause,
       },
       select: { fuelType: true },
     });
@@ -293,6 +324,23 @@ export class VehicleFiltersController {
       return { success: true, data: [] };
     }
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+
+    let engineFilterClause: any = {};
+    if (targetEngine) {
+      const candidates = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          year: Number(year),
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+      const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
+      engineFilterClause = { engine: { code: { in: rawCodes } } };
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -300,7 +348,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+        ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
       },
       select: { transmission: { select: { name: true } } },
@@ -353,6 +401,23 @@ export class VehicleFiltersController {
       return { success: true, data: [] };
     }
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+
+    let engineFilterClause: any = {};
+    if (targetEngine) {
+      const candidates = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          year: Number(year),
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+      const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
+      engineFilterClause = { engine: { code: { in: rawCodes } } };
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -360,7 +425,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+        ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
       },
       select: {
@@ -432,6 +497,23 @@ export class VehicleFiltersController {
     }
 
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+
+    let engineFilterClause: any = {};
+    if (targetEngine) {
+      const candidates = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+          year: Number(year),
+        },
+        select: { id: true, engine: { select: { code: true } } },
+      });
+      const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
+      engineFilterClause = { engine: { code: { in: rawCodes } } };
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -439,7 +521,7 @@ export class VehicleFiltersController {
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
-        ...(targetEngine ? { engine: { code: targetEngine } } : {}),
+        ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...(targetTrim && targetTrim !== 'Standart / Baz' ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
       },
