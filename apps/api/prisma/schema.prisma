@@ -3139,5 +3139,64 @@ model VehiclePowerEvidence {
   @@index([enrichmentId])
 }
 
+enum AiOperationType {
+  VEHICLE_REPORT
+  VEHICLE_CHATBOT
+  COMPARISON_REPORT
+  COMPARISON_CHATBOT
+}
+
+enum AiOperationStatus {
+  STARTED
+  RUNNING
+  SUCCESS
+  SUCCESS_WITH_FALLBACK
+  FAILED
+  CANCELLED
+}
+
+enum AiCacheStatus {
+  HIT
+  MISS
+  WRITE
+  ERROR
+  NOT_APPLICABLE
+}
+
+model AiTelemetryLog {
+  id                   String            @id @default(uuid())
+  traceId              String            @unique @default(uuid())
+  operationType        AiOperationType
+  status               AiOperationStatus @default(STARTED)
+  stage                String?
+  provider             String?
+  primaryProvider      String?
+  fallbackProvider     String?
+  fallbackUsed         Boolean           @default(false)
+  cacheStatus          AiCacheStatus     @default(NOT_APPLICABLE)
+  startedAt            DateTime          @default(now())
+  completedAt          DateTime?
+  durationMs           Int?
+  errorCategory        String?
+  errorCode            String?
+  errorMessage         String?
+  httpStatus           Int?
+  inputTokens          Int?
+  outputTokens         Int?
+  totalTokens          Int?
+  estimatedCost        Float?
+  vehicleVariantId     String?
+  comparisonVariantIds String[]          @default([])
+  retryOfTraceId       String?
+  metadata             Json?
+  createdAt            DateTime          @default(now())
+
+  @@index([operationType, startedAt])
+  @@index([status, startedAt])
+  @@index([provider, startedAt])
+  @@index([startedAt])
+}
+
+
 
 

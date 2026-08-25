@@ -24,6 +24,7 @@ import { ListingAiModule } from './modules/listing-ai/listing-ai.module';
 import { VehicleReportModule } from './modules/vehicle-report/vehicle-report.module';
 import { ListingPromotionModule } from './modules/listing-promotion/listing-promotion.module';
 import { VehicleProfileModule } from './modules/vehicle-profile/vehicle-profile.module';
+import { AiTelemetryModule } from './modules/ai-telemetry/ai-telemetry.module';
 
 import { AdminAuditLogController } from './modules/admin/admin-audit-log.controller';
 import { AdminAuditLogService } from './modules/admin/admin-audit-log.service';
@@ -53,6 +54,7 @@ import { AdminAuditLogService } from './modules/admin/admin-audit-log.service';
     VehicleReportModule,
     ListingPromotionModule,
     VehicleProfileModule,
+    AiTelemetryModule,
   ],
   controllers: [AppController, AdminAuditLogController],
   providers: [PrismaService, AdminAuditLogService],

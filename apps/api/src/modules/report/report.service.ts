@@ -8,6 +8,9 @@ import { CoverageService } from '../research/coverage.service';
 import { ResearchService } from '../research/research.service';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
+import { AiTelemetryService } from '../ai-telemetry/ai-telemetry.service';
+import { AiOperationType, AiOperationStatus, AiCacheStatus } from '@prisma/client';
+
 @Injectable()
 export class ReportService {
   constructor(
@@ -17,6 +20,7 @@ export class ReportService {
     private coverageService: CoverageService,
     private researchService: ResearchService,
     private providerService: ListingAiProviderService,
+    private telemetryService: AiTelemetryService,
   ) {}
 
   async generateReport(userId: string, dto: GenerateReportDto & { force?: boolean }) {
@@ -67,8 +71,19 @@ export class ReportService {
       },
     });
 
+    const startTime = Date.now();
     const hasFullSummary = existingReport && existingReport.summary && typeof existingReport.summary === 'object' && (existingReport.summary as any).summary;
     if (existingReport && existingReport.status === ApprovalStatus.APPROVED && !dto.force && hasFullSummary) {
+      // Record cache HIT telemetry
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.VEHICLE_REPORT,
+        status: AiOperationStatus.SUCCESS,
+        stage: 'Report Cache',
+        provider: 'Global Cache',
+        cacheStatus: AiCacheStatus.HIT,
+        durationMs: Date.now() - startTime,
+        vehicleVariantId: dto.variantId,
+      }).catch(() => {});
       return existingReport;
     }
 
@@ -92,8 +107,32 @@ export class ReportService {
     }
 
     // 4. Generate and cache report
-    const report = await this.reportGenerator.generateReportCache(dto.variantId, lang);
-    return report;
+    try {
+      const report = await this.reportGenerator.generateReportCache(dto.variantId, lang);
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.VEHICLE_REPORT,
+        status: AiOperationStatus.SUCCESS,
+        stage: 'Report Generator',
+        provider: 'Google Gemini API',
+        primaryProvider: 'Google Gemini API',
+        cacheStatus: AiCacheStatus.MISS,
+        durationMs: Date.now() - startTime,
+        vehicleVariantId: dto.variantId,
+      }).catch(() => {});
+      return report;
+    } catch (err: any) {
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.VEHICLE_REPORT,
+        status: AiOperationStatus.FAILED,
+        stage: 'Report Generator',
+        provider: 'Google Gemini API',
+        durationMs: Date.now() - startTime,
+        errorCategory: 'PROVIDER_ERROR',
+        errorMessage: err?.message || 'Report generation failed',
+        vehicleVariantId: dto.variantId,
+      }).catch(() => {});
+      throw err;
+    }
   }
 
   async askChatQuestion(userId: string, dto: AskChatDto) {
@@ -168,18 +207,43 @@ export class ReportService {
     };
 
     // Use unified ListingAiProviderService engine
-    const result = await this.providerService.generateListingAdvice(dto.question, contextJson);
+    const chatStart = Date.now();
+    try {
+      const result = await this.providerService.generateListingAdvice(dto.question, contextJson);
 
-    // Log the chat question
-    await this.prisma.aiChatLog.create({
-      data: {
-        userId,
-        variantId: variant.id,
-        prompt: dto.question,
-        response: result.answer,
-      },
-    });
+      // Log the chat question
+      await this.prisma.aiChatLog.create({
+        data: {
+          userId,
+          variantId: variant.id,
+          prompt: dto.question,
+          response: result.answer,
+        },
+      });
 
-    return { response: result.answer };
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.VEHICLE_CHATBOT,
+        status: AiOperationStatus.SUCCESS,
+        stage: 'Vehicle Chatbot Provider',
+        provider: result.provider || 'Google Gemini API',
+        primaryProvider: 'Google Gemini API',
+        durationMs: Date.now() - chatStart,
+        vehicleVariantId: variant.id,
+      }).catch(() => {});
+
+      return { response: result.answer };
+    } catch (err: any) {
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.VEHICLE_CHATBOT,
+        status: AiOperationStatus.FAILED,
+        stage: 'Vehicle Chatbot Provider',
+        provider: 'Google Gemini API',
+        durationMs: Date.now() - chatStart,
+        errorCategory: 'PROVIDER_ERROR',
+        errorMessage: err?.message || 'Vehicle Chatbot request failed',
+        vehicleVariantId: variant.id,
+      }).catch(() => {});
+      throw err;
+    }
   }
 }

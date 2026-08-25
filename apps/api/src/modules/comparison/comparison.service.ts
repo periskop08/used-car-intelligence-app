@@ -1,11 +1,12 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { ComparisonReportLoaderService, VehicleComparisonDossier, generateDerivedFactId } from './comparison-report-loader.service';
 import { FeatureLimitService } from '../feature-limit/feature-limit.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { VehicleReportService } from '../vehicle-report/vehicle-report.service';
 import { CompareVehiclesDto, ComparisonChatDto } from './comparison.dto';
-import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType } from '@prisma/client';
+import { FeatureKey, ApprovalStatus, SubscriptionTier, UsagePeriodType, AiOperationType, AiOperationStatus, AiCacheStatus } from '@prisma/client';
+import { AiTelemetryService } from '../ai-telemetry/ai-telemetry.service';
 import OpenAI from 'openai';
 import * as crypto from 'crypto';
 
@@ -138,6 +139,7 @@ export class ComparisonService {
     private featureLimitService: FeatureLimitService,
     private subscriptionService: SubscriptionService,
     private vehicleReportService: VehicleReportService,
+    @Optional() private telemetryService?: AiTelemetryService,
   ) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
@@ -267,6 +269,7 @@ export class ComparisonService {
     const rawCacheKey = `comp_v3_rich_relative_v8_market_TR_locale_trTR_priority_${priority}_data_${sourceDataVersion}_variants_${sortedVariantIds.join('_')}`;
     const cacheKey = crypto.createHash('sha256').update(rawCacheKey).digest('hex');
 
+    const startTime = Date.now();
     const cached = await this.prisma.aiVehicleComparisonCache.findUnique({
       where: { cacheKey },
     }).catch(() => null);
@@ -276,16 +279,45 @@ export class ComparisonService {
     if (cached && cached.analysisJson && typeof cached.analysisJson === 'object') {
       comparisonResult = cached.analysisJson as unknown as VehicleComparisonResult;
       await this.recordHistory(requestedIds, comparisonResult, userId).catch(() => null);
+
+      if (this.telemetryService) {
+        this.telemetryService.recordTrace({
+          operationType: AiOperationType.COMPARISON_REPORT,
+          status: AiOperationStatus.SUCCESS,
+          stage: 'Comparison Cache',
+          provider: 'Global Cache',
+          cacheStatus: AiCacheStatus.HIT,
+          durationMs: Date.now() - startTime,
+          comparisonVariantIds: requestedIds,
+        }).catch(() => {});
+      }
     } else {
       if (userId) {
         await this.featureLimitService.checkAndIncrement(userId, FeatureKey.VEHICLE_COMPARISON);
       }
 
+      let usedFallback = false;
       try {
         comparisonResult = await this.generateAdvancedAiComparison(profiles, priority, sourceDataVersion);
       } catch (err: any) {
         console.warn(`Comparison AI generation failed. Running Fallback generator. Reason: ${err?.message || err}`);
+        usedFallback = true;
         comparisonResult = await this.generateFallbackResult(profiles, priority, sourceDataVersion);
+      }
+
+      if (this.telemetryService) {
+        this.telemetryService.recordTrace({
+          operationType: AiOperationType.COMPARISON_REPORT,
+          status: usedFallback ? AiOperationStatus.SUCCESS_WITH_FALLBACK : AiOperationStatus.SUCCESS,
+          stage: 'Comparison Engine',
+          provider: usedFallback ? 'Comparison Fallback Engine' : 'OpenAI API',
+          primaryProvider: 'OpenAI API',
+          fallbackProvider: usedFallback ? 'Comparison Fallback Engine' : undefined,
+          fallbackUsed: usedFallback,
+          cacheStatus: AiCacheStatus.MISS,
+          durationMs: Date.now() - startTime,
+          comparisonVariantIds: requestedIds,
+        }).catch(() => {});
       }
 
       // Requirement 7: Cache ONLY generationMode === 'AI' and 8/8 criteria completeness
@@ -429,6 +461,8 @@ KATI TALİMATLAR:
 
     let responseText = '';
 
+    const chatStart = Date.now();
+    let usedProvider = 'OpenAI API';
     if (this.openai) {
       try {
         const aiRes = await this.openai.chat.completions.create({
@@ -443,6 +477,7 @@ KATI TALİMATLAR:
     }
 
     if (!responseText && geminiApiKey && process.env.NODE_ENV !== 'test') {
+      usedProvider = 'Google Gemini API';
       try {
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
         const res = await fetch(geminiUrl, {
@@ -465,6 +500,7 @@ KATI TALİMATLAR:
     }
 
     if (!responseText) {
+      usedProvider = 'Deterministic Fallback';
       const summaryNames = profiles.map(p => p.displayName).join(', ');
       responseText = `Seçtiğiniz ${profiles.length} araç (${summaryNames}) kıyaslandığında; motor güçleri, yakıt tüketimleri ve şanzıman verimlilikleri kullanım amacınıza göre farklılık gösterir. Şehir içi pratiklik veya uzun yol konforu kriterlerinize göre en uygun modeli belirleyebilirsiniz.`;
     }
@@ -477,6 +513,17 @@ KATI TALİMATLAR:
         response: responseText,
       },
     }).catch(() => null);
+
+    if (this.telemetryService) {
+      this.telemetryService.recordTrace({
+        operationType: AiOperationType.COMPARISON_CHATBOT,
+        status: AiOperationStatus.SUCCESS,
+        stage: 'Comparison Chat Provider',
+        provider: usedProvider,
+        durationMs: Date.now() - chatStart,
+        comparisonVariantIds: requestedIds,
+      }).catch(() => {});
+    }
 
     const remainingChatbotMessages = await this.getUserChatbotQuota(userId);
 
