@@ -1,0 +1,784 @@
+{
+  "policyVersion": "PHASE2P2_V2",
+  "generatedAt": "2026-08-25T12:12:50.884Z",
+  "sourcePolicySHA": "2b37b245de1e6608caedba7b2c959cee96bc8fa74f61c5034945a0196d6054f5",
+  "changeManifestSHA": "f468311580acd78bd803e5d5c154c4f5395602b52e107afff1ed33310ce24685",
+  "changedVariantCount": 86,
+  "mappings": [
+    {
+      "variantId": "5969b16c-675d-4ec3-85e9-f8fe6ae06d40",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "5a9ede96-cf14-4e6d-8d9b-45f962d87c60",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "5f87702d-9085-4f29-b8a8-7797cefbef20",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "63700c5d-4214-4c7b-8bd6-facb0ec457f0",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "63e27ab1-1e89-4e9c-85ed-2ffa4fe3fcec",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "662cc6cb-641d-4fed-a811-3fbb74b1e89b",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "66671815-1e1a-4a60-a198-258bba5920d0",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "671deb87-ac30-48e4-9679-961616412f70",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "6b0122ac-4d32-45f6-b3cf-35806a566935",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "6d2c5d74-2a37-4f0e-9800-d391dd8fd409",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "6d6b67d9-f8d5-4378-8e07-3641b6656a3f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "6e92f096-149e-4330-92ac-b96a52234c26",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "6fe576c6-6412-4703-82fa-64381314f003",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "744e4c54-4c2b-40dd-bdea-f93a575c9126",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "750e190c-5fc9-419d-b493-b30890af53ed",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "75408ec7-4a65-415a-a137-2be3780501fc",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "76538860-deee-4020-930e-52ef63013c49",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "77977504-410f-4793-ab02-8e6ff8ffdc10",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "7b67d4b3-307e-4e59-ac97-9489f5dc5358",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "8045a98c-f1ec-4540-bbb0-bb80634b22f5",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "811bfc87-1f4c-438e-baf8-80068681a10f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "81b0f2a0-f0c3-4a1a-bb3d-8c2b8f6b1d42",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "82691630-b199-42a4-9f49-db3f1ea6e1ff",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "84eaba89-2165-4f4f-9464-5eb616241f2f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "89e8c710-1962-46c9-8e6e-b6ab6644e5b8",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "8a3d5ffc-7add-488e-8d1b-aa8e314f716f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "8aa27663-933a-42d8-95f8-e76720734bd5",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "8e7b9d86-81fa-4236-90ed-7a542433402f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "91b60938-d0da-4a75-91c9-7f0a8434bbd1",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "93429069-5736-44f5-af03-e3bdcbd453d6",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "96e0244a-4b23-453f-af6f-a14184d72013",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "978d1b24-1cb0-40c4-8c2f-9a45777fd48f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "118b8c38-7632-43ab-b48c-0b7d0511b098",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "11d6fb52-7009-4dc8-84f4-ef5e60069deb",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "12d6aec5-d4ea-4443-bc9f-2d0fd334d0e0",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "12d7e69c-073e-45c2-bcc6-e6e2f9d72fac",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "14391962-67b9-43c3-a26e-5333b3e55e8f",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "14d7607d-441a-4ec3-bdde-1aa5990aeae4",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "153421df-ea50-4388-a5d7-7227977de6cf",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "005db10e-b403-48ea-a438-8f496e26c66a",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "032b796f-9d82-4af7-bbcc-4b9964ad8edd",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "0356e0ec-7f9a-4b35-9394-4b53b3e3d1d5",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "071c90b8-2035-4a5c-9d27-a6387b6e4dfd",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "090f6820-ac02-4f4b-a835-1d5107d4a951",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "09182a8b-7344-4627-af85-056f97c5ea62",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2476abf0-321c-42df-988a-20ec1f0f2cce",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "18943119-505b-4466-bfd3-7d92f690d52d",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "1e080fd9-9c6f-4a42-93a9-c0a932bc589d",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "1e3b6394-75b6-477f-9aad-28dbe8adb439",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "1fa586f6-a012-4c95-a0f6-2867cfdaef5d",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "203a541d-565f-4ae1-8ad5-62659a67b1e9",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "20471a35-0df2-4259-bb06-b9f086f4ba1c",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2123e7b7-fe2a-440e-9481-e837ee0e74da",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "230f7a88-2c38-4144-b995-d5c9f17e7f9b",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "3dc049c4-4aea-4d49-9598-fa23164114c2",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2665d21c-4de8-4efd-a97f-e8b3a19ba7bf",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "268414ed-33e9-4e2c-a732-17aed5a55875",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "28840339-1b70-4b3b-9950-1151b197d569",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "28c722c6-d612-445f-9c71-99767439dca2",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2920c4df-9d11-4806-8ddd-898e265780e1",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2a530398-46e4-44f6-a95c-69077f99b0bb",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2a576254-c8f2-4d9a-a9cc-4255fecda22a",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2e0a9651-9333-4236-84af-6fc03673220c",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "2fdf43a3-fed6-47f3-a441-36d9c368e43e",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "30432e9a-4abd-4c80-a45f-0e9abca030c6",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "307bc03b-da79-4b25-bf02-744e5743c107",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "32af8b86-84d4-4949-855a-25bf673460d6",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "33fbfd3a-8259-4ad5-9c7f-ab2aba6c5578",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "349509d3-08cd-4942-a600-e0386365f6de",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "34ac7a56-351c-43a9-8bd8-9df8c85285d7",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "37ecdd87-b4a1-4a13-8455-97b795209af9",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "38f944e1-aba3-4ac5-b047-8224230e9b77",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "3e98bd2c-85f9-4e7a-b3bb-53a7cb677e4d",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "43d24cdc-3d34-4491-a0fc-124f8095a3b5",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "457dec34-6725-449a-b440-81d0d2d032d9",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "45d1f6de-ab3e-4377-81b1-14308e447152",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "479c6194-1f6c-43ab-8be5-6655087a50c6",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "48207da0-34f0-4f09-9706-3324890ac5cd",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "48844e54-b419-4440-a18e-6dcd33b549a9",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "4970fb7f-4b29-418a-9481-1db56884bef7",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "4c8fdb20-0e09-48d8-b6c5-e7afce9e7108",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.6 Boxer",
+      "after": "1.6",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "4ce04e6b-f8dd-47a8-bdb4-fa04ce85040b",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "2.0 Boxer",
+      "after": "2.0",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "4d127017-71bb-4a1d-8c69-a588d41d03ab",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2005,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "4e647c9e-e288-415a-b38c-b59bec44636b",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "51506633-6916-4155-b50c-2e4c3a166d72",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2006,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    },
+    {
+      "variantId": "51a23a8a-511f-422c-b7da-50c1ee412b7d",
+      "brand": "SUBARU",
+      "model": "IMPREZA",
+      "year": 2007,
+      "before": "1.5 Boxer",
+      "after": "1.5",
+      "truthId": "TRACK_E_SUBARU_BOXER_ALIAS_05_07"
+    }
+  ],
+  "generatedAssetSHA": "12576501ec40e1ffce9beacf9590ee16a5faf804f59e582a2896da847ccbd8de"
+}
