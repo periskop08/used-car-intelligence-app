@@ -53,7 +53,6 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Ürün ve AI',
     icon: Bot,
     children: [
-      { key: 'AI_REPORTS', label: 'AI Raporları', href: '/admin/product-ai/reports' },
       { key: 'EVIDENCE_QUALITY', label: 'Claim / Evidence Kalitesi', href: '/admin/product-ai/evidence-quality' },
       { key: 'AI_OPERATIONS', label: 'AI Operasyonları', href: '/admin/product-ai/operations' },
     ],
