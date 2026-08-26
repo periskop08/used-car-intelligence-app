@@ -115,10 +115,45 @@ export class AdminIsiCepteController {
   }
 
   @Get('national-visibility')
-  @ApiOperation({ summary: 'Ülke Geneli Görünürlük Hakları' })
-  async getNationalVisibility(@Req() req: any) {
+  @ApiOperation({ summary: 'Ülke Geneli Görünürlük Hakları (Paginated & Filtered)' })
+  async getNationalVisibility(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('country') country?: string,
+  ) {
     await this.verifyAdminOnly(req);
-    return this.isiCepteService.getNationalVisibility();
+    return this.isiCepteService.getNationalVisibility({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      status,
+      source,
+      country,
+    });
+  }
+
+  @Get('recommendations')
+  @ApiOperation({ summary: 'İlan Detayı İşi Cepte Öneriyor Servis Hesaplama' })
+  async getRecommendations(
+    @Query('brand') brand?: string,
+    @Query('category') category?: string,
+    @Query('country') country?: string,
+    @Query('region') region?: string,
+    @Query('district') district?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.isiCepteService.getRecommendations({
+      brand,
+      category,
+      country: country || 'TR',
+      region,
+      district,
+      limit: limit ? parseInt(limit, 10) : 5,
+    });
   }
 
   @Get('purchases')

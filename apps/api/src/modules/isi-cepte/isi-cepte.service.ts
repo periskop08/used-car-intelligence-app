@@ -83,11 +83,43 @@ export class IsiCepteService {
     };
   }
 
-  async getNationalVisibility() {
+  async getNationalVisibility(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    source?: string;
+    country?: string;
+  }) {
+    // Currently no real synchronization connected. Returns truthful 0 items dataset.
     return {
       items: [],
       total: 0,
-      message: 'Henüz ülke geneli görünürlük kaydı bulunmuyor.',
+      page: Math.max(1, params.page || 1),
+      limit: Math.min(100, Math.max(1, params.limit || 20)),
+      totalPages: 1,
+      message: 'Henüz Ülke Geneli görünürlük kaydı bulunmuyor.',
+    };
+  }
+
+  async getRecommendations(params: {
+    brand?: string;
+    category?: string;
+    country?: string;
+    region?: string;
+    district?: string;
+    limit?: number;
+  }) {
+    // Currently no real provider synchronization connected. Returns truthful 0 items dataset.
+    // In future, this calculates Group 1 (LOCAL+SHOWCASE), Group 2 (LOCAL normal), Group 3 (NATIONAL+SHOWCASE), Group 4 (NATIONAL normal).
+    return {
+      items: [] as any[],
+      totalLocal: 0,
+      totalNational: 0,
+      totalCount: 0,
+      selectedRegion: params.region || null,
+      brand: params.brand || null,
+      message: 'Bu araç ve konum için henüz senkronize edilmiş uygun servis bulunamadı.',
     };
   }
 

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -19,12 +20,6 @@ const mockSimilarListings = [
   { id: 'sim-7', title: 'Honda Civic 1.5 VTEC Turbo Executive', year: 2019, km: '92.000', location: 'Adana / Seyhan', price: '1.140.000 TL', imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=400&auto=format&fit=crop&q=80' },
   { id: 'sim-8', title: 'Ford Focus 1.5 EcoBlue ST-Line', year: 2020, km: '84.000', location: 'Eskişehir / Tepebaşı', price: '1.030.000 TL', imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400&auto=format&fit=crop&q=80' },
   { id: 'sim-9', title: 'Peugeot 308 1.2 PureTech GT', year: 2021, km: '53.000', location: 'İstanbul / Maltepe', price: '1.120.000 TL', imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&auto=format&fit=crop&q=80' },
-];
-
-const mockIsiCepteRecommendations = [
-  { id: 'isi-1', name: 'Master Auto // Uzman Özel Servis', category: 'Motor, Şanzıman & Periyodik Bakım', brandSpec: 'Marka Uzmanı', location: 'İstanbul / Maslak Sanayi', rating: '4.9', image: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' },
-  { id: 'isi-2', name: 'Özkan Garaj // Mekanik & Diagnostik', category: 'Bilgisayarlı Arıza Tespit & Elektrik', brandSpec: 'Sertifikalı Usta', location: 'İstanbul / İkitelli OSB', rating: '4.8', image: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' },
-  { id: 'isi-3', name: 'Eksper Pro // Detaylı Muayene Noktası', category: 'Boya, Kaporta & Şasi Ölçüm', brandSpec: 'Yetkili Servis Noktası', location: 'İstanbul / Bostancı Sanayi', rating: '5.0', image: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?w=150&auto=format&fit=crop&q=80', link: 'https://isicepte.com' }
 ];
 
 const formatImageUrl = (url?: string) => {
@@ -860,52 +855,10 @@ export default function ListingDetail() {
           ) : null}
 
           {/* İŞİ CEPTE ÖNERİYOR (Orta Kolona, AI Analizi Kartının Altına Alındı) */}
-          <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden">
-            <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
-
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-1">
-                  <Wrench className="w-3 h-3 text-orange-400" /> İŞİ CEPTE ÖNERİYOR
-                </span>
-                <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
-                  {listing.brand || vehicle?.brand?.name || "Bu Araç"} Markası İle Uyumlu Servisler
-                </span>
-              </div>
-              <span className="text-[8px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 rounded">
-                Özel Öneri
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              {mockIsiCepteRecommendations.map((shop) => (
-                <div key={shop.id} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex flex-col gap-2 hover:border-orange-500/30 transition">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/10 shrink-0">
-                      <img src={shop.image} alt={shop.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <h4 className="text-[11px] font-extrabold text-slate-100 truncate">{shop.name}</h4>
-                        <span className="text-[8.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">⭐ {shop.rating}</span>
-                      </div>
-                      <span className="text-[9.5px] text-orange-400 font-semibold truncate">{shop.category}</span>
-                      <span className="text-[9px] text-slate-400 truncate">📍 {shop.location} • {shop.brandSpec}</span>
-                    </div>
-                  </div>
-                  <a
-                    href={shop.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1"
-                  >
-                    <span>Servise Git</span>
-                    <span>→</span>
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
+          <IsiCepteListingRecommendationWidget
+            vehicleBrand={listing.brand || vehicle?.brand?.name || "Bu Araç"}
+            listingId={listing.id}
+          />
         </div>
 
         {/* 3. SAĞ KOLON (lg:col-span-3): Dikey Sıralı 2 Kart */}
