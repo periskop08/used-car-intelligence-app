@@ -56,6 +56,11 @@ export interface IsiCepteProvider {
   regionCode: string;  // e.g. "TR-34" / "İstanbul"
   district?: string | null; // e.g. "Kadıköy"
 
+  /** Optional read-only contact information */
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+
   /** Synchronized automotive service categories */
   autoServiceCategories: IsiCepteServiceCategoryRef[];
   /** Synchronized supported vehicle brands */

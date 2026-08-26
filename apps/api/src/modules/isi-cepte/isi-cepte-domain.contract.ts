@@ -38,6 +38,9 @@ export interface IsiCepteProvider {
   countryCode: string;
   regionCode: string;
   district?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
   autoServiceCategories: IsiCepteServiceCategoryRef[];
   supportedVehicleBrands: IsiCepteVehicleBrandRef[];
   showcase: IsiCepteEntitlementDetail;
