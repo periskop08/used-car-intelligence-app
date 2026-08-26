@@ -12,7 +12,6 @@ import {
   ExternalLink,
   Search,
   CheckCircle2,
-  AlertCircle,
   Building,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
@@ -42,21 +41,92 @@ interface IsiCepteListingRecommendationWidgetProps {
   initialUserCity?: string;
 }
 
-const POPULAR_TURKISH_CITIES = [
-  'İstanbul',
-  'Kocaeli',
-  'Ankara',
-  'İzmir',
-  'Bursa',
-  'Antalya',
+/**
+ * OFFICIAL COMPLETE ARRAY OF ALL 81 TURKISH PROVINCES (ALPHABETICAL ORDER)
+ * All 81 provinces are selectable regardless of current provider availability in inventory.
+ */
+export const TURKEY_81_PROVINCES: string[] = [
   'Adana',
-  'Gaziantep',
-  'Konya',
+  'Adıyaman',
+  'Afyonkarahisar',
+  'Ağrı',
+  'Aksaray',
+  'Amasya',
+  'Ankara',
+  'Antalya',
+  'Ardahan',
+  'Artvin',
+  'Aydın',
+  'Balıkesir',
+  'Bartın',
+  'Batman',
+  'Bayburt',
+  'Bilecik',
+  'Bingöl',
+  'Bitlis',
+  'Bolu',
+  'Burdur',
+  'Bursa',
+  'Çanakkale',
+  'Çankırı',
+  'Çorum',
+  'Denizli',
+  'Diyarbakır',
+  'Düzce',
+  'Edirne',
+  'Elazığ',
+  'Erzincan',
+  'Erzurum',
   'Eskişehir',
-  'Samsun',
-  'Trabzon',
+  'Gaziantep',
+  'Giresun',
+  'Gümüşhane',
+  'Hakkari',
+  'Hatay',
+  'Iğdır',
+  'Isparta',
+  'İstanbul',
+  'İzmir',
+  'Kahramanmaraş',
+  'Karabük',
+  'Karaman',
+  'Kars',
+  'Kastamonu',
   'Kayseri',
+  'Kilis',
+  'Kırıkkale',
+  'Kırklareli',
+  'Kırşehir',
+  'Kocaeli',
+  'Konya',
+  'Kütahya',
+  'Malatya',
+  'Manisa',
+  'Mardin',
   'Mersin',
+  'Muğla',
+  'Muş',
+  'Nevşehir',
+  'Niğde',
+  'Ordu',
+  'Osmaniye',
+  'Rize',
+  'Sakarya',
+  'Samsun',
+  'Şanlıurfa',
+  'Siirt',
+  'Sinop',
+  'Şırnak',
+  'Sivas',
+  'Tekirdağ',
+  'Tokat',
+  'Trabzon',
+  'Tunceli',
+  'Uşak',
+  'Van',
+  'Yalova',
+  'Yozgat',
+  'Zonguldak',
 ];
 
 export default function IsiCepteListingRecommendationWidget({
@@ -119,7 +189,7 @@ export default function IsiCepteListingRecommendationWidget({
     setIsCitySelectorOpen(false);
   };
 
-  // Group candidates into Top 5 compact results according to Section 16 rules:
+  // Group candidates into Top 5 compact results according to Phase 6 rules:
   // Group 1: LOCAL + SHOWCASE
   // Group 2: LOCAL normal
   // Group 3: NATIONAL + SHOWCASE
@@ -140,33 +210,45 @@ export default function IsiCepteListingRecommendationWidget({
   const allLocalCandidates = [...localShowcase, ...localNormal];
   const allNationalCandidates = [...nationalShowcase, ...nationalNormal];
 
-  const filteredCities = POPULAR_TURKISH_CITIES.filter((c) =>
-    c.toLowerCase().includes(citySearch.toLowerCase())
+  // Turkish character insensitive search over all 81 provinces
+  const filteredCities = TURKEY_81_PROVINCES.filter((c) =>
+    c.toLocaleLowerCase('tr-TR').includes(citySearch.toLocaleLowerCase('tr-TR'))
   );
 
   return (
     <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden font-sans">
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
 
-      {/* Widget Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest flex items-center gap-1">
-            <Wrench className="w-3.5 h-3.5 text-orange-400" /> İİŞİ CEPTE ÖNERİYOR
-          </span>
-          <span className="text-[10px] text-slate-300 font-medium mt-0.5">
-            {vehicleBrand} markasına hizmet veren servisler
-          </span>
+      {/* Widget Header with Real İşi Cepte Logo */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="flex items-start gap-2.5 min-w-0">
+          {/* REAL İŞİ CEPTE LOGO (Uncropped, unedited, original dark navy + orange pin + briefcase) */}
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29]">
+            <img
+              src="/assets/images/isicepte-logo.jpeg"
+              alt="İşi Cepte Logo"
+              className="w-full h-full object-contain"
+            />
+          </div>
+
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none">
+              İŞİ CEPTE ÖNERİYOR
+            </span>
+            <span className="text-[10px] text-slate-300 font-medium mt-1 truncate">
+              {vehicleBrand} markasına hizmet veren servisler
+            </span>
+          </div>
         </div>
 
-        {/* Location Selector (Replaces old "Özel Öneri" badge) */}
+        {/* Location Selector Button */}
         <button
           onClick={() => setIsCitySelectorOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-orange-500/30 rounded-xl text-[11px] font-bold text-orange-300 transition cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-orange-500/30 rounded-xl text-[11px] font-bold text-orange-300 transition cursor-pointer shrink-0 ml-2"
         >
-          <MapPin className="w-3 h-3 text-orange-400" />
+          <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
           <span>{selectedCity ? `📍 ${selectedCity}` : '📍 Şehir Seç'}</span>
-          <ChevronDown className="w-3 h-3 text-slate-400" />
+          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
         </button>
       </div>
 
@@ -181,7 +263,7 @@ export default function IsiCepteListingRecommendationWidget({
           <Building className="w-8 h-8 text-slate-600 mx-auto" />
           <h4 className="text-xs font-bold text-white">Bu araç ve konum için henüz uygun servis bulunamadı.</h4>
           <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-            İşi Cepte senkronize servis verileri bağlandığında {vehicleBrand} markası için seçilen şehirde uygun servisler burada listelenecektir.
+            İşi Cepte servisleri bu bölgede kullanılabilir olduğunda, {vehicleBrand} markası için uygun işletmeler burada listelenecektir.
           </p>
           <button
             onClick={() => setIsCitySelectorOpen(true)}
@@ -262,7 +344,7 @@ export default function IsiCepteListingRecommendationWidget({
         </button>
       )}
 
-      {/* CITY SELECTOR MODAL */}
+      {/* COMPLETE TURKEY 81 PROVINCES CITY SELECTOR MODAL */}
       {isCitySelectorOpen && (
         <div
           onClick={() => setIsCitySelectorOpen(false)}
@@ -273,12 +355,15 @@ export default function IsiCepteListingRecommendationWidget({
             className="w-full max-w-sm bg-[#0b0f19] border border-white/10 rounded-2xl p-5 space-y-4 shadow-2xl"
           >
             <div className="flex justify-between items-center pb-2 border-b border-white/10">
-              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-orange-400" /> Şehir Seçimi
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-orange-400" /> Şehir Seçimi
+                </h3>
+                <span className="text-[10px] text-slate-400 font-mono">Türkiye (81 İl Selektörü)</span>
+              </div>
               <button
                 onClick={() => setIsCitySelectorOpen(false)}
-                className="p-1 text-slate-400 hover:text-white bg-white/5 rounded-lg"
+                className="p-1 text-slate-400 hover:text-white bg-white/5 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -288,28 +373,32 @@ export default function IsiCepteListingRecommendationWidget({
               <Search className="w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Şehir ara..."
+                placeholder="81 il içerisinde ara (örn. İstanbul, Bayburt, Iğdır)..."
                 value={citySearch}
                 onChange={(e) => setCitySearch(e.target.value)}
                 className="w-full bg-transparent text-white placeholder-slate-500 outline-none"
               />
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-1 font-mono text-xs">
-              {filteredCities.map((city) => (
-                <button
-                  key={city}
-                  onClick={() => handleCitySelect(city)}
-                  className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
-                    selectedCity === city
-                      ? 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30'
-                      : 'text-slate-300 hover:bg-white/5'
-                  }`}
-                >
-                  <span>{city}</span>
-                  {selectedCity === city && <CheckCircle2 className="w-3.5 h-3.5 text-orange-400" />}
-                </button>
-              ))}
+            <div className="max-h-64 overflow-y-auto space-y-1 font-mono text-xs pr-1">
+              {filteredCities.length === 0 ? (
+                <div className="p-4 text-center text-slate-500 text-xs">Aramayla eşleşen il bulunamadı.</div>
+              ) : (
+                filteredCities.map((city) => (
+                  <button
+                    key={city}
+                    onClick={() => handleCitySelect(city)}
+                    className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                      selectedCity === city
+                        ? 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30'
+                        : 'text-slate-300 hover:bg-white/5'
+                    }`}
+                  >
+                    <span>{city}</span>
+                    {selectedCity === city && <CheckCircle2 className="w-3.5 h-3.5 text-orange-400" />}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
