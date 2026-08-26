@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { IsiCepteService } from './isi-cepte.service';
@@ -34,10 +34,34 @@ export class AdminIsiCepteController {
   }
 
   @Get('providers')
-  @ApiOperation({ summary: 'İşi Cepte İşletmeler ve Ustalar Listesi' })
-  async getProviders(@Req() req: any) {
+  @ApiOperation({ summary: 'İşi Cepte İşletmeler ve Ustalar Listesi (Paginated & Filtered)' })
+  async getProviders(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('membershipStatus') membershipStatus?: string,
+    @Query('optIn') optIn?: string,
+    @Query('showcaseFilter') showcaseFilter?: string,
+    @Query('nationalFilter') nationalFilter?: string,
+  ) {
     await this.verifyAdminOnly(req);
-    return this.isiCepteService.getProviders();
+    return this.isiCepteService.getProviders({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      membershipStatus,
+      optIn,
+      showcaseFilter,
+      nationalFilter,
+    });
+  }
+
+  @Get('providers/:id')
+  @ApiOperation({ summary: 'İşi Cepte İşletme/Usta Tekil Admin Detayı' })
+  async getProviderById(@Req() req: any, @Param('id') id: string) {
+    await this.verifyAdminOnly(req);
+    return this.isiCepteService.getProviderById(id);
   }
 
   @Get('regional-visibility')

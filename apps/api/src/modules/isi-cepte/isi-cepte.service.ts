@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { IsiCepteProvider } from './isi-cepte-domain.contract';
 
 @Injectable()
 export class IsiCepteService {
@@ -16,12 +17,29 @@ export class IsiCepteService {
     };
   }
 
-  async getProviders() {
+  async getProviders(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    membershipStatus?: string;
+    optIn?: string;
+    showcaseFilter?: string;
+    nationalFilter?: string;
+  }) {
+    // Currently no real synchronization connected. Returns truthful 0 items dataset.
     return {
-      items: [],
+      items: [] as IsiCepteProvider[],
       total: 0,
+      page: Math.max(1, params.page || 1),
+      limit: Math.min(100, Math.max(1, params.limit || 20)),
+      totalPages: 1,
       message: 'Henüz TorqueScout\'a aktarılmış İşi Cepte işletmesi bulunmuyor.',
     };
+  }
+
+  async getProviderById(id: string): Promise<IsiCepteProvider> {
+    // Truthfully throws 404 since no real synced provider exists yet in persistence
+    throw new NotFoundException(`Provider '${id}' bulunamadı veya henüz senkronize edilmedi.`);
   }
 
   async getRegionalVisibility() {
