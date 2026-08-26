@@ -64,10 +64,21 @@ export class IsiCepteService {
     };
   }
 
-  async getShowcase() {
+  async getShowcase(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    source?: string;
+    country?: string;
+  }) {
+    // Currently no real synchronization connected. Returns truthful 0 items dataset.
     return {
       items: [],
       total: 0,
+      page: Math.max(1, params.page || 1),
+      limit: Math.min(100, Math.max(1, params.limit || 20)),
+      totalPages: 1,
       message: 'Henüz aktif veya geçmiş Vitrin kaydı bulunmuyor.',
     };
   }

@@ -93,10 +93,25 @@ export class AdminIsiCepteController {
   }
 
   @Get('showcase')
-  @ApiOperation({ summary: 'Vitrin Görünürlük Hakları' })
-  async getShowcase(@Req() req: any) {
+  @ApiOperation({ summary: 'Vitrin Görünürlük Hakları (Paginated & Filtered)' })
+  async getShowcase(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('country') country?: string,
+  ) {
     await this.verifyAdminOnly(req);
-    return this.isiCepteService.getShowcase();
+    return this.isiCepteService.getShowcase({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      status,
+      source,
+      country,
+    });
   }
 
   @Get('national-visibility')

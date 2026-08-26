@@ -21,7 +21,7 @@ import { IsiCepteProvider } from '@/types/isiCepteDomain';
 interface IsiCepteProviderDetailDrawerProps {
   provider: IsiCepteProvider | null;
   onClose: () => void;
-  initialSection?: 'REGIONAL_VISIBILITY' | 'GENERAL';
+  initialSection?: 'GENERAL' | 'REGIONAL_VISIBILITY' | 'SHOWCASE';
 }
 
 export default function IsiCepteProviderDetailDrawer({
@@ -30,6 +30,7 @@ export default function IsiCepteProviderDetailDrawer({
   initialSection = 'GENERAL',
 }: IsiCepteProviderDetailDrawerProps) {
   const regionalSectionRef = useRef<HTMLDivElement>(null);
+  const showcaseSectionRef = useRef<HTMLDivElement>(null);
 
   // ESC Key Listener to close drawer
   useEffect(() => {
@@ -42,12 +43,18 @@ export default function IsiCepteProviderDetailDrawer({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Optional auto-scroll to regional section when opened from regional view
+  // Auto-scroll to target section when opened from specific views
   useEffect(() => {
-    if (provider && initialSection === 'REGIONAL_VISIBILITY' && regionalSectionRef.current) {
-      setTimeout(() => {
-        regionalSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 150);
+    if (provider) {
+      if (initialSection === 'REGIONAL_VISIBILITY' && regionalSectionRef.current) {
+        setTimeout(() => {
+          regionalSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      } else if (initialSection === 'SHOWCASE' && showcaseSectionRef.current) {
+        setTimeout(() => {
+          showcaseSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      }
     }
   }, [provider, initialSection]);
 
@@ -90,7 +97,7 @@ export default function IsiCepteProviderDetailDrawer({
         <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[11px] text-cyan-300 flex items-center gap-2">
           <Info className="w-4 h-4 shrink-0 text-cyan-400" />
           <span>
-            Tekil İşletme Varlığı (Shared 360° Admin Detail). Bu pencere "İşletmeler / Ustalar" ve "Bölgesel Görünürlük" sekmelerinden ortak kullanılır. Profil verileri İşi Cepte kaynaklıdır ve salt okunurdur.
+            Tekil İşletme Varlığı (Shared 360° Admin Detail). Bu pencere tüm İşi Cepte admin sekmelerinden ("İşletmeler", "Bölgesel", "Vitrin") ortak kullanılır. Profil verileri İşi Cepte kaynaklıdır ve salt okunurdur.
           </span>
         </div>
 
@@ -241,8 +248,18 @@ export default function IsiCepteProviderDetailDrawer({
         </div>
 
         {/* Section 7 & 8: Görünürlük Hakları (Vitrin & Ülke Geneli) */}
-        <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-3 text-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-500 font-mono block">Section 7 & 8 • Görünürlük Hakları (Vitrin & Ülke Geneli)</span>
+        <div
+          ref={showcaseSectionRef}
+          className={`p-4 bg-slate-950 rounded-2xl border space-y-3 text-xs transition ${
+            initialSection === 'SHOWCASE' ? 'border-amber-500/40 ring-1 ring-amber-500/20' : 'border-white/5'
+          }`}
+        >
+          <div className="flex justify-between items-center font-mono">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Section 7 & 8 • Görünürlük Hakları (Vitrin & Ülke Geneli)</span>
+            {initialSection === 'SHOWCASE' && (
+              <span className="text-[9px] px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded font-mono">Vitrin Odaklı Görünüm</span>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Showcase / Vitrin */}
@@ -260,6 +277,9 @@ export default function IsiCepteProviderDetailDrawer({
                   <div>Kaynak: {provider.showcase.source === 'ADMIN_GRANTED' ? 'Admin Tarafından Verildi' : 'İşi Cepte Satın Alımı'}</div>
                   <div>Başlangıç: {provider.showcase.startsAt || '—'}</div>
                   <div>Bitiş: {provider.showcase.endsAt || 'Süresiz'}</div>
+                  {provider.showcase.purchaseId && (
+                    <div className="text-cyan-400 font-bold">Purchase ID: {provider.showcase.purchaseId}</div>
+                  )}
                 </div>
               ) : (
                 <div className="text-[10px] text-slate-500 font-mono italic">Aktif Vitrin hakkı bulunmuyor.</div>
@@ -281,6 +301,9 @@ export default function IsiCepteProviderDetailDrawer({
                   <div>Kaynak: {provider.nationalVisibility.source === 'ADMIN_GRANTED' ? 'Admin Tarafından Verildi' : 'İşi Cepte Satın Alımı'}</div>
                   <div>Başlangıç: {provider.nationalVisibility.startsAt || '—'}</div>
                   <div>Bitiş: {provider.nationalVisibility.endsAt || 'Süresiz'}</div>
+                  {provider.nationalVisibility.purchaseId && (
+                    <div className="text-cyan-400 font-bold">Purchase ID: {provider.nationalVisibility.purchaseId}</div>
+                  )}
                 </div>
               ) : (
                 <div className="text-[10px] text-slate-500 font-mono italic">Aktif Ülke Geneli hakkı bulunmuyor.</div>

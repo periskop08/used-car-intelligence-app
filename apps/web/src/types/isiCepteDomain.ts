@@ -1,11 +1,12 @@
 /**
- * TORQUESCOUT BACKOFFICE — İŞİ CEPTE DOMAIN CONTRACT (PHASE 3)
+ * TORQUESCOUT BACKOFFICE — İŞİ CEPTE DOMAIN CONTRACT (PHASE 4)
  * 
- * Authoritative TorqueScout representation of an İşi Cepte provider & regional visibility.
+ * Authoritative TorqueScout representation of an İşi Cepte provider & Showcase entitlement.
  * 
- * STRICT PRODUCT RULE:
- * One Provider entity -> One shared Provider Detail Drawer.
- * "İşletmeler / Ustalar" and "Bölgesel Görünürlük" are two different admin views of the SAME provider data.
+ * STRICT PRODUCT SEMANTIC:
+ * VİTRİN = SHOWCASE entitlement.
+ * Gives an ALREADY ELIGIBLE provider paid prominence/ranking advantage inside its legitimate context.
+ * DOES NOT expand geography, create brand eligibility, or override inactive membership/opt-out.
  */
 
 export type IsiCepteMembershipStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'UNKNOWN';
@@ -15,6 +16,8 @@ export type IsiCepteLocalListingState = 'ELIGIBLE' | 'INELIGIBLE' | 'OPTED_OUT';
 export type IsiCepteEntitlementType = 'LOCAL_LISTING' | 'SHOWCASE' | 'NATIONAL_VISIBILITY';
 
 export type IsiCepteEntitlementSource = 'ISICEPTE_PURCHASE' | 'ADMIN_GRANTED';
+
+export type IsiCepteShowcaseStatus = 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED' | 'UNKNOWN';
 
 export interface IsiCepteServiceCategoryRef {
   id: string;
@@ -35,6 +38,7 @@ export interface IsiCepteServiceRegion {
 
 export interface IsiCepteEntitlementDetail {
   active: boolean;
+  status?: IsiCepteShowcaseStatus | null;
   startsAt?: string | null;
   endsAt?: string | null;
   source?: IsiCepteEntitlementSource | null;
@@ -97,5 +101,18 @@ export interface IsiCepteRegionalVisibilityRecord {
   localListingState: IsiCepteLocalListingState;
   eligibilityReasonText: string;
   source: IsiCepteEntitlementSource;
+  updatedAt: string;
+}
+
+export interface IsiCepteShowcaseRecord {
+  id: string;
+  isicepteProviderId: string;
+  provider: IsiCepteProvider;
+  status: IsiCepteShowcaseStatus;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  source: IsiCepteEntitlementSource;
+  purchaseId?: string | null;
+  createdAt: string;
   updatedAt: string;
 }
