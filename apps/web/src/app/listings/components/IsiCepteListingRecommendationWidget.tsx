@@ -39,6 +39,7 @@ interface IsiCepteListingRecommendationWidgetProps {
   vehicleBrand?: string;
   listingId?: string;
   initialUserCity?: string;
+  className?: string;
 }
 
 /**
@@ -133,6 +134,7 @@ export default function IsiCepteListingRecommendationWidget({
   vehicleBrand = 'Bu Araç',
   listingId,
   initialUserCity,
+  className = '',
 }: IsiCepteListingRecommendationWidgetProps) {
   // Determine initial selected city from user profile or prop
   const [selectedCity, setSelectedCity] = useState<string>(() => {
@@ -190,10 +192,6 @@ export default function IsiCepteListingRecommendationWidget({
   };
 
   // Group candidates into Top 5 compact results according to Phase 6 rules:
-  // Group 1: LOCAL + SHOWCASE
-  // Group 2: LOCAL normal
-  // Group 3: NATIONAL + SHOWCASE
-  // Group 4: NATIONAL normal
   const localShowcase = candidates.filter((c) => c.resultGroup === 'LOCAL' && c.showcaseActive);
   const localNormal = candidates.filter((c) => c.resultGroup === 'LOCAL' && !c.showcaseActive);
   const nationalShowcase = candidates.filter((c) => c.resultGroup === 'NATIONAL' && c.showcaseActive);
@@ -216,14 +214,16 @@ export default function IsiCepteListingRecommendationWidget({
   );
 
   return (
-    <div className="glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col gap-3 shadow-xl relative overflow-hidden font-sans">
+    <div
+      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans h-full flex-1 ${className}`}
+    >
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
 
-      {/* Widget Header with Real İşi Cepte Logo */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
-        <div className="flex items-start gap-2.5 min-w-0">
-          {/* REAL İŞİ CEPTE LOGO (Uncropped, unedited, original dark navy + orange pin + briefcase) */}
-          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29]">
+      {/* Widget Header with Real İşi Cepte Logo & Non-truncated Subtitle (Fix #1) */}
+      <div className="flex items-start justify-between border-b border-white/10 pb-3 gap-2">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          {/* REAL İŞİ CEPTE LOGO */}
+          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29] mt-0.5">
             <img
               src="/assets/images/isicepte-logo.jpeg"
               alt="İşi Cepte Logo"
@@ -231,133 +231,138 @@ export default function IsiCepteListingRecommendationWidget({
             />
           </div>
 
-          <div className="flex flex-col min-w-0">
+          <div className="flex flex-col min-w-0 flex-1">
             <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none">
               İŞİ CEPTE ÖNERİYOR
             </span>
-            <span className="text-[10px] text-slate-300 font-medium mt-1 truncate">
+            {/* Non-truncated multiline subtitle */}
+            <span className="text-[9.5px] text-slate-300 font-medium mt-1 leading-tight whitespace-normal break-words">
               {vehicleBrand} markasına hizmet veren servisler
             </span>
           </div>
         </div>
 
-        {/* Location Selector Button */}
+        {/* Compact Location Selector Button (Fix #1 & #2) */}
         <button
           onClick={() => setIsCitySelectorOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-orange-500/30 rounded-xl text-[11px] font-bold text-orange-300 transition cursor-pointer shrink-0 ml-2"
+          className="flex items-center gap-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-orange-500/30 rounded-lg text-[10px] font-bold text-orange-300 transition cursor-pointer shrink-0"
         >
-          <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
-          <span>{selectedCity ? `📍 ${selectedCity}` : '📍 Şehir Seç'}</span>
-          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+          <MapPin className="w-2.5 h-2.5 text-orange-400 shrink-0" />
+          <span className="truncate max-w-[75px]">{selectedCity || 'Şehir Seç'}</span>
+          <ChevronDown className="w-2.5 h-2.5 text-slate-400 shrink-0" />
         </button>
       </div>
 
-      {/* Compact Cards List (Max 5) */}
-      {loading ? (
-        <div className="p-6 text-center text-xs text-slate-400 font-mono animate-pulse">
-          Servis önerileri hesaplanıyor...
-        </div>
-      ) : compactTop5.length === 0 ? (
-        /* Truthful Empty State */
-        <div className="p-5 text-center space-y-2 bg-slate-950/60 rounded-xl border border-white/5">
-          <Building className="w-8 h-8 text-slate-600 mx-auto" />
-          <h4 className="text-xs font-bold text-white">Bu araç ve konum için henüz uygun servis bulunamadı.</h4>
-          <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-            İşi Cepte servisleri bu bölgede kullanılabilir olduğunda, {vehicleBrand} markası için uygun işletmeler burada listelenecektir.
-          </p>
-          <button
-            onClick={() => setIsCitySelectorOpen(true)}
-            className="mt-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-lg text-[10px] font-bold transition cursor-pointer"
-          >
-            Farklı Şehir Seç ➔
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {compactTop5.map((shop) => (
-            <div
-              key={shop.id}
-              className="p-3 rounded-xl bg-slate-900/80 border border-white/10 flex flex-col gap-2 hover:border-orange-500/30 transition"
+      {/* Main Body: Fills vertical space down to TorqueScout İlan Zekası (Fix #3) */}
+      <div className="flex-1 flex flex-col justify-between gap-3 min-h-[200px] my-auto">
+        {loading ? (
+          <div className="p-8 text-center text-xs text-slate-400 font-mono animate-pulse my-auto">
+            Servis önerileri hesaplanıyor...
+          </div>
+        ) : compactTop5.length === 0 ? (
+          /* Truthful Empty State (Fills container down to bottom boundary) */
+          <div className="flex-1 flex flex-col items-center justify-center p-5 text-center space-y-3 bg-slate-950/60 rounded-xl border border-white/5 my-auto">
+            <Building className="w-9 h-9 text-slate-600 mx-auto" />
+            <h4 className="text-xs font-bold text-white leading-snug">
+              Bu araç ve konum için henüz uygun servis bulunamadı.
+            </h4>
+            <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+              İşi Cepte servisleri bu bölgede kullanılabilir olduğunda, {vehicleBrand} markası için uygun işletmeler burada listelenecektir.
+            </p>
+            <button
+              onClick={() => setIsCitySelectorOpen(true)}
+              className="px-3.5 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 rounded-lg text-[10.5px] font-bold transition cursor-pointer"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-col min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h4 className="text-xs font-bold text-white truncate">{shop.businessName}</h4>
+              Farklı Şehir Seç ➔
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2.5 my-auto">
+            {compactTop5.map((shop) => (
+              <div
+                key={shop.id}
+                className="p-3 rounded-xl bg-slate-900/80 border border-white/10 flex flex-col gap-2 hover:border-orange-500/30 transition"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="text-xs font-bold text-white truncate">{shop.businessName}</h4>
 
-                    {/* SHOWCASE Badge */}
-                    {shop.showcaseActive && (
-                      <span className="text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                        <Award className="w-2.5 h-2.5 text-amber-400" /> Öne Çıkan
-                      </span>
-                    )}
+                      {/* SHOWCASE Badge */}
+                      {shop.showcaseActive && (
+                        <span className="text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Award className="w-2.5 h-2.5 text-amber-400" /> Öne Çıkan
+                        </span>
+                      )}
 
-                    {/* NATIONAL Context Badge */}
-                    {shop.resultGroup === 'NATIONAL' && (
-                      <span className="text-[9px] font-bold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                        <Globe className="w-2.5 h-2.5 text-purple-400" /> Türkiye Genelinden
-                      </span>
-                    )}
+                      {/* NATIONAL Context Badge */}
+                      {shop.resultGroup === 'NATIONAL' && (
+                        <span className="text-[9px] font-bold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Globe className="w-2.5 h-2.5 text-purple-400" /> Türkiye Genelinden
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Location & Brand Wording */}
+                    <div className="text-[10px] text-slate-400 mt-1 space-y-0.5 font-mono">
+                      <div>
+                        📍 {shop.countryCode} • {shop.regionCode} {shop.district ? `/ ${shop.district}` : ''}
+                      </div>
+                      <div className="text-orange-400/90 font-medium font-sans">
+                        {vehicleBrand} markasına hizmet veriyor
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Location & Brand Wording */}
-                  <div className="text-[10px] text-slate-400 mt-1 space-y-0.5 font-mono">
-                    <div>
-                      📍 {shop.countryCode} • {shop.regionCode} {shop.district ? `/ ${shop.district}` : ''}
-                    </div>
-                    <div className="text-orange-400/90 font-medium font-sans">
-                      {vehicleBrand} markasına hizmet veriyor
-                    </div>
-                  </div>
+                  {/* Rating if real */}
+                  {shop.rating ? (
+                    <span className="text-[9.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0 flex items-center gap-0.5">
+                      <Star className="w-2.5 h-2.5 fill-emerald-400" /> {shop.rating}
+                    </span>
+                  ) : null}
                 </div>
 
-                {/* Rating if real */}
-                {shop.rating ? (
-                  <span className="text-[9.5px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0 flex items-center gap-0.5">
-                    <Star className="w-2.5 h-2.5 fill-emerald-400" /> {shop.rating}
-                  </span>
-                ) : null}
+                {/* Action */}
+                <a
+                  href={shop.link || 'https://isicepte.com'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <span>Servise Git</span>
+                  <span>→</span>
+                </a>
               </div>
-
-              {/* Action */}
-              <a
-                href={shop.link || 'https://isicepte.com'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-1.5 rounded-lg bg-gradient-to-r from-orange-500/15 to-amber-500/15 hover:from-orange-500/25 hover:to-amber-500/25 border border-orange-500/30 text-orange-400 font-bold text-[10px] text-center transition flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <span>Servise Git</span>
-                <span>→</span>
-              </a>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* CTA Button: "Tüm Uygun Servisleri Gör →" */}
       {candidates.length > 0 && (
         <button
           onClick={() => setIsExpandedModalOpen(true)}
-          className="w-full py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center justify-center gap-1.5"
+          className="w-full py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center justify-center gap-1.5 mt-auto"
         >
           <span>Tüm Uygun Servisleri Gör</span>
           <span>→</span>
         </button>
       )}
 
-      {/* COMPLETE TURKEY 81 PROVINCES CITY SELECTOR MODAL */}
+      {/* COMPLETE TURKEY 81 PROVINCES CITY SELECTOR MODAL (Fix #2: Scaled, non-overflowing modal) */}
       {isCitySelectorOpen && (
         <div
           onClick={() => setIsCitySelectorOpen(false)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm bg-[#0b0f19] border border-white/10 rounded-2xl p-5 space-y-4 shadow-2xl"
+            className="w-full max-w-xs sm:max-w-sm bg-[#0b0f19] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xl relative my-auto max-h-[85vh] flex flex-col overflow-hidden"
           >
-            <div className="flex justify-between items-center pb-2 border-b border-white/10">
+            <div className="flex justify-between items-center pb-2 border-b border-white/10 shrink-0">
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-orange-400" /> Şehir Seçimi
+                <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400" /> Şehir Seçimi
                 </h3>
                 <span className="text-[10px] text-slate-400 font-mono">Türkiye (81 İl Selektörü)</span>
               </div>
@@ -369,18 +374,19 @@ export default function IsiCepteListingRecommendationWidget({
               </button>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-950 rounded-xl border border-white/10 text-xs">
+            <div className="flex items-center gap-2 px-3 py-1.5 sm:py-2 bg-slate-950 rounded-xl border border-white/10 text-xs shrink-0">
               <Search className="w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="81 il içerisinde ara (örn. İstanbul, Bayburt, Iğdır)..."
                 value={citySearch}
                 onChange={(e) => setCitySearch(e.target.value)}
-                className="w-full bg-transparent text-white placeholder-slate-500 outline-none"
+                className="w-full bg-transparent text-white placeholder-slate-500 outline-none text-[11px] sm:text-xs"
               />
             </div>
 
-            <div className="max-h-64 overflow-y-auto space-y-1 font-mono text-xs pr-1">
+            {/* Scrollable List with custom subtle scrollbar */}
+            <div className="flex-1 overflow-y-auto max-h-[50vh] pr-1 space-y-1 font-mono text-xs scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-slate-950">
               {filteredCities.length === 0 ? (
                 <div className="p-4 text-center text-slate-500 text-xs">Aramayla eşleşen il bulunamadı.</div>
               ) : (
@@ -388,7 +394,7 @@ export default function IsiCepteListingRecommendationWidget({
                   <button
                     key={city}
                     onClick={() => handleCitySelect(city)}
-                    className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                    className={`w-full text-left px-3 py-1.5 sm:py-2 rounded-xl transition flex items-center justify-between cursor-pointer text-[11px] sm:text-xs ${
                       selectedCity === city
                         ? 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30'
                         : 'text-slate-300 hover:bg-white/5'

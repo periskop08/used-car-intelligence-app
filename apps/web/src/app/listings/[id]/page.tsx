@@ -586,7 +586,7 @@ export default function ListingDetail() {
         </div>
 
         {/* 2. ORTA KOLON (lg:col-span-3): Sahibinden Tarzı Daraltılmış Kompakt Araç Bilgileri Tablosu */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
+        <div className="lg:col-span-3 flex flex-col justify-between gap-5 h-full">
           <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2 shadow-xl max-w-[270px] w-full">
             <div className="flex items-center justify-between border-b border-white/10 pb-2">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
@@ -858,6 +858,7 @@ export default function ListingDetail() {
           <IsiCepteListingRecommendationWidget
             vehicleBrand={listing.brand || vehicle?.brand?.name || "Bu Araç"}
             listingId={listing.id}
+            className="h-full flex-1"
           />
         </div>
 
