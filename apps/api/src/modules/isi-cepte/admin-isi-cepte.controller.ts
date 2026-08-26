@@ -65,10 +65,31 @@ export class AdminIsiCepteController {
   }
 
   @Get('regional-visibility')
-  @ApiOperation({ summary: 'Bölgesel Görünürlük Kayıtları' })
-  async getRegionalVisibility(@Req() req: any) {
+  @ApiOperation({ summary: 'Bölgesel Görünürlük Kayıtları (Paginated & Filtered)' })
+  async getRegionalVisibility(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('country') country?: string,
+    @Query('region') region?: string,
+    @Query('district') district?: string,
+    @Query('eligibility') eligibility?: string,
+    @Query('brand') brand?: string,
+    @Query('category') category?: string,
+  ) {
     await this.verifyAdminOnly(req);
-    return this.isiCepteService.getRegionalVisibility();
+    return this.isiCepteService.getRegionalVisibility({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      country,
+      region,
+      district,
+      eligibility,
+      brand,
+      category,
+    });
   }
 
   @Get('showcase')

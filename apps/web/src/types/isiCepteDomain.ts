@@ -1,14 +1,11 @@
 /**
- * TORQUESCOUT BACKOFFICE — İŞİ CEPTE PROVIDER DOMAIN CONTRACT (PHASE 2)
+ * TORQUESCOUT BACKOFFICE — İŞİ CEPTE DOMAIN CONTRACT (PHASE 3)
  * 
- * Authoritative TorqueScout representation of an İşi Cepte provider.
+ * Authoritative TorqueScout representation of an İşi Cepte provider & regional visibility.
  * 
- * DATA OWNERSHIP PRINCIPLE:
- * İşi Cepte = Source of truth for business identity, profile, categories, brands, membership.
- * TorqueScout = Consumer of synchronized eligibility, regional visibility, and entitlements.
- * 
- * STABLE IDENTITY:
- * `isicepteProviderId` is the stable cross-system identity.
+ * STRICT PRODUCT RULE:
+ * One Provider entity -> One shared Provider Detail Drawer.
+ * "İşletmeler / Ustalar" and "Bölgesel Görünürlük" are two different admin views of the SAME provider data.
  */
 
 export type IsiCepteMembershipStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'UNKNOWN';
@@ -27,6 +24,13 @@ export interface IsiCepteServiceCategoryRef {
 export interface IsiCepteVehicleBrandRef {
   id?: string | null;
   name: string;
+}
+
+export interface IsiCepteServiceRegion {
+  id?: string;
+  countryCode: string;
+  regionCode: string;
+  district?: string | null;
 }
 
 export interface IsiCepteEntitlementDetail {
@@ -50,11 +54,16 @@ export interface IsiCepteProvider {
   torqueScoutOptIn: boolean;
   /** Calculated local listing eligibility state */
   localListingState: IsiCepteLocalListingState;
+  /** Human-readable eligibility reason text */
+  eligibilityReasonText?: string | null;
+  eligibilityReasonCode?: string | null;
 
   /** Country-first geographic model */
   countryCode: string; // e.g. "TR"
   regionCode: string;  // e.g. "TR-34" / "İstanbul"
   district?: string | null; // e.g. "Kadıköy"
+  /** Support for multiple service coverage areas */
+  serviceRegions?: IsiCepteServiceRegion[];
 
   /** Optional read-only contact information */
   phone?: string | null;
@@ -75,5 +84,18 @@ export interface IsiCepteProvider {
   sourceUpdatedAt?: string | null;
   lastSyncedAt?: string | null;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface IsiCepteRegionalVisibilityRecord {
+  id: string;
+  isicepteProviderId: string;
+  provider: IsiCepteProvider;
+  countryCode: string;
+  regionCode: string;
+  district?: string | null;
+  localListingState: IsiCepteLocalListingState;
+  eligibilityReasonText: string;
+  source: IsiCepteEntitlementSource;
   updatedAt: string;
 }

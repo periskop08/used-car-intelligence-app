@@ -1,5 +1,5 @@
 /**
- * TORQUESCOUT BACKOFFICE — İŞİ CEPTE BACKEND PROVIDER DOMAIN CONTRACT (PHASE 2)
+ * TORQUESCOUT BACKOFFICE — İŞİ CEPTE BACKEND PROVIDER DOMAIN CONTRACT (PHASE 3)
  */
 
 export type IsiCepteMembershipStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'UNKNOWN';
@@ -20,6 +20,13 @@ export interface IsiCepteVehicleBrandRef {
   name: string;
 }
 
+export interface IsiCepteServiceRegion {
+  id?: string;
+  countryCode: string;
+  regionCode: string;
+  district?: string | null;
+}
+
 export interface IsiCepteEntitlementDetail {
   active: boolean;
   startsAt?: string | null;
@@ -35,9 +42,12 @@ export interface IsiCepteProvider {
   membershipStatus: IsiCepteMembershipStatus;
   torqueScoutOptIn: boolean;
   localListingState: IsiCepteLocalListingState;
+  eligibilityReasonText?: string | null;
+  eligibilityReasonCode?: string | null;
   countryCode: string;
   regionCode: string;
   district?: string | null;
+  serviceRegions?: IsiCepteServiceRegion[];
   phone?: string | null;
   email?: string | null;
   address?: string | null;
@@ -49,5 +59,18 @@ export interface IsiCepteProvider {
   sourceUpdatedAt?: string | null;
   lastSyncedAt?: string | null;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface IsiCepteRegionalVisibilityRecord {
+  id: string;
+  isicepteProviderId: string;
+  provider: IsiCepteProvider;
+  countryCode: string;
+  regionCode: string;
+  district?: string | null;
+  localListingState: IsiCepteLocalListingState;
+  eligibilityReasonText: string;
+  source: IsiCepteEntitlementSource;
   updatedAt: string;
 }

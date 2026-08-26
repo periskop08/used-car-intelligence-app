@@ -42,10 +42,24 @@ export class IsiCepteService {
     throw new NotFoundException(`Provider '${id}' bulunamadı veya henüz senkronize edilmedi.`);
   }
 
-  async getRegionalVisibility() {
+  async getRegionalVisibility(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    country?: string;
+    region?: string;
+    district?: string;
+    eligibility?: string;
+    brand?: string;
+    category?: string;
+  }) {
+    // Currently no real synchronization connected. Returns truthful 0 items dataset.
     return {
-      items: [],
+      items: [] as IsiCepteProvider[],
       total: 0,
+      page: Math.max(1, params.page || 1),
+      limit: Math.min(100, Math.max(1, params.limit || 20)),
+      totalPages: 1,
       message: 'Henüz bölgesel görünürlük kaydı bulunmuyor.',
     };
   }
