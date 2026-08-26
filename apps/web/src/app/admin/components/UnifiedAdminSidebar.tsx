@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  Store,
 } from 'lucide-react';
 
 export type AdminNavItem = {
@@ -65,6 +66,19 @@ export const adminNavigationGroups: AdminNavGroup[] = [
       { key: 'LISTING_MODERATION', label: 'İlan Moderasyonu', href: '/admin/listings' },
       { key: 'LISTING_PERFORMANCE', label: 'İlan Performansı', href: '/admin/listings/performance' },
       { key: 'LISTING_QUALITY', label: 'İlan Veri Sağlığı', href: '/admin/listings/quality' },
+    ],
+  },
+  {
+    key: 'ISI_CEPTE',
+    label: 'İşi Cepte',
+    icon: Store,
+    children: [
+      { key: 'ISI_CEPTE_OVERVIEW', label: 'Genel Bakış', href: '/admin/isi-cepte' },
+      { key: 'ISI_CEPTE_PROVIDERS', label: 'İşletmeler / Ustalar', href: '/admin/isi-cepte/providers' },
+      { key: 'ISI_CEPTE_REGIONAL', label: 'Bölgesel Görünürlük', href: '/admin/isi-cepte/regional-visibility' },
+      { key: 'ISI_CEPTE_SHOWCASE', label: 'Vitrin', href: '/admin/isi-cepte/showcase' },
+      { key: 'ISI_CEPTE_NATIONAL', label: 'Ülke Geneli', href: '/admin/isi-cepte/national-visibility' },
+      { key: 'ISI_CEPTE_PURCHASES', label: 'Satın Alımlar', href: '/admin/isi-cepte/purchases' },
     ],
   },
   {
