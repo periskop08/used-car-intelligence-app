@@ -1,12 +1,13 @@
 /**
- * TORQUESCOUT BACKOFFICE — İŞİ CEPTE DOMAIN CONTRACT (PHASE 4)
+ * TORQUESCOUT BACKOFFICE — İŞİ CEPTE DOMAIN CONTRACT (PHASE 7)
  * 
- * Authoritative TorqueScout representation of an İşi Cepte provider & Showcase entitlement.
+ * Authoritative TorqueScout representation of an İşi Cepte provider, entitlements, & purchases.
  * 
- * STRICT PRODUCT SEMANTIC:
- * VİTRİN = SHOWCASE entitlement.
- * Gives an ALREADY ELIGIBLE provider paid prominence/ranking advantage inside its legitimate context.
- * DOES NOT expand geography, create brand eligibility, or override inactive membership/opt-out.
+ * HARD INVARIANT:
+ * Purchase != Entitlement.
+ * A purchase is a commercial transaction (amount, currency, status, purchasedAt).
+ * An entitlement is the visibility right produced by that transaction (SHOWCASE / NATIONAL_VISIBILITY).
+ * ADMIN_GRANTED entitlements do NOT have fake purchases.
  */
 
 export type IsiCepteMembershipStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'UNKNOWN';
@@ -18,6 +19,8 @@ export type IsiCepteEntitlementType = 'LOCAL_LISTING' | 'SHOWCASE' | 'NATIONAL_V
 export type IsiCepteEntitlementSource = 'ISICEPTE_PURCHASE' | 'ADMIN_GRANTED';
 
 export type IsiCepteShowcaseStatus = 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED' | 'UNKNOWN';
+
+export type IsiCeptePurchaseStatus = 'SUCCESS' | 'PENDING' | 'FAILED' | 'REFUNDED' | 'CANCELLED' | 'UNKNOWN';
 
 export interface IsiCepteServiceCategoryRef {
   id: string;
@@ -113,6 +116,28 @@ export interface IsiCepteShowcaseRecord {
   endsAt?: string | null;
   source: IsiCepteEntitlementSource;
   purchaseId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IsiCeptePurchaseRecord {
+  id: string;
+  externalPurchaseId: string;
+  isicepteProviderId: string;
+  provider: IsiCepteProvider;
+  productType: IsiCepteEntitlementType;
+  amount: number;
+  currency: string;
+  purchaseStatus: IsiCeptePurchaseStatus;
+  purchasedAt: string;
+  entitlementId?: string | null;
+  entitlementType: IsiCepteEntitlementType;
+  entitlementStatus?: IsiCepteShowcaseStatus | null;
+  entitlementStartsAt?: string | null;
+  entitlementEndsAt?: string | null;
+  sourceSystem: string;
+  sourceUpdatedAt?: string | null;
+  lastSyncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

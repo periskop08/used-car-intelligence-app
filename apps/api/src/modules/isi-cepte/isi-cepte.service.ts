@@ -123,11 +123,22 @@ export class IsiCepteService {
     };
   }
 
-  async getPurchases() {
+  async getPurchases(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    product?: string;
+    purchaseStatus?: string;
+    entitlementStatus?: string;
+  }) {
+    // Currently no real synchronization connected. Returns truthful 0 items dataset.
     return {
       items: [],
       total: 0,
-      message: 'Henüz satın alma kaydı bulunmuyor.',
+      page: Math.max(1, params.page || 1),
+      limit: Math.min(100, Math.max(1, params.limit || 20)),
+      totalPages: 1,
+      message: 'Henüz TorqueScout görünürlük ürünü satın alımı bulunmuyor.',
     };
   }
 }

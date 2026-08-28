@@ -1,5 +1,5 @@
 /**
- * TORQUESCOUT BACKOFFICE — İŞİ CEPTE BACKEND PROVIDER DOMAIN CONTRACT (PHASE 4)
+ * TORQUESCOUT BACKOFFICE — İŞİ CEPTE BACKEND PROVIDER DOMAIN CONTRACT (PHASE 7)
  */
 
 export type IsiCepteMembershipStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'UNKNOWN';
@@ -11,6 +11,8 @@ export type IsiCepteEntitlementType = 'LOCAL_LISTING' | 'SHOWCASE' | 'NATIONAL_V
 export type IsiCepteEntitlementSource = 'ISICEPTE_PURCHASE' | 'ADMIN_GRANTED';
 
 export type IsiCepteShowcaseStatus = 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED' | 'UNKNOWN';
+
+export type IsiCeptePurchaseStatus = 'SUCCESS' | 'PENDING' | 'FAILED' | 'REFUNDED' | 'CANCELLED' | 'UNKNOWN';
 
 export interface IsiCepteServiceCategoryRef {
   id: string;
@@ -65,15 +67,24 @@ export interface IsiCepteProvider {
   updatedAt: string;
 }
 
-export interface IsiCepteShowcaseRecord {
+export interface IsiCeptePurchaseRecord {
   id: string;
+  externalPurchaseId: string;
   isicepteProviderId: string;
   provider: IsiCepteProvider;
-  status: IsiCepteShowcaseStatus;
-  startsAt?: string | null;
-  endsAt?: string | null;
-  source: IsiCepteEntitlementSource;
-  purchaseId?: string | null;
+  productType: IsiCepteEntitlementType;
+  amount: number;
+  currency: string;
+  purchaseStatus: IsiCeptePurchaseStatus;
+  purchasedAt: string;
+  entitlementId?: string | null;
+  entitlementType: IsiCepteEntitlementType;
+  entitlementStatus?: IsiCepteShowcaseStatus | null;
+  entitlementStartsAt?: string | null;
+  entitlementEndsAt?: string | null;
+  sourceSystem: string;
+  sourceUpdatedAt?: string | null;
+  lastSyncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -157,9 +157,24 @@ export class AdminIsiCepteController {
   }
 
   @Get('purchases')
-  @ApiOperation({ summary: 'İşi Cepte Satın Alım Günlüğü (Salt Okunur)' })
-  async getPurchases(@Req() req: any) {
+  @ApiOperation({ summary: 'Satın Alma Kayıtları (Paginated & Filtered)' })
+  async getPurchases(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('product') product?: string,
+    @Query('purchaseStatus') purchaseStatus?: string,
+    @Query('entitlementStatus') entitlementStatus?: string,
+  ) {
     await this.verifyAdminOnly(req);
-    return this.isiCepteService.getPurchases();
+    return this.isiCepteService.getPurchases({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+      search,
+      product,
+      purchaseStatus,
+      entitlementStatus,
+    });
   }
 }
