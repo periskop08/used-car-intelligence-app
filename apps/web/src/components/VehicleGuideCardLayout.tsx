@@ -216,7 +216,7 @@ export default function VehicleGuideCardLayout({
 
             {/* Custom Overlay Slot for Admin Upload / Replace */}
             {customHeroSlot && (
-              <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
+              <div className="absolute inset-0 z-40 flex items-center justify-center">
                 {customHeroSlot}
               </div>
             )}

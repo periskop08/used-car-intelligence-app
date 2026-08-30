@@ -321,9 +321,9 @@ export default function VehicleGuideCardEditor({
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`w-full h-full p-4 flex flex-col items-center justify-center gap-2 text-center transition cursor-pointer border-2 border-dashed ${
+                className={`w-full h-full p-4 flex flex-col items-center justify-center gap-2 text-center transition cursor-pointer border-2 border-dashed group ${
                   (tempPreviewUrl || heroImageUrl)
-                    ? "bg-black/30 hover:bg-black/80 border-orange-500/40 hover:border-orange-500"
+                    ? "bg-black/0 hover:bg-black/80 border-transparent hover:border-orange-500"
                     : "bg-black/75 border-orange-500 hover:border-orange-400"
                 }`}
               >
@@ -345,7 +345,7 @@ export default function VehicleGuideCardEditor({
                     <span>CDN Sunucusuna Yükleniyor...</span>
                   </div>
                 ) : (tempPreviewUrl || heroImageUrl) ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-2 opacity-0 group-hover:opacity-100 transition duration-200">
                     <span className="px-3 py-1 bg-emerald-500/90 text-white font-black text-[10px] rounded-lg shadow-lg flex items-center gap-1 backdrop-blur-md">
                       ✓ Görsel Yüklendi (Değiştirmek İçin Tıklayın)
                     </span>
