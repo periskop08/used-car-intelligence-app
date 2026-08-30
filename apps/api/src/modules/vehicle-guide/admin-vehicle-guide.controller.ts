@@ -10,12 +10,33 @@ import {
   CreateTechnicalInfoDto, CardTranslationDto, FactTranslationDto
 } from './vehicle-guide.dto';
 
+import { BadRequestException } from '@nestjs/common';
+import { R2Service } from '../listing/r2.service';
+
 @ApiTags('Admin Vehicle Guide')
 @Controller('admin/vehicle-guide')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class AdminVehicleGuideController {
-  constructor(private guideService: VehicleGuideService) {}
+  constructor(
+    private guideService: VehicleGuideService,
+    private r2Service: R2Service,
+  ) {}
+
+  @Post('upload-image')
+  @ApiOperation({ summary: 'Araç rehberi kartı için Cloudflare R2 ortamına görsel yükler' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadStandaloneImage(@UploadedFile() file: any, @GetUser() user: UserPayload) {
+    this.assertAdmin(user);
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel dosyası seçin.');
+    }
+    const result = await this.r2Service.uploadImage(file.buffer, 'guide-cards');
+    if (!result.url) {
+      throw new BadRequestException('Görsel Cloudflare R2 sunucusuna yüklenemedi.');
+    }
+    return { url: result.url };
+  }
 
   @Post('cards/:id/image')
   @ApiOperation({ summary: 'Rehber kartına yeni görsel yükler (çözünürlük doğrulamalı ve WebP optimize)' })

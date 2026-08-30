@@ -148,7 +148,7 @@ export default function VehicleGuideCardEditor({
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`${API_BASE_URL}/admin/vehicle-profiles/upload-image`, {
+      const res = await fetch(`${API_BASE_URL}/admin/vehicle-guide/upload-image`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
