@@ -310,42 +310,79 @@ export default function VehicleGuideCardEditor({
               <div
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                className="w-full h-full p-4 flex flex-col items-center justify-center gap-2 text-center bg-black/70 backdrop-blur-sm cursor-pointer border-2 border-dashed border-orange-500/50 hover:border-orange-500 rounded-xl transition"
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full h-full p-4 flex flex-col items-center justify-center gap-2 text-center transition cursor-pointer border-2 border-dashed ${
+                  (tempPreviewUrl || heroImageUrl)
+                    ? "bg-black/30 hover:bg-black/80 border-orange-500/40 hover:border-orange-500"
+                    : "bg-black/75 border-orange-500 hover:border-orange-400"
+                }`}
               >
                 <input
                   type="file"
                   ref={fileInputRef}
                   accept="image/*"
-                  onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleFileUpload(e.target.files[0]);
+                    }
+                  }}
                   className="hidden"
                 />
 
                 {uploadingImage ? (
-                  <div className="flex flex-col items-center gap-2 text-white font-bold text-xs">
+                  <div className="flex flex-col items-center gap-2 text-white font-bold text-xs bg-slate-950/90 p-3 rounded-2xl border border-orange-500/50 shadow-xl">
                     <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                    <span>R2 Sunucusuna Yükleniyor...</span>
+                    <span>CDN Sunucusuna Yükleniyor...</span>
                   </div>
-                ) : (
-                  <>
-                    <Upload className="w-6 h-6 text-orange-400" />
-                    <span className="text-xs font-bold text-white">Görsel Sürükleyin veya Tıklayın</span>
-                    <div className="flex items-center gap-2 mt-1">
+                ) : (tempPreviewUrl || heroImageUrl) ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="px-3 py-1 bg-emerald-500/90 text-white font-black text-[10px] rounded-lg shadow-lg flex items-center gap-1 backdrop-blur-md">
+                      ✓ Görsel Yüklendi (Değiştirmek İçin Tıklayın)
+                    </span>
+                    <div className="flex items-center gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          fileInputRef.current?.click();
-                        }}
-                        className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-bold"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-bold shadow-lg"
                       >
                         Bilgisayardan Seç
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowUrlFallback(!showUrlFallback);
-                        }}
+                        onClick={() => setShowUrlFallback(!showUrlFallback)}
+                        className="px-2 py-1 bg-black/60 hover:bg-black/80 text-slate-300 rounded-lg text-[10px] font-bold border border-white/10"
+                      >
+                        CDN URL
+                      </button>
+                    </div>
+
+                    {showUrlFallback && (
+                      <div className="mt-2 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          placeholder="https://...r2.dev/..."
+                          value={heroImageUrl}
+                          onChange={(e) => setHeroImageUrl(e.target.value)}
+                          className="w-full px-2 py-1 bg-slate-900 border border-white/20 rounded text-[10px] text-white outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6 text-orange-400" />
+                    <span className="text-xs font-bold text-white">Görsel Sürükleyin veya Tıklayın</span>
+                    <div className="flex items-center gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-[10px] font-bold shadow-lg"
+                      >
+                        Bilgisayardan Seç
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlFallback(!showUrlFallback)}
                         className="px-2 py-1 bg-white/10 hover:bg-white/20 text-slate-300 rounded-lg text-[10px] font-bold"
                       >
                         CDN URL Yaz
