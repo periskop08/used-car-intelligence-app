@@ -8,15 +8,36 @@ import {
   Query,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { VehicleProfileService, CreateVehicleProfileDto } from './vehicle-profile.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
+import { R2Service } from '../listing/r2.service';
 
 @Controller('admin/vehicle-profiles')
 @UseGuards(JwtAuthGuard)
 export class AdminVehicleProfileController {
-  constructor(private readonly vehicleProfileService: VehicleProfileService) {}
+  constructor(
+    private readonly vehicleProfileService: VehicleProfileService,
+    private readonly r2Service: R2Service,
+  ) {}
+
+  @Post('upload-image')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(@UploadedFile() file: any) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel dosyası seçin.');
+    }
+    const result = await this.r2Service.uploadImage(file.buffer, 'vehicle-profiles');
+    if (!result.url || result.url.startsWith('data:image/')) {
+      throw new BadRequestException('Görsel CDN/R2 sunucusuna yüklenemedi. Lütfen Cloudflare R2 ayarlarını kontrol edin.');
+    }
+    return { url: result.url };
+  }
 
   @Get()
   async getProfiles(
@@ -61,3 +82,4 @@ export class AdminVehicleProfileController {
     return this.vehicleProfileService.archiveProfile(id, user?.id);
   }
 }
+
