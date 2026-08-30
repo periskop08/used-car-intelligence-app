@@ -500,7 +500,7 @@ export class VehicleGuideService {
           create: dto.facts.map((f, idx) => ({
             title: f.title,
             description: f.description,
-            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.CHRONIC_ISSUE),
+            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.KNOWN_ISSUE),
             displayOrder: idx,
             status: cardStatus,
             isActive: true,
@@ -536,7 +536,7 @@ export class VehicleGuideService {
             vehicleGuideCardId: id,
             title: f.title,
             description: f.description,
-            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.CHRONIC_ISSUE),
+            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.KNOWN_ISSUE),
             displayOrder: idx,
             status: cardStatus,
             isActive: true,
