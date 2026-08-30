@@ -33,8 +33,8 @@ export class AdminVehicleProfileController {
       throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel dosyası seçin.');
     }
     const result = await this.r2Service.uploadImage(file.buffer, 'vehicle-profiles');
-    if (!result.url || result.url.startsWith('data:image/')) {
-      throw new BadRequestException('Görsel CDN/R2 sunucusuna yüklenemedi. Lütfen Cloudflare R2 ayarlarını kontrol edin.');
+    if (!result.url) {
+      throw new BadRequestException('Görsel yüklenemedi.');
     }
     return { url: result.url };
   }

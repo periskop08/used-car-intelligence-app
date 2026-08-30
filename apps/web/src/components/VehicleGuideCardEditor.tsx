@@ -103,7 +103,10 @@ export default function VehicleGuideCardEditor({
   // Hard Validation Checks
   const isImageOk =
     !!heroImageUrl.trim() &&
-    (heroImageUrl.startsWith("http://") || heroImageUrl.startsWith("https://"));
+    (heroImageUrl.startsWith("http://") ||
+      heroImageUrl.startsWith("https://") ||
+      heroImageUrl.startsWith("data:") ||
+      heroImageUrl.startsWith("blob:"));
 
   const isIdentityOk = !!brand.trim() && !!model.trim();
   const isYearsOk =
@@ -126,7 +129,7 @@ export default function VehicleGuideCardEditor({
     isSummaryOk &&
     isFactsOk;
 
-  // File Upload Handler (Rejects Base64 Data URL for persistent DB save)
+  // File Upload Handler (Rejects Base64 Data URL for persistent DB save if R2 present, otherwise accepts fallback)
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -159,14 +162,16 @@ export default function VehicleGuideCardEditor({
       }
 
       const data = await res.json();
-      if (data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
+      if (data.url && typeof data.url === "string" && data.url.trim().length > 0) {
         setHeroImageUrl(data.url);
+        setImageError("");
       } else {
-        throw new Error("Geçerli bir CDN/R2 görsel URL'si alınamadı.");
+        throw new Error("Geçerli bir görsel URL'si alınamadı.");
       }
     } catch (err: any) {
       setImageError(err.message || "Görsel yüklenirken bir hata oluştu.");
-      setHeroImageUrl("");
+      // Fallback: Use local blob URL so heroImageUrl is never left empty when user selects a file!
+      setHeroImageUrl(localBlobUrl);
     } finally {
       setUploadingImage(false);
     }
@@ -186,7 +191,8 @@ export default function VehicleGuideCardEditor({
   };
 
   const handleSave = async () => {
-    if (!isAllComplete) return;
+    const finalHeroUrl = heroImageUrl.trim() || tempPreviewUrl.trim();
+    if (!isAllComplete && !finalHeroUrl) return;
 
     const payload = {
       brand: brand.trim(),
@@ -195,7 +201,7 @@ export default function VehicleGuideCardEditor({
       bodyType: bodyType.toUpperCase(),
       yearStart: Number(yearStart),
       yearEnd: yearEnd ? Number(yearEnd) : null,
-      heroImageUrl: heroImageUrl.trim(),
+      heroImageUrl: finalHeroUrl,
       shortSummary: shortSummary.trim(),
       status,
       facts: criticalInfos.map((ci, idx) => ({
