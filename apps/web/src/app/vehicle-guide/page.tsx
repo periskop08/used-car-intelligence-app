@@ -112,12 +112,6 @@ const getLicensePositionClass = (position?: string) => {
 
 const formatImageUrl = (url?: string) => {
   if (!url) return "";
-  if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
-    const parts = url.split(".r2.dev/");
-    if (parts.length > 1) {
-      return `${API_URL}/listings/media-proxy/${parts[1]}`;
-    }
-  }
   return url;
 };
 

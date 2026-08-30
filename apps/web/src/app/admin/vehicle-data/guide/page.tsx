@@ -7,7 +7,7 @@ import {
   Search,
   Image as ImageIcon,
 } from 'lucide-react';
-import { API_BASE_URL } from '@/utils/apiConfig';
+import { API_BASE_URL, getAuthToken } from '@/utils/apiConfig';
 import VehicleGuideCardEditor from '@/components/VehicleGuideCardEditor';
 import { translateBodyType } from '@/components/VehicleGuideCardLayout';
 
@@ -28,10 +28,10 @@ export default function AdminVehicleGuidePage() {
   const fetchCards = () => {
     setLoading(true);
     setError(null);
-    const token = localStorage.getItem('accessToken');
+    const token = getAuthToken();
 
     fetch(`${API_BASE_URL}/admin/vehicle-guide/cards`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((res) => {
         if (!res.ok) throw new Error('Araç rehberi kartları yüklenemedi.');
@@ -58,7 +58,7 @@ export default function AdminVehicleGuidePage() {
 
   const handleSaveCard = async (payload: any) => {
     setSubmitting(true);
-    const token = localStorage.getItem('accessToken');
+    const token = getAuthToken();
 
     const url = editingCard
       ? `${API_BASE_URL}/admin/vehicle-guide/cards/${editingCard.id}`
@@ -70,7 +70,7 @@ export default function AdminVehicleGuidePage() {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(payload),
       });
