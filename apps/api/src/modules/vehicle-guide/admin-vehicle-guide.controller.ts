@@ -26,8 +26,7 @@ export class AdminVehicleGuideController {
   @Post('upload-image')
   @ApiOperation({ summary: 'Araç rehberi kartı için Cloudflare R2 ortamına görsel yükler' })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadStandaloneImage(@UploadedFile() file: any, @GetUser() user: UserPayload) {
-    this.assertAdmin(user);
+  async uploadStandaloneImage(@UploadedFile() file: any) {
     if (!file || !file.buffer) {
       throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel dosyası seçin.');
     }
@@ -44,23 +43,19 @@ export class AdminVehicleGuideController {
   async uploadImage(
     @Param('id') id: string,
     @UploadedFile() file: any,
-    @GetUser() user: UserPayload,
   ) {
-    this.assertAdmin(user);
     return this.guideService.uploadGuideCardImage(id, file);
   }
 
   @Get('cards')
   @ApiOperation({ summary: 'Tüm araç rehberi kartlarını listeler.' })
-  async getCards(@GetUser() user: UserPayload) {
-    this.assertAdmin(user);
+  async getCards() {
     return this.guideService.adminGetCards();
   }
 
   @Post('cards')
   @ApiOperation({ summary: 'Yeni bir rehber kartı oluşturur.' })
-  async createCard(@Body() dto: CreateGuideCardDto, @GetUser() user: UserPayload) {
-    this.assertAdmin(user);
+  async createCard(@Body() dto: CreateGuideCardDto) {
     return this.guideService.adminCreateCard(dto);
   }
 
@@ -69,9 +64,7 @@ export class AdminVehicleGuideController {
   async updateCard(
     @Param('id') id: string,
     @Body() dto: UpdateGuideCardDto,
-    @GetUser() user: UserPayload,
   ) {
-    this.assertAdmin(user);
     return this.guideService.adminUpdateCard(id, dto);
   }
 

@@ -103,10 +103,10 @@ export default function VehicleGuideCardEditor({
   // Hard Validation Checks
   const isImageOk =
     !!heroImageUrl.trim() &&
+    !heroImageUrl.startsWith("blob:") &&
     (heroImageUrl.startsWith("http://") ||
       heroImageUrl.startsWith("https://") ||
-      heroImageUrl.startsWith("data:") ||
-      heroImageUrl.startsWith("blob:"));
+      heroImageUrl.startsWith("data:"));
 
   const isIdentityOk = !!brand.trim() && !!model.trim();
   const isYearsOk =
@@ -129,7 +129,7 @@ export default function VehicleGuideCardEditor({
     isSummaryOk &&
     isFactsOk;
 
-  // File Upload Handler (Rejects Base64 Data URL for persistent DB save if R2 present, otherwise accepts fallback)
+  // File Upload Handler (Uploads to Cloudflare R2 and sets permanent CDN URL)
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -162,16 +162,17 @@ export default function VehicleGuideCardEditor({
       }
 
       const data = await res.json();
-      if (data.url && typeof data.url === "string" && data.url.trim().length > 0) {
+      if (data.url && typeof data.url === "string" && data.url.trim().length > 0 && !data.url.startsWith("blob:")) {
         setHeroImageUrl(data.url);
+        setTempPreviewUrl(""); // Clear temp preview once permanent R2 URL is saved
         setImageError("");
       } else {
-        throw new Error("Geçerli bir görsel URL'si alınamadı.");
+        throw new Error("Geçerli bir Cloudflare R2 görsel URL'si alınamadı.");
       }
     } catch (err: any) {
       setImageError(err.message || "Görsel yüklenirken bir hata oluştu.");
-      // Fallback: Use local blob URL so heroImageUrl is never left empty when user selects a file!
-      setHeroImageUrl(localBlobUrl);
+      setHeroImageUrl("");
+      setTempPreviewUrl("");
     } finally {
       setUploadingImage(false);
     }
@@ -191,8 +192,11 @@ export default function VehicleGuideCardEditor({
   };
 
   const handleSave = async () => {
-    const finalHeroUrl = heroImageUrl.trim() || tempPreviewUrl.trim();
-    if (!isAllComplete && !finalHeroUrl) return;
+    if (!isImageOk) {
+      alert("Görsel sunucuya yüklenemedi veya geçersiz. Lütfen resmi yeniden yükleyin.");
+      return;
+    }
+    if (!isAllComplete) return;
 
     const payload = {
       brand: brand.trim(),
@@ -201,7 +205,7 @@ export default function VehicleGuideCardEditor({
       bodyType: bodyType.toUpperCase(),
       yearStart: Number(yearStart),
       yearEnd: yearEnd ? Number(yearEnd) : null,
-      heroImageUrl: finalHeroUrl,
+      heroImageUrl: heroImageUrl.trim(),
       shortSummary: shortSummary.trim(),
       status,
       facts: criticalInfos.map((ci, idx) => ({
