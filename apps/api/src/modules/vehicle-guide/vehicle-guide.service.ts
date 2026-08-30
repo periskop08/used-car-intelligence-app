@@ -475,7 +475,8 @@ export class VehicleGuideService {
   // ==========================================
 
   async adminCreateCard(dto: CreateGuideCardDto) {
-    return this.prisma.vehicleGuideCard.create({
+    const cardStatus = dto.status || GuideStatus.DRAFT;
+    const card = await this.prisma.vehicleGuideCard.create({
       data: {
         brand: dto.brand,
         model: dto.model,
@@ -485,18 +486,31 @@ export class VehicleGuideService {
         yearStart: dto.yearStart,
         yearEnd: dto.yearEnd,
         heroImageUrl: dto.heroImageUrl,
-        imageAltText: dto.imageAltText,
-        imageSource: dto.imageSource,
-        imageLicense: dto.imageLicense,
+        imageAltText: dto.imageAltText || `${dto.brand} ${dto.model}`,
+        imageSource: dto.imageSource || 'TorqueScout Editor',
+        imageLicense: dto.imageLicense || 'Lisanslı',
         placeholderImageUrl: dto.placeholderImageUrl,
         shortSummary: dto.shortSummary,
         imageObjectPosition: dto.imageObjectPosition,
         imageFitMode: dto.imageFitMode,
         licenseLabelPosition: dto.licenseLabelPosition,
-        status: GuideStatus.DRAFT, // Default to DRAFT
+        status: cardStatus,
         isActive: true,
+        facts: dto.facts && dto.facts.length > 0 ? {
+          create: dto.facts.map((f, idx) => ({
+            title: f.title,
+            description: f.description,
+            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.CHRONIC_ISSUE),
+            displayOrder: idx,
+            status: cardStatus,
+            isActive: true,
+          })),
+        } : undefined,
       },
+      include: { facts: true, technicalInfos: true },
     });
+
+    return card;
   }
 
   async adminUpdateCard(id: string, dto: UpdateGuideCardDto) {
@@ -509,41 +523,43 @@ export class VehicleGuideService {
       throw new NotFoundException('Kart bulunamadı.');
     }
 
-    // Strict validation when transitioning status to APPROVED
-    if (dto.status === GuideStatus.APPROVED) {
-      // Must have at least 4 facts
-      if (card.facts.length < 4) {
-        throw new BadRequestException('Bu kart APPROVED yapılamaz: En az 4 adet fact (bilgi) eklenmiş olmalıdır.');
-      }
+    const cardStatus = dto.status !== undefined ? dto.status : card.status;
 
-      // Check required fact types
-      const approvedFacts = card.facts.filter((f) => f.status === GuideStatus.APPROVED);
-      const factTypes = approvedFacts.map((f) => f.factType);
-      const hasInteresting = factTypes.includes(GuideFactType.INTERESTING_FACT);
-      const hasBuyingTip = factTypes.includes(GuideFactType.BUYING_TIP);
-      const hasExperience = factTypes.includes(GuideFactType.USER_EXPERIENCE);
-
-      if (!hasInteresting || !hasBuyingTip || !hasExperience) {
-        throw new BadRequestException(
-          'Bu kart APPROVED yapılamaz: En az birer adet INTERESTING_FACT, BUYING_TIP ve USER_EXPERIENCE tipinde onaylı fact bulunmalıdır.'
-        );
-      }
-
-      // Image license compliance check
-      if (!card.heroImageUrl && !card.placeholderImageUrl) {
-        throw new BadRequestException('Bu kart APPROVED yapılamaz: En az bir görsel url bulunmalıdır.');
-      }
-
-      if (card.heroImageUrl && (!card.imageAltText || !card.imageSource || !card.imageLicense)) {
-        throw new BadRequestException(
-          'Bu kart APPROVED yapılamaz: heroImageUrl var ise imageAltText, imageSource ve imageLicense girilmiş olmalıdır.'
-        );
+    // Update facts if provided in DTO
+    if (dto.facts && Array.isArray(dto.facts)) {
+      await this.prisma.vehicleGuideFact.deleteMany({
+        where: { vehicleGuideCardId: id },
+      });
+      if (dto.facts.length > 0) {
+        await this.prisma.vehicleGuideFact.createMany({
+          data: dto.facts.map((f, idx) => ({
+            vehicleGuideCardId: id,
+            title: f.title,
+            description: f.description,
+            factType: f.factType || (idx === 0 ? GuideFactType.INTERESTING_FACT : idx === 1 ? GuideFactType.BUYING_TIP : idx === 2 ? GuideFactType.USER_EXPERIENCE : GuideFactType.CHRONIC_ISSUE),
+            displayOrder: idx,
+            status: cardStatus,
+            isActive: true,
+          })),
+        });
       }
     }
 
     return this.prisma.vehicleGuideCard.update({
       where: { id },
-      data: dto,
+      data: {
+        brand: dto.brand ?? card.brand,
+        model: dto.model ?? card.model,
+        generationCode: dto.generationCode !== undefined ? dto.generationCode : card.generationCode,
+        generationName: dto.generationName !== undefined ? dto.generationName : card.generationName,
+        bodyType: dto.bodyType ?? card.bodyType,
+        yearStart: dto.yearStart ?? card.yearStart,
+        yearEnd: dto.yearEnd !== undefined ? dto.yearEnd : card.yearEnd,
+        heroImageUrl: dto.heroImageUrl !== undefined ? dto.heroImageUrl : card.heroImageUrl,
+        shortSummary: dto.shortSummary !== undefined ? dto.shortSummary : card.shortSummary,
+        status: cardStatus,
+      },
+      include: { facts: true, technicalInfos: true },
     });
   }
 

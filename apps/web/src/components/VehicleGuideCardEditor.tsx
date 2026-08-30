@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import VehicleGuideCardLayout, {
   CardFactItem,
   TechnicalInfoData,
   translateBodyType,
 } from "./VehicleGuideCardLayout";
 import { API_BASE_URL } from "@/utils/apiConfig";
-import { Upload, Check, AlertCircle, X, Link as LinkIcon } from "lucide-react";
+import { Upload, X } from "lucide-react";
 
 export interface VehicleGuideCardEditorProps {
   initialData?: any;
@@ -45,6 +45,11 @@ export default function VehicleGuideCardEditor({
     initialData?.shortSummary || initialData?.guideSummary || ""
   );
 
+  // Status State: "DRAFT" (Taslak) or "APPROVED" (Yayında)
+  const [status, setStatus] = useState<"DRAFT" | "APPROVED">(
+    initialData?.status === "APPROVED" || initialData?.showInGuide === true ? "APPROVED" : "DRAFT"
+  );
+
   // Mandatory Exactly 4 Critical Info Cards
   const initialFacts: CardFactItem[] = [
     { title: "", description: "" },
@@ -53,7 +58,14 @@ export default function VehicleGuideCardEditor({
     { title: "", description: "" },
   ];
 
-  if (initialData?.criticalInfos && Array.isArray(initialData.criticalInfos)) {
+  if (initialData?.facts && Array.isArray(initialData.facts)) {
+    initialData.facts.slice(0, 4).forEach((ci: any, idx: number) => {
+      initialFacts[idx] = {
+        title: ci.title || "",
+        description: ci.description || "",
+      };
+    });
+  } else if (initialData?.criticalInfos && Array.isArray(initialData.criticalInfos)) {
     initialData.criticalInfos.slice(0, 4).forEach((ci: any, idx: number) => {
       initialFacts[idx] = {
         title: ci.title || "",
@@ -64,7 +76,7 @@ export default function VehicleGuideCardEditor({
 
   const [criticalInfos, setCriticalInfos] = useState<CardFactItem[]>(initialFacts);
 
-  // Technical Specs (Profile Representative Specs)
+  // Technical Specs
   const [techOpen, setTechOpen] = useState(false);
   const [techData, setTechData] = useState<TechnicalInfoData>({
     productionYears: initialData?.yearStart ? `${initialData.yearStart} - ${initialData.yearEnd || "Günümüz"}` : "",
@@ -81,17 +93,6 @@ export default function VehicleGuideCardEditor({
     localizedNotes: initialData?.guideSummary || "Sürüş konforu ve süspansiyon yapısı ile sınıfının lideri.",
   });
 
-  // Settings & Linking
-  const [vehicleVariantId, setVehicleVariantId] = useState<string>(
-    initialData?.variantIds?.[0] || initialData?.vehicleVariantId || initialData?.variantId || ""
-  );
-  const [showInGuide, setShowInGuide] = useState<boolean>(
-    initialData?.showInGuide ?? initialData?.isGuideVisible ?? true
-  );
-  const [showInDiscovery, setShowInDiscovery] = useState<boolean>(
-    initialData?.showInDiscovery ?? initialData?.isDiscoveryVisible ?? true
-  );
-
   // Uploading state
   const [uploadingImage, setUploadingImage] = useState(false);
   const [tempPreviewUrl, setTempPreviewUrl] = useState<string>("");
@@ -99,7 +100,7 @@ export default function VehicleGuideCardEditor({
   const [imageError, setImageError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Validation Checks (Strict Storage URL, non-empty text, variant ID)
+  // Hard Validation Checks
   const isImageOk =
     !!heroImageUrl.trim() &&
     (heroImageUrl.startsWith("http://") || heroImageUrl.startsWith("https://"));
@@ -116,7 +117,6 @@ export default function VehicleGuideCardEditor({
     (ci) => ci.title.trim().length >= 3 && ci.description.trim().length >= 5
   ).length;
   const isFactsOk = validFactsCount === 4;
-  const isVariantOk = !!vehicleVariantId.trim();
 
   const isAllComplete =
     isImageOk &&
@@ -124,8 +124,7 @@ export default function VehicleGuideCardEditor({
     isYearsOk &&
     isBodyTypeOk &&
     isSummaryOk &&
-    isFactsOk &&
-    isVariantOk;
+    isFactsOk;
 
   // File Upload Handler (Rejects Base64 Data URL for persistent DB save)
   const handleFileUpload = async (file: File) => {
@@ -138,7 +137,6 @@ export default function VehicleGuideCardEditor({
     setUploadingImage(true);
     setImageError("");
 
-    // Temporary local preview URL while uploading
     const localBlobUrl = URL.createObjectURL(file);
     setTempPreviewUrl(localBlobUrl);
 
@@ -198,16 +196,13 @@ export default function VehicleGuideCardEditor({
       yearStart: Number(yearStart),
       yearEnd: yearEnd ? Number(yearEnd) : null,
       heroImageUrl: heroImageUrl.trim(),
-      guideSummary: shortSummary.trim(),
-      criticalInfos: criticalInfos.map((ci, idx) => ({
+      shortSummary: shortSummary.trim(),
+      status,
+      facts: criticalInfos.map((ci, idx) => ({
         title: ci.title.trim(),
         description: ci.description.trim(),
-        sortOrder: idx,
+        displayOrder: idx,
       })),
-      variantIds: vehicleVariantId.trim() ? [vehicleVariantId.trim()] : [],
-      showInGuide,
-      showInDiscovery,
-      isActive: true,
     };
 
     await onSave(payload);
@@ -231,7 +226,7 @@ export default function VehicleGuideCardEditor({
           {/* Section Completion Progress */}
           <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold">
             <span className={`px-2.5 py-1 rounded-lg border transition ${isImageOk ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-slate-400 border-white/10"}`}>
-              {isImageOk ? "✓ Görsel (R2/CDN)" : "○ Görsel"}
+              {isImageOk ? "✓ Görsel" : "○ Görsel"}
             </span>
             <span className={`px-2.5 py-1 rounded-lg border transition ${isIdentityOk ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-white/5 text-slate-400 border-white/10"}`}>
               {isIdentityOk ? "✓ Marka/Model" : "○ Marka/Model"}
@@ -248,9 +243,6 @@ export default function VehicleGuideCardEditor({
             <span className={`px-2.5 py-1 rounded-lg border transition ${isFactsOk ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
               {isFactsOk ? "✓ 4 Kritik Bilgi" : `○ Kritik Bilgiler (${validFactsCount}/4)`}
             </span>
-            <span className={`px-2.5 py-1 rounded-lg border transition ${isVariantOk ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>
-              {isVariantOk ? "✓ Variant ID" : "○ Variant ID Eksik"}
-            </span>
 
             <button
               onClick={onClose}
@@ -261,40 +253,39 @@ export default function VehicleGuideCardEditor({
           </div>
         </div>
 
-        {/* KART AYARLARI COMPACT BAR */}
-        <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-4 text-xs">
-          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-            <LinkIcon className="w-4 h-4 text-orange-400" />
-            <span className="font-bold text-slate-400 whitespace-nowrap">Linked Variant ID (Zorunlu):</span>
-            <input
-              type="text"
-              placeholder="Veritabanı VehicleVariant ID..."
-              value={vehicleVariantId}
-              onChange={(e) => setVehicleVariantId(e.target.value)}
-              className="flex-1 px-3 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-white outline-none font-mono text-[11px]"
-            />
+        {/* COMPACT STATUS CONTROL BAR */}
+        <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-3 flex items-center justify-between gap-4 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-slate-400 uppercase tracking-wider text-[11px]">Yayın Durumu:</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStatus("DRAFT")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  status === "DRAFT"
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                    : "bg-slate-900 text-slate-400 border border-white/10 hover:text-white"
+                }`}
+              >
+                📝 Taslak
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus("APPROVED")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  status === "APPROVED"
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                    : "bg-slate-900 text-slate-400 border border-white/10 hover:text-white"
+                }`}
+              >
+                🚀 Yayında
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-2 font-bold text-slate-300 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showInGuide}
-                onChange={(e) => setShowInGuide(e.target.checked)}
-                className="accent-orange-500 w-4 h-4"
-              />
-              <span>Araç Rehberi'nde Yayınla</span>
-            </label>
-            <label className="flex items-center gap-2 font-bold text-slate-300 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showInDiscovery}
-                onChange={(e) => setShowInDiscovery(e.target.checked)}
-                className="accent-orange-500 w-4 h-4"
-              />
-              <span>Keşfet'te Görünsün</span>
-            </label>
-          </div>
+          <span className="text-[11px] text-slate-400 italic">
+            {status === "APPROVED" ? "Kart kullanıcı Araç Rehberi'nde canlı yayınlanacak." : "Kart yalnızca taslak modunda kalacak, kullanıcıya görünmeyecek."}
+          </span>
         </div>
 
         {/* MAIN CANVASES: REAL CARD PREVIEW & EDITING SLOTS */}
@@ -544,11 +535,11 @@ export default function VehicleGuideCardEditor({
               </div>
             }
 
-            /* 6. TECHNICAL DRAWER EDIT SLOT (PROFILES REPRESENTATIVE SPECS - DOES NOT MUTATE SHARED VARIANT) */
+            /* 6. TECHNICAL DRAWER EDIT SLOT */
             customTechDrawerSlot={
               <div className="absolute inset-x-0 bottom-0 bg-[#090d1e] border-t border-white/15 rounded-t-[32px] p-6 shadow-2xl z-50 animate-in slide-in-from-bottom">
                 <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
-                  <h2 className="text-sm font-black text-white uppercase tracking-wider">🛠️ Rehber Kartı Teknik Verileri (Profil Temsili Özellikler)</h2>
+                  <h2 className="text-sm font-black text-white uppercase tracking-wider">🛠️ Rehber Kartı Teknik Verileri</h2>
                   <button
                     onClick={() => setTechOpen(false)}
                     className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs text-slate-400 cursor-pointer"

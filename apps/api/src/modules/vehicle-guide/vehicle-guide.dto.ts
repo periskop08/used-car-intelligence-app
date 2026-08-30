@@ -79,6 +79,16 @@ export class CreateGuideCardDto {
   @IsString()
   @IsOptional()
   licenseLabelPosition?: string;
+
+  @ApiProperty({ required: false, enum: GuideStatus })
+  @IsEnum(GuideStatus)
+  @IsOptional()
+  status?: GuideStatus;
+
+  @ApiProperty({ required: false })
+  @IsArray()
+  @IsOptional()
+  facts?: { title: string; description: string; factType?: GuideFactType; displayOrder?: number }[];
 }
 
 export class UpdateGuideCardDto {
@@ -171,6 +181,11 @@ export class UpdateGuideCardDto {
   @IsString()
   @IsOptional()
   licenseLabelPosition?: string;
+
+  @ApiProperty({ required: false })
+  @IsArray()
+  @IsOptional()
+  facts?: { title: string; description: string; factType?: GuideFactType; displayOrder?: number }[];
 }
 
 export class CreateGuideFactDto {

@@ -4,68 +4,66 @@ import React, { useEffect, useState } from 'react';
 import {
   Plus,
   Edit,
-  CheckCircle2,
-  XCircle,
-  Image as ImageIcon,
   Search,
-  Link as LinkIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import VehicleGuideCardEditor from '@/components/VehicleGuideCardEditor';
+import { translateBodyType } from '@/components/VehicleGuideCardLayout';
 
 export default function AdminVehicleGuidePage() {
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [cards, setCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Search
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'published' | 'draft' | 'discovery'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'published' | 'draft'>('all');
 
   // Live Card Editor State
-  const [editingProfile, setEditingProfile] = useState<any | null>(null);
+  const [editingCard, setEditingCard] = useState<any | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchProfiles = () => {
+  const fetchCards = () => {
     setLoading(true);
     setError(null);
     const token = localStorage.getItem('accessToken');
 
-    fetch(`${API_BASE_URL}/admin/vehicle-profiles`, {
+    fetch(`${API_BASE_URL}/admin/vehicle-guide/cards`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
-        if (!res.ok) throw new Error('Araç rehberi profilleri yüklenemedi.');
+        if (!res.ok) throw new Error('Araç rehberi kartları yüklenemedi.');
         return res.json();
       })
-      .then((data) => setProfiles(Array.isArray(data) ? data : []))
+      .then((data) => setCards(Array.isArray(data) ? data : []))
       .catch((err: any) => setError(err.message))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchProfiles();
+    fetchCards();
   }, []);
 
   const handleOpenNewCard = () => {
-    setEditingProfile(null);
+    setEditingCard(null);
     setShowEditor(true);
   };
 
-  const handleOpenEditCard = (profile: any) => {
-    setEditingProfile(profile);
+  const handleOpenEditCard = (card: any) => {
+    setEditingCard(card);
     setShowEditor(true);
   };
 
-  const handleSaveProfile = async (payload: any) => {
+  const handleSaveCard = async (payload: any) => {
     setSubmitting(true);
     const token = localStorage.getItem('accessToken');
 
-    const url = editingProfile
-      ? `${API_BASE_URL}/admin/vehicle-profiles/${editingProfile.id}`
-      : `${API_BASE_URL}/admin/vehicle-profiles`;
-    const method = editingProfile ? 'PATCH' : 'POST';
+    const url = editingCard
+      ? `${API_BASE_URL}/admin/vehicle-guide/cards/${editingCard.id}`
+      : `${API_BASE_URL}/admin/vehicle-guide/cards`;
+    const method = editingCard ? 'PATCH' : 'POST';
 
     try {
       const res = await fetch(url, {
@@ -78,13 +76,13 @@ export default function AdminVehicleGuidePage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.message || 'Araç rehberi kartı kaydedilemedi.');
       }
 
       setShowEditor(false);
-      setEditingProfile(null);
-      fetchProfiles();
+      setEditingCard(null);
+      fetchCards();
     } catch (err: any) {
       alert(err.message || 'Kaydetme sırasında bir hata oluştu.');
     } finally {
@@ -92,55 +90,36 @@ export default function AdminVehicleGuidePage() {
     }
   };
 
-  const handleTogglePublish = async (profileId: string, currentStatus: boolean) => {
-    const token = localStorage.getItem('accessToken');
-    try {
-      const res = await fetch(`${API_BASE_URL}/admin/vehicle-profiles/${profileId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ showInGuide: !currentStatus }),
-      });
-      if (!res.ok) throw new Error('Yayın durumu güncellenemedi.');
-      fetchProfiles();
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const filteredProfiles = profiles.filter((p) => {
-    const brandName = p.brand || p.brandName || '';
-    const modelName = p.model || p.modelName || '';
-    const title = p.title || `${brandName} ${modelName}`;
-    const variantId = p.variantId || p.vehicleVariantId || p.variantMappings?.[0]?.variantId || '';
+  const filteredCards = cards.filter((c) => {
+    const brandName = c.brand || '';
+    const modelName = c.model || '';
+    const title = `${brandName} ${modelName}`;
 
     const query = search.toLowerCase();
     const searchMatch =
       title.toLowerCase().includes(query) ||
       brandName.toLowerCase().includes(query) ||
-      modelName.toLowerCase().includes(query) ||
-      variantId.toLowerCase().includes(query);
+      modelName.toLowerCase().includes(query);
 
-    const isGuideVisible = p.showInGuide ?? p.isGuideVisible ?? true;
-    const isDiscoveryVisible = p.showInDiscovery ?? p.isDiscoveryVisible ?? true;
+    const isPublished = c.status === 'APPROVED';
 
-    if (filterType === 'published') return searchMatch && isGuideVisible;
-    if (filterType === 'draft') return searchMatch && !isGuideVisible;
-    if (filterType === 'discovery') return searchMatch && isDiscoveryVisible;
+    if (filterType === 'published') return searchMatch && isPublished;
+    if (filterType === 'draft') return searchMatch && !isPublished;
 
     return searchMatch;
   });
 
+  const publishedCount = cards.filter((c) => c.status === 'APPROVED').length;
+  const draftCount = cards.filter((c) => c.status !== 'APPROVED').length;
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto font-sans">
-      {/* Header */}
+    <div className="space-y-6 max-w-7xl mx-auto font-sans pb-12">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">Araç Rehberi Yönetimi</h1>
           <p className="text-xs text-slate-400 font-medium mt-1">
-            Kullanıcılara gösterilen Araç Rehberi kartlarının canlı WYSIWYG editörü ile yönetimi.
+            Mevcut tüm Araç Rehberi araçlarını yönetin, satıra tıklayarak canlı editörde düzenleyin veya yeni rehber ekleyin.
           </p>
         </div>
         <button
@@ -152,13 +131,13 @@ export default function AdminVehicleGuidePage() {
         </button>
       </div>
 
-      {/* Filter Bar */}
+      {/* FILTER & SEARCH BAR */}
       <div className="p-4 bg-slate-900/60 rounded-2xl border border-white/5 flex flex-wrap gap-4 items-center justify-between">
         <div className="flex flex-1 min-w-[280px] items-center gap-2 px-3.5 py-2 bg-slate-950 rounded-xl border border-white/10 focus-within:border-orange-500/50 transition">
           <Search className="w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Araç marka, model, rehber başlığı veya Variant ID ile ara..."
+            placeholder="Araç marka, model veya rehber başlığı ile ara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-transparent text-xs text-white placeholder-slate-500 outline-none"
@@ -174,7 +153,7 @@ export default function AdminVehicleGuidePage() {
                 : 'bg-slate-950 text-slate-400 border border-white/10 hover:text-white'
             }`}
           >
-            Tümü ({profiles.length})
+            Tümü ({cards.length})
           </button>
           <button
             onClick={() => setFilterType('published')}
@@ -184,7 +163,7 @@ export default function AdminVehicleGuidePage() {
                 : 'bg-slate-950 text-slate-400 border border-white/10 hover:text-white'
             }`}
           >
-            Yayında
+            Yayında ({publishedCount})
           </button>
           <button
             onClick={() => setFilterType('draft')}
@@ -194,22 +173,12 @@ export default function AdminVehicleGuidePage() {
                 : 'bg-slate-950 text-slate-400 border border-white/10 hover:text-white'
             }`}
           >
-            Taslak / Gizli
-          </button>
-          <button
-            onClick={() => setFilterType('discovery')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-              filterType === 'discovery'
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-slate-950 text-slate-400 border border-white/10 hover:text-white'
-            }`}
-          >
-            Keşfet'te
+            Taslak ({draftCount})
           </button>
         </div>
       </div>
 
-      {/* CARD GRID VIEW */}
+      {/* ROW-BASED TABLE VIEW */}
       {loading ? (
         <div className="p-12 text-center text-slate-400 font-medium bg-slate-900/60 rounded-2xl border border-white/5">
           Araç rehberi kartları yükleniyor...
@@ -218,113 +187,125 @@ export default function AdminVehicleGuidePage() {
         <div className="p-6 text-center text-rose-400 font-bold text-xs bg-rose-500/10 border border-rose-500/20 rounded-2xl">
           {error}
         </div>
-      ) : filteredProfiles.length === 0 ? (
+      ) : filteredCards.length === 0 ? (
         <div className="p-12 text-center text-slate-500 font-medium text-xs bg-slate-900/60 rounded-2xl border border-white/5">
           Kriterlerinize uygun rehber kartı bulunamadı.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProfiles.map((p) => {
-            const isGuideVisible = p.showInGuide ?? p.isGuideVisible ?? true;
-            const heroUrl = p.heroImageUrl || p.imageUrl || p.photoUrl;
-            const title = p.brand && p.model ? `${p.brand} ${p.model}` : p.title || 'İsimsiz Araç';
-            const yearStr = `${p.yearStart || ''} - ${p.yearEnd || 'Günümüz'}`;
-            const variantId = p.variantId || p.vehicleVariantId || p.variantMappings?.[0]?.variantId || '';
+        <div className="bg-slate-900/80 rounded-2xl border border-white/10 overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950 border-b border-white/10 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  <th className="py-3.5 px-4 w-16">Görsel</th>
+                  <th className="py-3.5 px-4">Marka / Model</th>
+                  <th className="py-3.5 px-4">Üretim Yılları</th>
+                  <th className="py-3.5 px-4">Kasa Tipi</th>
+                  <th className="py-3.5 px-4">Durum</th>
+                  <th className="py-3.5 px-4">Son Güncelleme</th>
+                  <th className="py-3.5 px-4 text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredCards.map((c) => {
+                  const isPublished = c.status === 'APPROVED';
+                  const heroUrl = c.heroImageUrl || c.imageUrl;
+                  const title = `${c.brand || ''} ${c.model || ''}`;
+                  const yearStr = `${c.yearStart || ''} - ${c.yearEnd || 'Günümüz'}`;
+                  const formattedDate = c.updatedAt
+                    ? new Date(c.updatedAt).toLocaleDateString('tr-TR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })
+                    : '-';
 
-            return (
-              <div
-                key={p.id}
-                className="bg-slate-900/80 rounded-2xl border border-white/10 overflow-hidden flex flex-col justify-between hover:border-orange-500/40 transition group"
-              >
-                {/* Card Image Thumbnail */}
-                <div className="relative h-44 bg-slate-950 overflow-hidden flex items-center justify-center">
-                  {heroUrl ? (
-                    <img
-                      src={heroUrl}
-                      alt={title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-slate-600 gap-2">
-                      <ImageIcon className="w-8 h-8" />
-                      <span className="text-[10px] font-bold">Görsel Yok</span>
-                    </div>
-                  )}
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => handleOpenEditCard(c)}
+                      className="hover:bg-orange-500/5 transition duration-150 cursor-pointer group"
+                    >
+                      {/* Thumbnail */}
+                      <td className="py-3 px-4">
+                        <div className="w-12 h-9 rounded-lg bg-slate-950 border border-white/10 overflow-hidden flex items-center justify-center">
+                          {heroUrl ? (
+                            <img src={heroUrl} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                          ) : (
+                            <ImageIcon className="w-4 h-4 text-slate-600" />
+                          )}
+                        </div>
+                      </td>
 
-                  {/* Status Badge */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    {isGuideVisible ? (
-                      <span className="px-2.5 py-1 bg-emerald-500/90 backdrop-blur-md text-white font-black text-[9px] rounded-lg shadow-lg">
-                        YAYINDA
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 bg-amber-500/90 backdrop-blur-md text-white font-black text-[9px] rounded-lg shadow-lg">
-                        TASLAK
-                      </span>
-                    )}
-                  </div>
-                </div>
+                      {/* Brand / Model */}
+                      <td className="py-3 px-4">
+                        <div className="font-black text-white text-xs group-hover:text-orange-400 transition">
+                          {title}
+                        </div>
+                        {c.generationCode && (
+                          <span className="text-[10px] text-slate-500 font-mono">{c.generationCode}</span>
+                        )}
+                      </td>
 
-                {/* Card Info Body */}
-                <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-bold text-orange-400 mb-1">
-                      <span>🚗 {p.bodyType || 'SUV'}</span>
-                      <span className="text-slate-400 font-mono">📅 {yearStr}</span>
-                    </div>
-                    <h3 className="font-black text-sm text-white uppercase line-clamp-1">
-                      {title}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed italic">
-                      "{p.guideSummary || p.shortSummary || p.summary || 'Özet açıklama bulunmuyor.'}"
-                    </p>
-                  </div>
+                      {/* Production Years */}
+                      <td className="py-3 px-4 text-slate-300 font-mono font-bold text-[11px]">
+                        📅 {yearStr}
+                      </td>
 
-                  <div className="pt-3 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                    <span className="flex items-center gap-1">
-                      <LinkIcon className="w-3 h-3 text-orange-400" />
-                      <span>Variant ID: {variantId ? variantId.slice(0, 8) : 'Bağsız'}</span>
-                    </span>
-                  </div>
-                </div>
+                      {/* Body Type (Kasa Tipi) */}
+                      <td className="py-3 px-4 text-orange-300 font-bold text-[11px]">
+                        🚗 {translateBodyType(c.bodyType || 'SUV')}
+                      </td>
 
-                {/* Card Actions Footer */}
-                <div className="p-3 bg-slate-950/80 border-t border-white/5 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => handleOpenEditCard(p)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    <span>Düzenle</span>
-                  </button>
+                      {/* Status */}
+                      <td className="py-3 px-4">
+                        {isPublished ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                            🚀 Yayında
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold text-[10px]">
+                            📝 Taslak
+                          </span>
+                        )}
+                      </td>
 
-                  <button
-                    onClick={() => handleTogglePublish(p.id, isGuideVisible)}
-                    className={`p-2 rounded-xl border transition cursor-pointer ${
-                      isGuideVisible
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                    }`}
-                    title={isGuideVisible ? 'Yayından Kaldır (Taslak Yap)' : 'Yayınla'}
-                  >
-                    {isGuideVisible ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                      {/* Last Updated */}
+                      <td className="py-3 px-4 text-slate-400 text-[11px] font-mono">
+                        {formattedDate}
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditCard(c);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Düzenle</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* LIVE STEP-BY-STEP VEHICLE GUIDE CARD EDITOR OVERLAY */}
       {showEditor && (
         <VehicleGuideCardEditor
-          initialData={editingProfile}
+          initialData={editingCard}
           onClose={() => {
             setShowEditor(false);
-            setEditingProfile(null);
+            setEditingCard(null);
           }}
-          onSave={handleSaveProfile}
+          onSave={handleSaveCard}
           submitting={submitting}
         />
       )}
