@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "build": "prisma generate && nest build",
-    "postbuild": "node -e \"const fs = require('fs'); if (fs.existsSync('dist/src/main.js') && !fs.existsSync('dist/main.js')) fs.copyFileSync('dist/src/main.js', 'dist/main.js'); if (fs.existsSync('dist/main.js') && !fs.existsSync('dist/src/main.js')) { fs.mkdirSync('dist/src', { recursive: true }); fs.copyFileSync('dist/main.js', 'dist/src/main.js'); }\"",
-    "start": "node dist/main.js",
+    "start": "node -e \"const fs=require('fs'); const target=fs.existsSync('dist/src/main.js')?'dist/src/main.js':'dist/main.js'; require('./'+target);\"",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main.js",
+    "start:prod": "node -e \"const fs=require('fs'); const target=fs.existsSync('dist/src/main.js')?'dist/src/main.js':'dist/main.js'; require('./'+target);\"",
     "postinstall": "prisma generate && node prisma/fix-stuck-migration.js",
     "db:fix-stuck": "node prisma/fix-stuck-migration.js",
     "db:validate": "prisma validate",
