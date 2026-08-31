@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "prisma generate && nest build && node -e \"const fs=require('fs'); if (fs.existsSync('dist/src/main.js') && !fs.existsSync('dist/main.js')) fs.writeFileSync('dist/main.js', 'require(\\\"./src/main.js\\\");');\"",
+    "build": "prisma generate && (npx prisma db push --schema=prisma/schema.prisma || true) && nest build && node -e \"const fs=require('fs'); if (fs.existsSync('dist/src/main.js') && !fs.existsSync('dist/main.js')) fs.writeFileSync('dist/main.js', 'require(\\\"./src/main.js\\\");');\"",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",

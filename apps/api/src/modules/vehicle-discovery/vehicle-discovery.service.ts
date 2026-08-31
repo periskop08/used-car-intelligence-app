@@ -885,18 +885,38 @@ export class VehicleDiscoveryService {
         orderBy: { id: 'asc' }
       });
 
-      const discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
-        select: {
-          id: true,
-          representativeVariantId: true,
-          imageUrl: true,
-          isActive: true,
-          allowInUnfilteredDiscovery: true,
-          tags: true,
-          brand: true,
-          modelFamily: true
+      let discoveryCards: any[] = [];
+      try {
+        discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
+          select: {
+            id: true,
+            representativeVariantId: true,
+            imageUrl: true,
+            isActive: true,
+            allowInUnfilteredDiscovery: true,
+            tags: true,
+            brand: true,
+            modelFamily: true
+          }
+        });
+      } catch (err) {
+        this.logger.warn('Failed to select allowInUnfilteredDiscovery, attempting fallback select', err);
+        try {
+          discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
+            select: {
+              id: true,
+              representativeVariantId: true,
+              imageUrl: true,
+              isActive: true,
+              tags: true,
+              brand: true,
+              modelFamily: true
+            }
+          });
+        } catch (e) {
+          this.logger.warn('Fallback discoveryCards query error', e);
         }
-      });
+      }
 
       const cardByVariantMap = new Map<string, any>();
       const cardByBrandModelMap = new Map<string, any>();
