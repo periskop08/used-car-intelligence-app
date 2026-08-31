@@ -134,6 +134,7 @@ export class VehicleDiscoveryService {
   async getOrCreateSession(params: {
     userId?: string;
     guestIdentityId?: string;
+    forceNew?: boolean;
     filters?: {
       minimumPrice?: number;
       maximumPrice?: number;
@@ -142,7 +143,7 @@ export class VehicleDiscoveryService {
       transmissions?: TransmissionType[];
     };
   }) {
-    const { userId, guestIdentityId, filters } = params;
+    const { userId, guestIdentityId, filters, forceNew } = params;
 
     if (!userId && !guestIdentityId) {
       throw new BadRequestException("Oturum başlatmak için kullanıcı veya misafir kimliği gereklidir.");
@@ -150,26 +151,69 @@ export class VehicleDiscoveryService {
 
     const now = new Date();
 
-    const existingSession = await this.prisma.vehicleDiscoverySession.findFirst({
-      where: {
-        userId: userId || undefined,
-        guestIdentityId: guestIdentityId && !userId ? guestIdentityId : undefined,
-        status: VehicleDiscoverySessionStatus.ACTIVE,
-        expiresAt: { gt: now }
-      },
-      include: {
-        items: {
-          orderBy: { position: 'asc' }
+    if (forceNew) {
+      // Deactivate any existing active session for this user/guest to guarantee clean start
+      await this.prisma.vehicleDiscoverySession.updateMany({
+        where: {
+          userId: userId || undefined,
+          guestIdentityId: guestIdentityId && !userId ? guestIdentityId : undefined,
+          status: VehicleDiscoverySessionStatus.ACTIVE
+        },
+        data: {
+          status: VehicleDiscoverySessionStatus.CANCELLED
         }
-      }
-    });
-
-    if (existingSession) {
-      await this.prisma.vehicleDiscoverySession.update({
-        where: { id: existingSession.id },
-        data: { lastActivityAt: now }
       });
-      return { session: existingSession, isNew: false, warning: null };
+    } else {
+      // Look for active, unexpired session
+      const existingSession = await this.prisma.vehicleDiscoverySession.findFirst({
+        where: {
+          userId: userId || undefined,
+          guestIdentityId: guestIdentityId && !userId ? guestIdentityId : undefined,
+          status: VehicleDiscoverySessionStatus.ACTIVE,
+          expiresAt: { gt: now }
+        },
+        include: {
+          items: {
+            orderBy: { position: 'asc' },
+            include: {
+              card: {
+                select: {
+                  id: true,
+                  brand: true,
+                  modelFamily: true,
+                  generationName: true,
+                  bodyType: true,
+                  fuelType: true,
+                  transmissionType: true,
+                  engineVersion: true,
+                  power: true,
+                  torque: true,
+                  productionYears: true,
+                  averageConsumption: true,
+                  drivetrain: true,
+                  imageUrl: true,
+                  tags: true,
+                  discoverySummary: true,
+                  guideSummary: true,
+                  highlight: true,
+                  discoveryHighlight: true,
+                  watchout: true,
+                  discoveryWatchout: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (existingSession) {
+        // Touch lastActivityAt
+        await this.prisma.vehicleDiscoverySession.update({
+          where: { id: existingSession.id },
+          data: { lastActivityAt: now }
+        });
+        return { session: existingSession, isNew: false, warning: null };
+      }
     }
 
     const hasFilters = filters && (
@@ -209,7 +253,14 @@ export class VehicleDiscoveryService {
       where: { id: newSession.id },
       include: {
         items: {
-          orderBy: { position: 'asc' }
+          orderBy: { position: 'asc' },
+          include: {
+            card: {
+              include: {
+                priceSnapshot: true
+              }
+            }
+          }
         }
       }
     });

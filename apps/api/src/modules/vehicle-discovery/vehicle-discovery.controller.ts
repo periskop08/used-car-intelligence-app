@@ -25,22 +25,29 @@ export class VehicleDiscoveryController {
     let guestIdentityId = '';
 
     if (token) {
-      // Find guest identity in DB by hash
+      // Find or upsert guest identity in DB by hash
       const tokenHash = this.discoveryService.hashToken(token);
-      const identity = await this.discoveryService['prisma'].vehicleDiscoveryGuestIdentity.findUnique({
+      let identity = await this.discoveryService['prisma'].vehicleDiscoveryGuestIdentity.findUnique({
         where: { tokenHash }
       });
 
-      if (identity && identity.expiresAt > new Date()) {
-        guestIdentityId = identity.id;
-        // Touch lastUsedAt
+      if (!identity || identity.expiresAt <= new Date()) {
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        identity = await this.discoveryService['prisma'].vehicleDiscoveryGuestIdentity.upsert({
+          where: { tokenHash },
+          create: { tokenHash, expiresAt },
+          update: { expiresAt, lastUsedAt: new Date() }
+        });
+      } else {
         await this.discoveryService['prisma'].vehicleDiscoveryGuestIdentity.update({
           where: { id: identity.id },
           data: { lastUsedAt: new Date() }
         });
-      } else {
-        token = null; // Re-generate if expired or invalid
       }
+
+      guestIdentityId = identity.id;
+      res.setHeader('x-guest-token', token);
+      return guestIdentityId;
     }
 
     if (!token) {
@@ -86,6 +93,7 @@ export class VehicleDiscoveryController {
       fuelTypes?: FuelType[];
       transmissions?: TransmissionType[];
     },
+    @Body('forceNew') forceNew?: boolean,
     @GetUser() user?: UserPayload
   ) {
     let guestIdentityId: string | undefined;
@@ -96,7 +104,8 @@ export class VehicleDiscoveryController {
     return this.discoveryService.getOrCreateSession({
       userId: user?.id,
       guestIdentityId,
-      filters
+      filters,
+      forceNew
     });
   }
 
