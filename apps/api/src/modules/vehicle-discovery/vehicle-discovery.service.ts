@@ -941,187 +941,198 @@ export class VehicleDiscoveryService {
   }) {
     const { search, bodyType, fuelType, transmission, filterCategory = 'all', page = 1, limit = 50 } = query;
 
-    const allVariants = await this.prisma.vehicleVariant.findMany({
-      where: { status: { not: 'REJECTED' } },
-      select: {
-        id: true,
-        brandId: true,
-        modelId: true,
-        generationId: true,
-        engineId: true,
-        transmissionId: true,
-        bodyType: true,
-        fuelType: true,
-        yearStart: true,
-        yearEnd: true,
-        year: true,
-        brand: { select: { id: true, name: true } },
-        model: { select: { id: true, name: true } },
-        generation: { select: { id: true, name: true } },
-        engine: { select: { id: true, code: true, horsepower: true, torque: true, displacement: true } },
-        transmission: { select: { id: true, name: true } },
-        trim: { select: { id: true, name: true } },
-        specs: { select: { specs: true } },
-        profileMappings: {
-          select: { profile: { select: { heroImageUrl: true } } },
-          take: 1
+    try {
+      const allVariants = await this.prisma.vehicleVariant.findMany({
+        where: { status: { not: 'REJECTED' } },
+        select: {
+          id: true,
+          brandId: true,
+          modelId: true,
+          generationId: true,
+          engineId: true,
+          transmissionId: true,
+          bodyType: true,
+          fuelType: true,
+          yearStart: true,
+          yearEnd: true,
+          year: true,
+          brand: { select: { id: true, name: true } },
+          model: { select: { id: true, name: true } },
+          generation: { select: { id: true, name: true } },
+          engine: { select: { id: true, code: true, horsepower: true, torque: true, displacement: true } },
+          transmission: { select: { id: true, name: true } },
+          trim: { select: { id: true, name: true } },
+          specs: { select: { specs: true } },
+          profileMappings: {
+            select: { profile: { select: { heroImageUrl: true } } },
+            take: 1
+          },
+          listings: {
+            where: { status: 'ACTIVE' },
+            select: { id: true, priceAmount: true, media: { select: { url: true }, take: 1 } },
+            take: 5
+          }
         },
-        listings: {
-          where: { status: 'ACTIVE' },
-          select: { id: true, priceAmount: true, media: { select: { url: true }, take: 1 } },
-          take: 5
-        }
-      },
-      take: 2000,
-      orderBy: [{ brand: { name: 'asc' } }, { model: { name: 'asc' } }]
-    });
-
-    const candidateMap = new Map<string, any[]>();
-    allVariants.forEach(v => {
-      const key = this.buildVisibleIdentityKey(v);
-      if (!candidateMap.has(key)) {
-        candidateMap.set(key, []);
-      }
-      candidateMap.get(key)!.push(v);
-    });
-
-    const groupedCandidates: any[] = [];
-
-    candidateMap.forEach((variants, candidateId) => {
-      const rep = this.selectRepresentativeVariant(variants);
-      if (!rep) return;
-
-      let totalActiveListings = 0;
-      const prices: number[] = [];
-      let previewImageUrl: string | undefined = undefined;
-
-      variants.forEach(v => {
-        if (v.listings && v.listings.length > 0) {
-          totalActiveListings += v.listings.length;
-          v.listings.forEach((l: any) => {
-            const p = Number(l.priceAmount);
-            if (p > 0) prices.push(p);
-            if (!previewImageUrl && l.media && l.media.length > 0 && l.media[0].url) {
-              previewImageUrl = l.media[0].url;
-            }
-          });
-        }
-        if (!previewImageUrl && v.profileMappings && v.profileMappings.length > 0 && v.profileMappings[0].profile?.heroImageUrl) {
-          previewImageUrl = v.profileMappings[0].profile.heroImageUrl;
-        }
+        take: 500,
+        orderBy: { id: 'asc' }
       });
 
-      if (!previewImageUrl) {
-        previewImageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
-      }
+      const candidateMap = new Map<string, any[]>();
+      allVariants.forEach(v => {
+        const key = this.buildVisibleIdentityKey(v);
+        if (!candidateMap.has(key)) {
+          candidateMap.set(key, []);
+        }
+        candidateMap.get(key)!.push(v);
+      });
 
-      const minActivePrice = prices.length > 0 ? Math.min(...prices) : null;
-      const maxActivePrice = prices.length > 0 ? Math.max(...prices) : null;
+      const groupedCandidates: any[] = [];
 
-      const specJson = (rep.specs?.specs as any) || {};
-      const powerHp = rep.engine?.horsepower || specJson.powerHp || null;
-      const torqueNm = rep.engine?.torque || specJson.torqueNm || null;
-      const hasImage = previewImageUrl && !previewImageUrl.includes('unsplash');
-      const hasSpecs = powerHp !== null || specJson.averageConsumption !== undefined;
+      candidateMap.forEach((variants, candidateId) => {
+        const rep = this.selectRepresentativeVariant(variants);
+        if (!rep) return;
 
-      let eligibilityStatus: 'ELIGIBLE' | 'MISSING_IMAGE' | 'INCOMPLETE_SPECS' = 'ELIGIBLE';
-      if (!hasImage) {
-        eligibilityStatus = 'MISSING_IMAGE';
-      } else if (!hasSpecs) {
-        eligibilityStatus = 'INCOMPLETE_SPECS';
-      }
+        let totalActiveListings = 0;
+        const prices: number[] = [];
+        let previewImageUrl: string | undefined = undefined;
 
-      const candidateObj = {
-        candidateId,
-        representativeVariantId: rep.id,
-        brandId: rep.brandId,
-        brandName: rep.brand?.name || 'Araç',
-        modelId: rep.modelId,
-        modelName: rep.model?.name || '',
-        generationName: rep.generation?.name || '',
-        engineVersion: rep.engine?.code ? `${(rep.engine.displacement ? rep.engine.displacement / 1000 : 1.6).toFixed(1)} ${rep.engine.code}` : '1.6 Motor',
-        bodyType: rep.bodyType || 'SEDAN',
-        fuelType: rep.fuelType || 'BENZIN',
-        transmissionName: rep.transmission?.name || 'Otomatik',
-        powerHp: powerHp ? `${powerHp} HP` : '—',
-        torqueNm: torqueNm ? `${torqueNm} Nm` : '—',
-        averageConsumption: specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km',
-        drivetrain: specJson.drivetrain || 'Önden Çekiş',
-        previewImageUrl,
-        activeListingCount: totalActiveListings,
-        minActivePrice,
-        maxActivePrice,
-        isFilteredAvailable: totalActiveListings > 0,
-        isUnfilteredEligible: eligibilityStatus === 'ELIGIBLE',
-        eligibilityStatus,
-        isPublished: true,
-        variantCount: variants.length,
-        variants: variants.map(v => ({
-          id: v.id,
-          year: v.yearStart || v.year,
-          trimName: v.trim?.name || 'Standart',
-          activeListings: v.listings ? v.listings.length : 0
-        })),
-        aiPresentationTags: ['#konfor', '#aile-araci']
+        variants.forEach(v => {
+          if (v.listings && v.listings.length > 0) {
+            totalActiveListings += v.listings.length;
+            v.listings.forEach((l: any) => {
+              const p = Number(l.priceAmount);
+              if (p > 0) prices.push(p);
+              if (!previewImageUrl && l.media && l.media.length > 0 && l.media[0].url) {
+                previewImageUrl = l.media[0].url;
+              }
+            });
+          }
+          if (!previewImageUrl && v.profileMappings && v.profileMappings.length > 0 && v.profileMappings[0].profile?.heroImageUrl) {
+            previewImageUrl = v.profileMappings[0].profile.heroImageUrl;
+          }
+        });
+
+        if (!previewImageUrl) {
+          previewImageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
+        }
+
+        const minActivePrice = prices.length > 0 ? Math.min(...prices) : null;
+        const maxActivePrice = prices.length > 0 ? Math.max(...prices) : null;
+
+        const specJson = (rep.specs?.specs as any) || {};
+        const powerHp = rep.engine?.horsepower || specJson.powerHp || null;
+        const torqueNm = rep.engine?.torque || specJson.torqueNm || null;
+        const hasImage = previewImageUrl && !previewImageUrl.includes('unsplash');
+        const hasSpecs = powerHp !== null || specJson.averageConsumption !== undefined;
+
+        let eligibilityStatus: 'ELIGIBLE' | 'MISSING_IMAGE' | 'INCOMPLETE_SPECS' = 'ELIGIBLE';
+        if (!hasImage) {
+          eligibilityStatus = 'MISSING_IMAGE';
+        } else if (!hasSpecs) {
+          eligibilityStatus = 'INCOMPLETE_SPECS';
+        }
+
+        const candidateObj = {
+          candidateId,
+          representativeVariantId: rep.id,
+          brandId: rep.brandId,
+          brandName: rep.brand?.name || 'Araç',
+          modelId: rep.modelId,
+          modelName: rep.model?.name || '',
+          generationName: rep.generation?.name || '',
+          engineVersion: rep.engine?.code ? `${(rep.engine.displacement ? rep.engine.displacement / 1000 : 1.6).toFixed(1)} ${rep.engine.code}` : '1.6 Motor',
+          bodyType: rep.bodyType || 'SEDAN',
+          fuelType: rep.fuelType || 'BENZIN',
+          transmissionName: rep.transmission?.name || 'Otomatik',
+          powerHp: powerHp ? `${powerHp} HP` : '—',
+          torqueNm: torqueNm ? `${torqueNm} Nm` : '—',
+          averageConsumption: specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km',
+          drivetrain: specJson.drivetrain || 'Önden Çekiş',
+          previewImageUrl,
+          activeListingCount: totalActiveListings,
+          minActivePrice,
+          maxActivePrice,
+          isFilteredAvailable: totalActiveListings > 0,
+          isUnfilteredEligible: eligibilityStatus === 'ELIGIBLE',
+          eligibilityStatus,
+          isPublished: true,
+          variantCount: variants.length,
+          variants: variants.map(v => ({
+            id: v.id,
+            year: v.yearStart || v.year,
+            trimName: v.trim?.name || 'Standart',
+            activeListings: v.listings ? v.listings.length : 0
+          })),
+          aiPresentationTags: ['#konfor', '#aile-araci']
+        };
+
+        groupedCandidates.push(candidateObj);
+      });
+
+      const summary = {
+        totalCandidates: groupedCandidates.length,
+        withListingsCount: groupedCandidates.filter(c => c.isFilteredAvailable).length,
+        unfilteredEligibleCount: groupedCandidates.filter(c => c.isUnfilteredEligible).length,
+        missingContentCount: groupedCandidates.filter(c => c.eligibilityStatus !== 'ELIGIBLE').length
       };
 
-      groupedCandidates.push(candidateObj);
-    });
+      let filtered = groupedCandidates;
 
-    const summary = {
-      totalCandidates: groupedCandidates.length,
-      withListingsCount: groupedCandidates.filter(c => c.isFilteredAvailable).length,
-      unfilteredEligibleCount: groupedCandidates.filter(c => c.isUnfilteredEligible).length,
-      missingContentCount: groupedCandidates.filter(c => c.eligibilityStatus !== 'ELIGIBLE').length
-    };
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(c => {
+          const title = `${c.brandName} ${c.modelName} ${c.generationName} ${c.engineVersion}`;
+          return title.toLowerCase().includes(q);
+        });
+      }
 
-    let filtered = groupedCandidates;
+      if (bodyType && bodyType !== 'all') {
+        filtered = filtered.filter(c => (c.bodyType || '').toUpperCase() === bodyType.toUpperCase());
+      }
 
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(c => {
-        const title = `${c.brandName} ${c.modelName} ${c.generationName} ${c.engineVersion}`;
-        return title.toLowerCase().includes(q);
-      });
+      if (fuelType && fuelType !== 'all') {
+        filtered = filtered.filter(c => (c.fuelType || '').toUpperCase() === fuelType.toUpperCase());
+      }
+
+      if (transmission && transmission !== 'all') {
+        filtered = filtered.filter(c => {
+          if (transmission.toUpperCase() === 'MANUAL') {
+            return c.transmissionName.toUpperCase().includes('MANUEL') || c.transmissionName.toUpperCase().includes('MANUAL');
+          } else {
+            return !c.transmissionName.toUpperCase().includes('MANUEL') && !c.transmissionName.toUpperCase().includes('MANUAL');
+          }
+        });
+      }
+
+      if (filterCategory === 'listings_only') {
+        filtered = filtered.filter(c => c.isFilteredAvailable);
+      } else if (filterCategory === 'unfiltered_eligible') {
+        filtered = filtered.filter(c => c.isUnfilteredEligible);
+      } else if (filterCategory === 'missing_content') {
+        filtered = filtered.filter(c => c.eligibilityStatus !== 'ELIGIBLE');
+      }
+
+      const total = filtered.length;
+      const totalPages = Math.ceil(total / limit) || 1;
+      const startIndex = (page - 1) * limit;
+      const paginatedCandidates = filtered.slice(startIndex, startIndex + limit);
+
+      return {
+        summary,
+        total,
+        page,
+        totalPages,
+        candidates: paginatedCandidates
+      };
+    } catch (error) {
+      this.logger.error('Error fetching admin discovery candidates', error);
+      return {
+        summary: { totalCandidates: 0, withListingsCount: 0, unfilteredEligibleCount: 0, missingContentCount: 0 },
+        total: 0,
+        page: 1,
+        totalPages: 1,
+        candidates: []
+      };
     }
-
-    if (bodyType && bodyType !== 'all') {
-      filtered = filtered.filter(c => (c.bodyType || '').toUpperCase() === bodyType.toUpperCase());
-    }
-
-    if (fuelType && fuelType !== 'all') {
-      filtered = filtered.filter(c => (c.fuelType || '').toUpperCase() === fuelType.toUpperCase());
-    }
-
-    if (transmission && transmission !== 'all') {
-      filtered = filtered.filter(c => {
-        if (transmission.toUpperCase() === 'MANUAL') {
-          return c.transmissionName.toUpperCase().includes('MANUEL') || c.transmissionName.toUpperCase().includes('MANUAL');
-        } else {
-          return !c.transmissionName.toUpperCase().includes('MANUEL') && !c.transmissionName.toUpperCase().includes('MANUAL');
-        }
-      });
-    }
-
-    if (filterCategory === 'listings_only') {
-      filtered = filtered.filter(c => c.isFilteredAvailable);
-    } else if (filterCategory === 'unfiltered_eligible') {
-      filtered = filtered.filter(c => c.isUnfilteredEligible);
-    } else if (filterCategory === 'missing_content') {
-      filtered = filtered.filter(c => c.eligibilityStatus !== 'ELIGIBLE');
-    }
-
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / limit) || 1;
-    const startIndex = (page - 1) * limit;
-    const paginatedCandidates = filtered.slice(startIndex, startIndex + limit);
-
-    return {
-      summary,
-      total,
-      page,
-      totalPages,
-      candidates: paginatedCandidates
-    };
   }
 }
