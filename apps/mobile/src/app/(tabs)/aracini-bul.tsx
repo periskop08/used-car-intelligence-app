@@ -187,6 +187,23 @@ interface RecommendedVariant {
   }>;
 }
 
+interface RecommendationItem {
+  recommendedVariantId?: string;
+  brandId?: string;
+  brandName?: string;
+  modelId?: string;
+  modelName?: string;
+  generationName?: string;
+  bodyType?: string;
+  fuelType?: string;
+  transmissionType?: string;
+  imageUrl?: string;
+  activeListingCount?: number;
+  minActivePrice?: number | null;
+  maxActivePrice?: number | null;
+  listingsQuery?: any;
+}
+
 interface RecommendationResult {
   message: string;
   scoringProfile?: {
@@ -196,7 +213,8 @@ interface RecommendationResult {
     brandScores?: Record<string, number>;
     modelFamilyScores?: Record<string, number>;
   };
-  recommendations: RecommendedVariant[];
+  recommendation?: RecommendationItem;
+  recommendations?: RecommendedVariant[];
 }
 
 export default function AraciniBulScreen() {
@@ -973,42 +991,83 @@ export default function AraciniBulScreen() {
             )}
           </View>
 
-          {/* Section 2: Önerilen Araç Modelleri */}
-          <View style={styles.sectionBox}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="car-sport-outline" size={18} color="#ea580c" />
-              <Text style={styles.sectionHeaderText}>Önerilen Araç Modelleri</Text>
-            </View>
+          {/* Section 2: Yapay Zeka Araç Önerisi */}
+          {resultsData.recommendation && (
+            <View style={styles.sectionBox}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="car-sport-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionHeaderText}>Yapay Zeka Destekli Araç Önerisi</Text>
+              </View>
 
-            {resultsData.recommendations.map((v) => (
-              <View key={v.id} style={styles.recommendedCard}>
-                <Text style={styles.recBrand}>{v.brand.name.toUpperCase()}</Text>
+              <View style={styles.recommendedCard}>
+                <Text style={styles.recBrand}>{(resultsData.recommendation.brandName || '').toUpperCase()}</Text>
                 <Text style={styles.recModel}>
-                  {v.model.name} {v.trim?.name || ''}
+                  {resultsData.recommendation.modelName} {resultsData.recommendation.generationName || ''}
                 </Text>
 
-                {v.priceSnapshot && (
-                  <View style={styles.priceTagBox}>
-                    <Text style={styles.priceTagLabel}>Piyasa Fiyat Tahmini</Text>
-                    <Text style={styles.priceTagVal}>
-                      {formatPrice(v.priceSnapshot.estimatedMin)} - {formatPrice(v.priceSnapshot.estimatedMax)}
-                    </Text>
-                  </View>
-                )}
-
+                {/* Badges */}
                 <View style={styles.recSpecsRow}>
                   <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>{v.engine?.name || 'Standart'}</Text>
+                    <Text style={styles.miniPillText}>{translateBodyType(resultsData.recommendation.bodyType)}</Text>
                   </View>
                   <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>
-                      {v.transmission ? `${v.transmission.speeds} İleri ${translateTransmission(v.transmission.type)}` : '-'}
-                    </Text>
+                    <Text style={styles.miniPillText}>{translateFuelType(resultsData.recommendation.fuelType)}</Text>
+                  </View>
+                  <View style={styles.miniPill}>
+                    <Text style={styles.miniPillText}>{translateTransmission(resultsData.recommendation.transmissionType)}</Text>
                   </View>
                 </View>
+
+                {resultsData.recommendation.minActivePrice && resultsData.recommendation.maxActivePrice ? (
+                  <View style={styles.priceTagBox}>
+                    <Text style={styles.priceTagLabel}>Tahmini Piyasa Fiyatı</Text>
+                    <Text style={styles.priceTagVal}>
+                      {formatPrice(resultsData.recommendation.minActivePrice)} - {formatPrice(resultsData.recommendation.maxActivePrice)}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-            ))}
-          </View>
+            </View>
+          )}
+
+          {/* Section 2B: Önerilen Diğer Modeller (Varsa) */}
+          {(resultsData.recommendations || []).length > 0 && (
+            <View style={styles.sectionBox}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="list-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionHeaderText}>Önerilen Diğer Modeller</Text>
+              </View>
+
+              {(resultsData.recommendations || []).map((v) => (
+                <View key={v.id} style={styles.recommendedCard}>
+                  <Text style={styles.recBrand}>{v.brand.name.toUpperCase()}</Text>
+                  <Text style={styles.recModel}>
+                    {v.model.name} {v.trim?.name || ''}
+                  </Text>
+
+                  {v.priceSnapshot && (
+                    <View style={styles.priceTagBox}>
+                      <Text style={styles.priceTagLabel}>Piyasa Fiyat Tahmini</Text>
+                      <Text style={styles.priceTagVal}>
+                        {formatPrice(v.priceSnapshot.estimatedMin)} - {formatPrice(v.priceSnapshot.estimatedMax)}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.recSpecsRow}>
+                    <View style={styles.miniPill}>
+                      <Text style={styles.miniPillText}>{v.engine?.name || 'Standart'}</Text>
+                    </View>
+                    <View style={styles.miniPill}>
+                      <Text style={styles.miniPillText}>
+                        {v.transmission ? `${v.transmission.speeds} İleri ${translateTransmission(v.transmission.type)}` : '-'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Section 3: Uygun Canlı İlanlar */}
           <View style={styles.sectionBox}>
@@ -1017,9 +1076,9 @@ export default function AraciniBulScreen() {
               <Text style={styles.sectionHeaderText}>Önerilen Araçlara Uyan Canlı İlanlar</Text>
             </View>
 
-            {resultsData.recommendations.flatMap((v) => v.listings).length > 0 ? (
-              resultsData.recommendations
-                .flatMap((v) => v.listings)
+            {(resultsData.recommendations || []).flatMap((v) => v.listings || []).length > 0 ? (
+              (resultsData.recommendations || [])
+                .flatMap((v) => v.listings || [])
                 .map((listing) => (
                   <TouchableOpacity
                     key={listing.id}
@@ -1209,15 +1268,16 @@ export default function AraciniBulScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#f8fafc',
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 14,
     marginTop: 12,
     fontWeight: '600',
@@ -1228,14 +1288,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     gap: 14,
+    backgroundColor: '#f8fafc',
   },
   introIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.3)',
+    backgroundColor: '#fff7ed',
+    borderWidth: 1.5,
+    borderColor: '#fed7aa',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -1243,11 +1304,11 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0b192c',
     textAlign: 'center',
   },
   introDesc: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
@@ -1261,10 +1322,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ea580c',
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 14,
+    borderRadius: 16,
     gap: 8,
     width: '100%',
     maxWidth: 320,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   primaryBtnText: {
     color: '#ffffff',
@@ -1275,18 +1341,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 14,
+    borderRadius: 16,
     gap: 6,
     width: '100%',
     maxWidth: 320,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   secondaryBtnText: {
-    color: '#cbd5e1',
+    color: '#0b192c',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1294,9 +1365,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(234, 88, 12, 0.08)',
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.25)',
+    borderColor: '#fed7aa',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 14,
@@ -1315,6 +1386,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 16,
+    backgroundColor: '#f8fafc',
   },
   headerRow: {
     flexDirection: 'row',
@@ -1328,12 +1400,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.3)',
+    borderColor: '#fed7aa',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   miniFilterText: {
     color: '#ea580c',
@@ -1345,16 +1422,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressCounterText: {
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 13,
     fontWeight: '900',
     marginBottom: 4,
   },
   progressBarTrack: {
     width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 2,
+    height: 5,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -1367,16 +1444,16 @@ const styles = StyleSheet.create({
   card: {
     width: SCREEN_WIDTH - 28,
     height: '76%',
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    elevation: 8,
+    borderColor: '#e2e8f0',
+    elevation: 4,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
   },
   choiceBadge: {
     position: 'absolute',
@@ -1390,7 +1467,7 @@ const styles = StyleSheet.create({
   likeBadge: {
     right: 20,
     borderColor: '#10b981',
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
   },
   likeBadgeText: {
     color: '#10b981',
@@ -1400,7 +1477,7 @@ const styles = StyleSheet.create({
   dislikeBadge: {
     left: 20,
     borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
   },
   dislikeBadgeText: {
     color: '#ef4444',
@@ -1409,7 +1486,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     height: 180,
-    backgroundColor: '#020617',
+    backgroundColor: '#f1f5f9',
     position: 'relative',
   },
   cardImage: {
@@ -1437,24 +1514,25 @@ const styles = StyleSheet.create({
   cardScroll: {
     flex: 1,
     padding: 14,
+    backgroundColor: '#ffffff',
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0b192c',
   },
   cardSubtitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: 2,
   },
   specGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: '#e2e8f0',
     borderRadius: 14,
     padding: 10,
     marginTop: 10,
@@ -1473,7 +1551,7 @@ const styles = StyleSheet.create({
   specVal: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#e2e8f0',
+    color: '#0b192c',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -1481,7 +1559,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: '#f1f5f9',
     gap: 6,
   },
   aiInsightHeader: {
@@ -1497,30 +1575,30 @@ const styles = StyleSheet.create({
   },
   aiInsightText: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#475569',
     lineHeight: 16,
   },
   highlightPill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
     borderWidth: 1,
     padding: 8,
     borderRadius: 8,
   },
   highlightPillText: {
-    color: '#34d399',
+    color: '#059669',
     fontSize: 10,
     fontWeight: '700',
   },
   watchoutPill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
     borderWidth: 1,
     padding: 8,
     borderRadius: 8,
   },
   watchoutPillText: {
-    color: '#fbbf24',
+    color: '#d97706',
     fontSize: 10,
     fontWeight: '700',
   },
@@ -1532,13 +1610,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   tagBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   tagBadgeText: {
-    color: '#94a3b8',
+    color: '#475569',
     fontSize: 9,
     fontWeight: '700',
   },
@@ -1554,25 +1634,26 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 3,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
     shadowRadius: 6,
   },
   dislikeBtn: {
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#ef4444',
   },
   likeBtn: {
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#10b981',
   },
   resultScroll: {
     padding: 16,
     gap: 16,
+    backgroundColor: '#f8fafc',
   },
   resultHeader: {
     alignItems: 'center',
@@ -1580,9 +1661,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sparkleBadge: {
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.3)',
+    borderColor: '#fed7aa',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,
@@ -1595,16 +1676,21 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0b192c',
     textAlign: 'center',
   },
   summaryCard: {
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
     gap: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   summaryTitleRow: {
     flexDirection: 'row',
@@ -1617,7 +1703,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   summaryText: {
-    color: '#cbd5e1',
+    color: '#334155',
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1628,10 +1714,12 @@ const styles = StyleSheet.create({
   },
   profileSpecBlock: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: '#f8fafc',
     padding: 10,
     borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   pLabel: {
     color: '#64748b',
@@ -1639,7 +1727,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   pVal: {
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 12,
     fontWeight: '800',
     marginTop: 2,
@@ -1655,15 +1743,20 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0b192c',
   },
   recommendedCard: {
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
     gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   recBrand: {
     color: '#ea580c',
@@ -1671,14 +1764,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   recModel: {
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 15,
     fontWeight: '800',
   },
   priceTagBox: {
-    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.2)',
+    borderColor: '#fed7aa',
     padding: 8,
     borderRadius: 10,
     alignItems: 'center',
@@ -1701,30 +1794,37 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   miniPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   miniPillText: {
-    color: '#94a3b8',
+    color: '#475569',
     fontSize: 10,
     fontWeight: '600',
   },
   listingCard: {
     flexDirection: 'row',
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 10,
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   listingImg: {
     width: 72,
     height: 72,
     borderRadius: 10,
-    backgroundColor: '#020617',
+    backgroundColor: '#f1f5f9',
   },
   listingInfo: {
     flex: 1,
@@ -1732,7 +1832,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   listingTitle: {
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1748,11 +1848,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   emptyListingsBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
     gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   emptyListingsText: {
     color: '#64748b',
@@ -1766,16 +1868,21 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#0c1224',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1784,7 +1891,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 17,
     fontWeight: '900',
   },
@@ -1802,13 +1909,13 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    color: '#f8fafc',
+    color: '#0b192c',
     fontSize: 13,
   },
   pillsWrap: {
@@ -1817,19 +1924,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
   },
   filterPillSelected: {
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
+    backgroundColor: '#fff7ed',
     borderColor: '#ea580c',
   },
   filterPillText: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -1843,6 +1950,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     marginTop: 16,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   applyBtnText: {
     color: '#ffffff',
