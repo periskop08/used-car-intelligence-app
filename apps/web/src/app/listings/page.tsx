@@ -90,10 +90,18 @@ function ListingsContent() {
       .catch((e) => console.error("Error fetching models:", e));
   }, [selectedBrand]);
 
+  const [vehicleVariantId, setVehicleVariantId] = useState("");
+
   // Read URL parameters on load
   useEffect(() => {
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
+    const variantId = searchParams.get("vehicleVariantId");
+    const bodyVal = searchParams.get("bodyType");
+    const fuelVal = searchParams.get("fuelType");
+    const transVal = searchParams.get("transmission");
+    const minP = searchParams.get("minPrice");
+    const maxP = searchParams.get("maxPrice");
     const aiReady = searchParams.get("isAiReady") === "true";
     const urgentVal = searchParams.get("urgentOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
@@ -103,6 +111,12 @@ function ListingsContent() {
     
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
+    if (variantId) setVehicleVariantId(variantId);
+    if (bodyVal) setBodyTypes(bodyVal.split(","));
+    if (fuelVal) setFuelTypes(fuelVal.split(","));
+    if (transVal) setTransmissions(transVal.split(","));
+    if (minP) setMinPrice(minP);
+    if (maxP) setMaxPrice(maxP);
     if (aiReady) setIsAiReady(true);
     if (urgentVal) setUrgentOnly(true);
     if (statusVal) setVehicleStatuses(statusVal.split(","));
@@ -117,6 +131,7 @@ function ListingsContent() {
     let query = `?page=${page}&limit=9&sort=${sort}`;
     if (selectedBrand) query += `&brandId=${selectedBrand}`;
     if (selectedModel) query += `&modelId=${selectedModel}`;
+    if (vehicleVariantId) query += `&vehicleVariantId=${vehicleVariantId}`;
     if (minYear) query += `&minYear=${minYear}`;
     if (maxYear) query += `&maxYear=${maxYear}`;
     if (minPrice) query += `&minPrice=${minPrice}`;
@@ -168,7 +183,7 @@ function ListingsContent() {
 
   useEffect(() => {
     fetchListings();
-  }, [page, sort, selectedBrand, selectedModel, isAiReady, token, preferenceProfileId, prefSessionId]);
+  }, [page, sort, selectedBrand, selectedModel, vehicleVariantId, minPrice, maxPrice, fuelTypes, transmissions, bodyTypes, isAiReady, token, preferenceProfileId, prefSessionId]);
 
   const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
     e.preventDefault();

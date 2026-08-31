@@ -523,6 +523,7 @@ model VehicleVariant {
   profileMappings       VehicleProfileVariant[]
   priceSnapshot         VehicleVariantPriceSnapshot?
   powerEnrichment       VehiclePowerEnrichment?
+  discoverySessionItems VehicleDiscoverySessionItem[]
 
   @@unique([brandId, modelId, generationId, engineId, transmissionId, trimId, countryId, year])
   @@index([brandId])
@@ -1816,7 +1817,8 @@ model VehicleDiscoverySession {
 model VehicleDiscoverySessionItem {
   id                     String                  @id @default(cuid())
   sessionId              String
-  vehicleDiscoveryCardId String
+  vehicleDiscoveryCardId String?
+  vehicleVariantId       String?
   position               Int
   action                 VehicleDiscoveryAction?
   shownAt                DateTime?
@@ -1824,12 +1826,13 @@ model VehicleDiscoverySessionItem {
   createdAt              DateTime                @default(now())
 
   session                VehicleDiscoverySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  card                   VehicleDiscoveryCard    @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: Restrict)
+  card                   VehicleDiscoveryCard?   @relation(fields: [vehicleDiscoveryCardId], references: [id], onDelete: SetNull)
+  variant                VehicleVariant?         @relation(fields: [vehicleVariantId], references: [id], onDelete: SetNull)
 
-  @@unique([sessionId, vehicleDiscoveryCardId])
   @@unique([sessionId, position])
   @@index([sessionId, position])
   @@index([vehicleDiscoveryCardId])
+  @@index([vehicleVariantId])
 }
 
 model VehicleDiscoveryCardVariant {

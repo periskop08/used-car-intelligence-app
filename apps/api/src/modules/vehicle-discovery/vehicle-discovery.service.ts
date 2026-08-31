@@ -59,31 +59,78 @@ export class VehicleDiscoveryService {
     return Math.abs(hash);
   }
 
-  // Map card fuel type string to FuelType enum
-  private mapFuelType(fuelStr: string): FuelType {
-    const s = fuelStr.toLowerCase();
-    if (s.includes("benzin")) return FuelType.PETROL;
-    if (s.includes("dizel")) return FuelType.DIESEL;
-    if (s.includes("lpg")) return FuelType.LPG;
-    if (s.includes("hibrit")) return FuelType.HYBRID;
-    if (s.includes("plug-in")) return FuelType.PLUG_IN_HYBRID;
-    if (s.includes("elektrik")) return FuelType.ELECTRIC;
-    return FuelType.OTHER;
+  /**
+   * Helper to check if a transmission name/type matches requested transmission filter
+   * Normalizes Automatic family (AUTOMATIC, DSG, EDC, S TRONIC, CVT, POWERSHIFT, DCT, etc.)
+   */
+  private isTransmissionMatch(transmissionName: string | undefined, requestedTypes: TransmissionType[]): boolean {
+    if (!requestedTypes || requestedTypes.length === 0) return true;
+    if (!transmissionName) return false;
+    const nameUpper = transmissionName.toUpperCase();
+
+    return requestedTypes.some(t => {
+      if (t === TransmissionType.MANUAL) {
+        return nameUpper.includes("MANUEL") || nameUpper.includes("MANUAL");
+      } else {
+        // Automatic family normalization
+        return (
+          nameUpper.includes("OTOMATIK") ||
+          nameUpper.includes("AUTOMATIC") ||
+          nameUpper.includes("DSG") ||
+          nameUpper.includes("EDC") ||
+          nameUpper.includes("S TRONIC") ||
+          nameUpper.includes("S-TRONIC") ||
+          nameUpper.includes("CVT") ||
+          nameUpper.includes("POWERSHIFT") ||
+          nameUpper.includes("DCT") ||
+          nameUpper.includes("E-CVT") ||
+          nameUpper.includes("STEPTRONIC") ||
+          nameUpper.includes("TIPTRONIC")
+        );
+      }
+    });
   }
 
-  // Map card body type string to BodyType enum
-  private mapBodyType(bodyStr: string): BodyType {
-    const s = bodyStr.toUpperCase();
-    if (s.includes("SEDAN")) return BodyType.SEDAN;
-    if (s.includes("HATCHBACK")) return BodyType.HATCHBACK;
-    if (s.includes("SUV")) return BodyType.SUV;
-    if (s.includes("WAGON") || s.includes("STATION")) return BodyType.WAGON;
-    if (s.includes("PICKUP")) return BodyType.PICKUP;
-    if (s.includes("MINIVAN") || s.includes("VAN")) return BodyType.VAN;
-    return BodyType.OTHER;
+  /**
+   * Visible Candidate Identity Key Generator:
+   * Prevents duplicate-looking cards to the user when variants only differ by trim/package
+   */
+  private buildVisibleIdentityKey(variant: any): string {
+    const brandId = variant.brandId || variant.brand?.id || '';
+    const modelId = variant.modelId || variant.model?.id || '';
+    const genId = variant.generationId || variant.generation?.id || '';
+    const engId = variant.engineId || variant.engine?.id || '';
+    const transId = variant.transmissionId || variant.transmission?.id || '';
+    const body = variant.bodyType || '';
+    const fuel = variant.fuelType || '';
+    return `${brandId}_${modelId}_${genId}_${engId}_${transId}_${body}_${fuel}`;
   }
 
-  // Start or resume a session
+  /**
+   * Deterministic representative variant selector from a grouped candidate bucket
+   */
+  private selectRepresentativeVariant(variants: any[]): any {
+    if (!variants || variants.length === 0) return null;
+    const sorted = [...variants].sort((a, b) => {
+      const aHp = a.engine?.horsepower || (a.specs?.specs as any)?.powerHp || 0;
+      const bHp = b.engine?.horsepower || (b.specs?.specs as any)?.powerHp || 0;
+      const aTq = a.engine?.torque || (a.specs?.specs as any)?.torqueNm || 0;
+      const bTq = b.engine?.torque || (b.specs?.specs as any)?.torqueNm || 0;
+
+      const aScore = (aHp ? 2 : 0) + (aTq ? 2 : 0);
+      const bScore = (bHp ? 2 : 0) + (bTq ? 2 : 0);
+      if (aScore !== bScore) return bScore - aScore;
+
+      const aYear = a.year || a.yearStart || 0;
+      const bYear = b.year || b.yearStart || 0;
+      if (aYear !== bYear) return bYear - aYear;
+
+      return (a.id || '').localeCompare(b.id || '');
+    });
+    return sorted[0];
+  }
+
+  // Start or resume a discovery session
   async getOrCreateSession(params: {
     userId?: string;
     guestIdentityId?: string;
@@ -103,7 +150,6 @@ export class VehicleDiscoveryService {
 
     const now = new Date();
 
-    // Look for active, unexpired session
     const existingSession = await this.prisma.vehicleDiscoverySession.findFirst({
       where: {
         userId: userId || undefined,
@@ -119,7 +165,6 @@ export class VehicleDiscoveryService {
     });
 
     if (existingSession) {
-      // Touch lastActivityAt
       await this.prisma.vehicleDiscoverySession.update({
         where: { id: existingSession.id },
         data: { lastActivityAt: now }
@@ -127,7 +172,6 @@ export class VehicleDiscoveryService {
       return { session: existingSession, isNew: false, warning: null };
     }
 
-    // Determine mode and create a new session
     const hasFilters = filters && (
       (filters.minimumPrice !== undefined && filters.minimumPrice > 0) ||
       filters.maximumPrice !== undefined ||
@@ -156,13 +200,11 @@ export class VehicleDiscoveryService {
       }
     });
 
-    // Populate candidates
     const { warning } = await this.populateSessionItems({
       session: newSession,
       startIndex: 0
     });
 
-    // Fetch complete session with items
     const sessionWithItems = await this.prisma.vehicleDiscoverySession.findUnique({
       where: { id: newSession.id },
       include: {
@@ -175,7 +217,9 @@ export class VehicleDiscoveryService {
     return { session: sessionWithItems, isNew: true, warning };
   }
 
-  // Candidate generation & Fisher-Yates Seeded Shuffle population
+  /**
+   * Real Product Flow Candidate Generation
+   */
   private async populateSessionItems(params: {
     session: any;
     startIndex: number;
@@ -185,96 +229,219 @@ export class VehicleDiscoveryService {
     const db = tx || this.prisma;
 
     let warning: string | null = null;
-
-    // Get all cards to filter
-    const allCards = await db.vehicleDiscoveryCard.findMany({
-      where: { isActive: true, archivedAt: null },
-      include: {
-        priceSnapshot: true
-      }
-    });
-
-    let candidates = [...allCards];
+    let candidateItems: { variantId: string; imageSourceUrl?: string }[] = [];
+    let effectiveTargetCount = session.targetCount;
 
     if (session.mode === VehicleDiscoveryMode.FILTERED) {
-      candidates = candidates.filter(card => {
-        // Price overlap check
-        if (card.priceSnapshot) {
-          const cardMin = Number(card.priceSnapshot.estimatedMin);
-          const cardMax = Number(card.priceSnapshot.estimatedMax);
-          const filterMin = Number(session.minimumPrice);
-          const filterMax = session.maximumPrice ? Number(session.maximumPrice) : Infinity;
+      const filterMin = Number(session.minimumPrice) || 0;
+      const filterMax = session.maximumPrice ? Number(session.maximumPrice) : Infinity;
 
-          // Check if overlap exists: Card interval intersects with Filter interval
-          if (cardMax < filterMin || cardMin > filterMax) {
-            return false;
+      const activeListings = await db.vehicleListing.findMany({
+        where: {
+          status: 'ACTIVE',
+          vehicleVariantId: { not: null },
+          priceAmount: {
+            gte: filterMin,
+            ...(session.maximumPrice ? { lte: filterMax } : {})
+          }
+        },
+        include: {
+          media: { take: 2 },
+          vehicleVariant: {
+            include: {
+              brand: true,
+              model: true,
+              generation: true,
+              engine: true,
+              transmission: true,
+              trim: true,
+              specs: true,
+            }
           }
         }
+      });
 
-        // Body type check
+      const matchingListings = activeListings.filter(l => {
+        const v = l.vehicleVariant;
+        if (!v) return false;
+
         if (session.bodyTypes && session.bodyTypes.length > 0) {
-          const cardEnum = this.mapBodyType(card.bodyType);
-          if (!session.bodyTypes.includes(cardEnum)) return false;
+          const bodyMatch = (v.bodyType && session.bodyTypes.includes(v.bodyType)) || (l.bodyType && session.bodyTypes.includes(l.bodyType));
+          if (!bodyMatch) return false;
         }
 
-        // Fuel type check
         if (session.fuelTypes && session.fuelTypes.length > 0) {
-          const cardEnum = this.mapFuelType(card.fuelType);
-          if (!session.fuelTypes.includes(cardEnum)) return false;
+          const fuelMatch = (v.fuelType && session.fuelTypes.includes(v.fuelType)) || (l.fuelType && session.fuelTypes.includes(l.fuelType));
+          if (!fuelMatch) return false;
         }
 
-        // Transmission type check
         if (session.transmissions && session.transmissions.length > 0) {
-          const cardTrans = card.transmissionType.toLowerCase();
-          const matches = session.transmissions.some((t: TransmissionType) => {
-            if (t === TransmissionType.MANUAL) {
-              return cardTrans.includes("manuel");
-            } else {
-              return cardTrans.includes("otomatik") || cardTrans.includes("cvt") || cardTrans.includes("dct");
-            }
-          });
-          if (!matches) return false;
+          const transName = v.transmission?.name || (l.transmission ? String(l.transmission) : '');
+          if (!this.isTransmissionMatch(transName, session.transmissions)) return false;
         }
 
         return true;
       });
 
-      if (candidates.length < session.targetCount) {
-        warning = `Seçtiğiniz filtrelere uyan yalnızca ${candidates.length} araç bulundu. Kalan kartlar genel havuzdan tamamlanacak.`;
-        
-        // Fill the rest with non-overlapping active cards
-        const candidateIds = new Set(candidates.map(c => c.id));
-        const extraCards = allCards.filter(c => !candidateIds.has(c.id));
-        
-        // Shuffle extras and append
-        const seedVal = this.getSeedFromString(session.id + "_extra_" + session.filterRevision);
-        const shuffledExtras = this.shuffleWithSeed(extraCards, seedVal);
-        
-        candidates = candidates.concat(shuffledExtras).slice(0, session.targetCount);
+      const candidateMap = new Map<string, { listings: typeof matchingListings; variants: any[] }>();
+
+      matchingListings.forEach(l => {
+        const v = l.vehicleVariant;
+        const key = this.buildVisibleIdentityKey(v);
+        if (!candidateMap.has(key)) {
+          candidateMap.set(key, { listings: [], variants: [] });
+        }
+        const group = candidateMap.get(key)!;
+        group.listings.push(l);
+        group.variants.push(v);
+      });
+
+      const candidateKeys = Array.from(candidateMap.keys());
+      const seed = this.getSeedFromString(session.id + "_" + session.filterRevision);
+      const shuffledKeys = this.shuffleWithSeed(candidateKeys, seed);
+
+      candidateItems = shuffledKeys.map(key => {
+        const group = candidateMap.get(key)!;
+        const repVariant = this.selectRepresentativeVariant(group.variants);
+        let imageSourceUrl: string | undefined = undefined;
+        for (const listing of group.listings) {
+          if (listing.media && listing.media.length > 0 && listing.media[0].url) {
+            imageSourceUrl = listing.media[0].url;
+            break;
+          }
+        }
+        return {
+          variantId: repVariant.id,
+          imageSourceUrl
+        };
+      });
+
+      if (candidateItems.length < 20) {
+        const matchingCount = candidateItems.length;
+        if (matchingCount === 0) {
+          warning = "Seçtiğiniz filtrelere uyan aktif ilan bulunamadı, tercih analizi için genel havuzdan araçlar gösteriliyor.";
+        } else {
+          warning = `Seçtiğiniz filtrelere uyan ${matchingCount} araç bulundu. Tercih analiziniz için kalan kartlar genel havuzdan tamamlandı.`;
+        }
+
+        // Fetch extra variants from catalog to reach 20 candidates
+        const existingVariantIds = new Set(candidateItems.map(c => c.variantId));
+        const extraVariants = await db.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            id: { notIn: Array.from(existingVariantIds) }
+          },
+          take: 100,
+          include: {
+            brand: true,
+            model: true,
+            generation: true,
+            engine: true,
+            transmission: true,
+            trim: true,
+            specs: true,
+            listings: { where: { status: 'ACTIVE' }, take: 1, include: { media: { take: 1 } } }
+          }
+        });
+
+        const seedExtra = this.getSeedFromString(session.id + "_extra_" + session.filterRevision);
+        const shuffledExtras = this.shuffleWithSeed(extraVariants, seedExtra);
+
+        for (const extVar of shuffledExtras) {
+          if (candidateItems.length >= 20) break;
+          let imageSourceUrl: string | undefined = undefined;
+          if (extVar.listings && extVar.listings.length > 0 && extVar.listings[0].media && extVar.listings[0].media.length > 0) {
+            imageSourceUrl = extVar.listings[0].media[0].url;
+          }
+          candidateItems.push({
+            variantId: extVar.id,
+            imageSourceUrl
+          });
+        }
       }
+
+      effectiveTargetCount = Math.min(20, candidateItems.length);
+
+    } else {
+      // Unfiltered Random Mode: Query canonical VehicleVariant catalog
+      const variants = await db.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+        },
+        take: 300,
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+          specs: true,
+          profileMappings: {
+            include: {
+              profile: true
+            }
+          },
+          listings: {
+            where: { status: 'ACTIVE' },
+            take: 1,
+            include: { media: { take: 1 } }
+          }
+        }
+      });
+
+      const candidateMap = new Map<string, any[]>();
+      variants.forEach(v => {
+        const key = this.buildVisibleIdentityKey(v);
+        if (!candidateMap.has(key)) {
+          candidateMap.set(key, []);
+        }
+        candidateMap.get(key)!.push(v);
+      });
+
+      const candidateKeys = Array.from(candidateMap.keys());
+      const seed = this.getSeedFromString(session.id + "_" + session.filterRevision);
+      const shuffledKeys = this.shuffleWithSeed(candidateKeys, seed);
+
+      candidateItems = shuffledKeys.slice(0, 20).map(key => {
+        const group = candidateMap.get(key)!;
+        const repVariant = this.selectRepresentativeVariant(group);
+        let imageSourceUrl: string | undefined = undefined;
+
+        if (repVariant.profileMappings && repVariant.profileMappings.length > 0 && repVariant.profileMappings[0].profile?.heroImageUrl) {
+          imageSourceUrl = repVariant.profileMappings[0].profile.heroImageUrl;
+        } else if (repVariant.listings && repVariant.listings.length > 0 && repVariant.listings[0].media && repVariant.listings[0].media.length > 0) {
+          imageSourceUrl = repVariant.listings[0].media[0].url;
+        }
+
+        return {
+          variantId: repVariant.id,
+          imageSourceUrl
+        };
+      });
+
+      effectiveTargetCount = Math.min(20, candidateItems.length);
     }
 
-    // Seeded shuffle of final candidate list
-    const seed = this.getSeedFromString(session.id + "_" + session.filterRevision);
-    const shuffledCandidates = this.shuffleWithSeed(candidates, seed);
-
-    const itemsToInsert = shuffledCandidates.slice(0, session.targetCount - startIndex).map((card, idx) => ({
+    const itemsToInsert = candidateItems.slice(0, effectiveTargetCount - startIndex).map((cand, idx) => ({
       sessionId: session.id,
-      vehicleDiscoveryCardId: card.id,
+      vehicleVariantId: cand.variantId,
       position: startIndex + idx,
       action: null,
       shownAt: null,
       actionAt: null
     }));
 
-    await db.vehicleDiscoverySessionItem.createMany({
-      data: itemsToInsert
-    });
+    if (itemsToInsert.length > 0) {
+      await db.vehicleDiscoverySessionItem.createMany({
+        data: itemsToInsert
+      });
+    }
 
     return { warning };
   }
 
-  // Get/claim next card candidate for a session
+  // Get/claim next card candidate for a session (Dual-read backward compatibility)
   async getNextCardCandidate(sessionId: string, identity: { userId?: string; guestIdentityId?: string }) {
     const now = new Date();
     const session = await this.prisma.vehicleDiscoverySession.findUnique({
@@ -283,11 +450,20 @@ export class VehicleDiscoveryService {
         items: {
           orderBy: { position: 'asc' },
           include: {
-            card: {
+            variant: {
               include: {
-                priceSnapshot: true
+                brand: true,
+                model: true,
+                generation: true,
+                engine: true,
+                transmission: true,
+                trim: true,
+                specs: true,
+                profileMappings: { include: { profile: true } },
+                listings: { where: { status: 'ACTIVE' }, take: 1, include: { media: { take: 1 } } }
               }
-            }
+            },
+            card: true
           }
         }
       }
@@ -297,7 +473,6 @@ export class VehicleDiscoveryService {
       throw new NotFoundException("Keşif oturumu bulunamadı.");
     }
 
-    // Access control
     if (session.userId && session.userId !== identity.userId) {
       throw new BadRequestException("Bu oturuma erişim yetkiniz yok.");
     }
@@ -311,7 +486,6 @@ export class VehicleDiscoveryService {
 
     const currentItem = session.items.find(item => item.position === session.currentIndex);
     if (!currentItem) {
-      // Completed, ran out of cards
       await this.prisma.vehicleDiscoverySession.update({
         where: { id: session.id },
         data: {
@@ -322,7 +496,6 @@ export class VehicleDiscoveryService {
       return { status: "COMPLETED", card: null, session };
     }
 
-    // Mark as shown if not already shown
     if (!currentItem.shownAt) {
       await this.prisma.vehicleDiscoverySessionItem.update({
         where: { id: currentItem.id },
@@ -330,9 +503,55 @@ export class VehicleDiscoveryService {
       });
     }
 
+    let cardDto: any = null;
+
+    if (currentItem.variant) {
+      const v = currentItem.variant;
+      const specJson = (v.specs?.specs as any) || {};
+
+      let imageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
+      if (v.listings && v.listings.length > 0 && v.listings[0].media && v.listings[0].media.length > 0) {
+        imageUrl = v.listings[0].media[0].url;
+      } else if (v.profileMappings && v.profileMappings.length > 0 && v.profileMappings[0].profile?.heroImageUrl) {
+        imageUrl = v.profileMappings[0].profile.heroImageUrl;
+      }
+
+      const bodyTypeStr = v.bodyType ? String(v.bodyType).toLowerCase() : 'sedan';
+      const fuelTypeStr = v.fuelType ? String(v.fuelType).toLowerCase() : 'benzinli';
+      const transStr = v.transmission?.name ? String(v.transmission.name).toLowerCase() : 'otomatik';
+
+      const powerHp = v.engine?.horsepower || specJson.powerHp || 130;
+      const torqueNm = v.engine?.torque || specJson.torqueNm || 230;
+      const avgConsumption = specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km';
+      const drivetrain = specJson.drivetrain || 'Önden Çekiş';
+      const engineCode = v.engine?.code ? `${(v.engine.displacement ? v.engine.displacement / 1000 : 1.6).toFixed(1)} ${v.engine.code}` : '1.6 Motor';
+
+      cardDto = {
+        id: v.id,
+        vehicleVariantId: v.id,
+        brand: v.brand?.name || 'Araç',
+        modelFamily: v.model?.name || '',
+        generationName: v.generation?.name || '',
+        bodyType: v.bodyType || 'SEDAN',
+        fuelType: v.fuelType || 'BENZIN',
+        transmissionType: v.transmission?.name || 'Otomatik',
+        engineVersion: engineCode,
+        power: `${powerHp} HP`,
+        torque: `${torqueNm} Nm`,
+        productionYears: `${v.yearStart || v.year || 2020}${v.yearEnd ? '-' + v.yearEnd : ''}`,
+        averageConsumption: avgConsumption,
+        drivetrain,
+        imageUrl,
+        tags: [bodyTypeStr, fuelTypeStr, transStr, 'konfor', 'aile-araci'],
+        // NO price on swipe card layout as requested
+      };
+    } else if (currentItem.card) {
+      cardDto = currentItem.card;
+    }
+
     return {
       status: "ACTIVE",
-      card: currentItem.card,
+      card: cardDto,
       currentIndex: session.currentIndex,
       version: session.version,
       targetCount: session.targetCount
@@ -348,24 +567,18 @@ export class VehicleDiscoveryService {
     identity: { userId?: string; guestIdentityId?: string };
   }) {
     const { sessionId, cardId, action, expectedVersion, identity } = params;
-
     const now = new Date();
 
-    // Use Prisma transaction to ensure strict serialization and lock
     return this.prisma.$transaction(async (tx) => {
-      // Fetch session with lock
       const session = await tx.vehicleDiscoverySession.findUnique({
         where: { id: sessionId },
-        include: {
-          items: true
-        }
+        include: { items: true }
       });
 
       if (!session) {
         throw new NotFoundException("Keşif oturumu bulunamadı.");
       }
 
-      // Access control
       if (session.userId && session.userId !== identity.userId) {
         throw new BadRequestException("Bu oturuma erişim yetkiniz yok.");
       }
@@ -377,7 +590,6 @@ export class VehicleDiscoveryService {
         throw new BadRequestException("Keşif oturumu aktif değil veya süresi dolmuş.");
       }
 
-      // Check version for optimistic concurrency control
       if (session.version !== expectedVersion) {
         throw new ConflictException("Oturum güncellendi. Lütfen en son kart durumunu tekrar yükleyin.");
       }
@@ -388,11 +600,11 @@ export class VehicleDiscoveryService {
         throw new BadRequestException("Mevcut pozisyonda araç bulunamadı.");
       }
 
-      if (activeItem.vehicleDiscoveryCardId !== cardId) {
+      const itemMatch = activeItem.vehicleVariantId === cardId || activeItem.vehicleDiscoveryCardId === cardId || activeItem.id === cardId;
+      if (!itemMatch) {
         throw new BadRequestException("Gönderilen araç kimliği sıradaki araçla eşleşmiyor.");
       }
 
-      // Record item action
       await tx.vehicleDiscoverySessionItem.update({
         where: { id: activeItem.id },
         data: {
@@ -401,7 +613,6 @@ export class VehicleDiscoveryService {
         }
       });
 
-      // Update session currentIndex and version
       const nextIndex = session.currentIndex + 1;
       const nextVersion = session.version + 1;
       const isCompleted = nextIndex >= session.targetCount;
@@ -451,7 +662,6 @@ export class VehicleDiscoveryService {
         throw new NotFoundException("Keşif oturumu bulunamadı.");
       }
 
-      // Access control
       if (session.userId && session.userId !== identity.userId) {
         throw new BadRequestException("Bu oturuma erişim yetkiniz yok.");
       }
@@ -463,7 +673,6 @@ export class VehicleDiscoveryService {
         throw new BadRequestException("Keşif oturumu süresi dolmuş.");
       }
 
-      // Delete all unswiped items after the current index (positional cleanup)
       await tx.vehicleDiscoverySessionItem.deleteMany({
         where: {
           sessionId,
@@ -474,7 +683,6 @@ export class VehicleDiscoveryService {
       const nextFilterRevision = session.filterRevision + 1;
       const nextVersion = session.version + 1;
 
-      // Update session with new filters and mode
       const updatedSession = await tx.vehicleDiscoverySession.update({
         where: { id: sessionId },
         data: {
@@ -484,8 +692,8 @@ export class VehicleDiscoveryService {
           fuelTypes: filters.fuelTypes || [],
           transmissions: filters.transmissions || [],
           targetCount: targetCount || session.targetCount,
-          status: VehicleDiscoverySessionStatus.ACTIVE, // Reset status to active
-          completedAt: null, // Clear completion date
+          status: VehicleDiscoverySessionStatus.ACTIVE,
+          completedAt: null,
           mode: VehicleDiscoveryMode.FILTERED,
           filterRevision: nextFilterRevision,
           version: nextVersion,
@@ -493,7 +701,6 @@ export class VehicleDiscoveryService {
         }
       });
 
-      // Seed items starting from current index
       const { warning } = await this.populateSessionItems({
         session: updatedSession,
         startIndex: session.currentIndex,
@@ -513,22 +720,26 @@ export class VehicleDiscoveryService {
     });
   }
 
-  // Get matching recommendations (rule-based algorithm with softening fallback layers)
+  // Get matching recommendations and URL handoff query params for listings
   async getRecommendations(sessionId: string, identity: { userId?: string; guestIdentityId?: string }) {
     const session = await this.prisma.vehicleDiscoverySession.findUnique({
       where: { id: sessionId },
       include: {
         items: {
           include: {
-            card: {
+            variant: {
               include: {
-                mappedVariants: {
-                  include: {
-                    variant: true
-                  }
-                }
+                brand: true,
+                model: true,
+                generation: true,
+                engine: true,
+                transmission: true,
+                trim: true,
+                specs: true,
+                listings: { where: { status: 'ACTIVE' }, select: { priceAmount: true } }
               }
-            }
+            },
+            card: true
           }
         }
       }
@@ -538,7 +749,6 @@ export class VehicleDiscoveryService {
       throw new NotFoundException("Keşif oturumu bulunamadı.");
     }
 
-    // Access control
     if (session.userId && session.userId !== identity.userId) {
       throw new BadRequestException("Bu oturuma erişim yetkiniz yok.");
     }
@@ -557,100 +767,39 @@ export class VehicleDiscoveryService {
       };
     }
 
-    // Recalculate scoring profile dynamically from swipes
     const bodyTypeScores: Record<string, number> = {};
     const fuelTypeScores: Record<string, number> = {};
     const transmissionScores: Record<string, number> = {};
     const brandScores: Record<string, number> = {};
     const modelFamilyScores: Record<string, number> = {};
-    const tagScores: Record<string, number> = {};
 
     swipes.forEach(s => {
-      const c = s.card;
+      const v = s.variant;
       const isLike = s.action === VehicleDiscoveryAction.LIKE;
       const weight = isLike ? 1.0 : -0.8;
 
-      const cardBody = this.mapBodyType(c.bodyType);
-      const cardFuel = this.mapFuelType(c.fuelType);
-      
-      bodyTypeScores[cardBody] = (bodyTypeScores[cardBody] || 0) + (1.5 * weight);
-      fuelTypeScores[cardFuel] = (fuelTypeScores[cardFuel] || 0) + (1.0 * weight);
-      
-      const cardTrans = c.transmissionType.toLowerCase();
-      const transEnum = cardTrans.includes("manuel") ? TransmissionType.MANUAL : TransmissionType.AUTOMATIC;
-      transmissionScores[transEnum] = (transmissionScores[transEnum] || 0) + (1.2 * weight);
-
-      brandScores[c.brand] = (brandScores[c.brand] || 0) + (0.5 * weight);
-      modelFamilyScores[c.modelFamily] = (modelFamilyScores[c.modelFamily] || 0) + (0.7 * weight);
-
-      const tags = (c.tags as string[]) || [];
-      tags.forEach(tag => {
-        tagScores[tag] = (tagScores[tag] || 0) + (1.5 * weight);
-      });
+      if (v) {
+        if (v.bodyType) bodyTypeScores[v.bodyType] = (bodyTypeScores[v.bodyType] || 0) + (1.5 * weight);
+        if (v.fuelType) fuelTypeScores[v.fuelType] = (fuelTypeScores[v.fuelType] || 0) + (1.0 * weight);
+        if (v.transmission?.name) {
+          const transKey = v.transmission.name.toUpperCase().includes("MANUEL") ? TransmissionType.MANUAL : TransmissionType.AUTOMATIC;
+          transmissionScores[transKey] = (transmissionScores[transKey] || 0) + (1.2 * weight);
+        }
+        if (v.brand?.name) brandScores[v.brand.name] = (brandScores[v.brand.name] || 0) + (0.5 * weight);
+        if (v.model?.name) modelFamilyScores[v.model.name] = (modelFamilyScores[v.model.name] || 0) + (0.7 * weight);
+      }
     });
 
-    const scoringProfile = {
-      bodyTypeScores,
-      fuelTypeScores,
-      transmissionScores,
-      brandScores,
-      modelFamilyScores,
-      tagScores
-    };
+    const likedVariants = likes.map(l => l.variant).filter(Boolean);
 
-    // Softening fallback algorithm
-    let matchedVariants: any[] = [];
-    let softeningLevel = 0;
+    let recommendedVariant = likedVariants[0];
+    if (!recommendedVariant && session.items.length > 0) {
+      recommendedVariant = session.items[0].variant;
+    }
 
-    const getTopKeys = (scores: Record<string, number>) => {
-      return Object.entries(scores)
-        .filter(([_, val]) => val > 0)
-        .sort((a, b) => b[1] - a[1])
-        .map(([key]) => key);
-    };
-
-    const topBrands = getTopKeys(brandScores);
-    const topBodies = getTopKeys(bodyTypeScores) as BodyType[];
-    const topFuels = getTopKeys(fuelTypeScores) as FuelType[];
-
-    // We only recommend APPROVED variants that have active price snapshots (Turkey-only)
-    // Filter conditions layers
-    while (matchedVariants.length < 5 && softeningLevel <= 4) {
-      const bodyFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 2) 
-        ? (session.bodyTypes && session.bodyTypes.length > 0 ? { in: session.bodyTypes } : undefined)
-        : (softeningLevel < 1 && topBodies.length > 0 ? { in: topBodies } : undefined);
-
-      const fuelFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 1)
-        ? (session.fuelTypes && session.fuelTypes.length > 0 ? { in: session.fuelTypes } : undefined)
-        : (softeningLevel < 1 && topFuels.length > 0 ? { in: topFuels } : undefined);
-
-      const transFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 1)
-        ? (session.transmissions && session.transmissions.length > 0 ? { type: { in: session.transmissions } } : undefined)
-        : undefined;
-
-      const brandFilter = (softeningLevel < 2 && topBrands.length > 0)
-        ? { name: { in: topBrands } }
-        : undefined;
-
-      const priceFilter = (session.mode === VehicleDiscoveryMode.FILTERED && softeningLevel < 3)
-        ? {
-            priceSnapshot: {
-              estimatedMin: { lte: session.maximumPrice ? Number(session.maximumPrice) : Infinity },
-              estimatedMax: { gte: Number(session.minimumPrice) }
-            }
-          }
-        : {};
-
-      matchedVariants = await this.prisma.vehicleVariant.findMany({
-        where: {
-          status: 'APPROVED',
-          bodyType: bodyFilter,
-          fuelType: fuelFilter,
-          transmission: transFilter,
-          brand: brandFilter,
-          ...priceFilter
-        },
-        take: 200, // Safety limit to prevent memory exhaustion!
+    if (!recommendedVariant) {
+      recommendedVariant = await this.prisma.vehicleVariant.findFirst({
+        where: { status: 'APPROVED' },
         include: {
           brand: true,
           model: true,
@@ -658,84 +807,68 @@ export class VehicleDiscoveryService {
           engine: true,
           transmission: true,
           trim: true,
-          priceSnapshot: true,
-          listings: {
-            where: { status: 'ACTIVE' },
-            take: 3,
-            include: {
-              media: {
-                take: 1
-              }
-            }
-          }
+          specs: true,
+          listings: { where: { status: 'ACTIVE' }, select: { priceAmount: true } }
         }
       });
-
-      softeningLevel++;
     }
 
-    // Rank the matched variants using our scoringProfile
-    const ranked = matchedVariants.map(v => {
-      let score = 0;
+    const activePrices = (recommendedVariant.listings || []).map((l: any) => Number(l.priceAmount)).filter((p: number) => p > 0);
+    const minActivePrice = activePrices.length > 0 ? Math.min(...activePrices) : null;
+    const maxActivePrice = activePrices.length > 0 ? Math.max(...activePrices) : null;
 
-      // Body score
-      if (v.bodyType && bodyTypeScores[v.bodyType]) {
-        score += bodyTypeScores[v.bodyType];
-      }
-
-      // Fuel score
-      if (v.fuelType && fuelTypeScores[v.fuelType]) {
-        score += fuelTypeScores[v.fuelType];
-      }
-
-      // Transmission score
-      if (v.transmission && transmissionScores[v.transmission.type]) {
-        score += transmissionScores[v.transmission.type];
-      }
-
-      // Brand score
-      if (v.brand && brandScores[v.brand.name]) {
-        score += brandScores[v.brand.name];
-      }
-
-      // Model score
-      if (v.model && modelFamilyScores[v.model.name]) {
-        score += modelFamilyScores[v.model.name];
-      }
-
-      // Add a small random noise to prevent identical rank clustering
-      score += Math.random() * 0.05;
-
-      return { variant: v, score };
-    });
-
-    // Sort by score descending and take top 5
-    ranked.sort((a, b) => b.score - a.score);
-    const topRecommendations = ranked.slice(0, 5).map(r => r.variant);
+    const minPriceFilter = Number(session.minimumPrice) > 0 ? Number(session.minimumPrice) : undefined;
+    const maxPriceFilter = session.maximumPrice ? Number(session.maximumPrice) : undefined;
 
     return {
-      message: softeningLevel > 1 ? "Kriterlerinize en yakın eşleşen alternatifleri listeledik." : "Kriterlerinize en uygun araç önerileri.",
-      scoringProfile,
-      recommendations: topRecommendations
+      message: "Keşif tercihlerinize göre en uygun araç önerisi.",
+      scoringProfile: {
+        bodyTypeScores,
+        fuelTypeScores,
+        transmissionScores,
+        brandScores,
+        modelFamilyScores
+      },
+      recommendation: {
+        recommendedVariantId: recommendedVariant.id,
+        brandId: recommendedVariant.brandId,
+        brandName: recommendedVariant.brand?.name || '',
+        modelId: recommendedVariant.modelId,
+        modelName: recommendedVariant.model?.name || '',
+        generationName: recommendedVariant.generation?.name || '',
+        bodyType: recommendedVariant.bodyType || 'SEDAN',
+        fuelType: recommendedVariant.fuelType || 'BENZIN',
+        transmissionType: recommendedVariant.transmission?.name || 'Otomatik',
+        activeListingCount: activePrices.length,
+        minActivePrice,
+        maxActivePrice,
+        listingsQuery: {
+          vehicleVariantId: recommendedVariant.id,
+          brandId: recommendedVariant.brandId,
+          modelId: recommendedVariant.modelId,
+          bodyType: recommendedVariant.bodyType,
+          fuelType: recommendedVariant.fuelType,
+          transmission: recommendedVariant.transmission?.name,
+          minPrice: minPriceFilter,
+          maxPrice: maxPriceFilter
+        }
+      }
     };
   }
 
   // Merge Guest Session with User Session
   async mergeGuestSession(guestIdentityId: string, userId: string) {
-    // Check if guest identity exists
     const guestIdentity = await this.prisma.vehicleDiscoveryGuestIdentity.findUnique({
       where: { id: guestIdentityId }
     });
 
     if (!guestIdentity) return { success: false };
 
-    // Update all sessions belonging to the guest identity to belong to the logged-in user
     await this.prisma.vehicleDiscoverySession.updateMany({
       where: { guestIdentityId, userId: null },
       data: { userId }
     });
 
-    // Record merge in guest identity table
     await this.prisma.vehicleDiscoveryGuestIdentity.update({
       where: { id: guestIdentityId },
       data: { mergedAt: new Date() }

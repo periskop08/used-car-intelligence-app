@@ -15,7 +15,6 @@ describe('VehicleDiscoveryService', () => {
   let service: VehicleDiscoveryService;
   let prisma: PrismaService;
 
-  // Mock database records
   const mockSession = {
     id: 'test-session-123',
     userId: 'user-123',
@@ -35,46 +34,28 @@ describe('VehicleDiscoveryService', () => {
     lastActivityAt: new Date(),
   };
 
-  const mockCards = [
-    {
-      id: 'card-1',
-      brand: 'Peugeot',
-      modelFamily: '3008',
-      bodyType: 'SUV',
-      fuelType: 'Benzinli',
-      transmissionType: 'Otomatik',
-      engineVersion: '1.2 PureTech',
-      power: '130 HP',
-      torque: '230 Nm',
-      productionYears: '2020-',
-      averageConsumption: '5.5 L',
-      drivetrain: 'FWD',
-      imageUrl: 'http://image.com/1',
-      tags: ['SUV', 'Konfor'],
-      isActive: true,
-      archivedAt: null,
-      priceSnapshot: { estimatedMin: 1200000, estimatedMax: 1500000, medianPrice: 1350000 }
-    },
-    {
-      id: 'card-2',
-      brand: 'Renault',
-      modelFamily: 'Megane',
-      bodyType: 'Sedan',
-      fuelType: 'Dizel',
-      transmissionType: 'Manuel',
-      engineVersion: '1.5 dCi',
-      power: '115 HP',
-      torque: '260 Nm',
-      productionYears: '2019-',
-      averageConsumption: '4.2 L',
-      drivetrain: 'FWD',
-      imageUrl: 'http://image.com/2',
-      tags: ['Sedan', 'Ekonomik'],
-      isActive: true,
-      archivedAt: null,
-      priceSnapshot: { estimatedMin: 900000, estimatedMax: 1100000, medianPrice: 1000000 }
-    }
-  ];
+  const mockVariant = {
+    id: 'variant-308-eat8',
+    brandId: 'brand-peugeot',
+    modelId: 'model-308',
+    generationId: 'gen-3',
+    engineId: 'eng-12-puretech',
+    transmissionId: 'trans-eat8',
+    trimId: 'trim-allure',
+    year: 2022,
+    bodyType: BodyType.HATCHBACK,
+    fuelType: FuelType.PETROL,
+    brand: { id: 'brand-peugeot', name: 'Peugeot' },
+    model: { id: 'model-308', name: '308' },
+    generation: { id: 'gen-3', name: '3. Nesil' },
+    engine: { id: 'eng-12-puretech', code: '1.2 PureTech 130', horsepower: 130, torque: 230 },
+    transmission: { id: 'trans-eat8', name: 'EAT8 Otomatik', type: TransmissionType.AUTOMATIC },
+    trim: { id: 'trim-allure', name: 'Allure' },
+    specs: { specs: { averageConsumption: 5.5, drivetrain: 'Önden Çekiş' } },
+    listings: [
+      { id: 'listing-1', priceAmount: 1520000, media: [{ url: 'http://image.com/1.jpg' }] }
+    ]
+  };
 
   const mockPrismaService = {
     vehicleDiscoverySession: {
@@ -85,10 +66,17 @@ describe('VehicleDiscoveryService', () => {
       updateMany: jest.fn(),
     },
     vehicleDiscoveryCard: {
-      findMany: jest.fn().mockResolvedValue(mockCards),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    vehicleListing: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    vehicleVariant: {
+      findMany: jest.fn().mockResolvedValue([mockVariant]),
+      findFirst: jest.fn().mockResolvedValue(mockVariant),
     },
     vehicleDiscoverySessionItem: {
-      createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       update: jest.fn(),
     },
@@ -96,9 +84,6 @@ describe('VehicleDiscoveryService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-    },
-    vehicleVariant: {
-      findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn((cb) => cb(mockPrismaService)),
   };
@@ -154,7 +139,7 @@ describe('VehicleDiscoveryService', () => {
       const activeSession = {
         ...mockSession,
         items: [
-          { id: 'item-1', position: 0, vehicleDiscoveryCardId: 'card-1', action: null }
+          { id: 'item-1', position: 0, vehicleVariantId: 'variant-308-eat8', action: null }
         ]
       };
 
@@ -167,7 +152,7 @@ describe('VehicleDiscoveryService', () => {
 
       const result = await service.recordSwipe({
         sessionId: 'test-session-123',
-        cardId: 'card-1',
+        cardId: 'variant-308-eat8',
         action: VehicleDiscoveryAction.LIKE,
         expectedVersion: 0,
         identity: { userId: 'user-123' }
@@ -181,9 +166,9 @@ describe('VehicleDiscoveryService', () => {
     it('should throw ConflictException if expected version does not match actual version', async () => {
       const activeSession = {
         ...mockSession,
-        version: 5, // actual version is 5
+        version: 5,
         items: [
-          { id: 'item-1', position: 0, vehicleDiscoveryCardId: 'card-1', action: null }
+          { id: 'item-1', position: 0, vehicleVariantId: 'variant-308-eat8', action: null }
         ]
       };
 
@@ -191,11 +176,40 @@ describe('VehicleDiscoveryService', () => {
 
       await expect(service.recordSwipe({
         sessionId: 'test-session-123',
-        cardId: 'card-1',
+        cardId: 'variant-308-eat8',
         action: VehicleDiscoveryAction.LIKE,
-        expectedVersion: 0, // client expects 0
+        expectedVersion: 0,
         identity: { userId: 'user-123' }
       })).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('Transmission Normalization & Recommendations Payload', () => {
+    it('should normalize DSG/EAT8 under Automatic family and return exact vehicleVariantId payload in recommendations', async () => {
+      const activeSession = {
+        ...mockSession,
+        minimumPrice: 1000000,
+        maximumPrice: 1600000,
+        items: [
+          {
+            id: 'item-1',
+            position: 0,
+            vehicleVariantId: mockVariant.id,
+            action: VehicleDiscoveryAction.LIKE,
+            variant: mockVariant
+          }
+        ]
+      };
+
+      mockPrismaService.vehicleDiscoverySession.findUnique.mockResolvedValueOnce(activeSession);
+
+      const result = await service.getRecommendations('test-session-123', { userId: 'user-123' });
+
+      expect(result.recommendation).toBeDefined();
+      expect(result.recommendation.recommendedVariantId).toBe('variant-308-eat8');
+      expect(result.recommendation.listingsQuery.vehicleVariantId).toBe('variant-308-eat8');
+      expect(result.recommendation.listingsQuery.minPrice).toBe(1000000);
+      expect(result.recommendation.listingsQuery.maxPrice).toBe(1600000);
     });
   });
 });

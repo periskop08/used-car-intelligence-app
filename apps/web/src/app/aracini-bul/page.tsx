@@ -1043,116 +1043,96 @@ export default function FindMyCarPage() {
               </div>
             </div>
 
-            {/* Section 2: Önerilen Modeller (Recommended Cards) */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Car className="w-5 h-5 text-orange-400" />
-                <h3 className="font-extrabold text-slate-200 text-lg">Önerilen Araç Modelleri</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {resultsData.recommendations.map(v => (
-                  <div 
-                    key={v.id}
-                    className="bg-slate-900/40 border border-white/5 rounded-[24px] overflow-hidden flex flex-col justify-between backdrop-blur-md hover:border-orange-500/20 transition-all duration-300"
-                  >
-                    <div className="p-5 flex flex-col gap-3">
-                      <div>
-                        <span className="text-[9px] font-bold text-orange-400 uppercase tracking-widest block mb-0.5">
-                          {v.brand.name}
-                        </span>
-                        <h4 className="font-black text-slate-100 text-base leading-tight">
-                          {v.model.name} {v.trim?.name || ""}
-                        </h4>
-                      </div>
-
-                      {v.priceSnapshot && (
-                        <div className="bg-orange-500/5 border border-orange-500/10 px-3 py-2.5 rounded-xl text-center">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Piyasa Fiyat Tahmini</span>
-                          <span className="text-xs font-black text-orange-400 block">
-                            {formatPrice(v.priceSnapshot.estimatedMin)} - {formatPrice(v.priceSnapshot.estimatedMax)}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Specs pills */}
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        <span className="bg-white/5 text-[9px] text-slate-400 px-2 py-0.5 rounded-md">
-                          {v.engine?.name || "Standart"}
-                        </span>
-                        <span className="bg-white/5 text-[9px] text-slate-400 px-2 py-0.5 rounded-md">
-                          {v.transmission ? `${v.transmission.speeds} İleri ${translateTransmission(v.transmission.type)}` : "-"}
-                        </span>
-                      </div>
-                    </div>
+            {/* Section 2: Önerilen Araç Raporu ve Sonuç Kartı */}
+            {resultsData.recommendation && (
+              <div className="bg-slate-900/60 border border-orange-500/20 rounded-[28px] p-6 backdrop-blur-md shadow-2xl space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                  <div>
+                    <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">
+                      Yapay Zeka Destekli Araç Önerisi
+                    </span>
+                    <h3 className="text-2xl font-black text-white tracking-tight">
+                      {resultsData.recommendation.brandName} {resultsData.recommendation.modelName} {resultsData.recommendation.generationName || ''}
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-xs font-bold rounded-xl">
+                      {translateBodyType(resultsData.recommendation.bodyType)}
+                    </span>
+                    <span className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-xs font-bold rounded-xl">
+                      {translateFuelType(resultsData.recommendation.fuelType)}
+                    </span>
+                    <span className="px-3 py-1 bg-white/5 border border-white/10 text-slate-300 text-xs font-bold rounded-xl">
+                      {translateTransmission(resultsData.recommendation.transmissionType)}
+                    </span>
+                  </div>
+                </div>
 
-            {/* Section 3: Uygun İkinci El İlanlar (Active Listings) */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-orange-400" />
-                <h3 className="font-extrabold text-slate-200 text-lg">Önerilen Araçlara Uyan Canlı İlanlar</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {resultsData.recommendations.flatMap(v => v.listings).map(listing => (
+                {/* İlan Durumu ve Canlı Fiyat Bilgisi */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-950/80 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Aktif İlan Durumu</span>
+                      <span className="text-sm font-bold text-slate-200">
+                        {resultsData.recommendation.activeListingCount > 0
+                          ? `${resultsData.recommendation.activeListingCount} Adet Aktif Satış İlanı Mevcut`
+                          : 'Şu Anda Aktif İlan Bulunmuyor'}
+                      </span>
+                    </div>
+                    {resultsData.recommendation.activeListingCount > 0 && (
+                      <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30">
+                        Piyasada Var
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-950/80 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Piyasa Fiyat Aralığı</span>
+                      <span className="text-sm font-black text-orange-400">
+                        {resultsData.recommendation.minActivePrice
+                          ? `${formatPrice(resultsData.recommendation.minActivePrice)} - ${formatPrice(resultsData.recommendation.maxActivePrice)}`
+                          : 'Fiyat İlanlardan Hesaplanıyor'}
+                      </span>
+                    </div>
+                    <Sparkles className="w-5 h-5 text-orange-400" />
+                  </div>
+                </div>
+
+                {/* Primary Action Buttons: İlanlara Git & Araç Raporunu Gör */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                  <button
+                    onClick={() => {
+                      const rec = resultsData.recommendation;
+                      const q = rec.listingsQuery;
+                      let url = `/listings?vehicleVariantId=${q.vehicleVariantId}`;
+                      if (q.brandId) url += `&brandId=${q.brandId}`;
+                      if (q.modelId) url += `&modelId=${q.modelId}`;
+                      if (q.bodyType) url += `&bodyType=${q.bodyType}`;
+                      if (q.fuelType) url += `&fuelType=${q.fuelType}`;
+                      if (q.transmission) url += `&transmission=${encodeURIComponent(q.transmission)}`;
+                      if (q.minPrice) url += `&minPrice=${q.minPrice}`;
+                      if (q.maxPrice) url += `&maxPrice=${q.maxPrice}`;
+                      router.push(url);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black py-4 px-6 rounded-2xl shadow-xl shadow-orange-500/20 transition duration-150 flex items-center justify-center gap-2 cursor-pointer text-sm"
+                  >
+                    <span>İlanlara Git</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
                   <a
-                    key={listing.id}
-                    href={`/listings/${listing.id}`}
+                    href={`/reports/vehicle/${resultsData.recommendation.recommendedVariantId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-[#0b0f1a]/80 border border-white/5 rounded-[22px] overflow-hidden flex gap-4 hover:border-orange-500/20 hover:bg-[#0c1224]/90 transition-all duration-300 p-3 group cursor-pointer"
+                    className="flex-1 bg-slate-950 hover:bg-slate-800 text-slate-200 font-extrabold py-4 px-6 rounded-2xl border border-white/10 transition duration-150 flex items-center justify-center gap-2 cursor-pointer text-sm"
                   >
-                    {/* Cover Photo */}
-                    <div className="w-24 h-24 bg-slate-950 rounded-xl overflow-hidden flex-shrink-0 relative">
-                      {listing.media?.[0]?.url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={formatImageUrl(listing.media[0].url)}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-900">
-                          <Car className="w-8 h-8" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Text Details */}
-                    <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
-                      <div>
-                        <h4 className="font-extrabold text-slate-200 text-sm leading-tight truncate group-hover:text-orange-400 transition-colors">
-                          {listing.title}
-                        </h4>
-                        <div className="text-[10px] text-slate-400 mt-1 flex gap-2">
-                          <span>{listing.modelYear} Model</span>
-                          <span>•</span>
-                          <span>{listing.kilometers.toLocaleString("tr-TR")} KM</span>
-                          <span>•</span>
-                          <span className="truncate">{listing.city}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-sm font-black text-orange-400">
-                          {formatPrice(listing.priceAmount)}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
-                      </div>
-                    </div>
+                    <Sparkles className="w-4 h-4 text-orange-400" />
+                    <span>Yapay Zeka Araç Raporunu Gör</span>
                   </a>
-                ))}
-                
-                {resultsData.recommendations.flatMap(v => v.listings).length === 0 && (
-                  <div className="col-span-2 bg-slate-900/20 border border-dashed border-white/5 p-8 rounded-2xl text-center">
-                    <Info className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                    <p className="text-slate-400 text-xs">Bu araç kriterlerine uygun aktif satış ilanı bulunamadı.</p>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Results Actions */}
             <div className="flex flex-col md:flex-row gap-4 mt-6">

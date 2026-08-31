@@ -111,7 +111,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
       { key: 'VEHICLE_QUALITY', label: 'Araç Veri Kalitesi', href: '/admin/vehicle-data/quality' },
       { key: 'VEHICLE_GUIDE', label: 'Araç Rehberi Yönetimi', href: '/admin/vehicle-data/guide' },
       { key: 'VEHICLE_APPROVALS', label: 'Araç Onayları', href: '/admin/vehicle-data/approvals' },
-      { key: 'COMMON_PROFILES', label: 'Ortak Araç Yönetimi', href: '/admin/vehicle-data/profiles' },
+      { key: 'VEHICLE_DISCOVERY', label: 'Aracını Bul Yönetimi', href: '/admin/vehicle-data/discovery' },
     ],
   },
   {
