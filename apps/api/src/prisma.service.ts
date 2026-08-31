@@ -20,6 +20,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   private async ensureClubTablesExist() {
+    try {
+      const check = await this.$queryRaw<any[]>`SELECT 1 FROM information_schema.tables WHERE table_name = 'ClubPost' LIMIT 1;`;
+      if (check && check.length > 0) {
+        return; // Tables already exist, bypass DDL execution completely
+      }
+    } catch (e) {}
+
     const sqlStatements = [
       `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'TANISMA';`,
       `ALTER TYPE "SubscriptionTier" ADD VALUE IF NOT EXISTS 'YETKIN';`,
