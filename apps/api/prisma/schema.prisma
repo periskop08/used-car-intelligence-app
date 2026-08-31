@@ -1632,6 +1632,7 @@ model VehicleDiscoveryCard {
   imageUrl           String
   tags               Json                          // Standartlaştırılmış etiket listesi (String[])
   isActive           Boolean                       @default(true)
+  allowInUnfilteredDiscovery Boolean             @default(true)
   createdAt          DateTime                      @default(now())
   updatedAt          DateTime                      @updatedAt
   swipes             UserVehiclePreferenceSwipe[]

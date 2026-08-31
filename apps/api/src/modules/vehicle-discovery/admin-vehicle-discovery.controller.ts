@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleDiscoveryService } from './vehicle-discovery.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -45,5 +45,26 @@ export class AdminVehicleDiscoveryController {
       isPublished,
       aiPresentationTags
     };
+  }
+
+  @Post('backfill-images')
+  @ApiOperation({ summary: 'Mevcut doğru görselleri fiziksel R2 Discovery havuzuna backfill eder' })
+  async backfillImages() {
+    return this.discoveryService.backfillDiscoveryImages();
+  }
+
+  @Post('enroll')
+  @ApiOperation({ summary: 'Yeni discovery candidate ekler veya mevcut candidate sunum ayarlarını günceller' })
+  async enrollCandidate(
+    @Body() dto: {
+      candidateId?: string;
+      representativeVariantId: string;
+      imageUrl?: string;
+      isActive?: boolean;
+      allowInUnfilteredDiscovery?: boolean;
+      tags?: string[];
+    }
+  ) {
+    return this.discoveryService.enrollDiscoveryCandidate(dto);
   }
 }

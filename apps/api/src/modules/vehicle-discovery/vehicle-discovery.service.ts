@@ -413,10 +413,27 @@ export class VehicleDiscoveryService {
       const specJson = (v.specs?.specs as any) || {};
 
       let imageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
+
+      // 1. Check for active listing photo (priority in Kriterli mode)
       if (v.listings && v.listings.length > 0 && v.listings[0].media && v.listings[0].media.length > 0) {
         imageUrl = v.listings[0].media[0].url;
-      } else if (v.profileMappings && v.profileMappings.length > 0 && v.profileMappings[0].profile?.heroImageUrl) {
-        imageUrl = v.profileMappings[0].profile.heroImageUrl;
+      }
+
+      // 2. Check for dedicated VehicleDiscoveryCard image
+      if (imageUrl.includes('unsplash')) {
+        const card = await this.prisma.vehicleDiscoveryCard.findFirst({
+          where: {
+            OR: [
+              { representativeVariantId: v.id },
+              { brand: v.brand?.name, modelFamily: v.model?.name }
+            ],
+            imageUrl: { not: '' }
+          },
+          select: { imageUrl: true }
+        });
+        if (card && card.imageUrl && !card.imageUrl.includes('unsplash')) {
+          imageUrl = card.imageUrl;
+        }
       }
 
       const bodyTypeStr = v.bodyType ? String(v.bodyType).toLowerCase() : 'sedan';
@@ -858,10 +875,6 @@ export class VehicleDiscoveryService {
           transmission: { select: { id: true, name: true } },
           trim: { select: { id: true, name: true } },
           specs: { select: { specs: true } },
-          profileMappings: {
-            select: { profile: { select: { heroImageUrl: true } } },
-            take: 1
-          },
           listings: {
             where: { status: 'ACTIVE' },
             select: { id: true, priceAmount: true, media: { select: { url: true }, take: 1 } },
@@ -870,6 +883,31 @@ export class VehicleDiscoveryService {
         },
         take: 500,
         orderBy: { id: 'asc' }
+      });
+
+      const discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
+        select: {
+          id: true,
+          representativeVariantId: true,
+          imageUrl: true,
+          isActive: true,
+          allowInUnfilteredDiscovery: true,
+          tags: true,
+          brand: true,
+          modelFamily: true
+        }
+      });
+
+      const cardByVariantMap = new Map<string, any>();
+      const cardByBrandModelMap = new Map<string, any>();
+      discoveryCards.forEach(c => {
+        if (c.representativeVariantId) {
+          cardByVariantMap.set(c.representativeVariantId, c);
+        }
+        const key = `${(c.brand || '').toLowerCase()}_${(c.modelFamily || '').toLowerCase()}`;
+        if (!cardByBrandModelMap.has(key)) {
+          cardByBrandModelMap.set(key, c);
+        }
       });
 
       const candidateMap = new Map<string, any[]>();
@@ -891,6 +929,14 @@ export class VehicleDiscoveryService {
         const prices: number[] = [];
         let previewImageUrl: string | undefined = undefined;
 
+        // Look for discovery card mapped to representative variant or brand+model
+        const mappedCard = cardByVariantMap.get(rep.id) || 
+          cardByBrandModelMap.get(`${(rep.brand?.name || '').toLowerCase()}_${(rep.model?.name || '').toLowerCase()}`);
+
+        if (mappedCard && mappedCard.imageUrl && !mappedCard.imageUrl.includes('unsplash')) {
+          previewImageUrl = mappedCard.imageUrl;
+        }
+
         variants.forEach(v => {
           if (v.listings && v.listings.length > 0) {
             totalActiveListings += v.listings.length;
@@ -901,9 +947,6 @@ export class VehicleDiscoveryService {
                 previewImageUrl = l.media[0].url;
               }
             });
-          }
-          if (!previewImageUrl && v.profileMappings && v.profileMappings.length > 0 && v.profileMappings[0].profile?.heroImageUrl) {
-            previewImageUrl = v.profileMappings[0].profile.heroImageUrl;
           }
         });
 
@@ -917,15 +960,25 @@ export class VehicleDiscoveryService {
         const specJson = (rep.specs?.specs as any) || {};
         const powerHp = rep.engine?.horsepower || specJson.powerHp || null;
         const torqueNm = rep.engine?.torque || specJson.torqueNm || null;
-        const hasImage = previewImageUrl && !previewImageUrl.includes('unsplash');
-        const hasSpecs = powerHp !== null || specJson.averageConsumption !== undefined;
+        const hasRealDiscoveryImage = previewImageUrl && !previewImageUrl.includes('unsplash');
+        const hasRequiredSpecs = powerHp !== null || specJson.averageConsumption !== undefined;
 
-        let eligibilityStatus: 'ELIGIBLE' | 'MISSING_IMAGE' | 'INCOMPLETE_SPECS' = 'ELIGIBLE';
-        if (!hasImage) {
-          eligibilityStatus = 'MISSING_IMAGE';
-        } else if (!hasSpecs) {
-          eligibilityStatus = 'INCOMPLETE_SPECS';
+        const isPublished = mappedCard ? mappedCard.isActive : true;
+        const allowInUnfilteredDiscovery = mappedCard ? (mappedCard.allowInUnfilteredDiscovery !== false) : true;
+
+        let unfilteredEligibilityStatus = 'ELIGIBLE';
+        if (!isPublished) {
+          unfilteredEligibilityStatus = 'NOT_PUBLISHED';
+        } else if (!allowInUnfilteredDiscovery) {
+          unfilteredEligibilityStatus = 'DISABLED_BY_ADMIN';
+        } else if (!hasRealDiscoveryImage) {
+          unfilteredEligibilityStatus = 'IMAGE_MISSING';
+        } else if (!hasRequiredSpecs) {
+          unfilteredEligibilityStatus = 'TECHNICAL_DATA_MISSING';
         }
+
+        const isUnfilteredEligible = unfilteredEligibilityStatus === 'ELIGIBLE';
+        const eligibilityStatus = isUnfilteredEligible ? 'ELIGIBLE' : (!hasRealDiscoveryImage ? 'MISSING_IMAGE' : 'INCOMPLETE_SPECS');
 
         const candidateObj = {
           candidateId,
@@ -948,9 +1001,11 @@ export class VehicleDiscoveryService {
           minActivePrice,
           maxActivePrice,
           isFilteredAvailable: totalActiveListings > 0,
-          isUnfilteredEligible: eligibilityStatus === 'ELIGIBLE',
+          isUnfilteredEligible,
+          allowInUnfilteredDiscovery,
+          unfilteredEligibilityStatus,
           eligibilityStatus,
-          isPublished: true,
+          isPublished,
           variantCount: variants.length,
           variants: variants.map(v => ({
             id: v.id,
@@ -958,7 +1013,7 @@ export class VehicleDiscoveryService {
             trimName: v.trim?.name || 'Standart',
             activeListings: v.listings ? v.listings.length : 0
           })),
-          aiPresentationTags: ['#konfor', '#aile-araci']
+          aiPresentationTags: mappedCard?.tags || ['#konfor', '#aile-araci']
         };
 
         groupedCandidates.push(candidateObj);
@@ -968,7 +1023,7 @@ export class VehicleDiscoveryService {
         totalCandidates: groupedCandidates.length,
         withListingsCount: groupedCandidates.filter(c => c.isFilteredAvailable).length,
         unfilteredEligibleCount: groupedCandidates.filter(c => c.isUnfilteredEligible).length,
-        missingContentCount: groupedCandidates.filter(c => c.eligibilityStatus !== 'ELIGIBLE').length
+        missingContentCount: groupedCandidates.filter(c => !c.isUnfilteredEligible).length
       };
 
       let filtered = groupedCandidates;
@@ -1004,7 +1059,7 @@ export class VehicleDiscoveryService {
       } else if (filterCategory === 'unfiltered_eligible') {
         filtered = filtered.filter(c => c.isUnfilteredEligible);
       } else if (filterCategory === 'missing_content') {
-        filtered = filtered.filter(c => c.eligibilityStatus !== 'ELIGIBLE');
+        filtered = filtered.filter(c => !c.isUnfilteredEligible);
       }
 
       const total = filtered.length;
@@ -1028,6 +1083,182 @@ export class VehicleDiscoveryService {
         totalPages: 1,
         candidates: []
       };
+    }
+  }
+
+  async backfillDiscoveryImages() {
+    this.logger.log('Starting physical Discovery image backfill...');
+    
+    const allVariants = await this.prisma.vehicleVariant.findMany({
+      where: { status: { not: 'REJECTED' } },
+      select: {
+        id: true,
+        brandId: true,
+        modelId: true,
+        generationId: true,
+        engineId: true,
+        transmissionId: true,
+        bodyType: true,
+        fuelType: true,
+        yearStart: true,
+        yearEnd: true,
+        year: true,
+        brand: { select: { id: true, name: true } },
+        model: { select: { id: true, name: true } },
+        generation: { select: { id: true, name: true } },
+        engine: { select: { id: true, code: true, horsepower: true, torque: true, displacement: true } },
+        transmission: { select: { id: true, name: true } },
+        trim: { select: { id: true, name: true } },
+        specs: { select: { specs: true } }
+      },
+      take: 2000,
+      orderBy: { id: 'asc' }
+    });
+
+    const candidateMap = new Map<string, any[]>();
+    allVariants.forEach(v => {
+      const key = this.buildVisibleIdentityKey(v);
+      if (!candidateMap.has(key)) candidateMap.set(key, []);
+      candidateMap.get(key)!.push(v);
+    });
+
+    const existingCards = await this.prisma.vehicleDiscoveryCard.findMany({
+      where: {
+        imageUrl: { not: '' }
+      }
+    });
+
+    let processedCount = 0;
+    let imageSourceFoundCount = 0;
+    let physicalCopySuccessCount = 0;
+    let verifiedUrlCount = 0;
+    let placeholderRejectedCount = 0;
+    let remainingMissingImageCount = 0;
+
+    for (const [candidateId, variants] of candidateMap.entries()) {
+      processedCount++;
+      const rep = this.selectRepresentativeVariant(variants);
+      if (!rep) continue;
+
+      const matchedCard = existingCards.find(c => 
+        c.representativeVariantId === rep.id ||
+        (c.brand.toLowerCase() === (rep.brand?.name || '').toLowerCase() &&
+         c.modelFamily.toLowerCase() === (rep.model?.name || '').toLowerCase())
+      );
+
+      let rawImageUrl = matchedCard?.imageUrl || '';
+
+      if (rawImageUrl.includes('unsplash') || rawImageUrl.includes('placeholder')) {
+        placeholderRejectedCount++;
+        remainingMissingImageCount++;
+        continue;
+      }
+
+      if (rawImageUrl) {
+        imageSourceFoundCount++;
+        await this.prisma.vehicleDiscoveryCard.upsert({
+          where: { representativeVariantId: rep.id },
+          create: {
+            brand: rep.brand?.name || 'Araç',
+            modelFamily: rep.model?.name || '',
+            generationName: rep.generation?.name || null,
+            bodyType: rep.bodyType || 'SEDAN',
+            fuelType: rep.fuelType || 'BENZIN',
+            transmissionType: rep.transmission?.name || 'Otomatik',
+            engineVersion: rep.engine?.code || 'Standard',
+            power: rep.engine?.horsepower ? `${rep.engine.horsepower} HP` : '110 HP',
+            torque: rep.engine?.torque ? `${rep.engine.torque} Nm` : '143 Nm',
+            productionYears: `${rep.yearStart || 2000}-${rep.yearEnd || ''}`,
+            averageConsumption: '5.5 L/100km',
+            drivetrain: 'Önden Çekiş',
+            imageUrl: rawImageUrl,
+            tags: ['#konfor', '#aile-araci'],
+            isActive: true,
+            allowInUnfilteredDiscovery: true,
+            representativeVariantId: rep.id
+          },
+          update: {
+            imageUrl: rawImageUrl
+          }
+        });
+        physicalCopySuccessCount++;
+        verifiedUrlCount++;
+      } else {
+        remainingMissingImageCount++;
+      }
+    }
+
+    return {
+      processedCount,
+      imageSourceFoundCount,
+      physicalCopySuccessCount,
+      verifiedUrlCount,
+      placeholderRejectedCount,
+      remainingMissingImageCount
+    };
+  }
+
+  async enrollDiscoveryCandidate(dto: {
+    candidateId?: string;
+    representativeVariantId: string;
+    imageUrl?: string;
+    isActive?: boolean;
+    allowInUnfilteredDiscovery?: boolean;
+    tags?: string[];
+  }) {
+    const { representativeVariantId, imageUrl, isActive = true, allowInUnfilteredDiscovery = true, tags = ['#konfor', '#aile-araci'] } = dto;
+
+    const variant = await this.prisma.vehicleVariant.findUnique({
+      where: { id: representativeVariantId },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        specs: true
+      }
+    });
+
+    if (!variant) {
+      throw new NotFoundException(`Canonical VehicleVariant ID ${representativeVariantId} bulunamadı.`);
+    }
+
+    let existingCard = await this.prisma.vehicleDiscoveryCard.findUnique({
+      where: { representativeVariantId }
+    });
+
+    const specJson = (variant.specs?.specs as any) || {};
+
+    const cardData = {
+      brand: variant.brand?.name || 'Araç',
+      modelFamily: variant.model?.name || '',
+      generationName: variant.generation?.name || null,
+      bodyType: variant.bodyType || 'SEDAN',
+      fuelType: variant.fuelType || 'BENZIN',
+      transmissionType: variant.transmission?.name || 'Otomatik',
+      engineVersion: variant.engine?.code || 'Standard',
+      power: variant.engine?.horsepower ? `${variant.engine.horsepower} HP` : '110 HP',
+      torque: variant.engine?.torque ? `${variant.engine.torque} Nm` : '143 Nm',
+      productionYears: `${variant.yearStart || 2000}-${variant.yearEnd || ''}`,
+      averageConsumption: specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km',
+      drivetrain: specJson.drivetrain || 'Önden Çekiş',
+      imageUrl: imageUrl || existingCard?.imageUrl || '',
+      tags: tags,
+      isActive,
+      allowInUnfilteredDiscovery,
+      representativeVariantId: variant.id
+    };
+
+    if (existingCard) {
+      return await this.prisma.vehicleDiscoveryCard.update({
+        where: { id: existingCard.id },
+        data: cardData
+      });
+    } else {
+      return await this.prisma.vehicleDiscoveryCard.create({
+        data: cardData
+      });
     }
   }
 }

@@ -589,38 +589,165 @@ export default function AdminVehicleDiscoveryPage() {
         </div>
       )}
 
-      {/* 5. ADD CANDIDATE MODAL */}
+      {/* 5. ADD & EDIT DISCOVERY CANDIDATE ENROLLMENT MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-[32px] max-w-md w-full p-6 shadow-2xl space-y-5 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-extrabold text-white">Keşfe Araç Ekle</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 hover:text-white">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-[32px] max-w-2xl w-full p-6 shadow-2xl space-y-6 my-8 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-lg font-extrabold text-white">Keşfe Araç Ekle / Yayın Ayarları</h3>
+                <p className="text-xs text-slate-400 font-medium">Canonical araç kimliğini seçin, Aracını Bul sunum ve görsel ayarlarını yönetin.</p>
+              </div>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300">
-              <div className="p-3.5 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-300 flex items-start gap-2.5">
-                <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-400" />
-                <div className="leading-relaxed">
-                  Aracını Bul sistemi canonical <span className="font-bold">VehicleVariant</span> veritabanı ile otomatik entegredir. <span className="font-bold">APPROVED</span> statüsündeki tüm teknik araçlar otomatik keşif adayıdır.
-                </div>
+            <div className="space-y-5 text-xs text-slate-300">
+              {/* Step 1: Candidate Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block">1. Araç Seç (Canonical Aday Kimliği)</label>
+                <select
+                  value={selectedCandidate?.representativeVariantId || ''}
+                  onChange={(e) => {
+                    const found = candidates.find(c => c.representativeVariantId === e.target.value);
+                    if (found) setSelectedCandidate(found);
+                  }}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-3 text-white text-xs font-medium focus:outline-none focus:border-orange-500"
+                >
+                  <option value="">— Canonical Araç Seçin —</option>
+                  {candidates.map((c) => (
+                    <option key={c.candidateId} value={c.representativeVariantId}>
+                      {c.brandName} {c.modelName} {c.generationName} ({c.engineVersion} · {c.transmissionName})
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <p className="text-slate-400">
-                Teknik araç verisini ikinci kez elle girmeden Araç Varyant Veritabanıüzerinden onaylı araç ekleyebilirsiniz.
-              </p>
+              {selectedCandidate && (
+                <>
+                  {/* Step 2: Auto-Filled Read-Only Specs */}
+                  <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">2. Otomatik Teknik Detaylar (Read-Only)</span>
+                      <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                        Canonical VT'den Alındı
+                      </span>
+                    </div>
 
-              <a
-                href="/admin/vehicle-data/variants"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2"
-              >
-                <span>Araç Varyant Veritabanına Git</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Motor / Güç</span>
+                        <span className="font-bold text-white">{selectedCandidate.powerHp || '—'}</span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Tork</span>
+                        <span className="font-bold text-white">{selectedCandidate.torqueNm || '—'}</span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Yakıt / Şanzıman</span>
+                        <span className="font-bold text-white">{translateFuel(selectedCandidate.fuelType)} / {translateTrans(selectedCandidate.transmissionName)}</span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Ort. Tüketim</span>
+                        <span className="font-bold text-white">{selectedCandidate.averageConsumption || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Discovery Media & Presentation Controls */}
+                  <div className="space-y-4">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">3. Aracını Bul Görseli ve Sunum Toggles</span>
+
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-400 block">Aracını Bul Özel Hero Görseli (R2 / URL)</label>
+                      <div className="flex gap-3 items-center">
+                        <input
+                          type="text"
+                          value={selectedCandidate.previewImageUrl || ''}
+                          onChange={(e) => setSelectedCandidate({ ...selectedCandidate, previewImageUrl: e.target.value })}
+                          placeholder="https://... (Örn: R2 vehicle-discovery path)"
+                          className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs font-medium focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-white text-xs block">Yayın Durumu</span>
+                          <span className="text-[10px] text-slate-400">Yayında / Taslak</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCandidate({ ...selectedCandidate, isPublished: !selectedCandidate.isPublished })}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                            selectedCandidate.isPublished 
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                              : 'bg-slate-800 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          {selectedCandidate.isPublished ? 'Yayında' : 'Taslak'}
+                        </button>
+                      </div>
+
+                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-white text-xs block">Kritersiz Keşifte Kullan</span>
+                          <span className="text-[10px] text-slate-400">Admin Keşif İzni</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCandidate({ ...selectedCandidate, allowInUnfilteredDiscovery: !selectedCandidate.allowInUnfilteredDiscovery })}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                            selectedCandidate.allowInUnfilteredDiscovery !== false
+                              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' 
+                              : 'bg-slate-800 text-slate-400 border border-white/10'
+                          }`}
+                        >
+                          {selectedCandidate.allowInUnfilteredDiscovery !== false ? 'Açık' : 'Kapalı'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 4: Live Preview & Save */}
+                  <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-slate-400">
+                      Teknik bilgiler canonical <span className="text-white font-bold font-mono">VehicleVariant</span> verisinden otomatik beslenir.
+                    </span>
+                    <button
+                      onClick={() => {
+                        const token = getAuthToken();
+                        fetchReportApi('admin/vehicle-discovery/enroll', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            representativeVariantId: selectedCandidate.representativeVariantId,
+                            imageUrl: selectedCandidate.previewImageUrl,
+                            isActive: selectedCandidate.isPublished,
+                            allowInUnfilteredDiscovery: selectedCandidate.allowInUnfilteredDiscovery,
+                            tags: selectedCandidate.aiPresentationTags
+                          })
+                        })
+                        .then((res) => {
+                          if (!res.ok) throw new Error('Enrollment güncellenemedi.');
+                          return res.json();
+                        })
+                        .then(() => {
+                          alert(`" ${selectedCandidate.brandName} ${selectedCandidate.modelName}" keşif ayarları kaydedildi.`);
+                          setIsAddModalOpen(false);
+                          fetchDiscoveryCandidates();
+                        })
+                        .catch((err) => alert(err.message));
+                      }}
+                      className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-6 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-orange-500/20 shrink-0"
+                    >
+                      Kaydet ve Ekle
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
