@@ -678,6 +678,7 @@ export class VehicleDiscoveryService {
 
     swipes.forEach(s => {
       const v = s.variant;
+      const c = s.card;
       const isLike = s.action === VehicleDiscoveryAction.LIKE;
       const weight = isLike ? 1.0 : -0.8;
 
@@ -690,14 +691,45 @@ export class VehicleDiscoveryService {
         }
         if (v.brand?.name) brandScores[v.brand.name] = (brandScores[v.brand.name] || 0) + (0.5 * weight);
         if (v.model?.name) modelFamilyScores[v.model.name] = (modelFamilyScores[v.model.name] || 0) + (0.7 * weight);
+      } else if (c) {
+        if (c.bodyType) bodyTypeScores[c.bodyType] = (bodyTypeScores[c.bodyType] || 0) + (1.5 * weight);
+        if (c.fuelType) fuelTypeScores[c.fuelType] = (fuelTypeScores[c.fuelType] || 0) + (1.0 * weight);
+        if (c.transmissionType) {
+          const transKey = c.transmissionType.toUpperCase().includes("MANUEL") || c.transmissionType.toUpperCase().includes("MANUAL") ? TransmissionType.MANUAL : TransmissionType.AUTOMATIC;
+          transmissionScores[transKey] = (transmissionScores[transKey] || 0) + (1.2 * weight);
+        }
+        if (c.brand) brandScores[c.brand] = (brandScores[c.brand] || 0) + (0.5 * weight);
+        if (c.modelFamily) modelFamilyScores[c.modelFamily] = (modelFamilyScores[c.modelFamily] || 0) + (0.7 * weight);
       }
     });
 
     const likedVariants = likes.map(l => l.variant).filter(Boolean);
+    const likedCards = likes.map(l => l.card).filter(Boolean);
 
     let recommendedVariant = likedVariants[0];
     if (!recommendedVariant && session.items.length > 0) {
       recommendedVariant = session.items[0].variant;
+    }
+
+    let topCard = likedCards[0] || (session.items[0]?.card ?? null);
+
+    if (!recommendedVariant && topCard) {
+      // Find a matching vehicle variant in db by brand / model
+      recommendedVariant = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brand: { name: { contains: topCard.brand, mode: 'insensitive' } },
+        },
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          trim: true,
+          specs: true,
+          listings: { where: { status: 'ACTIVE' }, select: { priceAmount: true } }
+        }
+      });
     }
 
     if (!recommendedVariant) {
@@ -716,15 +748,21 @@ export class VehicleDiscoveryService {
       });
     }
 
-    const activePrices = (recommendedVariant.listings || []).map((l: any) => Number(l.priceAmount)).filter((p: number) => p > 0);
+    const activePrices = (recommendedVariant?.listings || []).map((l: any) => Number(l.priceAmount)).filter((p: number) => p > 0);
     const minActivePrice = activePrices.length > 0 ? Math.min(...activePrices) : null;
     const maxActivePrice = activePrices.length > 0 ? Math.max(...activePrices) : null;
 
     const minPriceFilter = Number(session.minimumPrice) > 0 ? Number(session.minimumPrice) : undefined;
     const maxPriceFilter = session.maximumPrice ? Number(session.maximumPrice) : undefined;
 
+    const brandName = topCard?.brand || recommendedVariant?.brand?.name || 'Volkswagen';
+    const modelName = topCard?.modelFamily || recommendedVariant?.model?.name || 'Golf';
+    const bodyType = topCard?.bodyType || recommendedVariant?.bodyType || 'HATCHBACK';
+    const fuelType = topCard?.fuelType || recommendedVariant?.fuelType || 'BENZIN';
+    const transmissionType = topCard?.transmissionType || recommendedVariant?.transmission?.name || 'Otomatik';
+
     return {
-      message: "Keşif tercihlerinize göre en uygun araç önerisi.",
+      message: "Keşif tercihlerinize göre en uygun araç önerisi oluşturuldu.",
       scoringProfile: {
         bodyTypeScores,
         fuelTypeScores,
@@ -732,26 +770,28 @@ export class VehicleDiscoveryService {
         brandScores,
         modelFamilyScores
       },
+      recommendations: [],
       recommendation: {
-        recommendedVariantId: recommendedVariant.id,
-        brandId: recommendedVariant.brandId,
-        brandName: recommendedVariant.brand?.name || '',
-        modelId: recommendedVariant.modelId,
-        modelName: recommendedVariant.model?.name || '',
-        generationName: recommendedVariant.generation?.name || '',
-        bodyType: recommendedVariant.bodyType || 'SEDAN',
-        fuelType: recommendedVariant.fuelType || 'BENZIN',
-        transmissionType: recommendedVariant.transmission?.name || 'Otomatik',
+        recommendedVariantId: recommendedVariant?.id || topCard?.id || '',
+        brandId: recommendedVariant?.brandId || '',
+        brandName,
+        modelId: recommendedVariant?.modelId || '',
+        modelName,
+        generationName: recommendedVariant?.generation?.name || '',
+        bodyType,
+        fuelType,
+        transmissionType,
+        imageUrl: topCard?.imageUrl || '',
         activeListingCount: activePrices.length,
         minActivePrice,
         maxActivePrice,
         listingsQuery: {
-          vehicleVariantId: recommendedVariant.id,
-          brandId: recommendedVariant.brandId,
-          modelId: recommendedVariant.modelId,
-          bodyType: recommendedVariant.bodyType,
-          fuelType: recommendedVariant.fuelType,
-          transmission: recommendedVariant.transmission?.name,
+          vehicleVariantId: recommendedVariant?.id,
+          brandId: recommendedVariant?.brandId,
+          modelId: recommendedVariant?.modelId,
+          bodyType,
+          fuelType,
+          transmission: transmissionType,
           minPrice: minPriceFilter,
           maxPrice: maxPriceFilter
         }
