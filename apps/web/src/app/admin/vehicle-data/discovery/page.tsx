@@ -137,25 +137,25 @@ export default function AdminVehicleDiscoveryPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 bg-slate-900/80 border border-white/10 rounded-2xl backdrop-blur-md">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tüm Keşif Adayları</span>
-          <div className="text-2xl font-black text-white">{summary.totalCandidates}</div>
+          <div className="text-2xl font-black text-white">{loading ? '—' : summary.totalCandidates}</div>
           <div className="text-[10px] text-slate-500 mt-1">Gruplanmış Unique Aday</div>
         </div>
 
         <div className="p-4 bg-slate-900/80 border border-emerald-500/20 rounded-2xl backdrop-blur-md">
           <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">İlanlı Adaylar (Kriterli)</span>
-          <div className="text-2xl font-black text-emerald-400">{summary.withListingsCount}</div>
+          <div className="text-2xl font-black text-emerald-400">{loading ? '—' : summary.withListingsCount}</div>
           <div className="text-[10px] text-slate-500 mt-1">Aktif Satış İlanı Olan</div>
         </div>
 
         <div className="p-4 bg-slate-900/80 border border-sky-500/20 rounded-2xl backdrop-blur-md">
           <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider block mb-1">Kritersiz Keşfe Uygun</span>
-          <div className="text-2xl font-black text-sky-400">{summary.unfilteredEligibleCount}</div>
+          <div className="text-2xl font-black text-sky-400">{loading ? '—' : summary.unfilteredEligibleCount}</div>
           <div className="text-[10px] text-slate-500 mt-1">Görsel & Teknik Verisi Tam</div>
         </div>
 
         <div className="p-4 bg-slate-900/80 border border-amber-500/20 rounded-2xl backdrop-blur-md">
           <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-1">İçerik / Görsel Eksik</span>
-          <div className="text-2xl font-black text-amber-400">{summary.missingContentCount}</div>
+          <div className="text-2xl font-black text-amber-400">{loading ? '—' : summary.missingContentCount}</div>
           <div className="text-[10px] text-slate-500 mt-1">Fallback Medya Bekleyen</div>
         </div>
       </div>
@@ -252,8 +252,19 @@ export default function AdminVehicleDiscoveryPage() {
           Keşif adayları yükleniyor...
         </div>
       ) : error ? (
-        <div className="p-6 text-center text-rose-400 font-bold text-xs bg-rose-500/10 border border-rose-500/20 rounded-2xl">
-          {error}
+        <div className="p-8 text-center bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-3">
+          <div className="text-rose-400 font-bold text-sm">
+            Aracını Bul Keşif Adayları Yüklenemedi
+          </div>
+          <div className="text-slate-400 text-xs max-w-md mx-auto">
+            {error}
+          </div>
+          <button
+            onClick={() => fetchDiscoveryCandidates()}
+            className="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs rounded-xl border border-rose-500/30 transition cursor-pointer"
+          >
+            Tekrar Dene
+          </button>
         </div>
       ) : candidates.length === 0 ? (
         <div className="p-12 text-center text-slate-500 font-medium text-xs bg-slate-900/60 rounded-2xl border border-white/5">
