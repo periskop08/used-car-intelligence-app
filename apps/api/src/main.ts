@@ -57,7 +57,8 @@ async function bootstrap() {
     }, 15000);
   }
 
-  const port = process.env.PORT || process.env.API_PORT || 3000;
+  const rawPort = process.env.PORT || process.env.API_PORT || 3000;
+  const port = typeof rawPort === 'number' ? rawPort : parseInt(String(rawPort), 10);
   await app.listen(port, '0.0.0.0');
   console.log(`================================================================`);
   console.log(` API Service is running at: http://localhost:${port}`);
