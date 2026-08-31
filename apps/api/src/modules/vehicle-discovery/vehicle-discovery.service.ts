@@ -193,12 +193,9 @@ export class VehicleDiscoveryService {
                   drivetrain: true,
                   imageUrl: true,
                   tags: true,
-                  discoverySummary: true,
-                  guideSummary: true,
-                  highlight: true,
-                  discoveryHighlight: true,
-                  watchout: true,
-                  discoveryWatchout: true,
+                  yearFrom: true,
+                  yearTo: true,
+                  priceSnapshot: true,
                 }
               }
             }
