@@ -15,70 +15,90 @@ import {
 export class VehicleGuideService {
   constructor(private prisma: PrismaService) {}
 
+  private candidateCardsCache: { [locale: string]: { cards: any[]; timestamp: number } } = {};
+  private readonly CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes TTL
+
+  private invalidateCache() {
+    this.candidateCardsCache = {};
+  }
+
   // ==========================================
   // PUBLIC USER ACTIONS
   // ==========================================
 
   async getRandomCard(userId?: string, sessionId?: string, locale: Locale = Locale.tr) {
-    // 1. Fetch all candidate cards (APPROVED & isActive)
-    const cards = await this.prisma.vehicleGuideCard.findMany({
-      where: {
-        status: GuideStatus.APPROVED,
-        isActive: true,
-      },
-      include: {
-        translations: {
-          where: { locale },
+    const cacheKey = String(locale);
+    const now = Date.now();
+    let validCards: any[];
+
+    if (
+      this.candidateCardsCache[cacheKey] &&
+      now - this.candidateCardsCache[cacheKey].timestamp < this.CACHE_TTL_MS
+    ) {
+      validCards = this.candidateCardsCache[cacheKey].cards;
+    } else {
+      // 1. Fetch all candidate cards (APPROVED & isActive)
+      const cards = await this.prisma.vehicleGuideCard.findMany({
+        where: {
+          status: GuideStatus.APPROVED,
+          isActive: true,
         },
-        facts: {
-          where: {
-            status: GuideStatus.APPROVED,
-            isActive: true,
-            confidenceLevel: {
-              in: [DataConfidence.HIGH, DataConfidence.MEDIUM],
+        include: {
+          translations: {
+            where: { locale },
+          },
+          facts: {
+            where: {
+              status: GuideStatus.APPROVED,
+              isActive: true,
+              confidenceLevel: {
+                in: [DataConfidence.HIGH, DataConfidence.MEDIUM],
+              },
+            },
+            include: {
+              translations: {
+                where: { locale },
+              },
+            },
+            orderBy: {
+              displayOrder: 'asc',
             },
           },
-          include: {
-            translations: {
-              where: { locale },
+          technicalInfos: {
+            where: {
+              status: GuideStatus.APPROVED,
+              isActive: true,
             },
-          },
-          orderBy: {
-            displayOrder: 'asc',
-          },
-        },
-        technicalInfos: {
-          where: {
-            status: GuideStatus.APPROVED,
-            isActive: true,
-          },
-          include: {
-            translations: {
-              where: { locale },
+            include: {
+              translations: {
+                where: { locale },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    if (cards.length === 0) {
-      throw new NotFoundException('Yayında aktif araç rehberi kartı bulunamadı.');
-    }
+      if (cards.length === 0) {
+        throw new NotFoundException('Yayında aktif araç rehberi kartı bulunamadı.');
+      }
 
-    // 2. Filter candidates based on validation rules:
-    // - Must have at least 4 approved facts
-    // - Must contain at least 1 INTERESTING_FACT, 1 BUYING_TIP, 1 USER_EXPERIENCE
-    const validCards = cards.filter((card) => {
-      if (card.facts.length < 4) return false;
-      const factTypes = card.facts.map((f) => f.factType);
-      const hasInteresting = factTypes.includes(GuideFactType.INTERESTING_FACT);
-      const hasBuyingTip = factTypes.includes(GuideFactType.BUYING_TIP);
-      const hasExperience = factTypes.includes(GuideFactType.USER_EXPERIENCE);
-      return hasInteresting && hasBuyingTip && hasExperience;
-    });
+      // 2. Filter candidates based on validation rules:
+      // - Must have at least 4 approved facts
+      // - Must contain at least 1 INTERESTING_FACT, 1 BUYING_TIP, 1 USER_EXPERIENCE
+      validCards = cards.filter((card) => {
+        if (card.facts.length < 4) return false;
+        const factTypes = card.facts.map((f) => f.factType);
+        const hasInteresting = factTypes.includes(GuideFactType.INTERESTING_FACT);
+        const hasBuyingTip = factTypes.includes(GuideFactType.BUYING_TIP);
+        const hasExperience = factTypes.includes(GuideFactType.USER_EXPERIENCE);
+        return hasInteresting && hasBuyingTip && hasExperience;
+      });
 
-    if (validCards.length === 0) {
-      throw new NotFoundException('Kalite standartlarını karşılayan (min 4 fact, gerekli kategoriler) aktif kart bulunamadı.');
+      if (validCards.length === 0) {
+        throw new NotFoundException('Kalite standartlarını karşılayan (min 4 fact, gerekli kategoriler) aktif kart bulunamadı.');
+      }
+
+      this.candidateCardsCache[cacheKey] = { cards: validCards, timestamp: now };
     }
 
     // 3. Exclude cards viewed in the last 7 days (if possible)

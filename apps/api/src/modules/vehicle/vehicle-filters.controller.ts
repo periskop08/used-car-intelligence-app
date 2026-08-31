@@ -498,6 +498,7 @@ export class VehicleFiltersController {
 
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
 
+    // 1. Try strict matching first
     let engineFilterClause: any = {};
     if (targetEngine) {
       const candidates = await this.prisma.vehicleVariant.findMany({
@@ -511,7 +512,9 @@ export class VehicleFiltersController {
         select: { id: true, engine: { select: { code: true } } },
       });
       const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
-      engineFilterClause = { engine: { code: { in: rawCodes } } };
+      if (rawCodes.length > 0) {
+        engineFilterClause = { engine: { code: { in: rawCodes } } };
+      }
     }
 
     const variants = await this.prisma.vehicleVariant.findMany({
@@ -525,33 +528,87 @@ export class VehicleFiltersController {
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...(targetTrim && targetTrim !== 'Standart / Baz' ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
       },
-      include: { transmission: true, trim: true },
+      include: { transmission: true, trim: true, engine: true },
       take: 20,
     });
 
-    if (variants.length === 0) {
-      const fallbackVariants = await this.prisma.vehicleVariant.findMany({
-        where: {
-          status: 'APPROVED',
-          brand: { name: { equals: brand, mode: 'insensitive' } },
-          model: { name: { equals: targetModel, mode: 'insensitive' } },
-          year: Number(year),
-        },
-        take: 5,
-      });
+    if (variants.length > 0) {
+      const matched = targetTrans
+        ? variants.find(v => getTransmissionTr(v.transmission?.name || '').toLowerCase() === targetTrans.toLowerCase() || (v.transmission?.name || '').toLowerCase().includes(targetTrans.toLowerCase()))
+        : variants[0];
       return {
         success: true,
-        variantId: fallbackVariants[0]?.id || null,
+        variantId: matched ? matched.id : variants[0].id,
       };
     }
 
-    const matched = targetTrans
-      ? variants.find(v => getTransmissionTr(v.transmission.name).toLowerCase() === targetTrans.toLowerCase() || v.transmission.name.toLowerCase().includes(targetTrans.toLowerCase()))
-      : variants[0];
+    // 2. Intelligent Ranked Fallback: Score all candidates for this brand + model + year
+    const allYearVariants = await this.prisma.vehicleVariant.findMany({
+      where: {
+        status: 'APPROVED',
+        brand: { name: { equals: brand, mode: 'insensitive' } },
+        model: { name: { equals: targetModel, mode: 'insensitive' } },
+        year: Number(year),
+      },
+      include: { transmission: true, trim: true, engine: true },
+      take: 50,
+    });
+
+    if (allYearVariants.length === 0) {
+      return { success: true, variantId: null };
+    }
+
+    // Rank candidates by matching attributes
+    const scoredCandidates = allYearVariants.map(v => {
+      let score = 0;
+      const vFuelTr = getFuelTypeTr(v.fuelType).toLowerCase();
+      const vTransTr = getTransmissionTr(v.transmission?.name || '').toLowerCase();
+      const vEngineCode = (v.engine?.code || '').toLowerCase();
+      const vTrimName = (v.trim?.name || '').toLowerCase();
+
+      // Fuel match (highest priority: never swap Diesel for Hybrid/Petrol)
+      if (targetFuel && vFuelTr === targetFuel.toLowerCase()) {
+        score += 50;
+      }
+
+      // Transmission match
+      if (targetTrans) {
+        const transTarget = targetTrans.toLowerCase();
+        if (vTransTr === transTarget || (v.transmission?.name || '').toLowerCase().includes(transTarget)) {
+          score += 40;
+        }
+      }
+
+      // Engine match
+      if (targetEngine) {
+        const engTarget = targetEngine.toLowerCase();
+        const dispMatch = engTarget.match(/(\d+\.\d+)/);
+        if (dispMatch && vEngineCode.includes(dispMatch[1])) {
+          score += 30;
+        }
+        if (vEngineCode.includes(engTarget) || engTarget.includes(vEngineCode)) {
+          score += 15;
+        }
+      }
+
+      // Trim match
+      if (targetTrim && (vTrimName.includes(targetTrim.toLowerCase()) || targetTrim.toLowerCase().includes(vTrimName))) {
+        score += 20;
+      }
+
+      // BodyType match
+      if (targetBodyType && v.bodyType === getBodyTypeEnum(targetBodyType)) {
+        score += 10;
+      }
+
+      return { variant: v, score };
+    });
+
+    scoredCandidates.sort((a, b) => b.score - a.score);
 
     return {
       success: true,
-      variantId: matched ? matched.id : variants[0].id,
+      variantId: scoredCandidates[0].variant.id,
     };
   }
 }

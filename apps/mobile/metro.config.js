@@ -6,8 +6,10 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
+// 1. Watch all files within the monorepo
 config.watchFolders = [workspaceRoot];
 
+// 2. Specify resolution search paths
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
@@ -18,12 +20,7 @@ config.resolver.blockList = [
   new RegExp(`^${path.resolve(workspaceRoot, 'node_modules/react')}(/.*)?$`),
 ];
 
-config.resolver.extraNodeModules = {
-  'react': path.resolve(projectRoot, 'node_modules/react'),
-  'react/jsx-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-runtime.js'),
-  'react/jsx-dev-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-dev-runtime.js'),
-};
-
+// 3. Strict resolveRequest interceptor to force React 19.1.0 for ALL monorepo dependencies
 const originalResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
