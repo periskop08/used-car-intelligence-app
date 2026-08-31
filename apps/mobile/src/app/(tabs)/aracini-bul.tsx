@@ -283,9 +283,13 @@ export default function AraciniBulScreen() {
     }
 
     // 2. x-guest-token
-    const savedGuestToken = guestToken || (await AsyncStorage.getItem('discoveryGuestToken'));
-    if (savedGuestToken) {
-      headers['x-guest-token'] = savedGuestToken;
+    if (headers['x-guest-token'] === '') {
+      delete headers['x-guest-token'];
+    } else if (!headers['x-guest-token']) {
+      const savedGuestToken = guestToken || (await AsyncStorage.getItem('discoveryGuestToken'));
+      if (savedGuestToken) {
+        headers['x-guest-token'] = savedGuestToken;
+      }
     }
 
     let lastError: any = null;
@@ -396,39 +400,7 @@ export default function AraciniBulScreen() {
   const resetDiscovery = async () => {
     setGameState('loading');
     try {
-      const activeSessionId = sessionId;
-
-      // 1. If active session exists, fast-retire remaining cards so server marks it COMPLETED
-      if (activeSessionId) {
-        try {
-          let curr = currentIndex;
-          let ver = sessionVersion;
-          while (curr < targetCount && curr < 25) {
-            const nextRes = await customFetch(`${API_URL}/vehicle-discovery/sessions/${activeSessionId}/next`);
-            if (!nextRes.ok) break;
-            const nextData = await nextRes.json();
-            if (nextData.status === 'COMPLETED' || !nextData.card) break;
-
-            const swipeRes = await customFetch(`${API_URL}/vehicle-discovery/sessions/${activeSessionId}/swipes`, {
-              method: 'POST',
-              body: JSON.stringify({
-                cardId: nextData.card.id,
-                action: 'DISLIKE',
-                version: nextData.version ?? ver,
-              }),
-            });
-            if (!swipeRes.ok) break;
-            const swipeData = await swipeRes.json();
-            if (swipeData.status === 'COMPLETED') break;
-            curr++;
-            ver = (nextData.version ?? ver) + 1;
-          }
-        } catch (e) {
-          console.log('Session retirement error:', e);
-        }
-      }
-
-      // 2. Clear local guest tokens and filters
+      // 1. Clear local guest tokens and filters
       await AsyncStorage.removeItem('discoveryGuestToken');
       setGuestToken('');
       setMinPrice('');
@@ -440,16 +412,19 @@ export default function AraciniBulScreen() {
       setResultsData(null);
       setCurrentCard(null);
 
-      // 3. Request fresh brand new session (Server will now create new 0/20 session)
+      // 2. Request brand new session from server (forceNew: true creates a new 0/20 session)
       const res = await customFetch(`${API_URL}/vehicle-discovery/sessions`, {
         method: 'POST',
+        headers: {
+          'x-guest-token': '', // Ensure no old token header is sent
+        },
         body: JSON.stringify({ filters: {}, forceNew: true }),
       });
 
       if (res.ok) {
         const data = await res.json();
         const sess = data.session;
-        if (sess) {
+        if (sess && sess.id) {
           setSessionId(sess.id);
           setCurrentIndex(sess.currentIndex || 0);
           setSessionVersion(sess.version || 0);
@@ -471,6 +446,7 @@ export default function AraciniBulScreen() {
             });
           }
 
+          // Immediately fetch first card of the new session and start swiping
           await fetchNextCard(sess.id);
           return;
         }
