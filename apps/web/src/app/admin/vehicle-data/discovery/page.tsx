@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   Info
 } from 'lucide-react';
-import { API_BASE_URL, getAuthToken } from '@/utils/apiConfig';
+import { API_BASE_URL, getAuthToken, fetchReportApi } from '@/utils/apiConfig';
 import { translateBodyType } from '@/components/VehicleGuideCardLayout';
 
 export default function AdminVehicleDiscoveryPage() {
@@ -63,11 +63,9 @@ export default function AdminVehicleDiscoveryPage() {
     if (fuelType !== 'all') query += `&fuelType=${fuelType}`;
     if (transmission !== 'all') query += `&transmission=${transmission}`;
 
-    fetch(`${API_BASE_URL}/admin/vehicle-discovery/candidates${query}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetchReportApi(`admin/vehicle-discovery/candidates${query}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Aracını Bul keşif verileri yüklenemedi.');
+        if (!res.ok) throw new Error(`Aracını Bul keşif verileri yüklenemedi. (HTTP ${res.status})`);
         return res.json();
       })
       .then((data) => {
@@ -75,7 +73,7 @@ export default function AdminVehicleDiscoveryPage() {
         if (data.summary) setSummary(data.summary);
         setTotalPages(data.totalPages || 1);
       })
-      .catch((err: any) => setError(err.message))
+      .catch((err: any) => setError(err.message || 'Sunucu bağlantısı kurulamadı.'))
       .finally(() => setLoading(false));
   };
 

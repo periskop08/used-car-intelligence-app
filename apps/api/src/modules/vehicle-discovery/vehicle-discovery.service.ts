@@ -894,7 +894,7 @@ export class VehicleDiscoveryService {
     const { search, bodyType, fuelType, transmission, filterCategory = 'all', page = 1, limit = 50 } = query;
 
     const allVariants = await this.prisma.vehicleVariant.findMany({
-      where: { status: 'APPROVED' },
+      where: { status: { not: 'REJECTED' } },
       include: {
         brand: true,
         model: true,
