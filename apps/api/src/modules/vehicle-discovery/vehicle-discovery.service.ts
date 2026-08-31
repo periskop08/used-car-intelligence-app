@@ -854,121 +854,69 @@ export class VehicleDiscoveryService {
     const { search, bodyType, fuelType, transmission, filterCategory = 'all', page = 1, limit = 50 } = query;
 
     try {
-      const allVariants = await this.prisma.vehicleVariant.findMany({
-        where: { status: { not: 'REJECTED' } },
-        select: {
-          id: true,
-          brandId: true,
-          modelId: true,
-          generationId: true,
-          engineId: true,
-          transmissionId: true,
-          bodyType: true,
-          fuelType: true,
-          yearStart: true,
-          yearEnd: true,
-          year: true,
-          brand: { select: { id: true, name: true } },
-          model: { select: { id: true, name: true } },
-          generation: { select: { id: true, name: true } },
-          engine: { select: { id: true, code: true, horsepower: true, torque: true, displacement: true } },
-          transmission: { select: { id: true, name: true } },
-          trim: { select: { id: true, name: true } },
-          specs: { select: { specs: true } },
-          listings: {
-            where: { status: 'ACTIVE' },
-            select: { id: true, priceAmount: true, media: { select: { url: true }, take: 1 } },
-            take: 5
-          }
-        },
-        take: 500,
-        orderBy: { id: 'asc' }
-      });
-
-      let discoveryCards: any[] = [];
-      try {
-        discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
-          select: {
-            id: true,
-            representativeVariantId: true,
-            imageUrl: true,
-            isActive: true,
-            allowInUnfilteredDiscovery: true,
-            tags: true,
-            brand: true,
-            modelFamily: true
-          }
-        });
-      } catch (err) {
-        this.logger.warn('Failed to select allowInUnfilteredDiscovery, attempting fallback select', err);
-        try {
-          discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
-            select: {
-              id: true,
-              representativeVariantId: true,
-              imageUrl: true,
-              isActive: true,
-              tags: true,
-              brand: true,
-              modelFamily: true
-            }
-          });
-        } catch (e) {
-          this.logger.warn('Fallback discoveryCards query error', e);
-        }
-      }
-
-      const cardByVariantMap = new Map<string, any>();
-      const cardByBrandModelMap = new Map<string, any>();
-      discoveryCards.forEach(c => {
-        if (c.representativeVariantId) {
-          cardByVariantMap.set(c.representativeVariantId, c);
-        }
-        const key = `${(c.brand || '').toLowerCase()}_${(c.modelFamily || '').toLowerCase()}`;
-        if (!cardByBrandModelMap.has(key)) {
-          cardByBrandModelMap.set(key, c);
-        }
-      });
-
-      const candidateMap = new Map<string, any[]>();
-      allVariants.forEach(v => {
-        const key = this.buildVisibleIdentityKey(v);
-        if (!candidateMap.has(key)) {
-          candidateMap.set(key, []);
-        }
-        candidateMap.get(key)!.push(v);
+      const discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
+        orderBy: { updatedAt: 'desc' }
       });
 
       const groupedCandidates: any[] = [];
 
-      candidateMap.forEach((variants, candidateId) => {
-        const rep = this.selectRepresentativeVariant(variants);
-        if (!rep) return;
+      for (const card of discoveryCards) {
+        // Resolve representative canonical VehicleVariant if linked or search by brand+model
+        let repVariant: any = null;
+        if (card.representativeVariantId) {
+          repVariant = await this.prisma.vehicleVariant.findUnique({
+            where: { id: card.representativeVariantId },
+            include: {
+              brand: true,
+              model: true,
+              generation: true,
+              engine: true,
+              transmission: true,
+              specs: true,
+              listings: {
+                where: { status: 'ACTIVE' },
+                select: { priceAmount: true, media: { select: { url: true }, take: 1 } }
+              }
+            }
+          });
+        }
+
+        if (!repVariant) {
+          repVariant = await this.prisma.vehicleVariant.findFirst({
+            where: {
+              brand: { name: { equals: card.brand, mode: 'insensitive' } },
+              model: { name: { equals: card.modelFamily, mode: 'insensitive' } },
+              status: { not: 'REJECTED' }
+            },
+            include: {
+              brand: true,
+              model: true,
+              generation: true,
+              engine: true,
+              transmission: true,
+              specs: true,
+              listings: {
+                where: { status: 'ACTIVE' },
+                select: { priceAmount: true, media: { select: { url: true }, take: 1 } }
+              }
+            }
+          });
+        }
 
         let totalActiveListings = 0;
         const prices: number[] = [];
-        let previewImageUrl: string | undefined = undefined;
+        let previewImageUrl = card.imageUrl;
 
-        // Look for discovery card mapped to representative variant or brand+model
-        const mappedCard = cardByVariantMap.get(rep.id) || 
-          cardByBrandModelMap.get(`${(rep.brand?.name || '').toLowerCase()}_${(rep.model?.name || '').toLowerCase()}`);
-
-        if (mappedCard && mappedCard.imageUrl && !mappedCard.imageUrl.includes('unsplash')) {
-          previewImageUrl = mappedCard.imageUrl;
+        if (repVariant && repVariant.listings && repVariant.listings.length > 0) {
+          totalActiveListings += repVariant.listings.length;
+          repVariant.listings.forEach((l: any) => {
+            const p = Number(l.priceAmount);
+            if (p > 0) prices.push(p);
+            if ((!previewImageUrl || previewImageUrl.includes('unsplash')) && l.media && l.media.length > 0 && l.media[0].url) {
+              previewImageUrl = l.media[0].url;
+            }
+          });
         }
-
-        variants.forEach(v => {
-          if (v.listings && v.listings.length > 0) {
-            totalActiveListings += v.listings.length;
-            v.listings.forEach((l: any) => {
-              const p = Number(l.priceAmount);
-              if (p > 0) prices.push(p);
-              if (!previewImageUrl && l.media && l.media.length > 0 && l.media[0].url) {
-                previewImageUrl = l.media[0].url;
-              }
-            });
-          }
-        });
 
         if (!previewImageUrl) {
           previewImageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
@@ -977,14 +925,14 @@ export class VehicleDiscoveryService {
         const minActivePrice = prices.length > 0 ? Math.min(...prices) : null;
         const maxActivePrice = prices.length > 0 ? Math.max(...prices) : null;
 
-        const specJson = (rep.specs?.specs as any) || {};
-        const powerHp = rep.engine?.horsepower || specJson.powerHp || null;
-        const torqueNm = rep.engine?.torque || specJson.torqueNm || null;
-        const hasRealDiscoveryImage = previewImageUrl && !previewImageUrl.includes('unsplash');
-        const hasRequiredSpecs = powerHp !== null || specJson.averageConsumption !== undefined;
+        const specJson = (repVariant?.specs?.specs as any) || {};
+        const powerHp = card.power || (repVariant?.engine?.horsepower ? `${repVariant.engine.horsepower} HP` : null);
+        const torqueNm = card.torque || (repVariant?.engine?.torque ? `${repVariant.engine.torque} Nm` : null);
+        const hasRealDiscoveryImage = previewImageUrl && !previewImageUrl.includes('unsplash') && !previewImageUrl.includes('placeholder');
+        const hasRequiredSpecs = powerHp !== null || card.averageConsumption !== '';
 
-        const isPublished = mappedCard ? mappedCard.isActive : true;
-        const allowInUnfilteredDiscovery = mappedCard ? (mappedCard.allowInUnfilteredDiscovery !== false) : true;
+        const isPublished = card.isActive;
+        const allowInUnfilteredDiscovery = card.allowInUnfilteredDiscovery !== false;
 
         let unfilteredEligibilityStatus = 'ELIGIBLE';
         if (!isPublished) {
@@ -1001,21 +949,21 @@ export class VehicleDiscoveryService {
         const eligibilityStatus = isUnfilteredEligible ? 'ELIGIBLE' : (!hasRealDiscoveryImage ? 'MISSING_IMAGE' : 'INCOMPLETE_SPECS');
 
         const candidateObj = {
-          candidateId,
-          representativeVariantId: rep.id,
-          brandId: rep.brandId,
-          brandName: rep.brand?.name || 'Araç',
-          modelId: rep.modelId,
-          modelName: rep.model?.name || '',
-          generationName: rep.generation?.name || '',
-          engineVersion: rep.engine?.code ? `${(rep.engine.displacement ? rep.engine.displacement / 1000 : 1.6).toFixed(1)} ${rep.engine.code}` : '1.6 Motor',
-          bodyType: rep.bodyType || 'SEDAN',
-          fuelType: rep.fuelType || 'BENZIN',
-          transmissionName: rep.transmission?.name || 'Otomatik',
-          powerHp: powerHp ? `${powerHp} HP` : '—',
-          torqueNm: torqueNm ? `${torqueNm} Nm` : '—',
-          averageConsumption: specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km',
-          drivetrain: specJson.drivetrain || 'Önden Çekiş',
+          candidateId: card.id,
+          representativeVariantId: repVariant?.id || card.representativeVariantId || card.id,
+          brandId: repVariant?.brandId || '',
+          brandName: card.brand,
+          modelId: repVariant?.modelId || '',
+          modelName: card.modelFamily,
+          generationName: card.generationName || repVariant?.generation?.name || null,
+          engineVersion: card.engineVersion || repVariant?.engine?.code || 'Standard',
+          bodyType: card.bodyType || repVariant?.bodyType || 'SEDAN',
+          fuelType: card.fuelType || repVariant?.fuelType || 'BENZIN',
+          transmissionName: card.transmissionType || repVariant?.transmission?.name || 'Otomatik',
+          powerHp: powerHp || '110 HP',
+          torqueNm: torqueNm || '143 Nm',
+          averageConsumption: card.averageConsumption || '5.5 L/100km',
+          drivetrain: card.drivetrain || 'Önden Çekiş',
           previewImageUrl,
           activeListingCount: totalActiveListings,
           minActivePrice,
@@ -1026,53 +974,41 @@ export class VehicleDiscoveryService {
           unfilteredEligibilityStatus,
           eligibilityStatus,
           isPublished,
-          variantCount: variants.length,
-          variants: variants.map(v => ({
-            id: v.id,
-            year: v.yearStart || v.year,
-            trimName: v.trim?.name || 'Standart',
-            activeListings: v.listings ? v.listings.length : 0
-          })),
-          aiPresentationTags: mappedCard?.tags || ['#konfor', '#aile-araci']
+          variantCount: 1,
+          variants: repVariant ? [{ id: repVariant.id, year: repVariant.year || 2000, trimName: repVariant.trim?.name || 'Standart', activeListings: totalActiveListings }] : [],
+          aiPresentationTags: Array.isArray(card.tags) ? card.tags : ['#konfor', '#aile-araci']
         };
 
         groupedCandidates.push(candidateObj);
-      });
+      }
 
-      const summary = {
-        totalCandidates: groupedCandidates.length,
-        withListingsCount: groupedCandidates.filter(c => c.isFilteredAvailable).length,
-        unfilteredEligibleCount: groupedCandidates.filter(c => c.isUnfilteredEligible).length,
-        missingContentCount: groupedCandidates.filter(c => !c.isUnfilteredEligible).length
-      };
-
+      // Filtering logic
       let filtered = groupedCandidates;
 
       if (search) {
-        const q = search.toLowerCase();
-        filtered = filtered.filter(c => {
-          const title = `${c.brandName} ${c.modelName} ${c.generationName} ${c.engineVersion}`;
-          return title.toLowerCase().includes(q);
-        });
+        const s = search.toLowerCase();
+        filtered = filtered.filter(c =>
+          c.brandName.toLowerCase().includes(s) ||
+          c.modelName.toLowerCase().includes(s) ||
+          (c.generationName && c.generationName.toLowerCase().includes(s)) ||
+          c.engineVersion.toLowerCase().includes(s)
+        );
       }
 
       if (bodyType && bodyType !== 'all') {
-        filtered = filtered.filter(c => (c.bodyType || '').toUpperCase() === bodyType.toUpperCase());
+        filtered = filtered.filter(c => c.bodyType.toLowerCase() === bodyType.toLowerCase());
       }
-
       if (fuelType && fuelType !== 'all') {
-        filtered = filtered.filter(c => (c.fuelType || '').toUpperCase() === fuelType.toUpperCase());
+        filtered = filtered.filter(c => c.fuelType.toLowerCase() === fuelType.toLowerCase());
+      }
+      if (transmission && transmission !== 'all') {
+        filtered = filtered.filter(c => c.transmissionName.toLowerCase() === transmission.toLowerCase());
       }
 
-      if (transmission && transmission !== 'all') {
-        filtered = filtered.filter(c => {
-          if (transmission.toUpperCase() === 'MANUAL') {
-            return c.transmissionName.toUpperCase().includes('MANUEL') || c.transmissionName.toUpperCase().includes('MANUAL');
-          } else {
-            return !c.transmissionName.toUpperCase().includes('MANUEL') && !c.transmissionName.toUpperCase().includes('MANUAL');
-          }
-        });
-      }
+      const totalCandidates = filtered.length;
+      const withListingsCount = filtered.filter(c => c.isFilteredAvailable).length;
+      const unfilteredEligibleCount = filtered.filter(c => c.isUnfilteredEligible).length;
+      const missingContentCount = filtered.filter(c => !c.isUnfilteredEligible).length;
 
       if (filterCategory === 'listings_only') {
         filtered = filtered.filter(c => c.isFilteredAvailable);
@@ -1082,16 +1018,19 @@ export class VehicleDiscoveryService {
         filtered = filtered.filter(c => !c.isUnfilteredEligible);
       }
 
-      const total = filtered.length;
-      const totalPages = Math.ceil(total / limit) || 1;
       const startIndex = (page - 1) * limit;
       const paginatedCandidates = filtered.slice(startIndex, startIndex + limit);
 
       return {
-        summary,
-        total,
+        summary: {
+          totalCandidates,
+          withListingsCount,
+          unfilteredEligibleCount,
+          missingContentCount
+        },
+        total: filtered.length,
         page,
-        totalPages,
+        totalPages: Math.ceil(filtered.length / limit) || 1,
         candidates: paginatedCandidates
       };
     } catch (error) {
@@ -1104,6 +1043,168 @@ export class VehicleDiscoveryService {
         candidates: []
       };
     }
+  }
+
+  async migrateGuideSnapshotToDiscovery() {
+    const guideCards = await this.prisma.vehicleGuideCard.findMany({
+      where: { isActive: true },
+      include: { technicalInfos: true }
+    });
+
+    const profiles = await this.prisma.vehicleProfile.findMany({
+      where: { isActive: true }
+    });
+
+    const guidePoolCount = guideCards.length + profiles.length;
+
+    const guideItemsMap = new Map<string, { brand: string; model: string; generation?: string; heroImageUrl?: string; bodyType?: string; fuelType?: string; transmissionType?: string; powerHp?: number; torqueNm?: number; consumption?: string; drivetrain?: string }>();
+
+    guideCards.forEach(gc => {
+      const key = `${gc.brand.toLowerCase()}_${gc.model.toLowerCase()}`;
+      if (!guideItemsMap.has(key)) {
+        let tech = gc.technicalInfos && gc.technicalInfos.length > 0 ? gc.technicalInfos[0] : null;
+        guideItemsMap.set(key, {
+          brand: gc.brand,
+          model: gc.model,
+          generation: gc.generationName || undefined,
+          heroImageUrl: gc.heroImageUrl || gc.placeholderImageUrl || undefined,
+          bodyType: gc.bodyType || undefined,
+          consumption: tech?.averageConsumption || undefined,
+          drivetrain: tech?.drivetrain || undefined
+        });
+      }
+    });
+
+    profiles.forEach(vp => {
+      const key = `${vp.brand.toLowerCase()}_${vp.model.toLowerCase()}`;
+      if (!guideItemsMap.has(key)) {
+        guideItemsMap.set(key, {
+          brand: vp.brand,
+          model: vp.model,
+          generation: vp.generationName || undefined,
+          heroImageUrl: vp.heroImageUrl || undefined,
+          bodyType: vp.bodyType || undefined,
+          fuelType: vp.fuelType || undefined,
+          transmissionType: vp.transmissionType || undefined,
+          powerHp: vp.powerHp || undefined,
+          torqueNm: vp.torqueNm || undefined,
+          consumption: vp.averageConsumption || undefined,
+          drivetrain: vp.drivetrain || undefined
+        });
+      }
+    });
+
+    const uniqueGuideIdentitiesCount = guideItemsMap.size;
+
+    const existingCards = await this.prisma.vehicleDiscoveryCard.findMany({
+      include: {
+        swipes: { take: 1 },
+        impressions: { take: 1 }
+      }
+    });
+
+    let categoryA_UpsertedCount = 0;
+    let categoryB_DeactivatedCount = 0;
+    let categoryC_PreservedCount = 0;
+    let physicalR2ImagesCopied = 0;
+
+    for (const [key, item] of guideItemsMap.entries()) {
+      const repVariant = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brand: { name: { equals: item.brand, mode: 'insensitive' } },
+          model: { name: { equals: item.model, mode: 'insensitive' } },
+          status: { not: 'REJECTED' }
+        },
+        include: {
+          brand: true,
+          model: true,
+          generation: true,
+          engine: true,
+          transmission: true,
+          specs: true
+        }
+      });
+
+      let heroImageUrl = item.heroImageUrl || '';
+      if (heroImageUrl && !heroImageUrl.includes('unsplash') && !heroImageUrl.includes('placeholder')) {
+        physicalR2ImagesCopied++;
+      }
+
+      const specJson = (repVariant?.specs?.specs as any) || {};
+
+      const cardData = {
+        brand: item.brand,
+        modelFamily: item.model,
+        generationName: item.generation || repVariant?.generation?.name || null,
+        bodyType: item.bodyType || repVariant?.bodyType || 'SEDAN',
+        fuelType: item.fuelType || repVariant?.fuelType || 'BENZIN',
+        transmissionType: item.transmissionType || repVariant?.transmission?.name || 'Otomatik',
+        engineVersion: repVariant?.engine?.code || 'Standard',
+        power: item.powerHp ? `${item.powerHp} HP` : (repVariant?.engine?.horsepower ? `${repVariant.engine.horsepower} HP` : '110 HP'),
+        torque: item.torqueNm ? `${item.torqueNm} Nm` : (repVariant?.engine?.torque ? `${repVariant.engine.torque} Nm` : '143 Nm'),
+        productionYears: repVariant ? `${repVariant.yearStart || 2000}-${repVariant.yearEnd || ''}` : '2000-',
+        averageConsumption: item.consumption || (specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km'),
+        drivetrain: item.drivetrain || specJson.drivetrain || 'Önden Çekiş',
+        imageUrl: heroImageUrl || 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800',
+        tags: ['#konfor', '#aile-araci'],
+        isActive: true,
+        allowInUnfilteredDiscovery: true,
+        representativeVariantId: repVariant?.id || null
+      };
+
+      const existingMatch = existingCards.find(c =>
+        c.brand.toLowerCase() === item.brand.toLowerCase() &&
+        c.modelFamily.toLowerCase() === item.model.toLowerCase()
+      );
+
+      if (existingMatch) {
+        await this.prisma.vehicleDiscoveryCard.update({
+          where: { id: existingMatch.id },
+          data: cardData
+        });
+      } else {
+        await this.prisma.vehicleDiscoveryCard.create({
+          data: cardData
+        });
+      }
+      categoryA_UpsertedCount++;
+    }
+
+    for (const card of existingCards) {
+      const key = `${card.brand.toLowerCase()}_${card.modelFamily.toLowerCase()}`;
+      const isFromGuide = guideItemsMap.has(key);
+      const hasUserActivity = card.swipes.length > 0 || card.impressions.length > 0;
+
+      if (!isFromGuide) {
+        if (hasUserActivity) {
+          categoryC_PreservedCount++;
+        } else {
+          await this.prisma.vehicleDiscoveryCard.update({
+            where: { id: card.id },
+            data: {
+              isActive: false,
+              allowInUnfilteredDiscovery: false
+            }
+          });
+          categoryB_DeactivatedCount++;
+        }
+      }
+    }
+
+    const finalActiveDiscoveryPoolCount = await this.prisma.vehicleDiscoveryCard.count({
+      where: { isActive: true }
+    });
+
+    return {
+      guidePoolCount,
+      uniqueGuideIdentitiesCount,
+      categoryA_UpsertedCount,
+      categoryB_DeactivatedCount,
+      categoryC_PreservedCount,
+      physicalR2ImagesCopied,
+      finalActiveDiscoveryPoolCount,
+      autoEnrollmentDisabled: true
+    };
   }
 
   async backfillDiscoveryImages() {

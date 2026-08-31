@@ -53,6 +53,12 @@ export class AdminVehicleDiscoveryController {
     return this.discoveryService.backfillDiscoveryImages();
   }
 
+  @Post('migrate-guide-snapshot')
+  @ApiOperation({ summary: 'Araç Rehberi havuzunu 1:1 snapshot kopyalayarak Aracını Bul başlangıç havuzunu oluşturur' })
+  async migrateGuideSnapshot() {
+    return this.discoveryService.migrateGuideSnapshotToDiscovery();
+  }
+
   @Post('enroll')
   @ApiOperation({ summary: 'Yeni discovery candidate ekler veya mevcut candidate sunum ayarlarını günceller' })
   async enrollCandidate(

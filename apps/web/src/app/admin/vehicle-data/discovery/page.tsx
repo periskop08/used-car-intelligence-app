@@ -20,7 +20,8 @@ import {
   SlidersHorizontal,
   Check,
   ShieldCheck,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 import { API_BASE_URL, getAuthToken, fetchReportApi } from '@/utils/apiConfig';
 import { translateBodyType } from '@/components/VehicleGuideCardLayout';
@@ -124,13 +125,43 @@ export default function AdminVehicleDiscoveryPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Keşfe Araç Ekle</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (confirm("Araç Rehberi'nin mevcut havuzundan 1:1 snapshot kopyası oluşturulup Aracını Bul havuzu kurulacak. Onaylıyor musunuz?")) {
+                fetchReportApi('admin/vehicle-discovery/migrate-guide-snapshot', {
+                  method: 'POST'
+                })
+                .then(res => res.json())
+                .then(data => {
+                  alert(
+                    `✅ Snapshot Migration Başarıyla Tamamlandı!\n\n` +
+                    `• Araç Rehberi Mevcut Araç Sayısı: ${data.guidePoolCount}\n` +
+                    `• Benzersiz Kimlik Sayısı: ${data.uniqueGuideIdentitiesCount}\n` +
+                    `• Rehber Snapshot'ından Oluşturulan Aday: ${data.categoryA_UpsertedCount}\n` +
+                    `• Pasife Alınan Katalog Aday Sayısı: ${data.categoryB_DeactivatedCount}\n` +
+                    `• Korunan Manuel Admin Kaydı: ${data.categoryC_PreservedCount}\n` +
+                    `• Güncel Aktif Discovery Havuzu: ${data.finalActiveDiscoveryPoolCount}`
+                  );
+                  fetchDiscoveryCandidates();
+                })
+                .catch(err => alert('Migration hatası: ' + err.message));
+              }
+            }}
+            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
+            <span>Rehber'den Snapshot Al</span>
+          </button>
+
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Keşfe Araç Ekle</span>
+          </button>
+        </div>
       </div>
 
       {/* 1. TOP SUMMARY STATS BAR */}
