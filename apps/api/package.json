@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "prisma generate && prisma db push --accept-data-loss && nest build",
+    "build": "prisma generate && nest build",
     "postbuild": "node -e \"const fs = require('fs'); if (fs.existsSync('dist/src/main.js') && !fs.existsSync('dist/main.js')) fs.copyFileSync('dist/src/main.js', 'dist/main.js'); if (fs.existsSync('dist/main.js') && !fs.existsSync('dist/src/main.js')) { fs.mkdirSync('dist/src', { recursive: true }); fs.copyFileSync('dist/main.js', 'dist/src/main.js'); }\"",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
