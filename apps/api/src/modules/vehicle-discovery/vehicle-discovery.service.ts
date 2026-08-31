@@ -943,20 +943,36 @@ export class VehicleDiscoveryService {
 
     const allVariants = await this.prisma.vehicleVariant.findMany({
       where: { status: { not: 'REJECTED' } },
-      include: {
-        brand: true,
-        model: true,
-        generation: true,
-        engine: true,
-        transmission: true,
-        trim: true,
-        specs: true,
-        profileMappings: { include: { profile: true } },
+      select: {
+        id: true,
+        brandId: true,
+        modelId: true,
+        generationId: true,
+        engineId: true,
+        transmissionId: true,
+        bodyType: true,
+        fuelType: true,
+        yearStart: true,
+        yearEnd: true,
+        year: true,
+        brand: { select: { id: true, name: true } },
+        model: { select: { id: true, name: true } },
+        generation: { select: { id: true, name: true } },
+        engine: { select: { id: true, code: true, horsepower: true, torque: true, displacement: true } },
+        transmission: { select: { id: true, name: true } },
+        trim: { select: { id: true, name: true } },
+        specs: { select: { specs: true } },
+        profileMappings: {
+          select: { profile: { select: { heroImageUrl: true } } },
+          take: 1
+        },
         listings: {
           where: { status: 'ACTIVE' },
-          select: { id: true, priceAmount: true, media: { take: 1 } }
+          select: { id: true, priceAmount: true, media: { select: { url: true }, take: 1 } },
+          take: 5
         }
       },
+      take: 2000,
       orderBy: [{ brand: { name: 'asc' } }, { model: { name: 'asc' } }]
     });
 
