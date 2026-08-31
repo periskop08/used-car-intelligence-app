@@ -1,26 +1,42 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, Platform } from 'react-native';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: '#0f172a', // Slate 900
+          backgroundColor: '#ffffff',
           borderTopWidth: 1,
-          borderTopColor: 'rgba(255, 255, 255, 0.05)',
+          borderTopColor: '#e2e8f0',
           paddingTop: 8,
-          height: 60,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+          height: Platform.OS === 'ios' ? 88 : 72,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
         },
-        tabBarActiveTintColor: '#f97316', // Orange 500
-        tabBarInactiveTintColor: '#64748b', // Slate 500
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        tabBarActiveTintColor: '#ea580c',
+        tabBarInactiveTintColor: '#64748b',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+          marginTop: 2,
+        },
         headerStyle: {
-          backgroundColor: '#0f172a',
+          backgroundColor: '#ffffff',
         },
-        headerTintColor: '#f8fafc',
+        headerTintColor: '#0f172a',
         headerTitleStyle: {
-          fontWeight: '900',
+          fontWeight: '800',
         },
         headerShadowVisible: false,
       }}
@@ -28,10 +44,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'TorqueScout',
-          tabBarLabel: 'Ana Sayfa',
+          headerShown: false,
+          tabBarLabel: 'Sorgula',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -41,7 +57,19 @@ export default function TabsLayout() {
           title: 'Keşfet',
           tabBarLabel: 'Keşfet',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="listings"
+        options={{
+          title: 'İlanlar',
+          tabBarLabel: 'İlanlar',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={styles.centerTabBadge}>
+              <Ionicons name="car-sport" size={24} color="#ffffff" />
+            </View>
           ),
         }}
       />
@@ -54,39 +82,47 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="vehicle-guide"
         options={{
+          title: 'Araç Rehberi',
           href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="listings"
-        options={{
-          title: 'İlanlar',
-          tabBarLabel: 'Pazaryeri',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'pricetags' : 'pricetags-outline'} size={20} color={color} />
-          ),
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Mesajlar',
-          tabBarLabel: 'Sohbet',
+          title: 'Paketler & Sohbet',
+          tabBarLabel: 'Paketler',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'gift' : 'gift-outline'} size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profilim',
+          title: 'Profilim & Hesabım',
           tabBarLabel: 'Profil',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={20} color={color} />
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  centerTabBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#ea580c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -18,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+});

@@ -28,7 +28,7 @@ export default function LoginScreen() {
       if (res.ok && data.accessToken) {
         await AsyncStorage.setItem('accessToken', data.accessToken);
         Alert.alert('Başarılı', 'Giriş yapıldı.');
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/profile');
       } else {
         Alert.alert('Hata', data.message || 'E-posta veya şifre hatalı.');
       }

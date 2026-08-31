@@ -8,24 +8,25 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#0f172a', // Slate 900
+            backgroundColor: '#ffffff',
           },
-          headerTintColor: '#f8fafc', // Slate 50
+          headerTintColor: '#0f172a',
           headerTitleStyle: {
-            fontWeight: '900',
+            fontWeight: '800',
           },
           contentStyle: {
-            backgroundColor: '#0f172a',
+            backgroundColor: '#f8fafc',
           },
           headerShadowVisible: false,
         }}
       >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ title: 'Giriş Yap', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="register" options={{ title: 'Kayıt Ol', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="vehicle-query" options={{ title: 'Araç Sorgula', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="vehicle-report" options={{ title: 'Araç Raporu', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="comparison" options={{ title: 'Araç Karşılaştır', headerBackTitle: 'Geri' }} />
+        <Stack.Screen name="vehicle-report" options={{ headerShown: false }} />
+        <Stack.Screen name="comparison" options={{ headerShown: false }} />
         <Stack.Screen name="add-vehicle" options={{ title: 'Araç Öner', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="listings/create" options={{ title: 'İlan Ver', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="listings/[id]" options={{ title: 'İlan Detayı', headerBackTitle: 'Geri' }} />
@@ -41,6 +42,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
   },
 });

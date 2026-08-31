@@ -43,7 +43,7 @@ export default function ChatRoomScreen() {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
-        const res = await fetch(`${API_URL}/auth/profile`, {
+        const res = await fetch(`${API_URL}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {

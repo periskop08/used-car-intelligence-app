@@ -46,7 +46,7 @@ export default function ListingDetailScreen() {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
-        const res = await fetch(`${API_URL}/auth/profile`, {
+        const res = await fetch(`${API_URL}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -137,15 +137,17 @@ export default function ListingDetailScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {/* Title Block */}
             <View style={styles.card}>
-              <Text style={styles.price}>{listing.price.toLocaleString('tr-TR')} TL</Text>
+              <Text style={styles.price}>{(listing.price ?? 0).toLocaleString('tr-TR')} TL</Text>
               <Text style={styles.title}>{listing.title}</Text>
               
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{listing.year} Model</Text>
+                  <Ionicons name="calendar-outline" size={16} color="#94a3b8" />
+                  <Text style={styles.badgeText}>{listing.year || '-'}</Text>
                 </View>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{listing.mileage.toLocaleString('tr-TR')} km</Text>
+                  <Ionicons name="speedometer-outline" size={16} color="#94a3b8" />
+                  <Text style={styles.badgeText}>{(listing.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
                 </View>
               </View>
             </View>

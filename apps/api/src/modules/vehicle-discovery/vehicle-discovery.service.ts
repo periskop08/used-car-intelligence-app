@@ -277,212 +277,67 @@ export class VehicleDiscoveryService {
     const db = tx || this.prisma;
 
     let warning: string | null = null;
-    let candidateItems: { variantId: string; imageSourceUrl?: string }[] = [];
-    let effectiveTargetCount = session.targetCount;
+    let effectiveTargetCount = session.targetCount || 20;
+
+    // Fetch all active curated discovery cards (825 curated records with real R2 images)
+    const allCards = await db.vehicleDiscoveryCard.findMany({
+      where: {
+        isActive: true,
+      },
+    });
+
+    let eligibleCards = allCards;
 
     if (session.mode === VehicleDiscoveryMode.FILTERED) {
-      const filterMin = Number(session.minimumPrice) || 0;
-      const filterMax = session.maximumPrice ? Number(session.maximumPrice) : Infinity;
-
-      const activeListings = await db.vehicleListing.findMany({
-        where: {
-          status: 'ACTIVE',
-          vehicleVariantId: { not: null },
-          priceAmount: {
-            gte: filterMin,
-            ...(session.maximumPrice ? { lte: filterMax } : {})
-          }
-        },
-        include: {
-          media: { take: 2 },
-          vehicleVariant: {
-            include: {
-              brand: true,
-              model: true,
-              generation: true,
-              engine: true,
-              transmission: true,
-              trim: true,
-              specs: true,
-            }
-          }
-        }
-      });
-
-      const matchingListings = activeListings.filter(l => {
-        const v = l.vehicleVariant;
-        if (!v) return false;
-
-        if (session.bodyTypes && session.bodyTypes.length > 0) {
-          const bodyMatch = (v.bodyType && session.bodyTypes.includes(v.bodyType)) || (l.bodyType && session.bodyTypes.includes(l.bodyType));
-          if (!bodyMatch) return false;
-        }
-
-        if (session.fuelTypes && session.fuelTypes.length > 0) {
-          const fuelMatch = (v.fuelType && session.fuelTypes.includes(v.fuelType)) || (l.fuelType && session.fuelTypes.includes(l.fuelType));
-          if (!fuelMatch) return false;
-        }
-
-        if (session.transmissions && session.transmissions.length > 0) {
-          const transName = v.transmission?.name || (l.transmission ? String(l.transmission) : '');
-          if (!this.isTransmissionMatch(transName, session.transmissions)) return false;
-        }
-
-        return true;
-      });
-
-      const candidateMap = new Map<string, { listings: typeof matchingListings; variants: any[] }>();
-
-      matchingListings.forEach(l => {
-        const v = l.vehicleVariant;
-        const key = this.buildVisibleIdentityKey(v);
-        if (!candidateMap.has(key)) {
-          candidateMap.set(key, { listings: [], variants: [] });
-        }
-        const group = candidateMap.get(key)!;
-        group.listings.push(l);
-        group.variants.push(v);
-      });
-
-      const candidateKeys = Array.from(candidateMap.keys());
-      const seed = this.getSeedFromString(session.id + "_" + session.filterRevision);
-      const shuffledKeys = this.shuffleWithSeed(candidateKeys, seed);
-
-      candidateItems = shuffledKeys.map(key => {
-        const group = candidateMap.get(key)!;
-        const repVariant = this.selectRepresentativeVariant(group.variants);
-        let imageSourceUrl: string | undefined = undefined;
-        for (const listing of group.listings) {
-          if (listing.media && listing.media.length > 0 && listing.media[0].url) {
-            imageSourceUrl = listing.media[0].url;
-            break;
-          }
-        }
-        return {
-          variantId: repVariant.id,
-          imageSourceUrl
-        };
-      });
-
-      if (candidateItems.length < 20) {
-        const matchingCount = candidateItems.length;
-        if (matchingCount === 0) {
-          warning = "Seçtiğiniz filtrelere uyan aktif ilan bulunamadı, tercih analizi için genel havuzdan araçlar gösteriliyor.";
-        } else {
-          warning = `Seçtiğiniz filtrelere uyan ${matchingCount} araç bulundu. Tercih analiziniz için kalan kartlar genel havuzdan tamamlandı.`;
-        }
-
-        // Fetch extra variants from catalog to reach 20 candidates
-        const existingVariantIds = new Set(candidateItems.map(c => c.variantId));
-        const extraVariants = await db.vehicleVariant.findMany({
-          where: {
-            status: 'APPROVED',
-            id: { notIn: Array.from(existingVariantIds) }
-          },
-          take: 100,
-          include: {
-            brand: true,
-            model: true,
-            generation: true,
-            engine: true,
-            transmission: true,
-            trim: true,
-            specs: true,
-            listings: { where: { status: 'ACTIVE' }, take: 1, include: { media: { take: 1 } } }
-          }
-        });
-
-        const seedExtra = this.getSeedFromString(session.id + "_extra_" + session.filterRevision);
-        const shuffledExtras = this.shuffleWithSeed(extraVariants, seedExtra);
-
-        for (const extVar of shuffledExtras) {
-          if (candidateItems.length >= 20) break;
-          let imageSourceUrl: string | undefined = undefined;
-          if (extVar.listings && extVar.listings.length > 0 && extVar.listings[0].media && extVar.listings[0].media.length > 0) {
-            imageSourceUrl = extVar.listings[0].media[0].url;
-          }
-          candidateItems.push({
-            variantId: extVar.id,
-            imageSourceUrl
-          });
-        }
+      if (session.bodyTypes && session.bodyTypes.length > 0) {
+        const bodies = session.bodyTypes.map((b: string) => b.toUpperCase());
+        eligibleCards = eligibleCards.filter((c) => bodies.includes((c.bodyType || '').toUpperCase()));
       }
 
-      effectiveTargetCount = Math.min(20, candidateItems.length);
+      if (session.fuelTypes && session.fuelTypes.length > 0) {
+        const fuels = session.fuelTypes.map((f: string) => f.toUpperCase());
+        eligibleCards = eligibleCards.filter((c) => {
+          const fuelUpper = (c.fuelType || '').toUpperCase();
+          return fuels.some((f) => fuelUpper.includes(f) || f.includes(fuelUpper));
+        });
+      }
 
-    } else {
-      // Unfiltered Random Mode: Query canonical VehicleVariant catalog
-      const variants = await db.vehicleVariant.findMany({
-        where: {
-          status: 'APPROVED',
-        },
-        take: 300,
-        include: {
-          brand: true,
-          model: true,
-          generation: true,
-          engine: true,
-          transmission: true,
-          trim: true,
-          specs: true,
-          profileMappings: {
-            include: {
-              profile: true
-            }
-          },
-          listings: {
-            where: { status: 'ACTIVE' },
-            take: 1,
-            include: { media: { take: 1 } }
-          }
+      if (session.transmissions && session.transmissions.length > 0) {
+        eligibleCards = eligibleCards.filter((c) =>
+          this.isTransmissionMatch(c.transmissionType, session.transmissions)
+        );
+      }
+
+      if (eligibleCards.length < 20) {
+        if (eligibleCards.length === 0) {
+          warning = "Seçtiğiniz filtrelere uyan kart bulunamadı, tüm popüler araçlar gösteriliyor.";
+          eligibleCards = allCards;
+        } else {
+          warning = `Filtrelerinize uyan ${eligibleCards.length} araç bulundu, liste genel havuzla tamamlandı.`;
+          // Append other cards not in eligibleCards
+          const existingIds = new Set(eligibleCards.map((c) => c.id));
+          const remainders = allCards.filter((c) => !existingIds.has(c.id));
+          eligibleCards = [...eligibleCards, ...remainders];
         }
-      });
-
-      const candidateMap = new Map<string, any[]>();
-      variants.forEach(v => {
-        const key = this.buildVisibleIdentityKey(v);
-        if (!candidateMap.has(key)) {
-          candidateMap.set(key, []);
-        }
-        candidateMap.get(key)!.push(v);
-      });
-
-      const candidateKeys = Array.from(candidateMap.keys());
-      const seed = this.getSeedFromString(session.id + "_" + session.filterRevision);
-      const shuffledKeys = this.shuffleWithSeed(candidateKeys, seed);
-
-      candidateItems = shuffledKeys.slice(0, 20).map(key => {
-        const group = candidateMap.get(key)!;
-        const repVariant = this.selectRepresentativeVariant(group);
-        let imageSourceUrl: string | undefined = undefined;
-
-        if (repVariant.profileMappings && repVariant.profileMappings.length > 0 && repVariant.profileMappings[0].profile?.heroImageUrl) {
-          imageSourceUrl = repVariant.profileMappings[0].profile.heroImageUrl;
-        } else if (repVariant.listings && repVariant.listings.length > 0 && repVariant.listings[0].media && repVariant.listings[0].media.length > 0) {
-          imageSourceUrl = repVariant.listings[0].media[0].url;
-        }
-
-        return {
-          variantId: repVariant.id,
-          imageSourceUrl
-        };
-      });
-
-      effectiveTargetCount = Math.min(20, candidateItems.length);
+      }
     }
 
-    const itemsToInsert = candidateItems.slice(0, effectiveTargetCount - startIndex).map((cand, idx) => ({
+    const seed = this.getSeedFromString(session.id + "_" + (session.filterRevision || 0));
+    const shuffledCards = this.shuffleWithSeed(eligibleCards, seed);
+    const selectedCards = shuffledCards.slice(0, 20);
+
+    const itemsToInsert = selectedCards.slice(0, effectiveTargetCount - startIndex).map((card, idx) => ({
       sessionId: session.id,
-      vehicleVariantId: cand.variantId,
+      vehicleDiscoveryCardId: card.id,
       position: startIndex + idx,
       action: null,
       shownAt: null,
-      actionAt: null
+      actionAt: null,
     }));
 
     if (itemsToInsert.length > 0) {
       await db.vehicleDiscoverySessionItem.createMany({
-        data: itemsToInsert
+        data: itemsToInsert,
       });
     }
 

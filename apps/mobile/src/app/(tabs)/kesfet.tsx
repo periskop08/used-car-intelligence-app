@@ -12,21 +12,21 @@ export default function KesfetHub() {
       description: 'Hangi araç alınır? Kronik sorunları ve detaylı teknik özellikleri dikey kart rehberimizden inceleyin.',
       icon: 'book',
       route: '/(tabs)/vehicle-guide',
-      color: '#3b82f6', // Blue 500
+      color: '#0284c7',
     },
     {
       title: 'Aracını Bul',
       description: 'Hızlı kaydırmalı (swipe) kartlar ve kişiselleştirilmiş tercih profiliyle hayalindeki aracı keşfet.',
       icon: 'car-sport',
       route: '/(tabs)/aracini-bul',
-      color: '#ec4899', // Pink 500
+      color: '#ea580c',
     },
     {
       title: 'İlan Akışı',
       description: 'Aktif ilanları Reels / TikTok tarzı dikey bir akışta kaydırarak rastgele ve eğlenceli şekilde keşfedin.',
       icon: 'play-circle',
       route: '/ilan-akisi',
-      color: '#f97316', // Orange 500
+      color: '#16a34a',
     },
   ];
 
@@ -41,18 +41,18 @@ export default function KesfetHub() {
         {options.map((opt, index) => (
           <TouchableOpacity
             key={index}
-            style={[styles.card, { borderColor: opt.color + '33' }]}
-            activeOpacity={0.7}
+            style={[styles.card, { borderColor: opt.color + '22' }]}
+            activeOpacity={0.8}
             onPress={() => router.push(opt.route as any)}
           >
-            <View style={[styles.iconContainer, { backgroundColor: opt.color + '15' }]}>
+            <View style={[styles.iconContainer, { backgroundColor: opt.color + '12' }]}>
               <Ionicons name={opt.icon as any} size={28} color={opt.color} />
             </View>
             <View style={styles.cardText}>
               <Text style={[styles.cardTitle, { color: opt.color }]}>{opt.title}</Text>
               <Text style={styles.cardDesc}>{opt.description}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#475569" style={styles.arrow} />
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" style={styles.arrow} />
           </TouchableOpacity>
         ))}
       </View>
@@ -63,7 +63,7 @@ export default function KesfetHub() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
   },
   content: {
     padding: 20,
@@ -75,12 +75,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#64748b',
     lineHeight: 18,
   },
   grid: {
@@ -89,15 +89,15 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderWidth: 1.5,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
     borderRadius: 20,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   iconContainer: {
     width: 52,
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   cardDesc: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     lineHeight: 16,
   },
   arrow: {

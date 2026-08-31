@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
 interface Photo {
   id: string;
@@ -415,7 +415,7 @@ export default function ListingFeedScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Fiyat</Text>
                 <Text style={styles.infoValuePrice}>
-                  {item.price.toLocaleString('tr-TR')} {item.currency}
+                  {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
                 </Text>
               </View>
               <View style={styles.infoRow}>
@@ -428,7 +428,7 @@ export default function ListingFeedScreen() {
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>KM</Text>
-                <Text style={styles.infoValue}>{item.vehicle.mileage.toLocaleString('tr-TR')} km</Text>
+                <Text style={styles.infoValue}>{(item.vehicle.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Yakıt</Text>

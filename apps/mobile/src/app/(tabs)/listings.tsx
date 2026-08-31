@@ -98,7 +98,16 @@ export default function ListingsScreen() {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setListings(data.listings || data);
+        const apiItems = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.listings)
+          ? data.listings
+          : [];
+        setListings(apiItems);
       }
     } catch (e) {
       console.error(e);
@@ -171,10 +180,11 @@ export default function ListingsScreen() {
                   {item.vehicleVariant?.brand.name} {item.vehicleVariant?.model.name} ({item.year})
                 </Text>
                 <View style={styles.detailsRow}>
-                  <Text style={styles.detailsText}>{item.mileage.toLocaleString('tr-TR')} km</Text>
+                  <Text style={styles.detailsText}>{(item.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
                   <Text style={styles.dot}>•</Text>
-                  <Text style={styles.priceText}>{item.price.toLocaleString('tr-TR')} TL</Text>
+                  <Text style={styles.priceText}>{(item.price ?? 0).toLocaleString('tr-TR')} TL</Text>
                 </View>
+
                 <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#64748b" style={styles.cardArrow} />
@@ -228,7 +238,7 @@ export default function ListingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
   },
   center: {
     flex: 1,
@@ -245,9 +255,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: '#e2e8f0',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -255,7 +265,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 14,
   },
   addBtn: {
@@ -270,25 +280,25 @@ const styles = StyleSheet.create({
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 6,
   },
   activeFilterBtn: {
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    borderColor: 'rgba(249, 115, 22, 0.25)',
+    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+    borderColor: 'rgba(234, 88, 12, 0.3)',
   },
   filterBtnText: {
-    color: '#cbd5e1',
+    color: '#475569',
     fontSize: 12,
     fontWeight: '700',
   },
   activeFilterBtnText: {
-    color: '#f97316',
+    color: '#ea580c',
   },
   listContent: {
     padding: 16,
@@ -297,24 +307,29 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 20,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
     padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardInfo: {
     flex: 1,
     gap: 4,
   },
   cardTitle: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 14,
     fontWeight: '900',
   },
   cardVehicle: {
-    color: '#f97316',
-    fontSize: 11,
+    color: '#ea580c',
+    fontSize: 12,
     fontWeight: '700',
   },
   detailsRow: {
@@ -323,16 +338,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailsText: {
-    color: '#94a3b8',
-    fontSize: 11,
-  },
-  dot: {
     color: '#64748b',
     fontSize: 12,
   },
-  priceText: {
-    color: '#f8fafc',
+  dot: {
+    color: '#94a3b8',
     fontSize: 12,
+  },
+  priceText: {
+    color: '#ea580c',
+    fontSize: 13,
     fontWeight: '800',
   },
   cardDesc: {
@@ -346,15 +361,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: '#64748b',
-    fontSize: 12,
+    fontSize: 13,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '75%',
@@ -368,14 +383,14 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   modalTitle: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 18,
     fontWeight: '800',
   },
   clearRow: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: '#f1f5f9',
   },
   clearText: {
     color: '#ef4444',
@@ -385,10 +400,12 @@ const styles = StyleSheet.create({
   optionRow: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: '#f1f5f9',
   },
   optionText: {
-    color: '#cbd5e1',
+    color: '#0f172a',
     fontSize: 15,
+    fontWeight: '600',
   },
 });
+

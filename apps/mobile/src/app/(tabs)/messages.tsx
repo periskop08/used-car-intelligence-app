@@ -43,7 +43,7 @@ export default function MessageInboxScreen() {
       }
 
       // First get profile for current user ID
-      const profileRes = await fetch(`${API_URL}/auth/profile`, {
+      const profileRes = await fetch(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (profileRes.ok) {
