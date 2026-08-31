@@ -29,7 +29,8 @@ const formatImageUrl = (url?: string) => {
   return url;
 };
 
-const formatPrice = (amount: number | string) => {
+const formatPrice = (amount?: number | string | null) => {
+  if (amount === undefined || amount === null) return "-";
   const value = Number(amount);
   if (isNaN(value)) return "-";
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(value);
@@ -91,6 +92,30 @@ interface RecommendationResult {
     modelFamilyScores: Record<string, number>;
   };
   recommendations: RecommendedVariant[];
+  recommendation?: {
+    recommendedVariantId: string;
+    brandId: string;
+    brandName: string;
+    modelId: string;
+    modelName: string;
+    generationName?: string;
+    bodyType: string;
+    fuelType: string;
+    transmissionType: string;
+    activeListingCount: number;
+    minActivePrice?: number;
+    maxActivePrice?: number;
+    listingsQuery: {
+      vehicleVariantId: string;
+      brandId?: string;
+      modelId?: string;
+      bodyType?: string;
+      fuelType?: string;
+      transmission?: string;
+      minPrice?: number;
+      maxPrice?: number;
+    };
+  };
 }
 
 const translateBodyType = (bodyType: string) => {
@@ -1104,6 +1129,7 @@ export default function FindMyCarPage() {
                   <button
                     onClick={() => {
                       const rec = resultsData.recommendation;
+                      if (!rec) return;
                       const q = rec.listingsQuery;
                       let url = `/listings?vehicleVariantId=${q.vehicleVariantId}`;
                       if (q.brandId) url += `&brandId=${q.brandId}`;
@@ -1113,7 +1139,7 @@ export default function FindMyCarPage() {
                       if (q.transmission) url += `&transmission=${encodeURIComponent(q.transmission)}`;
                       if (q.minPrice) url += `&minPrice=${q.minPrice}`;
                       if (q.maxPrice) url += `&maxPrice=${q.maxPrice}`;
-                      router.push(url);
+                      window.location.href = url;
                     }}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black py-4 px-6 rounded-2xl shadow-xl shadow-orange-500/20 transition duration-150 flex items-center justify-center gap-2 cursor-pointer text-sm"
                   >
