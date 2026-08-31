@@ -237,4 +237,10 @@ export class VehicleDiscoveryController {
 
     return result;
   }
+
+  @Post('migrate-guide-snapshot')
+  @ApiOperation({ summary: 'Araç Rehberi havuzunu 1:1 snapshot kopyalayarak Aracını Bul başlangıç havuzunu oluşturur' })
+  async migrateGuideSnapshot() {
+    return this.discoveryService.migrateGuideSnapshotToDiscovery();
+  }
 }
