@@ -64,21 +64,23 @@ export class AdminVehicleDiscoveryController {
         previewImageUrl = v.profileMappings[0].profile.heroImageUrl;
       }
 
+      const specJson = (v.specs?.specs as any) || {};
+
       return {
         id: v.id,
         brandName: v.brand?.name,
         modelName: v.model?.name,
         generationName: v.generation?.name,
-        engineName: v.engine?.name,
+        engineName: v.engine?.code,
         transmissionName: v.transmission?.name,
         trimName: v.trim?.name,
         bodyType: v.bodyType,
         fuelType: v.fuelType,
         yearStart: v.yearStart || v.year,
         yearEnd: v.yearEnd,
-        powerHp: v.specs?.powerHp,
-        torqueNm: v.specs?.torqueNm,
-        averageConsumption: v.specs?.averageConsumption,
+        powerHp: v.engine?.horsepower || specJson.powerHp,
+        torqueNm: v.engine?.torque || specJson.torqueNm,
+        averageConsumption: specJson.averageConsumption,
         activeListingCount: v.listings.length,
         minActivePrice: minPrice,
         maxActivePrice: maxPrice,
@@ -100,7 +102,6 @@ export class AdminVehicleDiscoveryController {
     @Param('id') id: string,
     @Body('aiDisplayTags') aiDisplayTags?: string[]
   ) {
-    // Discovery presentation settings touch point
     return {
       success: true,
       variantId: id,
