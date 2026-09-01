@@ -10,9 +10,9 @@ import {
   Share,
   Linking,
   ScrollView,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -84,12 +84,14 @@ interface ListingFeedItem {
 
 export default function ListingFeedScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const feedHeight = windowHeight - insets.top - insets.bottom;
+
   const [listings, setListings] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [seed, setSeed] = useState<string>('');
-  const [feedHeight, setFeedHeight] = useState<number>(windowHeight);
 
   // States per listing id
   const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'desc' | 'loc'>>({});
@@ -306,13 +308,6 @@ export default function ListingFeedScreen() {
 
     return (
       <View style={[styles.cardContainer, { height: feedHeight }]}>
-        {/* Right Floating Vertical Swipe Guide Indicator */}
-        <View style={styles.scrollGuidePill} pointerEvents="none">
-          <Ionicons name="chevron-up" size={10} color="#94a3b8" />
-          <Ionicons name="swap-vertical" size={13} color="#ea580c" />
-          <Ionicons name="chevron-down" size={10} color="#94a3b8" />
-        </View>
-
         {/* Top Header Actions */}
         <View style={styles.topActions}>
           <TouchableOpacity onPress={() => router.back()} style={styles.circularBtn}>
@@ -335,202 +330,195 @@ export default function ListingFeedScreen() {
           </View>
         </View>
 
-        {/* Swipe Carousel for Photos */}
-        <View style={styles.photoContainer}>
-          {item.photos.length > 0 ? (
-            <>
-              <ExpoImage
-                source={{ uri: item.photos[activePhoto]?.url }}
-                style={styles.photoImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-              <View style={styles.photoCountBadge}>
-                <Text style={styles.photoCountText}>
-                  {activePhoto + 1} / {item.photos.length}
-                </Text>
-              </View>
+        {/* DISTINCT FRAMED CARD CONTAINER */}
+        <View style={styles.cardFrame}>
+          {/* Right Floating Vertical Swipe Guide Indicator on the card frame */}
+          <View style={styles.scrollGuidePill} pointerEvents="none">
+            <Ionicons name="chevron-up" size={10} color="#94a3b8" />
+            <Ionicons name="swap-vertical" size={12} color="#ea580c" />
+            <Ionicons name="chevron-down" size={10} color="#94a3b8" />
+          </View>
 
-              {item.photos.length > 1 && (
-                <View style={styles.carouselBtns}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setActivePhotoIndices((prev) => ({
-                        ...prev,
-                        [item.id]: Math.max(0, activePhoto - 1),
-                      }))
-                    }
-                    style={styles.carouselArrow}
-                  >
-                    <Ionicons name="chevron-back" size={16} color="white" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setActivePhotoIndices((prev) => ({
-                        ...prev,
-                        [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                      }))
-                    }
-                    style={styles.carouselArrow}
-                  >
-                    <Ionicons name="chevron-forward" size={16} color="white" />
-                  </TouchableOpacity>
+          {/* 1. Photo Carousel */}
+          <View style={styles.photoContainer}>
+            {item.photos.length > 0 ? (
+              <>
+                <ExpoImage
+                  source={{ uri: item.photos[activePhoto]?.url }}
+                  style={styles.photoImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+                <View style={styles.photoCountBadge}>
+                  <Text style={styles.photoCountText}>
+                    {activePhoto + 1} / {item.photos.length}
+                  </Text>
                 </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.noPhoto}>
-              <Ionicons name="car-outline" size={36} color="#94a3b8" />
-              <Text style={styles.noPhotoText}>Görsel Bulunmuyor</Text>
-            </View>
-          )}
-        </View>
 
-        {/* Title, Seller Info & Location */}
-        <View style={styles.detailsContainer}>
-          <Text style={styles.titleText} numberOfLines={1}>
-            {item.title.toUpperCase()}
-          </Text>
-          <View style={styles.infoLine}>
-            <Text style={styles.infoSubText}>
-              👤 {item.seller.displayName} ({item.seller.memberSince})
+                {item.photos.length > 1 && (
+                  <View style={styles.carouselBtns}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setActivePhotoIndices((prev) => ({
+                          ...prev,
+                          [item.id]: Math.max(0, activePhoto - 1),
+                        }))
+                      }
+                      style={styles.carouselArrow}
+                    >
+                      <Ionicons name="chevron-back" size={16} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        setActivePhotoIndices((prev) => ({
+                          ...prev,
+                          [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
+                        }))
+                      }
+                      style={styles.carouselArrow}
+                    >
+                      <Ionicons name="chevron-forward" size={16} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.noPhoto}>
+                <Ionicons name="car-outline" size={32} color="#94a3b8" />
+                <Text style={styles.noPhotoText}>Görsel Bulunmuyor</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 2. Title & Seller Info */}
+          <View style={styles.detailsContainer}>
+            <Text style={styles.titleText} numberOfLines={1}>
+              {item.title.toUpperCase()}
             </Text>
-            <Text style={styles.infoSubText}>
-              📍 {item.location.city}, {item.location.district}
+            <View style={styles.infoLine}>
+              <Text style={styles.infoSubText}>
+                👤 {item.seller.displayName} ({item.seller.memberSince})
+              </Text>
+              <Text style={styles.infoSubText}>
+                📍 {item.location.city}, {item.location.district}
+              </Text>
+            </View>
+          </View>
+
+          {/* 3. Breadcrumb */}
+          <View style={styles.breadcrumbContainer}>
+            <Text style={styles.breadcrumbText} numberOfLines={1}>
+              {item.breadcrumb.join(' > ')}
             </Text>
           </View>
-        </View>
 
-        {/* Breadcrumb */}
-        <View style={styles.breadcrumbContainer}>
-          <Text style={styles.breadcrumbText} numberOfLines={1}>
-            {item.breadcrumb.join(' > ')}
-          </Text>
-        </View>
-
-        {/* Tab Bar */}
-        <View style={styles.tabBar}>
-          {(['info', 'desc', 'loc'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
-              onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
-            >
-              <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
-                {tab === 'info' ? 'Özellikler' : tab === 'desc' ? 'Açıklama' : 'Konum'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Tab Content Box */}
-        <View style={styles.tabContentContainer}>
-          {activeTab === 'info' && (
-            <ScrollView style={styles.scrollInfo} showsVerticalScrollIndicator={false}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Fiyat</Text>
-                <Text style={styles.infoValuePrice}>
-                  {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
+          {/* 4. Tab Bar */}
+          <View style={styles.tabBar}>
+            {(['info', 'desc', 'loc'] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+                onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
+              >
+                <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
+                  {tab === 'info' ? 'Özellikler' : tab === 'desc' ? 'Açıklama' : 'Konum'}
                 </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>İlan No</Text>
-                <Text style={styles.infoValue}>{item.listingNo}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Yıl</Text>
-                <Text style={styles.infoValue}>{item.vehicle.year}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>KM</Text>
-                <Text style={styles.infoValue}>{(item.vehicle.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Yakıt</Text>
-                <Text style={styles.infoValue}>{item.vehicle.fuelType}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Vites</Text>
-                <Text style={styles.infoValue}>{item.vehicle.transmissionType}</Text>
-              </View>
-            </ScrollView>
-          )}
-
-          {activeTab === 'desc' && (
-            <View style={styles.descContainer}>
-              <Text style={styles.descText} numberOfLines={3}>
-                Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push(`/listings/${item.id}` as any)}
-                style={styles.detailLink}
-              >
-                <Text style={styles.detailLinkText}>İlan Detayına Git ➔</Text>
               </TouchableOpacity>
-            </View>
-          )}
+            ))}
+          </View>
 
-          {activeTab === 'loc' && (
-            <View style={styles.descContainer}>
-              <View style={styles.locBox}>
-                <Text style={styles.locTitle}>📍 İlan Konumu</Text>
-                <Text style={styles.locText}>Şehir: {item.location.city}</Text>
-                <Text style={styles.locText}>İlçe: {item.location.district || 'Belirtilmemiş'}</Text>
+          {/* 5. Tab Content Box */}
+          <View style={styles.tabContentContainer}>
+            {activeTab === 'info' && (
+              <View style={styles.scrollInfo}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Fiyat</Text>
+                  <Text style={styles.infoValuePrice}>
+                    {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>İlan No</Text>
+                  <Text style={styles.infoValue}>{item.listingNo}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Yıl / KM</Text>
+                  <Text style={styles.infoValue}>{item.vehicle.year} • {(item.vehicle.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Yakıt / Vites</Text>
+                  <Text style={styles.infoValue}>{item.vehicle.fuelType} • {item.vehicle.transmissionType}</Text>
+                </View>
               </View>
-              <TouchableOpacity
-                onPress={() => router.push(`/listings/${item.id}` as any)}
-                style={styles.detailLink}
-              >
-                <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
-              </TouchableOpacity>
+            )}
+
+            {activeTab === 'desc' && (
+              <View style={styles.descContainer}>
+                <Text style={styles.descText} numberOfLines={3}>
+                  Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push(`/listings/${item.id}` as any)}
+                  style={styles.detailLink}
+                >
+                  <Text style={styles.detailLinkText}>İlan Detayına Git ➔</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {activeTab === 'loc' && (
+              <View style={styles.descContainer}>
+                <View style={styles.locBox}>
+                  <Text style={styles.locTitle}>📍 İlan Konumu</Text>
+                  <Text style={styles.locText}>Şehir: {item.location.city} • İlçe: {item.location.district || 'Merkez'}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => router.push(`/listings/${item.id}` as any)}
+                  style={styles.detailLink}
+                >
+                  <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* 6. Specs Box */}
+          <View style={styles.specsBox}>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Güç</Text>
+              <Text style={styles.specVal}>{item.technicalSummary.maxPower || '-'}</Text>
             </View>
-          )}
-        </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Hız</Text>
+              <Text style={styles.specVal}>{item.technicalSummary.topSpeed || '-'}</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>0-100</Text>
+              <Text style={styles.specVal}>{item.technicalSummary.acceleration0100 || '-'}</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Tüketim</Text>
+              <Text style={styles.specVal}>{item.technicalSummary.fuelConsumption || '-'}</Text>
+            </View>
+          </View>
 
-        {/* Specs Box */}
-        <View style={styles.specsBox}>
-          <View style={styles.specItem}>
-            <Text style={styles.specLabel}>Güç</Text>
-            <Text style={styles.specVal}>{item.technicalSummary.maxPower || '-'}</Text>
+          {/* 7. CTA Action Buttons (Always securely visible at bottom of frame!) */}
+          <View style={styles.ctaContainer}>
+            <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
+              <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleMessage(item)} style={styles.ctaBtnSolid}>
+              <Text style={styles.ctaTextSolid}>💬 Mesaj Gönder</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specLabel}>Hız</Text>
-            <Text style={styles.specVal}>{item.technicalSummary.topSpeed || '-'}</Text>
-          </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specLabel}>0-100</Text>
-            <Text style={styles.specVal}>{item.technicalSummary.acceleration0100 || '-'}</Text>
-          </View>
-          <View style={styles.specItem}>
-            <Text style={styles.specLabel}>Tüketim</Text>
-            <Text style={styles.specVal}>{item.technicalSummary.fuelConsumption || '-'}</Text>
-          </View>
-        </View>
-
-        {/* CTA Action Buttons */}
-        <View style={styles.ctaContainer}>
-          <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
-            <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleMessage(item)} style={styles.ctaBtnSolid}>
-            <Text style={styles.ctaTextSolid}>💬 Mesaj Gönder</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView
-      style={styles.container}
-      onLayout={(e) => {
-        const h = e.nativeEvent.layout.height;
-        if (h > 100 && Math.abs(h - feedHeight) > 1) {
-          setFeedHeight(h);
-        }
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#ea580c" />
@@ -573,21 +561,21 @@ export default function ListingFeedScreen() {
           style={styles.feedList}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f1f5f9',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f1f5f9',
   },
   loadingText: {
     marginTop: 12,
@@ -623,53 +611,37 @@ const styles = StyleSheet.create({
   },
   feedList: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f1f5f9',
   },
   cardContainer: {
     width: windowWidth,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f1f5f9',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 14,
-    position: 'relative',
-  },
-  scrollGuidePill: {
-    position: 'absolute',
-    right: 8,
-    top: '45%',
-    transform: [{ translateY: -24 }],
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
-    zIndex: 20,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 10,
+    paddingHorizontal: 4,
+    paddingBottom: 6,
   },
   circularBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   feedTitle: {
     fontSize: 13,
@@ -681,16 +653,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  cardFrame: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 10,
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+    position: 'relative',
+  },
+  scrollGuidePill: {
+    position: 'absolute',
+    right: 8,
+    top: '42%',
+    transform: [{ translateY: -22 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 14,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 30,
+  },
   photoContainer: {
     width: '100%',
-    height: 180,
-    borderRadius: 16,
+    height: 155,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
     position: 'relative',
-    marginTop: 4,
   },
   photoImage: {
     width: '100%',
@@ -699,15 +706,15 @@ const styles = StyleSheet.create({
   },
   photoCountBadge: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
+    bottom: 6,
+    right: 6,
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   photoCountText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -717,13 +724,13 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    marginTop: -14,
+    paddingHorizontal: 6,
+    marginTop: -13,
   },
   carouselArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -732,10 +739,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   noPhotoText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#94a3b8',
     fontWeight: '600',
   },
@@ -743,7 +750,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   titleText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: 0.2,
@@ -751,7 +758,7 @@ const styles = StyleSheet.create({
   infoLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 3,
+    marginTop: 2,
   },
   infoSubText: {
     fontSize: 11,
@@ -760,14 +767,14 @@ const styles = StyleSheet.create({
   },
   breadcrumbContainer: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#dbeafe',
     borderRadius: 8,
   },
   breadcrumbText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#2563eb',
   },
@@ -777,7 +784,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 8,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
@@ -797,22 +804,25 @@ const styles = StyleSheet.create({
     color: '#ea580c',
   },
   tabContentContainer: {
-    height: 105,
+    height: 84,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    justifyContent: 'center',
   },
   scrollInfo: {
     flex: 1,
+    justifyContent: 'space-evenly',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    paddingVertical: 3,
+    borderBottomColor: '#f1f5f9',
+    paddingVertical: 2,
   },
   infoLabel: {
     fontSize: 11,
@@ -832,17 +842,18 @@ const styles = StyleSheet.create({
   descContainer: {
     flex: 1,
     justifyContent: 'space-between',
+    paddingVertical: 2,
   },
   descText: {
     fontSize: 11,
     color: '#334155',
-    lineHeight: 15,
+    lineHeight: 14,
   },
   detailLink: {
     alignSelf: 'flex-end',
   },
   detailLinkText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#ea580c',
   },
@@ -859,7 +870,7 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   locLinkText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#2563eb',
   },
@@ -868,7 +879,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 10,
-    padding: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -893,7 +905,7 @@ const styles = StyleSheet.create({
   },
   ctaBtnOutline: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
@@ -908,7 +920,7 @@ const styles = StyleSheet.create({
   },
   ctaBtnSolid: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: '#ea580c',
     justifyContent: 'center',
