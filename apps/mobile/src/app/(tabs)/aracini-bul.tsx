@@ -244,12 +244,9 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
       <View style={styles.imageContainer}>
         {card.imageUrl ? (
           <ExpoImage
-            key={card.imageUrl || card.id}
-            recyclingKey={card.imageUrl || card.id}
             source={{ uri: card.imageUrl }}
             style={styles.cardImage}
             contentFit="cover"
-            transition={0}
             cachePolicy="memory-disk"
             priority="high"
           />
@@ -1008,49 +1005,59 @@ export default function AraciniBulScreen() {
 
           {/* TWO-CARD DECK CONTAINER */}
           <View style={styles.deckContainer}>
-            {/* UNDERNEATH NEXT CARD (PRE-LOADED IN PLACE) */}
-            {underneathCard && (
-              <Animated.View
-                key={`underneath-${underneathCard.id}`}
-                style={[
-                  styles.card,
-                  styles.underneathCard,
-                  {
-                    transform: [{ scale: nextCardScale }],
-                    opacity: nextCardOpacity,
-                  },
-                ]}
-                pointerEvents="none"
-              >
-                <VehicleCardContent card={underneathCard} />
-              </Animated.View>
-            )}
+            {deck
+              .slice(0, 2)
+              .map((card, index) => {
+                const isTop = index === 0;
 
-            {/* TOP ACTIVE SWIPE CARD */}
-            <Animated.View
-              key={`top-${currentTopCard.id}`}
-              {...panResponder.panHandlers}
-              style={[
-                styles.card,
-                styles.topCard,
-                {
-                  transform: [{ translateX: currentPan.x }, { translateY: currentPan.y }, { rotate }],
-                  opacity: topCardOpacity,
-                },
-              ]}
-            >
-              {/* LIKE BADGE */}
-              <Animated.View style={[styles.choiceBadge, styles.likeBadge, { opacity: likeOpacity }]}>
-                <Text style={styles.likeBadgeText}>BEĞENDİM</Text>
-              </Animated.View>
+                if (isTop) {
+                  return (
+                    <Animated.View
+                      key={card.id}
+                      {...panResponder.panHandlers}
+                      style={[
+                        styles.card,
+                        styles.topCard,
+                        {
+                          transform: [{ translateX: currentPan.x }, { translateY: currentPan.y }, { rotate }],
+                          opacity: topCardOpacity,
+                        },
+                      ]}
+                    >
+                      {/* LIKE BADGE */}
+                      <Animated.View style={[styles.choiceBadge, styles.likeBadge, { opacity: likeOpacity }]}>
+                        <Text style={styles.likeBadgeText}>BEĞENDİM</Text>
+                      </Animated.View>
 
-              {/* DISLIKE BADGE */}
-              <Animated.View style={[styles.choiceBadge, styles.dislikeBadge, { opacity: dislikeOpacity }]}>
-                <Text style={styles.dislikeBadgeText}>PAS</Text>
-              </Animated.View>
+                      {/* DISLIKE BADGE */}
+                      <Animated.View style={[styles.choiceBadge, styles.dislikeBadge, { opacity: dislikeOpacity }]}>
+                        <Text style={styles.dislikeBadgeText}>PAS</Text>
+                      </Animated.View>
 
-              <VehicleCardContent card={currentTopCard} />
-            </Animated.View>
+                      <VehicleCardContent card={card} />
+                    </Animated.View>
+                  );
+                }
+
+                // Underneath Card (pre-rendered in background)
+                return (
+                  <Animated.View
+                    key={card.id}
+                    style={[
+                      styles.card,
+                      styles.underneathCard,
+                      {
+                        transform: [{ scale: nextCardScale }],
+                        opacity: nextCardOpacity,
+                      },
+                    ]}
+                    pointerEvents="none"
+                  >
+                    <VehicleCardContent card={card} />
+                  </Animated.View>
+                );
+              })
+              .reverse()}
           </View>
 
           {/* Swipe Buttons Bar */}
