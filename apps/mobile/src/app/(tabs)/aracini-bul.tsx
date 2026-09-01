@@ -244,7 +244,8 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
       <View style={styles.imageContainer}>
         {card.imageUrl ? (
           <ExpoImage
-            key={card.imageUrl}
+            key={card.imageUrl || card.id}
+            recyclingKey={card.imageUrl || card.id}
             source={{ uri: card.imageUrl }}
             style={styles.cardImage}
             contentFit="cover"
@@ -846,6 +847,12 @@ export default function AraciniBulScreen() {
     extrapolate: 'clamp',
   });
 
+  const topCardOpacity = pan.x.interpolate({
+    inputRange: [-SCREEN_WIDTH * 0.9, -SCREEN_WIDTH * 0.35, 0, SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.9],
+    outputRange: [0, 0.9, 1, 0.9, 0],
+    extrapolate: 'clamp',
+  });
+
   // Smooth scale up for underneath card as top card moves away
   const nextCardScale = pan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
@@ -983,6 +990,7 @@ export default function AraciniBulScreen() {
                 styles.topCard,
                 {
                   transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
+                  opacity: topCardOpacity,
                 },
               ]}
             >
