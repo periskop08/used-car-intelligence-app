@@ -770,10 +770,7 @@ export default function AraciniBulScreen() {
       setCurrentIndex((prev) => prev + 1);
       isSwipingRef.current = false;
 
-      // 3. Reset the swiped pan in background for the next underneath card
-      currentActivePan.setValue({ x: 0, y: 0 });
-
-      // 4. If deck is now empty, load AI recommendation results immediately
+      // 3. If deck is now empty, load AI recommendation results immediately
       if (remainingDeck.length === 0) {
         loadResults(sId);
       }
