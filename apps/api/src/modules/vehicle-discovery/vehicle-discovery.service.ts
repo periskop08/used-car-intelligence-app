@@ -868,53 +868,33 @@ export class VehicleDiscoveryService {
 
     try {
       const discoveryCards = await this.prisma.vehicleDiscoveryCard.findMany({
-        orderBy: { updatedAt: 'desc' }
+        where: { isActive: true },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          representativeVariant: {
+            select: {
+              id: true,
+              brandId: true,
+              modelId: true,
+              bodyType: true,
+              fuelType: true,
+              year: true,
+              brand: { select: { name: true } },
+              model: { select: { name: true } },
+              generation: { select: { name: true } },
+              engine: { select: { code: true, horsepower: true, torque: true } },
+              transmission: { select: { name: true } },
+              trim: { select: { name: true } },
+              specs: { select: { specs: true } }
+            }
+          }
+        }
       });
 
       const groupedCandidates: any[] = [];
 
       for (const card of discoveryCards) {
-        // Resolve representative canonical VehicleVariant if linked or search by brand+model
-        let repVariant: any = null;
-        if (card.representativeVariantId) {
-          repVariant = await this.prisma.vehicleVariant.findUnique({
-            where: { id: card.representativeVariantId },
-            include: {
-              brand: true,
-              model: true,
-              generation: true,
-              engine: true,
-              transmission: true,
-              specs: true,
-              listings: {
-                where: { status: 'ACTIVE' },
-                select: { priceAmount: true, media: { select: { url: true }, take: 1 } }
-              }
-            }
-          });
-        }
-
-        if (!repVariant) {
-          repVariant = await this.prisma.vehicleVariant.findFirst({
-            where: {
-              brand: { name: { equals: card.brand, mode: 'insensitive' } },
-              model: { name: { equals: card.modelFamily, mode: 'insensitive' } },
-              status: { not: 'REJECTED' }
-            },
-            include: {
-              brand: true,
-              model: true,
-              generation: true,
-              engine: true,
-              transmission: true,
-              specs: true,
-              listings: {
-                where: { status: 'ACTIVE' },
-                select: { priceAmount: true, media: { select: { url: true }, take: 1 } }
-              }
-            }
-          });
-        }
+        let repVariant: any = card.representativeVariant;
 
         let totalActiveListings = 0;
         const prices: number[] = [];
