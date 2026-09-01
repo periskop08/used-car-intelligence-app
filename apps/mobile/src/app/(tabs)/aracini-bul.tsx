@@ -702,19 +702,21 @@ export default function AraciniBulScreen() {
         return Math.abs(gestureState.dx) > 4;
       },
       onPanResponderGrant: () => {
+        if (isSwipingRef.current) return;
         const activePan = activePanIndexRef.current === 0 ? panA : panB;
         activePan.stopAnimation();
-        activePan.setOffset({ x: 0, y: 0 });
       },
       onPanResponderMove: (_, gestureState) => {
+        if (isSwipingRef.current) return;
         const activePan = activePanIndexRef.current === 0 ? panA : panB;
         activePan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.25 });
       },
       onPanResponderRelease: (_, gestureState) => {
+        if (isSwipingRef.current) return;
         const activePan = activePanIndexRef.current === 0 ? panA : panB;
-        if (gestureState.dx > SWIPE_THRESHOLD || gestureState.vx > 0.4) {
+        if (gestureState.dx > SWIPE_THRESHOLD || gestureState.vx > 0.3) {
           handleSwipe('right');
-        } else if (gestureState.dx < -SWIPE_THRESHOLD || gestureState.vx < -0.4) {
+        } else if (gestureState.dx < -SWIPE_THRESHOLD || gestureState.vx < -0.3) {
           handleSwipe('left');
         } else {
           Animated.spring(activePan, {
@@ -726,6 +728,7 @@ export default function AraciniBulScreen() {
         }
       },
       onPanResponderTerminate: () => {
+        if (isSwipingRef.current) return;
         const activePan = activePanIndexRef.current === 0 ? panA : panB;
         Animated.spring(activePan, {
           toValue: { x: 0, y: 0 },
