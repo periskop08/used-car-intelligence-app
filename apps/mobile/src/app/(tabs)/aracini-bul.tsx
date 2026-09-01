@@ -752,6 +752,57 @@ export default function AraciniBulScreen() {
     });
   };
 
+  const extendDiscovery = async () => {
+    setGameState('loading');
+    try {
+      const nextTargetCount = (targetCount || 20) + 20;
+      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sessionId}/filters`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          filters: {
+            minimumPrice: minPrice ? Number(minPrice) : 0,
+            maximumPrice: maxPrice ? Number(maxPrice) : null,
+            bodyTypes: selectedBodies,
+            fuelTypes: selectedFuels,
+            transmissions: selectedTransmissions,
+          },
+          targetCount: nextTargetCount,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const sess = data.session;
+        if (sess) {
+          setCurrentIndex(sess.currentIndex || 0);
+          setSessionVersion(sess.version || 0);
+          sessionVersionRef.current = sess.version || 0;
+          setTargetCount(sess.targetCount || nextTargetCount);
+          setWarningMessage(data.warning || null);
+
+          const unswiped = (sess.items || []).filter((it: any) => it.action === null);
+          const formattedDeck = unswiped.map(formatDiscoveryCard);
+          setDeck(formattedDeck);
+          deckRef.current = formattedDeck;
+
+          formattedDeck.forEach((card: DiscoveryCard) => {
+            if (card.imageUrl) {
+              Image.prefetch(card.imageUrl).catch(() => {});
+            }
+          });
+
+          pan.setValue({ x: 0, y: 0 });
+          setGameState('swiping');
+          return;
+        }
+      }
+      setGameState('error');
+    } catch (e) {
+      console.error('Error extending discovery:', e);
+      setGameState('error');
+    }
+  };
+
   const loadResults = async (sId = sessionId) => {
     setGameState('loading');
     try {
@@ -960,7 +1011,7 @@ export default function AraciniBulScreen() {
         </View>
       )}
 
-      {/* 4. RESULTS STATE (3 SECTIONS 1:1 WITH WEB) */}
+      {/* 4. RESULTS STATE (1:1 WITH WEB SCREENSHOT) */}
       {gameState === 'result' && resultsData && (
         <ScrollView contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.resultHeader}>
@@ -976,171 +1027,155 @@ export default function AraciniBulScreen() {
               <Ionicons name="sparkles" size={16} color="#ea580c" />
               <Text style={styles.summaryTitleText}>Karakteristik Özet</Text>
             </View>
-            <Text style={styles.summaryText}>{resultsData.message}</Text>
+            <Text style={styles.summaryText}>
+              {resultsData.message || 'Keşif tercihlerinize göre en uygun araç önerisi oluşturuldu.'}
+            </Text>
 
-            {resultsData.scoringProfile && (
-              <View style={styles.profileSpecsRow}>
-                <View style={styles.profileSpecBlock}>
-                  <Text style={styles.pLabel}>KASA TİPİ</Text>
-                  <Text style={styles.pVal}>
-                    {resultsData.scoringProfile.bodyTypeScores && Object.keys(resultsData.scoringProfile.bodyTypeScores)[0]
-                      ? translateBodyType(Object.keys(resultsData.scoringProfile.bodyTypeScores)[0])
-                      : '-'}
-                  </Text>
-                </View>
-                <View style={styles.profileSpecBlock}>
-                  <Text style={styles.pLabel}>YAKIT</Text>
-                  <Text style={styles.pVal}>
-                    {resultsData.scoringProfile.fuelTypeScores && Object.keys(resultsData.scoringProfile.fuelTypeScores)[0]
-                      ? translateFuelType(Object.keys(resultsData.scoringProfile.fuelTypeScores)[0])
-                      : '-'}
-                  </Text>
-                </View>
-                <View style={styles.profileSpecBlock}>
-                  <Text style={styles.pLabel}>ŞANZIMAN</Text>
-                  <Text style={styles.pVal}>
-                    {resultsData.scoringProfile.transmissionScores &&
-                    Object.keys(resultsData.scoringProfile.transmissionScores)[0]
-                      ? translateTransmission(Object.keys(resultsData.scoringProfile.transmissionScores)[0])
-                      : '-'}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Section 2: Yapay Zeka Araç Önerisi */}
-          {resultsData.recommendation && (
-            <View style={styles.sectionBox}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="car-sport-outline" size={18} color="#ea580c" />
-                <Text style={styles.sectionHeaderText}>Yapay Zeka Destekli Araç Önerisi</Text>
-              </View>
-
-              <View style={styles.recommendedCard}>
-                <Text style={styles.recBrand}>{(resultsData.recommendation.brandName || '').toUpperCase()}</Text>
-                <Text style={styles.recModel}>
-                  {resultsData.recommendation.modelName} {resultsData.recommendation.generationName || ''}
+            <View style={styles.profileSpecsRow}>
+              <View style={styles.profileSpecBlock}>
+                <Text style={styles.pLabel}>KASA TİPİ</Text>
+                <Text style={styles.pVal}>
+                  {resultsData.scoringProfile?.bodyTypeScores && Object.keys(resultsData.scoringProfile.bodyTypeScores)[0]
+                    ? translateBodyType(Object.keys(resultsData.scoringProfile.bodyTypeScores)[0])
+                    : resultsData.recommendation?.bodyType
+                    ? translateBodyType(resultsData.recommendation.bodyType)
+                    : 'SUV'}
                 </Text>
-
-                {/* Badges */}
-                <View style={styles.recSpecsRow}>
-                  <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>{translateBodyType(resultsData.recommendation.bodyType)}</Text>
-                  </View>
-                  <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>{translateFuelType(resultsData.recommendation.fuelType)}</Text>
-                  </View>
-                  <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>{translateTransmission(resultsData.recommendation.transmissionType)}</Text>
-                  </View>
-                </View>
-
-                {resultsData.recommendation.minActivePrice && resultsData.recommendation.maxActivePrice ? (
-                  <View style={styles.priceTagBox}>
-                    <Text style={styles.priceTagLabel}>Tahmini Piyasa Fiyatı</Text>
-                    <Text style={styles.priceTagVal}>
-                      {formatPrice(resultsData.recommendation.minActivePrice)} - {formatPrice(resultsData.recommendation.maxActivePrice)}
-                    </Text>
-                  </View>
-                ) : null}
+              </View>
+              <View style={styles.profileSpecBlock}>
+                <Text style={styles.pLabel}>MOTOR/YAKIT</Text>
+                <Text style={styles.pVal}>
+                  {resultsData.scoringProfile?.fuelTypeScores && Object.keys(resultsData.scoringProfile.fuelTypeScores)[0]
+                    ? translateFuelType(Object.keys(resultsData.scoringProfile.fuelTypeScores)[0])
+                    : resultsData.recommendation?.fuelType
+                    ? translateFuelType(resultsData.recommendation.fuelType)
+                    : 'Elektrikli'}
+                </Text>
+              </View>
+              <View style={styles.profileSpecBlock}>
+                <Text style={styles.pLabel}>ŞANZIMAN</Text>
+                <Text style={styles.pVal}>
+                  {resultsData.scoringProfile?.transmissionScores &&
+                  Object.keys(resultsData.scoringProfile.transmissionScores)[0]
+                    ? translateTransmission(Object.keys(resultsData.scoringProfile.transmissionScores)[0])
+                    : resultsData.recommendation?.transmissionType
+                    ? translateTransmission(resultsData.recommendation.transmissionType)
+                    : 'Otomatik'}
+                </Text>
               </View>
             </View>
-          )}
+          </View>
 
-          {/* Section 2B: Önerilen Diğer Modeller (Varsa) */}
-          {(resultsData.recommendations || []).length > 0 && (
-            <View style={styles.sectionBox}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="list-outline" size={18} color="#ea580c" />
-                <Text style={styles.sectionHeaderText}>Önerilen Diğer Modeller</Text>
-              </View>
-
-              {(resultsData.recommendations || []).map((v) => (
-                <View key={v.id} style={styles.recommendedCard}>
-                  <Text style={styles.recBrand}>{v.brand.name.toUpperCase()}</Text>
-                  <Text style={styles.recModel}>
-                    {v.model.name} {v.trim?.name || ''}
+          {/* Section 2: YAPAY ZEKA DESTEKLİ ARAÇ ÖNERİSİ */}
+          {resultsData.recommendation && (
+            <View style={styles.aiRecommendationCard}>
+              <View style={styles.aiRecHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.aiRecSub}>YAPAY ZEKA DESTEKLİ ARAÇ ÖNERİSİ</Text>
+                  <Text style={styles.aiRecTitle}>
+                    {resultsData.recommendation.brandName} {resultsData.recommendation.modelName}{' '}
+                    {resultsData.recommendation.generationName || ''}
                   </Text>
-
-                  {v.priceSnapshot && (
-                    <View style={styles.priceTagBox}>
-                      <Text style={styles.priceTagLabel}>Piyasa Fiyat Tahmini</Text>
-                      <Text style={styles.priceTagVal}>
-                        {formatPrice(v.priceSnapshot.estimatedMin)} - {formatPrice(v.priceSnapshot.estimatedMax)}
+                </View>
+                <View style={styles.aiRecPillsRow}>
+                  {resultsData.recommendation.bodyType && (
+                    <View style={styles.aiPillBadge}>
+                      <Text style={styles.aiPillText}>{translateBodyType(resultsData.recommendation.bodyType)}</Text>
+                    </View>
+                  )}
+                  {resultsData.recommendation.fuelType && (
+                    <View style={styles.aiPillBadge}>
+                      <Text style={styles.aiPillText}>{translateFuelType(resultsData.recommendation.fuelType)}</Text>
+                    </View>
+                  )}
+                  {resultsData.recommendation.transmissionType && (
+                    <View style={styles.aiPillBadge}>
+                      <Text style={styles.aiPillText}>
+                        {translateTransmission(resultsData.recommendation.transmissionType)}
                       </Text>
                     </View>
                   )}
-
-                  <View style={styles.recSpecsRow}>
-                    <View style={styles.miniPill}>
-                      <Text style={styles.miniPillText}>{v.engine?.name || 'Standart'}</Text>
-                    </View>
-                    <View style={styles.miniPill}>
-                      <Text style={styles.miniPillText}>
-                        {v.transmission ? `${v.transmission.speeds} İleri ${translateTransmission(v.transmission.type)}` : '-'}
-                      </Text>
-                    </View>
-                  </View>
                 </View>
-              ))}
+              </View>
+
+              {/* Status and Price Grid */}
+              <View style={styles.aiRecInfoGrid}>
+                <View style={styles.aiInfoBox}>
+                  <Text style={styles.aiInfoLabel}>AKTİF İLAN DURUMU</Text>
+                  <Text style={styles.aiInfoVal}>
+                    {resultsData.recommendation.activeListingCount && resultsData.recommendation.activeListingCount > 0
+                      ? `${resultsData.recommendation.activeListingCount} Adet Aktif Satış İlanı Mevcut`
+                      : 'Şu Anda Aktif İlan Bulunmuyor'}
+                  </Text>
+                </View>
+
+                <View style={styles.aiInfoBox}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.aiInfoLabel}>PİYASA FİYAT ARALIĞI</Text>
+                    <Ionicons name="sparkles" size={14} color="#ea580c" />
+                  </View>
+                  <Text style={[styles.aiInfoVal, { color: '#ea580c', fontWeight: '900' }]}>
+                    {resultsData.recommendation.minActivePrice && resultsData.recommendation.maxActivePrice
+                      ? `${formatPrice(resultsData.recommendation.minActivePrice)} - ${formatPrice(
+                          resultsData.recommendation.maxActivePrice
+                        )}`
+                      : 'Fiyat İlanlardan Hesaplanıyor'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Action Buttons in Card */}
+              <View style={styles.aiRecActionsRow}>
+                <TouchableOpacity
+                  style={styles.aiPrimaryBtn}
+                  onPress={() => {
+                    const rec = resultsData.recommendation;
+                    if (rec?.listingsQuery) {
+                      router.push({
+                        pathname: '/listings',
+                        params: {
+                          brandId: rec.listingsQuery.brandId,
+                          modelId: rec.listingsQuery.modelId,
+                        },
+                      });
+                    } else {
+                      router.push('/listings');
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.aiPrimaryBtnText}>İlanlara Git</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.aiSecondaryBtn}
+                  onPress={() => {
+                    if (resultsData.recommendation?.recommendedVariantId) {
+                      router.push(`/reports/vehicle/${resultsData.recommendation.recommendedVariantId}` as any);
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="sparkles" size={15} color="#ea580c" />
+                  <Text style={styles.aiSecondaryBtnText}>Yapay Zeka Araç Raporunu Gör</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
-          {/* Section 3: Uygun Canlı İlanlar */}
-          <View style={styles.sectionBox}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="newspaper-outline" size={18} color="#ea580c" />
-              <Text style={styles.sectionHeaderText}>Önerilen Araçlara Uyan Canlı İlanlar</Text>
-            </View>
-
-            {(resultsData.recommendations || []).flatMap((v) => v.listings || []).length > 0 ? (
-              (resultsData.recommendations || [])
-                .flatMap((v) => v.listings || [])
-                .map((listing) => (
-                  <TouchableOpacity
-                    key={listing.id}
-                    style={styles.listingCard}
-                    onPress={() => router.push({ pathname: '/listings', params: { listingId: listing.id } })}
-                    activeOpacity={0.85}
-                  >
-                    <Image
-                      source={{ uri: formatCloudflareImageUrl(listing.media?.[0]?.url) }}
-                      style={styles.listingImg}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.listingInfo}>
-                      <Text style={styles.listingTitle} numberOfLines={1}>
-                        {listing.title}
-                      </Text>
-                      <Text style={styles.listingSub}>
-                        {listing.modelYear} • {listing.kilometers?.toLocaleString('tr-TR')} KM • {listing.city}
-                      </Text>
-                      <Text style={styles.listingPrice}>{formatPrice(listing.priceAmount)}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))
-            ) : (
-              <View style={styles.emptyListingsBox}>
-                <Ionicons name="information-circle-outline" size={24} color="#64748b" />
-                <Text style={styles.emptyListingsText}>Bu kriterlere uyan aktif satış ilanı bulunamadı.</Text>
-              </View>
+          {/* Bottom Action Buttons (Matching Web 1:1) */}
+          <View style={styles.bottomActionsRow}>
+            {targetCount < 100 && (
+              <TouchableOpacity style={styles.extendBtn} onPress={extendDiscovery} activeOpacity={0.85}>
+                <Ionicons name="refresh" size={16} color="#0b192c" />
+                <Text style={styles.extendBtnText}>20 Araç Daha Değerlendir</Text>
+              </TouchableOpacity>
             )}
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionCol}>
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => router.push('/listings')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.primaryBtnText}>Tüm İlanları Gör</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.secondaryBtn} onPress={resetDiscovery} activeOpacity={0.85}>
-              <Ionicons name="refresh" size={18} color="#94a3b8" />
-              <Text style={styles.secondaryBtnText}>Sıfırla ve Yeniden Başla</Text>
+            <TouchableOpacity style={styles.resetOutlinedBtn} onPress={resetDiscovery} activeOpacity={0.85}>
+              <Ionicons name="refresh" size={16} color="#64748b" />
+              <Text style={styles.resetOutlinedBtnText}>Seçimleri Sıfırla ve Yeniden Keşfet</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1782,126 +1817,160 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0b192c',
   },
-  recommendedCard: {
+  aiRecommendationCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  recBrand: {
-    color: '#ea580c',
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  recModel: {
-    color: '#0b192c',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  priceTagBox: {
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1.5,
     borderColor: '#fed7aa',
-    padding: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginVertical: 4,
+    gap: 14,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  priceTagLabel: {
-    color: '#64748b',
-    fontSize: 9,
-    fontWeight: '700',
+  aiRecHeader: {
+    gap: 10,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  priceTagVal: {
+  aiRecSub: {
     color: '#ea580c',
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  aiRecTitle: {
+    color: '#0b192c',
+    fontSize: 20,
     fontWeight: '900',
     marginTop: 2,
   },
-  recSpecsRow: {
+  aiRecPillsRow: {
     flexDirection: 'row',
     gap: 6,
     flexWrap: 'wrap',
   },
-  miniPill: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  aiPillBadge: {
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
-  miniPillText: {
-    color: '#475569',
-    fontSize: 10,
-    fontWeight: '600',
+  aiPillText: {
+    color: '#334155',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  listingCard: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 10,
+  aiRecInfoGrid: {
     gap: 10,
+  },
+  aiInfoBox: {
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#000000',
+    borderRadius: 14,
+    padding: 12,
+    gap: 4,
+  },
+  aiInfoLabel: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  aiInfoVal: {
+    color: '#0b192c',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  aiRecActionsRow: {
+    flexDirection: 'column',
+    gap: 10,
+    paddingTop: 4,
+  },
+  aiPrimaryBtn: {
+    backgroundColor: '#ea580c',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  aiPrimaryBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  aiSecondaryBtn: {
+    backgroundColor: '#0b192c',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  aiSecondaryBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  bottomActionsRow: {
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  extendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
   },
-  listingImg: {
-    width: 72,
-    height: 72,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-  },
-  listingInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 2,
-  },
-  listingTitle: {
+  extendBtnText: {
     color: '#0b192c',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
   },
-  listingSub: {
-    color: '#64748b',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  listingPrice: {
-    color: '#ea580c',
-    fontSize: 13,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  emptyListingsBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
+  resetOutlinedBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
   },
-  emptyListingsText: {
+  resetOutlinedBtnText: {
     color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  actionCol: {
-    gap: 10,
-    marginVertical: 14,
-    alignItems: 'center',
+    fontSize: 13,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

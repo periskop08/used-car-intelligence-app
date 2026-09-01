@@ -679,14 +679,6 @@ export class VehicleDiscoveryService {
     const swipes = session.items.filter(item => item.action !== null);
     const likes = swipes.filter(s => s.action === VehicleDiscoveryAction.LIKE);
 
-    if (likes.length === 0) {
-      return {
-        message: "Beğendiğiniz araç bulunamadı. Lütfen daha fazla aracı beğenmeyi deneyin.",
-        scoringProfile: null,
-        recommendations: []
-      };
-    }
-
     const bodyTypeScores: Record<string, number> = {};
     const fuelTypeScores: Record<string, number> = {};
     const transmissionScores: Record<string, number> = {};
