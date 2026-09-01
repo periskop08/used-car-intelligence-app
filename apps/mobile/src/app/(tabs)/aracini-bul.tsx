@@ -889,22 +889,10 @@ export default function AraciniBulScreen() {
     extrapolate: 'clamp',
   });
 
-  const topCardOpacity = currentPan.x.interpolate({
-    inputRange: [-SCREEN_WIDTH * 0.9, -SCREEN_WIDTH * 0.35, 0, SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.9],
-    outputRange: [0, 0.9, 1, 0.9, 0],
-    extrapolate: 'clamp',
-  });
-
   // Smooth scale up for underneath card as top card moves away
   const nextCardScale = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: [1, 0.95, 1],
-    extrapolate: 'clamp',
-  });
-
-  const nextCardOpacity = currentPan.x.interpolate({
-    inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-    outputRange: [1, 0.88, 1],
     extrapolate: 'clamp',
   });
 
@@ -931,7 +919,7 @@ export default function AraciniBulScreen() {
           <View style={styles.introIconCircle}>
             <Ionicons name="car-sport" size={44} color="#ea580c" />
           </View>
-          <Text style={styles.introTitle}>Aracını Bul</Text>
+          <Text style={styles.introTitle}>Aracini Bul</Text>
           <Text style={styles.introDesc}>
             Hangi aracı alacağından emin değil misin? Karşına gelen araç kartlarını beğenip geçerek tercihlerini keşfet,
             yapay zeka destekli TorqueScout modeliyle en uygun araçları bulalım.
@@ -1020,7 +1008,6 @@ export default function AraciniBulScreen() {
                         styles.topCard,
                         {
                           transform: [{ translateX: currentPan.x }, { translateY: currentPan.y }, { rotate }],
-                          opacity: topCardOpacity,
                         },
                       ]}
                     >
@@ -1048,7 +1035,6 @@ export default function AraciniBulScreen() {
                       styles.underneathCard,
                       {
                         transform: [{ scale: nextCardScale }],
-                        opacity: nextCardOpacity,
                       },
                     ]}
                     pointerEvents="none"
