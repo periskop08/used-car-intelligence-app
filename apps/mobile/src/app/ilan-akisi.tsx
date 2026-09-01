@@ -5,14 +5,15 @@ import {
   View,
   Dimensions,
   FlatList,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Share,
   Linking,
   ScrollView,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -307,21 +308,21 @@ export default function ListingFeedScreen() {
         {/* Top Header Actions */}
         <View style={styles.topActions}>
           <TouchableOpacity onPress={() => router.back()} style={styles.circularBtn}>
-            <Ionicons name="arrow-back" size={18} color="#f8fafc" />
+            <Ionicons name="arrow-back" size={18} color="#0f172a" />
           </TouchableOpacity>
           <Text style={styles.feedTitle}>🎞️ İLAN AKIŞI</Text>
           <View style={styles.row}>
             <TouchableOpacity onPress={() => handleShare(item)} style={styles.circularBtn}>
-              <Ionicons name="share-social-outline" size={18} color="#f8fafc" />
+              <Ionicons name="share-social-outline" size={18} color="#0f172a" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleFavoriteToggle(item.id, item)}
               style={[
                 styles.circularBtn,
-                isFav && { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' },
+                isFav && { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
               ]}
             >
-              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#f8fafc'} />
+              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#0f172a'} />
             </TouchableOpacity>
           </View>
         </View>
@@ -330,7 +331,12 @@ export default function ListingFeedScreen() {
         <View style={styles.photoContainer}>
           {item.photos.length > 0 ? (
             <>
-              <Image source={{ uri: item.photos[activePhoto]?.url }} style={styles.photoImage} />
+              <ExpoImage
+                source={{ uri: item.photos[activePhoto]?.url }}
+                style={styles.photoImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
               <View style={styles.photoCountBadge}>
                 <Text style={styles.photoCountText}>
                   {activePhoto + 1} / {item.photos.length}
@@ -366,6 +372,7 @@ export default function ListingFeedScreen() {
             </>
           ) : (
             <View style={styles.noPhoto}>
+              <Ionicons name="car-outline" size={36} color="#94a3b8" />
               <Text style={styles.noPhotoText}>Görsel Bulunmuyor</Text>
             </View>
           )}
@@ -393,7 +400,7 @@ export default function ListingFeedScreen() {
           </Text>
         </View>
 
-        {/* Glassmorphism Tab Bar */}
+        {/* Tab Bar */}
         <View style={styles.tabBar}>
           {(['info', 'desc', 'loc'] as const).map((tab) => (
             <TouchableOpacity
@@ -408,7 +415,7 @@ export default function ListingFeedScreen() {
           ))}
         </View>
 
-        {/* Tab Content Box - compact height */}
+        {/* Tab Content Box */}
         <View style={styles.tabContentContainer}>
           {activeTab === 'info' && (
             <ScrollView style={styles.scrollInfo} showsVerticalScrollIndicator={false}>
@@ -507,9 +514,10 @@ export default function ListingFeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#f97316" />
+          <ActivityIndicator size="large" color="#ea580c" />
           <Text style={styles.loadingText}>Akış hazırlanıyor...</Text>
         </View>
       ) : error && listings.length === 0 ? (
@@ -525,7 +533,7 @@ export default function ListingFeedScreen() {
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.centered}>
-          <Ionicons name="film-outline" size={48} color="#64748b" />
+          <Ionicons name="film-outline" size={48} color="#94a3b8" />
           <Text style={styles.errorText}>Gösterilecek aktif ilan bulunmuyor.</Text>
           <Text style={styles.subText}>Yeni ilanlar yayınlandığında burada listelenecektir.</Text>
         </View>
@@ -551,25 +559,28 @@ export default function ListingFeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#060913',
+    backgroundColor: '#ffffff',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    backgroundColor: '#ffffff',
   },
   loadingText: {
     marginTop: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 13,
+    fontWeight: '600',
   },
   errorText: {
-    color: '#cbd5e1',
+    color: '#0f172a',
     fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   subText: {
     color: '#64748b',
@@ -578,10 +589,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryBtn: {
-    backgroundColor: '#f97316',
+    backgroundColor: '#ea580c',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
+    marginTop: 12,
   },
   retryText: {
     color: 'white',
@@ -590,14 +602,15 @@ const styles = StyleSheet.create({
   },
   feedList: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
   cardContainer: {
     width: windowWidth,
     height: windowHeight,
-    backgroundColor: '#0b0f19',
+    backgroundColor: '#ffffff',
     justifyContent: 'space-between',
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
   topActions: {
     flexDirection: 'row',
@@ -606,20 +619,20 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   circularBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   feedTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
-    color: '#94a3b8',
-    letterSpacing: 1.5,
+    color: '#0f172a',
+    letterSpacing: 1.2,
   },
   row: {
     flexDirection: 'row',
@@ -627,14 +640,14 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 200,
-    borderRadius: 20,
+    height: 205,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
     position: 'relative',
-    marginTop: 8,
+    marginTop: 6,
   },
   photoImage: {
     width: '100%',
@@ -645,15 +658,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   photoCountText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
-    color: '#cbd5e1',
+    color: '#ffffff',
   },
   carouselBtns: {
     position: 'absolute',
@@ -665,10 +678,10 @@ const styles = StyleSheet.create({
     marginTop: -14,
   },
   carouselArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -676,18 +689,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 6,
   },
   noPhotoText: {
     fontSize: 12,
-    color: '#475569',
+    color: '#94a3b8',
+    fontWeight: '600',
   },
   detailsContainer: {
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   titleText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '900',
-    color: '#e2e8f0',
+    color: '#0f172a',
+    letterSpacing: 0.2,
   },
   infoLine: {
     flexDirection: 'row',
@@ -695,21 +711,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   infoSubText: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748b',
+    fontWeight: '600',
   },
   breadcrumbContainer: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: '#dbeafe',
     borderRadius: 10,
   },
   breadcrumbText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#60a5fa',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563eb',
   },
   tabBar: {
     flexDirection: 'row',
@@ -717,31 +734,31 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderColor: 'rgba(59, 130, 246, 0.4)',
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
   },
   tabButtonText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#64748b',
   },
   tabButtonTextActive: {
-    color: '#60a5fa',
+    color: '#ea580c',
   },
   tabContentContainer: {
-    height: 120,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    height: 125,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
     padding: 12,
   },
   scrollInfo: {
@@ -751,62 +768,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: '#e2e8f0',
     paddingVertical: 4,
   },
   infoLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748b',
+    fontWeight: '600',
   },
   infoValue: {
-    fontSize: 11,
-    color: '#e2e8f0',
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '700',
   },
   infoValuePrice: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#f97316',
+    color: '#ea580c',
   },
   descContainer: {
     flex: 1,
     justifyContent: 'space-between',
   },
   descText: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-    lineHeight: 15,
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 17,
   },
   detailLink: {
     alignSelf: 'flex-end',
   },
   detailLinkText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#f97316',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ea580c',
   },
   locBox: {
     gap: 2,
   },
   locTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#cbd5e1',
+    color: '#0f172a',
   },
   locText: {
-    fontSize: 11,
-    color: '#94a3b8',
+    fontSize: 12,
+    color: '#475569',
   },
   locLinkText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#60a5fa',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
   },
   specsBox: {
-    backgroundColor: '#141b2c',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: 14,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
     padding: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -816,13 +834,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   specLabel: {
-    fontSize: 8,
-    color: '#475569',
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#64748b',
   },
   specVal: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0f172a',
     marginTop: 2,
   },
   ctaContainer: {
@@ -832,29 +851,34 @@ const styles = StyleSheet.create({
   ctaBtnOutline: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#141b2c',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#cbd5e1',
     justifyContent: 'center',
     alignItems: 'center',
   },
   ctaTextOutline: {
     fontSize: 12,
-    fontWeight: '900',
-    color: '#e2e8f0',
+    fontWeight: '800',
+    color: '#0f172a',
   },
   ctaBtnSolid: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#f97316',
+    borderRadius: 12,
+    backgroundColor: '#ea580c',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   ctaTextSolid: {
     fontSize: 12,
     fontWeight: '900',
-    color: 'white',
+    color: '#ffffff',
   },
 });
