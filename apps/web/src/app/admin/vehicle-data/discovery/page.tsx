@@ -24,6 +24,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { API_BASE_URL, getAuthToken, fetchReportApi } from '@/utils/apiConfig';
+import { formatImageUrl } from '@/utils/media';
 import { translateBodyType } from '@/components/VehicleGuideCardLayout';
 
 export default function AdminVehicleDiscoveryPage() {
@@ -295,7 +296,7 @@ export default function AdminVehicleDiscoveryPage() {
                     <td className="py-3 px-4">
                       <div className="w-12 h-9 rounded-lg overflow-hidden bg-slate-950 border border-white/10 relative">
                         <img
-                          src={c.previewImageUrl}
+                          src={formatImageUrl(c.previewImageUrl)}
                           alt={`${c.brandName} ${c.modelName}`}
                           className="w-full h-full object-cover"
                         />
@@ -447,7 +448,7 @@ export default function AdminVehicleDiscoveryPage() {
                   {/* Photo area */}
                   <div className="relative h-44 w-full bg-slate-950 border-b border-white/5 overflow-hidden">
                     <img
-                      src={selectedCandidate.previewImageUrl}
+                      src={formatImageUrl(selectedCandidate.previewImageUrl)}
                       alt={selectedCandidate.modelName}
                       className="w-full h-full object-contain"
                     />
