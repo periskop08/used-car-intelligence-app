@@ -47,17 +47,42 @@ export default function AdminVehicleDiscoveryPage() {
   const [fuelType, setFuelType] = useState('all');
   const [transmission, setTransmission] = useState('all');
 
-  // Detail Modal State
-  const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
-  const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+  // WYSIWYG Card Editor Modal State
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingCandidateId, setEditingCandidateId] = useState<string | null>(null);
+  
+  // Cascading options
+  const [dbBrands, setDbBrands] = useState<any[]>([]);
+  const [dbModels, setDbModels] = useState<any[]>([]);
+  const [dbVariants, setDbVariants] = useState<any[]>([]);
 
-  // Add Candidate Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // Form Fields
+  const [formBrandId, setFormBrandId] = useState('');
+  const [formBrandName, setFormBrandName] = useState('');
+  const [formModelId, setFormModelId] = useState('');
+  const [formModelName, setFormModelName] = useState('');
+  const [formGenerationName, setFormGenerationName] = useState('');
+  const [formBodyType, setFormBodyType] = useState('HATCHBACK');
+  const [formFuelType, setFormFuelType] = useState('BENZIN');
+  const [formTransmissionFamily, setFormTransmissionFamily] = useState('OTOMATIK');
+  const [formTransmissionType, setFormTransmissionType] = useState('Otomatik');
+  const [formEngineId, setFormEngineId] = useState('');
+  const [formEngineVersion, setFormEngineVersion] = useState('');
+  const [formPowerHp, setFormPowerHp] = useState('110 HP');
+  const [formTorqueNm, setFormTorqueNm] = useState('143 Nm');
+  const [formAverageConsumption, setFormAverageConsumption] = useState('5.5 L/100km');
+  const [formDrivetrain, setFormDrivetrain] = useState('Önden Çekiş');
+  const [formImageUrl, setFormImageUrl] = useState('');
+  const [formIsActive, setFormIsActive] = useState(true);
+  const [formAllowInUnfiltered, setFormAllowInUnfiltered] = useState(true);
+  const [formTags, setFormTags] = useState<string[]>(['#konfor', '#aile-araci']);
+  const [formRepresentativeVariantId, setFormRepresentativeVariantId] = useState<string | null>(null);
+  const [formTagInput, setFormTagInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchDiscoveryCandidates = () => {
     setLoading(true);
     setError(null);
-    const token = getAuthToken();
 
     let query = `?page=${page}&limit=50&filterCategory=${filterCategory}`;
     if (search) query += `&search=${encodeURIComponent(search)}`;
@@ -82,6 +107,181 @@ export default function AdminVehicleDiscoveryPage() {
   useEffect(() => {
     fetchDiscoveryCandidates();
   }, [page, filterCategory, bodyType, fuelType, transmission]);
+
+  // Load canonical Brands on mount
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/vehicles/brands`)
+      .then((res) => res.json())
+      .then((data) => setDbBrands(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error fetching brands:', err));
+  }, []);
+
+  // Load canonical Models when formBrandId changes
+  useEffect(() => {
+    if (!formBrandId) {
+      setDbModels([]);
+      return;
+    }
+    fetch(`${API_BASE_URL}/vehicles/models?brandId=${formBrandId}`)
+      .then((res) => res.json())
+      .then((data) => setDbModels(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error fetching models:', err));
+  }, [formBrandId]);
+
+  // Load canonical Variants when formModelId changes
+  useEffect(() => {
+    if (!formModelId) {
+      setDbVariants([]);
+      return;
+    }
+    fetch(`${API_BASE_URL}/vehicles/variants?modelId=${formModelId}`)
+      .then((res) => res.json())
+      .then((data) => setDbVariants(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Error fetching variants:', err));
+  }, [formModelId]);
+
+  // Derived unique Engine choices for clean motor selection
+  const uniqueEngineOptions = Array.from(
+    new Map(
+      dbVariants.map((v) => {
+        const engId = v.engineId || v.engine?.id || v.id;
+        const code = v.engine?.code || v.trim?.name || 'Standard';
+        return [
+          engId,
+          {
+            engineId: engId,
+            code,
+            horsepower: v.engine?.horsepower ? `${v.engine.horsepower} HP` : '110 HP',
+            torque: v.engine?.torque ? `${v.engine.torque} Nm` : '143 Nm',
+            bodyType: v.bodyType || 'SEDAN',
+            fuelType: v.fuelType || 'BENZIN',
+            transmissionName: v.transmission?.name || 'Otomatik',
+            variantId: v.id
+          }
+        ];
+      })
+    ).values()
+  );
+
+  const openCreateEditor = () => {
+    setEditingCandidateId(null);
+    setFormBrandId('');
+    setFormBrandName('');
+    setFormModelId('');
+    setFormModelName('');
+    setFormGenerationName('');
+    setFormBodyType('HATCHBACK');
+    setFormFuelType('BENZIN');
+    setFormTransmissionFamily('OTOMATIK');
+    setFormTransmissionType('Otomatik');
+    setFormEngineId('');
+    setFormEngineVersion('');
+    setFormPowerHp('');
+    setFormTorqueNm('');
+    setFormAverageConsumption('');
+    setFormDrivetrain('Önden Çekiş');
+    setFormImageUrl('');
+    setFormIsActive(true);
+    setFormAllowInUnfiltered(true);
+    setFormTags(['#konfor', '#aile-araci']);
+    setFormRepresentativeVariantId(null);
+    setEditorOpen(true);
+  };
+
+  const openEditEditor = (c: any) => {
+    setEditingCandidateId(c.candidateId);
+    setFormBrandId(c.brandId || '');
+    setFormBrandName(c.brandName || '');
+    setFormModelId(c.modelId || '');
+    setFormModelName(c.modelName || '');
+    setFormGenerationName(c.generationName || '');
+    setFormBodyType(c.bodyType || 'HATCHBACK');
+    setFormFuelType(c.fuelType || 'BENZIN');
+    setFormTransmissionType(c.transmissionName || 'Otomatik');
+    setFormTransmissionFamily((c.transmissionName || '').toUpperCase().includes('MANUEL') ? 'MANUEL' : 'OTOMATIK');
+    setFormEngineId(c.engineId || '');
+    setFormEngineVersion(c.engineVersion || '');
+    setFormPowerHp(c.powerHp || '');
+    setFormTorqueNm(c.torqueNm || '');
+    setFormAverageConsumption(c.averageConsumption || '');
+    setFormDrivetrain(c.drivetrain || 'Önden Çekiş');
+    setFormImageUrl(c.previewImageUrl || '');
+    setFormIsActive(c.isPublished !== false);
+    setFormAllowInUnfiltered(c.allowInUnfilteredDiscovery !== false);
+    setFormTags(Array.isArray(c.aiPresentationTags) ? c.aiPresentationTags : ['#konfor']);
+    setFormRepresentativeVariantId(c.representativeVariantId || null);
+    setEditorOpen(true);
+  };
+
+  const handleSaveCandidate = () => {
+    if (!formImageUrl || !formBrandName || !formModelName || !formEngineVersion || !formPowerHp || !formTorqueNm || !formAverageConsumption) {
+      alert('Lütfen zorunlu alanları (görsel, marka, model, motor, güç, tork, ortalama tüketim) eksiksiz doldurun.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payload = {
+      candidateId: editingCandidateId || undefined,
+      brandId: formBrandId || undefined,
+      brand: formBrandName,
+      modelId: formModelId || undefined,
+      modelFamily: formModelName,
+      generationName: formGenerationName || undefined,
+      bodyType: formBodyType,
+      fuelType: formFuelType,
+      transmissionType: formTransmissionType,
+      engineId: formEngineId || undefined,
+      engineVersion: formEngineVersion,
+      power: formPowerHp,
+      torque: formTorqueNm,
+      averageConsumption: formAverageConsumption,
+      drivetrain: formDrivetrain,
+      imageUrl: formImageUrl,
+      isActive: formIsActive,
+      allowInUnfilteredDiscovery: formAllowInUnfiltered,
+      tags: formTags,
+      representativeVariantId: formRepresentativeVariantId || undefined
+    };
+
+    fetchReportApi('admin/vehicle-discovery/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Keşif adayı kaydedilemedi.');
+        return res.json();
+      })
+      .then(() => {
+        alert(editingCandidateId ? 'Keşif adayı değişiklikleri kaydedildi.' : 'Yeni keşif adayı eklendi.');
+        setEditorOpen(false);
+        fetchDiscoveryCandidates();
+      })
+      .catch((err: any) => alert(err.message))
+      .finally(() => setIsSubmitting(false));
+  };
+
+  const isFormValid = Boolean(
+    formImageUrl &&
+    formBrandName &&
+    formModelName &&
+    formBodyType &&
+    formFuelType &&
+    formTransmissionFamily &&
+    formEngineVersion &&
+    formPowerHp &&
+    formTorqueNm &&
+    formAverageConsumption
+  );
+
+  const isFilterBoundReady = Boolean(
+    (formBrandId || formBrandName) &&
+    (formModelId || formModelName) &&
+    formBodyType &&
+    formFuelType &&
+    formTransmissionFamily
+  );
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +328,7 @@ export default function AdminVehicleDiscoveryPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={openCreateEditor}
             className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
             <PlusCircle className="w-4 h-4" />
@@ -180,73 +380,65 @@ export default function AdminVehicleDiscoveryPage() {
                 setFilterCategory(tab.key as any);
                 setPage(1);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 filterCategory === tab.key
                   ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                  : 'bg-slate-950/60 text-slate-400 border border-white/5 hover:text-white'
+                  : 'bg-slate-950/60 text-slate-400 hover:text-white border border-white/5'
               }`}
             >
               <span>{tab.label}</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-white/10 text-[10px]">{tab.count}</span>
+              <span className="px-1.5 py-0.2 bg-white/10 rounded-full text-[10px]">{tab.count}</span>
             </button>
           ))}
         </div>
 
         {/* Search & Criteria Dropdowns */}
-        <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3 items-center">
-          <div className="flex flex-1 min-w-[260px] items-center gap-2 px-3.5 py-2 bg-slate-950 rounded-xl border border-white/10 focus-within:border-orange-500/50 transition">
-            <Search className="w-4 h-4 text-slate-400" />
+        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
             <input
               type="text"
-              placeholder="Marka, model, jenerasyon veya motor ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+              placeholder="Marka, model, jenerasyon veya motor ara..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
             />
           </div>
 
           <select
             value={bodyType}
-            onChange={(e) => { setBodyType(e.target.value); setPage(1); }}
-            className="px-3 py-2 bg-slate-950 text-xs font-bold text-slate-300 rounded-xl border border-white/10 outline-none cursor-pointer"
+            onChange={(e) => setBodyType(e.target.value)}
+            className="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-orange-500"
           >
-            <option value="all">Kasa Tipi: Tümü</option>
+            <option value="all">Kasa Tipi: Tümüne Bak</option>
             <option value="SEDAN">Sedan</option>
             <option value="HATCHBACK">Hatchback</option>
             <option value="SUV">SUV</option>
-            <option value="WAGON">Station Wagon</option>
-            <option value="VAN">Minivan / Van</option>
+            <option value="STATION_WAGON">Station Wagon</option>
+            <option value="COUPE">Coupe</option>
           </select>
 
           <select
             value={fuelType}
-            onChange={(e) => { setFuelType(e.target.value); setPage(1); }}
-            className="px-3 py-2 bg-slate-950 text-xs font-bold text-slate-300 rounded-xl border border-white/10 outline-none cursor-pointer"
+            onChange={(e) => setFuelType(e.target.value)}
+            className="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-orange-500"
           >
             <option value="all">Yakıt: Tümü</option>
             <option value="BENZIN">Benzinli</option>
             <option value="DIZEL">Dizel</option>
             <option value="HIBRIT">Hibrit</option>
             <option value="ELEKTRIK">Elektrikli</option>
-            <option value="LPG">LPG</option>
           </select>
 
           <select
             value={transmission}
-            onChange={(e) => { setTransmission(e.target.value); setPage(1); }}
-            className="px-3 py-2 bg-slate-950 text-xs font-bold text-slate-300 rounded-xl border border-white/10 outline-none cursor-pointer"
+            onChange={(e) => setTransmission(e.target.value)}
+            className="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-orange-500"
           >
             <option value="all">Şanzıman: Tümü</option>
             <option value="AUTOMATIC">Otomatik</option>
             <option value="MANUAL">Manuel</option>
           </select>
-
-          <button
-            type="submit"
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            Filtrele
-          </button>
         </form>
       </div>
 
@@ -285,7 +477,7 @@ export default function AdminVehicleDiscoveryPage() {
                   <th className="py-3.5 px-4">Kriter Bilgileri</th>
                   <th className="py-3.5 px-4">Aktif İlanlar</th>
                   <th className="py-3.5 px-4">Kritersiz Keşif</th>
-                  <th className="py-3.5 px-4">Bağlı Varyantlar</th>
+                  <th className="py-3.5 px-4">Filtre Bağlantısı</th>
                   <th className="py-3.5 px-4 text-right">Aksiyon</th>
                 </tr>
               </thead>
@@ -340,47 +532,48 @@ export default function AdminVehicleDiscoveryPage() {
                           </div>
                         </div>
                       ) : (
-                        <span className="px-2 py-0.5 bg-slate-800 text-slate-500 text-[10px] font-bold rounded">
-                          0 İlan
-                        </span>
+                        <span className="text-[10px] text-slate-500 italic">İlan Yok</span>
                       )}
                     </td>
 
-                    {/* Kritersiz Keşif Status */}
+                    {/* Kritersiz Keşif */}
                     <td className="py-3 px-4">
-                      {c.eligibilityStatus === 'ELIGIBLE' ? (
+                      {c.isUnfilteredEligible ? (
                         <span className="px-2.5 py-1 bg-sky-500/20 text-sky-400 border border-sky-500/30 text-[10px] font-bold rounded-xl flex items-center gap-1 w-fit">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>✓ Uygun</span>
-                        </span>
-                      ) : c.eligibilityStatus === 'MISSING_IMAGE' ? (
-                        <span className="px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold rounded-xl flex items-center gap-1 w-fit">
-                          <ImageOff className="w-3 h-3" />
-                          <span>Görsel Eksik</span>
+                          <span>Uygun</span>
                         </span>
                       ) : (
                         <span className="px-2.5 py-1 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold rounded-xl flex items-center gap-1 w-fit">
                           <AlertCircle className="w-3 h-3" />
-                          <span>Teknik Veri Eksik</span>
+                          <span>Eksik Veri</span>
                         </span>
                       )}
                     </td>
 
-                    {/* Bağlı Varyantlar */}
+                    {/* Filtre Bağlantısı Status */}
                     <td className="py-3 px-4">
-                      <span className="px-2 py-1 bg-slate-950 text-slate-400 text-[10px] font-mono font-bold rounded-lg border border-white/5">
-                        {c.variantCount} Varyant
-                      </span>
+                      {c.isFilterReady !== false ? (
+                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold rounded-md flex items-center gap-1 w-fit">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>✓ Hazır</span>
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold rounded-md flex items-center gap-1 w-fit">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>⚠ Eksik</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* Aksiyon */}
                     <td className="py-3 px-4 text-right">
                       <button
-                        onClick={() => setSelectedCandidate(c)}
+                        onClick={() => openEditEditor(c)}
                         className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ml-auto border border-white/10"
                       >
                         <Eye className="w-3.5 h-3.5 text-orange-400" />
-                        <span>Detay / Önizle</span>
+                        <span>Detay / Düzenle</span>
                       </button>
                     </td>
                   </tr>
@@ -394,7 +587,7 @@ export default function AdminVehicleDiscoveryPage() {
             <span className="text-xs text-slate-400 font-medium">
               Sayfa {page} / {totalPages} (Toplam {summary.totalCandidates} Keşif Adayı)
             </span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
@@ -414,89 +607,129 @@ export default function AdminVehicleDiscoveryPage() {
         </div>
       )}
 
-      {/* 4. DETAIL / PREVIEW DRAWER MODAL */}
-      {selectedCandidate && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-white/10 rounded-[32px] max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-6 relative my-auto animate-scale-up">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-1">
-                  Keşif Adayı Önizleme ve Yönetimi
-                </span>
-                <h3 className="text-xl font-black text-white">
-                  {selectedCandidate.brandName} {selectedCandidate.modelName} {selectedCandidate.generationName || ''}
-                </h3>
+      {/* 4. UNIFIED WYSIWYG EDITABLE CARD EDITOR MODAL */}
+      {editorOpen && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-[32px] w-[94vw] max-w-6xl h-[90vh] max-h-[820px] overflow-hidden shadow-2xl flex flex-col relative my-auto animate-scale-up">
+            {/* Modal Header */}
+            <div className="p-5 bg-slate-950 border-b border-white/10 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    <span>{editingCandidateId ? 'Aracını Bul Kartı Düzenle' : '+ Keşfe Yeni Araç Ekle'}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full">
+                      WYSIWYG Editör
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    Kullanıcının gördüğü canlı swipe kartı üzerinde doğrudan görsel ve metin bilgilerini düzenleyin.
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => { setSelectedCandidate(null); setIsAccordionOpen(false); }}
-                className="text-slate-500 hover:text-white p-2 rounded-full bg-white/5 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-3">
+                {/* Filter Binding Badge */}
+                {isFilterBoundReady ? (
+                  <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-xl flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>İLAN FİLTRE BAĞLANTISI: ✓ Hazır</span>
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>İLAN FİLTRE BAĞLANTISI: ⚠ Eksik Eşleşme</span>
+                  </span>
+                )}
+
+                <button
+                  onClick={() => setEditorOpen(false)}
+                  className="text-slate-400 hover:text-white p-2 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* LEFT: EXACT USER SWIPE CARD PREVIEW */}
-              <div className="space-y-3">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-orange-400" />
-                  <span>Kullanıcı Swipe Kartı Önizlemesi</span>
+            {/* Modal Body: Split View (WYSIWYG Preview on Left + Canonical Controls on Right) */}
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-[#080c18]">
+              
+              {/* LEFT COLUMN: LIVE USER SWIPE CARD PREVIEW (WYSIWYG) */}
+              <div className="lg:col-span-6 flex flex-col items-center justify-start space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5 self-start">
+                  <Eye className="w-4 h-4 text-orange-400" />
+                  <span>Kullanıcı Canlı Kart Görünümü (Live Preview)</span>
                 </span>
 
-                <div className="bg-[#0c1224] border border-white/10 rounded-[28px] overflow-hidden shadow-2xl flex flex-col min-h-[460px]">
+                <div className="w-full max-w-[420px] bg-[#0c1224] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col min-h-[520px] relative">
                   {/* Photo area */}
-                  <div className="relative h-44 w-full bg-slate-950 border-b border-white/5 overflow-hidden">
-                    <img
-                      src={formatImageUrl(selectedCandidate.previewImageUrl)}
-                      alt={selectedCandidate.modelName}
-                      className="w-full h-full object-contain"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] to-transparent" />
-                    <div className="absolute bottom-3 left-4 right-4 z-10">
-                      <span className="text-[9px] font-bold text-orange-400 uppercase tracking-widest block">
-                        {selectedCandidate.brandName}
+                  <div className="relative h-52 w-full bg-slate-950 border-b border-white/5 overflow-hidden group">
+                    {formImageUrl ? (
+                      <>
+                        <img
+                          src={formatImageUrl(formImageUrl)}
+                          alt={formModelName || 'Araç Görseli'}
+                          className="w-full h-full object-contain relative z-10"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0c1224] to-transparent z-20" />
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2 p-6 text-center">
+                        <ImageOff className="w-8 h-8 text-slate-600" />
+                        <span className="text-xs font-bold">Görsel Yükleyin</span>
+                        <span className="text-[10px] text-slate-600">Cloudflare R2 aracini-bul/ klasörüne yüklenir</span>
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-3 left-4 right-4 z-30">
+                      <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest block mb-0.5">
+                        {formBrandName || 'MARKA SİLİNMEDİ'}
                       </span>
-                      <h4 className="text-base font-black text-white leading-tight">
-                        {selectedCandidate.modelName}
+                      <h4 className="text-lg font-black text-white leading-tight">
+                        {formModelName || 'Model / Başlık Girin'}
                       </h4>
                     </div>
                   </div>
 
-                  {/* Specs Details */}
+                  {/* Specification Details */}
                   <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <span className="text-slate-500 block">Kasa Tipi</span>
-                        <span className="font-semibold text-slate-300">{translateBodyType(selectedCandidate.bodyType)}</span>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Kasa Tipi</span>
+                        <span className="font-semibold text-slate-200">{translateBodyType(formBodyType)}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block">Yakıt</span>
-                        <span className="font-semibold text-slate-300">{translateFuel(selectedCandidate.fuelType)}</span>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Yakıt</span>
+                        <span className="font-semibold text-slate-200">{translateFuel(formFuelType)}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block">Şanzıman</span>
-                        <span className="font-semibold text-slate-300">{translateTrans(selectedCandidate.transmissionName)}</span>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Şanzıman</span>
+                        <span className="font-semibold text-slate-200">{translateTrans(formTransmissionType)} ({formTransmissionFamily})</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block">Motor</span>
-                        <span className="font-semibold text-slate-300">{selectedCandidate.engineVersion}</span>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Motor</span>
+                        <span className="font-semibold text-slate-200">{formEngineVersion || '—'}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block">Güç / Tork</span>
-                        <span className="font-semibold text-slate-300">{selectedCandidate.powerHp} / {selectedCandidate.torqueNm}</span>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Güç / Tork</span>
+                        <span className="font-semibold text-slate-200">{formPowerHp || '—'} / {formTorqueNm || '—'}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block">Ort. Tüketim</span>
-                        <span className="font-semibold text-slate-300">{selectedCandidate.averageConsumption}</span>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <span className="text-slate-500 text-[10px] block font-medium">Ort. Tüketim</span>
+                        <span className="font-semibold text-slate-200">{formAverageConsumption || '—'}</span>
                       </div>
                     </div>
 
-                    <div className="border-t border-white/10 pt-3 space-y-1">
-                      <span className="text-[9px] font-extrabold text-orange-400 uppercase tracking-wider block">AI Sunum Etiketleri</span>
-                      <div className="flex gap-1 flex-wrap">
-                        {selectedCandidate.aiPresentationTags.map((tag: string, idx: number) => (
-                          <span key={idx} className="px-1.5 py-0.5 bg-orange-500/10 text-orange-400 text-[9px] font-semibold rounded border border-orange-500/20">
+                    {/* AI Presentation Tags */}
+                    <div className="border-t border-white/10 pt-3 space-y-1.5">
+                      <span className="text-[10px] font-extrabold text-orange-400 uppercase tracking-wider block">
+                        AI Sunum Etiketleri
+                      </span>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {formTags.map((tag: string, idx: number) => (
+                          <span key={idx} className="px-2 py-0.5 bg-orange-500/10 text-orange-400 text-[10px] font-bold rounded-lg border border-orange-500/20">
                             {tag}
                           </span>
                         ))}
@@ -506,282 +739,333 @@ export default function AdminVehicleDiscoveryPage() {
                 </div>
               </div>
 
-              {/* RIGHT: ADMIN MANAGEMENT & CANONICAL DETAILS */}
-              <div className="space-y-5">
-                {/* 1. Availability Status */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-3">
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">Keşif Uygunluk Durumları</span>
+              {/* RIGHT COLUMN: CANONICAL FILTER BINDING & EDITABLE CONTROLS */}
+              <div className="lg:col-span-6 space-y-4">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-4 h-4 text-orange-400" />
+                  <span>Doğrudan Kart Üzerinde Seçim & Form Alanları</span>
+                </span>
 
-                  <div className="flex items-center justify-between text-xs py-1 border-b border-white/5">
-                    <span className="text-slate-400">Kriterli Keşif:</span>
-                    {selectedCandidate.isFilteredAvailable ? (
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Kullanılabilir ({selectedCandidate.activeListingCount} İlan)</span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 font-bold">İlan Yok</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs py-1">
-                    <span className="text-slate-400">Kritersiz Keşif:</span>
-                    {selectedCandidate.isUnfilteredEligible ? (
-                      <span className="text-sky-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Kullanılabilir (✓ Tam)</span>
-                      </span>
-                    ) : (
-                      <span className="text-amber-400 font-bold">İçerik / Görsel Eksik</span>
-                    )}
+                {/* 1. IMAGE UPLOAD & PREVIEW LINK */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
+                  <label className="text-xs font-bold text-slate-300 block">1. Araç Görseli (Cloudflare R2 aracini-bul/)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formImageUrl}
+                      onChange={(e) => setFormImageUrl(e.target.value)}
+                      placeholder="Görsel URL veya bilgisayardan yükleyin..."
+                      className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500"
+                    />
+                    <label className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-white/10 rounded-xl cursor-pointer transition shrink-0 flex items-center gap-1">
+                      <span>Yükle</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          try {
+                            const token = getAuthToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/vehicle-discovery/upload-image`, {
+                              method: 'POST',
+                              headers: { Authorization: `Bearer ${token}` },
+                              body: formData,
+                            });
+                            if (!res.ok) throw new Error('Görsel yüklenemedi.');
+                            const data = await res.json();
+                            if (data.url) {
+                              setFormImageUrl(data.url);
+                            }
+                          } catch (err: any) {
+                            alert(err.message);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                 </div>
 
-                {/* 2. Read-Only Canonical Spec Box */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Teknik Veri Kaynağı</span>
-                    <a
-                      href={`/admin/vehicle-data/variants?search=${encodeURIComponent(selectedCandidate.brandName + ' ' + selectedCandidate.modelName)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-bold text-orange-400 hover:underline flex items-center gap-1"
-                    >
-                      <span>Varyant VT'de Düzenle</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                    Teknik veriler canonical <span className="text-slate-200 font-mono">VehicleVariant</span> tablosundan salt-okunur olarak çekilmektedir.
-                  </p>
-                </div>
-
-                {/* 3. Accordion: Linked Variants */}
-                <div className="bg-slate-950 rounded-2xl border border-white/5 overflow-hidden">
-                  <button
-                    onClick={() => setIsAccordionOpen(!isAccordionOpen)}
-                    className="w-full p-4 flex items-center justify-between text-xs font-bold text-slate-300 hover:bg-white/5 transition"
-                  >
-                    <span>Bağlı Varyantlar ({selectedCandidate.variantCount})</span>
-                    {isAccordionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-
-                  {isAccordionOpen && (
-                    <div className="p-4 pt-0 space-y-2 border-t border-white/5">
-                      {selectedCandidate.variants.map((v: any) => (
-                        <div key={v.id} className="flex items-center justify-between text-[11px] py-1 border-b border-white/5 last:border-0">
-                          <span className="text-slate-300 font-medium">{v.year} model · {v.trimName}</span>
-                          <span className="text-slate-500 font-mono text-[10px]">{v.activeListings} aktif ilan</span>
-                        </div>
-                      ))}
+                {/* 2. CASCADING MARKA & MODEL SEÇİMİ */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/10 space-y-3">
+                  <span className="text-xs font-bold text-slate-300 block">2. Marka ve Model (Canonical Identity)</span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Marka Seç / Gir</label>
+                      <select
+                        value={formBrandId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setFormBrandId(selectedId);
+                          const found = dbBrands.find((b) => b.id === selectedId);
+                          if (found) setFormBrandName(found.name);
+                        }}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="">— Canonical Marka —</option>
+                        {dbBrands.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
                     </div>
-                  )}
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Model Seç / Gir</label>
+                      <select
+                        value={formModelId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setFormModelId(selectedId);
+                          const found = dbModels.find((m) => m.id === selectedId);
+                          if (found) setFormModelName(found.name);
+                        }}
+                        disabled={!formBrandId && dbModels.length === 0}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 disabled:opacity-40"
+                      >
+                        <option value="">— Canonical Model —</option>
+                        {dbModels.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Marka Display Adı</label>
+                      <input
+                        type="text"
+                        value={formBrandName}
+                        onChange={(e) => setFormBrandName(e.target.value)}
+                        placeholder="Örn: MERCEDES-BENZ"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Model / Başlık Display Adı</label>
+                      <input
+                        type="text"
+                        value={formModelName}
+                        onChange={(e) => setFormModelName(e.target.value)}
+                        placeholder="Örn: Corsa veya 3008 1.5 BlueHDi"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* 4. Controls Action */}
-                <div className="pt-2 flex gap-3">
-                  <button
-                    onClick={() => alert(`Keşif adayı "${selectedCandidate.brandName} ${selectedCandidate.modelName}" yayında.`)}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-4 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-orange-500/15"
-                  >
-                    Kaydet ve Kapat
-                  </button>
+                {/* 3. KASA, YAKIT, ŞANZIMAN & MOTOR SEÇİMİ */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/10 space-y-3">
+                  <span className="text-xs font-bold text-slate-300 block">3. Kasa, Yakıt, Şanzıman & Motor</span>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Kasa Tipi</label>
+                      <select
+                        value={formBodyType}
+                        onChange={(e) => setFormBodyType(e.target.value)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="HATCHBACK">Hatchback</option>
+                        <option value="SEDAN">Sedan</option>
+                        <option value="SUV">SUV</option>
+                        <option value="STATION_WAGON">Station Wagon</option>
+                        <option value="COUPE">Coupe</option>
+                        <option value="CABRIO">Cabrio</option>
+                        <option value="PICKUP">Pickup</option>
+                        <option value="VAN">Van / Minivan</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Yakıt</label>
+                      <select
+                        value={formFuelType}
+                        onChange={(e) => setFormFuelType(e.target.value)}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="BENZIN">Benzinli</option>
+                        <option value="DIZEL">Dizel</option>
+                        <option value="HIBRIT">Hibrit</option>
+                        <option value="ELEKTRIK">Elektrikli</option>
+                        <option value="LPG">LPG</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Şanzıman Family</label>
+                      <select
+                        value={formTransmissionFamily}
+                        onChange={(e) => {
+                          const fam = e.target.value;
+                          setFormTransmissionFamily(fam);
+                          setFormTransmissionType(fam === 'MANUEL' ? 'Manuel' : 'Otomatik');
+                        }}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="OTOMATIK">Otomatik</option>
+                        <option value="MANUEL">Manuel</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Clean Motor Options Dropdown */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Motor / Versiyon (Canonical Engine)</label>
+                    {uniqueEngineOptions.length > 0 ? (
+                      <select
+                        value={formEngineId}
+                        onChange={(e) => {
+                          const engId = e.target.value;
+                          setFormEngineId(engId);
+                          const found = uniqueEngineOptions.find((o) => o.engineId === engId);
+                          if (found) {
+                            setFormEngineVersion(found.code);
+                            if (found.horsepower) setFormPowerHp(found.horsepower);
+                            if (found.torque) setFormTorqueNm(found.torque);
+                            if (found.variantId) setFormRepresentativeVariantId(found.variantId);
+                          }
+                        }}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 mb-1"
+                      >
+                        <option value="">— Clean Canonical Motor Seç —</option>
+                        {uniqueEngineOptions.map((opt) => (
+                          <option key={opt.engineId} value={opt.engineId}>
+                            {opt.code} ({opt.horsepower} · {opt.torque})
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+
+                    <input
+                      type="text"
+                      value={formEngineVersion}
+                      onChange={(e) => setFormEngineVersion(e.target.value)}
+                      placeholder="Motor Adı Display (Örn: 1.6 CDTI veya 1.5 BlueHDi 130)"
+                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
                 </div>
+
+                {/* 4. PERFORMANCE & CONSUMPTION (MANUAL DISPLAY FIELDS) */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/10 space-y-3">
+                  <span className="text-xs font-bold text-slate-300 block">4. Performans ve Tüketim (Sunum Bilgileri)</span>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Güç (HP)</label>
+                      <input
+                        type="text"
+                        value={formPowerHp}
+                        onChange={(e) => setFormPowerHp(e.target.value)}
+                        placeholder="Örn: 130 HP"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Tork (Nm)</label>
+                      <input
+                        type="text"
+                        value={formTorqueNm}
+                        onChange={(e) => setFormTorqueNm(e.target.value)}
+                        placeholder="Örn: 300 Nm"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Ort. Tüketim</label>
+                      <input
+                        type="text"
+                        value={formAverageConsumption}
+                        onChange={(e) => setFormAverageConsumption(e.target.value)}
+                        placeholder="Örn: 4.5 L/100km"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. PUBLICATION & UNFILTERED DISCOVERY TOGGLES */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/10 space-y-3">
+                  <span className="text-xs font-bold text-slate-300 block">5. Yayın Ayarları</span>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-900 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-white text-xs block">Yayın Durumu</span>
+                        <span className="text-[10px] text-slate-400">Yayında / Taslak</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormIsActive(!formIsActive)}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                          formIsActive
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-white/10'
+                        }`}
+                      >
+                        {formIsActive ? 'Yayında' : 'Taslak'}
+                      </button>
+                    </div>
+
+                    <div className="p-3 bg-slate-900 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-white text-xs block">Kritersiz Keşif</span>
+                        <span className="text-[10px] text-slate-400">Açık / Kapalı</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormAllowInUnfiltered(!formAllowInUnfiltered)}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                          formAllowInUnfiltered
+                            ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-white/10'
+                        }`}
+                      >
+                        {formAllowInUnfiltered ? 'Açık' : 'Kapalı'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* 5. ADD & EDIT DISCOVERY CANDIDATE ENROLLMENT MODAL */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-white/10 rounded-[32px] max-w-2xl w-full p-6 shadow-2xl space-y-6 my-8 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h3 className="text-lg font-extrabold text-white">Keşfe Araç Ekle / Yayın Ayarları</h3>
-                <p className="text-xs text-slate-400 font-medium">Canonical araç kimliğini seçin, Aracını Bul sunum ve görsel ayarlarını yönetin.</p>
+            {/* Modal Footer CTA */}
+            <div className="p-4 bg-slate-950 border-t border-white/10 flex items-center justify-between shrink-0">
+              <div className="text-xs text-slate-400 font-medium">
+                {isFormValid ? (
+                  <span className="text-emerald-400 font-bold">✓ Tüm zorunlu alanlar dolduruldu.</span>
+                ) : (
+                  <span className="text-amber-400">⚠ Lütfen zorunlu alanları (görsel, marka, model, motor, güç, tork, tüketim) doldurun.</span>
+                )}
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-500 hover:text-white p-1">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-5 text-xs text-slate-300">
-              {/* Step 1: Candidate Selector */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block">1. Araç Seç (Canonical Aday Kimliği)</label>
-                <select
-                  value={selectedCandidate?.representativeVariantId || ''}
-                  onChange={(e) => {
-                    const found = candidates.find(c => c.representativeVariantId === e.target.value);
-                    if (found) setSelectedCandidate(found);
-                  }}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-3 text-white text-xs font-medium focus:outline-none focus:border-orange-500"
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditorOpen(false)}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs rounded-xl border border-white/10 transition cursor-pointer"
                 >
-                  <option value="">— Canonical Araç Seçin —</option>
-                  {candidates.map((c) => (
-                    <option key={c.candidateId} value={c.representativeVariantId}>
-                      {c.brandName} {c.modelName} {c.generationName} ({c.engineVersion} · {c.transmissionName})
-                    </option>
-                  ))}
-                </select>
+                  İptal
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!isFormValid || isSubmitting}
+                  onClick={handleSaveCandidate}
+                  className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-500/20 transition disabled:opacity-40 cursor-pointer flex items-center gap-2"
+                >
+                  {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingCandidateId ? 'Değişiklikleri Kaydet' : 'Kaydet ve Ekle'}</span>
+                </button>
               </div>
-
-              {selectedCandidate && (
-                <>
-                  {/* Step 2: Auto-Filled Read-Only Specs */}
-                  <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">2. Otomatik Teknik Detaylar (Read-Only)</span>
-                      <span className="text-[10px] text-emerald-400 font-bold px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                        Canonical VT'den Alındı
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
-                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
-                        <span className="text-slate-500 text-[10px] block font-medium">Motor / Güç</span>
-                        <span className="font-bold text-white">{selectedCandidate.powerHp || '—'}</span>
-                      </div>
-                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
-                        <span className="text-slate-500 text-[10px] block font-medium">Tork</span>
-                        <span className="font-bold text-white">{selectedCandidate.torqueNm || '—'}</span>
-                      </div>
-                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
-                        <span className="text-slate-500 text-[10px] block font-medium">Yakıt / Şanzıman</span>
-                        <span className="font-bold text-white">{translateFuel(selectedCandidate.fuelType)} / {translateTrans(selectedCandidate.transmissionName)}</span>
-                      </div>
-                      <div className="p-2.5 bg-slate-900/60 rounded-xl">
-                        <span className="text-slate-500 text-[10px] block font-medium">Ort. Tüketim</span>
-                        <span className="font-bold text-white">{selectedCandidate.averageConsumption || '—'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step 3: Discovery Media & Presentation Controls */}
-                  <div className="space-y-4">
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">3. Aracını Bul Görseli ve Sunum Toggles</span>
-
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-slate-400 block">Aracını Bul Özel Hero Görseli (Cloudflare R2 aracini-bul/)</label>
-                      <div className="flex gap-3 items-center">
-                        <input
-                          type="text"
-                          value={selectedCandidate.previewImageUrl || ''}
-                          onChange={(e) => setSelectedCandidate({ ...selectedCandidate, previewImageUrl: e.target.value })}
-                          placeholder="https://... (Örn: R2 aracini-bul/ path)"
-                          className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs font-medium focus:outline-none focus:border-orange-500"
-                        />
-                        <label className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-white/10 rounded-xl cursor-pointer transition shrink-0 flex items-center gap-1.5">
-                          <span>Görsel Yükle</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              try {
-                                const token = getAuthToken();
-                                const res = await fetch(`${API_BASE_URL}/admin/vehicle-discovery/upload-image`, {
-                                  method: 'POST',
-                                  headers: { Authorization: `Bearer ${token}` },
-                                  body: formData,
-                                });
-                                if (!res.ok) throw new Error('Görsel yüklenemedi.');
-                                const data = await res.json();
-                                if (data.url) {
-                                  setSelectedCandidate({ ...selectedCandidate, previewImageUrl: data.url });
-                                  alert('Görsel başarıyla Cloudflare R2 (aracini-bul/) klasörüne yüklendi.');
-                                }
-                              } catch (err: any) {
-                                alert(err.message);
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-white text-xs block">Yayın Durumu</span>
-                          <span className="text-[10px] text-slate-400">Yayında / Taslak</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCandidate({ ...selectedCandidate, isPublished: !selectedCandidate.isPublished })}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
-                            selectedCandidate.isPublished 
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                              : 'bg-slate-800 text-slate-400 border border-white/10'
-                          }`}
-                        >
-                          {selectedCandidate.isPublished ? 'Yayında' : 'Taslak'}
-                        </button>
-                      </div>
-
-                      <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-white text-xs block">Kritersiz Keşifte Kullan</span>
-                          <span className="text-[10px] text-slate-400">Admin Keşif İzni</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCandidate({ ...selectedCandidate, allowInUnfilteredDiscovery: !selectedCandidate.allowInUnfilteredDiscovery })}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer ${
-                            selectedCandidate.allowInUnfilteredDiscovery !== false
-                              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' 
-                              : 'bg-slate-800 text-slate-400 border border-white/10'
-                          }`}
-                        >
-                          {selectedCandidate.allowInUnfilteredDiscovery !== false ? 'Açık' : 'Kapalı'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step 4: Live Preview & Save */}
-                  <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
-                    <span className="text-[11px] text-slate-400">
-                      Teknik bilgiler canonical <span className="text-white font-bold font-mono">VehicleVariant</span> verisinden otomatik beslenir.
-                    </span>
-                    <button
-                      onClick={() => {
-                        const token = getAuthToken();
-                        fetchReportApi('admin/vehicle-discovery/enroll', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            representativeVariantId: selectedCandidate.representativeVariantId,
-                            imageUrl: selectedCandidate.previewImageUrl,
-                            isActive: selectedCandidate.isPublished,
-                            allowInUnfilteredDiscovery: selectedCandidate.allowInUnfilteredDiscovery,
-                            tags: selectedCandidate.aiPresentationTags
-                          })
-                        })
-                        .then((res) => {
-                          if (!res.ok) throw new Error('Enrollment güncellenemedi.');
-                          return res.json();
-                        })
-                        .then(() => {
-                          alert(`" ${selectedCandidate.brandName} ${selectedCandidate.modelName}" keşif ayarları kaydedildi.`);
-                          setIsAddModalOpen(false);
-                          fetchDiscoveryCandidates();
-                        })
-                        .catch((err) => alert(err.message));
-                      }}
-                      className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-6 rounded-xl text-xs transition cursor-pointer shadow-lg shadow-orange-500/20 shrink-0"
-                    >
-                      Kaydet ve Ekle
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>

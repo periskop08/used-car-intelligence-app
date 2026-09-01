@@ -91,11 +91,13 @@ function ListingsContent() {
   }, [selectedBrand]);
 
   const [vehicleVariantId, setVehicleVariantId] = useState("");
+  const [selectedEngineId, setSelectedEngineId] = useState("");
 
   // Read URL parameters on load
   useEffect(() => {
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
+    const engineVal = searchParams.get("engineId");
     const variantId = searchParams.get("vehicleVariantId");
     const bodyVal = searchParams.get("bodyType");
     const fuelVal = searchParams.get("fuelType");
@@ -111,6 +113,7 @@ function ListingsContent() {
     
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
+    if (engineVal) setSelectedEngineId(engineVal);
     if (variantId) setVehicleVariantId(variantId);
     if (bodyVal) setBodyTypes(bodyVal.split(","));
     if (fuelVal) setFuelTypes(fuelVal.split(","));
@@ -131,6 +134,7 @@ function ListingsContent() {
     let query = `?page=${page}&limit=9&sort=${sort}`;
     if (selectedBrand) query += `&brandId=${selectedBrand}`;
     if (selectedModel) query += `&modelId=${selectedModel}`;
+    if (selectedEngineId) query += `&engineId=${selectedEngineId}`;
     if (vehicleVariantId) query += `&vehicleVariantId=${vehicleVariantId}`;
     if (minYear) query += `&minYear=${minYear}`;
     if (maxYear) query += `&maxYear=${maxYear}`;

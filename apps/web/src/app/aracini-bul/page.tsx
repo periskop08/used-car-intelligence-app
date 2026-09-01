@@ -1128,12 +1128,14 @@ export default function FindMyCarPage() {
                 <div className="flex flex-col sm:flex-row gap-4 pt-2">
                   <button
                     onClick={() => {
-                      const rec = resultsData.recommendation;
+                      const rec = resultsData?.recommendation;
                       if (!rec) return;
-                      const q = rec.listingsQuery;
-                      let url = `/listings?vehicleVariantId=${q.vehicleVariantId}`;
+                      const q = (rec.listingsQuery || {}) as any;
+                      let url = `/listings?fromDiscovery=true`;
                       if (q.brandId) url += `&brandId=${q.brandId}`;
                       if (q.modelId) url += `&modelId=${q.modelId}`;
+                      if (q.engineId) url += `&engineId=${q.engineId}`;
+                      if (q.vehicleVariantId) url += `&vehicleVariantId=${q.vehicleVariantId}`;
                       if (q.bodyType) url += `&bodyType=${q.bodyType}`;
                       if (q.fuelType) url += `&fuelType=${q.fuelType}`;
                       if (q.transmission) url += `&transmission=${encodeURIComponent(q.transmission)}`;

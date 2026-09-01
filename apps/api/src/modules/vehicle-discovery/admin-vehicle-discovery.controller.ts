@@ -83,11 +83,25 @@ export class AdminVehicleDiscoveryController {
   async enrollCandidate(
     @Body() dto: {
       candidateId?: string;
-      representativeVariantId: string;
+      brandId?: string;
+      brand?: string;
+      modelId?: string;
+      modelFamily?: string;
+      generationName?: string;
+      bodyType?: string;
+      fuelType?: string;
+      transmissionType?: string;
+      engineId?: string;
+      engineVersion?: string;
+      power?: string;
+      torque?: string;
+      averageConsumption?: string;
+      drivetrain?: string;
       imageUrl?: string;
       isActive?: boolean;
       allowInUnfilteredDiscovery?: boolean;
       tags?: string[];
+      representativeVariantId?: string;
     }
   ) {
     return this.discoveryService.enrollDiscoveryCandidate(dto);

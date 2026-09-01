@@ -816,9 +816,9 @@ export class VehicleDiscoveryService {
         minActivePrice,
         maxActivePrice,
         listingsQuery: {
-          vehicleVariantId: recommendedVariant?.id,
           brandId: recommendedVariant?.brandId,
           modelId: recommendedVariant?.modelId,
+          engineId: recommendedVariant?.engineId,
           bodyType,
           fuelType,
           transmission: transmissionType,
@@ -941,6 +941,8 @@ export class VehicleDiscoveryService {
         const isUnfilteredEligible = unfilteredEligibilityStatus === 'ELIGIBLE';
         const eligibilityStatus = isUnfilteredEligible ? 'ELIGIBLE' : (!hasRealDiscoveryImage ? 'MISSING_IMAGE' : 'INCOMPLETE_SPECS');
 
+        const isFilterReady = Boolean((repVariant?.brandId || card.brand) && (repVariant?.modelId || card.modelFamily) && card.bodyType && card.fuelType && card.transmissionType);
+
         const candidateObj = {
           candidateId: card.id,
           representativeVariantId: repVariant?.id || card.representativeVariantId || card.id,
@@ -948,6 +950,7 @@ export class VehicleDiscoveryService {
           brandName: card.brand,
           modelId: repVariant?.modelId || '',
           modelName: card.modelFamily,
+          engineId: repVariant?.engineId || '',
           generationName: card.generationName || repVariant?.generation?.name || null,
           engineVersion: card.engineVersion || repVariant?.engine?.code || 'Standard',
           bodyType: card.bodyType || repVariant?.bodyType || 'SEDAN',
@@ -966,6 +969,7 @@ export class VehicleDiscoveryService {
           allowInUnfilteredDiscovery,
           unfilteredEligibilityStatus,
           eligibilityStatus,
+          isFilterReady,
           isPublished,
           variantCount: 1,
           variants: repVariant ? [{ id: repVariant.id, year: repVariant.year || 2000, trimName: repVariant.trim?.name || 'Standart', activeListings: totalActiveListings }] : [],
@@ -1363,54 +1367,92 @@ export class VehicleDiscoveryService {
 
   async enrollDiscoveryCandidate(dto: {
     candidateId?: string;
-    representativeVariantId: string;
+    brandId?: string;
+    brand?: string;
+    modelId?: string;
+    modelFamily?: string;
+    generationName?: string;
+    bodyType?: string;
+    fuelType?: string;
+    transmissionType?: string;
+    engineId?: string;
+    engineVersion?: string;
+    power?: string;
+    torque?: string;
+    averageConsumption?: string;
+    drivetrain?: string;
     imageUrl?: string;
     isActive?: boolean;
     allowInUnfilteredDiscovery?: boolean;
     tags?: string[];
+    representativeVariantId?: string;
   }) {
-    const { representativeVariantId, imageUrl, isActive = true, allowInUnfilteredDiscovery = true, tags = ['#konfor', '#aile-araci'] } = dto;
+    const {
+      candidateId,
+      brandId,
+      brand,
+      modelId,
+      modelFamily,
+      generationName,
+      bodyType = 'SEDAN',
+      fuelType = 'BENZIN',
+      transmissionType = 'Otomatik',
+      engineId,
+      engineVersion = 'Standard',
+      power = '110 HP',
+      torque = '143 Nm',
+      averageConsumption = '5.5 L/100km',
+      drivetrain = 'Önden Çekiş',
+      imageUrl,
+      isActive = true,
+      allowInUnfilteredDiscovery = true,
+      tags = ['#konfor', '#aile-araci'],
+      representativeVariantId
+    } = dto;
 
-    const variant = await this.prisma.vehicleVariant.findUnique({
-      where: { id: representativeVariantId },
-      include: {
-        brand: true,
-        model: true,
-        generation: true,
-        engine: true,
-        transmission: true,
-        specs: true
+    let targetVariantId = representativeVariantId;
+
+    // If representativeVariantId is not provided but brandId & modelId are present, resolve a representative variant if available
+    if (!targetVariantId && (representativeVariantId || (brandId && modelId))) {
+      const whereClause: any = {};
+      if (brandId) whereClause.brandId = brandId;
+      if (modelId) whereClause.modelId = modelId;
+      if (engineId) whereClause.engineId = engineId;
+
+      const foundVariant = await this.prisma.vehicleVariant.findFirst({
+        where: whereClause,
+        select: { id: true }
+      });
+
+      if (foundVariant) {
+        targetVariantId = foundVariant.id;
       }
-    });
-
-    if (!variant) {
-      throw new NotFoundException(`Canonical VehicleVariant ID ${representativeVariantId} bulunamadı.`);
     }
 
-    let existingCard = await this.prisma.vehicleDiscoveryCard.findUnique({
-      where: { representativeVariantId }
-    });
+    let existingCard = candidateId
+      ? await this.prisma.vehicleDiscoveryCard.findUnique({ where: { id: candidateId } })
+      : targetVariantId
+      ? await this.prisma.vehicleDiscoveryCard.findUnique({ where: { representativeVariantId: targetVariantId } })
+      : null;
 
-    const specJson = (variant.specs?.specs as any) || {};
-
-    const cardData = {
-      brand: variant.brand?.name || 'Araç',
-      modelFamily: variant.model?.name || '',
-      generationName: variant.generation?.name || null,
-      bodyType: variant.bodyType || 'SEDAN',
-      fuelType: variant.fuelType || 'BENZIN',
-      transmissionType: variant.transmission?.name || 'Otomatik',
-      engineVersion: variant.engine?.code || 'Standard',
-      power: variant.engine?.horsepower ? `${variant.engine.horsepower} HP` : '110 HP',
-      torque: variant.engine?.torque ? `${variant.engine.torque} Nm` : '143 Nm',
-      productionYears: `${variant.yearStart || 2000}-${variant.yearEnd || ''}`,
-      averageConsumption: specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km',
-      drivetrain: specJson.drivetrain || 'Önden Çekiş',
-      imageUrl: imageUrl || existingCard?.imageUrl || '',
+    const cardData: any = {
+      brand: brand || 'Araç',
+      modelFamily: modelFamily || '',
+      generationName: generationName || null,
+      bodyType: bodyType || 'SEDAN',
+      fuelType: fuelType || 'BENZIN',
+      transmissionType: transmissionType || 'Otomatik',
+      engineVersion: engineVersion || 'Standard',
+      power: power || '110 HP',
+      torque: torque || '143 Nm',
+      productionYears: '2018-2026',
+      averageConsumption: averageConsumption || '5.5 L/100km',
+      drivetrain: drivetrain || 'Önden Çekiş',
+      imageUrl: imageUrl || existingCard?.imageUrl || 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800',
       tags: tags,
       isActive,
       allowInUnfilteredDiscovery,
-      representativeVariantId: variant.id
+      representativeVariantId: targetVariantId || null
     };
 
     if (existingCard) {
