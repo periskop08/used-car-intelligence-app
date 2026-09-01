@@ -244,10 +244,11 @@ const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
       <View style={styles.imageContainer}>
         {card.imageUrl ? (
           <ExpoImage
+            key={card.imageUrl}
             source={{ uri: card.imageUrl }}
             style={styles.cardImage}
             contentFit="cover"
-            transition={150}
+            transition={0}
             cachePolicy="memory-disk"
             priority="high"
           />
@@ -723,15 +724,15 @@ export default function AraciniBulScreen() {
       duration: 220,
       useNativeDriver: false,
     }).start(() => {
-      // 1. Instantly transition to the already pre-rendered underneath card
+      // 1. Reset pan coordinates first
+      pan.setValue({ x: 0, y: 0 });
+      isSwipingRef.current = false;
+
+      // 2. Instantly shift deck so underneath card seamlessly becomes top card
       const remainingDeck = currentDeck.slice(1);
       setDeck(remainingDeck);
       deckRef.current = remainingDeck;
       setCurrentIndex((prev) => prev + 1);
-
-      // 2. Reset pan for the newly elevated top card with 0ms visual snap
-      pan.setValue({ x: 0, y: 0 });
-      isSwipingRef.current = false;
 
       // 3. If deck is now empty, load AI recommendation results immediately
       if (remainingDeck.length === 0) {
@@ -958,6 +959,7 @@ export default function AraciniBulScreen() {
             {/* UNDERNEATH NEXT CARD (PRE-LOADED IN PLACE) */}
             {underneathCard && (
               <Animated.View
+                key={`underneath-${underneathCard.id}`}
                 style={[
                   styles.card,
                   styles.underneathCard,
@@ -974,6 +976,7 @@ export default function AraciniBulScreen() {
 
             {/* TOP ACTIVE SWIPE CARD */}
             <Animated.View
+              key={`top-${currentTopCard.id}`}
               {...panResponder.panHandlers}
               style={[
                 styles.card,
