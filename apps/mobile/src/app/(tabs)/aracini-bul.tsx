@@ -217,6 +217,111 @@ interface RecommendationResult {
   recommendations?: RecommendedVariant[];
 }
 
+const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
+  return (
+    <>
+      {/* Photo Header */}
+      <View style={styles.imageContainer}>
+        {card.imageUrl ? (
+          <Image
+            source={{ uri: card.imageUrl }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.placeholderImage]}>
+            <Ionicons name="car-outline" size={54} color="#64748b" />
+          </View>
+        )}
+        <View style={styles.cardBadge}>
+          <Text style={styles.cardBadgeText}>{card.brand.toUpperCase()}</Text>
+        </View>
+      </View>
+
+      {/* Content Scroll */}
+      <ScrollView style={styles.cardScroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.cardTitle}>
+          {card.displayName || `${card.brand} ${card.modelFamily}`}
+        </Text>
+        <Text style={styles.cardSubtitle}>
+          {card.generationName ? `${card.generationName} • ` : ''}
+          {card.productionYears || ''}
+        </Text>
+
+        {/* Specification Grid (2x3) */}
+        <View style={styles.specGrid}>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Kasa Tipi</Text>
+            <Text style={styles.specVal}>{translateBodyType(card.bodyType)}</Text>
+          </View>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Yakıt</Text>
+            <Text style={styles.specVal}>{translateFuelType(card.fuelType)}</Text>
+          </View>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Şanzıman</Text>
+            <Text style={styles.specVal}>{translateTransmission(card.transmissionType)}</Text>
+          </View>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Motor</Text>
+            <Text style={styles.specVal}>{card.engineVersion || '-'}</Text>
+          </View>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Güç / Tork</Text>
+            <Text style={styles.specVal}>
+              {card.power || '-'} / {card.torque || '-'}
+            </Text>
+          </View>
+          <View style={styles.specItem}>
+            <Text style={styles.specLabel}>Ort. Tüketim</Text>
+            <Text style={styles.specVal}>{card.averageConsumption || '-'}</Text>
+          </View>
+        </View>
+
+        {/* BU ARAÇ NASIL? Section */}
+        {(card.discoverySummary || card.guideSummary) && (
+          <View style={styles.aiInsightBox}>
+            <View style={styles.aiInsightHeader}>
+              <Ionicons name="sparkles" size={14} color="#ea580c" />
+              <Text style={styles.aiInsightTitle}>BU ARAÇ NASIL?</Text>
+            </View>
+            <Text style={styles.aiInsightText}>
+              {card.discoverySummary || card.guideSummary}
+            </Text>
+
+            {(card.highlight || card.discoveryHighlight) && (
+              <View style={styles.highlightPill}>
+                <Text style={styles.highlightPillText}>
+                  ✓ ÖNE ÇIKAN: {card.highlight || card.discoveryHighlight}
+                </Text>
+              </View>
+            )}
+
+            {(card.watchout || card.discoveryWatchout) && (
+              <View style={styles.watchoutPill}>
+                <Text style={styles.watchoutPillText}>
+                  ⚠ DİKKAT: {card.watchout || card.discoveryWatchout}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Tags */}
+        {card.tags && card.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {card.tags.map((t) => (
+              <View key={t} style={styles.tagBadge}>
+                <Text style={styles.tagBadgeText}>#{t.replace(/^#/, '')}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </>
+  );
+});
+
 export default function AraciniBulScreen() {
   const router = useRouter();
 
@@ -231,8 +336,12 @@ export default function AraciniBulScreen() {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [targetCount, setTargetCount] = useState<number>(20);
 
-  const [currentCard, setCurrentCard] = useState<DiscoveryCard | null>(null);
+  const [deck, setDeck] = useState<DiscoveryCard[]>([]);
+  const deckRef = useRef<DiscoveryCard[]>([]);
+  deckRef.current = deck;
+
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
+  const isSwipingRef = useRef<boolean>(false);
 
   // Filter Modal & State
   const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
@@ -266,6 +375,35 @@ export default function AraciniBulScreen() {
   useEffect(() => {
     init();
   }, []);
+
+  const formatDiscoveryCard = (raw: any): DiscoveryCard => {
+    const cardData = raw.card || raw;
+    return {
+      id: cardData.id,
+      vehicleProfileId: cardData.vehicleProfileId,
+      displayName: cardData.displayName || `${cardData.brand} ${cardData.modelFamily}`,
+      brand: cardData.brand || '',
+      modelFamily: cardData.modelFamily || '',
+      generationName: cardData.generationName || null,
+      bodyType: cardData.bodyType || 'Sedan',
+      fuelType: cardData.fuelType || 'Benzin',
+      transmissionType: cardData.transmissionType || 'Otomatik',
+      engineVersion: cardData.engineVersion || '',
+      power: cardData.power || '',
+      torque: cardData.torque || '',
+      productionYears: cardData.productionYears || '',
+      averageConsumption: cardData.averageConsumption || '',
+      drivetrain: cardData.drivetrain || '',
+      imageUrl: resolveVehicleImageUrl(cardData.imageUrl, cardData.brand, cardData.modelFamily, cardData.generationName),
+      tags: Array.isArray(cardData.tags) ? cardData.tags : [],
+      discoverySummary: cardData.discoverySummary,
+      guideSummary: cardData.guideSummary,
+      highlight: cardData.highlight,
+      discoveryHighlight: cardData.discoveryHighlight,
+      watchout: cardData.watchout,
+      discoveryWatchout: cardData.discoveryWatchout,
+    };
+  };
 
   const customFetch = async (
     url: string,
@@ -345,8 +483,10 @@ export default function AraciniBulScreen() {
         const sess = data.session;
         if (sess) {
           setSessionId(sess.id);
+          sessionIdRef.current = sess.id;
           setCurrentIndex(sess.currentIndex || 0);
           setSessionVersion(sess.version || 0);
+          sessionVersionRef.current = sess.version || 0;
           setTargetCount(sess.targetCount || 20);
           setWarningMessage(data.warning || null);
 
@@ -355,21 +495,18 @@ export default function AraciniBulScreen() {
             return sess.id;
           }
 
+          // Build deck from unswiped items
+          const unswiped = (sess.items || []).filter((it: any) => it.action === null);
+          const formattedDeck = unswiped.map(formatDiscoveryCard);
+          setDeck(formattedDeck);
+          deckRef.current = formattedDeck;
+
           // Pre-cache all session images in parallel for instant 0ms transitions
-          if (sess.items && Array.isArray(sess.items)) {
-            sess.items.forEach((it: any) => {
-              const cardData = it.card || it;
-              const img = resolveVehicleImageUrl(
-                cardData?.imageUrl,
-                cardData?.brand,
-                cardData?.modelFamily || cardData?.model,
-                cardData?.generationName
-              );
-              if (img) {
-                Image.prefetch(img).catch(() => {});
-              }
-            });
-          }
+          formattedDeck.forEach((card: DiscoveryCard) => {
+            if (card.imageUrl) {
+              Image.prefetch(card.imageUrl).catch(() => {});
+            }
+          });
 
           setGameState('intro');
           return sess.id;
@@ -385,15 +522,19 @@ export default function AraciniBulScreen() {
   };
 
   const startDiscovery = async () => {
-    setGameState('loading');
-    let activeSessionId = sessionId;
-    if (!activeSessionId) {
-      activeSessionId = await init();
-    }
-    if (activeSessionId) {
-      await fetchNextCard(activeSessionId);
+    if (deckRef.current.length > 0) {
+      setGameState('swiping');
     } else {
-      setGameState('error');
+      setGameState('loading');
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        activeSessionId = await init();
+      }
+      if (activeSessionId) {
+        setGameState('swiping');
+      } else {
+        setGameState('error');
+      }
     }
   };
 
@@ -410,7 +551,8 @@ export default function AraciniBulScreen() {
       setSelectedTransmissions([]);
       setWarningMessage(null);
       setResultsData(null);
-      setCurrentCard(null);
+      setDeck([]);
+      deckRef.current = [];
 
       // 2. Request brand new session from server (forceNew: true creates a new 0/20 session)
       const res = await customFetch(`${API_URL}/vehicle-discovery/sessions`, {
@@ -426,28 +568,25 @@ export default function AraciniBulScreen() {
         const sess = data.session;
         if (sess && sess.id) {
           setSessionId(sess.id);
-          setCurrentIndex(sess.currentIndex || 0);
-          setSessionVersion(sess.version || 0);
+          sessionIdRef.current = sess.id;
+          setCurrentIndex(0);
+          setSessionVersion(0);
+          sessionVersionRef.current = 0;
           setTargetCount(sess.targetCount || 20);
 
-          // Pre-cache all fresh images
-          if (sess.items && Array.isArray(sess.items)) {
-            sess.items.forEach((it: any) => {
-              const cardData = it.card || it;
-              const img = resolveVehicleImageUrl(
-                cardData?.imageUrl,
-                cardData?.brand,
-                cardData?.modelFamily || cardData?.model,
-                cardData?.generationName
-              );
-              if (img) {
-                Image.prefetch(img).catch(() => {});
-              }
-            });
-          }
+          const formattedDeck = (sess.items || []).map(formatDiscoveryCard);
+          setDeck(formattedDeck);
+          deckRef.current = formattedDeck;
 
-          // Immediately fetch first card of the new session and start swiping
-          await fetchNextCard(sess.id);
+          // Pre-cache all fresh images
+          formattedDeck.forEach((card: DiscoveryCard) => {
+            if (card.imageUrl) {
+              Image.prefetch(card.imageUrl).catch(() => {});
+            }
+          });
+
+          pan.setValue({ x: 0, y: 0 });
+          setGameState('swiping');
           return;
         }
       }
@@ -477,10 +616,27 @@ export default function AraciniBulScreen() {
 
       if (res.ok) {
         const data = await res.json();
-        setCurrentIndex(data.session.currentIndex);
-        setSessionVersion(data.session.version);
-        setWarningMessage(data.warning);
-        await fetchNextCard(sessionId);
+        const sess = data.session;
+        if (sess) {
+          setCurrentIndex(sess.currentIndex || 0);
+          setSessionVersion(sess.version || 0);
+          sessionVersionRef.current = sess.version || 0;
+          setWarningMessage(data.warning || null);
+
+          const unswiped = (sess.items || []).filter((it: any) => it.action === null);
+          const formattedDeck = unswiped.map(formatDiscoveryCard);
+          setDeck(formattedDeck);
+          deckRef.current = formattedDeck;
+
+          formattedDeck.forEach((card: DiscoveryCard) => {
+            if (card.imageUrl) {
+              Image.prefetch(card.imageUrl).catch(() => {});
+            }
+          });
+
+          pan.setValue({ x: 0, y: 0 });
+          setGameState('swiping');
+        }
       } else {
         setGameState('error');
       }
@@ -490,74 +646,6 @@ export default function AraciniBulScreen() {
     }
   };
 
-  const fetchNextCard = async (targetSessionId?: string) => {
-    const sId = targetSessionId || sessionId;
-    if (!sId) {
-      setGameState('error');
-      return;
-    }
-
-    try {
-      const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sId}/next`);
-
-      if (!res.ok) {
-        setGameState('error');
-        return;
-      }
-
-      const data = await res.json();
-      if (data.status === 'COMPLETED' || !data.card) {
-        await loadResults(sId);
-        return;
-      }
-
-      const raw = data.card;
-      const formattedCard: DiscoveryCard = {
-        id: raw.id,
-        vehicleProfileId: raw.vehicleProfileId,
-        displayName: raw.displayName || `${raw.brand} ${raw.modelFamily}`,
-        brand: raw.brand || '',
-        modelFamily: raw.modelFamily || '',
-        generationName: raw.generationName || null,
-        bodyType: raw.bodyType || 'Sedan',
-        fuelType: raw.fuelType || 'Benzin',
-        transmissionType: raw.transmissionType || 'Otomatik',
-        engineVersion: raw.engineVersion || '',
-        power: raw.power || '',
-        torque: raw.torque || '',
-        productionYears: raw.productionYears || '',
-        averageConsumption: raw.averageConsumption || '',
-        drivetrain: raw.drivetrain || '',
-        imageUrl: resolveVehicleImageUrl(raw.imageUrl, raw.brand, raw.modelFamily, raw.generationName),
-        tags: Array.isArray(raw.tags) ? raw.tags : [],
-        discoverySummary: raw.discoverySummary,
-        guideSummary: raw.guideSummary,
-        highlight: raw.highlight,
-        discoveryHighlight: raw.discoveryHighlight,
-        watchout: raw.watchout,
-        discoveryWatchout: raw.discoveryWatchout,
-      };
-
-      if (formattedCard.imageUrl) {
-        Image.prefetch(formattedCard.imageUrl).catch(() => {});
-      }
-
-      setCurrentCard(formattedCard);
-      setCurrentIndex(data.currentIndex || 0);
-      setSessionVersion(data.version || 0);
-      setGameState('swiping');
-
-      pan.setValue({ x: 0, y: 0 });
-      cardOpacity.setValue(1);
-    } catch (e) {
-      console.error('Error fetchNextCard:', e);
-      setGameState('error');
-    }
-  };
-
-  // Refs to avoid stale closures in PanResponder
-  const currentCardRef = useRef<DiscoveryCard | null>(null);
-  currentCardRef.current = currentCard;
   const sessionIdRef = useRef<string>('');
   sessionIdRef.current = sessionId;
   const sessionVersionRef = useRef<number>(0);
@@ -565,9 +653,8 @@ export default function AraciniBulScreen() {
 
   // Animated values for card swipe
   const pan = useRef(new Animated.ValueXY()).current;
-  const cardOpacity = useRef(new Animated.Value(1)).current;
 
-  // Tinder pan responder with smooth gesture capture and zero offset bugs
+  // Tinder pan responder with smooth gesture capture
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -579,7 +666,7 @@ export default function AraciniBulScreen() {
         pan.setOffset({ x: 0, y: 0 });
       },
       onPanResponderMove: (_, gestureState) => {
-        pan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.2 });
+        pan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.25 });
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx > SWIPE_THRESHOLD || gestureState.vx > 0.4) {
@@ -589,7 +676,8 @@ export default function AraciniBulScreen() {
         } else {
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
-            friction: 5,
+            friction: 6,
+            tension: 40,
             useNativeDriver: false,
           }).start();
         }
@@ -597,7 +685,8 @@ export default function AraciniBulScreen() {
       onPanResponderTerminate: () => {
         Animated.spring(pan, {
           toValue: { x: 0, y: 0 },
-          friction: 5,
+          friction: 6,
+          tension: 40,
           useNativeDriver: false,
         }).start();
       },
@@ -605,48 +694,60 @@ export default function AraciniBulScreen() {
   ).current;
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    const card = currentCardRef.current;
+    if (isSwipingRef.current) return;
+    const currentDeck = deckRef.current;
+    if (!currentDeck || currentDeck.length === 0) return;
+
+    const activeCard = currentDeck[0];
     const sId = sessionIdRef.current;
     const ver = sessionVersionRef.current;
+    isSwipingRef.current = true;
 
-    if (!card || !sId) return;
-    const action = direction === 'right' ? 'LIKE' : 'DISLIKE';
-
-    // Animate card offscreen
+    // Smooth physics-based fly-off animation
     Animated.timing(pan, {
-      toValue: { x: direction === 'right' ? SCREEN_WIDTH + 150 : -SCREEN_WIDTH - 150, y: 0 },
-      duration: 180,
+      toValue: {
+        x: direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5,
+        y: 0,
+      },
+      duration: 220,
       useNativeDriver: false,
-    }).start(async () => {
-      // Instantly reset pan position for the new incoming card
-      pan.stopAnimation();
-      pan.setOffset({ x: 0, y: 0 });
-      pan.setValue({ x: 0, y: 0 });
-      cardOpacity.setValue(1);
+    }).start(() => {
+      // 1. Instantly transition to the already pre-rendered underneath card
+      const remainingDeck = currentDeck.slice(1);
+      setDeck(remainingDeck);
+      deckRef.current = remainingDeck;
+      setCurrentIndex((prev) => prev + 1);
 
-      try {
-        const res = await customFetch(`${API_URL}/vehicle-discovery/sessions/${sId}/swipes`, {
+      // 2. Reset pan for the newly elevated top card with 0ms visual snap
+      pan.setValue({ x: 0, y: 0 });
+      isSwipingRef.current = false;
+
+      // 3. If deck is now empty, load AI recommendation results immediately
+      if (remainingDeck.length === 0) {
+        loadResults(sId);
+      }
+
+      // 4. Send swipe to server in background (optimistic 0ms UI)
+      if (sId && activeCard) {
+        customFetch(`${API_URL}/vehicle-discovery/sessions/${sId}/swipes`, {
           method: 'POST',
           body: JSON.stringify({
-            cardId: card.id,
-            action,
+            cardId: activeCard.id,
+            action: direction === 'right' ? 'LIKE' : 'DISLIKE',
             version: ver,
           }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === 'COMPLETED') {
-            await loadResults(sId);
-          } else {
-            await fetchNextCard(sId);
-          }
-        } else {
-          await fetchNextCard(sId);
-        }
-      } catch (e) {
-        console.error('Error handleSwipe:', e);
-        await fetchNextCard(sId);
+        })
+          .then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'COMPLETED') {
+                loadResults(sId);
+              }
+            }
+          })
+          .catch((err) => {
+            console.log('Background swipe error:', err);
+          });
       }
     });
   };
@@ -670,7 +771,7 @@ export default function AraciniBulScreen() {
 
   const rotate = pan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-    outputRange: ['-10deg', '0deg', '10deg'],
+    outputRange: ['-12deg', '0deg', '12deg'],
     extrapolate: 'clamp',
   });
 
@@ -686,6 +787,19 @@ export default function AraciniBulScreen() {
     extrapolate: 'clamp',
   });
 
+  // Smooth scale up for underneath card as top card moves away
+  const nextCardScale = pan.x.interpolate({
+    inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
+    outputRange: [1, 0.95, 1],
+    extrapolate: 'clamp',
+  });
+
+  const nextCardOpacity = pan.x.interpolate({
+    inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
+    outputRange: [1, 0.88, 1],
+    extrapolate: 'clamp',
+  });
+
   const toggleBody = (key: string) => {
     setSelectedBodies((prev) => (prev.includes(key) ? prev.filter((b) => b !== key) : [...prev, key]));
   };
@@ -697,6 +811,9 @@ export default function AraciniBulScreen() {
   const toggleTrans = (key: string) => {
     setSelectedTransmissions((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
   };
+
+  const currentTopCard = deck[0] || null;
+  const underneathCard = deck[1] || null;
 
   return (
     <View style={styles.container}>
@@ -745,8 +862,8 @@ export default function AraciniBulScreen() {
         </View>
       )}
 
-      {/* 3. SWIPING STATE */}
-      {gameState === 'swiping' && currentCard && (
+      {/* 3. SWIPING STATE (TWO-CARD PRE-RENDERED DECK) */}
+      {gameState === 'swiping' && currentTopCard && (
         <View style={styles.swipeContainer}>
           {/* Header & Progress */}
           <View style={styles.headerRow}>
@@ -778,124 +895,49 @@ export default function AraciniBulScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Swipe Card */}
-          <Animated.View
-            {...panResponder.panHandlers}
-            style={[
-              styles.card,
-              {
-                transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
-                opacity: cardOpacity,
-              },
-            ]}
-          >
-            {/* LIKE BADGE */}
-            <Animated.View style={[styles.choiceBadge, styles.likeBadge, { opacity: likeOpacity }]}>
-              <Text style={styles.likeBadgeText}>BEĞENDİM</Text>
+          {/* TWO-CARD DECK CONTAINER */}
+          <View style={styles.deckContainer}>
+            {/* UNDERNEATH NEXT CARD (PRE-LOADED IN PLACE) */}
+            {underneathCard && (
+              <Animated.View
+                style={[
+                  styles.card,
+                  styles.underneathCard,
+                  {
+                    transform: [{ scale: nextCardScale }],
+                    opacity: nextCardOpacity,
+                  },
+                ]}
+                pointerEvents="none"
+              >
+                <VehicleCardContent card={underneathCard} />
+              </Animated.View>
+            )}
+
+            {/* TOP ACTIVE SWIPE CARD */}
+            <Animated.View
+              {...panResponder.panHandlers}
+              style={[
+                styles.card,
+                styles.topCard,
+                {
+                  transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
+                },
+              ]}
+            >
+              {/* LIKE BADGE */}
+              <Animated.View style={[styles.choiceBadge, styles.likeBadge, { opacity: likeOpacity }]}>
+                <Text style={styles.likeBadgeText}>BEĞENDİM</Text>
+              </Animated.View>
+
+              {/* DISLIKE BADGE */}
+              <Animated.View style={[styles.choiceBadge, styles.dislikeBadge, { opacity: dislikeOpacity }]}>
+                <Text style={styles.dislikeBadgeText}>PAS</Text>
+              </Animated.View>
+
+              <VehicleCardContent card={currentTopCard} />
             </Animated.View>
-
-            {/* DISLIKE BADGE */}
-            <Animated.View style={[styles.choiceBadge, styles.dislikeBadge, { opacity: dislikeOpacity }]}>
-              <Text style={styles.dislikeBadgeText}>PAS</Text>
-            </Animated.View>
-
-            {/* Photo Header */}
-            <View style={styles.imageContainer}>
-              {currentCard.imageUrl ? (
-                <Image
-                  source={{ uri: currentCard.imageUrl }}
-                  style={styles.cardImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.cardImage, styles.placeholderImage]}>
-                  <Ionicons name="car-outline" size={54} color="#64748b" />
-                </View>
-              )}
-              <View style={styles.cardBadge}>
-                <Text style={styles.cardBadgeText}>{currentCard.brand.toUpperCase()}</Text>
-              </View>
-            </View>
-
-            {/* Content Scroll */}
-            <ScrollView style={styles.cardScroll} showsVerticalScrollIndicator={false}>
-              <Text style={styles.cardTitle}>{currentCard.displayName || `${currentCard.brand} ${currentCard.modelFamily}`}</Text>
-              <Text style={styles.cardSubtitle}>
-                {currentCard.generationName ? `${currentCard.generationName} • ` : ''}
-                {currentCard.productionYears || ''}
-              </Text>
-
-              {/* Specification Grid (2x3) */}
-              <View style={styles.specGrid}>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Kasa Tipi</Text>
-                  <Text style={styles.specVal}>{translateBodyType(currentCard.bodyType)}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Yakıt</Text>
-                  <Text style={styles.specVal}>{translateFuelType(currentCard.fuelType)}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Şanzıman</Text>
-                  <Text style={styles.specVal}>{translateTransmission(currentCard.transmissionType)}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Motor</Text>
-                  <Text style={styles.specVal}>{currentCard.engineVersion || '-'}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Güç / Tork</Text>
-                  <Text style={styles.specVal}>
-                    {currentCard.power || '-'} / {currentCard.torque || '-'}
-                  </Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Ort. Tüketim</Text>
-                  <Text style={styles.specVal}>{currentCard.averageConsumption || '-'}</Text>
-                </View>
-              </View>
-
-              {/* BU ARAÇ NASIL? Section */}
-              {(currentCard.discoverySummary || currentCard.guideSummary) && (
-                <View style={styles.aiInsightBox}>
-                  <View style={styles.aiInsightHeader}>
-                    <Ionicons name="sparkles" size={14} color="#ea580c" />
-                    <Text style={styles.aiInsightTitle}>BU ARAÇ NASIL?</Text>
-                  </View>
-                  <Text style={styles.aiInsightText}>
-                    {currentCard.discoverySummary || currentCard.guideSummary}
-                  </Text>
-
-                  {(currentCard.highlight || currentCard.discoveryHighlight) && (
-                    <View style={styles.highlightPill}>
-                      <Text style={styles.highlightPillText}>
-                        ✓ ÖNE ÇIKAN: {currentCard.highlight || currentCard.discoveryHighlight}
-                      </Text>
-                    </View>
-                  )}
-
-                  {(currentCard.watchout || currentCard.discoveryWatchout) && (
-                    <View style={styles.watchoutPill}>
-                      <Text style={styles.watchoutPillText}>
-                        ⚠ DİKKAT: {currentCard.watchout || currentCard.discoveryWatchout}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Tags */}
-              {currentCard.tags && currentCard.tags.length > 0 && (
-                <View style={styles.tagsRow}>
-                  {currentCard.tags.map((t) => (
-                    <View key={t} style={styles.tagBadge}>
-                      <Text style={styles.tagBadgeText}>#{t.replace(/^#/, '')}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-          </Animated.View>
+          </View>
 
           {/* Swipe Buttons Bar */}
           <View style={styles.buttonRow}>
@@ -1105,7 +1147,7 @@ export default function AraciniBulScreen() {
       )}
 
       {/* 5. SWIPING LOADING FALLBACK */}
-      {gameState === 'swiping' && !currentCard && (
+      {gameState === 'swiping' && !currentTopCard && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#ea580c" />
           <Text style={styles.loadingText}>Sıradaki araç yükleniyor...</Text>
@@ -1417,9 +1459,16 @@ const styles = StyleSheet.create({
   resetBtn: {
     padding: 6,
   },
-  card: {
+  deckContainer: {
     width: SCREEN_WIDTH - 28,
     height: '76%',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  card: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 24,
     overflow: 'hidden',
@@ -1430,6 +1479,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
+  },
+  underneathCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 1,
+  },
+  topCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
   },
   choiceBadge: {
     position: 'absolute',
