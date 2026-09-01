@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 
 @Injectable()
@@ -90,6 +90,87 @@ export class R2Service {
       fileSize: optimizedBuffer.length,
       mimeType: 'image/webp',
     };
+  }
+
+  /**
+   * Performs physical object copy in Cloudflare R2 from source key to destination folder.
+   * If direct CopyObject fails or if credentials are unsupported, fetches source buffer and uploads to destination.
+   */
+  async copyImage(
+    sourceUrlOrKey: string,
+    destFolderPath: string = 'aracini-bul',
+  ): Promise<{ url: string; storageKey: string; success: boolean }> {
+    const bucketName = process.env.R2_BUCKET_NAME;
+    const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
+
+    // Extract object key from full URL if full URL is passed
+    let sourceKey = sourceUrlOrKey;
+    if (publicUrl && sourceUrlOrKey.startsWith(publicUrl)) {
+      sourceKey = sourceUrlOrKey.replace(`${publicUrl}/`, '');
+    } else if (sourceUrlOrKey.startsWith('http://') || sourceUrlOrKey.startsWith('https://')) {
+      try {
+        const urlObj = new URL(sourceUrlOrKey);
+        sourceKey = urlObj.pathname.replace(/^\//, '');
+      } catch (e) {
+        // Keep raw
+      }
+    }
+
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    const destKey = `${destFolderPath}/${uniqueId}.webp`;
+
+    if (this.s3Client && bucketName && publicUrl) {
+      // 1. Try S3 CopyObjectCommand
+      try {
+        await this.s3Client.send(
+          new CopyObjectCommand({
+            Bucket: bucketName,
+            CopySource: `${bucketName}/${sourceKey}`,
+            Key: destKey,
+            ContentType: 'image/webp',
+          }),
+        );
+        const url = `${publicUrl}/${destKey}`;
+        return { url, storageKey: destKey, success: true };
+      } catch (err) {
+        this.logger.warn(`S3 CopyObject failed for key ${sourceKey}, attempting stream/buffer fetch fallback:`, err);
+      }
+
+      // 2. Stream / Buffer Download + Upload Fallback
+      try {
+        let buffer: Buffer | null = null;
+        if (sourceUrlOrKey.startsWith('http://') || sourceUrlOrKey.startsWith('https://')) {
+          const res = await global.fetch(sourceUrlOrKey);
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            buffer = Buffer.from(arrayBuf);
+          }
+        }
+
+        if (!buffer && this.s3Client) {
+          const obj = await this.s3Client.send(
+            new GetObjectCommand({
+              Bucket: bucketName,
+              Key: sourceKey,
+            }),
+          );
+          if (obj.Body) {
+            const byteArray = await obj.Body.transformToByteArray();
+            buffer = Buffer.from(byteArray);
+          }
+        }
+
+        if (buffer) {
+          const uploadRes = await this.uploadImage(buffer, destFolderPath);
+          return { url: uploadRes.url, storageKey: uploadRes.storageKey, success: true };
+        }
+      } catch (fetchErr) {
+        this.logger.error(`Failed to copy image ${sourceUrlOrKey} via fetch fallback:`, fetchErr);
+      }
+    }
+
+    // Return original source URL if copy could not be performed
+    return { url: sourceUrlOrKey, storageKey: sourceKey, success: false };
   }
 
   /**

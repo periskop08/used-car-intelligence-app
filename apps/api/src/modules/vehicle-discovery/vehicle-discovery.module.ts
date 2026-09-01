@@ -4,9 +4,10 @@ import { AdminVehicleDiscoveryController } from './admin-vehicle-discovery.contr
 import { VehicleDiscoveryService } from './vehicle-discovery.service';
 import { PrismaService } from '../../prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { R2Service } from '../listing/r2.service';
 
 @Module({
   controllers: [VehicleDiscoveryController, AdminVehicleDiscoveryController],
-  providers: [VehicleDiscoveryService, PrismaService, JwtService],
+  providers: [VehicleDiscoveryService, PrismaService, JwtService, R2Service],
 })
 export class VehicleDiscoveryModule {}

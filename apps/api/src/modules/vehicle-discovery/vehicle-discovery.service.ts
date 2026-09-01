@@ -11,11 +11,16 @@ import {
 } from '@prisma/client';
 import * as crypto from 'crypto';
 
+import { R2Service } from '../listing/r2.service';
+
 @Injectable()
 export class VehicleDiscoveryService {
   private readonly logger = new Logger(VehicleDiscoveryService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private r2Service: R2Service,
+  ) {}
 
   // Helper to generate a secure random hex token
   generateGuestToken(): string {
@@ -1054,6 +1059,7 @@ export class VehicleDiscoveryService {
   }
 
   async migrateGuideSnapshotToDiscovery() {
+    // 1. Fetch active VehicleGuideCard records (Source of Truth: 68 active records)
     const guideCards = await this.prisma.vehicleGuideCard.findMany({
       where: { isActive: true },
       include: { technicalInfos: true }
@@ -1068,19 +1074,17 @@ export class VehicleDiscoveryService {
     const guideItemsMap = new Map<string, { brand: string; model: string; generation?: string; heroImageUrl?: string; bodyType?: string; fuelType?: string; transmissionType?: string; powerHp?: number; torqueNm?: number; consumption?: string; drivetrain?: string }>();
 
     guideCards.forEach(gc => {
-      const key = `${gc.brand.toLowerCase()}_${gc.model.toLowerCase()}`;
-      if (!guideItemsMap.has(key)) {
-        let tech = gc.technicalInfos && gc.technicalInfos.length > 0 ? gc.technicalInfos[0] : null;
-        guideItemsMap.set(key, {
-          brand: gc.brand,
-          model: gc.model,
-          generation: gc.generationName || undefined,
-          heroImageUrl: gc.heroImageUrl || gc.placeholderImageUrl || undefined,
-          bodyType: gc.bodyType || undefined,
-          consumption: tech?.averageConsumption || undefined,
-          drivetrain: tech?.drivetrain || undefined
-        });
-      }
+      const key = gc.id;
+      let tech = gc.technicalInfos && gc.technicalInfos.length > 0 ? gc.technicalInfos[0] : null;
+      guideItemsMap.set(key, {
+        brand: gc.brand,
+        model: gc.model,
+        generation: gc.generationName || undefined,
+        heroImageUrl: gc.heroImageUrl || gc.placeholderImageUrl || undefined,
+        bodyType: gc.bodyType || undefined,
+        consumption: tech?.averageConsumption || undefined,
+        drivetrain: tech?.drivetrain || undefined
+      });
     });
 
     profiles.forEach(vp => {
@@ -1115,7 +1119,12 @@ export class VehicleDiscoveryService {
     let categoryB_DeactivatedCount = 0;
     let categoryC_PreservedCount = 0;
     let physicalR2ImagesCopied = 0;
+    let verifiedUrlCount = 0;
+    let failedCopyCount = 0;
 
+    const assignedRepVariantIds = new Set<string>();
+
+    // STEP A, B, C & D: Physical R2 Copy and Upsert 68 Discovery Cards
     for (const [key, item] of guideItemsMap.entries()) {
       const repVariant = await this.prisma.vehicleVariant.findFirst({
         where: {
@@ -1134,11 +1143,36 @@ export class VehicleDiscoveryService {
       });
 
       let heroImageUrl = item.heroImageUrl || '';
+      let finalDiscoveryImageUrl = heroImageUrl;
+
+      // PHYSICAL R2 COPY from guide-cards/... to aracini-bul/...
       if (heroImageUrl && !heroImageUrl.includes('unsplash') && !heroImageUrl.includes('placeholder')) {
-        physicalR2ImagesCopied++;
+        try {
+          const copyResult = await this.r2Service.copyImage(heroImageUrl, 'aracini-bul');
+          if (copyResult.url) {
+            finalDiscoveryImageUrl = copyResult.url;
+            physicalR2ImagesCopied++;
+            verifiedUrlCount++;
+          }
+        } catch (err) {
+          this.logger.error(`Failed physical R2 copy for ${item.brand} ${item.model}:`, err);
+          failedCopyCount++;
+        }
+      }
+
+      if (!finalDiscoveryImageUrl) {
+        finalDiscoveryImageUrl = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800';
       }
 
       const specJson = (repVariant?.specs?.specs as any) || {};
+
+      let repVariantIdToAssign: string | null = repVariant?.id || null;
+      if (repVariantIdToAssign && assignedRepVariantIds.has(repVariantIdToAssign)) {
+        repVariantIdToAssign = null;
+      }
+      if (repVariantIdToAssign) {
+        assignedRepVariantIds.add(repVariantIdToAssign);
+      }
 
       const cardData = {
         brand: item.brand,
@@ -1153,16 +1187,17 @@ export class VehicleDiscoveryService {
         productionYears: repVariant ? `${repVariant.yearStart || 2000}-${repVariant.yearEnd || ''}` : '2000-',
         averageConsumption: item.consumption || (specJson.averageConsumption ? `${specJson.averageConsumption} L/100km` : '5.5 L/100km'),
         drivetrain: item.drivetrain || specJson.drivetrain || 'Önden Çekiş',
-        imageUrl: heroImageUrl || 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800',
+        imageUrl: finalDiscoveryImageUrl,
         tags: ['#konfor', '#aile-araci'],
         isActive: true,
         allowInUnfilteredDiscovery: true,
-        representativeVariantId: repVariant?.id || null
+        representativeVariantId: repVariantIdToAssign
       };
 
       const existingMatch = existingCards.find(c =>
         c.brand.toLowerCase() === item.brand.toLowerCase() &&
-        c.modelFamily.toLowerCase() === item.model.toLowerCase()
+        c.modelFamily.toLowerCase() === item.model.toLowerCase() &&
+        ((!c.generationName && !item.generation) || (c.generationName && item.generation && c.generationName.toLowerCase() === item.generation.toLowerCase()))
       );
 
       if (existingMatch) {
@@ -1178,15 +1213,30 @@ export class VehicleDiscoveryService {
       categoryA_UpsertedCount++;
     }
 
-    for (const card of existingCards) {
-      const key = `${card.brand.toLowerCase()}_${card.modelFamily.toLowerCase()}`;
-      const isFromGuide = guideItemsMap.has(key);
-      const hasUserActivity = card.swipes.length > 0 || card.impressions.length > 0;
+    // STEP E: VERIFY THAT THE 68 SNAPSHOT CARDS ARE PROPERLY CREATED & ACTIVE
+    const snapshotActiveCount = await this.prisma.vehicleDiscoveryCard.count({
+      where: {
+        isActive: true,
+        OR: Array.from(guideItemsMap.values()).map(item => ({
+          brand: { equals: item.brand, mode: 'insensitive' },
+          modelFamily: { equals: item.model, mode: 'insensitive' },
+          ...(item.generation ? { generationName: { equals: item.generation, mode: 'insensitive' } } : {})
+        }))
+      }
+    });
 
-      if (!isFromGuide) {
-        if (hasUserActivity) {
-          categoryC_PreservedCount++;
-        } else {
+    this.logger.log(`Verified ${snapshotActiveCount} active snapshot Discovery cards created/updated.`);
+
+    // STEP F: ONLY AFTER SUCCESSFUL VERIFICATION, DEACTIVATE LEGACY WRONG AUTO-GENERATED CARDS
+    if (snapshotActiveCount >= uniqueGuideIdentitiesCount) {
+      for (const card of existingCards) {
+        const isFromGuide = Array.from(guideItemsMap.values()).some(item =>
+          item.brand.toLowerCase() === card.brand.toLowerCase() &&
+          item.model.toLowerCase() === card.modelFamily.toLowerCase() &&
+          ((!card.generationName && !item.generation) || (card.generationName && item.generation && card.generationName.toLowerCase() === item.generation.toLowerCase()))
+        );
+
+        if (!isFromGuide) {
           await this.prisma.vehicleDiscoveryCard.update({
             where: { id: card.id },
             data: {
@@ -1204,12 +1254,16 @@ export class VehicleDiscoveryService {
     });
 
     return {
+      guideSourcePrefix: 'guide-cards/desktop/',
+      discoveryDestinationPrefix: 'aracini-bul/',
       guidePoolCount,
       uniqueGuideIdentitiesCount,
       categoryA_UpsertedCount,
       categoryB_DeactivatedCount,
       categoryC_PreservedCount,
       physicalR2ImagesCopied,
+      verifiedUrlCount,
+      failedCopyCount,
       finalActiveDiscoveryPoolCount,
       autoEnrollmentDisabled: true
     };

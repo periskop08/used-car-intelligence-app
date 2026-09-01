@@ -1,12 +1,31 @@
-import { Controller, Get, Patch, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Param, Body, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleDiscoveryService } from './vehicle-discovery.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
+import { R2Service } from '../listing/r2.service';
 
 @ApiTags('Admin Vehicle Discovery')
 @Controller('admin/vehicle-discovery')
 export class AdminVehicleDiscoveryController {
-  constructor(private discoveryService: VehicleDiscoveryService) {}
+  constructor(
+    private discoveryService: VehicleDiscoveryService,
+    private r2Service: R2Service,
+  ) {}
+
+  @Post('upload-image')
+  @ApiOperation({ summary: 'Aracını Bul keşif kartı için Cloudflare R2 ortamına (aracini-bul/) görsel yükler' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDiscoveryImage(@UploadedFile() file: any) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Lütfen yüklenecek geçerli bir görsel dosyası seçin.');
+    }
+    const result = await this.r2Service.uploadImage(file.buffer, 'aracini-bul');
+    if (!result.url) {
+      throw new BadRequestException('Görsel Cloudflare R2 sunucusuna yüklenemedi.');
+    }
+    return { url: result.url };
+  }
 
   @Get(['candidates', 'discovery-candidates'])
   @ApiOperation({ summary: 'Aracını Bul sunum ve keşif yönetimi için gruplanmış keşif adaylarını listeler' })

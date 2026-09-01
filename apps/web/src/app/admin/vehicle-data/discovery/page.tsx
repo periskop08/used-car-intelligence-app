@@ -127,34 +127,6 @@ export default function AdminVehicleDiscoveryPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              if (confirm("Araç Rehberi'nin mevcut havuzundan 1:1 snapshot kopyası oluşturulup Aracını Bul havuzu kurulacak. Onaylıyor musunuz?")) {
-                fetchReportApi('admin/vehicle-discovery/migrate-guide-snapshot', {
-                  method: 'POST'
-                })
-                .then(res => res.json())
-                .then(data => {
-                  alert(
-                    `✅ Snapshot Migration Başarıyla Tamamlandı!\n\n` +
-                    `• Araç Rehberi Mevcut Araç Sayısı: ${data.guidePoolCount}\n` +
-                    `• Benzersiz Kimlik Sayısı: ${data.uniqueGuideIdentitiesCount}\n` +
-                    `• Rehber Snapshot'ından Oluşturulan Aday: ${data.categoryA_UpsertedCount}\n` +
-                    `• Pasife Alınan Katalog Aday Sayısı: ${data.categoryB_DeactivatedCount}\n` +
-                    `• Korunan Manuel Admin Kaydı: ${data.categoryC_PreservedCount}\n` +
-                    `• Güncel Aktif Discovery Havuzu: ${data.finalActiveDiscoveryPoolCount}`
-                  );
-                  fetchDiscoveryCandidates();
-                })
-                .catch(err => alert('Migration hatası: ' + err.message));
-              }
-            }}
-            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
-            <span>Rehber'den Snapshot Al</span>
-          </button>
-
-          <button
             onClick={() => setIsAddModalOpen(true)}
             className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
@@ -691,15 +663,45 @@ export default function AdminVehicleDiscoveryPage() {
                     <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">3. Aracını Bul Görseli ve Sunum Toggles</span>
 
                     <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-slate-400 block">Aracını Bul Özel Hero Görseli (R2 / URL)</label>
+                      <label className="text-[11px] font-bold text-slate-400 block">Aracını Bul Özel Hero Görseli (Cloudflare R2 aracini-bul/)</label>
                       <div className="flex gap-3 items-center">
                         <input
                           type="text"
                           value={selectedCandidate.previewImageUrl || ''}
                           onChange={(e) => setSelectedCandidate({ ...selectedCandidate, previewImageUrl: e.target.value })}
-                          placeholder="https://... (Örn: R2 vehicle-discovery path)"
+                          placeholder="https://... (Örn: R2 aracini-bul/ path)"
                           className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white text-xs font-medium focus:outline-none focus:border-orange-500"
                         />
+                        <label className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-white/10 rounded-xl cursor-pointer transition shrink-0 flex items-center gap-1.5">
+                          <span>Görsel Yükle</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              try {
+                                const token = getAuthToken();
+                                const res = await fetch(`${API_BASE_URL}/admin/vehicle-discovery/upload-image`, {
+                                  method: 'POST',
+                                  headers: { Authorization: `Bearer ${token}` },
+                                  body: formData,
+                                });
+                                if (!res.ok) throw new Error('Görsel yüklenemedi.');
+                                const data = await res.json();
+                                if (data.url) {
+                                  setSelectedCandidate({ ...selectedCandidate, previewImageUrl: data.url });
+                                  alert('Görsel başarıyla Cloudflare R2 (aracini-bul/) klasörüne yüklendi.');
+                                }
+                              } catch (err: any) {
+                                alert(err.message);
+                              }
+                            }}
+                          />
+                        </label>
                       </div>
                     </div>
 
