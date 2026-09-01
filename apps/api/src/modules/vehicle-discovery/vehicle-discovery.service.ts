@@ -631,7 +631,23 @@ export class VehicleDiscoveryService {
         where: { id: sessionId },
         include: {
           items: {
-            orderBy: { position: 'asc' }
+            orderBy: { position: 'asc' },
+            include: {
+              card: {
+                include: {
+                  priceSnapshot: true
+                }
+              },
+              variant: {
+                include: {
+                  brand: true,
+                  model: true,
+                  generation: true,
+                  engine: true,
+                  transmission: true
+                }
+              }
+            }
           }
         }
       });

@@ -402,24 +402,46 @@ export default function AraciniBulScreen() {
   }, []);
 
   const formatDiscoveryCard = (raw: any): DiscoveryCard => {
-    const cardData = raw.card || raw;
+    const cardData = raw?.card || raw?.variant || raw || {};
+    const brand = (
+      typeof cardData.brand === 'string'
+        ? cardData.brand
+        : cardData.brand?.name || cardData.brandName || ''
+    ).trim();
+    const modelFamily = (
+      typeof cardData.modelFamily === 'string'
+        ? cardData.modelFamily
+        : cardData.model?.name || cardData.modelName || ''
+    ).trim();
+    const generationName = cardData.generationName || cardData.generation?.name || null;
+    const bodyType = cardData.bodyType || 'Sedan';
+    const fuelType = cardData.fuelType || 'Benzin';
+    const transmissionType =
+      cardData.transmissionType ||
+      (typeof cardData.transmission === 'string' ? cardData.transmission : cardData.transmission?.name) ||
+      'Otomatik';
+    const engineVersion =
+      cardData.engineVersion ||
+      (typeof cardData.engine === 'string' ? cardData.engine : cardData.engine?.name) ||
+      '';
+
     return {
-      id: cardData.id,
+      id: cardData.id || raw.id || String(Math.random()),
       vehicleProfileId: cardData.vehicleProfileId,
-      displayName: cardData.displayName || `${cardData.brand} ${cardData.modelFamily}`,
-      brand: cardData.brand || '',
-      modelFamily: cardData.modelFamily || '',
-      generationName: cardData.generationName || null,
-      bodyType: cardData.bodyType || 'Sedan',
-      fuelType: cardData.fuelType || 'Benzin',
-      transmissionType: cardData.transmissionType || 'Otomatik',
-      engineVersion: cardData.engineVersion || '',
+      displayName: cardData.displayName || `${brand} ${modelFamily}`.trim() || 'Araç Modeli',
+      brand,
+      modelFamily,
+      generationName,
+      bodyType,
+      fuelType,
+      transmissionType,
+      engineVersion,
       power: cardData.power || '',
       torque: cardData.torque || '',
       productionYears: cardData.productionYears || '',
       averageConsumption: cardData.averageConsumption || '',
       drivetrain: cardData.drivetrain || '',
-      imageUrl: resolveVehicleImageUrl(cardData.imageUrl, cardData.brand, cardData.modelFamily, cardData.generationName),
+      imageUrl: resolveVehicleImageUrl(cardData.imageUrl, brand, modelFamily, generationName),
       tags: Array.isArray(cardData.tags) ? cardData.tags : [],
       discoverySummary: cardData.discoverySummary,
       guideSummary: cardData.guideSummary,
