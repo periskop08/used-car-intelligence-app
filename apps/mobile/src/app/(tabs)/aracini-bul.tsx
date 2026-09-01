@@ -624,7 +624,9 @@ export default function AraciniBulScreen() {
           // Pre-cache all fresh images with priority on first card
           await prefetchDeckImages(formattedDeck);
 
-          pan.setValue({ x: 0, y: 0 });
+          panA.setValue({ x: 0, y: 0 });
+          panB.setValue({ x: 0, y: 0 });
+          setActivePanIndex(0);
           setGameState('swiping');
           return;
         }
@@ -669,7 +671,9 @@ export default function AraciniBulScreen() {
 
           await prefetchDeckImages(formattedDeck);
 
-          pan.setValue({ x: 0, y: 0 });
+          panA.setValue({ x: 0, y: 0 });
+          panB.setValue({ x: 0, y: 0 });
+          setActivePanIndex(0);
           setGameState('swiping');
         }
       } else {
@@ -687,7 +691,11 @@ export default function AraciniBulScreen() {
   sessionVersionRef.current = sessionVersion;
 
   // Animated values for card swipe
-  const pan = useRef(new Animated.ValueXY()).current;
+  const panA = useRef(new Animated.ValueXY()).current;
+  const panB = useRef(new Animated.ValueXY()).current;
+  const [activePanIndex, setActivePanIndex] = useState<0 | 1>(0);
+  const activePanIndexRef = useRef<0 | 1>(0);
+  activePanIndexRef.current = activePanIndex;
 
   // Tinder pan responder with smooth gesture capture
   const panResponder = useRef(
@@ -697,19 +705,22 @@ export default function AraciniBulScreen() {
         return Math.abs(gestureState.dx) > 4;
       },
       onPanResponderGrant: () => {
-        pan.stopAnimation();
-        pan.setOffset({ x: 0, y: 0 });
+        const activePan = activePanIndexRef.current === 0 ? panA : panB;
+        activePan.stopAnimation();
+        activePan.setOffset({ x: 0, y: 0 });
       },
       onPanResponderMove: (_, gestureState) => {
-        pan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.25 });
+        const activePan = activePanIndexRef.current === 0 ? panA : panB;
+        activePan.setValue({ x: gestureState.dx, y: gestureState.dy * 0.25 });
       },
       onPanResponderRelease: (_, gestureState) => {
+        const activePan = activePanIndexRef.current === 0 ? panA : panB;
         if (gestureState.dx > SWIPE_THRESHOLD || gestureState.vx > 0.4) {
           handleSwipe('right');
         } else if (gestureState.dx < -SWIPE_THRESHOLD || gestureState.vx < -0.4) {
           handleSwipe('left');
         } else {
-          Animated.spring(pan, {
+          Animated.spring(activePan, {
             toValue: { x: 0, y: 0 },
             friction: 6,
             tension: 40,
@@ -718,7 +729,8 @@ export default function AraciniBulScreen() {
         }
       },
       onPanResponderTerminate: () => {
-        Animated.spring(pan, {
+        const activePan = activePanIndexRef.current === 0 ? panA : panB;
+        Animated.spring(activePan, {
           toValue: { x: 0, y: 0 },
           friction: 6,
           tension: 40,
@@ -738,31 +750,38 @@ export default function AraciniBulScreen() {
     const ver = sessionVersionRef.current;
     isSwipingRef.current = true;
 
+    const currentActivePan = activePanIndexRef.current === 0 ? panA : panB;
+    const nextActivePan = activePanIndexRef.current === 0 ? panB : panA;
+
     // Smooth physics-based fly-off animation
-    Animated.timing(pan, {
+    Animated.timing(currentActivePan, {
       toValue: {
-        x: direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5,
+        x: direction === 'right' ? SCREEN_WIDTH * 1.6 : -SCREEN_WIDTH * 1.6,
         y: 0,
       },
       duration: 220,
       useNativeDriver: false,
     }).start(() => {
-      // 1. Reset pan coordinates first
-      pan.setValue({ x: 0, y: 0 });
-      isSwipingRef.current = false;
+      // 1. Prepare next pan (already at {x:0, y:0}) and switch active index
+      nextActivePan.setValue({ x: 0, y: 0 });
+      setActivePanIndex((prev) => (prev === 0 ? 1 : 0));
 
       // 2. Instantly shift deck so underneath card seamlessly becomes top card
       const remainingDeck = currentDeck.slice(1);
       setDeck(remainingDeck);
       deckRef.current = remainingDeck;
       setCurrentIndex((prev) => prev + 1);
+      isSwipingRef.current = false;
 
-      // 3. If deck is now empty, load AI recommendation results immediately
+      // 3. Reset the swiped pan in background for the next underneath card
+      currentActivePan.setValue({ x: 0, y: 0 });
+
+      // 4. If deck is now empty, load AI recommendation results immediately
       if (remainingDeck.length === 0) {
         loadResults(sId);
       }
 
-      // 4. Send swipe to server in background (optimistic 0ms UI)
+      // 5. Send swipe to server in background (optimistic 0ms UI)
       if (sId && activeCard) {
         customFetch(`${API_URL}/vehicle-discovery/sessions/${sId}/swipes`, {
           method: 'POST',
@@ -822,7 +841,9 @@ export default function AraciniBulScreen() {
 
           await prefetchDeckImages(formattedDeck);
 
-          pan.setValue({ x: 0, y: 0 });
+          panA.setValue({ x: 0, y: 0 });
+          panB.setValue({ x: 0, y: 0 });
+          setActivePanIndex(0);
           setGameState('swiping');
           return;
         }
@@ -851,38 +872,40 @@ export default function AraciniBulScreen() {
     }
   };
 
-  const rotate = pan.x.interpolate({
+  const currentPan = activePanIndex === 0 ? panA : panB;
+
+  const rotate = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: ['-12deg', '0deg', '12deg'],
     extrapolate: 'clamp',
   });
 
-  const likeOpacity = pan.x.interpolate({
+  const likeOpacity = currentPan.x.interpolate({
     inputRange: [0, SCREEN_WIDTH / 4],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  const dislikeOpacity = pan.x.interpolate({
+  const dislikeOpacity = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 4, 0],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
-  const topCardOpacity = pan.x.interpolate({
+  const topCardOpacity = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH * 0.9, -SCREEN_WIDTH * 0.35, 0, SCREEN_WIDTH * 0.35, SCREEN_WIDTH * 0.9],
     outputRange: [0, 0.9, 1, 0.9, 0],
     extrapolate: 'clamp',
   });
 
   // Smooth scale up for underneath card as top card moves away
-  const nextCardScale = pan.x.interpolate({
+  const nextCardScale = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: [1, 0.95, 1],
     extrapolate: 'clamp',
   });
 
-  const nextCardOpacity = pan.x.interpolate({
+  const nextCardOpacity = currentPan.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
     outputRange: [1, 0.88, 1],
     extrapolate: 'clamp',
@@ -1011,7 +1034,7 @@ export default function AraciniBulScreen() {
                 styles.card,
                 styles.topCard,
                 {
-                  transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
+                  transform: [{ translateX: currentPan.x }, { translateY: currentPan.y }, { rotate }],
                   opacity: topCardOpacity,
                 },
               ]}
