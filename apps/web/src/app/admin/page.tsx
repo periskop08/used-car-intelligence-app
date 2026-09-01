@@ -296,7 +296,11 @@ export default function AdminExecutiveOverviewPage() {
                   </div>
                   <div className="flex justify-between items-center p-3.5 bg-slate-950 rounded-xl border border-white/5">
                     <span className="text-slate-400 font-sans">Tahmini Brüt Marj</span>
-                    <strong className="text-amber-400 font-bold">%{data.financialSummary.grossMarginPct || 0}</strong>
+                    {data.financialSummary.grossMarginPct != null ? (
+                      <strong className="text-amber-400 font-bold">%{data.financialSummary.grossMarginPct}</strong>
+                    ) : (
+                      <strong className="text-slate-400 font-bold" title="Maliyet verileri (AI provider harcamaları) henüz tam kayıt altına alınmadığı için hesaplanamamaktadır.">— (Veri Yok)</strong>
+                    )}
                   </div>
                 </div>
               </div>

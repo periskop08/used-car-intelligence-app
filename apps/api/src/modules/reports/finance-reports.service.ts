@@ -72,44 +72,113 @@ export class FinanceReportsService {
   }
 
   /**
+  /**
+   * Central source-of-truth helper to calculate active recurring subscription metrics.
+   * MRR = SUM(active recurring paid subscriptions' actual billed amounts).
+   * ARR = MRR * 12.
+   * Active Paid Subscriptions Count = count of active non-zero recurring subscriptions.
+   */
+  async getActiveSubscriptionFinanceMetrics() {
+    const now = new Date();
+
+    // 1. Fetch active subscriptions where expiresAt >= now and status === ACTIVE
+    const activeSubs = await this.prisma.subscription.findMany({
+      where: {
+        status: 'ACTIVE',
+        expiresAt: { gte: now },
+      },
+      include: {
+        plan: true,
+        user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, subscriptionTier: true, createdAt: true } },
+      },
+    });
+
+    // 2. Filter paid plans (priceTrl > 0)
+    const activePaidSubs = activeSubs.filter((s) => s.plan && Number(s.plan.priceTrl) > 0);
+
+    let mrr = 0;
+    let tanismaCount = 0;
+    let yetkinCount = 0;
+    let profesyonelCount = 0;
+
+    const subscriberItems = activePaidSubs.map((s) => {
+      const price = Number(s.plan.priceTrl) || 0;
+      mrr += price;
+
+      const tier = (s.plan.tier || s.user.subscriptionTier || '').toUpperCase();
+      if (tier === 'FREE' || tier === 'TANISMA') {
+        tanismaCount++;
+      } else if (tier === 'STANDARD' || tier === 'YETKIN') {
+        yetkinCount++;
+      } else {
+        profesyonelCount++;
+      }
+
+      const yearMonth = `${s.createdAt.getFullYear().toString().slice(-2)}${(s.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
+      const shortId = s.id.slice(0, 6).toUpperCase();
+      const customerNo = `TS-${yearMonth}-${shortId}`;
+      const name = `${s.user.firstName || ''} ${s.user.lastName || ''}`.trim() || s.user.email.split('@')[0];
+
+      return {
+        userId: s.user.id,
+        subscriptionId: s.id,
+        customerNo,
+        name,
+        email: s.user.email,
+        planName: s.plan.name,
+        tier: `${s.plan.name} (₺${price})`,
+        monthlyPrice: price,
+        annualizedPrice: price * 12,
+        startDate: s.createdAt,
+        expiresAt: s.expiresAt,
+        status: s.status,
+      };
+    });
+
+    // Free / Tanışma users count
+    const freeUsersCount = await this.prisma.user.count({
+      where: {
+        subscriptionTier: { in: ['FREE', 'TANISMA'] },
+      },
+    });
+
+    const arr = mrr * 12;
+
+    return {
+      activePaidSubscriptionsCount: activePaidSubs.length,
+      mrr,
+      arr,
+      packageDistribution: {
+        tanismaUsers: freeUsersCount,
+        yetkinUsers: yetkinCount,
+        profesyonelUsers: profesyonelCount,
+      },
+      activePaidSubs,
+      subscriberItems,
+    };
+  }
+
+  /**
    * Main Finance Overview dashboard endpoint service.
    */
   async getFinanceOverview(range?: string, from?: string, to?: string) {
     const { startDate, endDate, label: periodLabel } = this.resolveDateRange(range, from, to);
 
-    // 1. Snapshot Metrics (Active Paid Subscriptions as of endDate)
-    const standardUsers = await this.prisma.user.findMany({
-      where: { subscriptionTier: 'STANDARD' },
-      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true },
-    });
-    const proUsers = await this.prisma.user.findMany({
-      where: { subscriptionTier: 'PRO' },
-      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true },
-    });
-
-    const standardCount = standardUsers.length;
-    const proCount = proUsers.length;
-    const activePaidSubscriptionsCount = standardCount + proCount;
-
-    // Standard = ₺249, Pro = ₺499
-    const mrr = standardCount * 249 + proCount * 499;
-    const arr = mrr * 12;
+    // 1. Snapshot Metrics from Central Source of Truth
+    const subMetrics = await this.getActiveSubscriptionFinanceMetrics();
+    const { mrr, arr, activePaidSubscriptionsCount, subscriberItems } = subMetrics;
 
     // 2. Period-Flow Metrics (Between startDate and endDate)
     const buyerPurchasesRaw = await this.prisma.buyerPackagePurchase.findMany({
       where: { createdAt: { gte: startDate, lte: endDate } },
       include: { user: true },
     });
-    // Filter real buyer package purchases (price > 0)
     const buyerPurchases = buyerPurchasesRaw.filter((p) => (p.price || 0) > 0);
     const buyerOneTimeRevenue = buyerPurchases.reduce((sum, p) => sum + (p.price || 0), 0);
 
     const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-      },
+      where: { createdAt: { gte: startDate, lte: endDate } },
     });
-    // Filter real paid promotion transactions (excludes ADMIN_GRANT, MOCK_PAYMENT, PENDING, FAILED)
     const promoPurchases = promoPurchasesRaw.filter((p) => this.isRealPaidPromotion(p));
     const promoOneTimeRevenue = promoPurchases.reduce((sum, p) => sum + this.getNetPromotionRevenue(p), 0);
 
@@ -121,40 +190,44 @@ export class FinanceReportsService {
     const totalCollected = oneTimeRevenue + estimatedSubRevenueInPeriod;
 
     // 3. Cost & Margin Calculation (STRICT UNKNOWN ≠ ZERO RULE)
-    const aiReportsCount = await this.prisma.analyticsEvent.count({
-      where: { eventType: 'AI_REPORT_COMPLETED', occurredAt: { gte: startDate, lte: endDate } },
-    });
-    const chatbotMsgCount = await this.prisma.analyticsEvent.count({
-      where: { eventType: 'CHATBOT_MESSAGE_SENT', occurredAt: { gte: startDate, lte: endDate } },
-    });
+    const grossMarginStatus = 'INCOMPLETE_COST_DATA';
+    const grossMarginPct: number | null = null;
+    const grossProfit: number | null = null;
 
-    const aiReportCost = Number((aiReportsCount * 1.85).toFixed(2));
-    const chatbotCost = Number((chatbotMsgCount * 0.12).toFixed(2));
-    const knownCostsTotal = aiReportCost + chatbotCost;
-
-    // Check if provider logs exist (OpenAI / Gemini token logs are N/A)
-    const hasMissingCosts = true; // OpenAI token logs & Gemini provider logs are not registered in system
-    let grossMarginStatus = 'INCOMPLETE_COST_DATA';
-    let grossMarginPct: number | null = null;
-    let grossProfit: number | null = null;
-
-    if (!hasMissingCosts) {
-      grossProfit = Math.max(0, totalCollected - knownCostsTotal);
-      grossMarginPct = totalCollected > 0 ? Number(((grossProfit / totalCollected) * 100).toFixed(1)) : 0;
-      grossMarginStatus = 'CALCULATED';
+    // 4. Revenue Distribution Breakdown from Real Subscriptions & One-time Purchases
+    const breakdownItems: any[] = [];
+    if (subMetrics.activePaidSubs.length > 0) {
+      const planGroups: Record<string, { name: string; count: number; mrr: number }> = {};
+      subMetrics.activePaidSubs.forEach((s) => {
+        const pName = s.plan.name;
+        const pPrice = Number(s.plan.priceTrl) || 0;
+        if (!planGroups[pName]) {
+          planGroups[pName] = { name: pName, count: 0, mrr: 0 };
+        }
+        planGroups[pName].count += 1;
+        planGroups[pName].mrr += pPrice;
+      });
+      Object.values(planGroups).forEach((g) => {
+        breakdownItems.push({
+          name: `${g.name} (${g.count} Abone - ₺${g.mrr}/ay)`,
+          type: 'SUBSCRIPTION',
+          amount: g.mrr,
+        });
+      });
     }
 
-    // 4. Revenue Distribution Breakdown
+    if (buyerOneTimeRevenue > 0) {
+      breakdownItems.push({ name: 'Alıcı Paketleri (Tek Seferlik)', type: 'ONE_TIME', amount: buyerOneTimeRevenue });
+    }
+    if (promoOneTimeRevenue > 0) {
+      breakdownItems.push({ name: 'İlan Ön Plana Çıkarma (Promosyon)', type: 'ONE_TIME', amount: promoOneTimeRevenue });
+    }
+
     const revenueDistribution = {
       subscriptionRevenue: estimatedSubRevenueInPeriod,
       oneTimeRevenue,
       totalRevenue: totalCollected,
-      breakdown: [
-        { name: 'Yetkin Paket Abonelik (₺249)', type: 'SUBSCRIPTION', amount: standardCount * 249 },
-        { name: 'Profesyonel Paket Abonelik (₺499)', type: 'SUBSCRIPTION', amount: proCount * 499 },
-        { name: 'Alıcı Paketleri (Tek Seferlik)', type: 'ONE_TIME', amount: buyerOneTimeRevenue },
-        { name: 'İlan Ön Plana Çıkarma (Promosyon)', type: 'ONE_TIME', amount: promoOneTimeRevenue },
-      ],
+      breakdown: breakdownItems,
     };
 
     // 5. MRR Development Timeline
@@ -179,7 +252,7 @@ export class FinanceReportsService {
       grossMarginStatus,
       grossMarginPct,
       grossProfit,
-      knownCostsTotal,
+      knownCostsTotal: 0,
       missingCosts: ['Google Gemini API Token Logları', 'OpenAI GPT-4o Provider Logları'],
       revenueDistribution,
       mrrDevelopment,
@@ -191,55 +264,31 @@ export class FinanceReportsService {
    */
   async getFinanceOverviewDrilldown(metric: string, range?: string, from?: string, to?: string) {
     const overview = await this.getFinanceOverview(range, from, to);
-    const { startDate, endDate } = this.resolveDateRange(range, from, to);
-
-    const formatUserItem = (u: any, tier: string, price: number) => {
-      const yearMonth = `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-      const shortId = u.id.slice(0, 6).toUpperCase();
-      const customerNo = `TS-${yearMonth}-${shortId}`;
-      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0];
-      return {
-        userId: u.id,
-        customerNo,
-        name,
-        email: u.email,
-        tier,
-        monthlyPrice: price,
-        annualizedPrice: price * 12,
-        startDate: u.createdAt,
-        status: 'ACTIVE',
-      };
-    };
-
-    const standardUsers = await this.prisma.user.findMany({
-      where: { subscriptionTier: 'STANDARD' },
-      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true },
-    });
-    const proUsers = await this.prisma.user.findMany({
-      where: { subscriptionTier: 'PRO' },
-      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true },
-    });
-
-    const subscribers = [
-      ...standardUsers.map((u) => formatUserItem(u, 'Yetkin Paket', 249)),
-      ...proUsers.map((u) => formatUserItem(u, 'Profesyonel Paket', 499)),
-    ];
+    const subMetrics = await this.getActiveSubscriptionFinanceMetrics();
 
     if (metric === 'mrr' || metric === 'arr' || metric === 'activePaid') {
+      const tierMap: Record<string, { tier: string; count: number; mrrContribution: number }> = {};
+      subMetrics.activePaidSubs.forEach((s) => {
+        const pName = `${s.plan.name} (₺${s.plan.priceTrl})`;
+        const pPrice = Number(s.plan.priceTrl) || 0;
+        if (!tierMap[pName]) {
+          tierMap[pName] = { tier: pName, count: 0, mrrContribution: 0 };
+        }
+        tierMap[pName].count += 1;
+        tierMap[pName].mrrContribution += pPrice;
+      });
+
       return {
         metric,
         periodLabel: overview.periodLabel,
-        snapshotDate: endDate,
+        snapshotDate: overview.endDate,
         summary: {
           mrr: overview.mrr,
           arr: overview.arr,
           activePaidSubscriptionsCount: overview.activePaidSubscriptionsCount,
         },
-        tierBreakdown: [
-          { tier: 'Yetkin Paket (₺249)', count: standardUsers.length, mrrContribution: standardUsers.length * 249 },
-          { tier: 'Profesyonel Paket (₺499)', count: proUsers.length, mrrContribution: proUsers.length * 499 },
-        ],
-        subscribers,
+        tierBreakdown: Object.values(tierMap),
+        subscribers: subMetrics.subscriberItems,
       };
     }
 

@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { SubscriptionTier } from '@prisma/client';
+import { FinanceReportsService } from './finance-reports.service';
 
 @Injectable()
 export class ReportsOverviewService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly financeService: FinanceReportsService,
+  ) {}
 
   private async safeCount(model: string, where?: any): Promise<number> {
     try {
@@ -28,45 +31,27 @@ export class ReportsOverviewService {
         yesterdayUsers,
         last7DaysUsers,
         last30DaysUsers,
-        freeTierUsers,
-        standardTierUsers,
-        proTierUsers,
-        premiumTierUsers,
-        activePaidSubsCount,
         todayAiReports,
         pendingListingsCount,
         queuedResearchJobsCount,
         fallbackReportsCount,
         openFeedbacksCount,
+        subMetrics,
       ] = await Promise.all([
         this.safeCount('user'),
         this.safeCount('user', { createdAt: { gte: todayStart } }),
         this.safeCount('user', { createdAt: { gte: yesterdayStart, lt: todayStart } }),
         this.safeCount('user', { createdAt: { gte: last7DaysStart } }),
         this.safeCount('user', { createdAt: { gte: last30DaysStart } }),
-        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.FREE }, { subscriptionTier: SubscriptionTier.TANISMA }] }),
-        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.STANDARD }, { subscriptionTier: SubscriptionTier.YETKIN }] }),
-        this.safeCount('user', { OR: [{ subscriptionTier: SubscriptionTier.PRO }, { subscriptionTier: SubscriptionTier.PROFESYONEL }] }),
-        this.safeCount('user', { subscriptionTier: SubscriptionTier.PREMIUM }),
-        this.safeCount('subscription', { status: 'ACTIVE' }),
         this.safeCount('aiVehicleReport', { createdAt: { gte: todayStart } }),
         this.safeCount('vehicleListing', { status: 'PENDING_REVIEW' }),
         this.safeCount('vehicleResearchJob', { status: 'QUEUED' }),
         this.safeCount('aiVehicleReport', { isSafeFallback: true }),
         this.safeCount('feedback', { status: 'NEW' }),
+        this.financeService.getActiveSubscriptionFinanceMetrics(),
       ]);
 
-      const yetkinUsers = standardTierUsers;
-      const profesyonelUsers = proTierUsers + premiumTierUsers;
-      const tanismaUsers = freeTierUsers;
-
-      const activePaidSubs = Math.max(activePaidSubsCount, yetkinUsers + profesyonelUsers);
-
-      // Financial estimations
-      const mrr = (yetkinUsers * 249) + (profesyonelUsers * 499);
-      const arr = mrr * 12;
-      const estAiCost = (todayAiReports * 1.85);
-      const grossMarginPct = mrr > 0 ? Number((((mrr - estAiCost) / mrr) * 100).toFixed(1)) : 0;
+      const { mrr, arr, activePaidSubscriptionsCount, packageDistribution } = subMetrics;
 
       return {
         kpis: [
@@ -95,8 +80,8 @@ export class ReportsOverviewService {
           {
             key: 'ACTIVE_PAID_SUBS',
             title: 'Aktif Ücretli Abonelik',
-            value: activePaidSubs,
-            previousValue: activePaidSubs,
+            value: activePaidSubscriptionsCount,
+            previousValue: activePaidSubscriptionsCount,
             changePercentage: 0,
             trend: 'neutral',
             alertLevel: 'normal',
@@ -139,15 +124,12 @@ export class ReportsOverviewService {
         queuedResearchJobsCount,
         fallbackReportsCount,
         openFeedbacksCount,
-        packageDistribution: {
-          tanismaUsers,
-          yetkinUsers,
-          profesyonelUsers,
-        },
+        packageDistribution,
         financialSummary: {
           mrr,
           arr,
-          grossMarginPct,
+          grossMarginStatus: 'INCOMPLETE_COST_DATA',
+          grossMarginPct: null,
         },
       };
     } catch (e: any) {
@@ -159,7 +141,7 @@ export class ReportsOverviewService {
         fallbackReportsCount: 0,
         openFeedbacksCount: 0,
         packageDistribution: { tanismaUsers: 0, yetkinUsers: 0, profesyonelUsers: 0 },
-        financialSummary: { mrr: 0, arr: 0, grossMarginPct: 0 },
+        financialSummary: { mrr: 0, arr: 0, grossMarginPct: null },
       };
     }
   }
