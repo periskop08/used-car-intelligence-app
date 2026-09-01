@@ -8,11 +8,11 @@ import {
   Animated,
   PanResponder,
   Dimensions,
-  Image,
   ScrollView,
   TextInput,
   Modal,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -217,16 +217,39 @@ interface RecommendationResult {
   recommendations?: RecommendedVariant[];
 }
 
+const prefetchDeckImages = async (cards: DiscoveryCard[]) => {
+  if (!cards || cards.length === 0) return;
+  // Instantly prefetch first 2 cards in parallel
+  const priorityCards = cards.slice(0, 2);
+  const remainingCards = cards.slice(2);
+
+  await Promise.all(
+    priorityCards.map((c) =>
+      c.imageUrl ? ExpoImage.prefetch(c.imageUrl, 'memory-disk').catch(() => {}) : Promise.resolve()
+    )
+  );
+
+  // Background cache remaining deck
+  remainingCards.forEach((c) => {
+    if (c.imageUrl) {
+      ExpoImage.prefetch(c.imageUrl, 'memory-disk').catch(() => {});
+    }
+  });
+};
+
 const VehicleCardContent = React.memo(({ card }: { card: DiscoveryCard }) => {
   return (
     <>
       {/* Photo Header */}
       <View style={styles.imageContainer}>
         {card.imageUrl ? (
-          <Image
+          <ExpoImage
             source={{ uri: card.imageUrl }}
             style={styles.cardImage}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={150}
+            cachePolicy="memory-disk"
+            priority="high"
           />
         ) : (
           <View style={[styles.cardImage, styles.placeholderImage]}>
@@ -501,12 +524,8 @@ export default function AraciniBulScreen() {
           setDeck(formattedDeck);
           deckRef.current = formattedDeck;
 
-          // Pre-cache all session images in parallel for instant 0ms transitions
-          formattedDeck.forEach((card: DiscoveryCard) => {
-            if (card.imageUrl) {
-              Image.prefetch(card.imageUrl).catch(() => {});
-            }
-          });
+          // Pre-cache all session images with high priority
+          await prefetchDeckImages(formattedDeck);
 
           setGameState('intro');
           return sess.id;
@@ -578,12 +597,8 @@ export default function AraciniBulScreen() {
           setDeck(formattedDeck);
           deckRef.current = formattedDeck;
 
-          // Pre-cache all fresh images
-          formattedDeck.forEach((card: DiscoveryCard) => {
-            if (card.imageUrl) {
-              Image.prefetch(card.imageUrl).catch(() => {});
-            }
-          });
+          // Pre-cache all fresh images with priority on first card
+          await prefetchDeckImages(formattedDeck);
 
           pan.setValue({ x: 0, y: 0 });
           setGameState('swiping');
@@ -628,11 +643,7 @@ export default function AraciniBulScreen() {
           setDeck(formattedDeck);
           deckRef.current = formattedDeck;
 
-          formattedDeck.forEach((card: DiscoveryCard) => {
-            if (card.imageUrl) {
-              Image.prefetch(card.imageUrl).catch(() => {});
-            }
-          });
+          await prefetchDeckImages(formattedDeck);
 
           pan.setValue({ x: 0, y: 0 });
           setGameState('swiping');
@@ -785,11 +796,7 @@ export default function AraciniBulScreen() {
           setDeck(formattedDeck);
           deckRef.current = formattedDeck;
 
-          formattedDeck.forEach((card: DiscoveryCard) => {
-            if (card.imageUrl) {
-              Image.prefetch(card.imageUrl).catch(() => {});
-            }
-          });
+          await prefetchDeckImages(formattedDeck);
 
           pan.setValue({ x: 0, y: 0 });
           setGameState('swiping');
