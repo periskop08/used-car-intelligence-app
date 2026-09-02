@@ -198,37 +198,37 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* WEB-MATCHED MENU ITEMS CONTAINER */}
-            <View style={styles.menuContainer}>
-              {/* 🛠️ Admin Paneli (Only for Admins) */}
-              {(profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && (
-                <TouchableOpacity
-                  style={[styles.menuRowItem, styles.adminRowItem]}
-                  activeOpacity={0.7}
-                  onPress={() => router.push('/profile/admin' as any)}
-                >
-                  <View style={styles.menuLeft}>
-                    <Text style={styles.menuEmoji}>🛠️</Text>
-                    <Text style={[styles.menuTitle, styles.adminTitle]}>Admin Paneli</Text>
-                  </View>
-                  <Ionicons name="arrow-forward" size={16} color="#ef4444" />
-                </TouchableOpacity>
-              )}
-
-              {/* 📊 Dashboard */}
+            {/* 🛠️ Admin Paneli (Only for Admins) */}
+            {(profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && (
               <TouchableOpacity
-                style={styles.menuRowItem}
+                style={[styles.menuContainer, styles.adminRowItem, { marginBottom: 12, paddingVertical: 14, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/dashboard' as any)}
+                onPress={() => router.push('/profile/admin' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="grid-outline" size={18} color="#64748b" style={styles.menuIcon} />
-                  <Text style={styles.menuTitle}>Dashboard</Text>
+                  <Text style={styles.menuEmoji}>🛠️</Text>
+                  <Text style={[styles.menuTitle, styles.adminTitle]}>Admin Paneli</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+                <Ionicons name="arrow-forward" size={16} color="#ef4444" />
               </TouchableOpacity>
+            )}
 
-              {/* 🚗 İlanlarım */}
+            {/* 📊 DASHBOARD GENERAL STATS */}
+            <TouchableOpacity
+              style={[styles.menuContainer, { marginBottom: 14, paddingVertical: 14, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+              activeOpacity={0.7}
+              onPress={() => router.push('/profile/dashboard' as any)}
+            >
+              <View style={styles.menuLeft}>
+                <Ionicons name="grid-outline" size={18} color="#ea580c" style={styles.menuIcon} />
+                <Text style={[styles.menuTitle, { fontWeight: '800' }]}>Dashboard (Kontrol Merkezi)</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+
+            {/* SECTION: İLAN YÖNETİMİ */}
+            <Text style={styles.groupSectionHeader}>İLAN YÖNETİMİ</Text>
+            <View style={styles.menuContainer}>
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
@@ -241,7 +241,34 @@ export default function ProfileScreen() {
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
-              {/* ❤️ Favori İlanlarım */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/my-listings' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="time-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Geçmiş İlanlarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push('/add-vehicle' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="add-circle-outline" size={18} color="#ea580c" style={styles.menuIcon} />
+                  <Text style={[styles.menuTitle, { color: '#ea580c', fontWeight: '800' }]}>+ İlan Ekle</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#ea580c" />
+              </TouchableOpacity>
+            </View>
+
+            {/* SECTION: FAVORİLERİM */}
+            <Text style={styles.groupSectionHeader}>FAVORİLERİM</Text>
+            <View style={styles.menuContainer}>
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
@@ -254,7 +281,6 @@ export default function ProfileScreen() {
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
-              {/* 📄 Favori Raporlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
@@ -267,9 +293,36 @@ export default function ProfileScreen() {
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
-              {/* 💬 Mesajlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'listings' } } as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="people-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Favori Satıcılarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'listings' } } as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="search-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Favori Aramalarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* SECTION: MESAJLAR */}
+            <Text style={styles.groupSectionHeader}>MESAJLAR</Text>
+            <View style={styles.menuContainer}>
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
                 onPress={() => router.push('/(tabs)/messages' as any)}
               >
@@ -284,8 +337,11 @@ export default function ProfileScreen() {
                 </View>
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
+            </View>
 
-              {/* 🎁 Paketim */}
+            {/* SECTION: ABONELİK */}
+            <Text style={styles.groupSectionHeader}>ABONELİK</Text>
+            <View style={styles.menuContainer}>
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
@@ -298,15 +354,130 @@ export default function ProfileScreen() {
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
-              {/* 👤 Kişisel Bilgilerim */}
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/subscription' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="sparkles-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Paket Haklarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* SECTION: HESAP */}
+            <Text style={styles.groupSectionHeader}>HESAP</Text>
+            <View style={styles.menuContainer}>
+              <TouchableOpacity
+                style={styles.menuRowItem}
                 activeOpacity={0.7}
                 onPress={() => router.push('/profile/personal-info' as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="person-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Kişisel Bilgilerim</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/personal-info' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="mail-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>E-posta Adresi</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/personal-info' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="call-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Telefon Numarası</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/personal-info' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="key-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Şifre Değiştir</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/settings' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="notifications-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Bildirim Ayarları</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/settings' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Hesap Güvenliği</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/settings' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="close-circle-outline" size={18} color="#ef4444" style={styles.menuIcon} />
+                  <Text style={[styles.menuTitle, { color: '#ef4444' }]}>Hesap İptali</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+
+            {/* SECTION: DESTEK */}
+            <Text style={styles.groupSectionHeader}>DESTEK</Text>
+            <View style={styles.menuContainer}>
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/profile/support', params: { tab: 'help' } } as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="help-buoy-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Yardım Merkezi</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/profile/support', params: { tab: 'feedback' } } as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={18} color="#64748b" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Geri Bildirim Gönder</Text>
                 </View>
                 <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
@@ -496,6 +667,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#475569',
+  },
+  groupSectionHeader: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 10,
+    marginBottom: 2,
+    marginLeft: 4,
   },
   menuContainer: {
     backgroundColor: '#ffffff',

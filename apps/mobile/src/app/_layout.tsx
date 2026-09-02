@@ -36,6 +36,8 @@ export default function RootLayout() {
         <Stack.Screen name="profile/subscription" options={{ headerShown: false }} />
         <Stack.Screen name="profile/dashboard" options={{ headerShown: false }} />
         <Stack.Screen name="profile/personal-info" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/settings" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/support" options={{ headerShown: false }} />
         <Stack.Screen name="ilan-akisi" options={{ title: 'İlan Akışı', headerBackTitle: 'Geri', headerShown: false }} />
       </Stack>
     </View>
