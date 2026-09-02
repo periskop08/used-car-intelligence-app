@@ -1,255 +1,475 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, FlatList, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-interface Message {
+const resolveMediaUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  if (url.includes('.r2.dev/') || url.includes('cloudflarestorage.com/')) {
+    const parts = url.split('.r2.dev/');
+    const storageKey = parts.length > 1 ? parts[1].split('?')[0] : '';
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+  return url;
+};
+
+interface MessageItem {
   id: string;
-  content: string;
+  body: string;
   senderId: string;
   createdAt: string;
+  readAt?: string | null;
 }
 
-export default function ChatRoomScreen() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams(); // Room ID
+interface ConversationDetail {
+  id: string;
+  listingId: string | null;
+  buyerId: string;
+  sellerId: string;
+  listing?: {
+    id: string;
+    title: string;
+    priceAmount?: number;
+    city?: string;
+  } | null;
+  buyer: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    username: string | null;
+    email: string;
+    profilePhotoUrl: string | null;
+  };
+  seller: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    username: string | null;
+    email: string;
+    profilePhotoUrl: string | null;
+  };
+  messages: MessageItem[];
+}
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
+export default function ChatDetailScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [conversation, setConversation] = useState<ConversationDetail | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  // Suggested questions list
-  const suggestedQuestions = [
-    'Aracın bilinen herhangi bir kronik sorunu var mı?',
-    'Son periyodik bakımı ne zaman ve nerede yapıldı?',
-    'Ekspertiz raporu mevcut mu, paylaşabilir misiniz?',
-    'Şanzıman beyni veya debriyaj değişimi yapıldı mı?',
-  ];
-
   useEffect(() => {
-    fetchMessages();
-    loadProfile();
-    // Poll for new messages every 3 seconds
-    const interval = setInterval(fetchMessages, 3000);
+    loadProfileAndChat();
+    const interval = setInterval(() => {
+      fetchMessagesSilently();
+    }, 4000);
     return () => clearInterval(interval);
   }, [id]);
 
-  const loadProfile = async () => {
+  const loadProfileAndChat = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (token) {
-        const res = await fetch(`${API_URL}/users/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const profile = await res.json();
-          setCurrentUserId(profile.id);
-        }
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
+
+      if (!token) {
+        setLoading(false);
+        return;
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
-  const fetchMessages = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) return;
+      // 1. Current user
+      const userRes = await fetch(`${API_URL}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (userRes.ok) {
+        const u = await userRes.json();
+        setCurrentUserId(u.id);
+      }
 
-      const res = await fetch(`${API_URL}/messages/rooms/${id}/messages`, {
+      // 2. Fetch conversation detail
+      const res = await fetch(`${API_URL}/conversations/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
         const data = await res.json();
-        setMessages(data);
+        setConversation(data);
+        setMessages(data.messages || []);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Chat load error:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSend = async (contentStr: string) => {
-    const textToSend = contentStr.trim();
-    if (!textToSend) return;
-
+  const fetchMessagesSilently = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) return;
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
+      if (!token || !id) return;
 
-      const res = await fetch(`${API_URL}/messages/rooms/${id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: textToSend }),
+      const res = await fetch(`${API_URL}/conversations/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
-        const newMessage = await res.json();
-        setMessages((prev) => [...prev, newMessage]);
-        if (contentStr === inputText) setInputText('');
-        // Scroll to end
+        const data = await res.json();
+        setMessages(data.messages || []);
+      }
+    } catch (e) {}
+  };
+
+  const handleSendMessage = async (textToSend?: string) => {
+    const content = (textToSend || inputText).trim();
+    if (!content || sending) return;
+
+    const token =
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+    if (!token) return;
+
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/conversations/${id}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ body: content }),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        setMessages((prev) => [...prev, created]);
+        setInputText('');
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      } else {
+        Alert.alert('Hata', 'Mesaj gönderilemedi.');
       }
     } catch (e) {
-      console.error(e);
-      Alert.alert('Hata', 'Mesaj gönderilemedi.');
+      Alert.alert('Hata', 'Bağlantı hatası oluştu.');
+    } finally {
+      setSending(false);
     }
   };
 
+  const getOtherParticipant = () => {
+    if (!conversation) return 'Kullanıcı';
+    const isBuyer = currentUserId === conversation.buyerId;
+    const other = isBuyer ? conversation.seller : conversation.buyer;
+    if (!other) return 'Kullanıcı';
+    if (other.firstName || other.lastName) {
+      return `${other.firstName || ''} ${other.lastName || ''}`.trim();
+    }
+    return other.username || other.email?.split('@')[0] || 'Kullanıcı';
+  };
+
+  const getOtherParticipantPhoto = () => {
+    if (!conversation) return null;
+    const isBuyer = currentUserId === conversation.buyerId;
+    const other = isBuyer ? conversation.seller : conversation.buyer;
+    return other?.profilePhotoUrl || null;
+  };
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
-      {/* Messages List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => {
-          const isMe = item.senderId === currentUserId;
-          return (
-            <View style={[styles.messageBubbleRow, isMe ? styles.myBubbleRow : styles.otherBubbleRow]}>
-              <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
-                <Text style={styles.bubbleText}>{item.content}</Text>
-              </View>
-            </View>
-          );
-        }}
-      />
-
-      {/* Suggested Questions List (Horizontal) */}
-      <View style={styles.suggestedContainer}>
-        <Text style={styles.suggestedTitle}>💡 Önerilen Hızlı Sorular</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestedScroll}>
-          {suggestedQuestions.map((q, idx) => (
-            <TouchableOpacity key={idx} style={styles.suggestedCard} onPress={() => handleSend(q)}>
-              <Text style={styles.suggestedCardText}>{q}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Message Input Box */}
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          placeholder="Mesajınızı yazın..."
-          placeholderTextColor="#64748b"
-          value={inputText}
-          onChangeText={setInputText}
-        />
-        <TouchableOpacity style={styles.sendBtn} onPress={() => handleSend(inputText)}>
-          <Ionicons name="send" size={20} color="#fff" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
+
+        <View style={styles.headerUserWrap}>
+          <View style={styles.headerAvatar}>
+            {getOtherParticipantPhoto() ? (
+              <ExpoImage
+                source={{ uri: resolveMediaUrl(getOtherParticipantPhoto()) || '' }}
+                style={styles.headerAvatarImg}
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={styles.headerAvatarText}>
+                {(getOtherParticipant()[0] || 'K').toUpperCase()}
+              </Text>
+            )}
+          </View>
+          <View>
+            <Text style={styles.headerName}>{getOtherParticipant()}</Text>
+            {conversation?.listing?.title && (
+              <Text style={styles.headerListingTitle} numberOfLines={1}>
+                {conversation.listing.title}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={{ width: 36 }} />
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Messages Feed */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#ea580c" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            renderItem={({ item }) => {
+              const isMine = item.senderId === currentUserId;
+              return (
+                <View
+                  style={[
+                    styles.messageBubbleWrap,
+                    isMine ? styles.myBubbleWrap : styles.theirBubbleWrap,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      isMine ? styles.myMessageBubble : styles.theirMessageBubble,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.messageText,
+                        isMine ? styles.myMessageText : styles.theirMessageText,
+                      ]}
+                    >
+                      {item.body}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.messageTimeText,
+                        isMine ? styles.myTimeText : styles.theirTimeText,
+                      ]}
+                    >
+                      {new Date(item.createdAt).toLocaleTimeString('tr-TR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        )}
+
+        {/* Input Bar */}
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.inputField}
+            placeholder="Mesajınızı yazın..."
+            placeholderTextColor="#94a3b8"
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={1000}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!inputText.trim() || sending) && styles.sendButtonDisabled,
+            ]}
+            onPress={() => handleSendMessage()}
+            disabled={!inputText.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Ionicons name="send" size={18} color="#ffffff" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
   },
-  listContent: {
-    padding: 16,
-    gap: 12,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  messageBubbleRow: {
+  headerBar: {
     flexDirection: 'row',
-    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  myBubbleRow: {
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerUserWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginLeft: 8,
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  headerAvatarText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#ea580c',
+  },
+  headerName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  headerListingTitle: {
+    fontSize: 11,
+    color: '#64748b',
+    maxWidth: 200,
+  },
+  messagesList: {
+    padding: 16,
+    gap: 8,
+  },
+  messageBubbleWrap: {
+    flexDirection: 'row',
+    marginVertical: 3,
+  },
+  myBubbleWrap: {
     justifyContent: 'flex-end',
   },
-  otherBubbleRow: {
+  theirBubbleWrap: {
     justifyContent: 'flex-start',
   },
-  bubble: {
-    maxWidth: '75%',
-    padding: 12,
-    borderRadius: 16,
+  messageBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    gap: 4,
   },
-  myBubble: {
-    backgroundColor: '#f97316',
-    borderBottomRightRadius: 2,
+  myMessageBubble: {
+    backgroundColor: '#ea580c',
+    borderBottomRightRadius: 4,
   },
-  otherBubble: {
-    backgroundColor: '#1e293b',
+  theirMessageBubble: {
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    borderBottomLeftRadius: 2,
+    borderColor: '#e2e8f0',
+    borderBottomLeftRadius: 4,
   },
-  bubbleText: {
-    color: '#fff',
+  messageText: {
     fontSize: 13.5,
     lineHeight: 18,
   },
-  suggestedContainer: {
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+  myMessageText: {
+    color: '#ffffff',
+    fontWeight: '500',
   },
-  suggestedTitle: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-    paddingHorizontal: 16,
-    marginBottom: 6,
+  theirMessageText: {
+    color: '#0f172a',
+    fontWeight: '500',
   },
-  suggestedScroll: {
-    gap: 8,
-    paddingHorizontal: 16,
+  messageTimeText: {
+    fontSize: 9.5,
+    alignSelf: 'flex-end',
   },
-  suggestedCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    maxWidth: 240,
+  myTimeText: {
+    color: 'rgba(255, 255, 255, 0.75)',
   },
-  suggestedCardText: {
-    color: '#cbd5e1',
-    fontSize: 11,
+  theirTimeText: {
+    color: '#94a3b8',
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    backgroundColor: '#0f172a',
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    color: '#f8fafc',
-    fontSize: 14,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#f97316',
-    alignItems: 'center',
+  inputField: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+    maxHeight: 90,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ea580c',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#cbd5e1',
   },
 });

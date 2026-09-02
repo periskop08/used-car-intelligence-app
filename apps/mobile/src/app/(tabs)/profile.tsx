@@ -219,7 +219,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/(tabs)' as any)}
+                onPress={() => router.push('/profile/dashboard' as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="grid-outline" size={18} color="#64748b" style={styles.menuIcon} />
