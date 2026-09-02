@@ -219,7 +219,12 @@ export default function TorqueScoutClubScreen() {
   const handleSendComment = async () => {
     if (!newCommentText.trim() || !activePostForComments) return;
 
-    if (!token) {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!currentToken) {
       Alert.alert('Giriş Yapın', 'Yorum yapmak için lütfen giriş yapın.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Giriş Yap', onPress: () => router.push('/(tabs)/profile' as any) },
@@ -232,7 +237,7 @@ export default function TorqueScoutClubScreen() {
       const res = await fetch(`${API_URL}/club/posts/${activePostForComments.id}/comments`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ content: newCommentText.trim() }),
@@ -245,11 +250,12 @@ export default function TorqueScoutClubScreen() {
         // Update comment count on post
         setPosts((prev) =>
           prev.map((p) =>
-            p.id === activePostForComments.id ? { ...p, commentCount: p.commentCount + 1 } : p
+            p.id === activePostForComments.id ? { ...p, commentCount: (p.commentCount || 0) + 1 } : p
           )
         );
       } else {
-        Alert.alert('Hata', 'Yorum gönderilemedi, lütfen tekrar deneyin.');
+        const errData = await res.json().catch(() => ({}));
+        Alert.alert('Bilgi', errData.message || 'Yorum gönderilemedi, lütfen tekrar deneyin.');
       }
     } catch (e) {
       Alert.alert('Hata', 'Bağlantı hatası oluştu.');
@@ -259,7 +265,12 @@ export default function TorqueScoutClubScreen() {
   };
 
   const handleVotePoll = async (pollId: string, optionId: string, postId: string) => {
-    if (!token) {
+    const currentToken =
+      token ||
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!currentToken) {
       Alert.alert('Giriş Yapın', 'Ankete oy vermek için lütfen giriş yapın.', [
         { text: 'Vazgeç', style: 'cancel' },
         { text: 'Giriş Yap', onPress: () => router.push('/(tabs)/profile' as any) },
@@ -272,14 +283,14 @@ export default function TorqueScoutClubScreen() {
       const res = await fetch(`${API_URL}/club/polls/${pollId}/my-vote`, {
         method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ optionId }),
       });
 
       if (res.ok) {
-        await fetchClubPosts(token);
+        await fetchClubPosts(currentToken);
       } else {
         Alert.alert('Bilgi', 'Oyunuz kaydedilemedi veya anket süresi doldu.');
       }
@@ -302,7 +313,7 @@ export default function TorqueScoutClubScreen() {
 
   const filteredPosts = posts.filter((p) => {
     if (selectedCategory === 'POLLS') return !!p.poll;
-    if (selectedCategory === 'ANNOUNCEMENTS') return p.isPinned || p.author.role === 'ADMIN';
+    if (selectedCategory === 'ANNOUNCEMENTS') return p.isPinned || p.author?.role === 'ADMIN';
     if (selectedCategory === 'DISCUSSIONS') return !p.poll && !p.isPinned;
     return true;
   });
@@ -392,8 +403,8 @@ export default function TorqueScoutClubScreen() {
               <Text style={styles.emptyFeedSub}>Farklı bir kategori seçebilir veya ilk yorumu yapabilirsiniz.</Text>
             </View>
           ) : (
-            filteredPosts.map((post) => (
-              <View key={post.id} style={styles.postCard}>
+            filteredPosts.map((post, postIndex) => (
+              <View key={post.id || `post-${postIndex}`} style={styles.postCard}>
                 {/* Pinned Tag */}
                 {post.isPinned && (
                   <View style={styles.pinnedRow}>
@@ -405,7 +416,7 @@ export default function TorqueScoutClubScreen() {
                 {/* Author Info */}
                 <View style={styles.authorRow}>
                   <View style={styles.authorAvatarWrap}>
-                    {post.author.profilePhotoUrl ? (
+                    {post.author?.profilePhotoUrl ? (
                       <ExpoImage
                         source={{ uri: post.author.profilePhotoUrl }}
                         style={styles.authorAvatar}
@@ -414,7 +425,7 @@ export default function TorqueScoutClubScreen() {
                     ) : (
                       <View style={styles.avatarPlaceholder}>
                         <Text style={styles.avatarInitial}>
-                          {(post.author.firstName?.[0] || post.author.username?.[0] || 'T').toUpperCase()}
+                          {(post.author?.firstName?.[0] || post.author?.username?.[0] || 'T').toUpperCase()}
                         </Text>
                       </View>
                     )}
@@ -423,11 +434,11 @@ export default function TorqueScoutClubScreen() {
                   <View style={styles.authorMeta}>
                     <View style={styles.authorNameRow}>
                       <Text style={styles.authorName}>
-                        {post.author.firstName
+                        {post.author?.firstName
                           ? `${post.author.firstName} ${post.author.lastName || ''}`.trim()
-                          : post.author.username || 'TorqueScout Üyesi'}
+                          : post.author?.username || 'TorqueScout Üyesi'}
                       </Text>
-                      {post.author.role === 'ADMIN' ? (
+                      {post.author?.role === 'ADMIN' ? (
                         <View style={styles.adminBadge}>
                           <Text style={styles.adminBadgeText}>YÖNETİCİ</Text>
                         </View>
@@ -466,18 +477,19 @@ export default function TorqueScoutClubScreen() {
                     </View>
 
                     <View style={styles.pollOptionsList}>
-                      {post.poll.options.map((opt) => {
+                      {post.poll.options.map((opt, optIndex) => {
+                        const optId = opt.id || `opt-${optIndex}`;
                         const isSelected = post.poll?.myVotedOptionId === opt.id;
                         const percentage =
                           post.poll && post.poll.totalVotes > 0
-                            ? Math.round((opt.voteCount / post.poll.totalVotes) * 100)
+                            ? Math.round(((opt.voteCount || 0) / post.poll.totalVotes) * 100)
                             : 0;
 
                         return (
                           <TouchableOpacity
-                            key={opt.id}
+                            key={optId}
                             style={[styles.pollOptionItem, isSelected && styles.pollOptionSelected]}
-                            onPress={() => handleVotePoll(post.poll!.id, opt.id, post.id)}
+                            onPress={() => handleVotePoll(post.poll!.id, opt.id || String(optIndex), post.id)}
                             disabled={votingPollIds[post.poll!.id]}
                           >
                             {/* Percentage fill bar */}
@@ -508,7 +520,7 @@ export default function TorqueScoutClubScreen() {
 
                     <View style={styles.pollFooterRow}>
                       <Text style={styles.pollTotalVotesText}>
-                        👥 Toplam {post.poll.totalVotes} oy kullanıldı
+                        👥 Toplam {post.poll.totalVotes || 0} oy kullanıldı
                       </Text>
                       {post.poll.myVotedOptionId && (
                         <Text style={styles.pollVotedBadge}>✓ Oyunuz Kaydedildi</Text>
@@ -595,22 +607,29 @@ export default function TorqueScoutClubScreen() {
                     </Text>
                   </View>
                 ) : (
-                  comments.map((c) => (
-                    <View key={c.id} style={styles.commentBubble}>
-                      <View style={styles.commentAvatar}>
-                        <Text style={styles.commentAvatarText}>
-                          {(c.author.displayName?.[0] || 'U').toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.commentBody}>
-                        <View style={styles.commentAuthorRow}>
-                          <Text style={styles.commentAuthorName}>{c.author.displayName}</Text>
-                          <Text style={styles.commentTime}>{formatTimeAgo(c.createdAt)}</Text>
+                  comments.map((c, cIndex) => {
+                    const authorName =
+                      c.author?.displayName ||
+                      ((c as any).author?.firstName
+                        ? `${(c as any).author.firstName} ${(c as any).author.lastName || ''}`.trim()
+                        : (c as any).author?.username || 'Kullanıcı');
+                    const initial = (authorName[0] || 'U').toUpperCase();
+
+                    return (
+                      <View key={c.id || `comment-${cIndex}`} style={styles.commentBubble}>
+                        <View style={styles.commentAvatar}>
+                          <Text style={styles.commentAvatarText}>{initial}</Text>
                         </View>
-                        <Text style={styles.commentTextContent}>{c.content}</Text>
+                        <View style={styles.commentBody}>
+                          <View style={styles.commentAuthorRow}>
+                            <Text style={styles.commentAuthorName}>{authorName}</Text>
+                            <Text style={styles.commentTime}>{formatTimeAgo(c.createdAt)}</Text>
+                          </View>
+                          <Text style={styles.commentTextContent}>{c.content}</Text>
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </ScrollView>
             )}
