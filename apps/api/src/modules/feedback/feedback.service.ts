@@ -255,7 +255,7 @@ export class FeedbackService {
   async getAdminFeedbacks(
     source?: FeedbackSource,
     category?: FeedbackCategory,
-    status?: FeedbackStatus,
+    status?: FeedbackStatus | string,
     priority?: FeedbackPriority,
     search?: string,
     assignedAdminId?: string,
@@ -264,7 +264,32 @@ export class FeedbackService {
 
     if (source) whereClause.source = source;
     if (category) whereClause.subjectCategory = category;
-    if (status) whereClause.status = status;
+
+    const UNRESOLVED_STATUSES: FeedbackStatus[] = [
+      FeedbackStatus.NEW,
+      FeedbackStatus.IN_REVIEW,
+      FeedbackStatus.WAITING_USER_INFO,
+      FeedbackStatus.WAITING_LISTING_OWNER,
+      FeedbackStatus.ASSIGNED,
+      FeedbackStatus.ACTION_TAKEN,
+    ];
+    const RESOLVED_STATUSES: FeedbackStatus[] = [
+      FeedbackStatus.RESOLVED,
+      FeedbackStatus.REJECTED,
+      FeedbackStatus.ARCHIVED,
+    ];
+
+    if (status) {
+      const sStr = String(status).toUpperCase();
+      if (sStr === 'PENDING' || sStr === 'OPEN' || sStr === 'UNRESOLVED' || sStr === 'BEKLEYEN') {
+        whereClause.status = { in: UNRESOLVED_STATUSES };
+      } else if (sStr === 'RESOLVED' || sStr === 'RESOLVED_GROUP' || sStr === 'CLOSED' || sStr === 'FINALIZED' || sStr === 'ÇÖZÜLEN') {
+        whereClause.status = { in: RESOLVED_STATUSES };
+      } else if (Object.values(FeedbackStatus).includes(status as any)) {
+        whereClause.status = status as FeedbackStatus;
+      }
+    }
+
     if (priority) whereClause.priority = priority;
     if (assignedAdminId) whereClause.assignedAdminId = assignedAdminId;
 
@@ -381,6 +406,25 @@ export class FeedbackService {
         };
       }),
     );
+
+    const baseSourceWhere: any = {};
+    if (source) baseSourceWhere.source = source;
+    if (category) baseSourceWhere.subjectCategory = category;
+
+    const [pendingCount, resolvedCount] = await Promise.all([
+      this.prisma.feedback.count({
+        where: { ...baseSourceWhere, status: { in: UNRESOLVED_STATUSES } },
+      }),
+      this.prisma.feedback.count({
+        where: { ...baseSourceWhere, status: { in: RESOLVED_STATUSES } },
+      }),
+    ]);
+
+    (enriched as any).meta = {
+      pendingCount,
+      resolvedCount,
+      totalCount: pendingCount + resolvedCount,
+    };
 
     return enriched;
   }

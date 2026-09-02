@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import AdminFeedbackOperationCenter from '../../components/AdminFeedbackOperationCenter';
 
 export default function AdminFeedbacksPage() {
@@ -20,7 +20,9 @@ export default function AdminFeedbacksPage() {
         </p>
       </div>
 
-      <AdminFeedbackOperationCenter token={token} />
+      <Suspense fallback={<div className="p-8 text-slate-400 text-xs animate-pulse">Yükleniyor...</div>}>
+        <AdminFeedbackOperationCenter token={token} />
+      </Suspense>
     </div>
   );
 }

@@ -47,7 +47,18 @@ export class ReportsOverviewService {
         this.safeCount('vehicleListing', { status: 'PENDING_REVIEW' }),
         this.safeCount('vehicleResearchJob', { status: 'QUEUED' }),
         this.safeCount('aiVehicleReport', { isSafeFallback: true }),
-        this.safeCount('feedback', { status: 'NEW' }),
+        this.safeCount('feedback', {
+          status: {
+            in: [
+              'NEW',
+              'IN_REVIEW',
+              'WAITING_USER_INFO',
+              'WAITING_LISTING_OWNER',
+              'ASSIGNED',
+              'ACTION_TAKEN',
+            ],
+          },
+        }),
         this.financeService.getActiveSubscriptionFinanceMetrics(),
       ]);
 

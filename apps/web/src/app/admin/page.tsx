@@ -240,7 +240,7 @@ export default function AdminExecutiveOverviewPage() {
                 <p className="text-xl font-black text-rose-400 mt-1">{data.openFeedbacksCount || 0}</p>
               </div>
               <Link
-                href="/admin/users/feedbacks"
+                href="/admin/users/feedbacks?status=PENDING"
                 className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold transition"
               >
                 Geri Bildirimleri Gör

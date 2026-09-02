@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import AdminUserCommunicationDialog from "./AdminUserCommunicationDialog";
 import {
   Search,
@@ -92,6 +93,17 @@ interface AdminFeedbackOperationCenterProps {
 }
 
 export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOperationCenterProps) {
+  const searchParams = useSearchParams();
+  const initialStatusParam = searchParams?.get("status") || searchParams?.get("statusFilter") || "";
+  const initialStatus =
+    initialStatusParam.toUpperCase() === "PENDING" ||
+    initialStatusParam.toUpperCase() === "OPEN" ||
+    initialStatusParam.toUpperCase() === "UNRESOLVED"
+      ? "PENDING"
+      : initialStatusParam.toUpperCase() === "RESOLVED" || initialStatusParam.toUpperCase() === "CLOSED"
+      ? "RESOLVED"
+      : initialStatusParam;
+
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -101,8 +113,14 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialStatus || "PENDING");
   const [priorityFilter, setPriorityFilter] = useState("");
+
+  const [metaCounts, setMetaCounts] = useState<{ pendingCount: number; resolvedCount: number; totalCount: number }>({
+    pendingCount: 0,
+    resolvedCount: 0,
+    totalCount: 0,
+  });
 
   // Communication Dialog State
   const [commDialogState, setCommDialogState] = useState<{
@@ -145,7 +163,17 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
       });
       if (!res.ok) throw new Error("Geri bildirimler yüklenemedi.");
       const data = await res.json();
-      setFeedbacks(data);
+
+      const items = Array.isArray(data) ? data : data.items || [];
+      setFeedbacks(items);
+
+      if (data && data.meta) {
+        setMetaCounts(data.meta);
+      } else {
+        const pending = items.filter((fb: any) => !["RESOLVED", "REJECTED", "ARCHIVED"].includes(fb.status)).length;
+        const resolved = items.filter((fb: any) => ["RESOLVED", "REJECTED", "ARCHIVED"].includes(fb.status)).length;
+        setMetaCounts({ pendingCount: pending, resolvedCount: resolved, totalCount: items.length });
+      }
 
       const notesMap: Record<string, string> = {};
       const responsesMap: Record<string, string> = {};
@@ -297,36 +325,93 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
           </p>
         </div>
 
-        <div className="px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold">
-          Toplam Talep: {feedbacks.length}
-        </div>
+        {metaCounts.pendingCount > 0 && (
+          <div className="px-4 py-2 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono font-bold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span>Bekleyen Talep: {metaCounts.pendingCount}</span>
+          </div>
+        )}
       </div>
 
-      {/* QUEUE TABS */}
-      <div className="flex items-center gap-3 border-b border-white/10 pb-3 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setActiveQueue("LISTING_REPORTS")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-            activeQueue === "LISTING_REPORTS"
-              ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20"
-              : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
-          }`}
-        >
-          <span>🚨</span> Şikâyet Edilen İlanlar (Listing Reports)
-        </button>
+      {/* QUEUE & STATUS TABS BAR */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+        {/* Source Queue Tabs */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setActiveQueue("LISTING_REPORTS")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              activeQueue === "LISTING_REPORTS"
+                ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20"
+                : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
+            }`}
+          >
+            <span>🚨</span> Şikâyet Edilen İlanlar (Listing Reports)
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveQueue("GENERAL")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-            activeQueue === "GENERAL"
-              ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
-              : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
-          }`}
-        >
-          <span>💬</span> Genel Geri Bildirimler
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveQueue("GENERAL")}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              activeQueue === "GENERAL"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20"
+                : "bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-850 border border-white/5"
+            }`}
+          >
+            <span>💬</span> Genel Geri Bildirimler
+          </button>
+        </div>
+
+        {/* Quick Status Sub-Tabs */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-900/60 border border-white/10 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("PENDING")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === "PENDING"
+                ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Bekleyen</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              statusFilter === "PENDING" ? "bg-black/20 text-slate-950 font-black" : "bg-white/10 text-slate-300"
+            }`}>
+              {metaCounts.pendingCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter("RESOLVED")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              statusFilter === "RESOLVED"
+                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 font-black"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            <span>Çözülen</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+              statusFilter === "RESOLVED" ? "bg-white/20 text-white font-black" : "bg-white/10 text-slate-300"
+            }`}>
+              {metaCounts.resolvedCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter("")}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              !statusFilter || (statusFilter !== "PENDING" && statusFilter !== "RESOLVED")
+                ? "bg-slate-700 text-white shadow-md font-black"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span>Tümü</span>
+          </button>
+        </div>
       </div>
 
       {/* RICH FILTERS BAR */}
@@ -389,6 +474,12 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
             className="bg-[#05070f] border border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition cursor-pointer"
           >
             <option value="">Tüm Durumlar</option>
+            <option value="PENDING" className="bg-[#090d1a] font-bold text-amber-400">
+              ⏳ Bekleyen Talepler (Aktif Operasyon)
+            </option>
+            <option value="RESOLVED" className="bg-[#090d1a] font-bold text-emerald-400">
+              ✅ Çözülen / Sonuçlanan Talepler
+            </option>
             {Object.entries(FEEDBACK_STATUS_LABELS).map(([val, lbl]) => (
               <option key={val} value={val} className="bg-[#090d1a]">
                 {lbl}
