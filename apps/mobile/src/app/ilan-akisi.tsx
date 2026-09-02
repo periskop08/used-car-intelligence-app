@@ -10,9 +10,9 @@ import {
   Share,
   Linking,
   ScrollView,
+  SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -84,8 +84,7 @@ interface ListingFeedItem {
 
 export default function ListingFeedScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const feedHeight = windowHeight - insets.top - insets.bottom;
+  const [feedHeight, setFeedHeight] = useState<number>(windowHeight - 80);
 
   const [listings, setListings] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -517,7 +516,15 @@ export default function ListingFeedScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <SafeAreaView
+      style={styles.container}
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 100 && Math.abs(h - feedHeight) > 2) {
+          setFeedHeight(h);
+        }
+      }}
+    >
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
@@ -561,7 +568,7 @@ export default function ListingFeedScreen() {
           style={styles.feedList}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
