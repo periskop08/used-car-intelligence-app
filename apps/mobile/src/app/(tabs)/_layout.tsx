@@ -45,9 +45,9 @@ export default function TabsLayout() {
         name="index"
         options={{
           headerShown: false,
-          tabBarLabel: 'Sorgula',
+          tabBarLabel: 'Ana Sayfa',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
           ),
         }}
       />
