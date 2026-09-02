@@ -222,59 +222,59 @@ export default function ProfileScreen() {
                 onPress={() => router.push('/(tabs)' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="grid-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="grid-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Dashboard</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* 🚗 İlanlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/listings' as any)}
+                onPress={() => router.push('/profile/my-listings' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="car-sport-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="car-sport-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>İlanlarım</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* ❤️ Favori İlanlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/favorites' as any)}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'listings' } } as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="heart-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="heart-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Favori İlanlarım</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* 📄 Favori Raporlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/favorites' as any)}
+                onPress={() => router.push({ pathname: '/profile/favorites', params: { tab: 'reports' } } as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="document-text-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="document-text-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Favori Raporlarım</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* 💬 Mesajlarım */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/messages' as any)}
+                onPress={() => router.push('/(tabs)/messages' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="chatbubbles-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="chatbubbles-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Mesajlarım</Text>
                   {unreadMessagesCount > 0 && (
                     <View style={styles.unreadBadge}>
@@ -282,20 +282,20 @@ export default function ProfileScreen() {
                     </View>
                   )}
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* 🎁 Paketim */}
               <TouchableOpacity
                 style={styles.menuRowItem}
                 activeOpacity={0.7}
-                onPress={() => router.push('/messages' as any)}
+                onPress={() => router.push('/profile/subscription' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="cube-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="cube-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Paketim</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
 
               {/* 👤 Kişisel Bilgilerim */}
@@ -305,10 +305,10 @@ export default function ProfileScreen() {
                 onPress={() => router.push('/profile/personal-info' as any)}
               >
                 <View style={styles.menuLeft}>
-                  <Ionicons name="person-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Ionicons name="person-outline" size={18} color="#64748b" style={styles.menuIcon} />
                   <Text style={styles.menuTitle}>Kişisel Bilgilerim</Text>
                 </View>
-                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+                <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
               </TouchableOpacity>
             </View>
 
