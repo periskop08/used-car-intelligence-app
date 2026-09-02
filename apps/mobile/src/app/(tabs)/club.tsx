@@ -24,6 +24,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 const { width: windowWidth } = Dimensions.get('window');
 
+const resolvePostMediaUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.includes('.r2.dev/') || url.includes('cloudflarestorage.com/')) {
+    const parts = url.split('.r2.dev/');
+    const storageKey = parts.length > 1 ? parts[1].split('?')[0] : '';
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+  return url;
+};
+
 interface PostMedia {
   id: string;
   mediaUrl: string;
@@ -128,15 +143,13 @@ export default function TorqueScoutClubScreen() {
       const res = await fetch(`${API_URL}/club/posts?limit=30`, { headers });
       if (res.ok) {
         const data = await res.json();
-        const rawPosts = Array.isArray(data) ? data : data.items || [];
+        const rawPosts = data.posts || (Array.isArray(data) ? data : data.items || []);
         setPosts(rawPosts);
       } else {
-        // Fallback sample posts if API is empty or in cold start
-        setPosts(getSampleClubPosts());
+        console.warn('Club posts fetch non-ok:', res.status);
       }
     } catch (e) {
       console.error('Failed to fetch club posts:', e);
-      setPosts(getSampleClubPosts());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -193,18 +206,8 @@ export default function TorqueScoutClubScreen() {
       const res = await fetch(`${API_URL}/club/posts/${post.id}/comments?limit=50`);
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data) ? data : data.items || [];
+        const list = data.comments || (Array.isArray(data) ? data : data.items || []);
         setComments(list);
-      } else {
-        setComments([
-          {
-            id: 'c-sample-1',
-            postId: post.id,
-            content: 'Çok faydalı bir paylaşım olmuş, teşekkürler!',
-            createdAt: new Date().toISOString(),
-            author: { id: 'u1', displayName: 'Ahmet Yılmaz', role: 'PRO' },
-          },
-        ]);
       }
     } catch (e) {
       console.error('Fetch comments error:', e);
@@ -446,7 +449,7 @@ export default function TorqueScoutClubScreen() {
                 {post.media && post.media.length > 0 && (
                   <View style={styles.postMediaContainer}>
                     <ExpoImage
-                      source={{ uri: post.media[0].mediaUrl }}
+                      source={{ uri: resolvePostMediaUrl(post.media[0].mediaUrl) }}
                       style={styles.postMediaImage}
                       contentFit="cover"
                       cachePolicy="memory-disk"
