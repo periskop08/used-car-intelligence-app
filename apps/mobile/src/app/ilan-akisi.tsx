@@ -128,6 +128,7 @@ interface ListingFeedItem {
   currency: string;
   listingDate: string;
   listingNo: string;
+  description?: string;
   location: { city: string; district: string };
   seller: Seller;
   vehicle: Vehicle;
@@ -469,24 +470,24 @@ export default function ListingFeedScreen() {
               </Text>
             </View>
 
-            {/* 4. Tab Bar */}
+            {/* 4. Tab Bar (Özellikler & Konum) */}
             <View style={styles.tabBar}>
-              {(['info', 'desc', 'loc'] as const).map((tab) => (
+              {(['info', 'loc'] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab}
                   style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
                   onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
                 >
                   <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
-                    {tab === 'info' ? 'Özellikler' : tab === 'desc' ? 'Açıklama' : 'Konum'}
+                    {tab === 'info' ? '📋 Özellikler' : '📍 Konum'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* 5. Tab Content Box (Directly below Tabs) */}
+            {/* 5. Tab Content Box (Özellikler or Konum) */}
             <View style={styles.tabContentContainer}>
-              {activeTab === 'info' && (
+              {activeTab === 'info' ? (
                 <View style={styles.scrollInfo}>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Fiyat</Text>
@@ -507,27 +508,15 @@ export default function ListingFeedScreen() {
                     <Text style={styles.infoValue}>{item.vehicle.fuelType} • {item.vehicle.transmissionType}</Text>
                   </View>
                 </View>
-              )}
-
-              {activeTab === 'desc' && (
-                <View style={styles.descContainer}>
-                  <Text style={styles.descText} numberOfLines={2}>
-                    Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/listings/${item.id}` as any)}
-                    style={styles.detailLink}
-                  >
-                    <Text style={styles.detailLinkText}>İlan Detayına Git ➔</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {activeTab === 'loc' && (
-                <View style={styles.descContainer}>
-                  <View style={styles.locBox}>
-                    <Text style={styles.locTitle}>📍 İlan Konumu</Text>
-                    <Text style={styles.locText}>Şehir: {item.location.city} • İlçe: {item.location.district || 'Merkez'}</Text>
+              ) : (
+                <View style={styles.locBox}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Şehir</Text>
+                    <Text style={styles.infoValue}>{item.location.city}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>İlçe / Mahalle</Text>
+                    <Text style={styles.infoValue}>{item.location.district || 'Merkez'}</Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => router.push(`/listings/${item.id}` as any)}
@@ -538,11 +527,24 @@ export default function ListingFeedScreen() {
                 </View>
               )}
             </View>
+
+            {/* 6. Dedicated Açıklamalar Kartı */}
+            <View style={styles.descriptionCard}>
+              <View style={styles.descriptionCardHeader}>
+                <Text style={styles.descriptionCardTitle}>📝 İlan Açıklaması</Text>
+                <TouchableOpacity onPress={() => router.push(`/listings/${item.id}` as any)}>
+                  <Text style={styles.descriptionDetailLink}>Tümünü Gör ➔</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.descriptionCardBody} numberOfLines={2}>
+                {item.description ? item.description.replace(/\n+/g, ' ').trim() : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
+              </Text>
+            </View>
           </View>
 
           {/* BOTTOM SECTION: 4-Stat Specs & CTA Buttons */}
           <View style={styles.cardContentBottom}>
-            {/* 6. Specs Box */}
+            {/* 7. Specs Box */}
             <View style={styles.specsBox}>
               <View style={styles.specItem}>
                 <Text style={styles.specLabel}>Güç</Text>
@@ -562,7 +564,7 @@ export default function ListingFeedScreen() {
               </View>
             </View>
 
-            {/* 7. CTA Action Buttons */}
+            {/* 8. CTA Action Buttons */}
             <View style={styles.ctaContainer}>
               <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
                 <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
@@ -921,26 +923,42 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#ea580c',
   },
-  descContainer: {
-    flex: 1,
+  descriptionCard: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 3,
+  },
+  descriptionCardHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    alignItems: 'center',
   },
-  descText: {
+  descriptionCardTitle: {
     fontSize: 10.5,
-    color: '#334155',
-    lineHeight: 14,
+    fontWeight: '800',
+    color: '#0f172a',
   },
-  detailLink: {
-    alignSelf: 'flex-end',
-  },
-  detailLinkText: {
+  descriptionDetailLink: {
     fontSize: 9.5,
     fontWeight: '800',
     color: '#ea580c',
   },
+  descriptionCardBody: {
+    fontSize: 10,
+    color: '#475569',
+    lineHeight: 13.5,
+  },
   locBox: {
-    gap: 2,
+    flex: 1,
+    justifyContent: 'space-evenly',
+  },
+  detailLink: {
+    alignSelf: 'flex-end',
+    marginTop: 2,
   },
   locTitle: {
     fontSize: 10.5,
