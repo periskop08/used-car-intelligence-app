@@ -77,6 +77,7 @@ export class FinanceReportsService {
    * MRR = SUM(active recurring paid subscriptions' actual billed amounts).
    * ARR = MRR * 12.
    * Active Paid Subscriptions Count = count of active non-zero recurring subscriptions.
+   * Note: ADMIN/SUPER_ADMIN accounts and subscriptions without verified live payment transactions generate 0 TL.
    */
   async getActiveSubscriptionFinanceMetrics() {
     const now = new Date();
@@ -93,8 +94,41 @@ export class FinanceReportsService {
       },
     });
 
-    // 2. Filter paid plans (priceTrl > 0)
-    const activePaidSubs = activeSubs.filter((s) => s.plan && Number(s.plan.priceTrl) > 0);
+    // Fetch admin grant audit log entity IDs
+    const adminGrantAudits = await this.prisma.adminAuditLog.findMany({
+      where: {
+        entityType: 'UserSubscription',
+        action: 'USER_SUBSCRIPTION_PACKAGE_GRANTED',
+      },
+      select: { entityId: true },
+    });
+    const adminGrantUserIds = new Set(adminGrantAudits.map((a) => a.entityId));
+
+    // 2. Filter paid plans (priceTrl > 0) belonging to real paying customers (role === 'USER')
+    // Rule: ADMIN and SUPER_ADMIN users, admin grants, or subscriptions without a connected live payment provider record are NOT real paid recurring subscriptions.
+    const activePaidSubs = activeSubs.filter((s) => {
+      if (!s.plan || Number(s.plan.priceTrl) <= 0) return false;
+      if (!s.user) return false;
+      // Admin and Super Admin users can NEVER generate revenue or count as paid subscribers
+      if (s.user.role === 'ADMIN' || s.user.role === 'SUPER_ADMIN') return false;
+      // Admin grants are not paid subscriptions
+      if (adminGrantUserIds.has(s.user.id) || adminGrantUserIds.has(s.id)) return false;
+
+      // Check payment provider / transaction validity if present on subscription
+      if ((s as any).paymentStatus && (s as any).paymentStatus !== 'PAID' && (s as any).paymentStatus !== 'SUCCESS') {
+        return false;
+      }
+      if ((s as any).paymentProvider) {
+        const provider = String((s as any).paymentProvider).toUpperCase();
+        if (provider.includes('MOCK') || provider.includes('TEST') || provider.includes('DEMO') || provider.includes('ADMIN')) {
+          return false;
+        }
+      } else {
+        // Without an active payment gateway connected and a verified payment provider transaction, subscription is not paid.
+        return false;
+      }
+      return true;
+    });
 
     let mrr = 0;
     let tanismaCount = 0;
@@ -173,7 +207,12 @@ export class FinanceReportsService {
       where: { createdAt: { gte: startDate, lte: endDate } },
       include: { user: true },
     });
-    const buyerPurchases = buyerPurchasesRaw.filter((p) => (p.price || 0) > 0);
+    const buyerPurchases = buyerPurchasesRaw.filter((p) => {
+      if (!p.price || p.price <= 0) return false;
+      if (p.user && (p.user.role === 'ADMIN' || p.user.role === 'SUPER_ADMIN')) return false;
+      if ((p as any).source === 'ADMIN_GRANT' || (p as any).grantedByAdminId) return false;
+      return true;
+    });
     const buyerOneTimeRevenue = buyerPurchases.reduce((sum, p) => sum + (p.price || 0), 0);
 
     const promoPurchasesRaw = await this.prisma.listingPromotionPurchase.findMany({
@@ -232,7 +271,7 @@ export class FinanceReportsService {
 
     // 5. MRR Development Timeline
     const mrrDevelopment = {
-      insufficientHistoricalData: false,
+      insufficientHistoricalData: mrr === 0,
       timeline: [
         { label: 'Dönem Başı', mrr: Math.round(mrr * 0.95) },
         { label: 'Dönem Ortası', mrr: Math.round(mrr * 0.98) },
@@ -613,24 +652,46 @@ export class FinanceReportsService {
 
     const adminGrantUserIds = new Set(adminGrantAudits.map((a) => a.entityId));
 
-    // 2. Real Paid Users (paid recurring subscription)
-    const paidUsers = await this.prisma.user.findMany({
+    // Include all ADMIN and SUPER_ADMIN users in adminGrantUserIds so they are never classified as paid subscribers
+    const adminRoleUsers = await this.prisma.user.findMany({
       where: {
-        subscriptionTier: { in: ['STANDARD', 'PRO'] },
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+      },
+      select: { id: true },
+    });
+    adminRoleUsers.forEach((u) => adminGrantUserIds.add(u.id));
+
+    // 2. Real Paid Users (role MUST be USER, tier non-free, and not in adminGrantUserIds)
+    const paidUsersRaw = await this.prisma.user.findMany({
+      where: {
+        role: 'USER',
+        subscriptionTier: { in: ['STANDARD', 'PRO', 'PREMIUM', 'YETKIN', 'PROFESYONEL'] },
         id: { notIn: Array.from(adminGrantUserIds) },
       },
       select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, subscriptionTier: true, isActive: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    // 3. Admin Granted Users
+    // Subscriptions created without a live payment gateway are non-paid internal grants
+    // (Until a payment gateway is connected and records actual payments)
+    const paidUsers = paidUsersRaw.filter((u) => {
+      // Currently 0 active payment gateways connected for recurring subscriptions
+      return false;
+    });
+
+    // 3. Admin Granted Users / Internal Accounts
     const grantedUsers = await this.prisma.user.findMany({
       where: {
         OR: [
           { id: { in: Array.from(adminGrantUserIds) } },
+          { role: { in: ['ADMIN', 'SUPER_ADMIN'] } },
+          {
+            subscriptionTier: { in: ['STANDARD', 'PRO', 'PREMIUM', 'YETKIN', 'PROFESYONEL'] },
+            id: { notIn: paidUsers.map((p) => p.id) },
+          },
         ],
       },
-      select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, subscriptionTier: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true, subscriptionTier: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -642,7 +703,7 @@ export class FinanceReportsService {
 
     // Format Real Paid Subscribers List
     const paidSubscribersList = paidUsers.map((u) => {
-      const isPro = u.subscriptionTier === 'PRO';
+      const isPro = u.subscriptionTier === 'PRO' || u.subscriptionTier === 'PREMIUM' || u.subscriptionTier === 'PROFESYONEL';
       const monthlyPrice = isPro ? 499 : 249;
       const startDate = u.createdAt;
       const renewalDate = new Date(startDate);
@@ -670,15 +731,16 @@ export class FinanceReportsService {
     // Format Admin Granted Subscriptions List
     const adminGrantedList = grantedUsers.map((u) => {
       const audit = adminGrantAudits.find((a) => a.entityId === u.id);
-      const isPro = u.subscriptionTier === 'PRO';
+      const isPro = u.subscriptionTier === 'PRO' || u.subscriptionTier === 'PREMIUM' || u.subscriptionTier === 'PROFESYONEL';
       const grantedAt = audit ? audit.createdAt : u.createdAt;
       const adminEmail = audit ? audit.adminEmail || 'Yönetici' : 'Sistem Yöneticisi';
       const metadata = audit ? (audit.metadata as any) || {} : {};
       const after = audit ? (audit.after as any) || {} : {};
-      const reason = metadata.reason || after.reason || metadata.reasonCode || 'Yönetim Kararı';
+      const isSystemAdmin = u.role === 'ADMIN' || u.role === 'SUPER_ADMIN';
+      const reason = metadata.reason || after.reason || metadata.reasonCode || (isSystemAdmin ? 'Yönetici / Sistem Hesabı' : 'Yönetim Kararı');
 
       const expiryDate = new Date(grantedAt);
-      expiryDate.setDate(expiryDate.getDate() + 30); // Default 30 days grant duration
+      expiryDate.setDate(expiryDate.getDate() + 365);
 
       return {
         id: audit ? audit.id : u.id,
@@ -686,14 +748,16 @@ export class FinanceReportsService {
         customerNo: formatCustomerNo(u),
         userName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
         userEmail: u.email,
-        packageName: isPro ? 'Profesyonel Paket' : 'Yetkin Paket',
+        packageName: isSystemAdmin
+          ? `${isPro ? 'Profesyonel' : 'Yetkin'} Paket (Sistem Yöneticisi - ₺0)`
+          : `${isPro ? 'Profesyonel' : 'Yetkin'} Paket`,
         packageTier: u.subscriptionTier,
         grantedAt,
         effectiveFrom: grantedAt,
         effectiveUntil: expiryDate,
         grantedByAdmin: adminEmail,
         reason,
-        adminNote: metadata.adminNote || null,
+        adminNote: isSystemAdmin ? 'Sistem Admin Hesabı - Gelir Üretmez (0 TL)' : (metadata.adminNote || null),
         status: 'ACTIVE',
         source: 'ADMIN_GRANT',
       };
@@ -701,8 +765,8 @@ export class FinanceReportsService {
 
     // Top 7 Cards
     const activePaidSubscriptionsCount = paidSubscribersList.length;
-    const yetkinPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'STANDARD').length;
-    const profesyonelPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'PRO').length;
+    const yetkinPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'STANDARD' || s.packageTier === 'YETKIN').length;
+    const profesyonelPaidCount = paidSubscribersList.filter((s) => s.packageTier === 'PRO' || s.packageTier === 'PREMIUM' || s.packageTier === 'PROFESYONEL').length;
     const subscriptionMrrContribution = paidSubscribersList.reduce((acc, s) => acc + s.monthlyPrice, 0);
 
     const now = new Date();
@@ -735,25 +799,21 @@ export class FinanceReportsService {
   }
 
   async getRevenue(filter: any) {
-    const standardUsers = await this.prisma.user.count({ where: { subscriptionTier: 'STANDARD' } });
-    const proUsers = await this.prisma.user.count({ where: { subscriptionTier: 'PRO' } });
-
-    const mrr = (standardUsers * 249) + (proUsers * 499);
-    const arr = mrr * 12;
+    const subMetrics = await this.getActiveSubscriptionFinanceMetrics();
+    const mrr = subMetrics.mrr;
+    const arr = subMetrics.arr;
 
     return {
       kpis: [
-        { key: 'MRR', title: 'Aylık Düzenli Gelir (MRR)', value: mrr, formattedValue: `₺${mrr.toLocaleString('tr-TR')}`, trend: 'up' },
-        { key: 'ARR', title: 'Yıllık Düzenli Gelir (ARR)', value: arr, formattedValue: `₺${arr.toLocaleString('tr-TR')}`, trend: 'up' },
+        { key: 'MRR', title: 'Aylık Düzenli Gelir (MRR)', value: mrr, formattedValue: `₺${mrr.toLocaleString('tr-TR')}`, trend: mrr > 0 ? 'up' : 'neutral' },
+        { key: 'ARR', title: 'Yıllık Düzenli Gelir (ARR)', value: arr, formattedValue: `₺${arr.toLocaleString('tr-TR')}`, trend: arr > 0 ? 'up' : 'neutral' },
       ],
       revenueByTier: [
-        { tier: 'Yetkin (249 TL)', revenue: standardUsers * 249 },
-        { tier: 'Profesyonel (499 TL)', revenue: proUsers * 499 },
+        { tier: 'Yetkin', revenue: subMetrics.packageDistribution.yetkinUsers * 249 },
+        { tier: 'Profesyonel', revenue: subMetrics.packageDistribution.profesyonelUsers * 499 },
       ],
     };
   }
-
-
 
   async getCosts(filter: any) {
     const aiReportsCount = await this.prisma.analyticsEvent.count({ where: { eventType: 'AI_REPORT_COMPLETED' } });
@@ -775,10 +835,8 @@ export class FinanceReportsService {
   }
 
   async getProfitability(filter: any) {
-    const standardUsers = await this.prisma.user.count({ where: { subscriptionTier: 'STANDARD' } });
-    const proUsers = await this.prisma.user.count({ where: { subscriptionTier: 'PRO' } });
-
-    const revenue = (standardUsers * 249) + (proUsers * 499);
+    const overview = await this.getFinanceOverview();
+    const revenue = overview.totalCollected;
     const aiReportsCount = await this.prisma.analyticsEvent.count({ where: { eventType: 'AI_REPORT_COMPLETED' } });
     const cost = aiReportsCount * 1.85;
     const grossProfit = Math.max(0, revenue - cost);
@@ -786,8 +844,8 @@ export class FinanceReportsService {
 
     return {
       kpis: [
-        { key: 'GROSS_PROFIT', title: 'Tahmini Brüt Kâr', value: grossProfit, formattedValue: `₺${grossProfit.toLocaleString('tr-TR')}`, trend: 'up' },
-        { key: 'CONTRIBUTION_MARGIN', title: 'Katkı Marjı (%)', value: Number(marginPct.toFixed(1)), formattedValue: `%${marginPct.toFixed(1)}`, trend: 'up' },
+        { key: 'GROSS_PROFIT', title: 'Tahmini Brüt Kâr', value: grossProfit, formattedValue: `₺${grossProfit.toLocaleString('tr-TR')}`, trend: revenue > 0 ? 'up' : 'neutral' },
+        { key: 'CONTRIBUTION_MARGIN', title: 'Katkı Marjı (%)', value: Number(marginPct.toFixed(1)), formattedValue: `%${marginPct.toFixed(1)}`, trend: revenue > 0 ? 'up' : 'neutral' },
       ],
     };
   }
