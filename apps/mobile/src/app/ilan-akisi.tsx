@@ -528,7 +528,7 @@ export default function ListingFeedScreen() {
               )}
             </View>
 
-            {/* 6. Dedicated Açıklamalar Kartı */}
+            {/* 6. Dedicated Açıklamalar Kartı (with finger spacing) */}
             <View style={styles.descriptionCard}>
               <View style={styles.descriptionCardHeader}>
                 <Text style={styles.descriptionCardTitle}>📝 İlan Açıklaması</Text>
@@ -536,35 +536,14 @@ export default function ListingFeedScreen() {
                   <Text style={styles.descriptionDetailLink}>Tümünü Gör ➔</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.descriptionCardBody} numberOfLines={2}>
+              <Text style={styles.descriptionCardBody} numberOfLines={3}>
                 {item.description ? item.description.replace(/\n+/g, ' ').trim() : 'Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir.'}
               </Text>
             </View>
           </View>
 
-          {/* BOTTOM SECTION: 4-Stat Specs & CTA Buttons */}
+          {/* BOTTOM SECTION: CTA Action Buttons */}
           <View style={styles.cardContentBottom}>
-            {/* 7. Specs Box */}
-            <View style={styles.specsBox}>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Güç</Text>
-                <Text style={styles.specVal}>{item.technicalSummary.maxPower || '-'}</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Hız</Text>
-                <Text style={styles.specVal}>{item.technicalSummary.topSpeed || '-'}</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>0-100</Text>
-                <Text style={styles.specVal}>{item.technicalSummary.acceleration0100 || '-'}</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Tüketim</Text>
-                <Text style={styles.specVal}>{item.technicalSummary.fuelConsumption || '-'}</Text>
-              </View>
-            </View>
-
-            {/* 8. CTA Action Buttons */}
             <View style={styles.ctaContainer}>
               <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
                 <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
@@ -774,7 +753,7 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 165,
+    height: 175,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
@@ -927,10 +906,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    gap: 3,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 10,
+    gap: 4,
   },
   descriptionCardHeader: {
     flexDirection: 'row',
@@ -938,19 +918,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   descriptionCardTitle: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '800',
     color: '#0f172a',
   },
   descriptionDetailLink: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: '800',
     color: '#ea580c',
   },
   descriptionCardBody: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: '#475569',
-    lineHeight: 13.5,
+    lineHeight: 15,
   },
   locBox: {
     flex: 1,
@@ -973,31 +953,6 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '800',
     color: '#2563eb',
-  },
-  specsBox: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  specItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  specLabel: {
-    fontSize: 8.5,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  specVal: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 1,
   },
   ctaContainer: {
     flexDirection: 'row',
