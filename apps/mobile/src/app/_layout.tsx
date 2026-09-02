@@ -27,12 +27,15 @@ export default function RootLayout() {
         <Stack.Screen name="vehicle-query" options={{ title: 'Araç Sorgula', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="vehicle-report" options={{ headerShown: false }} />
         <Stack.Screen name="comparison" options={{ headerShown: false }} />
-        <Stack.Screen name="add-vehicle" options={{ title: 'Araç Öner', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="listings/create" options={{ title: 'İlan Ver', headerBackTitle: 'Geri' }} />
         <Stack.Screen name="listings/[id]" options={{ title: 'İlan Detayı', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="messages/[id]" options={{ title: 'Mesajlaşma', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="profile/favorites" options={{ title: 'Favorilerim', headerBackTitle: 'Geri' }} />
-        <Stack.Screen name="profile/admin" options={{ title: 'Admin Paneli', headerBackTitle: 'Geri' }} />
+        <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/favorites" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/admin" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/my-listings" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/subscription" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/dashboard" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/personal-info" options={{ headerShown: false }} />
         <Stack.Screen name="ilan-akisi" options={{ title: 'İlan Akışı', headerBackTitle: 'Geri', headerShown: false }} />
       </Stack>
     </View>
