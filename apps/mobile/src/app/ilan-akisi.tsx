@@ -578,15 +578,7 @@ export default function ListingFeedScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={styles.container}
-      onLayout={(e) => {
-        const h = e.nativeEvent.layout.height;
-        if (h > 100 && Math.abs(h - feedHeight) > 2) {
-          setFeedHeight(h);
-        }
-      }}
-    >
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
@@ -611,24 +603,34 @@ export default function ListingFeedScreen() {
           <Text style={styles.subText}>Yeni ilanlar yayınlandığında burada listelenecektir.</Text>
         </View>
       ) : (
-        <FlatList
-          data={listings}
-          renderItem={renderFeedItem}
-          keyExtractor={(item) => item.id}
-          pagingEnabled={true}
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
-          snapToInterval={feedHeight}
-          snapToAlignment="start"
-          getItemLayout={(_, index) => ({
-            length: feedHeight,
-            offset: feedHeight * index,
-            index,
-          })}
-          viewabilityConfig={viewabilityConfig}
-          onViewableItemsChanged={onViewableItemsChanged}
-          style={styles.feedList}
-        />
+        <View
+          style={styles.feedWrapper}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h > 100 && Math.abs(h - feedHeight) > 1) {
+              setFeedHeight(h);
+            }
+          }}
+        >
+          <FlatList
+            data={listings}
+            renderItem={renderFeedItem}
+            keyExtractor={(item) => item.id}
+            pagingEnabled={true}
+            decelerationRate="fast"
+            showsVerticalScrollIndicator={false}
+            snapToInterval={feedHeight}
+            snapToAlignment="start"
+            getItemLayout={(_, index) => ({
+              length: feedHeight,
+              offset: feedHeight * index,
+              index,
+            })}
+            viewabilityConfig={viewabilityConfig}
+            onViewableItemsChanged={onViewableItemsChanged}
+            style={styles.feedList}
+          />
+        </View>
       )}
     </SafeAreaView>
   );
@@ -678,6 +680,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
+  feedWrapper: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+  },
   feedList: {
     flex: 1,
     backgroundColor: '#f1f5f9',
@@ -685,9 +691,9 @@ const styles = StyleSheet.create({
   cardContainer: {
     width: windowWidth,
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: 10,
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 6,
     justifyContent: 'space-between',
   },
   topActions: {
@@ -695,12 +701,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingBottom: 4,
+    paddingBottom: 2,
   },
   circularBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -725,28 +731,28 @@ const styles = StyleSheet.create({
   cardFrame: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    padding: 12,
+    padding: 10,
     justifyContent: 'space-between',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 3,
     position: 'relative',
   },
   cardContentTop: {
-    gap: 7,
+    gap: 5,
   },
   cardContentBottom: {
-    gap: 8,
+    gap: 6,
   },
   scrollGuidePill: {
     position: 'absolute',
     right: 8,
-    top: '42%',
+    top: '40%',
     transform: [{ translateY: -20 }],
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1,
@@ -766,8 +772,8 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 190,
-    borderRadius: 14,
+    height: 165,
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
