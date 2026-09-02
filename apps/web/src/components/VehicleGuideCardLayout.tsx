@@ -121,6 +121,10 @@ export const translateBodyType = (bodyType: string) => {
 
 const formatImageUrl = (url?: string) => {
   if (!url) return "";
+  if (url.startsWith("/")) {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || API_BASE_URL || "http://localhost:3000";
+    return `${baseUrl.replace(/\/$/, '')}${url}`;
+  }
   return url;
 };
 

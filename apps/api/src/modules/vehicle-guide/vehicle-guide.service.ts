@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 const sharp = require('sharp');
 import { Locale, GuideStatus, GuideFactType, GuideSourceType, GuideEventType, DataConfidence, GuideCommentStatus } from '@prisma/client';
 import { 
@@ -470,6 +470,18 @@ export class VehicleGuideService {
         })
       );
 
+      // Verify object existence and non-zero size in R2 before writing to DB
+      const headCheck = await s3Client.send(
+        new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: desktopKey,
+        }),
+      );
+
+      if (!headCheck || (headCheck.ContentLength || 0) === 0) {
+        throw new BadRequestException("Görsel R2 yüklemesi doğrulanamadı.");
+      }
+
       const desktopUrl = `${publicUrl}/${desktopKey}`;
 
       await this.prisma.vehicleGuideCard.update({
@@ -482,12 +494,78 @@ export class VehicleGuideService {
 
       return {
         success: true,
-        heroImageUrl: desktopUrl,
-        mobileHeroImageUrl: `${publicUrl}/${mobileKey}`
+        heroImageUrl: this.resolveGuideImageUrl(desktopUrl),
+        mobileHeroImageUrl: this.resolveGuideImageUrl(`${publicUrl}/${mobileKey}`)
       };
     } catch (err: any) {
       throw new BadRequestException(`Görsel R2'ye yüklenirken hata oluştu: ${err.message}`);
     }
+  }
+
+  /**
+   * Single Source of Truth image resolver for VehicleGuideCard.
+   * Formats image URL to guarantee 100% reliable stream delivery.
+   */
+  resolveGuideImageUrl(heroImageUrl?: string | null, req?: any): string | null {
+    if (!heroImageUrl) return null;
+    const publicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, '');
+
+    let storageKey = heroImageUrl;
+    if (publicUrl && heroImageUrl.startsWith(publicUrl)) {
+      storageKey = heroImageUrl.replace(`${publicUrl}/`, '');
+    } else if (heroImageUrl.includes('.r2.dev/')) {
+      storageKey = heroImageUrl.split('.r2.dev/')[1];
+    } else if (heroImageUrl.startsWith('http://') || heroImageUrl.startsWith('https://')) {
+      try {
+        const u = new URL(heroImageUrl);
+        storageKey = u.pathname.replace(/^\//, '');
+      } catch (e) {}
+    }
+
+    if (storageKey.startsWith('/')) storageKey = storageKey.slice(1);
+
+    // If custom non-r2.dev CDN domain is configured, return CDN URL
+    if (publicUrl && !publicUrl.includes('r2.dev')) {
+      return `${publicUrl}/${storageKey}`;
+    }
+
+    // Otherwise stream through media proxy
+    if (req) {
+      const host = req.get('host');
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      return `${protocol}://${host}/vehicle-guide/media-proxy/${storageKey}`;
+    }
+
+    return `/vehicle-guide/media-proxy/${storageKey}`;
+  }
+
+  /**
+   * Downloads stream directly from Cloudflare R2 bucket for proxying.
+   */
+  async downloadMediaStream(storageKey: string) {
+    const accountId = process.env.R2_ACCOUNT_ID;
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    const bucketName = process.env.R2_BUCKET_NAME || 'torquescout-listings';
+
+    if (!accountId || !accessKeyId || !secretAccessKey) return null;
+
+    const s3Client = new S3Client({
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+      region: 'auto',
+    });
+
+    let cleanKey = storageKey;
+    if (cleanKey.startsWith('/')) cleanKey = cleanKey.slice(1);
+
+    const response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: cleanKey,
+      }),
+    );
+    return response.Body;
   }
 
   // ==========================================
@@ -780,7 +858,7 @@ export class VehicleGuideService {
       bodyType: card.bodyType,
       yearStart: card.yearStart,
       yearEnd: card.yearEnd,
-      heroImageUrl: card.heroImageUrl,
+      heroImageUrl: this.resolveGuideImageUrl(card.heroImageUrl),
       imageAltText: card.imageAltText,
       imageSource: card.imageSource,
       imageLicense: card.imageLicense,
@@ -977,7 +1055,7 @@ export class VehicleGuideService {
         generationCode: c.generationCode,
         yearStart: c.yearStart,
         yearEnd: c.yearEnd,
-        heroImageUrl: c.heroImageUrl,
+        heroImageUrl: this.resolveGuideImageUrl(c.heroImageUrl),
         bodyType: c.bodyType,
         pendingCount,
         approvedCount,
@@ -1067,7 +1145,7 @@ export class VehicleGuideService {
         generationName: card.generationName,
         yearStart: card.yearStart,
         yearEnd: card.yearEnd,
-        heroImageUrl: card.heroImageUrl,
+        heroImageUrl: this.resolveGuideImageUrl(card.heroImageUrl),
       },
       comments: formatted,
     };

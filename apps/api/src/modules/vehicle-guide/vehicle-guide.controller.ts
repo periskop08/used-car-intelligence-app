@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Query, Param, Body, Headers, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, Headers, BadRequestException, UseGuards, Req, Res, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleGuideService } from './vehicle-guide.service';
 import { JwtService } from '@nestjs/jwt';
 import { Locale } from '@prisma/client';
 import { LogGuideEventDto, CreateVehicleGuideCommentDto } from './vehicle-guide.dto';
+import { Request, Response } from 'express';
 
 @ApiTags('Vehicle Guide')
 @Controller('vehicle-guide')
@@ -12,6 +13,32 @@ export class VehicleGuideController {
     private guideService: VehicleGuideService,
     private jwtService: JwtService,
   ) {}
+
+  @Get('media-proxy/*')
+  @ApiOperation({ summary: 'Proxy Araç Rehberi R2 media files to guarantee 100% reliable stream delivery' })
+  async proxyMedia(
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const parts = req.url.split('/vehicle-guide/media-proxy/');
+    const storageKey = parts[1]?.split('?')[0];
+
+    if (!storageKey) {
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+
+    try {
+      const stream = await this.guideService.downloadMediaStream(storageKey);
+      if (!stream) {
+        throw new NotFoundException('Görsel bulunamadı.');
+      }
+      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      (stream as any).pipe(res);
+    } catch (err) {
+      throw new NotFoundException('Görsel bulunamadı.');
+    }
+  }
 
   @Get('cards/random')
   @ApiOperation({ summary: 'Yayındaki aktif rehber kartlarından rastgele döner.' })
