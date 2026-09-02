@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import { Image as ExpoImage } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -32,13 +40,14 @@ interface UserProfile {
   phone?: string;
   profilePhotoUrl?: string;
   role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-  subscriptionTier: 'FREE' | 'BASIC' | 'PRO';
+  subscriptionTier: 'FREE' | 'TANISMA' | 'BASIC' | 'YETKIN' | 'STANDARD' | 'PRO' | 'PROFESYONEL' | 'PREMIUM';
 }
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,6 +61,7 @@ export default function ProfileScreen() {
       const token =
         (await AsyncStorage.getItem('accessToken')) ||
         (await AsyncStorage.getItem('token'));
+
       if (!token) {
         setProfile(null);
         setLoading(false);
@@ -67,8 +77,21 @@ export default function ProfileScreen() {
         setProfile(data);
       } else if (res.status === 401) {
         await AsyncStorage.removeItem('accessToken');
+        await AsyncStorage.removeItem('token');
         setProfile(null);
       }
+
+      // Fetch unread count
+      fetch(`${API_URL}/conversations/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && typeof d.unreadCount === 'number') {
+            setUnreadMessagesCount(d.unreadCount);
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       console.error('Fetch profile error:', e);
     } finally {
@@ -84,6 +107,7 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.removeItem('accessToken');
+          await AsyncStorage.removeItem('token');
           setProfile(null);
           router.replace('/(tabs)');
         },
@@ -93,389 +117,511 @@ export default function ProfileScreen() {
 
   const getDisplayName = () => {
     if (!profile) return '';
-    if (profile.firstName || profile.lastName) {
-      return `${profile.firstName || ''} ${profile.lastName || ''}`.trim();
+    if (profile.firstName) {
+      return `${profile.firstName} ${profile.lastName ? profile.lastName[0] + '.' : ''}`.trim();
     }
     if (profile.username) return profile.username;
     return profile.email.split('@')[0];
   };
 
-  const getAvatarChar = () => {
-    const name = getDisplayName();
-    return name ? name.charAt(0).toUpperCase() : 'U';
+  const getTierBadgeText = () => {
+    const tier = profile?.subscriptionTier || 'FREE';
+    if (tier === 'PROFESYONEL' || tier === 'PRO' || tier === 'PREMIUM') return 'PROFESYONEL';
+    if (tier === 'YETKIN' || tier === 'STANDARD' || tier === 'BASIC') return 'YETKİN';
+    return 'TANIŞMA';
   };
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <ActivityIndicator size="large" color="#ea580c" />
-      </View>
+        <Text style={styles.loadingText}>Profiliniz yükleniyor...</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      {profile ? (
-        <>
-          {/* User Profile Summary Card */}
-          <View style={styles.profileCard}>
-            {profile.profilePhotoUrl ? (
-              <ExpoImage
-                source={{ uri: resolveAvatarUrl(profile.profilePhotoUrl) || '' }}
-                style={styles.avatarImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{getAvatarChar()}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Header */}
+      <View style={styles.topHeader}>
+        <Text style={styles.topHeaderTitle}>Hesabım & Profil</Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {profile ? (
+          <>
+            {/* VIP PROFILE HEADER CARD (Web Style Dark/Sleek Container) */}
+            <View style={styles.profileHeaderCard}>
+              <View style={styles.profileTopRow}>
+                <View style={styles.avatarWrap}>
+                  {profile.profilePhotoUrl ? (
+                    <ExpoImage
+                      source={{ uri: resolveAvatarUrl(profile.profilePhotoUrl) || '' }}
+                      style={styles.avatarImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarInitial}>
+                        {(profile.firstName?.[0] || profile.email?.[0] || 'U').toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.profileMetaInfo}>
+                  <Text style={styles.welcomeGreeting}>HOŞ GELDİNİZ</Text>
+                  <Text style={styles.profileFullName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmailText} numberOfLines={1}>
+                    {profile.email}
+                  </Text>
+                </View>
               </View>
-            )}
 
-            <View style={styles.profileDetails}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{profile.email}</Text>
+              <View style={styles.headerPillRow}>
+                <View style={styles.tierPill}>
+                  <Ionicons name="sparkles" size={11} color="#f59e0b" style={{ marginRight: 4 }} />
+                  <Text style={styles.tierPillText}>{getTierBadgeText()}</Text>
+                </View>
 
-              <View style={styles.tierBadge}>
-                <Ionicons name="sparkles" size={12} color="#ea580c" style={{ marginRight: 4 }} />
-                <Text style={styles.tierBadgeText}>{profile.subscriptionTier || 'FREE'} Üyelik</Text>
+                <TouchableOpacity
+                  style={styles.editProfileChip}
+                  onPress={() => router.push('/profile/personal-info' as any)}
+                >
+                  <Ionicons name="pencil-outline" size={12} color="#94a3b8" />
+                  <Text style={styles.editProfileChipText}>Profili Düzenle</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
 
-          {/* Quick Stats Banner */}
-          <View style={styles.statsRow}>
-            <TouchableOpacity style={styles.statBox} onPress={() => router.push('/profile/favorites')}>
-              <Ionicons name="heart" size={20} color="#ef4444" />
-              <Text style={styles.statBoxTitle}>Favorilerim</Text>
-              <Text style={styles.statBoxSub}>Kaydedilenler</Text>
-            </TouchableOpacity>
+            {/* WEB-MATCHED MENU ITEMS CONTAINER */}
+            <View style={styles.menuContainer}>
+              {/* 🛠️ Admin Paneli (Only for Admins) */}
+              {(profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && (
+                <TouchableOpacity
+                  style={[styles.menuRowItem, styles.adminRowItem]}
+                  activeOpacity={0.7}
+                  onPress={() => router.push('/profile/admin' as any)}
+                >
+                  <View style={styles.menuLeft}>
+                    <Text style={styles.menuEmoji}>🛠️</Text>
+                    <Text style={[styles.menuTitle, styles.adminTitle]}>Admin Paneli</Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={16} color="#ef4444" />
+                </TouchableOpacity>
+              )}
 
-            <TouchableOpacity style={styles.statBox} onPress={() => router.push('/comparison')}>
-              <Ionicons name="scale" size={20} color="#0284c7" />
-              <Text style={styles.statBoxTitle}>Karşılaştır</Text>
-              <Text style={styles.statBoxSub}>Araç Analiz</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.statBox} onPress={() => router.push('/messages')}>
-              <Ionicons name="gift" size={20} color="#ea580c" />
-              <Text style={styles.statBoxTitle}>Paketlerim</Text>
-              <Text style={styles.statBoxSub}>Abonelik</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Menu Items Section */}
-          <View style={styles.menuSection}>
-            <Text style={styles.sectionHeader}>Kullanıcı Dashboard</Text>
-
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/favorites')}>
-              <View style={[styles.menuIconCircle, { backgroundColor: '#fef2f2' }]}>
-                <Ionicons name="heart-outline" size={18} color="#ef4444" />
-              </View>
-              <Text style={styles.menuItemText}>Favori Araçlar & Raporlar</Text>
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/comparison')}>
-              <View style={[styles.menuIconCircle, { backgroundColor: '#f0f9ff' }]}>
-                <Ionicons name="git-compare-outline" size={18} color="#0284c7" />
-              </View>
-              <Text style={styles.menuItemText}>Araç Karşılaştırma Paneli</Text>
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/add-vehicle')}>
-              <View style={[styles.menuIconCircle, { backgroundColor: '#fff7ed' }]}>
-                <Ionicons name="add-circle-outline" size={18} color="#ea580c" />
-              </View>
-              <Text style={styles.menuItemText}>İlan Ver / Araç Önerisi Yap</Text>
-              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Admin Panel Link */}
-          {(profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN') && (
-            <View style={styles.menuSection}>
-              <Text style={styles.sectionHeader}>Yönetim Paneli</Text>
-              <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/admin')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: '#fff7ed' }]}>
-                  <Ionicons name="shield-checkmark" size={18} color="#ea580c" />
+              {/* 📊 Dashboard */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/(tabs)' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="grid-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Dashboard</Text>
                 </View>
-                <Text style={[styles.menuItemText, { color: '#ea580c', fontWeight: '800' }]}>
-                  Admin Onay & Moderasyon Paneli
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color="#ea580c" />
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* 🚗 İlanlarım */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/listings' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="car-sport-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>İlanlarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* ❤️ Favori İlanlarım */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/favorites' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="heart-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Favori İlanlarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* 📄 Favori Raporlarım */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/favorites' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="document-text-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Favori Raporlarım</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* 💬 Mesajlarım */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/messages' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="chatbubbles-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Mesajlarım</Text>
+                  {unreadMessagesCount > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{unreadMessagesCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* 🎁 Paketim */}
+              <TouchableOpacity
+                style={styles.menuRowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push('/messages' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="cube-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Paketim</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
+              </TouchableOpacity>
+
+              {/* 👤 Kişisel Bilgilerim */}
+              <TouchableOpacity
+                style={[styles.menuRowItem, styles.lastMenuItem]}
+                activeOpacity={0.7}
+                onPress={() => router.push('/profile/personal-info' as any)}
+              >
+                <View style={styles.menuLeft}>
+                  <Ionicons name="person-outline" size={18} color="#94a3b8" style={styles.menuIcon} />
+                  <Text style={styles.menuTitle}>Kişisel Bilgilerim</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={16} color="#64748b" />
               </TouchableOpacity>
             </View>
-          )}
 
-          {/* Logout Button */}
-          <TouchableOpacity style={styles.logoutBtn} activeOpacity={0.85} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-            <Text style={styles.logoutBtnText}>Çıkış Yap</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        /* GUEST STATE WHEN NOT LOGGED IN */
-        <View style={styles.cardBox}>
-          <View style={styles.guestIconCircle}>
-            <Ionicons name="person-circle-outline" size={60} color="#ea580c" />
+            {/* LOGOUT BUTTON (Red) */}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              activeOpacity={0.8}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={18} color="#ef4444" />
+              <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          /* GUEST STATE WHEN NOT LOGGED IN */
+          <View style={styles.guestCard}>
+            <View style={styles.guestIconCircle}>
+              <Ionicons name="person-circle-outline" size={54} color="#ea580c" />
+            </View>
+
+            <Text style={styles.guestTitle}>TorqueScout Hesabınız</Text>
+            <Text style={styles.guestDesc}>
+              Giriş yaparak favorilerinize erişebilir, araç sorgulama raporlarını kaydedebilir ve araçlarınızı ilan verebilirsiniz.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.primaryLoginBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push('/login' as any)}
+            >
+              <Text style={styles.primaryLoginText}>Giriş Yap</Text>
+              <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryRegisterBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push('/register' as any)}
+            >
+              <Text style={styles.secondaryRegisterText}>Hesabınız Yok mu? Kayıt Olun</Text>
+            </TouchableOpacity>
           </View>
-
-          <Text style={styles.introTitle}>TorqueScout Profiliniz</Text>
-          <Text style={styles.introDesc}>
-            Hesabınıza giriş yaparak favorilerinize erişebilir, araç raporlarını kaydedebilir ve araçlarınızı ilan verebilirsiniz.
-          </Text>
-
-          <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => router.push('/login')}>
-            <Text style={styles.primaryBtnText}>Giriş Yap</Text>
-            <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.85} onPress={() => router.push('/register')}>
-            <Text style={styles.secondaryBtnText}>Hesabınız Yok mu? Kayıt Olun</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fafcff',
+    backgroundColor: '#0a0e1a', // Web Style Deep Navy Background
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fafcff',
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    padding: 18,
-    gap: 16,
-    marginTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#ea580c',
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#ea580c',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  profileDetails: {
-    flex: 1,
-    gap: 3,
-  },
-  profileName: {
-    color: '#0b192c',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  profileEmail: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  tierBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff7ed',
-    borderColor: '#ffedd5',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginTop: 4,
-  },
-  tierBadgeText: {
-    color: '#ea580c',
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#0a0e1a',
     gap: 10,
   },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    alignItems: 'center',
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
+  loadingText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '600',
   },
-  statBoxTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0b192c',
-  },
-  statBoxSub: {
-    fontSize: 10,
-    color: '#64748b',
-  },
-  menuSection: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  sectionHeader: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '800',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+  topHeader: {
+    paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    gap: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.07)',
   },
-  menuIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
+  topHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.3,
   },
-  menuItemText: {
-    color: '#0b192c',
-    fontSize: 14,
-    fontWeight: '700',
-    flex: 1,
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 16,
-    paddingVertical: 14,
-    gap: 8,
-    marginTop: 4,
-  },
-  logoutBtnText: {
-    color: '#ef4444',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  cardBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 24,
-    alignItems: 'center',
+  scrollContent: {
+    padding: 16,
     gap: 14,
-    marginTop: 40,
+    paddingBottom: 40,
+  },
+  profileHeaderCard: {
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 18,
+    gap: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 2,
+    elevation: 4,
   },
-  guestIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff7ed',
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#ea580c',
+    overflow: 'hidden',
+    backgroundColor: '#1e293b',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  introTitle: {
-    fontSize: 22,
+  avatarInitial: {
+    fontSize: 26,
     fontWeight: '900',
-    color: '#0b192c',
-    textAlign: 'center',
+    color: '#ea580c',
   },
-  introDesc: {
+  profileMetaInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  welcomeGreeting: {
+    fontSize: 10,
+    fontWeight: '800',
     color: '#64748b',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 8,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
-  primaryBtn: {
+  profileFullName: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.2,
+  },
+  profileEmailText: {
+    fontSize: 12.5,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  headerPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  tierPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tierPillText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#fbbf24',
+    letterSpacing: 0.5,
+  },
+  editProfileChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  editProfileChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#cbd5e1',
+  },
+  menuContainer: {
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+  },
+  menuRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  lastMenuItem: {
+    borderBottomWidth: 0,
+  },
+  adminRowItem: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuIcon: {
+    width: 22,
+  },
+  menuEmoji: {
+    fontSize: 16,
+    width: 22,
+  },
+  menuTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#e2e8f0',
+  },
+  adminTitle: {
+    color: '#f87171',
+    fontWeight: '800',
+  },
+  unreadBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 4,
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#f87171',
+  },
+  logoutButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderRadius: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ea580c',
-    borderRadius: 16,
-    paddingVertical: 16,
-    width: '100%',
-    shadowColor: '#ea580c',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 8,
   },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: 16,
+  logoutButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ef4444',
+  },
+  guestCard: {
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 20,
+  },
+  guestIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(234, 88, 12, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  guestTitle: {
+    fontSize: 18,
     fontWeight: '900',
+    color: '#ffffff',
   },
-  secondaryBtn: {
+  guestDesc: {
+    fontSize: 13,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  primaryLoginBtn: {
+    backgroundColor: '#ea580c',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  primaryLoginText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  secondaryRegisterBtn: {
     paddingVertical: 8,
   },
-  secondaryBtnText: {
-    color: '#ea580c',
-    fontSize: 13,
+  secondaryRegisterText: {
+    fontSize: 12.5,
     fontWeight: '700',
+    color: '#ea580c',
   },
 });
