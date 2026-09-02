@@ -17,10 +17,66 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
+
+const formatCloudflareImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
+
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+
+  return url;
+};
+
+const resolveVehicleImageUrl = (
+  url?: string | null,
+  brand?: string,
+  modelFamily?: string
+): string => {
+  const formatted = formatCloudflareImageUrl(url);
+  if (formatted) return formatted;
+
+  if (brand && modelFamily) {
+    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
+    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+    }
+    const modelKey = modelFamily.toLowerCase().trim();
+    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    }
+  }
+  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+};
 
 interface Photo {
   id: string;
@@ -84,7 +140,7 @@ interface ListingFeedItem {
 
 export default function ListingFeedScreen() {
   const router = useRouter();
-  const [feedHeight, setFeedHeight] = useState<number>(windowHeight - 80);
+  const [feedHeight, setFeedHeight] = useState<number>(windowHeight - 90);
 
   const [listings, setListings] = useState<ListingFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -305,6 +361,13 @@ export default function ListingFeedScreen() {
     const activePhoto = activePhotoIndices[item.id] || 0;
     const isFav = favorites[item.id] || false;
 
+    const rawPhotoUrl = item.photos[activePhoto]?.url;
+    const resolvedPhotoUrl = resolveVehicleImageUrl(
+      rawPhotoUrl,
+      item.vehicle.brand,
+      item.vehicle.modelFamily
+    );
+
     return (
       <View style={[styles.cardContainer, { height: feedHeight }]}>
         {/* Top Header Actions */}
@@ -340,51 +403,44 @@ export default function ListingFeedScreen() {
 
           {/* 1. Photo Carousel */}
           <View style={styles.photoContainer}>
-            {item.photos.length > 0 ? (
-              <>
-                <ExpoImage
-                  source={{ uri: item.photos[activePhoto]?.url }}
-                  style={styles.photoImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                />
-                <View style={styles.photoCountBadge}>
-                  <Text style={styles.photoCountText}>
-                    {activePhoto + 1} / {item.photos.length}
-                  </Text>
-                </View>
+            <ExpoImage
+              source={{ uri: resolvedPhotoUrl }}
+              style={styles.photoImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+            {item.photos.length > 1 && (
+              <View style={styles.photoCountBadge}>
+                <Text style={styles.photoCountText}>
+                  {activePhoto + 1} / {item.photos.length}
+                </Text>
+              </View>
+            )}
 
-                {item.photos.length > 1 && (
-                  <View style={styles.carouselBtns}>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setActivePhotoIndices((prev) => ({
-                          ...prev,
-                          [item.id]: Math.max(0, activePhoto - 1),
-                        }))
-                      }
-                      style={styles.carouselArrow}
-                    >
-                      <Ionicons name="chevron-back" size={16} color="white" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() =>
-                        setActivePhotoIndices((prev) => ({
-                          ...prev,
-                          [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                        }))
-                      }
-                      style={styles.carouselArrow}
-                    >
-                      <Ionicons name="chevron-forward" size={16} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
-            ) : (
-              <View style={styles.noPhoto}>
-                <Ionicons name="car-outline" size={32} color="#94a3b8" />
-                <Text style={styles.noPhotoText}>Görsel Bulunmuyor</Text>
+            {item.photos.length > 1 && (
+              <View style={styles.carouselBtns}>
+                <TouchableOpacity
+                  onPress={() =>
+                    setActivePhotoIndices((prev) => ({
+                      ...prev,
+                      [item.id]: Math.max(0, activePhoto - 1),
+                    }))
+                  }
+                  style={styles.carouselArrow}
+                >
+                  <Ionicons name="chevron-back" size={14} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    setActivePhotoIndices((prev) => ({
+                      ...prev,
+                      [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
+                    }))
+                  }
+                  style={styles.carouselArrow}
+                >
+                  <Ionicons name="chevron-forward" size={14} color="white" />
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -399,7 +455,7 @@ export default function ListingFeedScreen() {
                 👤 {item.seller.displayName} ({item.seller.memberSince})
               </Text>
               <Text style={styles.infoSubText}>
-                📍 {item.location.city}, {item.location.district}
+                📍 {item.location.city}, {item.location.district || 'Merkez'}
               </Text>
             </View>
           </View>
@@ -453,7 +509,7 @@ export default function ListingFeedScreen() {
 
             {activeTab === 'desc' && (
               <View style={styles.descContainer}>
-                <Text style={styles.descText} numberOfLines={3}>
+                <Text style={styles.descText} numberOfLines={2}>
                   Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
                 </Text>
                 <TouchableOpacity
@@ -623,22 +679,22 @@ const styles = StyleSheet.create({
   cardContainer: {
     width: windowWidth,
     backgroundColor: '#f1f5f9',
-    justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: 8,
+    paddingTop: 2,
+    paddingBottom: 6,
+    gap: 4,
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingBottom: 6,
+    paddingVertical: 2,
   },
   circularBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -663,29 +719,29 @@ const styles = StyleSheet.create({
   cardFrame: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    padding: 10,
+    padding: 8,
     justifyContent: 'space-between',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
     position: 'relative',
   },
   scrollGuidePill: {
     position: 'absolute',
-    right: 8,
-    top: '42%',
-    transform: [{ translateY: -22 }],
+    right: 6,
+    top: '38%',
+    transform: [{ translateY: -20 }],
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 14,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 3,
+    paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
@@ -698,8 +754,8 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 155,
-    borderRadius: 14,
+    height: 130,
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -713,15 +769,15 @@ const styles = StyleSheet.create({
   },
   photoCountBadge: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
+    bottom: 4,
+    right: 4,
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 4,
   },
   photoCountText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -731,13 +787,13 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
-    marginTop: -13,
+    paddingHorizontal: 4,
+    marginTop: -11,
   },
   carouselArrow: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -757,7 +813,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   titleText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: 0.2,
@@ -765,34 +821,34 @@ const styles = StyleSheet.create({
   infoLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 2,
+    marginTop: 1,
   },
   infoSubText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
   },
   breadcrumbContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#dbeafe',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   breadcrumbText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: '#2563eb',
   },
   tabBar: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -803,7 +859,7 @@ const styles = StyleSheet.create({
     borderColor: '#ea580c',
   },
   tabButtonText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#64748b',
   },
@@ -811,13 +867,13 @@ const styles = StyleSheet.create({
     color: '#ea580c',
   },
   tabContentContainer: {
-    height: 84,
+    height: 72,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     justifyContent: 'center',
   },
   scrollInfo: {
@@ -829,55 +885,55 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    paddingVertical: 2,
+    paddingVertical: 1,
   },
   infoLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
   },
   infoValue: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#0f172a',
     fontWeight: '700',
   },
   infoValuePrice: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     color: '#ea580c',
   },
   descContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    paddingVertical: 1,
   },
   descText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#334155',
-    lineHeight: 14,
+    lineHeight: 13,
   },
   detailLink: {
     alignSelf: 'flex-end',
   },
   detailLinkText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     color: '#ea580c',
   },
   locBox: {
-    gap: 2,
+    gap: 1,
   },
   locTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   locText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#475569',
   },
   locLinkText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     color: '#2563eb',
   },
@@ -885,9 +941,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -896,24 +952,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   specLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
     color: '#64748b',
   },
   specVal: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#0f172a',
     marginTop: 1,
   },
   ctaContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   ctaBtnOutline: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
@@ -921,25 +977,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaTextOutline: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#0f172a',
   },
   ctaBtnSolid: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: '#ea580c',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#ea580c',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 3,
     elevation: 2,
   },
   ctaTextSolid: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     color: '#ffffff',
   },
