@@ -35,6 +35,7 @@ export default function AdminGuideCommentsPage() {
   });
 
   const [search, setSearch] = useState("");
+  const [mainFilter, setMainFilter] = useState<"PENDING_ONLY" | "WITH_COMMENTS" | "ALL">("PENDING_ONLY");
 
   // Drawer / Modal State
   const [selectedCard, setSelectedCard] = useState<any | null>(null);
@@ -147,6 +148,11 @@ export default function AdminGuideCommentsPage() {
   };
 
   const filteredCards = overviewData.cards.filter((c) => {
+    // Main Tab Filter
+    if (mainFilter === "PENDING_ONLY" && c.pendingCount === 0) return false;
+    if (mainFilter === "WITH_COMMENTS" && c.totalCount === 0) return false;
+
+    // Search Query Filter
     const q = search.toLowerCase().trim();
     if (!q) return true;
     const title = `${c.brand} ${c.model} ${c.generationName || ""}`.toLowerCase();
@@ -197,16 +203,56 @@ export default function AdminGuideCommentsPage() {
         </div>
       </div>
 
-      {/* SEARCH BAR */}
-      <div className="p-4 rounded-2xl bg-slate-900/40 border border-white/5 flex items-center gap-3">
-        <Search className="w-4 h-4 text-slate-500" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Araç rehberi ara (Marka, Model, Kasa...)"
-          className="w-full bg-transparent border-none text-xs font-medium text-white placeholder-slate-500 focus:outline-none"
-        />
+      {/* SEARCH AND MAIN TABS */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        {/* Main Quick Filters */}
+        <div className="p-1 bg-[#050714] border border-white/10 rounded-2xl flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setMainFilter("PENDING_ONLY")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              mainFilter === "PENDING_ONLY"
+                ? "bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            ⏳ Bekleyen Yorumu Olanlar ({overviewData.cards.filter((c) => c.pendingCount > 0).length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainFilter("WITH_COMMENTS")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              mainFilter === "WITH_COMMENTS"
+                ? "bg-orange-500 text-slate-950 font-black shadow-lg shadow-orange-500/20"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            💬 Yorumu Olanlar ({overviewData.cards.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainFilter("ALL")}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              mainFilter === "ALL" ? "bg-slate-700 text-white font-black" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Tümü
+          </button>
+        </div>
+
+        {/* Search Input */}
+        <div className="p-3 px-4 rounded-2xl bg-slate-900/40 border border-white/5 flex items-center gap-3 flex-1 max-w-md">
+          <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Araç rehberi ara (Marka, Model, Kasa...)"
+            className="w-full bg-transparent border-none text-xs font-medium text-white placeholder-slate-500 focus:outline-none"
+          />
+        </div>
       </div>
 
       {/* GUIDE CARDS TABLE */}
@@ -233,8 +279,10 @@ export default function AdminGuideCommentsPage() {
                 </tr>
               ) : filteredCards.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    Arama kriterlerinize uygun araç rehberi kaydı bulunamadı.
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                    {mainFilter === "PENDING_ONLY"
+                      ? "Moderasyon bekleyen Araç Rehberi yorumu bulunmuyor."
+                      : "Henüz Araç Rehberi kullanıcı yorumu bulunmuyor."}
                   </td>
                 </tr>
               ) : (

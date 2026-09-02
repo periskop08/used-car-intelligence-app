@@ -930,6 +930,11 @@ export class VehicleGuideService {
 
   async adminGetGuideCommentsOverview() {
     const cards = await this.prisma.vehicleGuideCard.findMany({
+      where: {
+        guideComments: {
+          some: {},
+        },
+      },
       orderBy: [{ brand: 'asc' }, { model: 'asc' }],
       select: {
         id: true,
