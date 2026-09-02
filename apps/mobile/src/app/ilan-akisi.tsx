@@ -725,10 +725,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   cardContentTop: {
-    gap: 5,
+    gap: 8,
   },
   cardContentBottom: {
-    gap: 6,
+    gap: 8,
   },
   scrollGuidePill: {
     position: 'absolute',
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 175,
+    height: 160,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
@@ -809,8 +809,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   detailsContainer: {
-    paddingVertical: 1,
-    gap: 2,
+    marginTop: 8,
+    gap: 3,
   },
   titleText: {
     fontSize: 14.5,
@@ -822,6 +822,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 2,
   },
   infoSubText: {
     fontSize: 10.5,
@@ -829,6 +830,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   breadcrumbContainer: {
+    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     backgroundColor: '#eff6ff',
@@ -842,6 +844,7 @@ const styles = StyleSheet.create({
     color: '#2563eb',
   },
   tabBar: {
+    marginTop: 8,
     flexDirection: 'row',
     gap: 6,
   },
@@ -867,6 +870,7 @@ const styles = StyleSheet.create({
     color: '#ea580c',
   },
   tabContentContainer: {
+    marginTop: 6,
     height: 84,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
@@ -909,7 +913,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    marginTop: 10,
+    marginTop: 18,
     gap: 4,
   },
   descriptionCardHeader: {
