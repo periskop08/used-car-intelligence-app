@@ -401,170 +401,176 @@ export default function ListingFeedScreen() {
             <Ionicons name="chevron-down" size={10} color="#94a3b8" />
           </View>
 
-          {/* 1. Photo Carousel */}
-          <View style={styles.photoContainer}>
-            <ExpoImage
-              source={{ uri: resolvedPhotoUrl }}
-              style={styles.photoImage}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-            {item.photos.length > 1 && (
-              <View style={styles.photoCountBadge}>
-                <Text style={styles.photoCountText}>
-                  {activePhoto + 1} / {item.photos.length}
-                </Text>
-              </View>
-            )}
-
-            {item.photos.length > 1 && (
-              <View style={styles.carouselBtns}>
-                <TouchableOpacity
-                  onPress={() =>
-                    setActivePhotoIndices((prev) => ({
-                      ...prev,
-                      [item.id]: Math.max(0, activePhoto - 1),
-                    }))
-                  }
-                  style={styles.carouselArrow}
-                >
-                  <Ionicons name="chevron-back" size={14} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    setActivePhotoIndices((prev) => ({
-                      ...prev,
-                      [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
-                    }))
-                  }
-                  style={styles.carouselArrow}
-                >
-                  <Ionicons name="chevron-forward" size={14} color="white" />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* 2. Title & Seller Info */}
-          <View style={styles.detailsContainer}>
-            <Text style={styles.titleText} numberOfLines={1}>
-              {item.title.toUpperCase()}
-            </Text>
-            <View style={styles.infoLine}>
-              <Text style={styles.infoSubText}>
-                👤 {item.seller.displayName} ({item.seller.memberSince})
-              </Text>
-              <Text style={styles.infoSubText}>
-                📍 {item.location.city}, {item.location.district || 'Merkez'}
-              </Text>
-            </View>
-          </View>
-
-          {/* 3. Breadcrumb */}
-          <View style={styles.breadcrumbContainer}>
-            <Text style={styles.breadcrumbText} numberOfLines={1}>
-              {item.breadcrumb.join(' > ')}
-            </Text>
-          </View>
-
-          {/* 4. Tab Bar */}
-          <View style={styles.tabBar}>
-            {(['info', 'desc', 'loc'] as const).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
-                onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
-              >
-                <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
-                  {tab === 'info' ? 'Özellikler' : tab === 'desc' ? 'Açıklama' : 'Konum'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* 5. Tab Content Box */}
-          <View style={styles.tabContentContainer}>
-            {activeTab === 'info' && (
-              <View style={styles.scrollInfo}>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Fiyat</Text>
-                  <Text style={styles.infoValuePrice}>
-                    {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
+          {/* TOP SECTION: Photo, Title, Breadcrumb, Tabs, Table */}
+          <View style={styles.cardContentTop}>
+            {/* 1. Photo Carousel */}
+            <View style={styles.photoContainer}>
+              <ExpoImage
+                source={{ uri: resolvedPhotoUrl }}
+                style={styles.photoImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+              {item.photos.length > 1 && (
+                <View style={styles.photoCountBadge}>
+                  <Text style={styles.photoCountText}>
+                    {activePhoto + 1} / {item.photos.length}
                   </Text>
                 </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>İlan No</Text>
-                  <Text style={styles.infoValue}>{item.listingNo}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Yıl / KM</Text>
-                  <Text style={styles.infoValue}>{item.vehicle.year} • {(item.vehicle.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Yakıt / Vites</Text>
-                  <Text style={styles.infoValue}>{item.vehicle.fuelType} • {item.vehicle.transmissionType}</Text>
-                </View>
-              </View>
-            )}
+              )}
 
-            {activeTab === 'desc' && (
-              <View style={styles.descContainer}>
-                <Text style={styles.descText} numberOfLines={2}>
-                  Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
+              {item.photos.length > 1 && (
+                <View style={styles.carouselBtns}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActivePhotoIndices((prev) => ({
+                        ...prev,
+                        [item.id]: Math.max(0, activePhoto - 1),
+                      }))
+                    }
+                    style={styles.carouselArrow}
+                  >
+                    <Ionicons name="chevron-back" size={14} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActivePhotoIndices((prev) => ({
+                        ...prev,
+                        [item.id]: Math.min(item.photos.length - 1, activePhoto + 1),
+                      }))
+                    }
+                    style={styles.carouselArrow}
+                  >
+                    <Ionicons name="chevron-forward" size={14} color="white" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* 2. Title & Seller Info */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.titleText} numberOfLines={1}>
+                {item.title.toUpperCase()}
+              </Text>
+              <View style={styles.infoLine}>
+                <Text style={styles.infoSubText}>
+                  👤 {item.seller.displayName} ({item.seller.memberSince})
                 </Text>
-                <TouchableOpacity
-                  onPress={() => router.push(`/listings/${item.id}` as any)}
-                  style={styles.detailLink}
-                >
-                  <Text style={styles.detailLinkText}>İlan Detayına Git ➔</Text>
-                </TouchableOpacity>
+                <Text style={styles.infoSubText}>
+                  📍 {item.location.city}, {item.location.district || 'Merkez'}
+                </Text>
               </View>
-            )}
+            </View>
 
-            {activeTab === 'loc' && (
-              <View style={styles.descContainer}>
-                <View style={styles.locBox}>
-                  <Text style={styles.locTitle}>📍 İlan Konumu</Text>
-                  <Text style={styles.locText}>Şehir: {item.location.city} • İlçe: {item.location.district || 'Merkez'}</Text>
+            {/* 3. Breadcrumb */}
+            <View style={styles.breadcrumbContainer}>
+              <Text style={styles.breadcrumbText} numberOfLines={1}>
+                {item.breadcrumb.join(' > ')}
+              </Text>
+            </View>
+
+            {/* 4. Tab Bar */}
+            <View style={styles.tabBar}>
+              {(['info', 'desc', 'loc'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+                  onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
+                >
+                  <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
+                    {tab === 'info' ? 'Özellikler' : tab === 'desc' ? 'Açıklama' : 'Konum'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 5. Tab Content Box (Directly below Tabs) */}
+            <View style={styles.tabContentContainer}>
+              {activeTab === 'info' && (
+                <View style={styles.scrollInfo}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Fiyat</Text>
+                    <Text style={styles.infoValuePrice}>
+                      {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>İlan No</Text>
+                    <Text style={styles.infoValue}>{item.listingNo}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Yıl / KM</Text>
+                    <Text style={styles.infoValue}>{item.vehicle.year} • {(item.vehicle.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Yakıt / Vites</Text>
+                    <Text style={styles.infoValue}>{item.vehicle.fuelType} • {item.vehicle.transmissionType}</Text>
+                  </View>
                 </View>
-                <TouchableOpacity
-                  onPress={() => router.push(`/listings/${item.id}` as any)}
-                  style={styles.detailLink}
-                >
-                  <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
-                </TouchableOpacity>
+              )}
+
+              {activeTab === 'desc' && (
+                <View style={styles.descContainer}>
+                  <Text style={styles.descText} numberOfLines={2}>
+                    Bu araç TorqueScout yapay zeka analizinden geçmiştir. Hasar kayıtları ve kronik sorunları denetlenmiştir.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/listings/${item.id}` as any)}
+                    style={styles.detailLink}
+                  >
+                    <Text style={styles.detailLinkText}>İlan Detayına Git ➔</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {activeTab === 'loc' && (
+                <View style={styles.descContainer}>
+                  <View style={styles.locBox}>
+                    <Text style={styles.locTitle}>📍 İlan Konumu</Text>
+                    <Text style={styles.locText}>Şehir: {item.location.city} • İlçe: {item.location.district || 'Merkez'}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/listings/${item.id}` as any)}
+                    style={styles.detailLink}
+                  >
+                    <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* BOTTOM SECTION: 4-Stat Specs & CTA Buttons */}
+          <View style={styles.cardContentBottom}>
+            {/* 6. Specs Box */}
+            <View style={styles.specsBox}>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Güç</Text>
+                <Text style={styles.specVal}>{item.technicalSummary.maxPower || '-'}</Text>
               </View>
-            )}
-          </View>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Hız</Text>
+                <Text style={styles.specVal}>{item.technicalSummary.topSpeed || '-'}</Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>0-100</Text>
+                <Text style={styles.specVal}>{item.technicalSummary.acceleration0100 || '-'}</Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={styles.specLabel}>Tüketim</Text>
+                <Text style={styles.specVal}>{item.technicalSummary.fuelConsumption || '-'}</Text>
+              </View>
+            </View>
 
-          {/* 6. Specs Box */}
-          <View style={styles.specsBox}>
-            <View style={styles.specItem}>
-              <Text style={styles.specLabel}>Güç</Text>
-              <Text style={styles.specVal}>{item.technicalSummary.maxPower || '-'}</Text>
+            {/* 7. CTA Action Buttons */}
+            <View style={styles.ctaContainer}>
+              <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
+                <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleMessage(item)} style={styles.ctaBtnSolid}>
+                <Text style={styles.ctaTextSolid}>💬 Mesaj Gönder</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.specItem}>
-              <Text style={styles.specLabel}>Hız</Text>
-              <Text style={styles.specVal}>{item.technicalSummary.topSpeed || '-'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <Text style={styles.specLabel}>0-100</Text>
-              <Text style={styles.specVal}>{item.technicalSummary.acceleration0100 || '-'}</Text>
-            </View>
-            <View style={styles.specItem}>
-              <Text style={styles.specLabel}>Tüketim</Text>
-              <Text style={styles.specVal}>{item.technicalSummary.fuelConsumption || '-'}</Text>
-            </View>
-          </View>
-
-          {/* 7. CTA Action Buttons (Always securely visible at bottom of frame!) */}
-          <View style={styles.ctaContainer}>
-            <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
-              <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleMessage(item)} style={styles.ctaBtnSolid}>
-              <Text style={styles.ctaTextSolid}>💬 Mesaj Gönder</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -680,16 +686,16 @@ const styles = StyleSheet.create({
     width: windowWidth,
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
-    paddingTop: 2,
-    paddingBottom: 6,
-    gap: 4,
+    paddingTop: 4,
+    paddingBottom: 10,
+    justifyContent: 'space-between',
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingBottom: 4,
   },
   circularBtn: {
     width: 36,
@@ -717,23 +723,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardFrame: {
+    flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    padding: 10,
-    gap: 6,
+    padding: 12,
+    justifyContent: 'space-between',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
     elevation: 3,
     position: 'relative',
+  },
+  cardContentTop: {
+    gap: 7,
+  },
+  cardContentBottom: {
+    gap: 8,
   },
   scrollGuidePill: {
     position: 'absolute',
     right: 8,
-    top: '40%',
+    top: '42%',
     transform: [{ translateY: -20 }],
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1,
@@ -753,8 +766,8 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     width: '100%',
-    height: 180,
-    borderRadius: 12,
+    height: 190,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e2e8f0',
