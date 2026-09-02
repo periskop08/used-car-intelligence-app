@@ -96,10 +96,10 @@ export class ListingModerationService implements OnModuleInit {
   }
 
   private formatCustomerNo(user: any): string {
-    const year = user.createdAt ? new Date(user.createdAt).getFullYear().toString().slice(-2) : '26';
-    const month = user.createdAt ? (new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0') : '08';
-    const num = user.id ? user.id.replace(/-/g, '').substring(0, 6).toUpperCase() : '000000';
-    return `TS-${year}${month}-${num}`;
+    if (user?.customerNo) return user.customerNo;
+    const year = user?.createdAt ? new Date(user.createdAt).getFullYear().toString().slice(-2) : '26';
+    const month = user?.createdAt ? (new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0') : '07';
+    return `TS-${year}${month}-000001`;
   }
 
   private formatPublicListingNo(listing: any): string {

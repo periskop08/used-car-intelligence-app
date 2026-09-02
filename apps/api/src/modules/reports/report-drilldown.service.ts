@@ -15,6 +15,7 @@ export class ReportDrilldownService {
           orderBy: { createdAt: 'desc' },
           select: {
             id: true,
+            customerNo: true,
             firstName: true,
             lastName: true,
             username: true,
@@ -26,15 +27,18 @@ export class ReportDrilldownService {
           },
         });
 
-        const rows = users.map((u) => ({
-          customerNo: `TS-${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${u.id.substring(0, 6)}`.toUpperCase(),
-          displayName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username || 'Kullanıcı',
-          email: u.email,
-          role: u.role,
-          subscriptionTier: u.subscriptionTier,
-          createdAt: u.createdAt,
-          isActive: u.isActive ? 'AKTİF' : 'PASİF',
-        }));
+        const rows = users.map((u) => {
+          const yearMonth = u.createdAt ? `${new Date(u.createdAt).getFullYear().toString().slice(-2)}${(new Date(u.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
+          return {
+            customerNo: u.customerNo || `TS-${yearMonth}-000001`,
+            displayName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username || 'Kullanıcı',
+            email: u.email,
+            role: u.role,
+            subscriptionTier: u.subscriptionTier,
+            createdAt: u.createdAt,
+            isActive: u.isActive ? 'AKTİF' : 'PASİF',
+          };
+        });
 
         return {
           drilldownKey,

@@ -37,16 +37,26 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async register(dto: RegisterDto) {
-    const cleanEmail = dto.email ? dto.email.trim().toLowerCase() : '';
-    if (!cleanEmail) {
-      throw new BadRequestException('Lütfen geçerli bir e-posta adresi girin.');
-    }
+  private async generateCustomerNo(date: Date = new Date()): Promise<string> {
+    const yy = String(date.getFullYear()).slice(-2);
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const period = `${yy}${mm}`;
 
+    const updatedCounter = await this.prisma.customerNoCounter.upsert({
+      where: { period },
+      update: { counter: { increment: 1 } },
+      create: { period, counter: 1 },
+    });
+
+    const seqStr = String(updatedCounter.counter).padStart(6, '0');
+    return `TS-${period}-${seqStr}`;
+  }
+
+  async register(dto: RegisterDto) {
+    const cleanEmail = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { email: { equals: cleanEmail, mode: 'insensitive' } },
           { email: cleanEmail },
         ],
       },
@@ -59,6 +69,7 @@ export class AuthService implements OnModuleInit {
     const isAdmin = ADMIN_EMAILS.includes(cleanEmail);
     const assignedRole = isAdmin ? Role.ADMIN : (dto.role || Role.USER);
     const assignedTier = isAdmin ? SubscriptionTier.PROFESYONEL : (dto.subscriptionTier || SubscriptionTier.TANISMA);
+    const customerNo = await this.generateCustomerNo(new Date());
 
     let user;
     try {
@@ -69,6 +80,7 @@ export class AuthService implements OnModuleInit {
           role: assignedRole,
           subscriptionTier: assignedTier,
           preferredLanguageCode: 'tr',
+          customerNo,
         },
       });
     } catch (err: any) {
@@ -94,6 +106,7 @@ export class AuthService implements OnModuleInit {
             role: assignedRole,
             subscriptionTier: fallbackTier,
             preferredLanguageCode: 'tr',
+            customerNo,
           },
         });
       } catch (fallbackErr: any) {

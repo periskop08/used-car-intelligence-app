@@ -82,9 +82,10 @@ export class UserReportsService {
   async getUserByCustomerNo(customerNo: string) {
     try {
       const users = await this.prisma.user.findMany({
-        take: 10,
+        take: 50,
         select: {
           id: true,
+          customerNo: true,
           firstName: true,
           lastName: true,
           username: true,
@@ -97,16 +98,20 @@ export class UserReportsService {
         },
       });
 
+      const qUpper = customerNo.toUpperCase();
       const user = users.find(
         (u) =>
-          `TS-${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${u.id.substring(0, 6)}`.toUpperCase() === customerNo.toUpperCase() ||
+          (u.customerNo && u.customerNo.toUpperCase() === qUpper) ||
+          (u.customerNo && u.customerNo.toUpperCase().includes(qUpper)) ||
+          u.id === customerNo ||
           u.username === customerNo ||
           u.email === customerNo
       ) || users[0];
 
       if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
-      const customerNoFormatted = `TS-${user.createdAt.getFullYear().toString().slice(-2)}${(user.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${user.id.substring(0, 6)}`.toUpperCase();
+      const yearMonth = user.createdAt ? `${new Date(user.createdAt).getFullYear().toString().slice(-2)}${(new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
+      const customerNoFormatted = user.customerNo || `TS-${yearMonth}-000001`;
 
       return {
         profile: {
@@ -146,6 +151,7 @@ export class UserReportsService {
     const users = await this.prisma.user.findMany({
       select: {
         id: true,
+        customerNo: true,
         firstName: true,
         lastName: true,
         username: true,
@@ -155,9 +161,11 @@ export class UserReportsService {
       },
     });
 
+    const qUpper = customerNo.toUpperCase();
     const targetUser = users.find(
       (u) =>
-        `TS-${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${u.id.substring(0, 6)}`.toUpperCase() === customerNo.toUpperCase() ||
+        (u.customerNo && u.customerNo.toUpperCase() === qUpper) ||
+        (u.customerNo && u.customerNo.toUpperCase().includes(qUpper)) ||
         u.id === customerNo ||
         u.username === customerNo ||
         u.email === customerNo

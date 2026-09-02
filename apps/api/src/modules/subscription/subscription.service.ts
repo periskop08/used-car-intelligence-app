@@ -499,6 +499,7 @@ export class SubscriptionService {
         { firstName: { contains: q, mode: 'insensitive' } },
         { lastName: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
+        { customerNo: { contains: q, mode: 'insensitive' } },
         { id: { contains: q, mode: 'insensitive' } },
       ];
     }
@@ -507,7 +508,7 @@ export class SubscriptionService {
       this.prisma.user.count({ where: whereClause }),
       this.prisma.user.findMany({
         where: whereClause,
-        select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true, subscriptionTier: true, isActive: true },
+        select: { id: true, customerNo: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true, subscriptionTier: true, isActive: true },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -515,11 +516,11 @@ export class SubscriptionService {
     ]);
 
     const formattedUsers = users.map((u) => {
-      const yearMonth = `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-      const shortId = u.id.slice(0, 6).toUpperCase();
+      const yearMonth = u.createdAt ? `${new Date(u.createdAt).getFullYear().toString().slice(-2)}${(new Date(u.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
+      const customerNo = u.customerNo || `TS-${yearMonth}-000001`;
       return {
         id: u.id,
-        customerNo: `TS-${yearMonth}-${shortId}`,
+        customerNo,
         name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email.split('@')[0],
         email: u.email,
         phone: u.phone || '—',

@@ -462,6 +462,7 @@ export class UserService {
         { lastName: { contains: s, mode: 'insensitive' } },
         { phone: { contains: s, mode: 'insensitive' } },
         { username: { contains: s, mode: 'insensitive' } },
+        { customerNo: { contains: s, mode: 'insensitive' } },
         { id: { contains: s, mode: 'insensitive' } },
       ];
     }
@@ -509,23 +510,27 @@ export class UserService {
       return 1;
     };
 
-    let formatted = users.map((u) => ({
-      id: u.id,
-      customerNo: `TS-${u.id.slice(0, 8).toUpperCase()}`,
-      email: u.email,
-      firstName: u.firstName || '-',
-      lastName: u.lastName || '-',
-      fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
-      phone: u.phone || '-',
-      role: u.role,
-      subscriptionTier: getPackageDisplayName(u.subscriptionTier),
-      packageRank: getPackageRank(u.subscriptionTier),
-      isActive: u.isActive,
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-      activeListingCount: u._count.listings,
-      aiReportCount: u._count.generatedVehicleReports + u._count.chatLogs,
-    }));
+    let formatted = users.map((u) => {
+      const yearMonth = u.createdAt ? `${new Date(u.createdAt).getFullYear().toString().slice(-2)}${(new Date(u.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
+      const customerNo = u.customerNo || `TS-${yearMonth}-000001`;
+      return {
+        id: u.id,
+        customerNo,
+        email: u.email,
+        firstName: u.firstName || '-',
+        lastName: u.lastName || '-',
+        fullName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
+        phone: u.phone || '-',
+        role: u.role,
+        subscriptionTier: getPackageDisplayName(u.subscriptionTier),
+        packageRank: getPackageRank(u.subscriptionTier),
+        isActive: u.isActive,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+        activeListingCount: u._count.listings,
+        aiReportCount: u._count.generatedVehicleReports + u._count.chatLogs,
+      };
+    });
 
     // Server-side single-column sorting across entire dataset
     const sortBy = params.sortBy || 'createdAt';
