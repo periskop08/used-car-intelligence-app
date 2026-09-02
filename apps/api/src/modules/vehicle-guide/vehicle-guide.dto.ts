@@ -530,3 +530,41 @@ export class LogGuideEventDto {
   @IsOptional()
   locale?: string;
 }
+
+export class CreateVehicleGuideCommentDto {
+  @ApiProperty({ description: 'Yorum metni (en az 20, en fazla 1000 karakter)', minLength: 20, maxLength: 1000 })
+  @IsString()
+  comment!: string;
+
+  @ApiProperty({ description: 'Kullanım süresi (Ay)', minimum: 0 })
+  @IsInt()
+  @Min(0, { message: 'Kullanım süresi negatif olamaz.' })
+  usageMonths!: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  isOwner!: boolean;
+
+  @ApiProperty()
+  @IsBoolean()
+  recommends!: boolean;
+
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) reliabilityRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) fuelRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) comfortRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) partsRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) maintenanceRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) resaleRating!: number;
+  @ApiProperty({ minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) overallRating!: number;
+}
+
+export class ModerateGuideCommentDto {
+  @ApiProperty({ description: 'Moderasyon durumu (APPROVED / REJECTED)' })
+  @IsString()
+  status!: 'APPROVED' | 'REJECTED';
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  rejectionReason?: string;
+}

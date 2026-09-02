@@ -225,6 +225,7 @@ model User {
   auditLogs          AuditLog[]
   featureUsages      FeatureUsage[]
   guideViewHistories UserGuideCardViewHistory[]
+  vehicleGuideComments VehicleGuideComment[]
 
   savedSearches          SavedSearch[]
   favoriteSellers        FavoriteSeller[]          @relation("FavoriteSellerUser")
@@ -1301,6 +1302,49 @@ model VehicleGuideCard {
   technicalInfos      VehicleGuideTechnicalInfo[]
   viewHistories       UserGuideCardViewHistory[]
   analyticsEvents     GuideAnalyticsEvent[]
+  guideComments       VehicleGuideComment[]
+}
+
+enum GuideCommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VehicleGuideComment {
+  id                  String             @id @default(uuid())
+  vehicleGuideCardId  String
+  userId              String
+
+  comment             String             @db.Text
+  usageMonths         Int                @default(0)
+  isOwner             Boolean            @default(false)
+  recommends          Boolean            @default(true)
+
+  // 7 Ratings (1 to 5 stars)
+  reliabilityRating   Int                @default(5)
+  fuelRating          Int                @default(5)
+  comfortRating       Int                @default(5)
+  partsRating         Int                @default(5)
+  maintenanceRating   Int                @default(5)
+  resaleRating        Int                @default(5)
+  overallRating       Int                @default(5)
+
+  status              GuideCommentStatus @default(PENDING)
+  rejectionReason     String?
+  moderatedAt         DateTime?
+  moderatedBy         String?
+
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  card                VehicleGuideCard   @relation(fields: [vehicleGuideCardId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleGuideCardId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model VehicleGuideCardTranslation {

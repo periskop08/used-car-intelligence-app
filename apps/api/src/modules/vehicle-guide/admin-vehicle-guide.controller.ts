@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VehicleGuideService } from './vehicle-guide.service';
@@ -7,7 +7,8 @@ import { GetUser, UserPayload } from '../auth/get-user.decorator';
 import { 
   CreateGuideCardDto, UpdateGuideCardDto,
   CreateGuideFactDto, UpdateGuideFactDto,
-  CreateTechnicalInfoDto, CardTranslationDto, FactTranslationDto
+  CreateTechnicalInfoDto, CardTranslationDto, FactTranslationDto,
+  ModerateGuideCommentDto
 } from './vehicle-guide.dto';
 
 import { BadRequestException } from '@nestjs/common';
@@ -121,6 +122,36 @@ export class AdminVehicleGuideController {
   ) {
     this.assertAdmin(user);
     return this.guideService.adminSaveFactTranslation(factId, dto);
+  }
+
+  @Get('comments/overview')
+  @ApiOperation({ summary: 'Araç rehberi yorumlarının rehber kartı bazlı moderasyon özetini getirir.' })
+  async getCommentsOverview(@GetUser() user: UserPayload) {
+    this.assertAdmin(user);
+    return this.guideService.adminGetGuideCommentsOverview();
+  }
+
+  @Get('comments/card/:guideCardId')
+  @ApiOperation({ summary: 'Belirli bir araç rehberi kartına ait tüm kullanıcı yorumlarını getirir.' })
+  async getGuideCardComments(
+    @Param('guideCardId') guideCardId: string,
+    @GetUser() user: UserPayload,
+    @Query('status') statusFilter?: string,
+  ) {
+    this.assertAdmin(user);
+    return this.guideService.adminGetGuideCardComments(guideCardId, statusFilter);
+  }
+
+  @Patch('comments/:commentId/status')
+  @ApiOperation({ summary: 'Araç rehberi yorumunun moderasyon durumunu (APPROVED / REJECTED) günceller.' })
+  async updateCommentStatus(
+    @Param('commentId') commentId: string,
+    @Body() dto: ModerateGuideCommentDto,
+    @GetUser() user: UserPayload,
+  ) {
+    this.assertAdmin(user);
+    const adminName = user.email || user.id;
+    return this.guideService.adminUpdateGuideCommentStatus(commentId, { id: user.id, name: adminName }, dto);
   }
 
   // ==========================================

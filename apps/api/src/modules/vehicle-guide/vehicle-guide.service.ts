@@ -2,13 +2,13 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException 
 import { PrismaService } from '../../prisma.service';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 const sharp = require('sharp');
-import { Locale, GuideStatus, GuideFactType, GuideSourceType, GuideEventType, DataConfidence } from '@prisma/client';
+import { Locale, GuideStatus, GuideFactType, GuideSourceType, GuideEventType, DataConfidence, GuideCommentStatus } from '@prisma/client';
 import { 
   CreateGuideCardDto, UpdateGuideCardDto,
   CreateGuideFactDto, UpdateGuideFactDto,
   CreateTechnicalInfoDto, UpdateTechnicalInfoDto,
   CardTranslationDto, FactTranslationDto, TechnicalInfoTranslationDto,
-  LogGuideEventDto
+  LogGuideEventDto, CreateVehicleGuideCommentDto, ModerateGuideCommentDto
 } from './vehicle-guide.dto';
 
 @Injectable()
@@ -790,5 +790,304 @@ export class VehicleGuideService {
       shortSummary,
       facts: formattedFacts,
     };
+  }
+
+  // ==========================================
+  // VEHICLE GUIDE COMMENTS (SİSTEM B - BAĞIMSIZ)
+  // ==========================================
+
+  async getGuideComments(guideCardId: string) {
+    const card = await this.prisma.vehicleGuideCard.findUnique({
+      where: { id: guideCardId },
+    });
+    if (!card) throw new NotFoundException('Araç Rehberi kartı bulunamadı.');
+
+    const comments = await this.prisma.vehicleGuideComment.findMany({
+      where: {
+        vehicleGuideCardId: guideCardId,
+        status: GuideCommentStatus.APPROVED,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            customerNo: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formattedComments = comments.map((c) => {
+      const u = c.user;
+      const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+      const displayName = fullName || u.username || 'Kullanıcı';
+
+      return {
+        id: c.id,
+        vehicleGuideCardId: c.vehicleGuideCardId,
+        displayName,
+        customerNo: u.customerNo || null,
+        comment: c.comment,
+        usageMonths: c.usageMonths,
+        isOwner: c.isOwner,
+        recommends: c.recommends,
+        reliabilityRating: c.reliabilityRating,
+        fuelRating: c.fuelRating,
+        comfortRating: c.comfortRating,
+        partsRating: c.partsRating,
+        maintenanceRating: c.maintenanceRating,
+        resaleRating: c.resaleRating,
+        overallRating: c.overallRating,
+        createdAt: c.createdAt,
+      };
+    });
+
+    let ratingSummary: any = null;
+    if (comments.length > 0) {
+      const avg = (key: keyof typeof comments[0]) =>
+        Number((comments.reduce((acc, curr) => acc + Number(curr[key] || 0), 0) / comments.length).toFixed(1));
+
+      ratingSummary = {
+        approvedCount: comments.length,
+        overallRating: avg('overallRating'),
+        reliabilityRating: avg('reliabilityRating'),
+        fuelRating: avg('fuelRating'),
+        comfortRating: avg('comfortRating'),
+        partsRating: avg('partsRating'),
+        maintenanceRating: avg('maintenanceRating'),
+        resaleRating: avg('resaleRating'),
+      };
+    }
+
+    return {
+      comments: formattedComments,
+      approvedCount: comments.length,
+      ratingSummary,
+    };
+  }
+
+  async createGuideComment(guideCardId: string, userId: string, dto: CreateVehicleGuideCommentDto) {
+    if (!dto.comment || dto.comment.trim().length < 20) {
+      throw new BadRequestException('Yorumunuz en az 20 karakter olmalıdır.');
+    }
+    if (dto.comment.trim().length > 1000) {
+      throw new BadRequestException('Yorumunuz en fazla 1000 karakter olabilir.');
+    }
+    if (dto.usageMonths < 0) {
+      throw new BadRequestException('Kullanım süresi negatif olamaz.');
+    }
+
+    const card = await this.prisma.vehicleGuideCard.findUnique({
+      where: { id: guideCardId },
+    });
+    if (!card) throw new NotFoundException('Araç Rehberi kartı bulunamadı.');
+
+    // Günde 1 Yorum Sınırı (SADECE Araç Rehberi yorum sistemi içindir)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const existingTodayComment = await this.prisma.vehicleGuideComment.findFirst({
+      where: {
+        userId,
+        vehicleGuideCardId: guideCardId,
+        createdAt: { gte: todayStart },
+      },
+    });
+
+    if (existingTodayComment) {
+      throw new BadRequestException('Araç Rehberi\'nde bu araç için bugün zaten bir yorum gönderdiniz. Günde en fazla 1 yorum gönderebilirsiniz.');
+    }
+
+    const newComment = await this.prisma.vehicleGuideComment.create({
+      data: {
+        vehicleGuideCardId: guideCardId,
+        userId,
+        comment: dto.comment.trim(),
+        usageMonths: Math.max(0, Math.floor(dto.usageMonths || 0)),
+        isOwner: Boolean(dto.isOwner),
+        recommends: Boolean(dto.recommends),
+        reliabilityRating: Math.min(5, Math.max(1, Math.floor(dto.reliabilityRating || 5))),
+        fuelRating: Math.min(5, Math.max(1, Math.floor(dto.fuelRating || 5))),
+        comfortRating: Math.min(5, Math.max(1, Math.floor(dto.comfortRating || 5))),
+        partsRating: Math.min(5, Math.max(1, Math.floor(dto.partsRating || 5))),
+        maintenanceRating: Math.min(5, Math.max(1, Math.floor(dto.maintenanceRating || 5))),
+        resaleRating: Math.min(5, Math.max(1, Math.floor(dto.resaleRating || 5))),
+        overallRating: Math.min(5, Math.max(1, Math.floor(dto.overallRating || 5))),
+        status: GuideCommentStatus.PENDING,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Yorumunuz alındı ve yayınlanmadan önce incelenecektir.',
+      commentId: newComment.id,
+    };
+  }
+
+  async adminGetGuideCommentsOverview() {
+    const cards = await this.prisma.vehicleGuideCard.findMany({
+      orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        generationName: true,
+        generationCode: true,
+        yearStart: true,
+        yearEnd: true,
+        heroImageUrl: true,
+        bodyType: true,
+        guideComments: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    let totalPending = 0;
+    let totalApproved = 0;
+    let totalRejected = 0;
+
+    const formattedCards = cards.map((c) => {
+      const pendingCount = c.guideComments.filter((gm) => gm.status === GuideCommentStatus.PENDING).length;
+      const approvedCount = c.guideComments.filter((gm) => gm.status === GuideCommentStatus.APPROVED).length;
+      const rejectedCount = c.guideComments.filter((gm) => gm.status === GuideCommentStatus.REJECTED).length;
+      const totalCount = c.guideComments.length;
+
+      totalPending += pendingCount;
+      totalApproved += approvedCount;
+      totalRejected += rejectedCount;
+
+      return {
+        id: c.id,
+        brand: c.brand,
+        model: c.model,
+        generationName: c.generationName,
+        generationCode: c.generationCode,
+        yearStart: c.yearStart,
+        yearEnd: c.yearEnd,
+        heroImageUrl: c.heroImageUrl,
+        bodyType: c.bodyType,
+        pendingCount,
+        approvedCount,
+        rejectedCount,
+        totalCount,
+      };
+    });
+
+    return {
+      cards: formattedCards,
+      summary: {
+        totalPending,
+        totalApproved,
+        totalRejected,
+        totalComments: totalPending + totalApproved + totalRejected,
+      },
+    };
+  }
+
+  async adminGetGuideCardComments(guideCardId: string, statusFilter?: string) {
+    const card = await this.prisma.vehicleGuideCard.findUnique({
+      where: { id: guideCardId },
+    });
+    if (!card) throw new NotFoundException('Araç Rehberi kartı bulunamadı.');
+
+    const whereClause: any = { vehicleGuideCardId: guideCardId };
+    if (statusFilter && statusFilter !== 'ALL') {
+      const sUpper = statusFilter.toUpperCase();
+      if (sUpper === 'PENDING') whereClause.status = GuideCommentStatus.PENDING;
+      else if (sUpper === 'APPROVED') whereClause.status = GuideCommentStatus.APPROVED;
+      else if (sUpper === 'REJECTED') whereClause.status = GuideCommentStatus.REJECTED;
+    }
+
+    const comments = await this.prisma.vehicleGuideComment.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            email: true,
+            customerNo: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = comments.map((c) => {
+      const u = c.user;
+      const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+      const displayName = fullName || u.username || u.email.split('@')[0];
+
+      return {
+        id: c.id,
+        vehicleGuideCardId: c.vehicleGuideCardId,
+        userId: c.userId,
+        displayName,
+        customerNo: u.customerNo || null,
+        email: u.email,
+        comment: c.comment,
+        usageMonths: c.usageMonths,
+        isOwner: c.isOwner,
+        recommends: c.recommends,
+        reliabilityRating: c.reliabilityRating,
+        fuelRating: c.fuelRating,
+        comfortRating: c.comfortRating,
+        partsRating: c.partsRating,
+        maintenanceRating: c.maintenanceRating,
+        resaleRating: c.resaleRating,
+        overallRating: c.overallRating,
+        status: c.status,
+        rejectionReason: c.rejectionReason,
+        moderatedAt: c.moderatedAt,
+        moderatedBy: c.moderatedBy,
+        createdAt: c.createdAt,
+      };
+    });
+
+    return {
+      guideCard: {
+        id: card.id,
+        brand: card.brand,
+        model: card.model,
+        generationName: card.generationName,
+        yearStart: card.yearStart,
+        yearEnd: card.yearEnd,
+        heroImageUrl: card.heroImageUrl,
+      },
+      comments: formatted,
+    };
+  }
+
+  async adminUpdateGuideCommentStatus(
+    commentId: string,
+    adminUser: { id: string; name: string },
+    dto: ModerateGuideCommentDto,
+  ) {
+    const comment = await this.prisma.vehicleGuideComment.findUnique({
+      where: { id: commentId },
+    });
+    if (!comment) throw new NotFoundException('Yorum bulunamadı.');
+
+    const updated = await this.prisma.vehicleGuideComment.update({
+      where: { id: commentId },
+      data: {
+        status: dto.status === 'APPROVED' ? GuideCommentStatus.APPROVED : GuideCommentStatus.REJECTED,
+        rejectionReason: dto.rejectionReason || null,
+        moderatedBy: adminUser.name || adminUser.id,
+        moderatedAt: new Date(),
+      },
+    });
+
+    return updated;
   }
 }

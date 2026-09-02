@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import VehicleGuideCardLayout from "@/components/VehicleGuideCardLayout";
+import VehicleGuideCommentsSection from "@/components/VehicleGuideCommentsSection";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -347,45 +348,53 @@ export default function VehicleGuidePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans overflow-hidden">
-      <main className="flex-1 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col font-sans overflow-y-auto">
+      <main className="flex-1 flex flex-col items-center justify-start p-4 md:p-8 relative gap-6">
         {loading ? (
           <div className="w-full max-w-[430px] md:max-w-[840px] h-[580px] bg-[#090d1a] border border-white/10 rounded-[48px] shadow-2xl flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
             <p className="text-slate-400 text-sm font-bold">Harika bilgiler hazırlanıyor...</p>
           </div>
         ) : currentCard ? (
-          <VehicleGuideCardLayout
-            brand={currentCard.brand}
-            model={currentCard.model}
-            generationCode={currentCard.generationCode}
-            yearStart={currentCard.yearStart}
-            yearEnd={currentCard.yearEnd}
-            bodyType={currentCard.bodyType}
-            heroImageUrl={currentCard.heroImageUrl}
-            placeholderImageUrl={currentCard.placeholderImageUrl}
-            imageAltText={currentCard.imageAltText}
-            imageSource={currentCard.imageSource}
-            imageLicense={currentCard.imageLicense}
-            licenseLabelPosition={currentCard.licenseLabelPosition}
-            imageFitMode={currentCard.imageFitMode}
-            imageObjectPosition={currentCard.imageObjectPosition}
-            shortSummary={currentCard.shortSummary}
-            facts={currentCard.facts}
-            techOpen={techOpen}
-            onToggleTech={fetchTechnicalInfo}
-            technicalInfo={technicalInfo}
-            loadingTech={loadingTech}
-            isReadonly={true}
-            onSwipePrev={handleSwipePrev}
-            onSwipeNext={handleSwipeNext}
-            hasPrev={historyStack.length > 0}
-            onCtaClick={handleCtaClick}
-            slideDirection={slideDirection}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          />
+          <>
+            <VehicleGuideCardLayout
+              brand={currentCard.brand}
+              model={currentCard.model}
+              generationCode={currentCard.generationCode}
+              yearStart={currentCard.yearStart}
+              yearEnd={currentCard.yearEnd}
+              bodyType={currentCard.bodyType}
+              heroImageUrl={currentCard.heroImageUrl}
+              placeholderImageUrl={currentCard.placeholderImageUrl}
+              imageAltText={currentCard.imageAltText}
+              imageSource={currentCard.imageSource}
+              imageLicense={currentCard.imageLicense}
+              licenseLabelPosition={currentCard.licenseLabelPosition}
+              imageFitMode={currentCard.imageFitMode}
+              imageObjectPosition={currentCard.imageObjectPosition}
+              shortSummary={currentCard.shortSummary}
+              facts={currentCard.facts}
+              techOpen={techOpen}
+              onToggleTech={fetchTechnicalInfo}
+              technicalInfo={technicalInfo}
+              loadingTech={loadingTech}
+              isReadonly={true}
+              onSwipePrev={handleSwipePrev}
+              onSwipeNext={handleSwipeNext}
+              hasPrev={historyStack.length > 0}
+              onCtaClick={handleCtaClick}
+              slideDirection={slideDirection}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            />
+
+            {/* SEPARATE INDEPENDENT VEHICLE GUIDE COMMENTS (SİSTEM B) */}
+            <VehicleGuideCommentsSection
+              guideCardId={currentCard.id}
+              guideCardTitle={`${currentCard.brand} ${currentCard.model} ${currentCard.generationCode || ""}`.trim()}
+            />
+          </>
         ) : (
           <div className="w-full max-w-[430px] md:max-w-[840px] h-[580px] bg-[#090d1a] border border-white/10 rounded-[48px] shadow-2xl flex items-center justify-center p-6 text-center">
             <p className="text-slate-400 text-sm font-bold">Görüntülenecek aktif rehber bulunamadı.</p>
