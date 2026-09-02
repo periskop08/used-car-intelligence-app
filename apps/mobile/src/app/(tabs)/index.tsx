@@ -1155,13 +1155,9 @@ export default function MobileDashboard() {
 
           <TouchableOpacity
             style={styles.searchIconButton}
-            onPress={() => {
-              setModalView('form');
-              if (brands.length === 0) fetchBrands();
-              setQueryModalVisible(true);
-            }}
+            onPress={() => router.push('/(tabs)/profile' as any)}
           >
-            <Ionicons name="search" size={20} color="#0f172a" />
+            <Ionicons name="person-circle-outline" size={24} color="#0f172a" />
           </TouchableOpacity>
         </View>
       </View>

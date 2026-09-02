@@ -99,10 +99,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profilim & Hesabım',
-          tabBarLabel: 'Profil',
+          title: 'TorqueScout Club',
+          tabBarLabel: 'Club',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={22} color={color} />
           ),
         }}
       />
