@@ -48,32 +48,35 @@ export default function AdminGuideCommentsPage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem("accessToken") || "";
-    setToken(savedToken);
-  }, []);
+  const getAuthToken = () => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+  };
 
-  const fetchOverview = async () => {
-    if (!token) return;
+  const fetchOverview = async (overrideToken?: string) => {
+    const authToken = overrideToken || token || getAuthToken();
+    if (!authToken) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/admin/vehicle-guide/comments/overview`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
         setOverviewData(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchOverview error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOverview();
-  }, [token]);
+    const savedToken = getAuthToken();
+    setToken(savedToken);
+    fetchOverview(savedToken);
+  }, []);
 
   const openCardCommentsModal = async (card: any, initialFilter: "PENDING" | "APPROVED" | "REJECTED" | "ALL" = "PENDING") => {
     setSelectedCard(card);
@@ -81,28 +84,30 @@ export default function AdminGuideCommentsPage() {
     fetchCardComments(card.id, initialFilter);
   };
 
-  const fetchCardComments = async (guideCardId: string, filter: string) => {
-    if (!token) return;
+  const fetchCardComments = async (guideCardId: string, filter: string, overrideToken?: string) => {
+    const authToken = overrideToken || token || getAuthToken();
+    if (!authToken) return;
     setDrawerLoading(true);
     try {
       const queryParams = new URLSearchParams();
       if (filter && filter !== "ALL") queryParams.append("status", filter);
 
       const res = await fetch(`${API_URL}/admin/vehicle-guide/comments/card/${guideCardId}?${queryParams.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
         setCardCommentsData(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchCardComments error:", err);
     } finally {
       setDrawerLoading(false);
     }
   };
 
   const handleModerateComment = async (commentId: string, status: "APPROVED" | "REJECTED") => {
+    const authToken = token || getAuthToken();
     let rejectionReason: string | undefined = undefined;
     if (status === "REJECTED") {
       const reasonInput = prompt("Lütfen reddetme sebebini yazın (Opsiyonel):");
@@ -115,7 +120,7 @@ export default function AdminGuideCommentsPage() {
       const res = await fetch(`${API_URL}/admin/vehicle-guide/comments/${commentId}/status`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -131,9 +136,9 @@ export default function AdminGuideCommentsPage() {
 
       // Refresh drawer & overview
       if (selectedCard) {
-        await fetchCardComments(selectedCard.id, modalStatusFilter);
+        await fetchCardComments(selectedCard.id, modalStatusFilter, authToken);
       }
-      await fetchOverview();
+      await fetchOverview(authToken);
     } catch (err: any) {
       alert(err.message || "Hata oluştu.");
     } finally {

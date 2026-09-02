@@ -46,32 +46,37 @@ export default function AdminResearchCommentsPage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem("accessToken") || "";
-    setToken(savedToken);
-  }, []);
+  const getAuthToken = () => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
+  };
 
-  const fetchOverview = async () => {
-    if (!token) return;
+  const fetchOverview = async (overrideToken?: string) => {
+    const authToken = overrideToken || token || getAuthToken();
+    if (!authToken) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/admin/vehicle-reviews/overview`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
         setOverviewData(data);
+      } else {
+        console.error("Failed to fetch overview, status:", res.status);
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchOverview error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOverview();
-  }, [token]);
+    const savedToken = getAuthToken();
+    setToken(savedToken);
+    fetchOverview(savedToken);
+  }, []);
 
   const openVariantReviewsModal = async (
     variant: any,
@@ -82,34 +87,38 @@ export default function AdminResearchCommentsPage() {
     fetchVariantReviews(variant.id, initialFilter);
   };
 
-  const fetchVariantReviews = async (variantId: string, filter: string) => {
-    if (!token) return;
+  const fetchVariantReviews = async (variantId: string, filter: string, overrideToken?: string) => {
+    const authToken = overrideToken || token || getAuthToken();
+    if (!authToken) return;
     setDrawerLoading(true);
     try {
       const queryParams = new URLSearchParams();
       if (filter && filter !== "ALL") queryParams.append("status", filter);
 
       const res = await fetch(`${API_URL}/admin/vehicle-reviews/variant/${variantId}?${queryParams.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
         setVariantReviewsData(data);
+      } else {
+        console.error("Failed to fetch variant reviews, status:", res.status);
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchVariantReviews error:", err);
     } finally {
       setDrawerLoading(false);
     }
   };
 
   const handleModerateReview = async (reviewId: string, status: "APPROVED" | "REJECTED") => {
+    const authToken = token || getAuthToken();
     setActionLoadingId(reviewId);
     try {
       const res = await fetch(`${API_URL}/admin/vehicle-reviews/${reviewId}/status`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ status }),
@@ -122,9 +131,9 @@ export default function AdminResearchCommentsPage() {
 
       // Refresh drawer & overview
       if (selectedVariant) {
-        await fetchVariantReviews(selectedVariant.id, modalStatusFilter);
+        await fetchVariantReviews(selectedVariant.id, modalStatusFilter, authToken);
       }
-      await fetchOverview();
+      await fetchOverview(authToken);
     } catch (err: any) {
       alert(err.message || "Hata oluştu.");
     } finally {
