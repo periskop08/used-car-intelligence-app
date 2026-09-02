@@ -105,6 +105,7 @@ export default function TorqueScoutClubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'ANNOUNCEMENTS' | 'POLLS' | 'DISCUSSIONS'>('ALL');
   const [token, setToken] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ profilePhotoUrl?: string; firstName?: string } | null>(null);
 
   // Comment Modal State
   const [activePostForComments, setActivePostForComments] = useState<ClubPost | null>(null);
@@ -124,8 +125,18 @@ export default function TorqueScoutClubScreen() {
 
   const loadTokenAndFeed = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('accessToken');
+      const storedToken =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
       setToken(storedToken);
+
+      if (storedToken) {
+        fetch(`${API_URL}/users/me`, { headers: { Authorization: `Bearer ${storedToken}` } })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => d && setUserProfile(d))
+          .catch(() => {});
+      }
+
       await fetchClubPosts(storedToken);
     } catch (e) {
       console.error('Error loading club:', e);
@@ -336,7 +347,16 @@ export default function TorqueScoutClubScreen() {
           style={styles.profileBtn}
           onPress={() => router.push('/(tabs)/profile' as any)}
         >
-          <Ionicons name="person-circle-outline" size={26} color="#0f172a" />
+          {userProfile?.profilePhotoUrl ? (
+            <ExpoImage
+              source={{ uri: resolvePostMediaUrl(userProfile.profilePhotoUrl) }}
+              style={styles.navProfileAvatar}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <Ionicons name="person-circle-outline" size={26} color="#0f172a" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -418,9 +438,10 @@ export default function TorqueScoutClubScreen() {
                   <View style={styles.authorAvatarWrap}>
                     {post.author?.profilePhotoUrl ? (
                       <ExpoImage
-                        source={{ uri: post.author.profilePhotoUrl }}
+                        source={{ uri: resolvePostMediaUrl(post.author.profilePhotoUrl) }}
                         style={styles.authorAvatar}
                         contentFit="cover"
+                        cachePolicy="memory-disk"
                       />
                     ) : (
                       <View style={styles.avatarPlaceholder}>
@@ -614,11 +635,21 @@ export default function TorqueScoutClubScreen() {
                         ? `${(c as any).author.firstName} ${(c as any).author.lastName || ''}`.trim()
                         : (c as any).author?.username || 'Kullanıcı');
                     const initial = (authorName[0] || 'U').toUpperCase();
+                    const authorPhoto = (c as any).author?.profilePhotoUrl || c.author?.profilePhotoUrl;
 
                     return (
                       <View key={c.id || `comment-${cIndex}`} style={styles.commentBubble}>
                         <View style={styles.commentAvatar}>
-                          <Text style={styles.commentAvatarText}>{initial}</Text>
+                          {authorPhoto ? (
+                            <ExpoImage
+                              source={{ uri: resolvePostMediaUrl(authorPhoto) }}
+                              style={styles.commentAvatarImage}
+                              contentFit="cover"
+                              cachePolicy="memory-disk"
+                            />
+                          ) : (
+                            <Text style={styles.commentAvatarText}>{initial}</Text>
+                          )}
                         </View>
                         <View style={styles.commentBody}>
                           <View style={styles.commentAuthorRow}>
@@ -827,6 +858,11 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  navProfileAvatar: {
+    width: '100%',
+    height: '100%',
   },
   filterScrollWrapper: {
     backgroundColor: '#ffffff',
@@ -1249,6 +1285,11 @@ const styles = StyleSheet.create({
     borderColor: '#fed7aa',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  commentAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   commentAvatarText: {
     fontSize: 12,

@@ -4,7 +4,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { Image as ExpoImage } from 'expo-image';
+
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+const resolveAvatarUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  if (url.includes('.r2.dev/') || url.includes('cloudflarestorage.com/')) {
+    const parts = url.split('.r2.dev/');
+    const storageKey = parts.length > 1 ? parts[1].split('?')[0] : '';
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+  return url;
+};
 
 interface UserProfile {
   id: string;
@@ -32,7 +49,9 @@ export default function ProfileScreen() {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('accessToken');
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
       if (!token) {
         setProfile(null);
         setLoading(false);
@@ -101,7 +120,12 @@ export default function ProfileScreen() {
           {/* User Profile Summary Card */}
           <View style={styles.profileCard}>
             {profile.profilePhotoUrl ? (
-              <Image source={{ uri: profile.profilePhotoUrl }} style={styles.avatarImage} />
+              <ExpoImage
+                source={{ uri: resolveAvatarUrl(profile.profilePhotoUrl) || '' }}
+                style={styles.avatarImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{getAvatarChar()}</Text>
