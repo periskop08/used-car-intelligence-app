@@ -12,6 +12,8 @@ import {
   ScrollView,
   Alert,
   Share,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +24,65 @@ import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+const TURKISH_CITIES = [
+  'Tümü',
+  'İstanbul',
+  'Ankara',
+  'İzmir',
+  'Bursa',
+  'Antalya',
+  'Adana',
+  'Konya',
+  'Gaziantep',
+  'Kayseri',
+  'Kocaeli',
+  'Samsun',
+  'Mersin',
+  'Eskişehir',
+  'Trabzon',
+  'Diyarbakır',
+  'Muğla',
+  'Denizli',
+  'Sakarya',
+  'Tekirdağ',
+  'Balıkesir',
+  'Manisa',
+  'Aydın',
+  'Hatay',
+];
+
+const FUEL_TYPES = [
+  { label: 'Benzin', val: 'PETROL' },
+  { label: 'Dizel', val: 'DIESEL' },
+  { label: 'Benzin & LPG', val: 'LPG' },
+  { label: 'Hibrit', val: 'HYBRID' },
+  { label: 'Elektrik', val: 'ELECTRIC' },
+];
+
+const TRANSMISSIONS = [
+  { label: 'Otomatik', val: 'AUTOMATIC' },
+  { label: 'Manuel', val: 'MANUAL' },
+];
+
+const BODY_TYPES = [
+  { label: 'Sedan', val: 'SEDAN' },
+  { label: 'Hatchback', val: 'HATCHBACK' },
+  { label: 'SUV', val: 'SUV' },
+  { label: 'Coupe', val: 'COUPE' },
+  { label: 'Station Wagon', val: 'WAGON' },
+];
+
+const VEHICLE_STATUSES = [
+  { label: 'İkinci El', val: 'USED' },
+  { label: 'Sıfır', val: 'NEW' },
+  { label: 'İthal Sıfır', val: 'IMPORTED_NEW' },
+];
+
+const SELLER_TYPES = [
+  { label: 'Sahibinden', val: 'INDIVIDUAL' },
+  { label: 'Galeriden', val: 'DEALER' },
+];
 
 const formatCloudflareImageUrl = (url?: string | null): string => {
   if (!url) return '';
@@ -118,6 +179,11 @@ interface Brand {
   name: string;
 }
 
+interface VehicleModel {
+  id: string;
+  name: string;
+}
+
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc';
 
 export default function ListingsScreen() {
@@ -129,18 +195,39 @@ export default function ListingsScreen() {
   const [search, setSearch] = useState('');
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
-  // View Mode: 'LIST' (sahibinden.com compact row style) or 'CARD' (large card)
+  // View Mode: 'LIST' or 'CARD'
   const [viewMode, setViewMode] = useState<'LIST' | 'CARD'>('LIST');
 
   // Filter States
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [models, setModels] = useState<VehicleModel[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
-  const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const [selectedModel, setSelectedModel] = useState<VehicleModel | null>(null);
+
+  const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minYear, setMinYear] = useState('');
+  const [maxYear, setMaxYear] = useState('');
+  const [minKm, setMinKm] = useState('');
+  const [maxKm, setMaxKm] = useState('');
+  const [selectedFuels, setSelectedFuels] = useState<string[]>([]);
+  const [selectedTransmissions, setSelectedTransmissions] = useState<string[]>([]);
+  const [selectedBodyTypes, setSelectedBodyTypes] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedSellerTypes, setSelectedSellerTypes] = useState<string[]>([]);
   const [urgentOnly, setUrgentOnly] = useState(false);
+
+  // Sorting
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
 
   // Modals
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [brandPickerVisible, setBrandPickerVisible] = useState(false);
+  const [modelPickerVisible, setModelPickerVisible] = useState(false);
+  const [cityPickerVisible, setCityPickerVisible] = useState(false);
 
   useEffect(() => {
     fetchBrands();
@@ -148,8 +235,35 @@ export default function ListingsScreen() {
   }, []);
 
   useEffect(() => {
+    if (selectedBrand) {
+      fetchModels(selectedBrand.id);
+    } else {
+      setModels([]);
+      setSelectedModel(null);
+    }
+  }, [selectedBrand]);
+
+  useEffect(() => {
     fetchListings();
-  }, [selectedBrand, sortOption, urgentOnly]);
+  }, [
+    selectedBrand,
+    selectedModel,
+    city,
+    district,
+    minPrice,
+    maxPrice,
+    minYear,
+    maxYear,
+    minKm,
+    maxKm,
+    selectedFuels,
+    selectedTransmissions,
+    selectedBodyTypes,
+    selectedStatuses,
+    selectedSellerTypes,
+    urgentOnly,
+    sortOption,
+  ]);
 
   const loadFavorites = async () => {
     try {
@@ -176,10 +290,28 @@ export default function ListingsScreen() {
       const res = await fetch(`${API_URL}/vehicles/brands`);
       if (res.ok) {
         const data = await res.json();
-        setBrands(Array.isArray(data) ? data : []);
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+          : [];
+        setBrands(sorted);
       }
     } catch (e) {
       console.error('Error fetching brands:', e);
+    }
+  };
+
+  const fetchModels = async (brandId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/vehicles/models?brandId=${brandId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+          : [];
+        setModels(sorted);
+      }
+    } catch (e) {
+      console.error('Error fetching models:', e);
     }
   };
 
@@ -187,15 +319,25 @@ export default function ListingsScreen() {
     setLoading(true);
     try {
       let url = `${API_URL}/listings?limit=50&`;
-      if (selectedBrand) {
-        url += `brandId=${selectedBrand.id}&`;
-      }
-      if (search.trim()) {
-        url += `keyword=${encodeURIComponent(search.trim())}&`;
-      }
-      if (urgentOnly) {
-        url += `urgentOnly=true&`;
-      }
+      if (selectedBrand) url += `brandId=${selectedBrand.id}&`;
+      if (selectedModel) url += `modelId=${selectedModel.id}&`;
+      if (search.trim()) url += `keyword=${encodeURIComponent(search.trim())}&`;
+      if (city.trim() && city !== 'Tümü') url += `city=${encodeURIComponent(city.trim())}&`;
+      if (district.trim()) url += `district=${encodeURIComponent(district.trim())}&`;
+      if (minPrice.trim()) url += `minPrice=${minPrice.trim()}&`;
+      if (maxPrice.trim()) url += `maxPrice=${maxPrice.trim()}&`;
+      if (minYear.trim()) url += `minYear=${minYear.trim()}&`;
+      if (maxYear.trim()) url += `maxYear=${maxYear.trim()}&`;
+      if (minKm.trim()) url += `minKm=${minKm.trim()}&`;
+      if (maxKm.trim()) url += `maxKm=${maxKm.trim()}&`;
+      if (urgentOnly) url += `urgentOnly=true&`;
+
+      if (selectedFuels.length === 1) url += `fuelType=${selectedFuels[0]}&`;
+      if (selectedTransmissions.length === 1) url += `transmission=${selectedTransmissions[0]}&`;
+      if (selectedBodyTypes.length === 1) url += `bodyType=${selectedBodyTypes[0]}&`;
+      if (selectedStatuses.length === 1) url += `vehicleStatus=${selectedStatuses[0]}&`;
+      if (selectedSellerTypes.length === 1) url += `sellerType=${selectedSellerTypes[0]}&`;
+
       if (sortOption === 'price_asc') url += `sort=price_asc&`;
       else if (sortOption === 'price_desc') url += `sort=price_desc&`;
       else if (sortOption === 'km_asc') url += `sort=km_asc&`;
@@ -204,7 +346,7 @@ export default function ListingsScreen() {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const items = Array.isArray(data)
+        let items: ListingItem[] = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
           ? data.items
@@ -213,6 +355,17 @@ export default function ListingsScreen() {
           : Array.isArray(data?.listings)
           ? data.listings
           : [];
+
+        // Client-side multi-filter fallback
+        if (selectedFuels.length > 1) {
+          items = items.filter((i) => i.fuelType && selectedFuels.includes(i.fuelType));
+        }
+        if (selectedTransmissions.length > 1) {
+          items = items.filter(
+            (i) => i.transmission && selectedTransmissions.includes(i.transmission)
+          );
+        }
+
         setListings(items);
       } else {
         console.warn('Listings fetch non-ok status:', res.status);
@@ -229,6 +382,56 @@ export default function ListingsScreen() {
     setRefreshing(true);
     fetchListings();
     loadFavorites();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedBrand(null);
+    setSelectedModel(null);
+    setCity('');
+    setDistrict('');
+    setMinPrice('');
+    setMaxPrice('');
+    setMinYear('');
+    setMaxYear('');
+    setMinKm('');
+    setMaxKm('');
+    setSelectedFuels([]);
+    setSelectedTransmissions([]);
+    setSelectedBodyTypes([]);
+    setSelectedStatuses([]);
+    setSelectedSellerTypes([]);
+    setUrgentOnly(false);
+    setSearch('');
+  };
+
+  const countActiveFilters = () => {
+    let count = 0;
+    if (selectedBrand) count++;
+    if (selectedModel) count++;
+    if (city && city !== 'Tümü') count++;
+    if (district) count++;
+    if (minPrice || maxPrice) count++;
+    if (minYear || maxYear) count++;
+    if (minKm || maxKm) count++;
+    if (selectedFuels.length > 0) count++;
+    if (selectedTransmissions.length > 0) count++;
+    if (selectedBodyTypes.length > 0) count++;
+    if (selectedStatuses.length > 0) count++;
+    if (selectedSellerTypes.length > 0) count++;
+    if (urgentOnly) count++;
+    return count;
+  };
+
+  const toggleArrayFilter = (
+    list: string[],
+    setList: React.Dispatch<React.SetStateAction<string[]>>,
+    val: string
+  ) => {
+    if (list.includes(val)) {
+      setList(list.filter((x) => x !== val));
+    } else {
+      setList([...list, val]);
+    }
   };
 
   const handleShareSearch = async () => {
@@ -296,11 +499,10 @@ export default function ListingsScreen() {
     }
   };
 
-  // SAHIBINDEN.COM STYLE ROW RENDER
+  // SAHIBINDEN ROW RENDER
   const renderListRow = ({ item }: { item: ListingItem }) => {
     const brandName = item.vehicleVariant?.brand?.name || '';
     const modelName = item.vehicleVariant?.model?.name || '';
-    const trimName = item.vehicleVariant?.trim?.name || '';
     const year = item.year || item.vehicleVariant?.year || '';
     const priceVal = item.priceAmount ?? item.price ?? 0;
     const kmVal = item.kilometers ?? item.mileage ?? 0;
@@ -319,7 +521,6 @@ export default function ListingsScreen() {
         activeOpacity={0.7}
         onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } } as any)}
       >
-        {/* Left Thumbnail Image */}
         <View style={styles.shThumbnailWrap}>
           <ExpoImage
             source={{ uri: resolvedImageUrl }}
@@ -334,14 +535,11 @@ export default function ListingsScreen() {
           )}
         </View>
 
-        {/* Right Info Details */}
         <View style={styles.shInfoContainer}>
-          {/* Title */}
           <Text style={styles.shListingTitle} numberOfLines={2}>
             {item.title}
           </Text>
 
-          {/* Specs / Seller Tag */}
           <View style={styles.shSpecsRow}>
             {!!year && <Text style={styles.shSpecText}>{year}</Text>}
             {!!year && <Text style={styles.shDot}>•</Text>}
@@ -357,7 +555,6 @@ export default function ListingsScreen() {
             )}
           </View>
 
-          {/* Bottom Row: Location Left, Price Right */}
           <View style={styles.shBottomRow}>
             <View style={styles.shLocationGroup}>
               <Ionicons name="location-sharp" size={12} color="#94a3b8" />
@@ -375,14 +572,12 @@ export default function ListingsScreen() {
     );
   };
 
-  // CARD / VITRIN STYLE RENDER
+  // CARD RENDER
   const renderCardItem = ({ item }: { item: ListingItem }) => {
     const brandName = item.vehicleVariant?.brand?.name || '';
     const modelName = item.vehicleVariant?.model?.name || '';
     const trimName = item.vehicleVariant?.trim?.name || '';
-    const year = item.year || item.vehicleVariant?.year || '';
     const priceVal = item.priceAmount ?? item.price ?? 0;
-    const kmVal = item.kilometers ?? item.mileage ?? 0;
 
     const firstImage =
       item.media?.[0]?.url ||
@@ -454,22 +649,11 @@ export default function ListingsScreen() {
     );
   };
 
-  const getSortDisplayName = () => {
-    switch (sortOption) {
-      case 'price_asc':
-        return 'Fiyat: Artan';
-      case 'price_desc':
-        return 'Fiyat: Azalan';
-      case 'km_asc':
-        return 'Km: En Düşük';
-      default:
-        return 'En Yeni';
-    }
-  };
+  const activeFilterCount = countActiveFilters();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* TOP APPBAR (WHITE THEME) */}
+      {/* TOP APPBAR */}
       <View style={styles.topAppBar}>
         <TouchableOpacity
           style={styles.appBarIconBtn}
@@ -495,23 +679,23 @@ export default function ListingsScreen() {
         </View>
       </View>
 
-      {/* SAHIBINDEN STYLE 4-GRID FILTER SUB-BAR */}
+      {/* 4-GRID SUB-BAR */}
       <View style={styles.subMenuBar}>
         {/* 1. Filtrele */}
         <TouchableOpacity
-          style={[styles.subMenuBtn, selectedBrand && styles.subMenuBtnActive]}
+          style={[styles.subMenuBtn, activeFilterCount > 0 && styles.subMenuBtnActive]}
           onPress={() => setFilterModalVisible(true)}
         >
           <Ionicons
             name="funnel-outline"
             size={14}
-            color={selectedBrand ? '#ea580c' : '#334155'}
+            color={activeFilterCount > 0 ? '#ea580c' : '#334155'}
           />
           <Text
-            style={[styles.subMenuBtnText, selectedBrand && styles.subMenuBtnTextActive]}
+            style={[styles.subMenuBtnText, activeFilterCount > 0 && styles.subMenuBtnTextActive]}
             numberOfLines={1}
           >
-            {selectedBrand ? selectedBrand.name : 'Filtrele'}
+            Filtrele {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
           </Text>
         </TouchableOpacity>
 
@@ -530,7 +714,7 @@ export default function ListingsScreen() {
 
         <View style={styles.subMenuDivider} />
 
-        {/* 3. Görünüm (Liste / Kart Toggle) */}
+        {/* 3. Görünüm (Toggle) */}
         <TouchableOpacity
           style={styles.subMenuBtn}
           onPress={() => setViewMode(viewMode === 'LIST' ? 'CARD' : 'LIST')}
@@ -545,7 +729,7 @@ export default function ListingsScreen() {
 
         <View style={styles.subMenuDivider} />
 
-        {/* 4. Aramayı Kaydet */}
+        {/* 4. Kaydet */}
         <TouchableOpacity style={styles.subMenuBtn} onPress={handleSaveSearch}>
           <Ionicons name="bookmark-outline" size={14} color="#334155" />
           <Text style={styles.subMenuBtnText} numberOfLines={1}>
@@ -554,7 +738,7 @@ export default function ListingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* INLINE SEARCH BOX */}
+      {/* SEARCH BOX & QUICK CHIP */}
       <View style={styles.searchWrap}>
         <View style={styles.searchInner}>
           <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 6 }} />
@@ -590,14 +774,57 @@ export default function ListingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ACTIVE FILTER NOTICE TAG */}
-      {selectedBrand && (
+      {/* ACTIVE FILTERS SUMMARY CHIPS */}
+      {activeFilterCount > 0 && (
         <View style={styles.activeFilterNotice}>
-          <Text style={styles.activeFilterNoticeText}>
-            Marka Filtresi: <Text style={{ fontWeight: '900' }}>{selectedBrand.name}</Text>
-          </Text>
-          <TouchableOpacity onPress={() => setSelectedBrand(null)}>
-            <Ionicons name="close" size={16} color="#ea580c" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {selectedBrand && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => setSelectedBrand(null)}
+              >
+                <Text style={styles.filterTagPillText}>{selectedBrand.name}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {selectedModel && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => setSelectedModel(null)}
+              >
+                <Text style={styles.filterTagPillText}>{selectedModel.name}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {city && city !== 'Tümü' && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setCity('')}>
+                <Text style={styles.filterTagPillText}>{city}</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {(minPrice || maxPrice) && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => {
+                  setMinPrice('');
+                  setMaxPrice('');
+                }}
+              >
+                <Text style={styles.filterTagPillText}>
+                  {minPrice ? `${minPrice} TL` : '0'} - {maxPrice ? `${maxPrice} TL` : 'Max'}
+                </Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {urgentOnly && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setUrgentOnly(false)}>
+                <Text style={styles.filterTagPillText}>Acil İlanlar</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+          <TouchableOpacity onPress={handleClearFilters} style={{ marginLeft: 8 }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#ea580c' }}>Temizle</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -615,15 +842,7 @@ export default function ListingsScreen() {
           <Text style={styles.emptySub}>
             Filtreleri sıfırlayarak veya arama terimini değiştirerek tekrar deneyebilirsiniz.
           </Text>
-          <TouchableOpacity
-            style={styles.resetFiltersBtn}
-            onPress={() => {
-              setSelectedBrand(null);
-              setSearch('');
-              setUrgentOnly(false);
-              setSortOption('newest');
-            }}
-          >
+          <TouchableOpacity style={styles.resetFiltersBtn} onPress={handleClearFilters}>
             <Text style={styles.resetFiltersBtnText}>Filtreleri Sıfırla</Text>
           </TouchableOpacity>
         </View>
@@ -647,78 +866,426 @@ export default function ListingsScreen() {
         />
       )}
 
-      {/* 1. FILTER MODAL (MARKA & KRİTERLER) */}
+      {/* ========================================================================= */}
+      {/* 🌟 WEB-MATCHED DETAILED FILTER MODAL 🌟 */}
+      {/* ========================================================================= */}
       <Modal
         visible={filterModalVisible}
         animationType="slide"
-        transparent={true}
+        presentationStyle="pageSheet"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>İlanları Filtrele</Text>
+        <SafeAreaView style={styles.filterModalContainer} edges={['top', 'bottom']}>
+          {/* Modal Header */}
+          <View style={styles.filterModalHeader}>
+            <TouchableOpacity onPress={handleClearFilters}>
+              <Text style={styles.filterModalResetText}>Temizle</Text>
+            </TouchableOpacity>
+            <Text style={styles.filterModalTitle}>Detaylı Filtreleme</Text>
+            <TouchableOpacity
+              style={styles.modalCloseCircle}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Ionicons name="close" size={20} color="#0f172a" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter Body Scroll */}
+          <ScrollView
+            style={styles.filterModalScroll}
+            contentContainerStyle={styles.filterModalScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 1. ADRES (İL / İLÇE) */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>📍 ADRES (İL / İLÇE)</Text>
               <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setFilterModalVisible(false)}
+                style={styles.dropdownSelector}
+                onPress={() => setCityPickerVisible(true)}
               >
-                <Ionicons name="close" size={20} color="#64748b" />
+                <Text style={[styles.dropdownSelectorText, !!city && styles.dropdownSelectedText]}>
+                  {city || 'İl Seçin'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TextInput
+                style={styles.filterTextInput}
+                placeholder="İlçe girin (Örn: Kadıköy)..."
+                placeholderTextColor="#94a3b8"
+                value={district}
+                onChangeText={setDistrict}
+              />
+            </View>
+
+            {/* 2. MARKA & MODEL */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🚗 MARKA & MODEL</Text>
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => setBrandPickerVisible(true)}
+              >
+                <Text
+                  style={[
+                    styles.dropdownSelectorText,
+                    !!selectedBrand && styles.dropdownSelectedText,
+                  ]}
+                >
+                  {selectedBrand ? selectedBrand.name : 'Marka Seçin'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dropdownSelector, !selectedBrand && { opacity: 0.5 }]}
+                disabled={!selectedBrand}
+                onPress={() => setModelPickerVisible(true)}
+              >
+                <Text
+                  style={[
+                    styles.dropdownSelectorText,
+                    !!selectedModel && styles.dropdownSelectedText,
+                  ]}
+                >
+                  {selectedModel ? selectedModel.name : 'Model Seçin'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#94a3b8" />
               </TouchableOpacity>
             </View>
 
+            {/* 3. FİYAT ARALIĞI */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>💰 FİYAT ARALIĞI (TL)</Text>
+              <View style={styles.rangeRow}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min TL"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={minPrice}
+                  onChangeText={setMinPrice}
+                />
+                <Text style={styles.rangeDash}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max TL"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={maxPrice}
+                  onChangeText={setMaxPrice}
+                />
+              </View>
+            </View>
+
+            {/* 4. MODEL YILI */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>📅 MODEL YILI</Text>
+              <View style={styles.rangeRow}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min Yıl (2015)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={minYear}
+                  onChangeText={setMinYear}
+                />
+                <Text style={styles.rangeDash}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max Yıl (2024)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={maxYear}
+                  onChangeText={setMaxYear}
+                />
+              </View>
+            </View>
+
+            {/* 5. KİLOMETRE */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🛣️ KİLOMETRE</Text>
+              <View style={styles.rangeRow}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min KM"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={minKm}
+                  onChangeText={setMinKm}
+                />
+                <Text style={styles.rangeDash}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max KM"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={maxKm}
+                  onChangeText={setMaxKm}
+                />
+              </View>
+            </View>
+
+            {/* 6. ARAÇ DURUMU */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>⚡ ARAÇ DURUMU</Text>
+              <View style={styles.chipsWrap}>
+                {VEHICLE_STATUSES.map((s) => {
+                  const isSelected = selectedStatuses.includes(s.val);
+                  return (
+                    <TouchableOpacity
+                      key={s.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(selectedStatuses, setSelectedStatuses, s.val)
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 7. YAKIT TİPİ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>⛽ YAKIT TİPİ</Text>
+              <View style={styles.chipsWrap}>
+                {FUEL_TYPES.map((f) => {
+                  const isSelected = selectedFuels.includes(f.val);
+                  return (
+                    <TouchableOpacity
+                      key={f.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(selectedFuels, setSelectedFuels, f.val)
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {f.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 8. VİTES TİPİ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🕹️ VİTES</Text>
+              <View style={styles.chipsWrap}>
+                {TRANSMISSIONS.map((t) => {
+                  const isSelected = selectedTransmissions.includes(t.val);
+                  return (
+                    <TouchableOpacity
+                      key={t.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(
+                          selectedTransmissions,
+                          setSelectedTransmissions,
+                          t.val
+                        )
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 9. KASA TİPİ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🚘 KASA TİPİ</Text>
+              <View style={styles.chipsWrap}>
+                {BODY_TYPES.map((b) => {
+                  const isSelected = selectedBodyTypes.includes(b.val);
+                  return (
+                    <TouchableOpacity
+                      key={b.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(selectedBodyTypes, setSelectedBodyTypes, b.val)
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {b.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 10. KİMDEN / SATICI TÜRÜ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>👤 KİMDEN</Text>
+              <View style={styles.chipsWrap}>
+                {SELLER_TYPES.map((st) => {
+                  const isSelected = selectedSellerTypes.includes(st.val);
+                  return (
+                    <TouchableOpacity
+                      key={st.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(
+                          selectedSellerTypes,
+                          setSelectedSellerTypes,
+                          st.val
+                        )
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {st.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 11. ACİL SATIŞ TOGGLE */}
+            <TouchableOpacity
+              style={[styles.urgentToggleRow, urgentOnly && styles.urgentToggleRowActive]}
+              onPress={() => setUrgentOnly(!urgentOnly)}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons
+                  name="flame"
+                  size={20}
+                  color={urgentOnly ? '#ef4444' : '#64748b'}
+                />
+                <View>
+                  <Text
+                    style={[
+                      styles.urgentToggleTitle,
+                      urgentOnly && { color: '#ef4444' },
+                    ]}
+                  >
+                    Sadece Acil İlanları Göster
+                  </Text>
+                  <Text style={styles.urgentToggleSub}>
+                    Fiyatı düşen acil satışlı araçlar
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name={urgentOnly ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={urgentOnly ? '#ef4444' : '#94a3b8'}
+              />
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Sticky Bottom Apply Button */}
+          <View style={styles.filterModalFooter}>
+            <TouchableOpacity
+              style={styles.applyFilterBtn}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Text style={styles.applyFilterBtnText}>
+                Filtreleri Uygula ({listings.length} İlan)
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* BRAND SELECTION SHEET */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={brandPickerVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setBrandPickerVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Marka Seçin</Text>
+              <TouchableOpacity
+                style={styles.modalCloseCircle}
+                onPress={() => setBrandPickerVisible(false)}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
             <ScrollView
               style={{ maxHeight: 420 }}
-              contentContainerStyle={{ padding: 16, gap: 12 }}
-              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: 14, gap: 8 }}
             >
-              <Text style={styles.filterSectionHeader}>MARKA SEÇİMİ</Text>
               <TouchableOpacity
-                style={[
-                  styles.brandOptionItem,
-                  !selectedBrand && styles.brandOptionSelected,
-                ]}
+                style={[styles.pickerItem, !selectedBrand && styles.pickerItemSelected]}
                 onPress={() => {
                   setSelectedBrand(null);
-                  setFilterModalVisible(false);
+                  setSelectedModel(null);
+                  setBrandPickerVisible(false);
                 }}
               >
                 <Text
                   style={[
-                    styles.brandOptionText,
-                    !selectedBrand && styles.brandOptionTextSelected,
+                    styles.pickerItemText,
+                    !selectedBrand && styles.pickerItemTextSelected,
                   ]}
                 >
                   Tüm Markalar
                 </Text>
                 {!selectedBrand && (
-                  <Ionicons name="checkmark-circle" size={18} color="#0369a1" />
+                  <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
                 )}
               </TouchableOpacity>
-
               {brands.map((b) => {
                 const isSelected = selectedBrand?.id === b.id;
                 return (
                   <TouchableOpacity
                     key={b.id}
-                    style={[
-                      styles.brandOptionItem,
-                      isSelected && styles.brandOptionSelected,
-                    ]}
+                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
                     onPress={() => {
                       setSelectedBrand(b);
-                      setFilterModalVisible(false);
+                      setSelectedModel(null);
+                      setBrandPickerVisible(false);
                     }}
                   >
                     <Text
                       style={[
-                        styles.brandOptionText,
-                        isSelected && styles.brandOptionTextSelected,
+                        styles.pickerItemText,
+                        isSelected && styles.pickerItemTextSelected,
                       ]}
                     >
                       {b.name}
                     </Text>
                     {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color="#0369a1" />
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
                     )}
                   </TouchableOpacity>
                 );
@@ -728,7 +1295,138 @@ export default function ListingsScreen() {
         </View>
       </Modal>
 
-      {/* 2. SORT MODAL (SIRALAMA SEÇENEKLERİ) */}
+      {/* ========================================================================= */}
+      {/* MODEL SELECTION SHEET */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={modelPickerVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModelPickerVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedBrand ? `${selectedBrand.name} Modelleri` : 'Model Seçin'}
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseCircle}
+                onPress={() => setModelPickerVisible(false)}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ padding: 14, gap: 8 }}
+            >
+              <TouchableOpacity
+                style={[styles.pickerItem, !selectedModel && styles.pickerItemSelected]}
+                onPress={() => {
+                  setSelectedModel(null);
+                  setModelPickerVisible(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.pickerItemText,
+                    !selectedModel && styles.pickerItemTextSelected,
+                  ]}
+                >
+                  Tüm Modeller
+                </Text>
+                {!selectedModel && (
+                  <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                )}
+              </TouchableOpacity>
+              {models.map((m) => {
+                const isSelected = selectedModel?.id === m.id;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                    onPress={() => {
+                      setSelectedModel(m);
+                      setModelPickerVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerItemText,
+                        isSelected && styles.pickerItemTextSelected,
+                      ]}
+                    >
+                      {m.name}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* CITY SELECTION SHEET */}
+      {/* ========================================================================= */}
+      <Modal
+        visible={cityPickerVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCityPickerVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>İl Seçin</Text>
+              <TouchableOpacity
+                style={styles.modalCloseCircle}
+                onPress={() => setCityPickerVisible(false)}
+              >
+                <Ionicons name="close" size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ padding: 14, gap: 8 }}
+            >
+              {TURKISH_CITIES.map((c) => {
+                const isSelected = city === c || (!city && c === 'Tümü');
+                return (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
+                    onPress={() => {
+                      setCity(c === 'Tümü' ? '' : c);
+                      setCityPickerVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerItemText,
+                        isSelected && styles.pickerItemTextSelected,
+                      ]}
+                    >
+                      {c}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* SORT OPTIONS SHEET */}
+      {/* ========================================================================= */}
       <Modal
         visible={sortModalVisible}
         animationType="slide"
@@ -736,18 +1434,17 @@ export default function ListingsScreen() {
         onRequestClose={() => setSortModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalSheet}>
+          <View style={styles.pickerSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>İlanları Sırala</Text>
               <TouchableOpacity
-                style={styles.modalCloseBtn}
+                style={styles.modalCloseCircle}
                 onPress={() => setSortModalVisible(false)}
               >
-                <Ionicons name="close" size={20} color="#64748b" />
+                <Ionicons name="close" size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
-
-            <View style={{ padding: 16, gap: 10 }}>
+            <View style={{ padding: 14, gap: 8 }}>
               {[
                 { key: 'newest', label: 'Tarihe Göre (Önce en yeni)' },
                 { key: 'price_asc', label: 'Fiyata Göre (Önce en düşük)' },
@@ -758,10 +1455,7 @@ export default function ListingsScreen() {
                 return (
                   <TouchableOpacity
                     key={opt.key}
-                    style={[
-                      styles.brandOptionItem,
-                      isSelected && styles.brandOptionSelected,
-                    ]}
+                    style={[styles.pickerItem, isSelected && styles.pickerItemSelected]}
                     onPress={() => {
                       setSortOption(opt.key as SortOption);
                       setSortModalVisible(false);
@@ -769,14 +1463,14 @@ export default function ListingsScreen() {
                   >
                     <Text
                       style={[
-                        styles.brandOptionText,
-                        isSelected && styles.brandOptionTextSelected,
+                        styles.pickerItemText,
+                        isSelected && styles.pickerItemTextSelected,
                       ]}
                     >
                       {opt.label}
                     </Text>
                     {isSelected && (
-                      <Ionicons name="checkmark-circle" size={18} color="#0369a1" />
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
                     )}
                   </TouchableOpacity>
                 );
@@ -798,7 +1492,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff', // Clean white background
+    backgroundColor: '#ffffff',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -817,7 +1511,7 @@ const styles = StyleSheet.create({
   appBarTitle: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#0f172a', // Dark navy / slate title matching other tabs
+    color: '#0f172a',
     letterSpacing: 0.3,
   },
   appBarSubTitle: {
@@ -918,14 +1612,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#fff7ed',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderBottomWidth: 1,
     borderBottomColor: '#fed7aa',
   },
-  activeFilterNoticeText: {
-    fontSize: 12,
-    color: '#9a3412',
+  filterTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  filterTagPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#c2410c',
   },
   centerLoading: {
     flex: 1,
@@ -977,7 +1683,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f1f5f9',
   },
-  /* SAHIBINDEN ROW ITEM STYLES */
   shRowCard: {
     flexDirection: 'row',
     paddingHorizontal: 12,
@@ -1062,9 +1767,8 @@ const styles = StyleSheet.create({
   shPriceText: {
     fontSize: 14.5,
     fontWeight: '900',
-    color: '#ea580c', // Orange price text
+    color: '#ea580c',
   },
-  /* CARD VIEW STYLES */
   cardContent: {
     padding: 14,
     gap: 14,
@@ -1171,13 +1875,193 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ea580c',
   },
-  /* MODAL STYLES */
+  /* DETAILED FILTER MODAL STYLES */
+  filterModalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  filterModalTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  filterModalResetText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  modalCloseCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterModalScroll: {
+    flex: 1,
+  },
+  filterModalScrollContent: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 40,
+  },
+  filterCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 10,
+  },
+  filterCardTitle: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#475569',
+    letterSpacing: 0.5,
+  },
+  dropdownSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  dropdownSelectorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  dropdownSelectedText: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  filterTextInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  rangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rangeInput: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  rangeDash: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chipPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  chipPillActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  chipPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  chipPillTextActive: {
+    color: '#ea580c',
+    fontWeight: '900',
+  },
+  urgentToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  urgentToggleRowActive: {
+    backgroundColor: '#fff1f2',
+    borderColor: '#fecdd3',
+  },
+  urgentToggleTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  urgentToggleSub: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  filterModalFooter: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  applyFilterBtn: {
+    backgroundColor: '#ea580c',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  applyFilterBtnText: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  /* PICKER BOTTOM SHEETS */
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalSheet: {
+  pickerSheet: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -1197,21 +2081,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0f172a',
   },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterSectionHeader: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.5,
-  },
-  brandOptionItem: {
+  pickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1222,16 +2092,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  brandOptionSelected: {
+  pickerItemSelected: {
     backgroundColor: '#fff7ed',
     borderColor: '#ea580c',
   },
-  brandOptionText: {
+  pickerItemText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#334155',
   },
-  brandOptionTextSelected: {
+  pickerItemTextSelected: {
     color: '#ea580c',
     fontWeight: '900',
   },
