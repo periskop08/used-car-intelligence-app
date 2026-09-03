@@ -18,10 +18,67 @@ import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image as ExpoImage } from 'expo-image';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 
 const { width: windowWidth } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+const formatCloudflareImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
+
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+
+  return url;
+};
+
+const resolveVehicleImageUrl = (
+  url?: string | null,
+  brand?: string,
+  modelFamily?: string
+): string => {
+  const formatted = formatCloudflareImageUrl(url);
+  if (formatted) return formatted;
+
+  if (brand && modelFamily) {
+    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
+    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+    }
+    const modelKey = modelFamily.toLowerCase().trim();
+    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    }
+  }
+  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+};
 
 interface Brand {
   id: string;
@@ -588,7 +645,14 @@ export default function MobileDashboard() {
             const yearVal = Number(item.modelYear || item.year || item.vehicleVariant?.year || 2020);
             const kmVal = Number(item.kilometers || item.mileage || 0);
             
-            const imgUrl = item.media?.[0]?.url || item.images?.[0] || DEFAULT_VITRIN_ITEMS[idx % DEFAULT_VITRIN_ITEMS.length].imageUrl;
+            const firstImage =
+              item.media?.[0]?.url ||
+              item.media?.[0]?.mediaUrl ||
+              item.photos?.[0]?.url ||
+              item.images?.[0] ||
+              null;
+
+            const imgUrl = resolveVehicleImageUrl(firstImage, brandStr, modelStr);
 
             return {
               id: item.id || `api-${idx}`,
@@ -1268,7 +1332,12 @@ export default function MobileDashboard() {
                   onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
                 >
                   <View style={styles.vitrinImageContainer}>
-                    <Image source={{ uri: item.imageUrl }} style={styles.vitrinCarImage} resizeMode="cover" />
+                    <ExpoImage
+                      source={{ uri: item.imageUrl }}
+                      style={styles.vitrinCarImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
 
                     {item.isUrgent && (
                       <View style={{ position: 'absolute', top: 10, left: 10 }}>
