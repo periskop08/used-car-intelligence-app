@@ -25,16 +25,28 @@ export class AdminPricingController {
   async updateSubscriptionPrice(
     @Request() req: any,
     @Param('tier') tier: SubscriptionTier,
-    @Body() body: { newPrice: number; reason?: string }
+    @Body()
+    body: {
+      newPrice?: number;
+      limits?: {
+        aiReports?: number;
+        aiChat?: number;
+        activeListings?: number;
+        listingDurationDays?: number;
+        comparisons?: number;
+        maxVehiclesPerComparison?: number;
+        vitrinListings?: number;
+      };
+      reason?: string;
+    }
   ) {
     this.checkAdminPermission(req.user);
-    if (body.newPrice === undefined || body.newPrice === null || isNaN(Number(body.newPrice))) {
-      throw new BadRequestException('newPrice sayısal bir değer olmalıdır.');
-    }
+    const newPrice = body.newPrice !== undefined && body.newPrice !== null ? Number(body.newPrice) : undefined;
     return this.subscriptionService.updateSubscriptionPrice(
       req.user,
       tier,
-      Number(body.newPrice),
+      newPrice,
+      body.limits,
       body.reason
     );
   }

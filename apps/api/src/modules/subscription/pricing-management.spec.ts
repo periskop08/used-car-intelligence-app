@@ -86,7 +86,7 @@ describe('Pricing Management & Financial Integrity Tests', () => {
     mockPrisma.subscription.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.packagePriceHistory.create.mockResolvedValue({});
 
-    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.YETKIN, 599, 'Enflasyon düzenlemesi');
+    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.YETKIN, 599, undefined, 'Enflasyon düzenlemesi');
 
     expect(result.success).toBe(true);
     expect(result.oldPrice).toBe(499);
@@ -96,7 +96,7 @@ describe('Pricing Management & Financial Integrity Tests', () => {
     // Verify catalog price updated
     expect(mockPrisma.subscriptionPlan.update).toHaveBeenCalledWith({
       where: { id: 'plan-yetkin' },
-      data: { priceTrl: 599 },
+      data: { priceTrl: 599, limits: expect.any(Object) },
     });
 
     // Verify next renewal updated for paid subscriber
@@ -132,7 +132,7 @@ describe('Pricing Management & Financial Integrity Tests', () => {
     mockPrisma.subscription.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.packagePriceHistory.create.mockResolvedValue({});
 
-    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.YETKIN, 649, 'İkinci düzenleme');
+    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.YETKIN, 649, undefined, 'İkinci düzenleme');
 
     expect(result.newPrice).toBe(649);
     expect(mockPrisma.subscription.updateMany).toHaveBeenCalledWith({
@@ -221,10 +221,49 @@ describe('Pricing Management & Financial Integrity Tests', () => {
     mockPrisma.subscriptionPlan.update.mockResolvedValue({});
     mockPrisma.packagePriceHistory.create.mockResolvedValue({});
 
-    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.PROFESYONEL, 1799, 'Fiyat artışı');
+    const result = await subscriptionService.updateSubscriptionPrice(adminUser, SubscriptionTier.PROFESYONEL, 1799, undefined, 'Fiyat artışı');
 
     expect(result.success).toBe(true);
     expect(result.affectedSubscribersCount).toBe(0); // 0 paid subscribers affected
     expect(mockPrisma.subscription.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('TEST G: Updating numeric entitlement limits (e.g. aiReports 5 -> 12) updates SubscriptionPlan limits in DB', async () => {
+    mockPrisma.subscriptionPlan.findUnique.mockResolvedValue({
+      id: 'plan-yetkin',
+      tier: SubscriptionTier.YETKIN,
+      name: 'Yetkin Paket',
+      priceTrl: 499,
+      limits: { aiReports: 5, aiChat: 50, activeListings: 5, listingDurationDays: 30, comparisons: 20, maxVehiclesPerComparison: 5, vitrinListings: 1 },
+    });
+
+    mockPrisma.subscription.findMany.mockResolvedValue([]);
+    mockPrisma.subscriptionPlan.update.mockResolvedValue({});
+    mockPrisma.packagePriceHistory.create.mockResolvedValue({});
+
+    const result = await subscriptionService.updateSubscriptionPrice(
+      adminUser,
+      SubscriptionTier.YETKIN,
+      599,
+      { aiReports: 12, aiChat: 60 },
+      'Rapor hakkı artışı'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.newPrice).toBe(599);
+    expect(result.limits.aiReports).toBe(12);
+    expect(result.limits.aiChat).toBe(60);
+
+    expect(mockPrisma.subscriptionPlan.update).toHaveBeenCalledWith({
+      where: { id: 'plan-yetkin' },
+      data: {
+        priceTrl: 599,
+        limits: expect.objectContaining({
+          aiReports: 12,
+          aiChat: 60,
+          activeListings: 5,
+        }),
+      },
+    });
   });
 });

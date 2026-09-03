@@ -119,34 +119,20 @@ export class SubscriptionService {
       };
     }
 
-    let tierName = 'Tanışma Paketi';
-    let baseAiReports = 3;
-    let baseAiChat = 3;
-    let baseActiveListings = 1;
-    let listingDurationDays = 30;
-    let baseComparisons = 3;
-    let maxVehiclesPerComparison = 2;
-    let baseVitrin = 0;
+    // Fetch live plan limits from database
+    const dbPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { tier: effectiveTier },
+    });
 
-    if (effectiveTier === SubscriptionTier.PROFESYONEL || effectiveTier === SubscriptionTier.PREMIUM || effectiveTier === SubscriptionTier.PRO) {
-      tierName = 'Profesyonel Paket';
-      baseAiReports = 50;
-      baseAiChat = 150;
-      baseActiveListings = 50;
-      listingDurationDays = 45;
-      baseComparisons = 30;
-      maxVehiclesPerComparison = 10;
-      baseVitrin = 5;
-    } else if (effectiveTier === SubscriptionTier.YETKIN || effectiveTier === SubscriptionTier.STANDARD) {
-      tierName = 'Yetkin Paket';
-      baseAiReports = 10;
-      baseAiChat = 30;
-      baseActiveListings = 10;
-      listingDurationDays = 30;
-      baseComparisons = 10;
-      maxVehiclesPerComparison = 5;
-      baseVitrin = 1;
-    }
+    const limits = (dbPlan?.limits as any) || {};
+    const tierName = dbPlan?.name || (effectiveTier === SubscriptionTier.PROFESYONEL ? 'Profesyonel Paket' : effectiveTier === SubscriptionTier.YETKIN ? 'Yetkin Paket' : 'Tanışma Paketi');
+    const baseAiReports = limits.aiReports !== undefined ? Number(limits.aiReports) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 20 : effectiveTier === SubscriptionTier.YETKIN ? 5 : 1);
+    const baseAiChat = limits.aiChat !== undefined ? Number(limits.aiChat) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 150 : effectiveTier === SubscriptionTier.YETKIN ? 50 : 3);
+    const baseActiveListings = limits.activeListings !== undefined ? Number(limits.activeListings) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 15 : effectiveTier === SubscriptionTier.YETKIN ? 5 : 1);
+    const listingDurationDays = limits.listingDurationDays !== undefined ? Number(limits.listingDurationDays) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 45 : 30);
+    const baseComparisons = limits.comparisons !== undefined ? Number(limits.comparisons) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 50 : effectiveTier === SubscriptionTier.YETKIN ? 20 : 3);
+    const maxVehiclesPerComparison = limits.maxVehiclesPerComparison !== undefined ? Number(limits.maxVehiclesPerComparison) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 10 : effectiveTier === SubscriptionTier.YETKIN ? 5 : 2);
+    const baseVitrin = limits.vitrinListings !== undefined ? Number(limits.vitrinListings) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 3 : effectiveTier === SubscriptionTier.YETKIN ? 1 : 0);
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -300,27 +286,31 @@ export class SubscriptionService {
       }),
     ]);
 
-    // Aggregate subscription subscriber counts per plan
-    const subPlanStats = subscriptionPlans.map((plan) => {
-      const matchingSubs = allActiveSubs.filter((s) => s.planId === plan.id);
-      const totalActive = matchingSubs.length;
-      const renewingCount = matchingSubs.filter(
-        (s) => s.expiresAt < lifetimeThreshold && s.user.role !== Role.ADMIN && !ADMIN_EMAILS.includes(s.user.email.toLowerCase())
-      ).length;
+    // Aggregate subscription subscriber counts per plan (Strictly canonical 3 tiers)
+    const canonicalOrder = [SubscriptionTier.TANISMA, SubscriptionTier.YETKIN, SubscriptionTier.PROFESYONEL];
+    const subPlanStats = canonicalOrder
+      .map((tier) => subscriptionPlans.find((p) => p.tier === tier))
+      .filter(Boolean)
+      .map((plan: any) => {
+        const matchingSubs = allActiveSubs.filter((s) => s.planId === plan.id);
+        const totalActive = matchingSubs.length;
+        const renewingCount = matchingSubs.filter(
+          (s) => s.expiresAt < lifetimeThreshold && s.user.role !== Role.ADMIN && !ADMIN_EMAILS.includes(s.user.email.toLowerCase())
+        ).length;
 
-      return {
-        id: plan.id,
-        tier: plan.tier,
-        name: plan.name,
-        priceTrl: Number(plan.priceTrl),
-        priceUsd: Number(plan.priceUsd),
-        limits: plan.limits,
-        totalActiveSubscribers: totalActive,
-        renewingSubscribersCount: renewingCount,
-        lifetimeGrantCount: totalActive - renewingCount,
-        updatedAt: plan.updatedAt,
-      };
-    });
+        return {
+          id: plan.id,
+          tier: plan.tier,
+          name: plan.name,
+          priceTrl: Number(plan.priceTrl),
+          priceUsd: Number(plan.priceUsd),
+          limits: plan.limits || {},
+          totalActiveSubscribers: totalActive,
+          renewingSubscribersCount: renewingCount,
+          lifetimeGrantCount: totalActive - renewingCount,
+          updatedAt: plan.updatedAt,
+        };
+      });
 
     // Aggregate buyer package data
     const buyerPackageStats = buyerPackagePlans.map((bp) => {
@@ -354,21 +344,26 @@ export class SubscriptionService {
   }
 
   /**
-   * Updates Subscription Plan Price atomically:
-   * 1. Updates SubscriptionPlan.priceTrl
-   * 2. Synchronizes active renewing subscriptions' nextRenewalPriceTrl (leaves currentPeriodPriceTrl intact)
+   * Updates Subscription Plan Price & Numeric Entitlement Limits atomically:
+   * 1. Updates SubscriptionPlan.priceTrl and/or SubscriptionPlan.limits
+   * 2. Synchronizes active renewing subscriptions' nextRenewalPriceTrl if price changed (leaves currentPeriodPriceTrl intact)
    * 3. Records immutable PackagePriceHistory audit entry
    */
   async updateSubscriptionPrice(
     adminUser: { id: string; email: string },
     tier: SubscriptionTier,
-    newPrice: number,
+    newPrice?: number,
+    limits?: {
+      aiReports?: number;
+      aiChat?: number;
+      activeListings?: number;
+      listingDurationDays?: number;
+      comparisons?: number;
+      maxVehiclesPerComparison?: number;
+      vitrinListings?: number;
+    },
     reason?: string
   ) {
-    if (newPrice < 0 || isNaN(newPrice) || !Number.isFinite(newPrice)) {
-      throw new BadRequestException('Fiyat geçerli, sıfır veya sıfırdan büyük bir sayı olmalıdır.');
-    }
-
     const plan = await this.prisma.subscriptionPlan.findUnique({
       where: { tier },
     });
@@ -378,15 +373,24 @@ export class SubscriptionService {
     }
 
     const oldPrice = Number(plan.priceTrl);
-    if (oldPrice === newPrice) {
-      return {
-        success: true,
-        message: `Paket fiyatı zaten ₺${newPrice}. Değişiklik yapılmadı.`,
-        oldPrice,
-        newPrice,
-        affectedSubscribersCount: 0,
-      };
+    const targetPrice = newPrice !== undefined && newPrice !== null ? Number(newPrice) : oldPrice;
+
+    if (targetPrice < 0 || isNaN(targetPrice) || !Number.isFinite(targetPrice)) {
+      throw new BadRequestException('Fiyat geçerli, sıfır veya sıfırdan büyük bir sayı olmalıdır.');
     }
+
+    const currentLimits = (plan.limits as any) || {};
+    const mergedLimits = {
+      ...currentLimits,
+      ...(limits || {}),
+    };
+
+    // Sanitize numeric limits
+    Object.keys(mergedLimits).forEach((k) => {
+      if (typeof mergedLimits[k] === 'number') {
+        mergedLimits[k] = Math.max(0, Math.floor(mergedLimits[k]));
+      }
+    });
 
     const now = new Date();
     const lifetimeThreshold = new Date('2040-01-01');
@@ -411,17 +415,20 @@ export class SubscriptionService {
 
     // Atomic DB execution
     await this.prisma.$transaction(async (tx) => {
-      // 1. Update SubscriptionPlan catalog price
+      // 1. Update SubscriptionPlan catalog price & limits
       await tx.subscriptionPlan.update({
         where: { id: plan.id },
-        data: { priceTrl: newPrice },
+        data: {
+          priceTrl: targetPrice,
+          limits: mergedLimits as any,
+        },
       });
 
-      // 2. Update active paid subscriptions' nextRenewalPriceTrl
-      if (affectedIds.length > 0) {
+      // 2. Update active paid subscriptions' nextRenewalPriceTrl (if price changed)
+      if (affectedIds.length > 0 && targetPrice !== oldPrice) {
         await tx.subscription.updateMany({
           where: { id: { in: affectedIds } },
-          data: { nextRenewalPriceTrl: newPrice },
+          data: { nextRenewalPriceTrl: targetPrice },
         });
       }
 
@@ -432,11 +439,11 @@ export class SubscriptionService {
           packageCode: tier,
           packageName: plan.name,
           oldPrice,
-          newPrice,
+          newPrice: targetPrice,
           currency: 'TRY',
           adminUserId: adminUser.id,
           adminEmail: adminUser.email || 'Admin',
-          reason: reason || 'Admin panelinden fiyat güncellemesi',
+          reason: reason || 'Admin panelinden paket güncellemesi',
           affectedSubscribersCount: affectedIds.length,
         },
       });
@@ -444,10 +451,11 @@ export class SubscriptionService {
 
     return {
       success: true,
-      message: `${plan.name} fiyatı ₺${oldPrice} → ₺${newPrice} olarak güncellendi.`,
+      message: `${plan.name} güncellendi. (Fiyat: ₺${oldPrice} → ₺${targetPrice})`,
       tier,
       oldPrice,
-      newPrice,
+      newPrice: targetPrice,
+      limits: mergedLimits,
       affectedSubscribersCount: affectedIds.length,
     };
   }
