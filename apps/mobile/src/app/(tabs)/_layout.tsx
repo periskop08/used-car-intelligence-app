@@ -87,13 +87,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="packages"
         options={{
           headerShown: false,
           tabBarLabel: 'Paketler',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'gift' : 'gift-outline'} size={22} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          href: null,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
