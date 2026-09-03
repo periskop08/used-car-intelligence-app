@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   CircleDollarSign,
-  TrendingUp,
   Clock,
   ShieldCheck,
   AlertTriangle,
@@ -45,6 +44,12 @@ interface SubscriptionPlanItem {
   updatedAt: string;
 }
 
+interface BuyerPackageLimits {
+  aiReportLimit: number;
+  chatbotMessageLimit: number;
+  validityDays: number;
+}
+
 interface BuyerPackageItem {
   id: string;
   code: string;
@@ -53,11 +58,7 @@ interface BuyerPackageItem {
   priceTrl: number;
   currency: string;
   isActive: boolean;
-  limits: {
-    aiReportLimit: number;
-    chatbotMessageLimit: number;
-    validityDays: number;
-  } | null;
+  limits: BuyerPackageLimits;
   description: string;
   popularTag: string | null;
   updatedAt: string;
@@ -71,6 +72,8 @@ interface PriceHistoryItem {
   oldPrice: number;
   newPrice: number;
   currency: string;
+  oldLimits?: any;
+  newLimits?: any;
   adminUserId: string;
   adminEmail: string;
   reason: string | null;
@@ -91,7 +94,7 @@ export default function AdminPricingPage() {
   const [buyerPackages, setBuyerPackages] = useState<BuyerPackageItem[]>([]);
   const [recentHistory, setRecentHistory] = useState<PriceHistoryItem[]>([]);
 
-  // Edit Modal State
+  // Subscription Edit Modal State
   const [editingSubTarget, setEditingSubTarget] = useState<{
     tier: string;
     name: string;
@@ -101,13 +104,15 @@ export default function AdminPricingPage() {
     lifetimeGrantCount: number;
   } | null>(null);
 
+  // Buyer Package Edit Modal State
   const [editingBuyerTarget, setEditingBuyerTarget] = useState<{
     code: string;
     name: string;
     currentPrice: number;
+    limits: BuyerPackageLimits;
   } | null>(null);
 
-  // Form State
+  // Form States
   const [newPriceInput, setNewPriceInput] = useState<string>("");
   const [editLimits, setEditLimits] = useState<SubscriptionLimits>({
     aiReports: 1,
@@ -118,6 +123,12 @@ export default function AdminPricingPage() {
     maxVehiclesPerComparison: 2,
     vitrinListings: 0,
   });
+  const [editBuyerLimits, setEditBuyerLimits] = useState<BuyerPackageLimits>({
+    aiReportLimit: 5,
+    chatbotMessageLimit: 15,
+    validityDays: 30,
+  });
+
   const [priceChangeReason, setPriceChangeReason] = useState<string>("");
   const [confirmStep, setConfirmStep] = useState<1 | 2>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -209,8 +220,14 @@ export default function AdminPricingPage() {
       code: bp.code,
       name: bp.name,
       currentPrice: bp.priceTrl,
+      limits: bp.limits,
     });
     setNewPriceInput(bp.priceTrl.toString());
+    setEditBuyerLimits({
+      aiReportLimit: bp.limits?.aiReportLimit ?? (bp.code === "ALICI_MAX" ? 20 : bp.code === "ALICI_PLUS" ? 10 : 5),
+      chatbotMessageLimit: bp.limits?.chatbotMessageLimit ?? (bp.code === "ALICI_MAX" ? 60 : bp.code === "ALICI_PLUS" ? 30 : 15),
+      validityDays: bp.limits?.validityDays ?? (bp.code === "ALICI_MAX" ? 60 : 30),
+    });
   };
 
   const handleProceedToStep2 = () => {
@@ -248,7 +265,7 @@ export default function AdminPricingPage() {
       if (res.ok) {
         setFeedbackMessage({
           type: "success",
-          text: data.message || "Paket başarıyla güncellendi.",
+          text: data.message || "Abonelik paketi başarıyla güncellendi.",
         });
         setTimeout(() => {
           setEditingSubTarget(null);
@@ -283,6 +300,7 @@ export default function AdminPricingPage() {
         },
         body: JSON.stringify({
           newPrice: num,
+          limits: editBuyerLimits,
           reason: priceChangeReason.trim() || undefined,
         }),
       });
@@ -291,7 +309,7 @@ export default function AdminPricingPage() {
       if (res.ok) {
         setFeedbackMessage({
           type: "success",
-          text: data.message || "Fiyat başarıyla güncellendi.",
+          text: data.message || "Alıcı paketi başarıyla güncellendi.",
         });
         setTimeout(() => {
           setEditingBuyerTarget(null);
@@ -314,7 +332,7 @@ export default function AdminPricingPage() {
     <div className="p-6 sm:p-8 space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-black text-white">Paket Fiyatları ve Hakları Yönetim Merkezi</h1>
-        <p className="text-xs text-slate-400">Canlı abonelik planlarının fiyat ve sayısal haklarını tek merkezden yönetin.</p>
+        <p className="text-xs text-slate-400">Canlı abonelik ve alıcı paketlerinin fiyat ve sayısal haklarını tek merkezden yönetin.</p>
       </div>
 
       {/* Top KPI Metrics Bar */}
@@ -543,7 +561,7 @@ export default function AdminPricingPage() {
                       onClick={() => handleOpenSubModal(sub)}
                       className="w-full py-3 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> Fiyatı ve İçeriği Düzenle
+                      <Edit3 className="w-3.5 h-3.5" /> Fiyatı ve Hakları Düzenle
                     </button>
                   </div>
                 </div>
@@ -560,74 +578,85 @@ export default function AdminPricingPage() {
             <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-blue-300">Tek Seferlik Alıcı Paketleri: </span>
-              Fiyat değiştirildiğinde yeni satın almalar anında yeni fiyattan açılır.
+              Fiyat veya hak değişikliği yapıldığında yeni satın almalarda anında geçerli olur. Daha önce satın almış kullanıcıların hakları (snapshot) korunur.
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {buyerPackages.map((bp) => (
-              <div
-                key={bp.id}
-                className="rounded-3xl bg-slate-900/90 border border-white/10 p-6 flex flex-col justify-between relative hover:border-white/20 transition-all shadow-xl"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-md border border-orange-500/20">
-                        {bp.badge}
-                      </span>
-                      <h3 className="text-xl font-black text-white mt-2">{bp.name}</h3>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-black text-orange-400 font-mono">
-                        ₺{bp.priceTrl}
+            {buyerPackages.map((bp) => {
+              const l = bp.limits || ({} as any);
+              return (
+                <div
+                  key={bp.id}
+                  className="rounded-3xl bg-slate-900/90 border border-white/10 p-6 flex flex-col justify-between relative hover:border-white/20 transition-all shadow-xl"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-md border border-orange-500/20">
+                          {bp.badge}
+                        </span>
+                        <h3 className="text-xl font-black text-white mt-2">{bp.name}</h3>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-bold">Tek Seferlik</div>
+                      <div className="text-right">
+                        <div className="text-2xl font-black text-orange-400 font-mono">
+                          ₺{bp.priceTrl}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-bold">Tek Seferlik</div>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-400 leading-relaxed">{bp.description}</p>
+
+                    <div className="border-t border-white/5 pt-4 space-y-2 text-xs text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-blue-400 font-bold shrink-0" />
+                        <span><strong className="text-white font-mono">{l.aiReportLimit ?? (bp.code === "ALICI_MAX" ? 20 : bp.code === "ALICI_PLUS" ? 10 : 5)}</strong> AI araç raporu</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-blue-400 font-bold shrink-0" />
+                        <span><strong className="text-white font-mono">{l.chatbotMessageLimit ?? (bp.code === "ALICI_MAX" ? 60 : bp.code === "ALICI_PLUS" ? 30 : 15)}</strong> chatbot mesajı</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-blue-400 font-bold shrink-0" />
+                        <span><strong className="text-white font-mono">{l.validityDays ?? (bp.code === "ALICI_MAX" ? 60 : 30)}</strong> gün kullanım süresi</span>
+                      </div>
+                      <div className="pt-2 border-t border-white/5 space-y-1.5 text-[11px] text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span>Her raporda satıcıya sorulacak sorular</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span>Her raporda ekspertiz kontrol listesi</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-400 leading-relaxed">{bp.description}</p>
-
-                  {bp.limits && (
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 text-xs text-slate-300">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">AI Rapor Hakkı:</span>
-                        <span className="font-bold text-white">+{bp.limits.aiReportLimit} Rapor</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Chatbot Soru:</span>
-                        <span className="font-bold text-white">+{bp.limits.chatbotMessageLimit} Soru</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Geçerlilik:</span>
-                        <span className="font-bold text-white">{bp.limits.validityDays} Gün</span>
-                      </div>
-                    </div>
-                  )}
+                  <div className="pt-6">
+                    <button
+                      onClick={() => handleOpenBuyerModal(bp)}
+                      className="w-full py-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Fiyatı ve Hakları Düzenle
+                    </button>
+                  </div>
                 </div>
-
-                <div className="pt-6">
-                  <button
-                    onClick={() => handleOpenBuyerModal(bp)}
-                    className="w-full py-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Fiyatı Düzenle
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* EDIT SUBSCRIPTION MODAL (Numeric Limits + Price) */}
+      {/* EDIT SUBSCRIPTION MODAL */}
       {editingSubTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-white/15 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div>
                 <div className="text-xs font-bold text-orange-400 uppercase tracking-wider">
-                  Paket Fiyatı ve Hakları Düzenleme
+                  Abonelik Fiyatı ve Hakları Düzenleme
                 </div>
                 <h3 className="text-xl font-black text-white mt-1">{editingSubTarget.name}</h3>
               </div>
@@ -641,7 +670,6 @@ export default function AdminPricingPage() {
 
             {confirmStep === 1 && (
               <div className="space-y-4">
-                {/* Price Input */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
                     <div className="text-[10px] text-slate-400 font-bold uppercase">Mevcut Fiyat</div>
@@ -662,7 +690,6 @@ export default function AdminPricingPage() {
                   </div>
                 </div>
 
-                {/* Numeric Entitlements Form */}
                 <div className="space-y-3 pt-2">
                   <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
                     Sayısal Haklar (Sadece Rakam Düzenlenebilir)
@@ -807,7 +834,7 @@ export default function AdminPricingPage() {
                   </div>
                   <div className="flex items-center justify-between py-1 border-b border-white/5">
                     <span className="text-slate-400">Mevcut Aktif Dönemler:</span>
-                    <span className="font-bold text-slate-200">DEĞİŞMEZ</span>
+                    <span className="font-bold text-slate-200">DEĞİŞMEZ (Hak ve Fiyat Korunur)</span>
                   </div>
                   <div className="flex items-center justify-between py-1 border-b border-white/5">
                     <span className="text-slate-400">Sonraki Yenilemeler:</span>
@@ -866,14 +893,14 @@ export default function AdminPricingPage() {
         </div>
       )}
 
-      {/* EDIT BUYER MODAL */}
+      {/* EDIT BUYER MODAL (Numeric Limits + Price) */}
       {editingBuyerTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/15 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-white/15 rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div>
                 <div className="text-xs font-bold text-blue-400 uppercase tracking-wider">
-                  Alıcı Paketi Fiyat Düzenleme
+                  Alıcı Paketi Fiyatı ve Hakları Düzenleme
                 </div>
                 <h3 className="text-xl font-black text-white mt-1">{editingBuyerTarget.name}</h3>
               </div>
@@ -885,74 +912,175 @@ export default function AdminPricingPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Mevcut Fiyat</div>
-                  <div className="text-2xl font-black text-slate-300 mt-1 font-mono">
-                    ₺{editingBuyerTarget.currentPrice}
+            {confirmStep === 1 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">Mevcut Fiyat</div>
+                    <div className="text-2xl font-black text-slate-300 mt-1 font-mono">
+                      ₺{editingBuyerTarget.currentPrice}
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30">
+                    <div className="text-[10px] text-blue-400 font-bold uppercase">Yeni Fiyat (TL)</div>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newPriceInput}
+                      onChange={(e) => setNewPriceInput(e.target.value)}
+                      className="w-full bg-transparent text-2xl font-black text-white mt-1 font-mono outline-none"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30">
-                  <div className="text-[10px] text-blue-400 font-bold uppercase">Yeni Fiyat (TL)</div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Sayısal Haklar (Sadece Rakam Düzenlenebilir)
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-800 border border-white/5 space-y-1">
+                      <label className="text-[11px] text-slate-400">AI Araç Raporu Hakkı</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editBuyerLimits.aiReportLimit}
+                        onChange={(e) => setEditBuyerLimits({ ...editBuyerLimits, aiReportLimit: Number(e.target.value) })}
+                        className="w-full bg-transparent text-base font-black text-white font-mono outline-none"
+                      />
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-800 border border-white/5 space-y-1">
+                      <label className="text-[11px] text-slate-400">Chatbot Mesaj Hakkı</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editBuyerLimits.chatbotMessageLimit}
+                        onChange={(e) => setEditBuyerLimits({ ...editBuyerLimits, chatbotMessageLimit: Number(e.target.value) })}
+                        className="w-full bg-transparent text-base font-black text-white font-mono outline-none"
+                      />
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-800 border border-white/5 space-y-1 col-span-2">
+                      <label className="text-[11px] text-slate-400">Kullanım Süresi (Gün)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editBuyerLimits.validityDays}
+                        onChange={(e) => setEditBuyerLimits({ ...editBuyerLimits, validityDays: Number(e.target.value) })}
+                        className="w-full bg-transparent text-base font-black text-white font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Değişiklik Gerekçesi (Opsiyonel Denetim Notu):
+                  </label>
                   <input
-                    type="number"
-                    min="1"
-                    value={newPriceInput}
-                    onChange={(e) => setNewPriceInput(e.target.value)}
-                    className="w-full bg-transparent text-2xl font-black text-white mt-1 font-mono outline-none"
-                    placeholder="Örn: 249"
-                    autoFocus
+                    type="text"
+                    value={priceChangeReason}
+                    onChange={(e) => setPriceChangeReason(e.target.value)}
+                    placeholder="Örn: Alıcı paketi hak güncellemesi"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-white/10 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Değişiklik Gerekçesi (Opsiyonel Denetim Notu):
-                </label>
-                <input
-                  type="text"
-                  value={priceChangeReason}
-                  onChange={(e) => setPriceChangeReason(e.target.value)}
-                  placeholder="Örn: Fiyat ayarlaması"
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-white/10 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500"
-                />
-              </div>
+                {feedbackMessage && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                      feedbackMessage.type === "success"
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    }`}
+                  >
+                    {feedbackMessage.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    {feedbackMessage.text}
+                  </div>
+                )}
 
-              {feedbackMessage && (
-                <div
-                  className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                    feedbackMessage.type === "success"
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                  }`}
-                >
-                  {feedbackMessage.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                  {feedbackMessage.text}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingBuyerTarget(null)}
+                    className="flex-1 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProceedToStep2}
+                    className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-blue-600/30"
+                  >
+                    İlerle <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
-              )}
-
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => setEditingBuyerTarget(null)}
-                  className="flex-1 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
-                >
-                  İptal
-                </button>
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={handleExecuteBuyerUpdate}
-                  className="flex-1 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-blue-600/30 disabled:opacity-50"
-                >
-                  {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Fiyatı Güncelle
-                </button>
               </div>
-            </div>
+            )}
+
+            {confirmStep === 2 && (
+              <div className="space-y-5">
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2">
+                  <div className="font-black text-amber-300 flex items-center gap-1.5 text-sm">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" /> Güncellemeyi Onaylayın
+                  </div>
+                  <p className="leading-relaxed">
+                    <strong>{editingBuyerTarget.name}</strong> paketinin fiyatını <strong>₺{editingBuyerTarget.currentPrice}</strong> → <span className="text-white font-black underline">₺{newPriceInput}</span> olarak ve sayısal haklarını güncellemek üzeresiniz.
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs text-slate-300 p-4 rounded-2xl bg-slate-800/80 border border-white/5">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <span className="text-slate-400">Yeni Satın Almalar:</span>
+                    <span className="font-bold text-emerald-400 font-mono">₺{newPriceInput} (Anında Uygulanır)</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">Geçmiş Satın Almalar:</span>
+                    <span className="font-bold text-slate-200">DEĞİŞMEZ (Hak Snapshot'ı Korunur)</span>
+                  </div>
+                </div>
+
+                {feedbackMessage && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                      feedbackMessage.type === "success"
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                    }`}
+                  >
+                    {feedbackMessage.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    {feedbackMessage.text}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setConfirmStep(1)}
+                    className="py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                  >
+                    Geri
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleExecuteBuyerUpdate}
+                    className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-blue-600/30 disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" /> İşleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" /> Kesin Olarak Güncelle
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -966,8 +1094,8 @@ export default function AdminPricingPage() {
                 <div className="flex items-center gap-2.5">
                   <History className="w-5 h-5 text-orange-400" />
                   <div>
-                    <h3 className="text-lg font-black text-white">Fiyat Değişiklik Geçmişi</h3>
-                    <p className="text-xs text-slate-400">Tüm finansal paket fiyat güncellemelerinin denetim kaydı.</p>
+                    <h3 className="text-lg font-black text-white">Paket ve Hak Değişiklik Geçmişi</h3>
+                    <p className="text-xs text-slate-400">Tüm paket fiyat ve sayısal hak güncellemelerinin denetim kaydı.</p>
                   </div>
                 </div>
                 <button
@@ -982,7 +1110,7 @@ export default function AdminPricingPage() {
                 {loadingHistory ? (
                   <div className="py-12 text-center text-xs text-slate-400">Yükleniyor...</div>
                 ) : fullHistory.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-slate-400">Henüz fiyat değişikliği kaydı bulunmuyor.</div>
+                  <div className="py-12 text-center text-xs text-slate-400">Henüz değişiklik kaydı bulunmuyor.</div>
                 ) : (
                   fullHistory.map((h) => (
                     <div

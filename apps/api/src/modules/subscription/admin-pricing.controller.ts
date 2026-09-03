@@ -55,16 +55,24 @@ export class AdminPricingController {
   async updateBuyerPackagePrice(
     @Request() req: any,
     @Param('code') code: BuyerPackageCode,
-    @Body() body: { newPrice: number; reason?: string }
+    @Body()
+    body: {
+      newPrice?: number;
+      limits?: {
+        aiReportLimit?: number;
+        chatbotMessageLimit?: number;
+        validityDays?: number;
+      };
+      reason?: string;
+    }
   ) {
     this.checkAdminPermission(req.user);
-    if (body.newPrice === undefined || body.newPrice === null || isNaN(Number(body.newPrice))) {
-      throw new BadRequestException('newPrice sayısal bir değer olmalıdır.');
-    }
+    const newPrice = body.newPrice !== undefined && body.newPrice !== null ? Number(body.newPrice) : undefined;
     return this.subscriptionService.updateBuyerPackagePrice(
       req.user,
       code,
-      Number(body.newPrice),
+      newPrice,
+      body.limits,
       body.reason
     );
   }

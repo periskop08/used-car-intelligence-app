@@ -10,9 +10,11 @@ export interface BuyerPackageItem {
   badge: string;
   price: number;
   priceText: string;
+  aiReportLimit: number;
+  chatbotMessageLimit: number;
+  validityDays: number;
   description: string;
   popularTag?: string;
-  features: string[];
   ctaText: string;
   btnStyle: string;
 }
@@ -24,14 +26,10 @@ export const BUYER_PACKAGES_DATA: BuyerPackageItem[] = [
     badge: "MİNİ",
     price: 149,
     priceText: "149 TL",
+    aiReportLimit: 5,
+    chatbotMessageLimit: 15,
+    validityDays: 30,
     description: "Birkaç aracı detaylı incelemek ve karar sürecine devam etmek isteyenler için.",
-    features: [
-      "5 AI araç raporu",
-      "15 chatbot mesajı",
-      "30 gün kullanım süresi",
-      "Her raporda satıcıya sorulacak sorular",
-      "Her raporda ekspertiz kontrol listesi",
-    ],
     ctaText: "Alıcı Mini Satın Al",
     btnStyle: "border border-white/10 text-slate-300 hover:bg-white/5 hover:text-white",
   },
@@ -42,14 +40,10 @@ export const BUYER_PACKAGES_DATA: BuyerPackageItem[] = [
     popularTag: "EN ÇOK TERCİH EDİLEN",
     price: 249,
     priceText: "249 TL",
+    aiReportLimit: 10,
+    chatbotMessageLimit: 30,
+    validityDays: 30,
     description: "Daha fazla aracı karşılaştırmak ve satın alma kararını netleştirmek isteyenler için.",
-    features: [
-      "10 AI araç raporu",
-      "30 chatbot mesajı",
-      "30 gün kullanım süresi",
-      "Her raporda satıcıya sorulacak sorular",
-      "Her raporda ekspertiz kontrol listesi",
-    ],
     ctaText: "Alıcı Plus Satın Al",
     btnStyle: "bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-500/20",
   },
@@ -59,14 +53,10 @@ export const BUYER_PACKAGES_DATA: BuyerPackageItem[] = [
     badge: "MAX",
     price: 399,
     priceText: "399 TL",
+    aiReportLimit: 20,
+    chatbotMessageLimit: 60,
+    validityDays: 60,
     description: "Yoğun araç araştırması yapan ve daha geniş kullanım hakkına ihtiyaç duyanlar için.",
-    features: [
-      "20 AI araç raporu",
-      "60 chatbot mesajı",
-      "60 gün kullanım süresi",
-      "Her raporda satıcıya sorulacak sorular",
-      "Her raporda ekspertiz kontrol listesi",
-    ],
     ctaText: "Alıcı Max Satın Al",
     btnStyle: "border border-white/10 hover:border-orange-500/50 hover:bg-orange-500/10 text-slate-200 hover:text-orange-400",
   },
@@ -87,11 +77,14 @@ export default function BuyerPackagesSection() {
           setPackages((prev) =>
             prev.map((pkg) => {
               const live = data.find((d) => d.code === pkg.code);
-              if (live && live.price !== undefined) {
+              if (live) {
                 return {
                   ...pkg,
-                  price: live.price,
-                  priceText: `${live.price} TL`,
+                  price: live.price !== undefined ? live.price : pkg.price,
+                  priceText: `${live.price !== undefined ? live.price : pkg.price} TL`,
+                  aiReportLimit: live.aiReportLimit !== undefined ? live.aiReportLimit : pkg.aiReportLimit,
+                  chatbotMessageLimit: live.chatbotMessageLimit !== undefined ? live.chatbotMessageLimit : pkg.chatbotMessageLimit,
+                  validityDays: live.validityDays !== undefined ? live.validityDays : pkg.validityDays,
                 };
               }
               return pkg;
@@ -200,12 +193,26 @@ export default function BuyerPackagesSection() {
                 <div className="border-t border-white/10 my-1" />
 
                 <ul className="text-xs text-slate-300 flex flex-col gap-2.5">
-                  {pkg.features.map((feat, idx) => (
-                    <li key={idx} className="flex items-center gap-2">
-                      <span className="text-orange-500 font-bold">•</span>
-                      <span>{feat}</span>
-                    </li>
-                  ))}
+                  <li className="flex items-center gap-2">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>{pkg.aiReportLimit} AI araç raporu</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>{pkg.chatbotMessageLimit} chatbot mesajı</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>{pkg.validityDays} gün kullanım süresi</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-slate-400">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>Her raporda satıcıya sorulacak sorular</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-slate-400">
+                    <span className="text-orange-500 font-bold">•</span>
+                    <span>Her raporda ekspertiz kontrol listesi</span>
+                  </li>
                 </ul>
               </div>
 

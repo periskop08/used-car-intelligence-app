@@ -119,12 +119,22 @@ export class SubscriptionService {
       };
     }
 
-    // Fetch live plan limits from database
+    // 1. Fetch active subscription with periodLimitsSnapshot for period immunity
+    const activeSub = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: { gt: new Date() },
+      },
+      include: { plan: true },
+    });
+
+    // 2. Fetch live plan limits from database
     const dbPlan = await this.prisma.subscriptionPlan.findUnique({
       where: { tier: effectiveTier },
     });
 
-    const limits = (dbPlan?.limits as any) || {};
+    const limits = (activeSub?.periodLimitsSnapshot as any) || (activeSub?.plan?.limits as any) || (dbPlan?.limits as any) || {};
     const tierName = dbPlan?.name || (effectiveTier === SubscriptionTier.PROFESYONEL ? 'Profesyonel Paket' : effectiveTier === SubscriptionTier.YETKIN ? 'Yetkin Paket' : 'Tanışma Paketi');
     const baseAiReports = limits.aiReports !== undefined ? Number(limits.aiReports) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 20 : effectiveTier === SubscriptionTier.YETKIN ? 5 : 1);
     const baseAiChat = limits.aiChat !== undefined ? Number(limits.aiChat) : (effectiveTier === SubscriptionTier.PROFESYONEL ? 150 : effectiveTier === SubscriptionTier.YETKIN ? 50 : 3);
@@ -312,7 +322,7 @@ export class SubscriptionService {
         };
       });
 
-    // Aggregate buyer package data
+    // Aggregate buyer package data with dynamic DB limits
     const buyerPackageStats = buyerPackagePlans.map((bp) => {
       const config = BUYER_PACKAGES[bp.code];
       return {
@@ -323,13 +333,11 @@ export class SubscriptionService {
         priceTrl: bp.priceTrl,
         currency: bp.currency,
         isActive: bp.isActive,
-        limits: config
-          ? {
-              aiReportLimit: config.aiReportLimit,
-              chatbotMessageLimit: config.chatbotMessageLimit,
-              validityDays: config.validityDays,
-            }
-          : null,
+        limits: {
+          aiReportLimit: bp.aiReportLimit,
+          chatbotMessageLimit: bp.chatbotMessageLimit,
+          validityDays: bp.validityDays,
+        },
         description: config?.description || '',
         popularTag: config?.popularTag || null,
         updatedAt: bp.updatedAt,
@@ -461,20 +469,21 @@ export class SubscriptionService {
   }
 
   /**
-   * Updates One-Time Buyer Package Price atomically:
-   * 1. Updates BuyerPackagePlan.priceTrl in DB
-   * 2. Logs immutable PackagePriceHistory audit entry
+   * Updates One-Time Buyer Package Price & Numeric Entitlements atomically:
+   * 1. Updates BuyerPackagePlan.priceTrl, aiReportLimit, chatbotMessageLimit, validityDays in DB
+   * 2. Logs immutable PackagePriceHistory audit entry with oldLimits and newLimits
    */
   async updateBuyerPackagePrice(
     adminUser: { id: string; email: string },
     code: BuyerPackageCode,
-    newPrice: number,
+    newPrice?: number,
+    limits?: {
+      aiReportLimit?: number;
+      chatbotMessageLimit?: number;
+      validityDays?: number;
+    },
     reason?: string
   ) {
-    if (newPrice <= 0 || isNaN(newPrice) || !Number.isFinite(newPrice)) {
-      throw new BadRequestException('Alıcı paketi fiyatı sıfırdan büyük bir sayı olmalıdır.');
-    }
-
     const plan = await this.prisma.buyerPackagePlan.findUnique({
       where: { code },
     });
@@ -484,21 +493,35 @@ export class SubscriptionService {
     }
 
     const oldPrice = plan.priceTrl;
-    if (oldPrice === newPrice) {
-      return {
-        success: true,
-        message: `Paket fiyatı zaten ₺${newPrice}. Değişiklik yapılmadı.`,
-        oldPrice,
-        newPrice,
-      };
+    const targetPrice = newPrice !== undefined && newPrice !== null ? Number(newPrice) : oldPrice;
+
+    if (targetPrice <= 0 || isNaN(targetPrice) || !Number.isFinite(targetPrice)) {
+      throw new BadRequestException('Alıcı paketi fiyatı sıfırdan büyük bir sayı olmalıdır.');
     }
+
+    const oldLimits = {
+      aiReportLimit: plan.aiReportLimit,
+      chatbotMessageLimit: plan.chatbotMessageLimit,
+      validityDays: plan.validityDays,
+    };
+
+    const mergedLimits = {
+      aiReportLimit: limits?.aiReportLimit !== undefined ? Math.max(0, Math.floor(Number(limits.aiReportLimit))) : plan.aiReportLimit,
+      chatbotMessageLimit: limits?.chatbotMessageLimit !== undefined ? Math.max(0, Math.floor(Number(limits.chatbotMessageLimit))) : plan.chatbotMessageLimit,
+      validityDays: limits?.validityDays !== undefined ? Math.max(1, Math.floor(Number(limits.validityDays))) : plan.validityDays,
+    };
 
     const config = BUYER_PACKAGES[code];
 
     await this.prisma.$transaction(async (tx) => {
       await tx.buyerPackagePlan.update({
         where: { id: plan.id },
-        data: { priceTrl: newPrice },
+        data: {
+          priceTrl: targetPrice,
+          aiReportLimit: mergedLimits.aiReportLimit,
+          chatbotMessageLimit: mergedLimits.chatbotMessageLimit,
+          validityDays: mergedLimits.validityDays,
+        },
       });
 
       await tx.packagePriceHistory.create({
@@ -507,11 +530,13 @@ export class SubscriptionService {
           packageCode: code,
           packageName: config?.name || code,
           oldPrice,
-          newPrice,
+          newPrice: targetPrice,
+          oldLimits: oldLimits as any,
+          newLimits: mergedLimits as any,
           currency: plan.currency,
           adminUserId: adminUser.id,
           adminEmail: adminUser.email || 'Admin',
-          reason: reason || 'Admin panelinden fiyat güncellemesi',
+          reason: reason || 'Admin panelinden alıcı paketi güncellemesi',
           affectedSubscribersCount: 0,
         },
       });
@@ -519,10 +544,11 @@ export class SubscriptionService {
 
     return {
       success: true,
-      message: `${config?.name || code} fiyatı ₺${oldPrice} → ₺${newPrice} olarak güncellendi.`,
+      message: `${config?.name || code} güncellendi. (Fiyat: ₺${oldPrice} → ₺${targetPrice})`,
       code,
       oldPrice,
-      newPrice,
+      newPrice: targetPrice,
+      limits: mergedLimits,
     };
   }
 

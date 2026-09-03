@@ -25,6 +25,7 @@ describe('Pricing Management & Financial Integrity Tests', () => {
       },
       subscription: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         updateMany: jest.fn(),
         update: jest.fn(),
@@ -41,6 +42,13 @@ describe('Pricing Management & Financial Integrity Tests', () => {
       },
       buyerPackagePurchase: {
         create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      featureUsage: {
+        findUnique: jest.fn(),
+      },
+      vehicleListing: {
+        count: jest.fn().mockResolvedValue(0),
       },
       user: {
         findUnique: jest.fn(),
@@ -265,5 +273,108 @@ describe('Pricing Management & Financial Integrity Tests', () => {
         }),
       },
     });
+  });
+
+  it('TEST H: Admin updates Buyer Package price & numeric limits (e.g. Alıcı Plus 249 -> 299, aiReportLimit 10 -> 20)', async () => {
+    mockPrisma.buyerPackagePlan.findUnique.mockResolvedValue({
+      id: 'plan-plus',
+      code: BuyerPackageCode.ALICI_PLUS,
+      priceTrl: 249,
+      aiReportLimit: 10,
+      chatbotMessageLimit: 30,
+      validityDays: 30,
+      currency: 'TRY',
+      isActive: true,
+    });
+
+    mockPrisma.buyerPackagePlan.update.mockResolvedValue({});
+    mockPrisma.packagePriceHistory.create.mockResolvedValue({});
+
+    const result = await subscriptionService.updateBuyerPackagePrice(
+      adminUser,
+      BuyerPackageCode.ALICI_PLUS,
+      299,
+      { aiReportLimit: 20, chatbotMessageLimit: 50 },
+      'Alıcı Plus hak ve fiyat güncellemesi'
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.newPrice).toBe(299);
+    expect(result.limits.aiReportLimit).toBe(20);
+    expect(result.limits.chatbotMessageLimit).toBe(50);
+    expect(result.limits.validityDays).toBe(30);
+
+    expect(mockPrisma.buyerPackagePlan.update).toHaveBeenCalledWith({
+      where: { id: 'plan-plus' },
+      data: {
+        priceTrl: 299,
+        aiReportLimit: 20,
+        chatbotMessageLimit: 50,
+        validityDays: 30,
+      },
+    });
+  });
+
+  it('TEST I: New buyer purchase gets updated limits (20 AI reports), previous buyer purchase maintains existing snapshot', async () => {
+    mockPrisma.buyerPackagePlan.findUnique.mockResolvedValue({
+      id: 'plan-plus',
+      code: BuyerPackageCode.ALICI_PLUS,
+      priceTrl: 299,
+      aiReportLimit: 20,
+      chatbotMessageLimit: 50,
+      validityDays: 30,
+      currency: 'TRY',
+      isActive: true,
+    });
+
+    mockPrisma.buyerPackagePurchase.create.mockImplementation(({ data }: any) => ({
+      id: 'purchase-new-1',
+      ...data,
+    }));
+
+    const result = await buyerPackageService.purchasePackage('user-2', BuyerPackageCode.ALICI_PLUS);
+
+    expect(result.success).toBe(true);
+    expect(result.purchase.price).toBe(299);
+    expect(result.purchase.aiReportLimit).toBe(20);
+    expect(result.purchase.chatbotMessageLimit).toBe(50);
+  });
+
+  it('TEST J: Existing subscription active period is immune to mid-cycle limits change (uses periodLimitsSnapshot)', async () => {
+    // Current active subscription has snapshotted limits { aiReports: 5, aiChat: 50 }
+    const mockActiveSub = {
+      id: 'sub-user-active',
+      userId: 'user-active-1',
+      status: SubscriptionStatus.ACTIVE,
+      periodLimitsSnapshot: {
+        aiReports: 5,
+        aiChat: 50,
+        activeListings: 5,
+        listingDurationDays: 30,
+        comparisons: 20,
+        maxVehiclesPerComparison: 5,
+        vitrinListings: 1,
+      },
+      expiresAt: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+      plan: {
+        tier: SubscriptionTier.YETKIN,
+        // Catalog plan in DB was updated by admin to 15 reports
+        limits: { aiReports: 15, aiChat: 100 },
+      },
+      user: { id: 'user-active-1', email: 'user@example.com', role: Role.USER, subscriptionTier: SubscriptionTier.YETKIN },
+    };
+
+    mockPrisma.user.findUnique.mockResolvedValue(mockActiveSub.user);
+    mockPrisma.subscription.findFirst.mockResolvedValue(mockActiveSub);
+    mockPrisma.subscriptionPlan.findUnique.mockResolvedValue(mockActiveSub.plan);
+    mockPrisma.featureUsage.findUnique.mockResolvedValue({ count: 2 });
+    mockPrisma.vehicleListing.count.mockResolvedValue(1);
+    mockPrisma.buyerPackagePurchase.findMany.mockResolvedValue([]);
+
+    const summary = await subscriptionService.getSubscriptionSummary('user-active-1');
+
+    // Quota total for current period must remain 5 (from snapshotted active period limits), not mid-cycle 15!
+    expect(summary.rights.aiReports.totalLimit).toBe(5);
+    expect(summary.rights.aiReports.remaining).toBe(3); // 5 - 2 used = 3
   });
 });

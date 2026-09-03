@@ -64,14 +64,22 @@ export class BuyerPackageService {
     const dbPlans = await this.prisma.buyerPackagePlan.findMany({
       where: { isActive: true },
     });
-    const dbPriceMap = new Map(dbPlans.map((p) => [p.code, p.priceTrl]));
+    const dbPlanMap = new Map(dbPlans.map((p) => [p.code, p]));
 
     return Object.values(BUYER_PACKAGES).map((pkg) => {
-      const dynamicPrice = dbPriceMap.get(pkg.code);
+      const livePlan = dbPlanMap.get(pkg.code);
+      const price = livePlan ? livePlan.priceTrl : pkg.price;
+      const aiReportLimit = livePlan ? livePlan.aiReportLimit : pkg.aiReportLimit;
+      const chatbotMessageLimit = livePlan ? livePlan.chatbotMessageLimit : pkg.chatbotMessageLimit;
+      const validityDays = livePlan ? livePlan.validityDays : pkg.validityDays;
+
       return {
         ...pkg,
-        price: dynamicPrice !== undefined ? dynamicPrice : pkg.price,
-        priceText: `${dynamicPrice !== undefined ? dynamicPrice : pkg.price} TL`,
+        price,
+        priceText: `${price} TL`,
+        aiReportLimit,
+        chatbotMessageLimit,
+        validityDays,
       };
     });
   }
@@ -82,35 +90,38 @@ export class BuyerPackageService {
       throw new BadRequestException('Geçersiz alıcı paketi kodu.');
     }
 
-    // Dynamic Price Resolution from DB Source of Truth (Zero Static Fallback in Production)
+    // Dynamic Price & Entitlement Limits Resolution from DB Source of Truth (Zero Static Fallback)
     const dbPlan = await this.prisma.buyerPackagePlan.findUnique({
       where: { code: packageCode },
     });
 
     if (!dbPlan || !dbPlan.isActive) {
-      throw new BadRequestException('PRICING_UNAVAILABLE: Alıcı paketi fiyat bilgisi bulunamadı veya paket aktif değil.');
+      throw new BadRequestException('PRICING_UNAVAILABLE: Alıcı paketi fiyat veya hak bilgisi bulunamadı.');
     }
 
     const priceSnapshot = dbPlan.priceTrl;
-    const expiresAt = new Date(Date.now() + config.validityDays * 24 * 60 * 60 * 1000);
+    const aiReportLimitSnapshot = dbPlan.aiReportLimit;
+    const chatbotMessageLimitSnapshot = dbPlan.chatbotMessageLimit;
+    const validityDaysSnapshot = dbPlan.validityDays;
+    const expiresAt = new Date(Date.now() + validityDaysSnapshot * 24 * 60 * 60 * 1000);
 
     const purchase = await this.prisma.buyerPackagePurchase.create({
       data: {
         userId,
         packageCode,
         price: priceSnapshot,
-        aiReportLimit: config.aiReportLimit,
+        aiReportLimit: aiReportLimitSnapshot,
         aiReportUsed: 0,
-        chatbotMessageLimit: config.chatbotMessageLimit,
+        chatbotMessageLimit: chatbotMessageLimitSnapshot,
         chatbotMessageUsed: 0,
-        validityDays: config.validityDays,
+        validityDays: validityDaysSnapshot,
         expiresAt,
       },
     });
 
     return {
       success: true,
-      message: `${config.name} paketiniz hesabınıza tanımlandı. ${config.validityDays} gün boyunca geçerlidir.`,
+      message: `${config.name} paketiniz hesabınıza tanımlandı. ${validityDaysSnapshot} gün boyunca geçerlidir.`,
       purchase,
     };
   }
