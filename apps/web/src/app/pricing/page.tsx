@@ -12,12 +12,30 @@ interface UserProfile {
   email: string;
 }
 
+interface SubscriptionPlanDto {
+  id: string;
+  tier: string;
+  name: string;
+  priceTrl: number;
+}
+
 export default function PricingPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlanDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [buyingPackage, setBuyingPackage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch live plans from database
+    fetch(`${API_URL}/subscriptions/plans`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.subscriptions) {
+          setPlans(data.subscriptions);
+        }
+      })
+      .catch(() => {});
+
     const token = localStorage.getItem("accessToken");
     if (!token) {
       setLoading(false);
@@ -34,6 +52,12 @@ export default function PricingPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const yetkinPlan = plans.find((p) => p.tier === "YETKIN" || p.tier === "STANDARD");
+  const proPlan = plans.find((p) => p.tier === "PROFESYONEL" || p.tier === "PREMIUM" || p.tier === "PRO");
+
+  const yetkinPrice = yetkinPlan ? Number(yetkinPlan.priceTrl) : 499;
+  const proPrice = proPlan ? Number(proPlan.priceTrl) : 1499;
 
   const rawTier = profile?.subscriptionTier || "TANISMA";
   const currentTier =
@@ -186,7 +210,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white">499 TL</span>
+                  <span className="text-4xl font-black text-white">{yetkinPrice} TL</span>
                   <span className="text-xs text-slate-400 font-bold">/ ay</span>
                 </div>
 
@@ -248,7 +272,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white">1.499 TL</span>
+                  <span className="text-4xl font-black text-white">{proPrice.toLocaleString("tr-TR")} TL</span>
                   <span className="text-xs text-slate-400 font-bold">/ ay</span>
                 </div>
 

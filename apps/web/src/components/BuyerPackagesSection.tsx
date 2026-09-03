@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -73,10 +73,34 @@ export const BUYER_PACKAGES_DATA: BuyerPackageItem[] = [
 ];
 
 export default function BuyerPackagesSection() {
+  const [packages, setPackages] = useState<BuyerPackageItem[]>(BUYER_PACKAGES_DATA);
   const [selectedPkg, setSelectedPkg] = useState<BuyerPackageItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_URL}/buyer-packages`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: any[]) => {
+        if (Array.isArray(data)) {
+          setPackages((prev) =>
+            prev.map((pkg) => {
+              const live = data.find((d) => d.code === pkg.code);
+              if (live && live.price !== undefined) {
+                return {
+                  ...pkg,
+                  price: live.price,
+                  priceText: `${live.price} TL`,
+                };
+              }
+              return pkg;
+            })
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleOpenCheckout = (pkg: BuyerPackageItem) => {
     setSelectedPkg(pkg);
@@ -105,9 +129,10 @@ export default function BuyerPackagesSection() {
         packageCode: selectedPkg.code,
       }),
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("Satın alma gerçekleştirilemedi.");
-        return res.json();
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Satın alma gerçekleştirilemedi.");
+        return json;
       })
       .then((data) => {
         setLoading(false);
@@ -135,7 +160,7 @@ export default function BuyerPackagesSection() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-2 items-stretch">
-        {BUYER_PACKAGES_DATA.map((pkg) => {
+        {packages.map((pkg) => {
           const isFeatured = pkg.code === "ALICI_PLUS";
           return (
             <div

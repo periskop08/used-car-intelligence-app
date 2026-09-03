@@ -28,6 +28,15 @@ export class SubscriptionController {
   async getPlans() {
     return this.subscriptionService.getAvailablePlans();
   }
+
+  @Post('upgrade')
+  @UseGuards(JwtAuthGuard)
+  async upgrade(@Request() req: any, @Body() body: { tier: SubscriptionTier }) {
+    if (!body.tier) {
+      throw new ForbiddenException('Abonelik paketi (tier) belirtilmelidir.');
+    }
+    return this.subscriptionService.upgradeUserSubscription(req.user.id, body.tier);
+  }
 }
 
 @Controller('admin/users')

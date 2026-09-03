@@ -60,8 +60,20 @@ export const BUYER_PACKAGES: Record<BuyerPackageCode, BuyerPackageConfig> = {
 export class BuyerPackageService {
   constructor(private prisma: PrismaService) {}
 
-  getAvailablePackages() {
-    return Object.values(BUYER_PACKAGES);
+  async getAvailablePackages() {
+    const dbPlans = await this.prisma.buyerPackagePlan.findMany({
+      where: { isActive: true },
+    });
+    const dbPriceMap = new Map(dbPlans.map((p) => [p.code, p.priceTrl]));
+
+    return Object.values(BUYER_PACKAGES).map((pkg) => {
+      const dynamicPrice = dbPriceMap.get(pkg.code);
+      return {
+        ...pkg,
+        price: dynamicPrice !== undefined ? dynamicPrice : pkg.price,
+        priceText: `${dynamicPrice !== undefined ? dynamicPrice : pkg.price} TL`,
+      };
+    });
   }
 
   async purchasePackage(userId: string, packageCode: BuyerPackageCode) {
@@ -70,13 +82,23 @@ export class BuyerPackageService {
       throw new BadRequestException('Geçersiz alıcı paketi kodu.');
     }
 
+    // Dynamic Price Resolution from DB Source of Truth (Zero Static Fallback in Production)
+    const dbPlan = await this.prisma.buyerPackagePlan.findUnique({
+      where: { code: packageCode },
+    });
+
+    if (!dbPlan || !dbPlan.isActive) {
+      throw new BadRequestException('PRICING_UNAVAILABLE: Alıcı paketi fiyat bilgisi bulunamadı veya paket aktif değil.');
+    }
+
+    const priceSnapshot = dbPlan.priceTrl;
     const expiresAt = new Date(Date.now() + config.validityDays * 24 * 60 * 60 * 1000);
 
     const purchase = await this.prisma.buyerPackagePurchase.create({
       data: {
         userId,
         packageCode,
-        price: config.price,
+        price: priceSnapshot,
         aiReportLimit: config.aiReportLimit,
         aiReportUsed: 0,
         chatbotMessageLimit: config.chatbotMessageLimit,

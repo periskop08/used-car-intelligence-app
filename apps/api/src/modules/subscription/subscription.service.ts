@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { SubscriptionTier, SubscriptionStatus, Role, FeatureKey, UsagePeriodType } from '@prisma/client';
+import { SubscriptionTier, SubscriptionStatus, Role, FeatureKey, UsagePeriodType, BuyerPackageCode, PromotionPaymentStatus } from '@prisma/client';
+import { BUYER_PACKAGES } from './buyer-package.service';
 
 export const ADMIN_EMAILS = [
   'efeguven9991@gmail.com',
@@ -238,68 +239,421 @@ export class SubscriptionService {
   }
 
   async getAvailablePlans() {
-    let plans = await this.prisma.subscriptionPlan.findMany({
+    const plans = await this.prisma.subscriptionPlan.findMany({
       orderBy: { createdAt: 'asc' },
     });
 
-    const subscriptionCatalog = (plans && plans.length > 0) ? plans : [
-      {
-        id: 'plan-tanisma',
-        tier: SubscriptionTier.TANISMA,
-        name: 'Tanışma / Ücretsiz Paket',
-        priceTrl: 0,
-        limits: { aiReports: 3, aiChat: 3, activeListings: 1, comparisons: 3, listingDurationDays: 30 },
-      },
-      {
-        id: 'plan-yetkin',
-        tier: SubscriptionTier.YETKIN,
-        name: 'Yetkin / Standard Paket',
-        priceTrl: 499,
-        limits: { aiReports: 10, aiChat: 30, activeListings: 10, comparisons: 10, listingDurationDays: 30 },
-      },
-      {
-        id: 'plan-profesyonel',
-        tier: SubscriptionTier.PROFESYONEL,
-        name: 'Profesyonel / Pro Paket',
-        priceTrl: 1499,
-        limits: { aiReports: 50, aiChat: 150, activeListings: 50, comparisons: 30, listingDurationDays: 45 },
-      },
-    ];
+    const dbBuyerPlans = await this.prisma.buyerPackagePlan.findMany({
+      where: { isActive: true },
+    });
+    const buyerPriceMap = new Map(dbBuyerPlans.map((p) => [p.code, p.priceTrl]));
 
-    const buyerCatalog = [
-      {
-        id: 'buyer-mini',
-        packageCode: 'ALICI_MINI',
-        name: 'Alıcı Mini Ek Hak Paket (+5 AI Rapor / +20 Chatbot)',
-        priceTrl: 199,
-        aiReportLimit: 5,
-        chatbotMessageLimit: 20,
-        validityDays: 30,
-      },
-      {
-        id: 'buyer-plus',
-        packageCode: 'ALICI_PLUS',
-        name: 'Alıcı Plus Ek Hak Paket (+15 AI Rapor / +50 Chatbot)',
-        priceTrl: 499,
-        aiReportLimit: 15,
-        chatbotMessageLimit: 50,
-        validityDays: 30,
-      },
-      {
-        id: 'buyer-max',
-        packageCode: 'ALICI_MAX',
-        name: 'Alıcı Max Ek Hak Paket (+30 AI Rapor / +100 Chatbot)',
-        priceTrl: 899,
-        aiReportLimit: 30,
-        chatbotMessageLimit: 100,
-        validityDays: 45,
-      },
-    ];
+    const buyerCatalog = Object.values(BUYER_PACKAGES).map((bp) => {
+      const dynamicPrice = buyerPriceMap.get(bp.code);
+      return {
+        id: `buyer-${bp.code.toLowerCase().replace('_', '-')}`,
+        packageCode: bp.code,
+        name: bp.name,
+        priceTrl: dynamicPrice !== undefined ? dynamicPrice : bp.price,
+        aiReportLimit: bp.aiReportLimit,
+        chatbotMessageLimit: bp.chatbotMessageLimit,
+        validityDays: bp.validityDays,
+        description: bp.description,
+        popularTag: bp.popularTag,
+      };
+    });
 
     return {
-      subscriptions: subscriptionCatalog,
+      subscriptions: plans,
       buyerPackages: buyerCatalog,
     };
+  }
+
+  /**
+   * Admin Pricing Center Overview:
+   * Returns live dynamic prices, active subscriber count, renewing subscriber count, and history.
+   */
+  async getPricingOverview() {
+    const now = new Date();
+    const lifetimeThreshold = new Date('2040-01-01');
+
+    const [subscriptionPlans, buyerPackagePlans, allActiveSubs, priceHistory] = await Promise.all([
+      this.prisma.subscriptionPlan.findMany({
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.buyerPackagePlan.findMany({
+        orderBy: { code: 'asc' },
+      }),
+      this.prisma.subscription.findMany({
+        where: {
+          status: SubscriptionStatus.ACTIVE,
+          expiresAt: { gt: now },
+        },
+        include: {
+          user: { select: { email: true, role: true } },
+          plan: true,
+        },
+      }),
+      this.prisma.packagePriceHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+    ]);
+
+    // Aggregate subscription subscriber counts per plan
+    const subPlanStats = subscriptionPlans.map((plan) => {
+      const matchingSubs = allActiveSubs.filter((s) => s.planId === plan.id);
+      const totalActive = matchingSubs.length;
+      const renewingCount = matchingSubs.filter(
+        (s) => s.expiresAt < lifetimeThreshold && s.user.role !== Role.ADMIN && !ADMIN_EMAILS.includes(s.user.email.toLowerCase())
+      ).length;
+
+      return {
+        id: plan.id,
+        tier: plan.tier,
+        name: plan.name,
+        priceTrl: Number(plan.priceTrl),
+        priceUsd: Number(plan.priceUsd),
+        limits: plan.limits,
+        totalActiveSubscribers: totalActive,
+        renewingSubscribersCount: renewingCount,
+        lifetimeGrantCount: totalActive - renewingCount,
+        updatedAt: plan.updatedAt,
+      };
+    });
+
+    // Aggregate buyer package data
+    const buyerPackageStats = buyerPackagePlans.map((bp) => {
+      const config = BUYER_PACKAGES[bp.code];
+      return {
+        id: bp.id,
+        code: bp.code,
+        name: config?.name || bp.code,
+        badge: config?.badge || 'EK HAK',
+        priceTrl: bp.priceTrl,
+        currency: bp.currency,
+        isActive: bp.isActive,
+        limits: config
+          ? {
+              aiReportLimit: config.aiReportLimit,
+              chatbotMessageLimit: config.chatbotMessageLimit,
+              validityDays: config.validityDays,
+            }
+          : null,
+        description: config?.description || '',
+        popularTag: config?.popularTag || null,
+        updatedAt: bp.updatedAt,
+      };
+    });
+
+    return {
+      subscriptions: subPlanStats,
+      buyerPackages: buyerPackageStats,
+      recentHistory: priceHistory,
+    };
+  }
+
+  /**
+   * Updates Subscription Plan Price atomically:
+   * 1. Updates SubscriptionPlan.priceTrl
+   * 2. Synchronizes active renewing subscriptions' nextRenewalPriceTrl (leaves currentPeriodPriceTrl intact)
+   * 3. Records immutable PackagePriceHistory audit entry
+   */
+  async updateSubscriptionPrice(
+    adminUser: { id: string; email: string },
+    tier: SubscriptionTier,
+    newPrice: number,
+    reason?: string
+  ) {
+    if (newPrice < 0 || isNaN(newPrice) || !Number.isFinite(newPrice)) {
+      throw new BadRequestException('Fiyat geçerli, sıfır veya sıfırdan büyük bir sayı olmalıdır.');
+    }
+
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { tier },
+    });
+
+    if (!plan) {
+      throw new NotFoundException(`"${tier}" abonelik planı bulunamadı.`);
+    }
+
+    const oldPrice = Number(plan.priceTrl);
+    if (oldPrice === newPrice) {
+      return {
+        success: true,
+        message: `Paket fiyatı zaten ₺${newPrice}. Değişiklik yapılmadı.`,
+        oldPrice,
+        newPrice,
+        affectedSubscribersCount: 0,
+      };
+    }
+
+    const now = new Date();
+    const lifetimeThreshold = new Date('2040-01-01');
+
+    // Find renewing paid subscriptions only (exclude lifetime admin grants)
+    const activeSubs = await this.prisma.subscription.findMany({
+      where: {
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: { gt: now, lt: lifetimeThreshold },
+      },
+      include: {
+        user: { select: { email: true, role: true } },
+      },
+    });
+
+    const renewingPaidSubs = activeSubs.filter(
+      (s) => s.user.role !== Role.ADMIN && !ADMIN_EMAILS.includes(s.user.email.toLowerCase())
+    );
+
+    const affectedIds = renewingPaidSubs.map((s) => s.id);
+
+    // Atomic DB execution
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Update SubscriptionPlan catalog price
+      await tx.subscriptionPlan.update({
+        where: { id: plan.id },
+        data: { priceTrl: newPrice },
+      });
+
+      // 2. Update active paid subscriptions' nextRenewalPriceTrl
+      if (affectedIds.length > 0) {
+        await tx.subscription.updateMany({
+          where: { id: { in: affectedIds } },
+          data: { nextRenewalPriceTrl: newPrice },
+        });
+      }
+
+      // 3. Log immutable Financial Audit Entry
+      await tx.packagePriceHistory.create({
+        data: {
+          packageGroup: 'SUBSCRIPTION',
+          packageCode: tier,
+          packageName: plan.name,
+          oldPrice,
+          newPrice,
+          currency: 'TRY',
+          adminUserId: adminUser.id,
+          adminEmail: adminUser.email || 'Admin',
+          reason: reason || 'Admin panelinden fiyat güncellemesi',
+          affectedSubscribersCount: affectedIds.length,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: `${plan.name} fiyatı ₺${oldPrice} → ₺${newPrice} olarak güncellendi.`,
+      tier,
+      oldPrice,
+      newPrice,
+      affectedSubscribersCount: affectedIds.length,
+    };
+  }
+
+  /**
+   * Updates One-Time Buyer Package Price atomically:
+   * 1. Updates BuyerPackagePlan.priceTrl in DB
+   * 2. Logs immutable PackagePriceHistory audit entry
+   */
+  async updateBuyerPackagePrice(
+    adminUser: { id: string; email: string },
+    code: BuyerPackageCode,
+    newPrice: number,
+    reason?: string
+  ) {
+    if (newPrice <= 0 || isNaN(newPrice) || !Number.isFinite(newPrice)) {
+      throw new BadRequestException('Alıcı paketi fiyatı sıfırdan büyük bir sayı olmalıdır.');
+    }
+
+    const plan = await this.prisma.buyerPackagePlan.findUnique({
+      where: { code },
+    });
+
+    if (!plan) {
+      throw new NotFoundException(`"${code}" alıcı paketi bulunamadı.`);
+    }
+
+    const oldPrice = plan.priceTrl;
+    if (oldPrice === newPrice) {
+      return {
+        success: true,
+        message: `Paket fiyatı zaten ₺${newPrice}. Değişiklik yapılmadı.`,
+        oldPrice,
+        newPrice,
+      };
+    }
+
+    const config = BUYER_PACKAGES[code];
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.buyerPackagePlan.update({
+        where: { id: plan.id },
+        data: { priceTrl: newPrice },
+      });
+
+      await tx.packagePriceHistory.create({
+        data: {
+          packageGroup: 'BUYER_PACKAGE',
+          packageCode: code,
+          packageName: config?.name || code,
+          oldPrice,
+          newPrice,
+          currency: plan.currency,
+          adminUserId: adminUser.id,
+          adminEmail: adminUser.email || 'Admin',
+          reason: reason || 'Admin panelinden fiyat güncellemesi',
+          affectedSubscribersCount: 0,
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: `${config?.name || code} fiyatı ₺${oldPrice} → ₺${newPrice} olarak güncellendi.`,
+      code,
+      oldPrice,
+      newPrice,
+    };
+  }
+
+  async getPriceHistory(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit;
+    const [total, history] = await Promise.all([
+      this.prisma.packagePriceHistory.count(),
+      this.prisma.packagePriceHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      history,
+    };
+  }
+
+  /**
+   * Upgrades a user subscription by resolving price dynamically from DB.
+   * Finalizes currentPeriodPriceTrl snapshot upon activation.
+   */
+  async upgradeUserSubscription(userId: string, tier: SubscriptionTier) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
+
+    const plan = await this.prisma.subscriptionPlan.findUnique({ where: { tier } });
+    if (!plan) {
+      throw new BadRequestException('PRICING_UNAVAILABLE: Seçilen abonelik planı bulunamadı.');
+    }
+
+    const priceSnapshot = Number(plan.priceTrl);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      // 1. Update user tier
+      await tx.user.update({
+        where: { id: userId },
+        data: { subscriptionTier: tier },
+      });
+
+      // 2. Create or update subscription
+      const sub = await tx.subscription.create({
+        data: {
+          userId,
+          planId: plan.id,
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodPriceTrl: priceSnapshot > 0 ? priceSnapshot : null,
+          nextRenewalPriceTrl: priceSnapshot > 0 ? priceSnapshot : null,
+          expiresAt,
+        },
+      });
+
+      // 3. If paid, create initial SubscriptionPayment transaction snapshot
+      if (priceSnapshot > 0) {
+        await tx.subscriptionPayment.create({
+          data: {
+            subscriptionId: sub.id,
+            userId,
+            tier,
+            amount: priceSnapshot,
+            currency: 'TRY',
+            billingPeriodStart: new Date(),
+            billingPeriodEnd: expiresAt,
+            paymentStatus: PromotionPaymentStatus.PAID,
+            paymentProvider: 'DIRECT_CHECKOUT',
+          },
+        });
+      }
+
+      return sub;
+    });
+
+    return {
+      success: true,
+      message: `${plan.name} aboneliğiniz başarıyla başlatıldı.`,
+      subscription,
+    };
+  }
+
+  /**
+   * Creates or retrieves an idempotent renewal payment attempt snapshot.
+   */
+  async createRenewalPaymentSnapshot(subscriptionId: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      include: { plan: true, user: true },
+    });
+
+    if (!sub || sub.status !== SubscriptionStatus.ACTIVE) {
+      throw new NotFoundException('Aktif abonelik bulunamadı.');
+    }
+
+    // Exclude Admin Lifetime Grants from renewal charges
+    if (sub.expiresAt > new Date('2040-01-01') || ADMIN_EMAILS.includes(sub.user.email.toLowerCase())) {
+      return null;
+    }
+
+    const billingPeriodStart = sub.expiresAt;
+    const billingPeriodEnd = new Date(sub.expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // Check for existing snapshot for this exact period to prevent duplicate charges
+    const existing = await this.prisma.subscriptionPayment.findUnique({
+      where: {
+        subscriptionId_billingPeriodStart_billingPeriodEnd: {
+          subscriptionId,
+          billingPeriodStart,
+          billingPeriodEnd,
+        },
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const targetAmount =
+      sub.nextRenewalPriceTrl !== null && sub.nextRenewalPriceTrl !== undefined
+        ? sub.nextRenewalPriceTrl
+        : sub.plan.priceTrl;
+
+    return this.prisma.subscriptionPayment.create({
+      data: {
+        subscriptionId,
+        userId: sub.userId,
+        tier: sub.plan.tier,
+        amount: targetAmount,
+        currency: 'TRY',
+        billingPeriodStart,
+        billingPeriodEnd,
+        paymentStatus: PromotionPaymentStatus.PENDING,
+      },
+    });
   }
 
   async grantPackageToUser(

@@ -273,6 +273,7 @@ model User {
   promotions             ListingPromotionPurchase[]
   adminNotes             AdminUserNote[]           @relation("UserAdminNotes")
   adminMessages          AdminUserMessage[]        @relation("UserAdminMessages")
+  subscriptionPayments   SubscriptionPayment[]
 }
 
 model SubscriptionPlan {
@@ -289,16 +290,73 @@ model SubscriptionPlan {
 }
 
 model Subscription {
-  id        String             @id @default(uuid())
-  userId    String
-  planId    String
-  status    SubscriptionStatus @default(ACTIVE)
-  expiresAt DateTime
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id                    String                @id @default(uuid())
+  userId                String
+  planId                String
+  status                SubscriptionStatus    @default(ACTIVE)
+  currentPeriodPriceTrl Decimal?              @db.Decimal(12, 2)
+  nextRenewalPriceTrl   Decimal?              @db.Decimal(12, 2)
+  expiresAt             DateTime
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
-  user      User               @relation(fields: [userId], references: [id])
-  plan      SubscriptionPlan   @relation(fields: [planId], references: [id])
+  user                  User                  @relation(fields: [userId], references: [id])
+  plan                  SubscriptionPlan      @relation(fields: [planId], references: [id])
+  payments              SubscriptionPayment[]
+
+  @@index([userId, status])
+}
+
+model SubscriptionPayment {
+  id                 String                 @id @default(cuid())
+  subscriptionId     String
+  userId             String
+  tier               SubscriptionTier
+  amount             Decimal                @db.Decimal(12, 2)
+  currency           String                 @default("TRY")
+  billingPeriodStart DateTime
+  billingPeriodEnd   DateTime
+  paymentStatus      PromotionPaymentStatus @default(PENDING)
+  paymentProvider    String?
+  paymentReferenceId String?
+  lastError          String?
+  attemptCount       Int                    @default(0)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  subscription       Subscription           @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, billingPeriodStart, billingPeriodEnd])
+  @@index([userId, paymentStatus])
+}
+
+model BuyerPackagePlan {
+  id        String           @id @default(uuid())
+  code      BuyerPackageCode @unique
+  priceTrl  Int
+  currency  String           @default("TRY")
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model PackagePriceHistory {
+  id                       String   @id @default(uuid())
+  packageGroup             String   // "SUBSCRIPTION" | "BUYER_PACKAGE"
+  packageCode              String   // Canonical code e.g. "YETKIN", "PROFESYONEL", "ALICI_MINI", "ALICI_PLUS", "ALICI_MAX"
+  packageName              String
+  oldPrice                 Int
+  newPrice                 Int
+  currency                 String   @default("TRY")
+  adminUserId              String
+  adminEmail               String
+  reason                   String?
+  affectedSubscribersCount Int      @default(0)
+  createdAt                DateTime @default(now())
+
+  @@index([packageGroup, packageCode])
+  @@index([createdAt])
 }
 
 model FeatureUsage {

@@ -89,6 +89,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
       { key: 'REVENUE', label: 'Finans Özeti & MRR', href: '/admin/finance' },
       { key: 'SUBSCRIPTIONS', label: 'Aktif Abonelikler', href: '/admin/finance/subscriptions' },
       { key: 'ONE_TIME_PACKAGES', label: 'Tek Seferlik Paketler', href: '/admin/finance/packages' },
+      { key: 'PACKAGE_PRICES', label: 'Paket Fiyatları', href: '/admin/finance/pricing' },
       { key: 'COSTS', label: 'AI & Altyapı Maliyetleri', href: '/admin/finance/ai-costs' },
     ],
   },
