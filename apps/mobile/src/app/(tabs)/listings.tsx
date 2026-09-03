@@ -1,22 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Image, Modal } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-interface Listing {
+const formatCloudflareImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
+
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+
+  return url;
+};
+
+const resolveVehicleImageUrl = (
+  url?: string | null,
+  brand?: string,
+  modelFamily?: string
+): string => {
+  const formatted = formatCloudflareImageUrl(url);
+  if (formatted) return formatted;
+
+  if (brand && modelFamily) {
+    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
+    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+    }
+    const modelKey = modelFamily.toLowerCase().trim();
+    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    }
+  }
+  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+};
+
+interface ListingMedia {
+  id: string;
+  url?: string;
+  mediaUrl?: string;
+}
+
+interface ListingItem {
   id: string;
   title: string;
-  price: number;
-  year: number;
-  mileage: number;
-  description: string;
-  vehicleVariant: {
-    year: number;
-    brand: { name: string };
-    model: { name: string };
+  priceAmount?: number;
+  price?: number;
+  currency?: string;
+  kilometers?: number;
+  mileage?: number;
+  year?: number;
+  city?: string;
+  district?: string;
+  fuelType?: string;
+  transmission?: string;
+  isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
+  hasAiReport?: boolean;
+  description?: string;
+  createdAt?: string;
+  media?: ListingMedia[];
+  photos?: { url: string }[];
+  vehicleVariant?: {
+    year?: number;
+    brand?: { id?: string; name: string };
+    model?: { id?: string; name: string };
+    trim?: { id?: string; name: string };
   };
 }
 
@@ -27,45 +117,46 @@ interface Brand {
 
 export default function ListingsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
 
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [listings, setListings] = useState<ListingItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
-  const [sortByProfile, setSortByProfile] = useState(false);
-  const [profileId, setProfileId] = useState<string | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
-  // Filter dropdown data
+  // Filters
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [brandModalVisible, setBrandModalVisible] = useState(false);
+  const [sortOption, setSortOption] = useState<'newest' | 'price_asc' | 'price_desc' | 'km_asc'>('newest');
+  const [urgentOnly, setUrgentOnly] = useState(false);
 
   useEffect(() => {
     fetchBrands();
-    loadProfileId();
+    loadFavorites();
   }, []);
 
-  // Fetch listings when filters change
   useEffect(() => {
     fetchListings();
-  }, [selectedBrand, sortByProfile, params]);
+  }, [selectedBrand, sortOption, urgentOnly]);
 
-  const loadProfileId = async () => {
+  const loadFavorites = async () => {
     try {
-      const savedSessionId = await AsyncStorage.getItem('discoverySessionId');
-      if (savedSessionId) {
-        const token = await AsyncStorage.getItem('accessToken');
-        const headers: any = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
+      if (!token) return;
 
-        const res = await fetch(`${API_URL}/vehicle-discovery/profile/${savedSessionId}`, { headers });
-        if (res.ok) {
-          const profileData = await res.json();
-          setProfileId(profileData.id);
-        }
+      const res = await fetch(`${API_URL}/me/favorites`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const favs = await res.json();
+        const ids = new Set<string>((favs || []).map((f: any) => f.listingId || f.id));
+        setFavoriteIds(ids);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Load favorites error:', e);
     }
   };
 
@@ -74,31 +165,35 @@ export default function ListingsScreen() {
       const res = await fetch(`${API_URL}/vehicles/brands`);
       if (res.ok) {
         const data = await res.json();
-        setBrands(data);
+        setBrands(Array.isArray(data) ? data : []);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching brands:', e);
     }
   };
 
   const fetchListings = async () => {
     setLoading(true);
     try {
-      let url = `${API_URL}/listings?`;
+      let url = `${API_URL}/listings?limit=50&`;
       if (selectedBrand) {
         url += `brandId=${selectedBrand.id}&`;
       }
-      if (sortByProfile && (profileId || params.preferenceProfileId)) {
-        url += `preferenceProfileId=${profileId || params.preferenceProfileId}&`;
-      }
       if (search.trim()) {
-        url += `search=${encodeURIComponent(search)}&`;
+        url += `keyword=${encodeURIComponent(search.trim())}&`;
       }
+      if (urgentOnly) {
+        url += `urgentOnly=true&`;
+      }
+      if (sortOption === 'price_asc') url += `sort=price_asc&`;
+      else if (sortOption === 'price_desc') url += `sort=price_desc&`;
+      else if (sortOption === 'km_asc') url += `sort=km_asc&`;
+      else url += `sort=newest&`;
 
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const apiItems = Array.isArray(data)
+        const items = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
           ? data.items
@@ -107,131 +202,436 @@ export default function ListingsScreen() {
           : Array.isArray(data?.listings)
           ? data.listings
           : [];
-        setListings(apiItems);
+        setListings(items);
+      } else {
+        console.warn('Listings fetch non-ok status:', res.status);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Fetch listings error:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchListings();
+    loadFavorites();
+  };
+
+  const toggleFavorite = async (listingId: string) => {
+    const token =
+      (await AsyncStorage.getItem('accessToken')) ||
+      (await AsyncStorage.getItem('token'));
+
+    if (!token) {
+      Alert.alert('Giriş Yapın', 'İlanları favoriye eklemek için giriş yapmalısınız.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/login' as any) },
+      ]);
+      return;
+    }
+
+    const isFav = favoriteIds.has(listingId);
+    const updated = new Set(favoriteIds);
+    if (isFav) {
+      updated.delete(listingId);
+    } else {
+      updated.add(listingId);
+    }
+    setFavoriteIds(updated);
+
+    try {
+      if (isFav) {
+        await fetch(`${API_URL}/me/favorites/${listingId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await fetch(`${API_URL}/me/favorites`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ listingId }),
+        });
+      }
+    } catch (e) {
+      console.error('Toggle favorite error:', e);
+    }
+  };
+
+  const renderListingCard = ({ item }: { item: ListingItem }) => {
+    const brandName = item.vehicleVariant?.brand?.name || '';
+    const modelName = item.vehicleVariant?.model?.name || '';
+    const trimName = item.vehicleVariant?.trim?.name || '';
+    const year = item.year || item.vehicleVariant?.year || '';
+    const priceVal = item.priceAmount ?? item.price ?? 0;
+    const kmVal = item.kilometers ?? item.mileage ?? 0;
+
+    const firstImage =
+      item.media?.[0]?.url ||
+      item.media?.[0]?.mediaUrl ||
+      item.photos?.[0]?.url ||
+      null;
+
+    const resolvedImageUrl = resolveVehicleImageUrl(firstImage, brandName, modelName);
+    const isFav = favoriteIds.has(item.id);
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.88}
+        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } } as any)}
+      >
+        {/* Card Image Container */}
+        <View style={styles.imageContainer}>
+          <ExpoImage
+            source={{ uri: resolvedImageUrl }}
+            style={styles.cardImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+
+          {/* Badges on Top of Image */}
+          <View style={styles.imageBadgesRow}>
+            {item.isUrgent && (
+              <View style={styles.urgentBadge}>
+                <Ionicons name="flame" size={11} color="#ffffff" />
+                <Text style={styles.urgentBadgeText}>ACİL SATIŞ</Text>
+              </View>
+            )}
+
+            {item.isShowcaseFeedActive && (
+              <View style={styles.showcaseBadge}>
+                <Ionicons name="star" size={11} color="#ffffff" />
+                <Text style={styles.showcaseBadgeText}>VİTRİN</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Favorite Heart Button */}
+          <TouchableOpacity
+            style={styles.favBtn}
+            onPress={() => toggleFavorite(item.id)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={20}
+              color={isFav ? '#ef4444' : '#ffffff'}
+            />
+          </TouchableOpacity>
+
+          {/* Price Tag Overlay Bottom Left */}
+          <View style={styles.priceOverlay}>
+            <Text style={styles.priceAmountText}>
+              {new Intl.NumberFormat('tr-TR').format(priceVal)} TL
+            </Text>
+          </View>
+        </View>
+
+        {/* Card Content Info */}
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+
+          <Text style={styles.vehicleSpecText} numberOfLines={1}>
+            {brandName} {modelName} {trimName ? `• ${trimName}` : ''}
+          </Text>
+
+          {/* Key Specs Pills */}
+          <View style={styles.specsRow}>
+            {!!year && (
+              <View style={styles.specPill}>
+                <Ionicons name="calendar-outline" size={12} color="#64748b" />
+                <Text style={styles.specPillText}>{year}</Text>
+              </View>
+            )}
+            <View style={styles.specPill}>
+              <Ionicons name="speedometer-outline" size={12} color="#64748b" />
+              <Text style={styles.specPillText}>
+                {new Intl.NumberFormat('tr-TR').format(kmVal)} km
+              </Text>
+            </View>
+            {!!item.fuelType && (
+              <View style={styles.specPill}>
+                <Text style={styles.specPillText}>{item.fuelType}</Text>
+              </View>
+            )}
+            {!!item.transmission && (
+              <View style={styles.specPill}>
+                <Text style={styles.specPillText}>{item.transmission}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Location & Arrow */}
+          <View style={styles.cardFooterRow}>
+            <View style={styles.locationGroup}>
+              <Ionicons name="location-outline" size={13} color="#94a3b8" />
+              <Text style={styles.locationText} numberOfLines={1}>
+                {item.city ? `${item.city}${item.district ? ` / ${item.district}` : ''}` : 'Türkiye'}
+              </Text>
+            </View>
+
+            <View style={styles.viewDetailRow}>
+              <Text style={styles.viewDetailText}>İlanı İncele</Text>
+              <Ionicons name="chevron-forward" size={14} color="#ea580c" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Search and Action Header */}
-      <View style={styles.header}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="#64748b" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Navbar */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerTitleGroup}>
+          <Ionicons name="car-sport" size={22} color="#ea580c" />
+          <Text style={styles.headerTitle}>Araç İlanları</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.createListingBtn}
+          onPress={() => router.push('/listings/create' as any)}
+        >
+          <Ionicons name="add" size={18} color="#ffffff" />
+          <Text style={styles.createListingBtnText}>İlan Ver</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Search Input Bar */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchInputWrap}>
+          <Ionicons name="search" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="İlan ara (Örn: Golf, Astra)..."
-            placeholderTextColor="#64748b"
+            placeholder="Marka, model veya kelime ara..."
+            placeholderTextColor="#94a3b8"
             value={search}
             onChangeText={setSearch}
             onSubmitEditing={fetchListings}
+            returnKeyType="search"
           />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearch('');
+                fetchListings();
+              }}
+            >
+              <Ionicons name="close-circle" size={18} color="#94a3b8" />
+            </TouchableOpacity>
+          )}
         </View>
-
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/listings/create')}>
-          <Ionicons name="add-circle" size={32} color="#f97316" />
-        </TouchableOpacity>
       </View>
 
-      {/* Filter Row Buttons */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={[styles.filterBtn, selectedBrand && styles.activeFilterBtn]} onPress={() => setModalVisible(true)}>
-          <Ionicons name="funnel-outline" size={16} color={selectedBrand ? '#fff' : '#94a3b8'} />
-          <Text style={[styles.filterBtnText, selectedBrand && styles.activeFilterBtnText]}>
-            {selectedBrand ? selectedBrand.name : 'Marka Filtrele'}
-          </Text>
-        </TouchableOpacity>
-
-        {profileId && (
+      {/* Filter Horizontal Chips */}
+      <View style={styles.filterBarWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {/* Brand Filter */}
           <TouchableOpacity
-            style={[styles.filterBtn, sortByProfile && styles.activeFilterBtn]}
-            onPress={() => setSortByProfile(!sortByProfile)}
+            style={[styles.filterChip, selectedBrand && styles.filterChipActive]}
+            onPress={() => setBrandModalVisible(true)}
           >
-            <Ionicons name="sparkles-outline" size={16} color={sortByProfile ? '#fff' : '#94a3b8'} />
-            <Text style={[styles.filterBtnText, sortByProfile && styles.activeFilterBtnText]}>
-              Profilime Göre Sırala
+            <Ionicons
+              name="car-outline"
+              size={15}
+              color={selectedBrand ? '#ea580c' : '#64748b'}
+            />
+            <Text style={[styles.filterChipText, selectedBrand && styles.filterChipTextActive]}>
+              {selectedBrand ? selectedBrand.name : 'Tüm Markalar'}
+            </Text>
+            {selectedBrand ? (
+              <TouchableOpacity
+                onPress={() => setSelectedBrand(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={14} color="#ea580c" />
+              </TouchableOpacity>
+            ) : (
+              <Ionicons name="chevron-down" size={13} color="#94a3b8" />
+            )}
+          </TouchableOpacity>
+
+          {/* Urgent Filter */}
+          <TouchableOpacity
+            style={[styles.filterChip, urgentOnly && styles.filterChipUrgentActive]}
+            onPress={() => setUrgentOnly(!urgentOnly)}
+          >
+            <Ionicons
+              name="flame"
+              size={15}
+              color={urgentOnly ? '#ef4444' : '#64748b'}
+            />
+            <Text style={[styles.filterChipText, urgentOnly && { color: '#ef4444', fontWeight: '800' }]}>
+              Acil Satış
             </Text>
           </TouchableOpacity>
-        )}
+
+          {/* Sort: Newest */}
+          <TouchableOpacity
+            style={[styles.filterChip, sortOption === 'newest' && styles.filterChipActive]}
+            onPress={() => setSortOption('newest')}
+          >
+            <Text style={[styles.filterChipText, sortOption === 'newest' && styles.filterChipTextActive]}>
+              En Yeni
+            </Text>
+          </TouchableOpacity>
+
+          {/* Sort: Price Asc */}
+          <TouchableOpacity
+            style={[styles.filterChip, sortOption === 'price_asc' && styles.filterChipActive]}
+            onPress={() => setSortOption('price_asc')}
+          >
+            <Text style={[styles.filterChipText, sortOption === 'price_asc' && styles.filterChipTextActive]}>
+              Fiyat: Artan
+            </Text>
+          </TouchableOpacity>
+
+          {/* Sort: Price Desc */}
+          <TouchableOpacity
+            style={[styles.filterChip, sortOption === 'price_desc' && styles.filterChipActive]}
+            onPress={() => setSortOption('price_desc')}
+          >
+            <Text style={[styles.filterChipText, sortOption === 'price_desc' && styles.filterChipTextActive]}>
+              Fiyat: Azalan
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
-      {/* Listings List */}
+      {/* Main Content Feed */}
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#f97316" />
+        <View style={styles.centerLoading}>
+          <ActivityIndicator size="large" color="#ea580c" />
+          <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
-      ) : listings.length > 0 ? (
+      ) : listings.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="car-sport-outline" size={54} color="#cbd5e1" />
+          <Text style={styles.emptyTitle}>Aradığınız kriterde ilan bulunamadı</Text>
+          <Text style={styles.emptySub}>
+            Filtreleri sıfırlayarak veya arama terimini değiştirerek tekrar deneyebilirsiniz.
+          </Text>
+          <TouchableOpacity
+            style={styles.resetFiltersBtn}
+            onPress={() => {
+              setSelectedBrand(null);
+              setSearch('');
+              setUrgentOnly(false);
+              setSortOption('newest');
+            }}
+          >
+            <Text style={styles.resetFiltersBtnText}>Filtreleri Sıfırla</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
+          renderItem={renderListingCard}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-            >
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.cardVehicle}>
-                  {item.vehicleVariant?.brand.name} {item.vehicleVariant?.model.name} ({item.year})
-                </Text>
-                <View style={styles.detailsRow}>
-                  <Text style={styles.detailsText}>{(item.mileage ?? 0).toLocaleString('tr-TR')} km</Text>
-                  <Text style={styles.dot}>•</Text>
-                  <Text style={styles.priceText}>{(item.price ?? 0).toLocaleString('tr-TR')} TL</Text>
-                </View>
-
-                <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#64748b" style={styles.cardArrow} />
-            </TouchableOpacity>
-          )}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#ea580c"
+            />
+          }
         />
-      ) : (
-        <View style={styles.center}>
-          <Text style={styles.emptyText}>Aradığınız kriterlerde aktif ilan bulunamadı.</Text>
-        </View>
       )}
 
-      {/* Brand Select Modal */}
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      {/* BRAND SELECT MODAL */}
+      <Modal
+        visible={brandModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setBrandModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Marka Seçin</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#f8fafc" />
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setBrandModalVisible(false)}
+              >
+                <Ionicons name="close" size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.clearRow} onPress={() => { setSelectedBrand(null); setModalVisible(false); }}>
-              <Text style={styles.clearText}>Tüm Markalar (Filtreyi Kaldır)</Text>
-            </TouchableOpacity>
-
-            <FlatList
-              data={brands}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  onPress={() => {
-                    setSelectedBrand(item);
-                    setModalVisible(false);
-                  }}
+            <ScrollView
+              style={{ maxHeight: 400 }}
+              contentContainerStyle={{ padding: 14, gap: 8 }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.brandOptionItem,
+                  !selectedBrand && styles.brandOptionSelected,
+                ]}
+                onPress={() => {
+                  setSelectedBrand(null);
+                  setBrandModalVisible(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.brandOptionText,
+                    !selectedBrand && styles.brandOptionTextSelected,
+                  ]}
                 >
-                  <Text style={styles.optionText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-            />
+                  Tüm Markalar
+                </Text>
+                {!selectedBrand && (
+                  <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                )}
+              </TouchableOpacity>
+
+              {brands.map((b) => {
+                const isSelected = selectedBrand?.id === b.id;
+                return (
+                  <TouchableOpacity
+                    key={b.id}
+                    style={[
+                      styles.brandOptionItem,
+                      isSelected && styles.brandOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedBrand(b);
+                      setBrandModalVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.brandOptionText,
+                        isSelected && styles.brandOptionTextSelected,
+                      ]}
+                    >
+                      {b.name}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -240,172 +640,354 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: 0.2,
+  },
+  createListingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  createListingBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
   },
   searchInput: {
     flex: 1,
+    fontSize: 13,
     color: '#0f172a',
-    fontSize: 14,
+    padding: 0,
   },
-  addBtn: {
-    justifyContent: 'center',
+  filterBarWrapper: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 10,
   },
-  filterRow: {
-    flexDirection: 'row',
+  filterScroll: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 10,
+    gap: 8,
   },
-  filterBtn: {
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
   },
-  activeFilterBtn: {
-    backgroundColor: 'rgba(234, 88, 12, 0.1)',
-    borderColor: 'rgba(234, 88, 12, 0.3)',
+  filterChipActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
   },
-  filterBtnText: {
-    color: '#475569',
+  filterChipUrgentActive: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#ef4444',
+  },
+  filterChipText: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#64748b',
   },
-  activeFilterBtnText: {
+  filterChipTextActive: {
     color: '#ea580c',
+    fontWeight: '800',
+  },
+  centerLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: 12.5,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  resetFiltersBtn: {
+    marginTop: 8,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  resetFiltersBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   listContent: {
-    padding: 16,
-    gap: 12,
+    padding: 14,
+    gap: 14,
+    paddingBottom: 40,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 18,
-    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
   },
-  cardInfo: {
-    flex: 1,
-    gap: 4,
+  imageContainer: {
+    width: '100%',
+    height: 190,
+    backgroundColor: '#f1f5f9',
+    position: 'relative',
   },
-  cardTitle: {
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: '900',
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
-  cardVehicle: {
-    color: '#ea580c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  detailsRow: {
+  imageBadgesRow: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
   },
-  detailsText: {
-    color: '#64748b',
-    fontSize: 12,
+  urgentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  dot: {
-    color: '#94a3b8',
-    fontSize: 12,
+  urgentBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
-  priceText: {
+  showcaseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  showcaseBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  favBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  priceOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  priceAmountText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  cardBody: {
+    padding: 14,
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  vehicleSpecText: {
+    fontSize: 12.5,
+    fontWeight: '700',
     color: '#ea580c',
-    fontSize: 13,
-    fontWeight: '800',
   },
-  cardDesc: {
-    color: '#64748b',
+  specsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  specPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  specPillText: {
     fontSize: 11,
-    lineHeight: 16,
-    marginTop: 4,
+    fontWeight: '600',
+    color: '#475569',
   },
-  cardArrow: {
-    paddingLeft: 8,
+  cardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 8,
+    marginTop: 2,
   },
-  emptyText: {
+  locationGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  locationText: {
+    fontSize: 11.5,
     color: '#64748b',
-    fontSize: 13,
+    fontWeight: '600',
   },
-  modalOverlay: {
+  viewDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewDetailText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  modalSheet: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '75%',
-    padding: 20,
-    gap: 16,
+    paddingBottom: 24,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   modalTitle: {
+    fontSize: 16,
+    fontWeight: '900',
     color: '#0f172a',
-    fontSize: 18,
-    fontWeight: '800',
   },
-  clearRow: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  clearText: {
-    color: '#ef4444',
-    fontSize: 14,
+  brandOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  brandOptionSelected: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  brandOptionText: {
+    fontSize: 13.5,
     fontWeight: '700',
+    color: '#334155',
   },
-  optionRow: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  optionText: {
-    color: '#0f172a',
-    fontSize: 15,
-    fontWeight: '600',
+  brandOptionTextSelected: {
+    color: '#ea580c',
+    fontWeight: '900',
   },
 });
-

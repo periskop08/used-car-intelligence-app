@@ -64,7 +64,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="listings"
         options={{
-          title: 'İlanlar',
+          headerShown: false,
           tabBarLabel: 'İlanlar',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.centerTabBadge}>
