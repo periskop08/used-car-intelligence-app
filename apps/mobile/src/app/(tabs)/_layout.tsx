@@ -106,7 +106,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="club"
         options={{
-          title: 'TorqueScout Club',
+          headerShown: false,
           tabBarLabel: 'Club',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={22} color={color} />
