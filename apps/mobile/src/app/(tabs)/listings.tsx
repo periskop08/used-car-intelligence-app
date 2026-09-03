@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
@@ -217,6 +217,7 @@ type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'km_asc';
 
 export default function ListingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ urgentOnly?: string }>();
 
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -260,6 +261,14 @@ export default function ListingsScreen() {
   const [hasWarranty, setHasWarranty] = useState(false);
   const [noHeavyDamage, setNoHeavyDamage] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
+
+  useEffect(() => {
+    if (params.urgentOnly === 'true') {
+      setUrgentOnly(true);
+    } else if (params.urgentOnly === 'false') {
+      setUrgentOnly(false);
+    }
+  }, [params.urgentOnly]);
 
   // Sorting
   const [sortOption, setSortOption] = useState<SortOption>('newest');
