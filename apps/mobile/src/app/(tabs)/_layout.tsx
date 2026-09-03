@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -9,11 +9,55 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
+  Animated,
 } from 'react-native';
 
 export default function TabsLayout() {
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // Animations for the 3 floating bubbles
+  const scaleAnim1 = useRef(new Animated.Value(0)).current;
+  const scaleAnim2 = useRef(new Animated.Value(0)).current;
+  const scaleAnim3 = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (menuVisible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.stagger(60, [
+          Animated.spring(scaleAnim3, {
+            toValue: 1,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim2, {
+            toValue: 1,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim1, {
+            toValue: 1,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      scaleAnim1.setValue(0);
+      scaleAnim2.setValue(0);
+      scaleAnim3.setValue(0);
+      fadeAnim.setValue(0);
+    }
+  }, [menuVisible]);
 
   const handleOpenListings = (urgent: boolean) => {
     setMenuVisible(false);
@@ -90,7 +134,7 @@ export default function TabsLayout() {
           name="listings"
           listeners={{
             tabPress: (e) => {
-              // Prevent default navigation and open upward action popover
+              // Open 3 floating bubbles above tab button
               e.preventDefault();
               setMenuVisible(true);
             },
@@ -155,99 +199,86 @@ export default function TabsLayout() {
       </Tabs>
 
       {/* ========================================================================= */}
-      {/* 🌟 UPWARD SPRING POPUP MODAL (İLANLAR AÇILIR MENÜSÜ) 🌟 */}
+      {/* 🎈 3 FLOATING BUBBLES POPUP (BALONCUK MENÜ) 🎈 */}
       {/* ========================================================================= */}
       <Modal
         visible={menuVisible}
-        animationType="slide"
         transparent={true}
+        animationType="none"
         onRequestClose={() => setMenuVisible(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
-          <Pressable style={styles.popoverCard} onPress={(e) => e.stopPropagation()}>
-            {/* Handle Drag Bar */}
-            <View style={styles.dragBar} />
+          {/* Dimmed backdrop animated view */}
+          <Animated.View style={[styles.backdropBg, { opacity: fadeAnim }]} />
 
-            {/* Header */}
-            <View style={styles.popoverHeader}>
-              <View>
-                <Text style={styles.popoverTitle}>İlan Menüsü</Text>
-                <Text style={styles.popoverSub}>İşlem yapmak istediğiniz alanı seçin</Text>
-              </View>
+          {/* Centered Floating Bubbles Cluster */}
+          <View style={styles.bubblesContainer}>
+            {/* Bubble 1 (Top): İLAN VER */}
+            <Animated.View
+              style={{
+                transform: [{ scale: scaleAnim1 }],
+                opacity: scaleAnim1,
+              }}
+            >
               <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setMenuVisible(false)}
+                style={[styles.bubblePill, styles.bubblePillCreate]}
+                activeOpacity={0.85}
+                onPress={handleCreateListing}
               >
-                <Ionicons name="close" size={20} color="#64748b" />
+                <View style={styles.bubbleIconCircleCreate}>
+                  <Ionicons name="add" size={18} color="#ea580c" />
+                </View>
+                <Text style={styles.bubbleTextCreate}>İlan Ver</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
-            {/* Option 1: ACİL İLANLAR */}
-            <TouchableOpacity
-              style={[styles.menuOptionCard, styles.urgentCardBorder]}
-              activeOpacity={0.8}
-              onPress={() => handleOpenListings(true)}
+            {/* Bubble 2 (Middle): TÜM İLANLAR */}
+            <Animated.View
+              style={{
+                transform: [{ scale: scaleAnim2 }],
+                opacity: scaleAnim2,
+              }}
             >
-              <View style={[styles.menuIconCircle, styles.urgentIconCircle]}>
-                <Ionicons name="flame" size={24} color="#ef4444" />
-              </View>
-              <View style={styles.menuTextWrap}>
-                <View style={styles.menuTitleRow}>
-                  <Text style={styles.menuTitle}>Acil İlanlar</Text>
-                  <View style={styles.opportunityBadge}>
-                    <Text style={styles.opportunityBadgeText}>FIRSAT</Text>
-                  </View>
+              <TouchableOpacity
+                style={[styles.bubblePill, styles.bubblePillAll]}
+                activeOpacity={0.85}
+                onPress={() => handleOpenListings(false)}
+              >
+                <View style={styles.bubbleIconCircleAll}>
+                  <Ionicons name="car-sport" size={18} color="#ea580c" />
                 </View>
-                <Text style={styles.menuDesc}>Fiyatı düşen ve acil satışlı araçları incele</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ef4444" />
-            </TouchableOpacity>
+                <Text style={styles.bubbleTextAll}>Tüm İlanlar</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Option 2: TÜM İLANLAR */}
-            <TouchableOpacity
-              style={styles.menuOptionCard}
-              activeOpacity={0.8}
-              onPress={() => handleOpenListings(false)}
+            {/* Bubble 3 (Bottom): ACİL İLANLAR */}
+            <Animated.View
+              style={{
+                transform: [{ scale: scaleAnim3 }],
+                opacity: scaleAnim3,
+              }}
             >
-              <View style={[styles.menuIconCircle, styles.allIconCircle]}>
-                <Ionicons name="car-sport" size={24} color="#ea580c" />
-              </View>
-              <View style={styles.menuTextWrap}>
-                <Text style={styles.menuTitle}>Tüm İlanlar</Text>
-                <Text style={styles.menuDesc}>Onaylı ve güncel tüm satılık araç listesi</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ea580c" />
-            </TouchableOpacity>
-
-            {/* Option 3: İLAN VER */}
-            <TouchableOpacity
-              style={[styles.menuOptionCard, styles.createCardBg]}
-              activeOpacity={0.8}
-              onPress={handleCreateListing}
-            >
-              <View style={[styles.menuIconCircle, styles.createIconCircle]}>
-                <Ionicons name="add" size={26} color="#ffffff" />
-              </View>
-              <View style={styles.menuTextWrap}>
-                <View style={styles.menuTitleRow}>
-                  <Text style={[styles.menuTitle, { color: '#0f172a' }]}>İlan Ver</Text>
-                  <View style={styles.fastBadge}>
-                    <Text style={styles.fastBadgeText}>HIZLI YAYIN</Text>
-                  </View>
+              <TouchableOpacity
+                style={[styles.bubblePill, styles.bubblePillUrgent]}
+                activeOpacity={0.85}
+                onPress={() => handleOpenListings(true)}
+              >
+                <View style={styles.bubbleIconCircleUrgent}>
+                  <Ionicons name="flame" size={18} color="#ef4444" />
                 </View>
-                <Text style={styles.menuDesc}>Aracını dakikalar içinde binlerce alıcıya ulaştır</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ea580c" />
-            </TouchableOpacity>
+                <Text style={styles.bubbleTextUrgent}>Acil İlanlar</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Cancel Button */}
+            {/* Close Cross Floating Button */}
             <TouchableOpacity
-              style={styles.cancelBtn}
+              style={styles.bubbleCloseBtn}
+              activeOpacity={0.8}
               onPress={() => setMenuVisible(false)}
             >
-              <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              <Ionicons name="close" size={22} color="#ffffff" />
             </TouchableOpacity>
-          </Pressable>
+          </View>
         </Pressable>
       </Modal>
     </>
@@ -271,144 +302,110 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'flex-end',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    alignItems: 'center',
   },
-  popoverCard: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 24,
+  backdropBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  bubblesContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 36 : 24,
+    alignItems: 'center',
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
   },
-  dragBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#e2e8f0',
-    alignSelf: 'center',
-    marginBottom: 4,
-  },
-  popoverHeader: {
+  /* 🎈 BUBBLE PILLS STYLES 🎈 */
+  bubblePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 4,
+    gap: 10,
+    paddingLeft: 8,
+    paddingRight: 18,
+    paddingVertical: 7,
+    borderRadius: 30,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
   },
-  popoverTitle: {
-    fontSize: 18,
+  bubblePillCreate: {
+    backgroundColor: '#ea580c',
+    borderColor: '#fb923c',
+    shadowColor: '#ea580c',
+    shadowOpacity: 0.4,
+  },
+  bubblePillAll: {
+    backgroundColor: '#ffffff',
+    borderColor: '#fed7aa',
+  },
+  bubblePillUrgent: {
+    backgroundColor: '#ffffff',
+    borderColor: '#fecdd3',
+  },
+  /* ICON CIRCLES */
+  bubbleIconCircleCreate: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bubbleIconCircleAll: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff7ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bubbleIconCircleUrgent: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff1f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  /* BUBBLE TEXTS */
+  bubbleTextCreate: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.3,
+  },
+  bubbleTextAll: {
+    fontSize: 14.5,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: 0.2,
   },
-  popoverSub: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
+  bubbleTextUrgent: {
+    fontSize: 14.5,
+    fontWeight: '900',
+    color: '#ef4444',
+    letterSpacing: 0.2,
   },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+  /* CLOSE BUTTON */
+  bubbleCloseBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  menuOptionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    gap: 14,
-  },
-  urgentCardBorder: {
-    borderColor: '#fecdd3',
-    backgroundColor: '#fff1f2',
-  },
-  createCardBg: {
-    backgroundColor: '#fff7ed',
-    borderColor: '#fed7aa',
-  },
-  menuIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  urgentIconCircle: {
-    backgroundColor: '#ffe4e6',
-  },
-  allIconCircle: {
-    backgroundColor: '#ffedd5',
-  },
-  createIconCircle: {
-    backgroundColor: '#ea580c',
-  },
-  menuTextWrap: {
-    flex: 1,
-    gap: 3,
-  },
-  menuTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  menuTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  menuDesc: {
-    fontSize: 11.5,
-    color: '#64748b',
-    lineHeight: 16,
-  },
-  opportunityBadge: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  opportunityBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  fastBadge: {
-    backgroundColor: '#ea580c',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  fastBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  cancelBtn: {
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cancelBtnText: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#475569',
+    marginTop: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
 });
