@@ -469,13 +469,13 @@ export default function ListingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* TOP APPBAR */}
+      {/* TOP APPBAR (WHITE THEME) */}
       <View style={styles.topAppBar}>
         <TouchableOpacity
           style={styles.appBarIconBtn}
           onPress={() => router.push('/(tabs)/index' as any)}
         >
-          <Ionicons name="chevron-back" size={24} color="#ffffff" />
+          <Ionicons name="chevron-back" size={24} color="#0f172a" />
         </TouchableOpacity>
 
         <View style={styles.appBarCenter}>
@@ -487,10 +487,10 @@ export default function ListingsScreen() {
 
         <View style={styles.appBarRightGroup}>
           <TouchableOpacity style={styles.appBarIconBtn} onPress={handleShareSearch}>
-            <Ionicons name="share-outline" size={20} color="#ffffff" />
+            <Ionicons name="share-outline" size={20} color="#334155" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.appBarIconBtn} onPress={handleSaveSearch}>
-            <Ionicons name="star-outline" size={20} color="#ffffff" />
+            <Ionicons name="star-outline" size={20} color="#334155" />
           </TouchableOpacity>
         </View>
       </View>
@@ -798,9 +798,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0f172a', // Sleek dark slate background
+    backgroundColor: '#ffffff', // Clean white background
     paddingHorizontal: 12,
     paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   appBarIconBtn: {
     width: 36,
@@ -820,7 +822,7 @@ const styles = StyleSheet.create({
   },
   appBarSubTitle: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#64748b',
     fontWeight: '600',
     marginTop: 1,
   },
@@ -832,7 +834,7 @@ const styles = StyleSheet.create({
   subMenuBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
@@ -850,7 +852,7 @@ const styles = StyleSheet.create({
   subMenuBtnText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#334155',
+    color: '#475569',
   },
   subMenuBtnTextActive: {
     color: '#ea580c',
@@ -859,7 +861,7 @@ const styles = StyleSheet.create({
   subMenuDivider: {
     width: 1,
     height: 18,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: '#e2e8f0',
   },
   searchWrap: {
     flexDirection: 'row',
