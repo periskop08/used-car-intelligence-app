@@ -15,10 +15,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const TIER_RANKS: Record<string, number> = {
+  TANISMA: 1,
+  FREE: 1,
+  YETKIN: 2,
+  STANDARD: 2,
+  BASIC: 2,
+  PROFESYONEL: 3,
+  PRO: 3,
+  PREMIUM: 3,
+};
+
 interface PackagePlan {
   id: string;
   name: string;
   code: string;
+  rank: number;
   price: number;
   period: string;
   reportCount: number;
@@ -86,22 +98,14 @@ export default function SubscriptionScreen() {
       ? 'PROFESYONEL'
       : rawTier;
 
-  const getTierDisplayName = () => {
-    switch (tier) {
-      case 'PROFESYONEL':
-        return 'Profesyonel Paket (1.499 TL / ay)';
-      case 'YETKIN':
-        return 'Yetkin Paket (499 TL / ay)';
-      default:
-        return 'Tanışma Paketi (0 TL / ay)';
-    }
-  };
+  const currentRank = TIER_RANKS[tier] || 1;
 
   const PLANS: PackagePlan[] = [
     {
       id: 'p-tanisma',
       name: 'Tanışma Paketi',
       code: 'TANISMA',
+      rank: 1,
       price: 0,
       period: 'Ay',
       reportCount: 3,
@@ -120,6 +124,7 @@ export default function SubscriptionScreen() {
       id: 'p-yetkin',
       name: 'Yetkin Paket',
       code: 'YETKIN',
+      rank: 2,
       price: 499,
       period: 'Ay',
       reportCount: 10,
@@ -140,6 +145,7 @@ export default function SubscriptionScreen() {
       id: 'p-pro',
       name: 'Profesyonel Paket',
       code: 'PROFESYONEL',
+      rank: 3,
       price: 1499,
       period: 'Ay',
       reportCount: 50,
@@ -158,6 +164,9 @@ export default function SubscriptionScreen() {
       ],
     },
   ];
+
+  // Only show higher upgrade packages if any exist above the user's current rank
+  const higherPlans = PLANS.filter((p) => p.rank > currentRank);
 
   if (loading) {
     return (
@@ -187,12 +196,27 @@ export default function SubscriptionScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* CURRENT ACTIVE PLAN HERO CARD */}
         <View style={styles.activePlanCard}>
-          <View style={styles.planHeaderRow}>
-            <View>
+          <View style={styles.planHeaderTop}>
+            <View style={styles.planHeaderLeft}>
               <Text style={styles.activePlanLabel}>AYLIK ABONELİK PAKETİNİZ</Text>
-              <Text style={styles.activePlanTitle}>{getTierDisplayName()}</Text>
+              <Text style={styles.activePlanTitle} numberOfLines={1}>
+                {tier === 'PROFESYONEL'
+                  ? 'Profesyonel VIP Paket'
+                  : tier === 'YETKIN'
+                  ? 'Yetkin Paket'
+                  : 'Tanışma Paketi'}
+              </Text>
+              <Text style={styles.activePlanPrice}>
+                {tier === 'PROFESYONEL'
+                  ? '1.499 TL / ay'
+                  : tier === 'YETKIN'
+                  ? '499 TL / ay'
+                  : 'Ücretsiz (0 TL / ay)'}
+              </Text>
             </View>
+
             <View style={styles.activePlanBadge}>
+              <Ionicons name="sparkles" size={11} color="#f59e0b" style={{ marginRight: 4 }} />
               <Text style={styles.activePlanBadgeText}>{tier}</Text>
             </View>
           </View>
@@ -200,7 +224,7 @@ export default function SubscriptionScreen() {
           {/* Quick Perks Row */}
           <View style={styles.quotaRow}>
             <View style={styles.quotaBox}>
-              <Ionicons name="document-text-outline" size={18} color="#ea580c" />
+              <Ionicons name="document-text" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
                 {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '3'}
               </Text>
@@ -208,7 +232,7 @@ export default function SubscriptionScreen() {
             </View>
             <View style={styles.quotaDivider} />
             <View style={styles.quotaBox}>
-              <Ionicons name="chatbubbles-outline" size={18} color="#ea580c" />
+              <Ionicons name="chatbubbles" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
                 {tier === 'PROFESYONEL' ? '150' : tier === 'YETKIN' ? '30' : '3'}
               </Text>
@@ -216,7 +240,7 @@ export default function SubscriptionScreen() {
             </View>
             <View style={styles.quotaDivider} />
             <View style={styles.quotaBox}>
-              <Ionicons name="car-sport-outline" size={18} color="#ea580c" />
+              <Ionicons name="car-sport" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
                 {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '1'}
               </Text>
@@ -232,84 +256,80 @@ export default function SubscriptionScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ALL AVAILABLE PLANS (MATCHING WEB) */}
-        <Text style={styles.sectionHeaderTitle}>Aylık Abonelik Planları</Text>
+        {/* IF USER IS ALREADY AT HIGHEST TIER (PROFESYONEL) */}
+        {currentRank >= 3 ? (
+          <View style={styles.topTierVipCard}>
+            <View style={styles.vipCrownCircle}>
+              <Ionicons name="trophy" size={28} color="#f59e0b" />
+            </View>
+            <Text style={styles.vipTitle}>En Üst Seviye VIP Üyeliktesiniz</Text>
+            <Text style={styles.vipDesc}>
+              Mevcut Profesyonel Paketiniz TorqueScout platformundaki en yüksek üyeliktir. Ayda 50 AI Araç Raporu, 150 Chatbot Mesajı, 50 Aktif İlan ve 45 gün vitrin yayın süresi gibi tüm premium ayrıcalıklardan eksiksiz faydalanmaktasınız.
+            </Text>
+          </View>
+        ) : (
+          /* HIGHER UPGRADE PLANS (ONLY SHOWN IF USER HAS AN UPGRADE AVAILABLE) */
+          <>
+            <Text style={styles.sectionHeaderTitle}>Yükseltebileceğiniz Paketler</Text>
 
-        {PLANS.map((plan) => {
-          const isCurrent = tier === plan.code;
-          return (
-            <View
-              key={plan.id}
-              style={[
-                styles.planCard,
-                plan.isPopular && styles.popularPlanCard,
-                isCurrent && styles.currentPlanBorder,
-              ]}
-            >
-              {plan.isPopular && (
-                <View style={styles.popularBadge}>
-                  <Text style={styles.popularBadgeText}>EN POPÜLER</Text>
-                </View>
-              )}
-
-              <View style={styles.planCardTop}>
-                <View>
-                  <Text style={styles.planName}>{plan.name}</Text>
-                  <Text style={styles.planSub}>
-                    {plan.reportCount} AI Rapor • {plan.listingCount} İlan • {plan.durationDays} Gün
-                  </Text>
-                </View>
-                <View style={styles.priceWrap}>
-                  <Text style={styles.priceNumber}>
-                    {plan.price === 0 ? '0 TL' : `${new Intl.NumberFormat('tr-TR').format(plan.price)} TL`}
-                  </Text>
-                  <Text style={styles.pricePeriod}>/ {plan.period}</Text>
-                </View>
-              </View>
-
-              <View style={styles.featuresList}>
-                {plan.features.map((feat, idx) => (
-                  <View key={idx} style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
-                    <Text style={styles.featureText}>{feat}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <TouchableOpacity
+            {higherPlans.map((plan) => (
+              <View
+                key={plan.id}
                 style={[
-                  styles.selectPlanBtn,
-                  isCurrent
-                    ? styles.currentPlanBtn
-                    : plan.isPopular
-                    ? styles.popularPlanBtn
-                    : styles.defaultPlanBtn,
+                  styles.planCard,
+                  plan.isPopular && styles.popularPlanCard,
                 ]}
-                onPress={() => {
-                  if (isCurrent) {
-                    Alert.alert('Bilgi', 'Şu an bu paketi kullanmaktasınız.');
-                  } else {
+              >
+                {plan.isPopular && (
+                  <View style={styles.popularBadge}>
+                    <Text style={styles.popularBadgeText}>EN POPÜLER</Text>
+                  </View>
+                )}
+
+                <View style={styles.planCardTop}>
+                  <View>
+                    <Text style={styles.planName}>{plan.name}</Text>
+                    <Text style={styles.planSub}>
+                      {plan.reportCount} AI Rapor • {plan.listingCount} İlan • {plan.durationDays} Gün
+                    </Text>
+                  </View>
+                  <View style={styles.priceWrap}>
+                    <Text style={styles.priceNumber}>
+                      {new Intl.NumberFormat('tr-TR').format(plan.price)} TL
+                    </Text>
+                    <Text style={styles.pricePeriod}>/ {plan.period}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.featuresList}>
+                  {plan.features.map((feat, idx) => (
+                    <View key={idx} style={styles.featureItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+                      <Text style={styles.featureText}>{feat}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.selectPlanBtn,
+                    plan.isPopular ? styles.popularPlanBtn : styles.defaultPlanBtn,
+                  ]}
+                  onPress={() => {
                     Alert.alert(
                       'Planı Yükselt',
-                      `${plan.name} (${new Intl.NumberFormat('tr-TR').format(plan.price)} TL / ay) paketine geçmek için web sitemizdeki güvenli ödeme merkezine yönlendirileceksiniz.`
+                      `${plan.name} (${new Intl.NumberFormat('tr-TR').format(plan.price)} TL / ay) paketine geçiş yapmak için web sitemizdeki güvenli ödeme merkezine yönlendirileceksiniz.`
                     );
-                  }
-                }}
-              >
-                <Text
-                  style={[
-                    styles.selectPlanBtnText,
-                    isCurrent && styles.currentPlanBtnText,
-                  ]}
+                  }}
                 >
-                  {isCurrent ? 'Mevcut Paketiniz' : 'Planı Yükselt'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
+                  <Text style={styles.selectPlanBtnText}>Planı Yükselt</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
+        )}
 
-        {/* EK ALICI PAKETLERİ (TEK SEFERLİK) */}
+        {/* EK ALICI PAKETLERİ (TEK SEFERLİK KREDİLER) */}
         <View style={styles.buyerPackageBanner}>
           <View style={styles.buyerPackageHeader}>
             <View style={{ flex: 1 }}>
@@ -413,10 +433,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  planHeaderRow: {
+  planHeaderTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 10,
+  },
+  planHeaderLeft: {
+    flex: 1,
+    gap: 2,
   },
   activePlanLabel: {
     fontSize: 10,
@@ -428,20 +453,27 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '900',
     color: '#ffffff',
-    marginTop: 2,
+  },
+  activePlanPrice: {
+    fontSize: 12.5,
+    color: '#fb923c',
+    fontWeight: '700',
   },
   activePlanBadge: {
-    backgroundColor: 'rgba(234, 88, 12, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(234, 88, 12, 0.4)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   activePlanBadgeText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#ea580c',
+    color: '#fbbf24',
+    letterSpacing: 0.5,
   },
   quotaRow: {
     flexDirection: 'row',
@@ -453,7 +485,7 @@ const styles = StyleSheet.create({
   quotaBox: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
   quotaVal: {
     fontSize: 18,
@@ -479,6 +511,43 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ea580c',
   },
+  topTierVipCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#fed7aa',
+    padding: 22,
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  vipCrownCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  vipTitle: {
+    fontSize: 16.5,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  vipDesc: {
+    fontSize: 12.5,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   sectionHeaderTitle: {
     fontSize: 15,
     fontWeight: '800',
@@ -502,9 +571,6 @@ const styles = StyleSheet.create({
   popularPlanCard: {
     borderColor: '#ea580c',
     borderWidth: 2,
-  },
-  currentPlanBorder: {
-    backgroundColor: '#ffffff',
   },
   popularBadge: {
     position: 'absolute',
@@ -579,18 +645,10 @@ const styles = StyleSheet.create({
   defaultPlanBtn: {
     backgroundColor: '#0f172a',
   },
-  currentPlanBtn: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
   selectPlanBtnText: {
     fontSize: 13.5,
     fontWeight: '800',
     color: '#ffffff',
-  },
-  currentPlanBtnText: {
-    color: '#64748b',
   },
   buyerPackageBanner: {
     backgroundColor: '#ffffff',
