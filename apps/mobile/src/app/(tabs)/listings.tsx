@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   appBarTitle: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#ea580c', // Orange page title
+    color: '#0f172a', // Dark navy / slate title matching other tabs
     letterSpacing: 0.3,
   },
   appBarSubTitle: {
