@@ -34,6 +34,7 @@ export default function RootLayout() {
         <Stack.Screen name="profile/admin" options={{ headerShown: false }} />
         <Stack.Screen name="profile/my-listings" options={{ headerShown: false }} />
         <Stack.Screen name="profile/subscription" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/package-rights" options={{ headerShown: false }} />
         <Stack.Screen name="profile/dashboard" options={{ headerShown: false }} />
         <Stack.Screen name="profile/personal-info" options={{ headerShown: false }} />
         <Stack.Screen name="profile/settings" options={{ headerShown: false }} />

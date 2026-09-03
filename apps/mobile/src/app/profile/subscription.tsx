@@ -21,8 +21,10 @@ interface PackagePlan {
   code: string;
   price: number;
   period: string;
-  reportQuota: number;
-  listingQuota: number;
+  reportCount: number;
+  chatCount: number;
+  listingCount: number;
+  durationDays: number;
   features: string[];
   isPopular?: boolean;
 }
@@ -31,12 +33,13 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [buyerCredits, setBuyerCredits] = useState<any>(null);
 
   useEffect(() => {
-    fetchProfile();
+    fetchProfileAndCredits();
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchProfileAndCredits = async () => {
     try {
       const token =
         (await AsyncStorage.getItem('accessToken')) ||
@@ -48,13 +51,23 @@ export default function SubscriptionScreen() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [userRes, creditsRes] = await Promise.all([
+        fetch(`${API_URL}/users/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/buyer-packages/my-credits`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => null),
+      ]);
 
-      if (res.ok) {
-        const data = await res.json();
-        setUserProfile(data);
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUserProfile(userData);
+      }
+
+      if (creditsRes && creditsRes.ok) {
+        const cData = await creditsRes.json();
+        setBuyerCredits(cData);
       }
     } catch (e) {
       console.error('Fetch subscription error:', e);
@@ -63,60 +76,85 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const getTierText = () => {
-    const tier = userProfile?.subscriptionTier || 'FREE';
-    if (tier === 'PROFESYONEL' || tier === 'PRO' || tier === 'PREMIUM') return 'PROFESYONEL';
-    if (tier === 'YETKIN' || tier === 'STANDARD' || tier === 'BASIC') return 'YETKİN';
-    return 'TANIŞMA';
+  const rawTier = userProfile?.subscriptionTier || 'TANISMA';
+  const tier =
+    rawTier === 'FREE'
+      ? 'TANISMA'
+      : rawTier === 'STANDARD'
+      ? 'YETKIN'
+      : rawTier === 'PREMIUM'
+      ? 'PROFESYONEL'
+      : rawTier;
+
+  const getTierDisplayName = () => {
+    switch (tier) {
+      case 'PROFESYONEL':
+        return 'Profesyonel Paket (1.499 TL / ay)';
+      case 'YETKIN':
+        return 'Yetkin Paket (499 TL / ay)';
+      default:
+        return 'Tanışma Paketi (0 TL / ay)';
+    }
   };
 
   const PLANS: PackagePlan[] = [
     {
-      id: 'p-free',
+      id: 'p-tanisma',
       name: 'Tanışma Paketi',
       code: 'TANISMA',
       price: 0,
-      period: 'Ücretsiz',
-      reportQuota: 1,
-      listingQuota: 1,
+      period: 'Ay',
+      reportCount: 3,
+      chatCount: 3,
+      listingCount: 1,
+      durationDays: 30,
       features: [
-        '1 Adet Ücretsiz Araç Risk Raporu',
-        '1 Adet Aktif Araç İlanı',
-        'Temel Teknik Özellikler',
+        'Ayda 3 AI Araç Raporu',
+        'Ayda 3 Chatbot Mesajı',
+        'Aynı anda 1 Aktif İlan Yayını',
+        'İlan Başına 30 Gün Yayın Süresi',
         'TorqueScout Club Topluluk Erişimi',
       ],
     },
     {
       id: 'p-yetkin',
-      name: 'Yetkin Üyelik',
+      name: 'Yetkin Paket',
       code: 'YETKIN',
-      price: 199,
-      period: 'Aylık',
-      reportQuota: 10,
-      listingQuota: 5,
+      price: 499,
+      period: 'Ay',
+      reportCount: 10,
+      chatCount: 30,
+      listingCount: 10,
+      durationDays: 30,
+      isPopular: false,
       features: [
-        '10 Adet Detaylı AI Risk Raporu',
-        '5 Adet Eşzamanlı İlan Hakkı',
-        'Kronik Problem Analizleri',
-        'Fiyat & Değerleme Geçmişi',
-        'Öncelikli Satıcı Rozeti',
+        'Ayda 10 AI Araç Raporu',
+        'Ayda 30 Chatbot Mesajı',
+        'Aynı anda 10 Aktif İlan Yayını',
+        'İlan Başına 30 Gün Yayın Süresi',
+        'Kronik Problem ve Piyasa Fiyat Analizleri',
+        'Öncelikli Satıcı Desteği',
       ],
     },
     {
       id: 'p-pro',
-      name: 'Profesyonel VIP',
+      name: 'Profesyonel Paket',
       code: 'PROFESYONEL',
-      price: 499,
-      period: 'Aylık',
-      reportQuota: 50,
-      listingQuota: 20,
+      price: 1499,
+      period: 'Ay',
+      reportCount: 50,
+      chatCount: 150,
+      listingCount: 50,
+      durationDays: 45,
       isPopular: true,
       features: [
-        '50 Adet AI Detaylı Risk & Şasi Analizi',
-        '20 Adet Vitrin ve Acil İlan Hakkı',
-        'Özel TorqueScout Club VIP Rozeti',
-        '7/24 Uzman Araç Danışmanı Desteği',
-        'Canlı Piyasa ve Fiyat Düşüş Bildirimleri',
+        'Ayda 50 AI Araç Raporu',
+        'Ayda 150 Chatbot Mesajı',
+        'Aynı anda 50 Aktif İlan Yayını',
+        'İlan Başına 45 Gün Yayın Süresi',
+        'Vitrin İlan ve Acil Satış Rozetleri',
+        'TorqueScout Profesyonel VIP Üyelik Rozeti',
+        'Öncelikli 7/24 Uzman Araç Danışmanı',
       ],
     },
   ];
@@ -137,8 +175,13 @@ export default function SubscriptionScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Paketim & Abonelik</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>Abonelik & Paketlerim</Text>
+        <TouchableOpacity
+          style={styles.rightsLinkBtn}
+          onPress={() => router.push('/profile/package-rights' as any)}
+        >
+          <Ionicons name="sparkles" size={16} color="#ea580c" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -146,37 +189,54 @@ export default function SubscriptionScreen() {
         <View style={styles.activePlanCard}>
           <View style={styles.planHeaderRow}>
             <View>
-              <Text style={styles.activePlanLabel}>MEVCUT AKTİF PAKETİNİZ</Text>
-              <Text style={styles.activePlanTitle}>{getTierText()} ÜYELİK</Text>
+              <Text style={styles.activePlanLabel}>AYLIK ABONELİK PAKETİNİZ</Text>
+              <Text style={styles.activePlanTitle}>{getTierDisplayName()}</Text>
             </View>
             <View style={styles.activePlanBadge}>
-              <Ionicons name="sparkles" size={14} color="#ea580c" />
-              <Text style={styles.activePlanBadgeText}>AKTİF</Text>
+              <Text style={styles.activePlanBadgeText}>{tier}</Text>
             </View>
           </View>
 
+          {/* Quick Perks Row */}
           <View style={styles.quotaRow}>
             <View style={styles.quotaBox}>
+              <Ionicons name="document-text-outline" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
-                {userProfile?.reportQuota || (getTierText() === 'PROFESYONEL' ? '50' : getTierText() === 'YETKİN' ? '10' : '1')}
+                {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '3'}
               </Text>
-              <Text style={styles.quotaBoxLabel}>Kalan Rapor Hakkı</Text>
+              <Text style={styles.quotaBoxLabel}>AI Rapor / Ay</Text>
             </View>
             <View style={styles.quotaDivider} />
             <View style={styles.quotaBox}>
+              <Ionicons name="chatbubbles-outline" size={18} color="#ea580c" />
               <Text style={styles.quotaVal}>
-                {getTierText() === 'PROFESYONEL' ? '20' : getTierText() === 'YETKİN' ? '5' : '1'}
+                {tier === 'PROFESYONEL' ? '150' : tier === 'YETKIN' ? '30' : '3'}
               </Text>
-              <Text style={styles.quotaBoxLabel}>İlan Yayınlama Hakkı</Text>
+              <Text style={styles.quotaBoxLabel}>Chatbot Mesaj</Text>
+            </View>
+            <View style={styles.quotaDivider} />
+            <View style={styles.quotaBox}>
+              <Ionicons name="car-sport-outline" size={18} color="#ea580c" />
+              <Text style={styles.quotaVal}>
+                {tier === 'PROFESYONEL' ? '50' : tier === 'YETKIN' ? '10' : '1'}
+              </Text>
+              <Text style={styles.quotaBoxLabel}>Aktif İlan</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.viewRightsBtn}
+            onPress={() => router.push('/profile/package-rights' as any)}
+          >
+            <Text style={styles.viewRightsBtnText}>Kullanım Limitlerimi ve Kalan Haklarımı Gör →</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ALL AVAILABLE PLANS */}
-        <Text style={styles.sectionHeaderTitle}>Abonelik Seçenekleri</Text>
+        {/* ALL AVAILABLE PLANS (MATCHING WEB) */}
+        <Text style={styles.sectionHeaderTitle}>Aylık Abonelik Planları</Text>
 
         {PLANS.map((plan) => {
-          const isCurrent = getTierText() === plan.code;
+          const isCurrent = tier === plan.code;
           return (
             <View
               key={plan.id}
@@ -195,11 +255,15 @@ export default function SubscriptionScreen() {
               <View style={styles.planCardTop}>
                 <View>
                   <Text style={styles.planName}>{plan.name}</Text>
-                  <Text style={styles.planSub}>{plan.reportQuota} Rapor • {plan.listingQuota} İlan</Text>
+                  <Text style={styles.planSub}>
+                    {plan.reportCount} AI Rapor • {plan.listingCount} İlan • {plan.durationDays} Gün
+                  </Text>
                 </View>
                 <View style={styles.priceWrap}>
-                  <Text style={styles.priceNumber}>{plan.price === 0 ? 'Ücretsiz' : `${plan.price} TL`}</Text>
-                  {plan.price > 0 && <Text style={styles.pricePeriod}>/ {plan.period}</Text>}
+                  <Text style={styles.priceNumber}>
+                    {plan.price === 0 ? '0 TL' : `${new Intl.NumberFormat('tr-TR').format(plan.price)} TL`}
+                  </Text>
+                  <Text style={styles.pricePeriod}>/ {plan.period}</Text>
                 </View>
               </View>
 
@@ -215,13 +279,20 @@ export default function SubscriptionScreen() {
               <TouchableOpacity
                 style={[
                   styles.selectPlanBtn,
-                  isCurrent ? styles.currentPlanBtn : plan.isPopular ? styles.popularPlanBtn : styles.defaultPlanBtn,
+                  isCurrent
+                    ? styles.currentPlanBtn
+                    : plan.isPopular
+                    ? styles.popularPlanBtn
+                    : styles.defaultPlanBtn,
                 ]}
                 onPress={() => {
                   if (isCurrent) {
                     Alert.alert('Bilgi', 'Şu an bu paketi kullanmaktasınız.');
                   } else {
-                    Alert.alert('Paket Yükseltme', `${plan.name} paketine geçiş yapmak için web sitesi ödeme merkezine yönlendirileceksiniz.`);
+                    Alert.alert(
+                      'Planı Yükselt',
+                      `${plan.name} (${new Intl.NumberFormat('tr-TR').format(plan.price)} TL / ay) paketine geçmek için web sitemizdeki güvenli ödeme merkezine yönlendirileceksiniz.`
+                    );
                   }
                 }}
               >
@@ -231,12 +302,47 @@ export default function SubscriptionScreen() {
                     isCurrent && styles.currentPlanBtnText,
                   ]}
                 >
-                  {isCurrent ? 'Kullanılan Paket' : 'Bu Paketi Seç'}
+                  {isCurrent ? 'Mevcut Paketiniz' : 'Planı Yükselt'}
                 </Text>
               </TouchableOpacity>
             </View>
           );
         })}
+
+        {/* EK ALICI PAKETLERİ (TEK SEFERLİK) */}
+        <View style={styles.buyerPackageBanner}>
+          <View style={styles.buyerPackageHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.buyerPackageTitle}>🛒 Ek Alıcı Paketleri</Text>
+              <Text style={styles.buyerPackageSub}>
+                Aboneliğinizi değiştirmeden tek seferlik ek AI araç raporu ve chatbot mesaj hakkı yükleyin.
+              </Text>
+            </View>
+            <View style={styles.onceBadge}>
+              <Text style={styles.onceBadgeText}>TEK SEFERLİK</Text>
+            </View>
+          </View>
+
+          {buyerCredits?.activePurchases && buyerCredits.activePurchases.length > 0 ? (
+            <View style={styles.activeCreditsCard}>
+              <Text style={styles.activeCreditsText}>
+                Tanımlı Ek Kredileriniz: {buyerCredits.totalRemainingReports || 0} Ek Rapor, {buyerCredits.totalRemainingChat || 0} Ek Mesaj
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.buyExtraCreditsBtn}
+              onPress={() =>
+                Alert.alert(
+                  'Ek Alıcı Paketi',
+                  'Ek AI rapor hakları satın almak için web sitemizi ziyaret edebilirsiniz.'
+                )
+              }
+            >
+              <Text style={styles.buyExtraCreditsBtnText}>+ Ek Alıcı Paketi Satın Al</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -281,6 +387,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
   },
+  rightsLinkBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollContent: {
     padding: 16,
     gap: 14,
@@ -290,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     borderRadius: 20,
     padding: 18,
-    gap: 16,
+    gap: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -309,15 +425,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   activePlanTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     color: '#ffffff',
     marginTop: 2,
   },
   activePlanBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     backgroundColor: 'rgba(234, 88, 12, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -343,12 +456,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   quotaVal: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#ea580c',
+    color: '#ffffff',
   },
   quotaBoxLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#cbd5e1',
     fontWeight: '600',
   },
@@ -356,6 +469,15 @@ const styles = StyleSheet.create({
     width: 1,
     height: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  viewRightsBtn: {
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  viewRightsBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#ea580c',
   },
   sectionHeaderTitle: {
     fontSize: 15,
@@ -469,5 +591,69 @@ const styles = StyleSheet.create({
   },
   currentPlanBtnText: {
     color: '#64748b',
+  },
+  buyerPackageBanner: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 18,
+    gap: 12,
+    marginTop: 6,
+  },
+  buyerPackageHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  buyerPackageTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  buyerPackageSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  onceBadge: {
+    backgroundColor: '#fff7ed',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  onceBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#ea580c',
+  },
+  activeCreditsCard: {
+    backgroundColor: '#f0fdf4',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  activeCreditsText: {
+    fontSize: 12,
+    color: '#166534',
+    fontWeight: '700',
+  },
+  buyExtraCreditsBtn: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  buyExtraCreditsBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ea580c',
   },
 });

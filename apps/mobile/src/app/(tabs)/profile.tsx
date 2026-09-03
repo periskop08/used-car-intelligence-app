@@ -357,7 +357,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.menuRowItem, styles.lastMenuItem]}
                 activeOpacity={0.7}
-                onPress={() => router.push('/profile/subscription' as any)}
+                onPress={() => router.push('/profile/package-rights' as any)}
               >
                 <View style={styles.menuLeft}>
                   <Ionicons name="sparkles-outline" size={18} color="#64748b" style={styles.menuIcon} />
