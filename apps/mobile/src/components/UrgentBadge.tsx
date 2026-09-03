@@ -64,7 +64,7 @@ export default function UrgentBadge({ size = 'small' }: UrgentBadgeProps) {
 
       <Ionicons name="flame" size={isMedium ? 13 : 11} color="#ffffff" />
       <Text style={[styles.badgeText, isMedium && styles.badgeTextMedium]}>
-        ACİL SATIŞ
+        ACİL
       </Text>
     </Animated.View>
   );

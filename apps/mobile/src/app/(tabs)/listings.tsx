@@ -471,7 +471,7 @@ export default function ListingsScreen() {
               color={urgentOnly ? '#ef4444' : '#64748b'}
             />
             <Text style={[styles.filterChipText, urgentOnly && { color: '#ef4444', fontWeight: '800' }]}>
-              Acil Satış
+              Acil
             </Text>
           </TouchableOpacity>
 
