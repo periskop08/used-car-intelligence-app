@@ -103,7 +103,7 @@ export default function TorqueScoutClubScreen() {
   const [posts, setPosts] = useState<ClubPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'ANNOUNCEMENTS' | 'POLLS' | 'DISCUSSIONS'>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'POLLS'>('ALL');
   const [token, setToken] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{
     profilePhotoUrl?: string;
@@ -477,8 +477,6 @@ export default function TorqueScoutClubScreen() {
 
   const filteredPosts = posts.filter((p) => {
     if (selectedCategory === 'POLLS') return !!p.poll;
-    if (selectedCategory === 'ANNOUNCEMENTS') return p.isPinned || p.author?.role === 'ADMIN';
-    if (selectedCategory === 'DISCUSSIONS') return !p.poll && !p.isPinned;
     return true;
   });
 
@@ -513,7 +511,7 @@ export default function TorqueScoutClubScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* CATEGORY FILTER PILLS */}
+      {/* CATEGORY FILTER PILLS (TÜMÜ & ANKETLER) */}
       <View style={styles.filterScrollWrapper}>
         <ScrollView
           horizontal
@@ -521,10 +519,8 @@ export default function TorqueScoutClubScreen() {
           contentContainerStyle={styles.filterContainer}
         >
           {[
-            { key: 'ALL', label: '🔥 Tümü', count: posts.length },
-            { key: 'ANNOUNCEMENTS', label: '📢 Duyurular' },
+            { key: 'ALL', label: '🔥 Tümü' },
             { key: 'POLLS', label: '📊 Anketler' },
-            { key: 'DISCUSSIONS', label: '💬 Sohbet & Deneyim' },
           ].map((cat) => {
             const isActive = selectedCategory === cat.key;
             return (
