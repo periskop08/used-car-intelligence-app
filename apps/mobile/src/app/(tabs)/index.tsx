@@ -18,6 +18,7 @@ import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import UrgentBadge from '../../components/UrgentBadge';
 
 const { width: windowWidth } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -1270,8 +1271,8 @@ export default function MobileDashboard() {
                     <Image source={{ uri: item.imageUrl }} style={styles.vitrinCarImage} resizeMode="cover" />
 
                     {item.isUrgent && (
-                      <View style={styles.urgentBadge}>
-                        <Text style={styles.urgentBadgeText}>ACİL</Text>
+                      <View style={{ position: 'absolute', top: 10, left: 10 }}>
+                        <UrgentBadge size="small" />
                       </View>
                     )}
 

@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
+import UrgentBadge from '../../components/UrgentBadge';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -297,12 +298,7 @@ export default function ListingsScreen() {
 
           {/* Badges on Top of Image */}
           <View style={styles.imageBadgesRow}>
-            {item.isUrgent && (
-              <View style={styles.urgentBadge}>
-                <Ionicons name="flame" size={11} color="#ffffff" />
-                <Text style={styles.urgentBadgeText}>ACİL SATIŞ</Text>
-              </View>
-            )}
+            {item.isUrgent && <UrgentBadge size="small" />}
 
             {item.isShowcaseFeedActive && (
               <View style={styles.showcaseBadge}>
