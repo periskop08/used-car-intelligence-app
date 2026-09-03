@@ -469,7 +469,7 @@ export default function ListingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* SAHIBINDEN STYLE TOP APPBAR */}
+      {/* TOP APPBAR */}
       <View style={styles.topAppBar}>
         <TouchableOpacity
           style={styles.appBarIconBtn}
@@ -479,7 +479,7 @@ export default function ListingsScreen() {
         </TouchableOpacity>
 
         <View style={styles.appBarCenter}>
-          <Text style={styles.appBarTitle}>Arama Sonucu</Text>
+          <Text style={styles.appBarTitle}>Araç İlanları</Text>
           <Text style={styles.appBarSubTitle}>
             {loading ? 'Yükleniyor...' : `${listings.length} ilan`}
           </Text>
@@ -605,7 +605,7 @@ export default function ListingsScreen() {
       {/* MAIN LISTINGS FEED */}
       {loading ? (
         <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color="#0369a1" />
+          <ActivityIndicator size="large" color="#ea580c" />
           <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
         </View>
       ) : listings.length === 0 ? (
@@ -641,7 +641,7 @@ export default function ListingsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#0369a1"
+              tintColor="#ea580c"
             />
           }
         />
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#002f5e', // Authentic sahibinden dark navy blue header
+    backgroundColor: '#0f172a', // Sleek dark slate background
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -813,13 +813,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appBarTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#ea580c', // Orange page title
+    letterSpacing: 0.3,
   },
   appBarSubTitle: {
     fontSize: 11,
-    color: '#93c5fd',
+    color: '#cbd5e1',
     fontWeight: '600',
     marginTop: 1,
   },
@@ -956,7 +957,7 @@ const styles = StyleSheet.create({
   },
   resetFiltersBtn: {
     marginTop: 8,
-    backgroundColor: '#002f5e',
+    backgroundColor: '#ea580c',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1059,7 +1060,7 @@ const styles = StyleSheet.create({
   shPriceText: {
     fontSize: 14.5,
     fontWeight: '900',
-    color: '#0369a1', // Authentic sahibinden primary price blue
+    color: '#ea580c', // Orange price text
   },
   /* CARD VIEW STYLES */
   cardContent: {
@@ -1133,7 +1134,7 @@ const styles = StyleSheet.create({
   priceAmountText: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#fb923c',
   },
   cardBody: {
     padding: 14,
@@ -1166,7 +1167,7 @@ const styles = StyleSheet.create({
   viewDetailText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0369a1',
+    color: '#ea580c',
   },
   /* MODAL STYLES */
   modalBackdrop: {
@@ -1220,8 +1221,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   brandOptionSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#0369a1',
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
   },
   brandOptionText: {
     fontSize: 13,
@@ -1229,7 +1230,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   brandOptionTextSelected: {
-    color: '#0369a1',
+    color: '#ea580c',
     fontWeight: '900',
   },
 });
