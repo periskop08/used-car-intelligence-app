@@ -162,9 +162,14 @@ export default function MessageInboxScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Navbar */}
       <View style={styles.headerBar}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="chatbubbles" size={20} color="#ea580c" />
-          <Text style={styles.headerTitle}>Mesajlarım</Text>
+        <View style={styles.headerLeftGroup}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color="#0f172a" />
+          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <Ionicons name="chatbubbles" size={20} color="#ea580c" />
+            <Text style={styles.headerTitle}>Mesajlarım</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
           <Ionicons name="reload-outline" size={18} color="#64748b" />
@@ -296,6 +301,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerLeft: {
     flexDirection: 'row',
