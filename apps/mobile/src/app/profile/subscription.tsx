@@ -159,7 +159,7 @@ export default function SubscriptionScreen() {
         'Aynı anda 50 Aktif İlan Yayını',
         'İlan Başına 45 Gün Yayın Süresi',
         'Vitrin İlan ve Acil Satış Rozetleri',
-        'TorqueScout Profesyonel VIP Üyelik Rozeti',
+        'TorqueScout Profesyonel Üyelik Rozeti',
         'Öncelikli 7/24 Uzman Araç Danışmanı',
       ],
     },
@@ -196,29 +196,31 @@ export default function SubscriptionScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* CURRENT ACTIVE PLAN HERO CARD */}
         <View style={styles.activePlanCard}>
-          <View style={styles.planHeaderTop}>
-            <View style={styles.planHeaderLeft}>
-              <Text style={styles.activePlanLabel}>AYLIK ABONELİK PAKETİNİZ</Text>
-              <Text style={styles.activePlanTitle} numberOfLines={1}>
-                {tier === 'PROFESYONEL'
-                  ? 'Profesyonel VIP Paket'
-                  : tier === 'YETKIN'
-                  ? 'Yetkin Paket'
-                  : 'Tanışma Paketi'}
-              </Text>
-              <Text style={styles.activePlanPrice}>
-                {tier === 'PROFESYONEL'
-                  ? '1.499 TL / ay'
-                  : tier === 'YETKIN'
-                  ? '499 TL / ay'
-                  : 'Ücretsiz (0 TL / ay)'}
-              </Text>
-            </View>
-
+          {/* Top Label & Badge Row (Guarantees zero horizontal overflow) */}
+          <View style={styles.planLabelRow}>
+            <Text style={styles.activePlanLabel}>AYLIK ABONELİK PAKETİNİZ</Text>
             <View style={styles.activePlanBadge}>
-              <Ionicons name="sparkles" size={11} color="#f59e0b" style={{ marginRight: 4 }} />
+              <Ionicons name="sparkles" size={10} color="#f59e0b" style={{ marginRight: 3 }} />
               <Text style={styles.activePlanBadgeText}>{tier}</Text>
             </View>
+          </View>
+
+          {/* Main Title & Price */}
+          <View style={styles.planTitleBlock}>
+            <Text style={styles.activePlanTitle}>
+              {tier === 'PROFESYONEL'
+                ? 'Profesyonel Paket'
+                : tier === 'YETKIN'
+                ? 'Yetkin Paket'
+                : 'Tanışma Paketi'}
+            </Text>
+            <Text style={styles.activePlanPrice}>
+              {tier === 'PROFESYONEL'
+                ? '1.499 TL / ay'
+                : tier === 'YETKIN'
+                ? '499 TL / ay'
+                : 'Ücretsiz (0 TL / ay)'}
+            </Text>
           </View>
 
           {/* Quick Perks Row */}
@@ -258,14 +260,42 @@ export default function SubscriptionScreen() {
 
         {/* IF USER IS ALREADY AT HIGHEST TIER (PROFESYONEL) */}
         {currentRank >= 3 ? (
-          <View style={styles.topTierVipCard}>
-            <View style={styles.vipCrownCircle}>
-              <Ionicons name="trophy" size={28} color="#f59e0b" />
+          <View style={styles.topTierCard}>
+            <View style={styles.topTierIconCircle}>
+              <Ionicons name="shield-checkmark" size={26} color="#ea580c" />
             </View>
-            <Text style={styles.vipTitle}>En Üst Seviye VIP Üyeliktesiniz</Text>
-            <Text style={styles.vipDesc}>
-              Mevcut Profesyonel Paketiniz TorqueScout platformundaki en yüksek üyeliktir. Ayda 50 AI Araç Raporu, 150 Chatbot Mesajı, 50 Aktif İlan ve 45 gün vitrin yayın süresi gibi tüm premium ayrıcalıklardan eksiksiz faydalanmaktasınız.
+            <Text style={styles.topTierTitle}>Profesyonel Paket Kullanıyorsunuz</Text>
+            <Text style={styles.topTierDesc}>
+              TorqueScout platformundaki en kapsamlı üyelik planına sahipsiniz. Tüm ayrıcalıklardan ve en yüksek kotalardan sınırsızca yararlanmaktasınız.
             </Text>
+
+            {/* Clear Advantages List */}
+            <View style={styles.advantagesList}>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>Ayda 50 Detaylı AI Araç Raporu</Text>
+              </View>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>Ayda 150 Chatbot Danışman Mesajı</Text>
+              </View>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>Aynı anda 50 Aktif İlan Yayını</Text>
+              </View>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>İlan Başına 45 Gün Yayın Süresi</Text>
+              </View>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>Vitrin İlan ve Acil Satış Rozetleri</Text>
+              </View>
+              <View style={styles.advantageItem}>
+                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                <Text style={styles.advantageText}>Öncelikli Satıcı ve Uzman Danışman Desteği</Text>
+              </View>
+            </View>
           </View>
         ) : (
           /* HIGHER UPGRADE PLANS (ONLY SHOWN IF USER HAS AN UPGRADE AVAILABLE) */
@@ -426,54 +456,54 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     borderRadius: 20,
     padding: 18,
-    gap: 14,
+    gap: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
-  planHeaderTop: {
+  planLabelRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-  },
-  planHeaderLeft: {
-    flex: 1,
-    gap: 2,
   },
   activePlanLabel: {
     fontSize: 10,
     fontWeight: '800',
     color: '#94a3b8',
-    letterSpacing: 0.5,
-  },
-  activePlanTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#ffffff',
-  },
-  activePlanPrice: {
-    fontSize: 12.5,
-    color: '#fb923c',
-    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   activePlanBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   activePlanBadgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '900',
     color: '#fbbf24',
     letterSpacing: 0.5,
+  },
+  planTitleBlock: {
+    gap: 2,
+    marginTop: 2,
+  },
+  activePlanTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.2,
+  },
+  activePlanPrice: {
+    fontSize: 13,
+    color: '#fb923c',
+    fontWeight: '700',
   },
   quotaRow: {
     flexDirection: 'row',
@@ -481,11 +511,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 14,
     paddingVertical: 12,
+    marginTop: 2,
   },
   quotaBox: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   quotaVal: {
     fontSize: 18,
@@ -503,50 +534,72 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   viewRightsBtn: {
-    paddingVertical: 6,
+    paddingVertical: 4,
     alignItems: 'center',
+    marginTop: 2,
   },
   viewRightsBtnText: {
     fontSize: 11.5,
     fontWeight: '800',
     color: '#ea580c',
   },
-  topTierVipCard: {
+  topTierCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#fed7aa',
-    padding: 22,
+    padding: 20,
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
-  vipCrownCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fffbeb',
+  topTierIconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#fff7ed',
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: '#fed7aa',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  vipTitle: {
-    fontSize: 16.5,
+  topTierTitle: {
+    fontSize: 16,
     fontWeight: '900',
     color: '#0f172a',
     textAlign: 'center',
   },
-  vipDesc: {
-    fontSize: 12.5,
+  topTierDesc: {
+    fontSize: 12,
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 18,
+    marginBottom: 6,
+  },
+  advantagesList: {
+    width: '100%',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  advantageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  advantageText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#334155',
+    flex: 1,
   },
   sectionHeaderTitle: {
     fontSize: 15,
