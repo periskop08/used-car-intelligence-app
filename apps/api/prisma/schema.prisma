@@ -3309,6 +3309,57 @@ model AiTelemetryLog {
   @@index([startedAt])
 }
 
+model IsiCepteProvider {
+  id                        String    @id @default(uuid())
+  isicepteProviderId        String    @unique
+  businessName              String
+  slug                      String    @unique
+  coverImageUrl             String?
+  avatarUrl                 String?
+  membershipStatus          String    @default("ACTIVE") // ACTIVE | INACTIVE | SUSPENDED
+  isAutomotive              Boolean   @default(true)
+  torqueScoutOptIn          Boolean   @default(true)
+  countryCode               String    @default("TR")
+  city                      String
+  district                  String?
+  address                   String?
+  phone                     String?
+  email                     String?
+  websiteUrl                String?
+  isicepteProfileUrl        String
+  supportedBrands           String[]  @default([])
+  serviceCategories         String[]  @default([])
+  rating                    Float     @default(4.8)
+  reviewCount               Int       @default(0)
+  isShowcaseActive          Boolean   @default(false)
+  showcaseStartsAt          DateTime?
+  showcaseExpiresAt         DateTime?
+  showcaseSource            String    @default("ISICEPTE_PURCHASE") // ISICEPTE_PURCHASE | ADMIN_GRANTED
+  isNationalVisibilityActive Boolean  @default(false)
+  nationalStartsAt          DateTime?
+  nationalExpiresAt         DateTime?
+  impressionsCount          Int       @default(0)
+  clicksCount               Int       @default(0)
+  outboundClicksCount       Int       @default(0)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
+  @@index([city])
+  @@index([isShowcaseActive, showcaseExpiresAt])
+  @@index([isAutomotive, membershipStatus, torqueScoutOptIn])
+}
 
+model IsiCepteEventLog {
+  id         String   @id @default(uuid())
+  providerId String?
+  eventType  String   // ISICEPTE_SHOWCASE_IMPRESSION | ISICEPTE_PROFILE_CLICK | ISICEPTE_OUTBOUND_CLICK
+  city       String?
+  brand      String?
+  userId     String?
+  ipHash     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
+  @@index([eventType, createdAt])
+  @@index([providerId, eventType])
+}

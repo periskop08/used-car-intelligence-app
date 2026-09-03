@@ -104,6 +104,7 @@ export default function Header() {
   const isKesfetActive = pathname === "/vehicle-guide" || pathname === "/aracini-bul";
   const isIlanlarActive = pathname === "/listings" || pathname === "/listings/create" || pathname.startsWith("/listings/");
   const isPaketlerActive = pathname === "/pricing" || pathname === "/#packages";
+  const isIsiCepteActive = pathname.startsWith("/isicepte-oneriyor");
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-white/5 bg-[#020617]/85 backdrop-blur-xl px-4 md:px-8 py-2 flex items-center justify-between">
@@ -113,7 +114,7 @@ export default function Header() {
         <img 
           src="/logo.png" 
           alt="TorkScout" 
-          className="h-6 md:h-7 w-auto transform group-hover/logo:scale-[1.03] transition duration-300"
+          className="h-9 w-auto object-contain transition-transform duration-300 group-hover/logo:scale-105" 
         />
       </a>
 
@@ -196,7 +197,14 @@ export default function Header() {
           Paketler
         </a>
 
-        {/* 5. Tork Scout Club */}
+        {/* 5. İşiCepte Öneriyor */}
+        <a href="/isicepte-oneriyor" className={`text-sm font-semibold transition flex items-center gap-1 ${
+          isIsiCepteActive ? "text-orange-500 font-bold border-b-2 border-orange-500 pb-0.5" : "text-slate-300 hover:text-orange-500"
+        }`}>
+          <span>İşiCepte Öneriyor</span>
+        </a>
+
+        {/* 6. Tork Scout Club */}
         <a href="/club" className={`text-sm font-semibold transition flex items-center gap-1 ${
           pathname.startsWith("/club") ? "text-orange-500 font-bold border-b-2 border-orange-500 pb-0.5" : "text-slate-300 hover:text-orange-500"
         }`}>
@@ -506,6 +514,19 @@ export default function Header() {
                   }`}
                 >
                   Paketler
+                </a>
+              </div>
+
+              {/* 5. İşiCepte Öneriyor */}
+              <div className="border-b border-white/5 pb-3 py-2">
+                <a
+                  href="/isicepte-oneriyor"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`text-sm font-bold transition block ${
+                    isIsiCepteActive ? "text-orange-400" : "text-slate-200 hover:text-orange-400"
+                  }`}
+                >
+                  İşiCepte Öneriyor
                 </a>
               </div>
 
