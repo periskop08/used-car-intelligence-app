@@ -12,8 +12,6 @@ import {
   ScrollView,
   Alert,
   Share,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,6 +80,30 @@ const VEHICLE_STATUSES = [
 const SELLER_TYPES = [
   { label: 'Sahibinden', val: 'INDIVIDUAL' },
   { label: 'Galeriden', val: 'DEALER' },
+];
+
+const DRIVETRAINS = [
+  { label: 'Önden Çekiş', val: 'FWD' },
+  { label: 'Arkadan İtiş', val: 'RWD' },
+  { label: '4WD (Sürekli)', val: '4WD' },
+  { label: 'AWD (Elektronik)', val: 'AWD' },
+];
+
+const CAR_COLORS = [
+  { label: 'Beyaz', code: '#ffffff', border: '#cbd5e1' },
+  { label: 'Siyah', code: '#0f172a', border: '#0f172a' },
+  { label: 'Gri', code: '#64748b', border: '#64748b' },
+  { label: 'Gümüş', code: '#94a3b8', border: '#94a3b8' },
+  { label: 'Kırmızı', code: '#dc2626', border: '#dc2626' },
+  { label: 'Mavi', code: '#2563eb', border: '#2563eb' },
+  { label: 'Sarı', code: '#eab308', border: '#eab308' },
+  { label: 'Yeşil', code: '#16a34a', border: '#16a34a' },
+];
+
+const PLATE_TYPES = [
+  { label: 'TR Plakalı', val: 'TR' },
+  { label: 'Mavi Plakalı (MA)', val: 'MA' },
+  { label: 'Özel Plaka', val: 'SPECIAL' },
 ];
 
 const formatCloudflareImageUrl = (url?: string | null): string => {
@@ -162,6 +184,13 @@ interface ListingItem {
   isShowcaseFeedActive?: boolean;
   hasAiReport?: boolean;
   sellerType?: string;
+  drivetrain?: string;
+  color?: string;
+  enginePower?: number;
+  engineDisplacement?: number;
+  plateType?: string;
+  hasWarranty?: boolean;
+  heavyDamage?: boolean;
   description?: string;
   createdAt?: string;
   media?: ListingMedia[];
@@ -212,11 +241,24 @@ export default function ListingsScreen() {
   const [maxYear, setMaxYear] = useState('');
   const [minKm, setMinKm] = useState('');
   const [maxKm, setMaxKm] = useState('');
+
+  // Extended filters
+  const [minHp, setMinHp] = useState('');
+  const [maxHp, setMaxHp] = useState('');
+  const [minCc, setMinCc] = useState('');
+  const [maxCc, setMaxCc] = useState('');
+
   const [selectedFuels, setSelectedFuels] = useState<string[]>([]);
   const [selectedTransmissions, setSelectedTransmissions] = useState<string[]>([]);
   const [selectedBodyTypes, setSelectedBodyTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedSellerTypes, setSelectedSellerTypes] = useState<string[]>([]);
+  const [selectedDrivetrains, setSelectedDrivetrains] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedPlateTypes, setSelectedPlateTypes] = useState<string[]>([]);
+
+  const [hasWarranty, setHasWarranty] = useState(false);
+  const [noHeavyDamage, setNoHeavyDamage] = useState(false);
   const [urgentOnly, setUrgentOnly] = useState(false);
 
   // Sorting
@@ -256,11 +298,20 @@ export default function ListingsScreen() {
     maxYear,
     minKm,
     maxKm,
+    minHp,
+    maxHp,
+    minCc,
+    maxCc,
     selectedFuels,
     selectedTransmissions,
     selectedBodyTypes,
     selectedStatuses,
     selectedSellerTypes,
+    selectedDrivetrains,
+    selectedColors,
+    selectedPlateTypes,
+    hasWarranty,
+    noHeavyDamage,
     urgentOnly,
     sortOption,
   ]);
@@ -330,13 +381,24 @@ export default function ListingsScreen() {
       if (maxYear.trim()) url += `maxYear=${maxYear.trim()}&`;
       if (minKm.trim()) url += `minKm=${minKm.trim()}&`;
       if (maxKm.trim()) url += `maxKm=${maxKm.trim()}&`;
+
+      if (minHp.trim()) url += `minEnginePower=${minHp.trim()}&`;
+      if (maxHp.trim()) url += `maxEnginePower=${maxHp.trim()}&`;
+      if (minCc.trim()) url += `minEngineDisplacement=${minCc.trim()}&`;
+      if (maxCc.trim()) url += `maxEngineDisplacement=${maxCc.trim()}&`;
+
       if (urgentOnly) url += `urgentOnly=true&`;
+      if (hasWarranty) url += `hasWarranty=true&`;
+      if (noHeavyDamage) url += `heavyDamage=false&`;
 
       if (selectedFuels.length === 1) url += `fuelType=${selectedFuels[0]}&`;
       if (selectedTransmissions.length === 1) url += `transmission=${selectedTransmissions[0]}&`;
       if (selectedBodyTypes.length === 1) url += `bodyType=${selectedBodyTypes[0]}&`;
       if (selectedStatuses.length === 1) url += `vehicleStatus=${selectedStatuses[0]}&`;
       if (selectedSellerTypes.length === 1) url += `sellerType=${selectedSellerTypes[0]}&`;
+      if (selectedDrivetrains.length === 1) url += `drivetrain=${selectedDrivetrains[0]}&`;
+      if (selectedColors.length === 1) url += `color=${encodeURIComponent(selectedColors[0])}&`;
+      if (selectedPlateTypes.length === 1) url += `plateType=${selectedPlateTypes[0]}&`;
 
       if (sortOption === 'price_asc') url += `sort=price_asc&`;
       else if (sortOption === 'price_desc') url += `sort=price_desc&`;
@@ -364,6 +426,14 @@ export default function ListingsScreen() {
           items = items.filter(
             (i) => i.transmission && selectedTransmissions.includes(i.transmission)
           );
+        }
+        if (selectedDrivetrains.length > 1) {
+          items = items.filter(
+            (i) => i.drivetrain && selectedDrivetrains.includes(i.drivetrain)
+          );
+        }
+        if (selectedColors.length > 1) {
+          items = items.filter((i) => i.color && selectedColors.includes(i.color));
         }
 
         setListings(items);
@@ -395,11 +465,20 @@ export default function ListingsScreen() {
     setMaxYear('');
     setMinKm('');
     setMaxKm('');
+    setMinHp('');
+    setMaxHp('');
+    setMinCc('');
+    setMaxCc('');
     setSelectedFuels([]);
     setSelectedTransmissions([]);
     setSelectedBodyTypes([]);
     setSelectedStatuses([]);
     setSelectedSellerTypes([]);
+    setSelectedDrivetrains([]);
+    setSelectedColors([]);
+    setSelectedPlateTypes([]);
+    setHasWarranty(false);
+    setNoHeavyDamage(false);
     setUrgentOnly(false);
     setSearch('');
   };
@@ -413,11 +492,18 @@ export default function ListingsScreen() {
     if (minPrice || maxPrice) count++;
     if (minYear || maxYear) count++;
     if (minKm || maxKm) count++;
+    if (minHp || maxHp) count++;
+    if (minCc || maxCc) count++;
     if (selectedFuels.length > 0) count++;
     if (selectedTransmissions.length > 0) count++;
     if (selectedBodyTypes.length > 0) count++;
     if (selectedStatuses.length > 0) count++;
     if (selectedSellerTypes.length > 0) count++;
+    if (selectedDrivetrains.length > 0) count++;
+    if (selectedColors.length > 0) count++;
+    if (selectedPlateTypes.length > 0) count++;
+    if (hasWarranty) count++;
+    if (noHeavyDamage) count++;
     if (urgentOnly) count++;
     return count;
   };
@@ -816,6 +902,32 @@ export default function ListingsScreen() {
                 <Ionicons name="close" size={12} color="#ea580c" />
               </TouchableOpacity>
             )}
+            {(minHp || maxHp) && (
+              <TouchableOpacity
+                style={styles.filterTagPill}
+                onPress={() => {
+                  setMinHp('');
+                  setMaxHp('');
+                }}
+              >
+                <Text style={styles.filterTagPillText}>
+                  {minHp || '0'} - {maxHp || 'Max'} HP
+                </Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {hasWarranty && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setHasWarranty(false)}>
+                <Text style={styles.filterTagPillText}>Garantili</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+            {noHeavyDamage && (
+              <TouchableOpacity style={styles.filterTagPill} onPress={() => setNoHeavyDamage(false)}>
+                <Text style={styles.filterTagPillText}>Ağır Hasarsız</Text>
+                <Ionicons name="close" size={12} color="#ea580c" />
+              </TouchableOpacity>
+            )}
             {urgentOnly && (
               <TouchableOpacity style={styles.filterTagPill} onPress={() => setUrgentOnly(false)}>
                 <Text style={styles.filterTagPillText}>Acil İlanlar</Text>
@@ -867,7 +979,7 @@ export default function ListingsScreen() {
       )}
 
       {/* ========================================================================= */}
-      {/* 🌟 WEB-MATCHED DETAILED FILTER MODAL 🌟 */}
+      {/* 🌟 WEB-MATCHED FULL DETAILED FILTER MODAL 🌟 */}
       {/* ========================================================================= */}
       <Modal
         visible={filterModalVisible}
@@ -1025,7 +1137,203 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 6. ARAÇ DURUMU */}
+            {/* 6. MOTOR GÜCÜ (HP) */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>⚡ MOTOR GÜCÜ (HP)</Text>
+              <View style={styles.rangeRow}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min HP (Örn: 90)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={minHp}
+                  onChangeText={setMinHp}
+                />
+                <Text style={styles.rangeDash}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max HP (Örn: 250)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={maxHp}
+                  onChangeText={setMaxHp}
+                />
+              </View>
+            </View>
+
+            {/* 7. MOTOR HACMİ (CC) */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🔧 MOTOR HACMİ (CC)</Text>
+              <View style={styles.rangeRow}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min CC (Örn: 1200)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={minCc}
+                  onChangeText={setMinCc}
+                />
+                <Text style={styles.rangeDash}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max CC (Örn: 2000)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={maxCc}
+                  onChangeText={setMaxCc}
+                />
+              </View>
+            </View>
+
+            {/* 8. ÇEKİŞ */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>⚙️ ÇEKİŞ</Text>
+              <View style={styles.chipsWrap}>
+                {DRIVETRAINS.map((d) => {
+                  const isSelected = selectedDrivetrains.includes(d.val);
+                  return (
+                    <TouchableOpacity
+                      key={d.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(
+                          selectedDrivetrains,
+                          setSelectedDrivetrains,
+                          d.val
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name={isSelected ? 'checkbox' : 'square-outline'}
+                        size={14}
+                        color={isSelected ? '#ea580c' : '#94a3b8'}
+                      />
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {d.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 9. RENK */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🎨 RENK</Text>
+              <View style={styles.chipsWrap}>
+                {CAR_COLORS.map((c) => {
+                  const isSelected = selectedColors.includes(c.label);
+                  return (
+                    <TouchableOpacity
+                      key={c.label}
+                      style={[
+                        styles.colorChipPill,
+                        isSelected && styles.colorChipPillActive,
+                      ]}
+                      onPress={() =>
+                        toggleArrayFilter(selectedColors, setSelectedColors, c.label)
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.colorDot,
+                          {
+                            backgroundColor: c.code,
+                            borderColor: c.border,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 10. GARANTİ & HASAR */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🛡️ GARANTİ & HASAR</Text>
+              <View style={{ gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.checkboxRow, hasWarranty && styles.checkboxRowActive]}
+                  onPress={() => setHasWarranty(!hasWarranty)}
+                >
+                  <Ionicons
+                    name={hasWarranty ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={hasWarranty ? '#ea580c' : '#94a3b8'}
+                  />
+                  <Text style={[styles.checkboxLabel, hasWarranty && styles.checkboxLabelActive]}>
+                    Garantili Araçlar
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.checkboxRow, noHeavyDamage && styles.checkboxRowActive]}
+                  onPress={() => setNoHeavyDamage(!noHeavyDamage)}
+                >
+                  <Ionicons
+                    name={noHeavyDamage ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={noHeavyDamage ? '#ea580c' : '#94a3b8'}
+                  />
+                  <Text style={[styles.checkboxLabel, noHeavyDamage && styles.checkboxLabelActive]}>
+                    Ağır Hasar Kayıtlı Değil
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 11. PLAKA / UYRUK */}
+            <View style={styles.filterCard}>
+              <Text style={styles.filterCardTitle}>🇹🇷 PLAKA / UYRUK</Text>
+              <View style={styles.chipsWrap}>
+                {PLATE_TYPES.map((p) => {
+                  const isSelected = selectedPlateTypes.includes(p.val);
+                  return (
+                    <TouchableOpacity
+                      key={p.val}
+                      style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                      onPress={() =>
+                        toggleArrayFilter(
+                          selectedPlateTypes,
+                          setSelectedPlateTypes,
+                          p.val
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name={isSelected ? 'checkbox' : 'square-outline'}
+                        size={14}
+                        color={isSelected ? '#ea580c' : '#94a3b8'}
+                      />
+                      <Text
+                        style={[
+                          styles.chipPillText,
+                          isSelected && styles.chipPillTextActive,
+                        ]}
+                      >
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* 12. ARAÇ DURUMU */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>⚡ ARAÇ DURUMU</Text>
               <View style={styles.chipsWrap}>
@@ -1053,7 +1361,7 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 7. YAKIT TİPİ */}
+            {/* 13. YAKIT TİPİ */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>⛽ YAKIT TİPİ</Text>
               <View style={styles.chipsWrap}>
@@ -1081,7 +1389,7 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 8. VİTES TİPİ */}
+            {/* 14. VİTES TİPİ */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>🕹️ VİTES</Text>
               <View style={styles.chipsWrap}>
@@ -1113,7 +1421,7 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 9. KASA TİPİ */}
+            {/* 15. KASA TİPİ */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>🚘 KASA TİPİ</Text>
               <View style={styles.chipsWrap}>
@@ -1141,7 +1449,7 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 10. KİMDEN / SATICI TÜRÜ */}
+            {/* 16. KİMDEN / SATICI TÜRÜ */}
             <View style={styles.filterCard}>
               <Text style={styles.filterCardTitle}>👤 KİMDEN</Text>
               <View style={styles.chipsWrap}>
@@ -1173,7 +1481,7 @@ export default function ListingsScreen() {
               </View>
             </View>
 
-            {/* 11. ACİL SATIŞ TOGGLE */}
+            {/* 17. ACİL SATIŞ TOGGLE */}
             <TouchableOpacity
               style={[styles.urgentToggleRow, urgentOnly && styles.urgentToggleRowActive]}
               onPress={() => setUrgentOnly(!urgentOnly)}
@@ -1988,6 +2296,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
@@ -2005,6 +2316,51 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   chipPillTextActive: {
+    color: '#ea580c',
+    fontWeight: '900',
+  },
+  colorChipPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  colorChipPillActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  colorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  checkboxRowActive: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#ea580c',
+  },
+  checkboxLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  checkboxLabelActive: {
     color: '#ea580c',
     fontWeight: '900',
   },
