@@ -254,6 +254,7 @@ export class ListingService {
         plateHidden: dto.plateHidden ?? true,
         vinHidden: dto.vinHidden ?? true,
         status: ListingStatus.DRAFT,
+        isUrgent: dto.isUrgent ?? false,
         isAiReady,
       },
     });

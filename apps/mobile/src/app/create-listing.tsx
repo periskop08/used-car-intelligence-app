@@ -27,6 +27,17 @@ try {
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const formatNumberInput = (val: string | number): string => {
+  if (val === '' || val === undefined || val === null) return '';
+  const numStr = String(val).replace(/\D/g, '');
+  if (!numStr) return '';
+  return parseInt(numStr, 10).toLocaleString('tr-TR');
+};
+
+const parseNumberInput = (val: string): string => {
+  return val.replace(/\D/g, '');
+};
+
 const TURKISH_CITIES = [
   'İstanbul',
   'Ankara',
@@ -259,15 +270,18 @@ export default function CreateListingScreen() {
   };
 
   const handleSubmit = async () => {
+    const rawPrice = parseNumberInput(priceAmount);
+    const rawKm = parseNumberInput(kilometers);
+
     if (!title.trim()) {
       Alert.alert('Eksik Bilgi', 'Lütfen ilan başlığını yazın.');
       return;
     }
-    if (!priceAmount.trim() || isNaN(Number(priceAmount))) {
+    if (!rawPrice || isNaN(Number(rawPrice)) || Number(rawPrice) <= 0) {
       Alert.alert('Eksik Bilgi', 'Lütfen geçerli bir fiyat girin.');
       return;
     }
-    if (!kilometers.trim() || isNaN(Number(kilometers))) {
+    if (!rawKm || isNaN(Number(rawKm))) {
       Alert.alert('Eksik Bilgi', 'Lütfen kilometre bilgisini girin.');
       return;
     }
@@ -303,13 +317,16 @@ export default function CreateListingScreen() {
         return;
       }
 
+      const yearNum = Number(parseNumberInput(selectedYear)) || 2020;
+
       const payload: any = {
         title: title.trim(),
         description: description.trim() || 'Temiz ve bakımlı araç.',
-        priceAmount: Number(priceAmount.replace(/\D/g, '')),
-        kilometers: Number(kilometers.replace(/\D/g, '')),
+        priceAmount: Number(rawPrice),
+        kilometers: Number(rawKm),
+        modelYear: yearNum,
         city: city.trim(),
-        district: district.trim(),
+        district: district.trim() || undefined,
         fuelType,
         transmission,
         bodyType,
@@ -323,8 +340,6 @@ export default function CreateListingScreen() {
 
       if (selectedVariant) {
         payload.vehicleVariantId = selectedVariant.id;
-      } else if (selectedYear) {
-        payload.modelYear = Number(selectedYear);
       }
 
       // 1. Create Listing
@@ -483,7 +498,8 @@ export default function CreateListingScreen() {
                 placeholderTextColor="#94a3b8"
                 keyboardType="numeric"
                 value={selectedYear}
-                onChangeText={setSelectedYear}
+                onChangeText={(t) => setSelectedYear(parseNumberInput(t))}
+                maxLength={4}
               />
             </View>
           </View>
@@ -513,11 +529,11 @@ export default function CreateListingScreen() {
                 <Text style={styles.inputLabel}>Fiyat (TL) *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: 850000"
+                  placeholder="Örn: 850.000"
                   placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={priceAmount}
-                  onChangeText={setPriceAmount}
+                  onChangeText={(t) => setPriceAmount(formatNumberInput(t))}
                 />
               </View>
 
@@ -525,11 +541,11 @@ export default function CreateListingScreen() {
                 <Text style={styles.inputLabel}>Kilometre (KM) *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: 120000"
+                  placeholder="Örn: 120.000"
                   placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={kilometers}
-                  onChangeText={setKilometers}
+                  onChangeText={(t) => setKilometers(formatNumberInput(t))}
                 />
               </View>
             </View>

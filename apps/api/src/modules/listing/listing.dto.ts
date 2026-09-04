@@ -190,12 +190,21 @@ export class CreateListingDto {
   @IsNumber()
   @IsOptional()
   customYear?: number;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  isUrgent?: boolean;
 }
 
 export class UpdateListingDto {
   @IsString()
   @IsOptional()
   title?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isUrgent?: boolean;
 
   @IsString()
   @IsOptional()
