@@ -726,10 +726,20 @@ export class ListingController {
       },
     });
 
+    const tierNames: Record<string, string> = {
+      FREE: 'Ücretsiz',
+      STANDARD: 'Standart',
+      PREMIUM: 'Premium',
+      PRO: 'Pro',
+    };
+
     return {
       tier: dbUser.subscriptionTier,
+      tierName: tierNames[dbUser.subscriptionTier] || 'Ücretsiz',
       activeCount,
+      usedActiveListings: activeCount,
       limit,
+      maxActiveListings: limit,
       remaining: Math.max(0, limit - activeCount),
     };
   }

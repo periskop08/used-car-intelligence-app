@@ -400,38 +400,42 @@ function SellerDashboardContent() {
       )}
 
       {/* Quota Summary & Package Info Card */}
-      {quota && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Mevcut Paketiniz</span>
-            <span className="text-xl font-black text-orange-400">{quota.tierName || "Ücretsiz"}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Aktif İlan Kullanımı</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-black text-slate-200">
-                {quota.usedActiveListings} / {quota.maxActiveListings}
-              </span>
-              <span className="text-xs text-slate-400">
-                ({quota.maxActiveListings - quota.usedActiveListings} İlan Hakkınız Var)
-              </span>
+      {quota && (() => {
+        const usedCount = quota.usedActiveListings ?? quota.activeCount ?? 0;
+        const maxCount = quota.maxActiveListings ?? quota.limit ?? 1;
+        const remaining = Math.max(0, maxCount - usedCount);
+        const percent = Math.min(100, Math.round((usedCount / maxCount) * 100));
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-slate-900/20 border border-white/5 rounded-3xl">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Mevcut Paketiniz</span>
+              <span className="text-xl font-black text-orange-400">{quota.tierName || "Ücretsiz"}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Aktif İlan Kullanımı</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-black text-slate-200">
+                  {usedCount} / {maxCount}
+                </span>
+                <span className="text-xs text-slate-400">
+                  ({remaining} İlan Hakkınız Var)
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1 justify-center">
+              <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${percent}%`,
+                  }}
+                />
+              </div>
             </div>
           </div>
-          <div className="flex flex-col gap-1 justify-center">
-            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    (quota.usedActiveListings / (quota.maxActiveListings || 1)) * 100
-                  )}%`,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-3 border-b border-white/5 pb-4 overflow-x-auto">

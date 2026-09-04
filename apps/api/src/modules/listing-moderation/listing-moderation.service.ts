@@ -755,7 +755,7 @@ export class ListingModerationService implements OnModuleInit {
     };
 
     const counts = await Promise.all([
-      countByStatus('PENDING'),
+      countByStatus('PENDING_REVIEW'),
       countByStatus('REVISION_REQUIRED'),
       countByStatus('DETAILED_REVIEW'),
       countByStatus('ACTIVE'),
@@ -767,6 +767,7 @@ export class ListingModerationService implements OnModuleInit {
 
     return {
       PENDING: counts[0],
+      PENDING_REVIEW: counts[0],
       REVISION_REQUIRED: counts[1],
       DETAILED_REVIEW: counts[2],
       ACTIVE: counts[3],
@@ -786,7 +787,8 @@ export class ListingModerationService implements OnModuleInit {
     page?: number;
     limit?: number;
   }) {
-    const status = query.status || 'PENDING';
+    const rawStatus = query.status || 'PENDING_REVIEW';
+    const status = rawStatus === 'PENDING' ? 'PENDING_REVIEW' : rawStatus;
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;

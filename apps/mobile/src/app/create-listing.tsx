@@ -232,6 +232,28 @@ export default function CreateListingScreen() {
     }
   }, [selectedModel]);
 
+  // Auto match variant from variants list
+  useEffect(() => {
+    if (variants.length > 0) {
+      if (selectedYear) {
+        const yearNum = Number(selectedYear);
+        const matched = variants.filter((v) => v.year === yearNum);
+        if (matched.length > 0) {
+          const perfect = matched.find(
+            (v) =>
+              (v.fuelType === fuelType || !v.fuelType) &&
+              (v.transmission?.type === transmission || !v.transmission?.type)
+          ) || matched[0];
+          setSelectedVariant(perfect);
+          return;
+        }
+      }
+      setSelectedVariant(variants[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [variants, selectedYear, fuelType, transmission]);
+
   const fetchBrands = async () => {
     try {
       const res = await fetch(`${API_URL}/vehicles/brands`);
@@ -457,22 +479,27 @@ export default function CreateListingScreen() {
         }
       }
 
-      // 3. Publish / Activate status
-      await fetch(`${API_URL}/listings/${listingId}/status`, {
+      // 3. Submit for Moderation Review (PENDING_REVIEW)
+      const statusRes = await fetch(`${API_URL}/listings/${listingId}/status`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'ACTIVE' }),
-      }).catch(() => {});
+        body: JSON.stringify({ status: 'PENDING_REVIEW' }),
+      });
+
+      if (!statusRes.ok) {
+        const errData = await statusRes.json().catch(() => ({}));
+        console.warn('Status update warning:', errData.message);
+      }
 
       Alert.alert(
-        'İlanınız Başarıyla Yayınlandı! 🎉',
-        'İlanınız onaylandı ve vitrinde listelenmeye başladı.',
+        'İlanınız Onaya Gönderildi! 🎉',
+        'İlanınız başarıyla kaydedildi ve moderasyon incelemesine alındı. Admin onayından sonra vitrinde yayına girecektir.',
         [
           {
-            text: 'İlanları Gör',
+            text: 'İlanlarımı Gör',
             onPress: () => router.push('/(tabs)/listings' as any),
           },
         ]

@@ -22,7 +22,7 @@ import { API_BASE_URL } from '@/utils/apiConfig';
 import { AdminUserDrawer } from '../components/AdminUserDrawer';
 
 const STATUS_TABS = [
-  { key: 'PENDING', label: 'Onay Bekleyenler' },
+  { key: 'PENDING_REVIEW', label: 'Onay Bekleyenler' },
   { key: 'REVISION_REQUIRED', label: 'Düzeltme Bekleyenler' },
   { key: 'DETAILED_REVIEW', label: 'Detaylı İncelemede' },
   { key: 'ACTIVE', label: 'Aktif İlanlar' },
@@ -36,7 +36,8 @@ function AdminListingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const currentStatus = searchParams.get('status') || 'PENDING';
+  const rawStatus = searchParams.get('status') || 'PENDING_REVIEW';
+  const currentStatus = rawStatus === 'PENDING' ? 'PENDING_REVIEW' : rawStatus;
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
 
   const [items, setItems] = useState<any[]>([]);
