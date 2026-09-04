@@ -731,9 +731,15 @@ function IsiCepteOneriyorContent() {
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-wider border border-orange-500/20">
-                  👑 İŞİCEPTE VİTRİN ÜYESİ
-                </span>
+                {detailModalProvider.isShowcase ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-wider border border-orange-500/20">
+                    👑 İŞİCEPTE VİTRİN ÜYESİ
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase tracking-wider border border-blue-500/20">
+                    🛠️ İŞİCEPTE ONAYLI SERVİS
+                  </span>
+                )}
                 <h3 className="text-xl font-black text-white mt-1.5">
                   {detailModalProvider.businessName}
                 </h3>
