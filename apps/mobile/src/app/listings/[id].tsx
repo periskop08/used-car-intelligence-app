@@ -38,6 +38,10 @@ export default function ListingDetailScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (id === 'create') {
+      router.replace('/create-listing');
+      return;
+    }
     fetchListingDetail();
     loadUser();
   }, [id]);

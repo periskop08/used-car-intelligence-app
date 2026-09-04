@@ -69,7 +69,7 @@ export default function TabsLayout() {
 
   const handleCreateListing = () => {
     setMenuVisible(false);
-    router.push('/listings/create' as any);
+    router.push('/create-listing' as any);
   };
 
   return (
