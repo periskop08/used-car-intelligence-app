@@ -73,6 +73,9 @@ describe('IsiCepteService — "İşiCepte Öneriyor" Public Discovery & Showcase
       isiCepteEventLog: {
         create: jest.fn(),
       },
+      brand: {
+        findMany: jest.fn().mockResolvedValue([{ name: 'BMW' }, { name: 'Mercedes-Benz' }]),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -277,7 +280,7 @@ describe('IsiCepteService — "İşiCepte Öneriyor" Public Discovery & Showcase
     expect(result.items).toEqual([]);
   });
 
-  it('TEST 11 (Acceptance 30): 15 Vitrin + 20 Standart — Default SHOWCASE_ONLY returns max 10 Vitrin providers', async () => {
+  it('TEST 11: 15 Vitrin + 20 Standart — Default SHOWCASE_ONLY returns all 15 Vitrin providers without hard 10 cap', async () => {
     // Generate 15 Vitrin providers
     const vitrin15 = Array.from({ length: 15 }, (_, i) => ({
       id: `vitrin-${i + 1}`,
@@ -310,7 +313,7 @@ describe('IsiCepteService — "İşiCepte Öneriyor" Public Discovery & Showcase
     expect(result.total).toBe(15); // total showcase matching
     expect(result.totalShowcase).toBe(15);
     expect(result.totalAll).toBe(35);
-    expect(result.items.length).toBe(10); // max 10 returned in default view
+    expect(result.items.length).toBe(15); // all 15 returned without arbitrary 10 cap
     expect(result.items.every((i) => i.isShowcase === true)).toBe(true);
   });
 

@@ -197,11 +197,11 @@ export default function Header() {
           Paketler
         </a>
 
-        {/* 5. İşiCepte Öneriyor */}
+        {/* 5. İşi Cepte Öneriyor */}
         <a href="/isicepte-oneriyor" className={`text-sm font-semibold transition flex items-center gap-1 ${
           isIsiCepteActive ? "text-orange-500 font-bold border-b-2 border-orange-500 pb-0.5" : "text-slate-300 hover:text-orange-500"
         }`}>
-          <span>İşiCepte Öneriyor</span>
+          <span>İşi Cepte Öneriyor</span>
         </a>
 
         {/* 6. Tork Scout Club */}
@@ -517,7 +517,7 @@ export default function Header() {
                 </a>
               </div>
 
-              {/* 5. İşiCepte Öneriyor */}
+              {/* 5. İşi Cepte Öneriyor */}
               <div className="border-b border-white/5 pb-3 py-2">
                 <a
                   href="/isicepte-oneriyor"
@@ -526,7 +526,7 @@ export default function Header() {
                     isIsiCepteActive ? "text-orange-400" : "text-slate-200 hover:text-orange-400"
                   }`}
                 >
-                  İşiCepte Öneriyor
+                  İşi Cepte Öneriyor
                 </a>
               </div>
 

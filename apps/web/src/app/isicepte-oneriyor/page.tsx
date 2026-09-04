@@ -32,6 +32,24 @@ const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
   "Oto Ekspertiz",
 ] as const;
 
+const TURKEY_81_PROVINCES: string[] = [
+  'Adana', 'Adıyaman', 'Afyonkarahisar', 'Ağrı', 'Aksaray', 'Amasya', 'Ankara', 'Antalya', 'Ardahan', 'Artvin',
+  'Aydın', 'Balıkesir', 'Bartın', 'Batman', 'Bayburt', 'Bilecik', 'Bingöl', 'Bitlis', 'Bolu', 'Burdur',
+  'Bursa', 'Çanakkale', 'Çankırı', 'Çorum', 'Denizli', 'Diyarbakır', 'Düzce', 'Edirne', 'Elazığ', 'Erzincan',
+  'Erzurum', 'Eskişehir', 'Gaziantep', 'Giresun', 'Gümüşhane', 'Hakkari', 'Hatay', 'Iğdır', 'Isparta', 'İstanbul',
+  'İzmir', 'Kahramanmaraş', 'Karabük', 'Karaman', 'Kars', 'Kastamonu', 'Kayseri', 'Kilis', 'Kırıkkale', 'Kırklareli',
+  'Kırşehir', 'Kocaeli', 'Konya', 'Kütahya', 'Malatya', 'Manisa', 'Mardin', 'Mersin', 'Muğla', 'Muş',
+  'Nevşehir', 'Niğde', 'Ordu', 'Osmaniye', 'Rize', 'Sakarya', 'Samsun', 'Şanlıurfa', 'Siirt', 'Sinop',
+  'Şırnak', 'Sivas', 'Tekirdağ', 'Tokat', 'Trabzon', 'Tunceli', 'Uşak', 'Van', 'Yalova', 'Yozgat', 'Zonguldak'
+];
+
+const INITIAL_CANONICAL_BRANDS: string[] = [
+  'Alfa Romeo', 'Audi', 'BMW', 'Chery', 'Chevrolet', 'Citroen', 'Cupra', 'Dacia', 'DS Automobiles', 'Fiat',
+  'Ford', 'Honda', 'Hyundai', 'Jeep', 'Kia', 'Land Rover', 'Mazda', 'Mercedes-Benz', 'MINI', 'Mitsubishi',
+  'Nissan', 'Opel', 'Peugeot', 'Porsche', 'Renault', 'Seat', 'Skoda', 'Subaru', 'Suzuki', 'Tesla',
+  'Togg', 'Toyota', 'Volkswagen', 'Volvo'
+];
+
 interface IsiCepteShowcaseItem {
   id: string;
   isicepteProviderId: string;
@@ -69,9 +87,9 @@ function IsiCepteOneriyorContent() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Available filter options from active showcase pool
-  const [availableCities, setAvailableCities] = useState<string[]>(["Tüm Şehirler"]);
-  const [availableBrands, setAvailableBrands] = useState<string[]>(["Tüm Markalar"]);
+  // Available filter options from canonical sources and active pool
+  const [availableCities, setAvailableCities] = useState<string[]>(["Tüm Şehirler", ...TURKEY_81_PROVINCES]);
+  const [availableBrands, setAvailableBrands] = useState<string[]>(["Tüm Markalar", ...INITIAL_CANONICAL_BRANDS]);
   const availableCategories = ["Tüm Kategoriler", ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
 
   // Filter form state (dropdown selections before submit)
@@ -152,7 +170,7 @@ function IsiCepteOneriyorContent() {
         }
         query.append("scope", scopeVal);
         query.append("page", pageNum.toString());
-        query.append("limit", scopeVal === "SHOWCASE_ONLY" ? "10" : "12");
+        query.append("limit", scopeVal === "SHOWCASE_ONLY" ? "50" : "24");
         query.append("seed", sessionSeed);
 
         const res = await fetch(`${API_BASE_URL}/isicepte/recommendations?${query.toString()}`);
@@ -322,46 +340,16 @@ function IsiCepteOneriyorContent() {
     <div className="w-full flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
       {/* Top Header & Filter Controls Bar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
-        {/* Title & Info Badges */}
-        <div className="space-y-3 max-w-xl">
+        {/* Title */}
+        <div className="space-y-2 max-w-xl">
           <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-            İşiCepte Öneriyor
+            İşi Cepte Öneriyor
           </h1>
           <p className="text-sm text-slate-400 leading-relaxed">
             {scope === "SHOWCASE_ONLY"
-              ? "Sadece aktif vitrin üyeleri arasından öne çıkan otomotiv ustalarını ve servisleri keşfedin."
-              : "TorqueScout onaylı tüm aktif İşiCepte otomotiv servislerini ve vitrin üyelerini keşfedin."}
+              ? "Aktif vitrin üyeleri arasından öne çıkan otomotiv ustalarını ve servisleri keşfedin."
+              : "TorqueScout onaylı tüm aktif İşi Cepte otomotiv servislerini ve vitrin üyelerini keşfedin."}
           </p>
-
-          {/* Informative chips & view mode selector */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <button
-              type="button"
-              onClick={() => handleToggleScope("SHOWCASE_ONLY")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                scope === "SHOWCASE_ONLY"
-                  ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 text-orange-400 font-bold shadow-sm"
-                  : "bg-white/5 border border-white/10 text-slate-400 hover:text-white"
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>👑 Vitrin Üyeleri {totalShowcase > 0 ? `(${totalShowcase})` : ""}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleScope("ALL_ELIGIBLE")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                scope === "ALL_ELIGIBLE"
-                  ? "bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold shadow-sm"
-                  : "bg-white/5 border border-white/10 text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>🛠️ Tüm Ustaları Gör {totalAll > 0 ? `(${totalAll})` : ""}</span>
-            </button>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold select-none">
-              <Shuffle className="w-3.5 h-3.5" /> Adil Sıralama
-            </span>
-          </div>
         </div>
 
         {/* 3-Filter Form: ŞEHİR | MARKA | KATEGORİ | [FİLTRELE] */}

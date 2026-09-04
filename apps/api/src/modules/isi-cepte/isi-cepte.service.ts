@@ -29,6 +29,90 @@ export const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
   'Oto Ekspertiz',
 ] as const;
 
+export const TURKEY_81_PROVINCES: string[] = [
+  'Adana',
+  'Adıyaman',
+  'Afyonkarahisar',
+  'Ağrı',
+  'Aksaray',
+  'Amasya',
+  'Ankara',
+  'Antalya',
+  'Ardahan',
+  'Artvin',
+  'Aydın',
+  'Balıkesir',
+  'Bartın',
+  'Batman',
+  'Bayburt',
+  'Bilecik',
+  'Bingöl',
+  'Bitlis',
+  'Bolu',
+  'Burdur',
+  'Bursa',
+  'Çanakkale',
+  'Çankırı',
+  'Çorum',
+  'Denizli',
+  'Diyarbakır',
+  'Düzce',
+  'Edirne',
+  'Elazığ',
+  'Erzincan',
+  'Erzurum',
+  'Eskişehir',
+  'Gaziantep',
+  'Giresun',
+  'Gümüşhane',
+  'Hakkari',
+  'Hatay',
+  'Iğdır',
+  'Isparta',
+  'İstanbul',
+  'İzmir',
+  'Kahramanmaraş',
+  'Karabük',
+  'Karaman',
+  'Kars',
+  'Kastamonu',
+  'Kayseri',
+  'Kilis',
+  'Kırıkkale',
+  'Kırklareli',
+  'Kırşehir',
+  'Kocaeli',
+  'Konya',
+  'Kütahya',
+  'Malatya',
+  'Manisa',
+  'Mardin',
+  'Mersin',
+  'Muğla',
+  'Muş',
+  'Nevşehir',
+  'Niğde',
+  'Ordu',
+  'Osmaniye',
+  'Rize',
+  'Sakarya',
+  'Samsun',
+  'Şanlıurfa',
+  'Siirt',
+  'Sinop',
+  'Şırnak',
+  'Sivas',
+  'Tekirdağ',
+  'Tokat',
+  'Trabzon',
+  'Tunceli',
+  'Uşak',
+  'Van',
+  'Yalova',
+  'Yozgat',
+  'Zonguldak',
+];
+
 export type CanonicalIsiCepteOtoCategory = (typeof CANONICAL_ISICEPTE_OTO_CATEGORIES)[number];
 
 @Injectable()
@@ -61,7 +145,7 @@ export class IsiCepteService implements OnModuleInit {
    * 2. membershipStatus === 'ACTIVE'
    * 3. torqueScoutOptIn === true
    * 4. When scope === 'SHOWCASE_ONLY' (default): strictly isShowcaseActive === true AND showcaseExpiresAt > now.
-   *    Default limit is 10 (or up to 100 for listing widgets).
+   *    Lists all active showcase providers without arbitrary 10-person hard caps.
    * 5. When scope === 'ALL_ELIGIBLE' ("Tüm Ustaları Gör"): returns all matching automotive opted-in active providers,
    *    with showcase members prioritized at the top and clearly badged.
    * 6. ZERO mock / sample / filler records. If count is 0, returns empty items array truthfully.
@@ -69,7 +153,7 @@ export class IsiCepteService implements OnModuleInit {
   async getPublicRecommendations(params: PublicRecommendationParams) {
     const now = new Date();
     const scope = params.scope || 'SHOWCASE_ONLY';
-    const defaultLimit = scope === 'SHOWCASE_ONLY' ? 10 : 12;
+    const defaultLimit = 50;
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(params.limit) || defaultLimit));
 
@@ -180,21 +264,28 @@ export class IsiCepteService implements OnModuleInit {
       };
     });
 
-    // Collect available cities & brands from active pool for filter dropdowns
-    const allActiveEligible = await this.prisma.isiCepteProvider.findMany({
-      where: {
-        isAutomotive: true,
-        membershipStatus: 'ACTIVE',
-        torqueScoutOptIn: true,
-      },
-      select: {
-        city: true,
-        supportedBrands: true,
-      },
-    });
+    // Collect available cities & canonical brands for filter dropdowns
+    const [allActiveEligible, canonicalBrandsDb] = await Promise.all([
+      this.prisma.isiCepteProvider.findMany({
+        where: {
+          isAutomotive: true,
+          membershipStatus: 'ACTIVE',
+          torqueScoutOptIn: true,
+        },
+        select: {
+          city: true,
+          supportedBrands: true,
+        },
+      }),
+      this.prisma.brand.findMany({
+        where: { isActive: true },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }).catch(() => []),
+    ]);
 
-    const citySet = new Set<string>();
-    const brandSet = new Set<string>();
+    const citySet = new Set<string>(TURKEY_81_PROVINCES);
+    const brandSet = new Set<string>(canonicalBrandsDb.map((b) => b.name));
 
     for (const p of allActiveEligible) {
       if (p.city) citySet.add(p.city);
