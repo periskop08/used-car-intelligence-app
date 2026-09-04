@@ -192,4 +192,88 @@ describe('IsiCepteService — "İşiCepte Öneriyor" Public Discovery & Showcase
       data: { clicksCount: { increment: 1 } },
     });
   });
+
+  it('TEST 7: Category filter (Motor/Mekanik) queries providers with matching canonical category relation', async () => {
+    const motorMekanikProviders = mockActiveShowcaseProviders.filter((p) =>
+      p.serviceCategories.includes('Motor/Mekanik')
+    );
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce(motorMekanikProviders)
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+
+    const result = await service.getPublicRecommendations({ category: 'Motor/Mekanik' });
+
+    expect(result.success).toBe(true);
+    expect(result.total).toBe(3);
+    expect(result.selectedCategory).toBe('Motor/Mekanik');
+    expect(mockPrisma.isiCepteProvider.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          serviceCategories: { has: 'Motor/Mekanik' },
+        }),
+      })
+    );
+  });
+
+  it('TEST 8: Triple filter (İstanbul + BMW + Oto Elektrik/Elektronik) applies AND semantics on all 3 predicates', async () => {
+    const tripleFiltered = mockActiveShowcaseProviders.filter(
+      (p) =>
+        p.city === 'İstanbul' &&
+        p.supportedBrands.includes('BMW') &&
+        p.serviceCategories.includes('Oto Elektrik/Elektronik')
+    );
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce(tripleFiltered)
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+
+    const result = await service.getPublicRecommendations({
+      city: 'İstanbul',
+      brand: 'BMW',
+      category: 'Oto Elektrik/Elektronik',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.total).toBe(2);
+    expect(result.selectedCity).toBe('İstanbul');
+    expect(result.selectedBrand).toBe('BMW');
+    expect(result.selectedCategory).toBe('Oto Elektrik/Elektronik');
+    expect(mockPrisma.isiCepteProvider.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          city: { equals: 'İstanbul', mode: 'insensitive' },
+          supportedBrands: { has: 'BMW' },
+          serviceCategories: { has: 'Oto Elektrik/Elektronik' },
+        }),
+      })
+    );
+  });
+
+  it('TEST 9: "Tüm Kategoriler" does not attach category predicate to database query', async () => {
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce(mockActiveShowcaseProviders)
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+
+    const result = await service.getPublicRecommendations({ category: 'Tüm Kategoriler' });
+
+    expect(result.success).toBe(true);
+    expect(result.selectedCategory).toBeNull();
+    const findManyCall = mockPrisma.isiCepteProvider.findMany.mock.calls[0][0];
+    expect(findManyCall.where.serviceCategories).toBeUndefined();
+  });
+
+  it('TEST 10: Non-matching category combination (e.g. İstanbul + BMW + Oto Ekspertiz) returns 0 without filler', async () => {
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce([]) // 0 records matching Oto Ekspertiz
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+
+    const result = await service.getPublicRecommendations({
+      city: 'İstanbul',
+      brand: 'BMW',
+      category: 'Oto Ekspertiz',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.total).toBe(0);
+    expect(result.items).toEqual([]);
+  });
 });

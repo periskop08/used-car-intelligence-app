@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ShieldCheck,
   Shuffle,
@@ -15,6 +16,21 @@ import {
   Search,
 } from "lucide-react";
 import { API_BASE_URL } from "@/utils/apiConfig";
+
+// Canonical locked 11 automotive categories
+const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
+  "Motor/Mekanik",
+  "Kaporta/Boya",
+  "Oto Çekici/Kurtarıcı",
+  "Oto Elektrik/Elektronik",
+  "Motosiklet Servisi",
+  "Cam Filmi/Kaplama",
+  "Oto Yıkama & Detay",
+  "Lastik/Jant",
+  "Oto Aksesuar",
+  "Oto Yedek Parça",
+  "Oto Ekspertiz",
+] as const;
 
 interface IsiCepteShowcaseItem {
   id: string;
@@ -34,7 +50,15 @@ interface IsiCepteShowcaseItem {
   isShowcase: boolean;
 }
 
-export default function IsiCepteOneriyorPage() {
+function IsiCepteOneriyorContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read initial query params
+  const initialCity = searchParams.get("city") || "Tüm Şehirler";
+  const initialBrand = searchParams.get("brand") || "Tüm Markalar";
+  const initialCategory = searchParams.get("category") || "Tüm Kategoriler";
+
   const [items, setItems] = useState<IsiCepteShowcaseItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,100 +68,158 @@ export default function IsiCepteOneriyorPage() {
   // Available filter options from active showcase pool
   const [availableCities, setAvailableCities] = useState<string[]>(["Tüm Şehirler"]);
   const [availableBrands, setAvailableBrands] = useState<string[]>(["Tüm Markalar"]);
+  const availableCategories = ["Tüm Kategoriler", ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
 
-  // Filter form state
-  const [selectedCity, setSelectedCity] = useState<string>("Tüm Şehirler");
-  const [selectedBrand, setSelectedBrand] = useState<string>("Tüm Markalar");
+  // Filter form state (dropdown selections before submit)
+  const [selectedCity, setSelectedCity] = useState<string>(initialCity);
+  const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
 
-  // Applied filter state
-  const [appliedCity, setAppliedCity] = useState<string>("Tüm Şehirler");
-  const [appliedBrand, setAppliedBrand] = useState<string>("Tüm Markalar");
+  // Applied filter state (triggers API fetch)
+  const [appliedCity, setAppliedCity] = useState<string>(initialCity);
+  const [appliedBrand, setAppliedBrand] = useState<string>(initialBrand);
+  const [appliedCategory, setAppliedCategory] = useState<string>(initialCategory);
 
   // Selected Provider Detail Modal
   const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteShowcaseItem | null>(null);
 
-  // Fetch showcase recommendations from API
-  const fetchRecommendations = useCallback(async (cityVal: string, brandVal: string, pageNum: number) => {
-    setLoading(true);
-    try {
-      const query = new URLSearchParams();
+  // Update URL query parameters cleanly
+  const syncUrlParams = useCallback(
+    (cityVal: string, brandVal: string, catVal: string) => {
+      const params = new URLSearchParams();
       if (cityVal && cityVal !== "Tüm Şehirler") {
-        query.append("city", cityVal);
+        params.set("city", cityVal);
       }
       if (brandVal && brandVal !== "Tüm Markalar") {
-        query.append("brand", brandVal);
+        params.set("brand", brandVal);
       }
-      query.append("page", pageNum.toString());
-      query.append("limit", "12");
+      if (catVal && catVal !== "Tüm Kategoriler") {
+        params.set("category", catVal);
+      }
+      const qs = params.toString();
+      const newUrl = qs ? `/isicepte-oneriyor?${qs}` : "/isicepte-oneriyor";
+      window.history.replaceState(null, "", newUrl);
+    },
+    []
+  );
 
-      const res = await fetch(`${API_BASE_URL}/isicepte/recommendations?${query.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-        setTotalCount(data.total || 0);
-        setTotalPages(data.totalPages || 1);
+  // Sync state if URL searchParams change (e.g. back/forward navigation)
+  useEffect(() => {
+    const qCity = searchParams.get("city") || "Tüm Şehirler";
+    const qBrand = searchParams.get("brand") || "Tüm Markalar";
+    const qCategory = searchParams.get("category") || "Tüm Kategoriler";
 
-        if (Array.isArray(data.availableCities) && data.availableCities.length > 0) {
-          setAvailableCities(data.availableCities);
-        }
-        if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
-          setAvailableBrands(data.availableBrands);
-        }
+    setSelectedCity(qCity);
+    setSelectedBrand(qBrand);
+    setSelectedCategory(qCategory);
+    setAppliedCity(qCity);
+    setAppliedBrand(qBrand);
+    setAppliedCategory(qCategory);
+  }, [searchParams]);
 
-        // Record impression event for Vitrin analytics if items exist
-        if (data.items && data.items.length > 0) {
-          fetch(`${API_BASE_URL}/isicepte/events`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              eventType: "ISICEPTE_SHOWCASE_IMPRESSION",
-              city: cityVal !== "Tüm Şehirler" ? cityVal : undefined,
-              brand: brandVal !== "Tüm Markalar" ? brandVal : undefined,
-            }),
-          }).catch(() => {});
+  // Fetch showcase recommendations from API
+  const fetchRecommendations = useCallback(
+    async (cityVal: string, brandVal: string, catVal: string, pageNum: number) => {
+      setLoading(true);
+      try {
+        const query = new URLSearchParams();
+        if (cityVal && cityVal !== "Tüm Şehirler") {
+          query.append("city", cityVal);
         }
-      } else {
+        if (brandVal && brandVal !== "Tüm Markalar") {
+          query.append("brand", brandVal);
+        }
+        if (catVal && catVal !== "Tüm Kategoriler") {
+          query.append("category", catVal);
+        }
+        query.append("page", pageNum.toString());
+        query.append("limit", "12");
+
+        const res = await fetch(`${API_BASE_URL}/isicepte/recommendations?${query.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setItems(data.items || []);
+          setTotalCount(data.total || 0);
+          setTotalPages(data.totalPages || 1);
+
+          if (Array.isArray(data.availableCities) && data.availableCities.length > 0) {
+            setAvailableCities(data.availableCities);
+          }
+          if (Array.isArray(data.availableBrands) && data.availableBrands.length > 0) {
+            setAvailableBrands(data.availableBrands);
+          }
+
+          // Record impression event for Vitrin analytics if items exist
+          if (data.items && data.items.length > 0) {
+            fetch(`${API_BASE_URL}/isicepte/events`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                eventType: "ISICEPTE_SHOWCASE_IMPRESSION",
+                city: cityVal !== "Tüm Şehirler" ? cityVal : undefined,
+                brand: brandVal !== "Tüm Markalar" ? brandVal : undefined,
+                metadata: catVal !== "Tüm Kategoriler" ? { category: catVal } : undefined,
+              }),
+            }).catch(() => {});
+          }
+        } else {
+          setItems([]);
+          setTotalCount(0);
+        }
+      } catch (e) {
+        console.error("Failed to load showcase providers:", e);
         setItems([]);
         setTotalCount(0);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      console.error("Failed to load showcase providers:", e);
-      setItems([]);
-      setTotalCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchRecommendations(appliedCity, appliedBrand, page);
-  }, [appliedCity, appliedBrand, page, fetchRecommendations]);
+    fetchRecommendations(appliedCity, appliedBrand, appliedCategory, page);
+  }, [appliedCity, appliedBrand, appliedCategory, page, fetchRecommendations]);
 
   const handleApplyFilters = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setPage(1);
     setAppliedCity(selectedCity);
     setAppliedBrand(selectedBrand);
+    setAppliedCategory(selectedCategory);
+    syncUrlParams(selectedCity, selectedBrand, selectedCategory);
   };
 
   const handleClearCityFilter = () => {
     setSelectedCity("Tüm Şehirler");
     setAppliedCity("Tüm Şehirler");
     setPage(1);
+    syncUrlParams("Tüm Şehirler", appliedBrand, appliedCategory);
   };
 
   const handleClearBrandFilter = () => {
     setSelectedBrand("Tüm Markalar");
     setAppliedBrand("Tüm Markalar");
     setPage(1);
+    syncUrlParams(appliedCity, "Tüm Markalar", appliedCategory);
+  };
+
+  const handleClearCategoryFilter = () => {
+    setSelectedCategory("Tüm Kategoriler");
+    setAppliedCategory("Tüm Kategoriler");
+    setPage(1);
+    syncUrlParams(appliedCity, appliedBrand, "Tüm Kategoriler");
   };
 
   const handleClearAllFilters = () => {
     setSelectedCity("Tüm Şehirler");
     setSelectedBrand("Tüm Markalar");
+    setSelectedCategory("Tüm Kategoriler");
     setAppliedCity("Tüm Şehirler");
     setAppliedBrand("Tüm Markalar");
+    setAppliedCategory("Tüm Kategoriler");
     setPage(1);
+    syncUrlParams("Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler");
   };
 
   const handleOpenDetailModal = (provider: IsiCepteShowcaseItem) => {
@@ -166,15 +248,47 @@ export default function IsiCepteOneriyorPage() {
     window.open(provider.isicepteProfileUrl, "_blank", "noopener,noreferrer");
   };
 
-  const isFiltered = appliedCity !== "Tüm Şehirler" || appliedBrand !== "Tüm Markalar";
+  const isFiltered =
+    appliedCity !== "Tüm Şehirler" ||
+    appliedBrand !== "Tüm Markalar" ||
+    appliedCategory !== "Tüm Kategoriler";
+
+  // Build contextual results summary
+  const getContextualSummaryTitle = () => {
+    const hasCity = appliedCity !== "Tüm Şehirler";
+    const hasBrand = appliedBrand !== "Tüm Markalar";
+    const hasCat = appliedCategory !== "Tüm Kategoriler";
+
+    if (hasCity && hasBrand && hasCat) {
+      return `${appliedCity} şehrinde ${appliedBrand} için ${appliedCategory} hizmeti veren vitrin üyeleri`;
+    }
+    if (hasCity && hasBrand) {
+      return `${appliedCity} şehrinde ${appliedBrand} uzmanı vitrin üyeleri`;
+    }
+    if (hasCity && hasCat) {
+      return `${appliedCity} şehrinde ${appliedCategory} hizmeti veren vitrin üyeleri`;
+    }
+    if (hasBrand && hasCat) {
+      return `${appliedBrand} için ${appliedCategory} hizmeti veren vitrin üyeleri`;
+    }
+    if (hasCity) {
+      return `${appliedCity} şehrindeki vitrin üyeleri`;
+    }
+    if (hasBrand) {
+      return `${appliedBrand} uzmanı vitrin üyeleri`;
+    }
+    if (hasCat) {
+      return `${appliedCategory} hizmeti veren vitrin üyeleri`;
+    }
+    return "Tüm Vitrin Üyeleri";
+  };
 
   return (
     <div className="w-full flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
       {/* Top Header & Filter Controls Bar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-white/10">
-        
         {/* Title & Info Badges */}
-        <div className="space-y-3 max-w-2xl">
+        <div className="space-y-3 max-w-xl">
           <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
             İşiCepte Öneriyor
           </h1>
@@ -193,17 +307,20 @@ export default function IsiCepteOneriyorPage() {
           </div>
         </div>
 
-        {/* City & Brand Filters Form */}
-        <form onSubmit={handleApplyFilters} className="flex flex-wrap sm:flex-nowrap items-end gap-3">
-          {/* City Dropdown */}
-          <div className="w-full sm:w-44 space-y-1">
+        {/* 3-Filter Form: ŞEHİR | MARKA | KATEGORİ | [FİLTRELE] */}
+        <form
+          onSubmit={handleApplyFilters}
+          className="flex flex-wrap lg:flex-nowrap items-end gap-3 w-full lg:w-auto"
+        >
+          {/* 1. City Dropdown */}
+          <div className="w-full sm:w-[150px] lg:w-[160px] space-y-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Şehir
             </label>
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
             >
               {availableCities.map((c) => (
                 <option key={c} value={c} className="bg-slate-900 text-white">
@@ -213,15 +330,15 @@ export default function IsiCepteOneriyorPage() {
             </select>
           </div>
 
-          {/* Brand Dropdown */}
-          <div className="w-full sm:w-44 space-y-1">
+          {/* 2. Brand Dropdown */}
+          <div className="w-full sm:w-[150px] lg:w-[160px] space-y-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
               Marka
             </label>
             <select
               value={selectedBrand}
               onChange={(e) => setSelectedBrand(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition"
             >
               {availableBrands.map((b) => (
                 <option key={b} value={b} className="bg-slate-900 text-white">
@@ -231,10 +348,28 @@ export default function IsiCepteOneriyorPage() {
             </select>
           </div>
 
-          {/* Filter Button */}
+          {/* 3. Category Dropdown */}
+          <div className="w-full sm:w-[180px] lg:w-[200px] space-y-1">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+              Kategori
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full bg-[#0b0f19] border border-white/15 text-white rounded-xl px-3 py-2.5 text-xs font-semibold focus:border-orange-500 focus:outline-none cursor-pointer transition truncate"
+            >
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Filter Button */}
           <button
             type="submit"
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/25 shrink-0 h-[38px]"
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Filtrele</span>
@@ -242,16 +377,12 @@ export default function IsiCepteOneriyorPage() {
         </form>
       </div>
 
-      {/* Filtered Mode Context Bar */}
+      {/* Filtered Mode Context Bar & Chips */}
       {isFiltered && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-white/10 animate-in fade-in duration-200">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-sm sm:text-base font-bold text-white">
-              {appliedCity !== "Tüm Şehirler" && appliedBrand !== "Tüm Markalar"
-                ? `${appliedCity} şehrinde ${appliedBrand} uzmanı vitrin üyeleri`
-                : appliedCity !== "Tüm Şehirler"
-                ? `${appliedCity} şehrindeki vitrin üyeleri`
-                : `${appliedBrand} uzmanı vitrin üyeleri`}
+              {getContextualSummaryTitle()}
             </h2>
             <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-xs font-mono font-bold">
               {totalCount} sonuç
@@ -259,8 +390,10 @@ export default function IsiCepteOneriyorPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* City Chip */}
             {appliedCity !== "Tüm Şehirler" && (
               <button
+                type="button"
                 onClick={handleClearCityFilter}
                 className="px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
               >
@@ -269,8 +402,10 @@ export default function IsiCepteOneriyorPage() {
               </button>
             )}
 
+            {/* Brand Chip */}
             {appliedBrand !== "Tüm Markalar" && (
               <button
+                type="button"
                 onClick={handleClearBrandFilter}
                 className="px-3 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
               >
@@ -279,7 +414,20 @@ export default function IsiCepteOneriyorPage() {
               </button>
             )}
 
+            {/* Category Chip */}
+            {appliedCategory !== "Tüm Kategoriler" && (
+              <button
+                type="button"
+                onClick={handleClearCategoryFilter}
+                className="px-3 py-1 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>{appliedCategory}</span>
+                <X className="w-3 h-3" />
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={handleClearAllFilters}
               className="text-xs text-slate-400 hover:text-white underline font-semibold transition cursor-pointer ml-2"
             >
@@ -306,17 +454,18 @@ export default function IsiCepteOneriyorPage() {
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white">
               {isFiltered
-                ? "Bu şehir ve marka için şu anda İşiCepte Öneriyor üyesi bulunmuyor."
+                ? "Seçtiğiniz şehir, marka ve kategoriye uygun işletme bulunamadı."
                 : "Şu anda İşiCepte Öneriyor bölümünde aktif vitrin üyesi bulunmuyor."}
             </h3>
             <p className="text-xs text-slate-400">
               {isFiltered
-                ? "Marka veya şehir filtresini kaldırarak diğer vitrin üyelerini görebilirsiniz."
+                ? "Filtreleri değiştirerek veya temizleyerek diğer vitrin üyelerini görebilirsiniz."
                 : "Yeni vitrin üyesi otomotiv servisleri eklendikçe burada listelenecektir."}
             </p>
           </div>
           {isFiltered && (
             <button
+              type="button"
               onClick={handleClearAllFilters}
               className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition cursor-pointer shadow-lg shadow-orange-600/20"
             >
@@ -416,12 +565,14 @@ export default function IsiCepteOneriyorPage() {
               {/* Card Actions */}
               <div className="p-6 pt-0 flex items-center gap-3">
                 <button
+                  type="button"
                   onClick={() => handleOpenDetailModal(provider)}
                   className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition text-center shadow-lg shadow-orange-600/20 cursor-pointer"
                 >
                   Profili Gör
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleOutboundClick(provider)}
                   className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
@@ -438,6 +589,7 @@ export default function IsiCepteOneriyorPage() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-6">
           <button
+            type="button"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             className="px-4 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition disabled:opacity-40 cursor-pointer"
@@ -448,6 +600,7 @@ export default function IsiCepteOneriyorPage() {
             Sayfa {page} / {totalPages}
           </span>
           <button
+            type="button"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             className="px-4 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition disabled:opacity-40 cursor-pointer"
@@ -461,7 +614,6 @@ export default function IsiCepteOneriyorPage() {
       {detailModalProvider && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0b101e] border border-white/15 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div>
@@ -473,6 +625,7 @@ export default function IsiCepteOneriyorPage() {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setDetailModalProvider(null)}
                 className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
               >
@@ -502,7 +655,9 @@ export default function IsiCepteOneriyorPage() {
               {detailModalProvider.rating > 0 && (
                 <div className="p-3.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
                   <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold">Müşteri Değerlendirmesi</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-bold">
+                      Müşteri Değerlendirmesi
+                    </div>
                     <div className="text-sm font-bold text-white flex items-center gap-1 mt-0.5">
                       <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
                       <span>{detailModalProvider.rating.toFixed(1)} / 5.0</span>
@@ -520,17 +675,25 @@ export default function IsiCepteOneriyorPage() {
               <div className="space-y-1">
                 <div className="text-[10px] text-slate-400 uppercase font-bold">Adres & Konum</div>
                 <div className="text-slate-200">
-                  {detailModalProvider.address || `${detailModalProvider.city} ${detailModalProvider.district ? `/ ${detailModalProvider.district}` : ""}`}
+                  {detailModalProvider.address ||
+                    `${detailModalProvider.city} ${
+                      detailModalProvider.district ? `/ ${detailModalProvider.district}` : ""
+                    }`}
                 </div>
               </div>
 
               {/* Supported Brands (Only if exists) */}
               {detailModalProvider.supportedBrands && detailModalProvider.supportedBrands.length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Hizmet Verilen Araç Markaları</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">
+                    Hizmet Verilen Araç Markaları
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {detailModalProvider.supportedBrands.map((b, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-semibold">
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-semibold"
+                      >
                         {b}
                       </span>
                     ))}
@@ -541,10 +704,15 @@ export default function IsiCepteOneriyorPage() {
               {/* Hizmet Uzmanlıkları (Strict Canonical Oto Hizmetleri Categories) */}
               {detailModalProvider.serviceCategories && detailModalProvider.serviceCategories.length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">Hizmet Uzmanlıkları</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">
+                    Hizmet Uzmanlıkları
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {detailModalProvider.serviceCategories.map((c, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-lg bg-slate-800 border border-white/5 text-slate-300 text-[11px] font-medium">
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 border border-white/5 text-slate-300 text-[11px] font-medium"
+                      >
                         {c}
                       </span>
                     ))}
@@ -586,5 +754,20 @@ export default function IsiCepteOneriyorPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function IsiCepteOneriyorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full flex-1 max-w-7xl mx-auto px-4 py-24 flex flex-col items-center justify-center gap-3">
+          <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
+          <span className="text-xs text-slate-400 font-semibold">Sayfa yükleniyor...</span>
+        </div>
+      }
+    >
+      <IsiCepteOneriyorContent />
+    </Suspense>
   );
 }

@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 export interface PublicRecommendationParams {
   city?: string;
   brand?: string;
+  category?: string;
   page?: number;
   limit?: number;
   seed?: string;
@@ -88,6 +89,13 @@ export class IsiCepteService implements OnModuleInit {
       };
     }
 
+    // Category Filter (Checks if serviceCategories array contains the requested canonical category)
+    if (params.category && params.category !== 'ALL' && params.category !== 'Tüm Kategoriler' && params.category.trim() !== '') {
+      where.serviceCategories = {
+        has: params.category.trim(),
+      };
+    }
+
     // Fetch matching eligible providers
     const eligibleProviders = await this.prisma.isiCepteProvider.findMany({
       where,
@@ -162,6 +170,7 @@ export class IsiCepteService implements OnModuleInit {
       canonicalCategories: CANONICAL_ISICEPTE_OTO_CATEGORIES,
       selectedCity: params.city && params.city !== 'ALL' && params.city !== 'Tüm Şehirler' ? params.city : null,
       selectedBrand: params.brand && params.brand !== 'ALL' && params.brand !== 'Tüm Markalar' ? params.brand : null,
+      selectedCategory: params.category && params.category !== 'ALL' && params.category !== 'Tüm Kategoriler' ? params.category : null,
     };
   }
 

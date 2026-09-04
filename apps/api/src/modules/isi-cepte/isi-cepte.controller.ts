@@ -11,12 +11,14 @@ export class IsiCepteController {
   @ApiOperation({ summary: 'İşiCepte Öneriyor - Aktif Vitrin Otomotiv Üyeleri Keşif Listesi' })
   @ApiQuery({ name: 'city', required: false, description: 'Şehir filtresi (örn: İstanbul)' })
   @ApiQuery({ name: 'brand', required: false, description: 'Marka uzmanlık filtresi (örn: BMW)' })
+  @ApiQuery({ name: 'category', required: false, description: 'Kategori filtresi (örn: Motor/Mekanik)' })
   @ApiQuery({ name: 'page', required: false, description: 'Sayfa no (default 1)' })
   @ApiQuery({ name: 'limit', required: false, description: 'Sayfa başına kayıt (default 12)' })
   @ApiQuery({ name: 'seed', required: false, description: 'Adil rotasyon için seed' })
   async getRecommendations(
     @Query('city') city?: string,
     @Query('brand') brand?: string,
+    @Query('category') category?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('seed') seed?: string,
@@ -24,6 +26,7 @@ export class IsiCepteController {
     return this.isiCepteService.getPublicRecommendations({
       city,
       brand,
+      category,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       seed,
