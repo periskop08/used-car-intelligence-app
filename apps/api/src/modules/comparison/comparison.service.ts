@@ -845,9 +845,12 @@ KATI TALİMATLAR:
       const combinedConsumption = dossier.performanceUsage.combinedFuelL100km ?? (specData.averageFuelConsumption ? Number(specData.averageFuelConsumption) : undefined);
       const bootLitres = dossier.performanceUsage.trunkCapacityLiters ?? (specData.luggageCapacity ? Number(specData.luggageCapacity) : undefined);
 
+      const engineCode = dossier.vehicleIdentity.engineCode || v.engine.code || '';
+      const engineSuffix = engineCode ? ` ${engineCode}` : '';
+
       profiles.push({
         vehicleId: v.id,
-        displayName: `${dossier.vehicleIdentity.brand || v.brand.name} ${dossier.vehicleIdentity.model || v.model.name} ${dossier.vehicleIdentity.modelYear || v.year} (${dossier.vehicleIdentity.trimName || v.trim.name})`,
+        displayName: `${dossier.vehicleIdentity.brand || v.brand.name} ${dossier.vehicleIdentity.model || v.model.name} ${dossier.vehicleIdentity.modelYear || v.year}${engineSuffix} (${dossier.vehicleIdentity.trimName || v.trim.name})`,
         identity: {
           brand: dossier.vehicleIdentity.brand || v.brand.name,
           model: dossier.vehicleIdentity.model || v.model.name,
@@ -1803,15 +1806,31 @@ Lütfen SADECE geçerli JSON yanıt ver.
 
     if (openai) {
       try {
+        const winnerMotor = winnerProfile.identity.engineCode || 'Belirtilmedi';
+        const winnerFuel = formatFuelType(winnerProfile.identity.fuelType);
+        const winnerTrans = winnerProfile.identity.transmission || 'Belirtilmedi';
+
         const narrativePrompt = `Sen TorqueScout otomotiv analistisin. Backend hesaplama motorumuz aşağıdaki SIRALAMA VE KAZANAN SONUCUNU DETERNİMİSTİK OLARAK BELİRLEMİŞTİR:
 
 KAZANAN ARAÇ (#1): "${winnerProfile.displayName}" (ID: ${winnerProfile.vehicleId})
+KAZANAN ARACIN SEÇİLEN KİMLİĞİ:
+- Marka / Model / Yıl: ${winnerProfile.identity.brand} ${winnerProfile.identity.model} (${winnerProfile.identity.year})
+- Kullanıcının Seçtiği Motor / Hacim: ${winnerMotor}
+- Yakıt / Şanzıman: ${winnerFuel} / ${winnerTrans}
+- Donanım Paketi: ${winnerProfile.identity.trim || 'Standart'}
+
 BACKEND TOPLAM SIRALAMA VE SKORLAR:
 ${rankingSummaryStr}
 
 GÖREVİN:
 Yalnızca bir analiz metni ("narrativeRecommendation") ve araç özet kartları yaz.
-ASLA SIRALAMAYI VE KAZANAN ARACI DEĞİŞTİRME. Kazananın neden 1. olduğunu motor gücü, yakıt tüketimi, kronik arıza riski ve donanım verileriyle açıklayan akıcı bir değerlendirme yaz.
+ASLA SIRALAMAYI VE KAZANAN ARACI DEĞİŞTİRME.
+
+KATI MOTOR VE TEKNİK VERİ KURALLARI:
+1. Kullanıcının filtrelerden seçtiği motor KESİNLİKLE "${winnerMotor}" (${winnerFuel}) dur.
+2. Motor hacmini veya motor kodunu ASLA DEĞİŞTİRME ve FARKLI BİR MOTORLA (Örn: 2.0 TDI, 2.0 TSI vb.) KARIŞTIRMA!
+3. Kullanıcı filtrede sadece motoru seçtiği için, bu "${winnerMotor}" motorun ilgili model yılındaki (${winnerProfile.identity.year}) Türkiye/Avrupa pazarındaki resmi fabrika beygir gücünü (HP), torkunu ve yakıt tüketimini kendi uzman otomotiv bilginle doğru eşleştirerek analizinde kullan.
+4. Kazananın neden 1. olduğunu seçilen bu motorun performansı/tüketimi, kronik arıza riski ve donanım avantajlarıyla akıcı, profesyonel bir dille özetle.
 
 Lütfen SADECE geçerli JSON dön:
 {
