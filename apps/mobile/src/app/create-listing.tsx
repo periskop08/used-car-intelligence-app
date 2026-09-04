@@ -75,6 +75,7 @@ const FUEL_TYPES = [
 const TRANSMISSIONS = [
   { label: 'Otomatik', val: 'AUTOMATIC' },
   { label: 'Manuel', val: 'MANUAL' },
+  { label: 'Yarı Otomatik', val: 'SEMI_AUTOMATIC' },
 ];
 
 const BODY_TYPES = [
@@ -82,7 +83,14 @@ const BODY_TYPES = [
   { label: 'Hatchback', val: 'HATCHBACK' },
   { label: 'SUV', val: 'SUV' },
   { label: 'Coupe', val: 'COUPE' },
-  { label: 'Station Wagon', val: 'WAGON' },
+  { label: 'Station Wagon', val: 'STATION_WAGON' },
+  { label: 'Cabrio', val: 'CABRIO' },
+];
+
+const DRIVETRAINS = [
+  { label: 'Önden Çekiş', val: 'FWD' },
+  { label: 'Arkadan İtiş', val: 'RWD' },
+  { label: 'Dört Çeker (4x4)', val: 'AWD' },
 ];
 
 const VEHICLE_STATUSES = [
@@ -94,6 +102,7 @@ const VEHICLE_STATUSES = [
 const SELLER_TYPES = [
   { label: 'Sahibinden', val: 'OWNER' },
   { label: 'Galeriden', val: 'DEALER' },
+  { label: 'Yetkili Bayiden', val: 'AUTHORIZED_DEALER' },
 ];
 
 const CAR_COLORS = [
@@ -109,6 +118,22 @@ const CAR_COLORS = [
   'Lacivert',
 ];
 
+const CAR_BODY_PARTS = [
+  { key: 'FRONT_BUMPER', label: 'Ön Tampon' },
+  { key: 'REAR_BUMPER', label: 'Arka Tampon' },
+  { key: 'HOOD', label: 'Motor Kaputu' },
+  { key: 'ROOF', label: 'Tavan' },
+  { key: 'TRUNK', label: 'Bagaj Kapağı' },
+  { key: 'LEFT_FRONT_FENDER', label: 'Sol Ön Çamurluk' },
+  { key: 'RIGHT_FRONT_FENDER', label: 'Sağ Ön Çamurluk' },
+  { key: 'LEFT_FRONT_DOOR', label: 'Sol Ön Kapı' },
+  { key: 'RIGHT_FRONT_DOOR', label: 'Sağ Ön Kapı' },
+  { key: 'LEFT_REAR_DOOR', label: 'Sol Arka Kapı' },
+  { key: 'RIGHT_REAR_DOOR', label: 'Sağ Arka Kapı' },
+  { key: 'LEFT_REAR_FENDER', label: 'Sol Arka Çamurluk' },
+  { key: 'RIGHT_REAR_FENDER', label: 'Sağ Arka Çamurluk' },
+];
+
 interface Brand {
   id: string;
   name: string;
@@ -122,9 +147,12 @@ interface VehicleModel {
 interface Variant {
   id: string;
   year?: number;
-  engine?: { code?: string; displacement?: number; powerHp?: number };
+  engine?: { code?: string; displacement?: number; displacementCc?: number; powerHp?: number };
   transmission?: { name?: string; type?: string };
   trim?: { name?: string };
+  fuelType?: string;
+  bodyType?: string;
+  specs?: any;
 }
 
 export default function CreateListingScreen() {
@@ -151,6 +179,18 @@ export default function CreateListingScreen() {
   const [bodyType, setBodyType] = useState('SEDAN');
   const [color, setColor] = useState('Beyaz');
   const [description, setDescription] = useState('');
+
+  // Technical Specs (Fully Editable)
+  const [engineDisplacement, setEngineDisplacement] = useState('');
+  const [enginePower, setEnginePower] = useState('');
+  const [drivetrain, setDrivetrain] = useState('FWD');
+
+  // Condition, Paint & Tramer
+  const [tramerAmount, setTramerAmount] = useState('0');
+  const [damageRecord, setDamageRecord] = useState('');
+  const [paintedParts, setPaintedParts] = useState<string[]>([]);
+  const [changedParts, setChangedParts] = useState<string[]>([]);
+  const [maintenanceHistory, setMaintenanceHistory] = useState('');
 
   // Extended Details
   const [vehicleStatus, setVehicleStatus] = useState('USED');
@@ -269,6 +309,24 @@ export default function CreateListingScreen() {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const togglePartState = (partKey: string, targetType: 'painted' | 'changed') => {
+    if (targetType === 'painted') {
+      if (paintedParts.includes(partKey)) {
+        setPaintedParts((prev) => prev.filter((k) => k !== partKey));
+      } else {
+        setPaintedParts((prev) => [...prev, partKey]);
+        setChangedParts((prev) => prev.filter((k) => k !== partKey));
+      }
+    } else if (targetType === 'changed') {
+      if (changedParts.includes(partKey)) {
+        setChangedParts((prev) => prev.filter((k) => k !== partKey));
+      } else {
+        setChangedParts((prev) => [...prev, partKey]);
+        setPaintedParts((prev) => prev.filter((k) => k !== partKey));
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     const rawPrice = parseNumberInput(priceAmount);
     const rawKm = parseNumberInput(kilometers);
@@ -318,6 +376,9 @@ export default function CreateListingScreen() {
       }
 
       const yearNum = Number(parseNumberInput(selectedYear)) || 2020;
+      const rawDisplacement = parseNumberInput(engineDisplacement);
+      const rawPower = parseNumberInput(enginePower);
+      const rawTramer = parseNumberInput(tramerAmount);
 
       const payload: any = {
         title: title.trim(),
@@ -336,6 +397,14 @@ export default function CreateListingScreen() {
         hasWarranty,
         heavyDamage,
         isUrgent,
+        engineDisplacement: rawDisplacement ? Number(rawDisplacement) : undefined,
+        enginePower: rawPower ? Number(rawPower) : undefined,
+        drivetrain,
+        tramerAmount: rawTramer ? Number(rawTramer) : 0,
+        damageRecord: damageRecord.trim() || undefined,
+        paintedParts,
+        changedParts,
+        maintenanceHistory: maintenanceHistory.trim() || undefined,
       };
 
       if (selectedVariant) {
@@ -583,6 +652,81 @@ export default function CreateListingScreen() {
               </View>
             </View>
 
+            {/* Açıklama */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Açıklama</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                placeholder="Aracın durumu, periyodik bakımları ve ekstraları..."
+                placeholderTextColor="#94a3b8"
+                multiline={true}
+                numberOfLines={4}
+                value={description}
+                onChangeText={setDescription}
+              />
+            </View>
+          </View>
+
+          {/* 3. TEKNİK ÖZELLİKLER & MOTOR DETAYLARI CARD */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="speedometer" size={18} color="#ea580c" />
+              <Text style={styles.cardTitle}>Motor & Teknik Özellikler</Text>
+            </View>
+
+            {/* Motor Hacmi & Motor Gücü Row (Düzenlenebilir) */}
+            <View style={styles.rowInputs}>
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Motor Hacmi (CC)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: 1498"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={engineDisplacement}
+                  onChangeText={(t) => setEngineDisplacement(parseNumberInput(t))}
+                />
+              </View>
+
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Motor Gücü (HP)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: 150"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={enginePower}
+                  onChangeText={(t) => setEnginePower(parseNumberInput(t))}
+                />
+              </View>
+            </View>
+
+            {/* Çekiş */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Çekiş</Text>
+              <View style={styles.chipsWrap}>
+                {DRIVETRAINS.map((d) => (
+                  <TouchableOpacity
+                    key={d.val}
+                    style={[
+                      styles.chipPill,
+                      drivetrain === d.val && styles.chipPillActive,
+                    ]}
+                    onPress={() => setDrivetrain(d.val)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipPillText,
+                        drivetrain === d.val && styles.chipPillTextActive,
+                      ]}
+                    >
+                      {d.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Yakıt Tipi */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Yakıt Tipi</Text>
@@ -686,23 +830,110 @@ export default function CreateListingScreen() {
                 ))}
               </View>
             </View>
+          </View>
 
-            {/* Açıklama */}
+          {/* 4. BOYA, DEĞİŞEN VE TRAMER BİLGİSİ CARD */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="build" size={18} color="#ea580c" />
+              <Text style={styles.cardTitle}>Boya, Değişen ve Tramer Bilgisi</Text>
+            </View>
+
+            {/* Tramer Tutarı & Hasar Açıklaması Row */}
+            <View style={styles.rowInputs}>
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Tramer Kaydı (TL)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: 5.000"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={tramerAmount}
+                  onChangeText={(t) => setTramerAmount(formatNumberInput(t))}
+                />
+              </View>
+
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Hasar Açıklaması</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: Çamurluk boyalı"
+                  placeholderTextColor="#94a3b8"
+                  value={damageRecord}
+                  onChangeText={setDamageRecord}
+                />
+              </View>
+            </View>
+
+            {/* 13 Kaporta Parçası Seçimi */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Açıklama</Text>
+              <Text style={styles.inputLabel}>Boya & Değişen Parçaları İşaretleyin:</Text>
+              <View style={styles.partsGrid}>
+                {CAR_BODY_PARTS.map((part) => {
+                  const isPainted = paintedParts.includes(part.key);
+                  const isChanged = changedParts.includes(part.key);
+                  return (
+                    <View key={part.key} style={styles.partCard}>
+                      <Text style={styles.partTitle} numberOfLines={1}>
+                        {part.label}
+                      </Text>
+                      <View style={styles.partButtonsRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.partStatusBtn,
+                            isPainted && styles.partStatusBtnPainted,
+                          ]}
+                          onPress={() => togglePartState(part.key, 'painted')}
+                        >
+                          <Text
+                            style={[
+                              styles.partStatusBtnText,
+                              isPainted && styles.partStatusBtnTextPainted,
+                            ]}
+                          >
+                            Boyalı
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.partStatusBtn,
+                            isChanged && styles.partStatusBtnChanged,
+                          ]}
+                          onPress={() => togglePartState(part.key, 'changed')}
+                        >
+                          <Text
+                            style={[
+                              styles.partStatusBtnText,
+                              isChanged && styles.partStatusBtnTextChanged,
+                            ]}
+                          >
+                            Değişen
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Bakım Geçmişi & Notlar */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Bakım Geçmişi & Notlar</Text>
               <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Aracın durumu, periyodik bakımları ve ekstraları..."
+                style={[styles.textInput, styles.textAreaSmall]}
+                placeholder="Son yağ bakımı, triger kayışı değişimi vb. detaylar..."
                 placeholderTextColor="#94a3b8"
                 multiline={true}
-                numberOfLines={4}
-                value={description}
-                onChangeText={setDescription}
+                numberOfLines={3}
+                value={maintenanceHistory}
+                onChangeText={setMaintenanceHistory}
               />
             </View>
           </View>
 
-          {/* 3. FOTOĞRAFLAR CARD */}
+          {/* 5. FOTOĞRAFLAR CARD */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="images" size={18} color="#ea580c" />
@@ -740,7 +971,7 @@ export default function CreateListingScreen() {
             )}
           </View>
 
-          {/* 4. EKSTRA SEÇENEKLER CARD */}
+          {/* 6. DURUM & EKSTRALAR CARD */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="shield-checkmark" size={18} color="#ea580c" />
@@ -1115,6 +1346,10 @@ const styles = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: 'top',
   },
+  textAreaSmall: {
+    minHeight: 65,
+    textAlignVertical: 'top',
+  },
   rowInputs: {
     flexDirection: 'row',
     gap: 10,
@@ -1163,6 +1398,59 @@ const styles = StyleSheet.create({
   },
   chipPillTextActive: {
     color: '#ea580c',
+    fontWeight: '900',
+  },
+  partsGrid: {
+    gap: 8,
+  },
+  partCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  partTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1e293b',
+    flex: 1,
+  },
+  partButtonsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  partStatusBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#e2e8f0',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  partStatusBtnPainted: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+  },
+  partStatusBtnChanged: {
+    backgroundColor: '#ffe4e6',
+    borderColor: '#f43f5e',
+  },
+  partStatusBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  partStatusBtnTextPainted: {
+    color: '#b45309',
+    fontWeight: '900',
+  },
+  partStatusBtnTextChanged: {
+    color: '#e11d48',
     fontWeight: '900',
   },
   addPhotosBtn: {

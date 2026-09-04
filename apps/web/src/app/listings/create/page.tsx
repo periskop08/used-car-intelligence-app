@@ -13,6 +13,22 @@ const PAINTED_COMPONENTS = [
   "LEFT_FRONT_FENDER", "LEFT_REAR_FENDER", "RIGHT_FRONT_FENDER", "RIGHT_REAR_FENDER"
 ];
 
+const PART_LABELS: Record<string, string> = {
+  FRONT_BUMPER: "Ön Tampon",
+  REAR_BUMPER: "Arka Tampon",
+  HOOD: "Kaput",
+  ROOF: "Tavan",
+  TRUNK: "Bagaj Kapağı",
+  LEFT_FRONT_FENDER: "Sol Ön Çamurluk",
+  RIGHT_FRONT_FENDER: "Sağ Ön Çamurluk",
+  LEFT_FRONT_DOOR: "Sol Ön Kapı",
+  RIGHT_FRONT_DOOR: "Sağ Ön Kapı",
+  LEFT_REAR_DOOR: "Sol Arka Kapı",
+  RIGHT_REAR_DOOR: "Sağ Arka Kapı",
+  LEFT_REAR_FENDER: "Sol Arka Çamurluk",
+  RIGHT_REAR_FENDER: "Sağ Arka Çamurluk",
+};
+
 const BODY_TYPE_LABELS: Record<string, string> = {
   SEDAN: "Sedan",
   HATCHBACK: "Hatchback",
@@ -936,26 +952,13 @@ export default function CreateListing() {
             <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
-                {!useCustomVariant && availableDisplacements.length > 0 ? (
-                  <select
-                    value={engineDisplacement}
-                    onChange={(e) => setEngineDisplacement(e.target.value)}
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Motor Hacmi Seçiniz...</option>
-                    {availableDisplacements.map((disp) => (
-                      <option key={disp} value={String(disp)}>{disp} cc</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    value={engineDisplacement}
-                    onChange={(e) => setEngineDisplacement(e.target.value)}
-                    placeholder="Örn: 1598"
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                  />
-                )}
+                <input
+                  type="number"
+                  value={engineDisplacement}
+                  onChange={(e) => setEngineDisplacement(e.target.value)}
+                  placeholder="Örn: 1498"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
@@ -971,26 +974,13 @@ export default function CreateListing() {
                     </span>
                   )}
                 </div>
-                {!useCustomVariant && availablePowers.length > 0 ? (
-                  <select
-                    value={enginePower}
-                    onChange={(e) => setEnginePower(e.target.value)}
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Motor Gücü Seçiniz...</option>
-                    {availablePowers.map((hp) => (
-                      <option key={hp} value={String(hp)}>{hp} HP</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    value={enginePower}
-                    onChange={(e) => setEnginePower(e.target.value)}
-                    placeholder="Örn: 128"
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                  />
-                )}
+                <input
+                  type="number"
+                  value={enginePower}
+                  onChange={(e) => setEnginePower(e.target.value)}
+                  placeholder="Örn: 150"
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
@@ -1074,10 +1064,10 @@ export default function CreateListing() {
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase">Tramer Hasar Kaydı Tutarı (TL)</label>
               <input
-                type="number"
-                value={tramerAmount}
-                onChange={(e) => setTramerAmount(e.target.value)}
-                placeholder="Örn: 5000"
+                type="text"
+                value={formatNumberInput(tramerAmount)}
+                onChange={(e) => setTramerAmount(parseNumberInput(e.target.value))}
+                placeholder="Örn: 5.000"
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
               />
             </div>
@@ -1101,7 +1091,7 @@ export default function CreateListing() {
                 const isChanged = changedParts.includes(part);
                 return (
                   <div key={part} className="flex flex-col gap-1 bg-slate-900/60 p-3 rounded-xl border border-white/5">
-                    <span className="text-[11px] font-bold text-slate-300 truncate">{part.replace(/_/g, " ")}</span>
+                    <span className="text-[11px] font-bold text-slate-300 truncate">{PART_LABELS[part] || part}</span>
                     <div className="flex items-center gap-2 text-[10px]">
                       <button
                         type="button"
