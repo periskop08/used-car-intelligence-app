@@ -8,6 +8,7 @@ export interface PublicRecommendationParams {
   page?: number;
   limit?: number;
   seed?: string;
+  scope?: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE';
 }
 
 /**
@@ -53,91 +54,138 @@ export class IsiCepteService implements OnModuleInit {
   }
 
   /**
-   * Public discovery endpoint: Returns strictly eligible ACTIVE VITRIN (SHOWCASE) automotive providers from real database.
+   * Public discovery endpoint: Returns eligible automotive providers from real database.
    *
    * Hard Invariants:
    * 1. isAutomotive === true (Oto Hizmetleri scope)
    * 2. membershipStatus === 'ACTIVE'
    * 3. torqueScoutOptIn === true
-   * 4. isShowcaseActive === true
-   * 5. showcaseExpiresAt > now (Active Vitrin entitlement)
+   * 4. When scope === 'SHOWCASE_ONLY' (default): strictly isShowcaseActive === true AND showcaseExpiresAt > now.
+   *    Default limit is 10 (or up to 100 for listing widgets).
+   * 5. When scope === 'ALL_ELIGIBLE' ("Tüm Ustaları Gör"): returns all matching automotive opted-in active providers,
+   *    with showcase members prioritized at the top and clearly badged.
    * 6. ZERO mock / sample / filler records. If count is 0, returns empty items array truthfully.
    */
   async getPublicRecommendations(params: PublicRecommendationParams) {
     const now = new Date();
+    const scope = params.scope || 'SHOWCASE_ONLY';
+    const defaultLimit = scope === 'SHOWCASE_ONLY' ? 10 : 12;
     const page = Math.max(1, Number(params.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(params.limit) || 12));
+    const limit = Math.min(100, Math.max(1, Number(params.limit) || defaultLimit));
 
-    // Base filter: Strictly real active showcase automotive providers
-    const where: any = {
+    // Base filter: All active, opted-in automotive providers
+    const baseWhere: any = {
       isAutomotive: true,
       membershipStatus: 'ACTIVE',
       torqueScoutOptIn: true,
-      isShowcaseActive: true,
-      showcaseExpiresAt: { gt: now },
     };
 
     // City Filter (Exact match or case-insensitive)
     if (params.city && params.city !== 'ALL' && params.city !== 'Tüm Şehirler' && params.city.trim() !== '') {
-      where.city = { equals: params.city.trim(), mode: 'insensitive' };
+      baseWhere.city = { equals: params.city.trim(), mode: 'insensitive' };
     }
 
     // Brand Filter (Checks if supportedBrands array contains the requested brand)
     if (params.brand && params.brand !== 'ALL' && params.brand !== 'Tüm Markalar' && params.brand.trim() !== '') {
-      where.supportedBrands = {
+      baseWhere.supportedBrands = {
         has: params.brand.trim(),
       };
     }
 
     // Category Filter (Checks if serviceCategories array contains the requested canonical category)
     if (params.category && params.category !== 'ALL' && params.category !== 'Tüm Kategoriler' && params.category.trim() !== '') {
-      where.serviceCategories = {
+      baseWhere.serviceCategories = {
         has: params.category.trim(),
       };
     }
 
-    // Fetch matching eligible providers
-    const eligibleProviders = await this.prisma.isiCepteProvider.findMany({
-      where,
-    });
-
-    const total = eligibleProviders.length;
-
-    // Apply deterministic fair rotation per seed / day so visibility is evenly distributed
     const seedString = params.seed || new Date().toISOString().slice(0, 10);
-    const sorted = this.applyDeterministicFairRotation(eligibleProviders, seedString);
+
+    let itemsToPaginate: any[] = [];
+    let total = 0;
+    let totalShowcase = 0;
+    let totalAll = 0;
+
+    if (scope === 'SHOWCASE_ONLY') {
+      // Strictly active showcase members
+      const showcaseWhere = {
+        ...baseWhere,
+        isShowcaseActive: true,
+        showcaseExpiresAt: { gt: now },
+      };
+
+      const [showcaseProviders, totalAllCount] = await Promise.all([
+        this.prisma.isiCepteProvider.findMany({ where: showcaseWhere }),
+        this.prisma.isiCepteProvider.count({ where: baseWhere }),
+      ]);
+
+      totalShowcase = showcaseProviders.length;
+      totalAll = totalAllCount;
+      total = totalShowcase;
+
+      // Apply fair rotation among eligible showcase providers
+      const rotated = this.applyDeterministicFairRotation(showcaseProviders, seedString);
+      itemsToPaginate = rotated;
+    } else {
+      // ALL_ELIGIBLE ("Tüm Ustaları Gör")
+      const allMatchingProviders = await this.prisma.isiCepteProvider.findMany({
+        where: baseWhere,
+      });
+
+      totalAll = allMatchingProviders.length;
+
+      // Partition into showcase vs standard
+      const showcaseList = allMatchingProviders.filter(
+        (p) => p.isShowcaseActive === true && p.showcaseExpiresAt && p.showcaseExpiresAt > now
+      );
+      const standardList = allMatchingProviders.filter(
+        (p) => !(p.isShowcaseActive === true && p.showcaseExpiresAt && p.showcaseExpiresAt > now)
+      );
+
+      totalShowcase = showcaseList.length;
+      total = totalAll;
+
+      // Rotate each group fairly and place showcase members first
+      const rotatedShowcase = this.applyDeterministicFairRotation(showcaseList, seedString);
+      const rotatedStandard = this.applyDeterministicFairRotation(standardList, `${seedString}-std`);
+
+      itemsToPaginate = [...rotatedShowcase, ...rotatedStandard];
+    }
 
     // Pagination
     const startIndex = (page - 1) * limit;
-    const paginatedItems = sorted.slice(startIndex, startIndex + limit);
+    const paginatedItems = itemsToPaginate.slice(startIndex, startIndex + limit);
 
     // Format for Public UI Safe Consumption
-    const items = paginatedItems.map((p) => ({
-      id: p.id,
-      isicepteProviderId: p.isicepteProviderId,
-      businessName: p.businessName,
-      slug: p.slug,
-      coverImageUrl: p.coverImageUrl || null,
-      city: p.city,
-      district: p.district || null,
-      address: p.address || null,
-      phone: p.phone || null,
-      isicepteProfileUrl: p.isicepteProfileUrl,
-      supportedBrands: Array.isArray(p.supportedBrands) ? p.supportedBrands : [],
-      serviceCategories: Array.isArray(p.serviceCategories) ? p.serviceCategories : [],
-      rating: p.rating || 0,
-      reviewCount: p.reviewCount || 0,
-      isShowcase: true,
-    }));
+    const items = paginatedItems.map((p) => {
+      const isShowcaseActiveNow = Boolean(
+        p.isShowcaseActive === true && p.showcaseExpiresAt && p.showcaseExpiresAt > now
+      );
+      return {
+        id: p.id,
+        isicepteProviderId: p.isicepteProviderId,
+        businessName: p.businessName,
+        slug: p.slug,
+        coverImageUrl: p.coverImageUrl || null,
+        city: p.city,
+        district: p.district || null,
+        address: p.address || null,
+        phone: p.phone || null,
+        isicepteProfileUrl: p.isicepteProfileUrl,
+        supportedBrands: Array.isArray(p.supportedBrands) ? p.supportedBrands : [],
+        serviceCategories: Array.isArray(p.serviceCategories) ? p.serviceCategories : [],
+        rating: p.rating || 0,
+        reviewCount: p.reviewCount || 0,
+        isShowcase: isShowcaseActiveNow,
+      };
+    });
 
-    // Collect available cities & brands from active showcase pool for filter dropdowns
-    const allActiveShowcase = await this.prisma.isiCepteProvider.findMany({
+    // Collect available cities & brands from active pool for filter dropdowns
+    const allActiveEligible = await this.prisma.isiCepteProvider.findMany({
       where: {
         isAutomotive: true,
         membershipStatus: 'ACTIVE',
         torqueScoutOptIn: true,
-        isShowcaseActive: true,
-        showcaseExpiresAt: { gt: now },
       },
       select: {
         city: true,
@@ -148,7 +196,7 @@ export class IsiCepteService implements OnModuleInit {
     const citySet = new Set<string>();
     const brandSet = new Set<string>();
 
-    for (const p of allActiveShowcase) {
+    for (const p of allActiveEligible) {
       if (p.city) citySet.add(p.city);
       if (Array.isArray(p.supportedBrands)) {
         p.supportedBrands.forEach((b) => brandSet.add(b));
@@ -162,9 +210,12 @@ export class IsiCepteService implements OnModuleInit {
       success: true,
       items,
       total,
+      totalShowcase,
+      totalAll,
       page,
       limit,
       totalPages: Math.ceil(total / limit) || 1,
+      scope,
       availableCities,
       availableBrands,
       canonicalCategories: CANONICAL_ISICEPTE_OTO_CATEGORIES,

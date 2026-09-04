@@ -13,8 +13,9 @@ export class IsiCepteController {
   @ApiQuery({ name: 'brand', required: false, description: 'Marka uzmanlık filtresi (örn: BMW)' })
   @ApiQuery({ name: 'category', required: false, description: 'Kategori filtresi (örn: Motor/Mekanik)' })
   @ApiQuery({ name: 'page', required: false, description: 'Sayfa no (default 1)' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Sayfa başına kayıt (default 12)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Sayfa başına kayıt (default 10)' })
   @ApiQuery({ name: 'seed', required: false, description: 'Adil rotasyon için seed' })
+  @ApiQuery({ name: 'scope', required: false, enum: ['SHOWCASE_ONLY', 'ALL_ELIGIBLE'], description: 'SHOWCASE_ONLY veya ALL_ELIGIBLE' })
   async getRecommendations(
     @Query('city') city?: string,
     @Query('brand') brand?: string,
@@ -22,6 +23,7 @@ export class IsiCepteController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('seed') seed?: string,
+    @Query('scope') scope?: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE',
   ) {
     return this.isiCepteService.getPublicRecommendations({
       city,
@@ -30,6 +32,7 @@ export class IsiCepteController {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       seed,
+      scope,
     });
   }
 

@@ -857,6 +857,7 @@ export default function ListingDetail() {
           {/* İŞİ CEPTE ÖNERİYOR (Orta Kolona, AI Analizi Kartının Altına Alındı) */}
           <IsiCepteListingRecommendationWidget
             vehicleBrand={listing.brand || vehicle?.brand?.name || "Bu Araç"}
+            initialUserCity={listing.city}
             listingId={listing.id}
             className="h-full flex-1"
           />

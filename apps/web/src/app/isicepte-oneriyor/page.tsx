@@ -58,9 +58,13 @@ function IsiCepteOneriyorContent() {
   const initialCity = searchParams.get("city") || "Tüm Şehirler";
   const initialBrand = searchParams.get("brand") || "Tüm Markalar";
   const initialCategory = searchParams.get("category") || "Tüm Kategoriler";
+  const initialScope = (searchParams.get("scope") as 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') || "SHOWCASE_ONLY";
 
   const [items, setItems] = useState<IsiCepteShowcaseItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalShowcase, setTotalShowcase] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
+  const [scope, setScope] = useState<'SHOWCASE_ONLY' | 'ALL_ELIGIBLE'>(initialScope);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -83,9 +87,12 @@ function IsiCepteOneriyorContent() {
   // Selected Provider Detail Modal
   const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteShowcaseItem | null>(null);
 
+  // Session seed for stable randomization per page view
+  const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
+
   // Update URL query parameters cleanly
   const syncUrlParams = useCallback(
-    (cityVal: string, brandVal: string, catVal: string) => {
+    (cityVal: string, brandVal: string, catVal: string, scopeVal: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') => {
       const params = new URLSearchParams();
       if (cityVal && cityVal !== "Tüm Şehirler") {
         params.set("city", cityVal);
@@ -95,6 +102,9 @@ function IsiCepteOneriyorContent() {
       }
       if (catVal && catVal !== "Tüm Kategoriler") {
         params.set("category", catVal);
+      }
+      if (scopeVal && scopeVal !== "SHOWCASE_ONLY") {
+        params.set("scope", scopeVal);
       }
       const qs = params.toString();
       const newUrl = qs ? `/isicepte-oneriyor?${qs}` : "/isicepte-oneriyor";
@@ -108,6 +118,7 @@ function IsiCepteOneriyorContent() {
     const qCity = searchParams.get("city") || "Tüm Şehirler";
     const qBrand = searchParams.get("brand") || "Tüm Markalar";
     const qCategory = searchParams.get("category") || "Tüm Kategoriler";
+    const qScope = (searchParams.get("scope") as 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') || "SHOWCASE_ONLY";
 
     setSelectedCity(qCity);
     setSelectedBrand(qBrand);
@@ -115,11 +126,18 @@ function IsiCepteOneriyorContent() {
     setAppliedCity(qCity);
     setAppliedBrand(qBrand);
     setAppliedCategory(qCategory);
+    setScope(qScope);
   }, [searchParams]);
 
-  // Fetch showcase recommendations from API
+  // Fetch recommendations from API
   const fetchRecommendations = useCallback(
-    async (cityVal: string, brandVal: string, catVal: string, pageNum: number) => {
+    async (
+      cityVal: string,
+      brandVal: string,
+      catVal: string,
+      scopeVal: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE',
+      pageNum: number
+    ) => {
       setLoading(true);
       try {
         const query = new URLSearchParams();
@@ -132,14 +150,18 @@ function IsiCepteOneriyorContent() {
         if (catVal && catVal !== "Tüm Kategoriler") {
           query.append("category", catVal);
         }
+        query.append("scope", scopeVal);
         query.append("page", pageNum.toString());
-        query.append("limit", "12");
+        query.append("limit", scopeVal === "SHOWCASE_ONLY" ? "10" : "12");
+        query.append("seed", sessionSeed);
 
         const res = await fetch(`${API_BASE_URL}/isicepte/recommendations?${query.toString()}`);
         if (res.ok) {
           const data = await res.json();
           setItems(data.items || []);
           setTotalCount(data.total || 0);
+          setTotalShowcase(data.totalShowcase || 0);
+          setTotalAll(data.totalAll || 0);
           setTotalPages(data.totalPages || 1);
 
           if (Array.isArray(data.availableCities) && data.availableCities.length > 0) {
@@ -158,28 +180,35 @@ function IsiCepteOneriyorContent() {
                 eventType: "ISICEPTE_SHOWCASE_IMPRESSION",
                 city: cityVal !== "Tüm Şehirler" ? cityVal : undefined,
                 brand: brandVal !== "Tüm Markalar" ? brandVal : undefined,
-                metadata: catVal !== "Tüm Kategoriler" ? { category: catVal } : undefined,
+                metadata: {
+                  category: catVal !== "Tüm Kategoriler" ? catVal : undefined,
+                  scope: scopeVal,
+                },
               }),
             }).catch(() => {});
           }
         } else {
           setItems([]);
           setTotalCount(0);
+          setTotalShowcase(0);
+          setTotalAll(0);
         }
       } catch (e) {
-        console.error("Failed to load showcase providers:", e);
+        console.error("Failed to load providers:", e);
         setItems([]);
         setTotalCount(0);
+        setTotalShowcase(0);
+        setTotalAll(0);
       } finally {
         setLoading(false);
       }
     },
-    []
+    [sessionSeed]
   );
 
   useEffect(() => {
-    fetchRecommendations(appliedCity, appliedBrand, appliedCategory, page);
-  }, [appliedCity, appliedBrand, appliedCategory, page, fetchRecommendations]);
+    fetchRecommendations(appliedCity, appliedBrand, appliedCategory, scope, page);
+  }, [appliedCity, appliedBrand, appliedCategory, scope, page, fetchRecommendations]);
 
   const handleApplyFilters = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -187,28 +216,28 @@ function IsiCepteOneriyorContent() {
     setAppliedCity(selectedCity);
     setAppliedBrand(selectedBrand);
     setAppliedCategory(selectedCategory);
-    syncUrlParams(selectedCity, selectedBrand, selectedCategory);
+    syncUrlParams(selectedCity, selectedBrand, selectedCategory, scope);
   };
 
   const handleClearCityFilter = () => {
     setSelectedCity("Tüm Şehirler");
     setAppliedCity("Tüm Şehirler");
     setPage(1);
-    syncUrlParams("Tüm Şehirler", appliedBrand, appliedCategory);
+    syncUrlParams("Tüm Şehirler", appliedBrand, appliedCategory, scope);
   };
 
   const handleClearBrandFilter = () => {
     setSelectedBrand("Tüm Markalar");
     setAppliedBrand("Tüm Markalar");
     setPage(1);
-    syncUrlParams(appliedCity, "Tüm Markalar", appliedCategory);
+    syncUrlParams(appliedCity, "Tüm Markalar", appliedCategory, scope);
   };
 
   const handleClearCategoryFilter = () => {
     setSelectedCategory("Tüm Kategoriler");
     setAppliedCategory("Tüm Kategoriler");
     setPage(1);
-    syncUrlParams(appliedCity, appliedBrand, "Tüm Kategoriler");
+    syncUrlParams(appliedCity, appliedBrand, "Tüm Kategoriler", scope);
   };
 
   const handleClearAllFilters = () => {
@@ -219,7 +248,13 @@ function IsiCepteOneriyorContent() {
     setAppliedBrand("Tüm Markalar");
     setAppliedCategory("Tüm Kategoriler");
     setPage(1);
-    syncUrlParams("Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler");
+    syncUrlParams("Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler", scope);
+  };
+
+  const handleToggleScope = (newScope: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') => {
+    setScope(newScope);
+    setPage(1);
+    syncUrlParams(appliedCity, appliedBrand, appliedCategory, newScope);
   };
 
   const handleOpenDetailModal = (provider: IsiCepteShowcaseItem) => {
@@ -259,28 +294,28 @@ function IsiCepteOneriyorContent() {
     const hasBrand = appliedBrand !== "Tüm Markalar";
     const hasCat = appliedCategory !== "Tüm Kategoriler";
 
+    let descriptor = "";
     if (hasCity && hasBrand && hasCat) {
-      return `${appliedCity} şehrinde ${appliedBrand} için ${appliedCategory} hizmeti veren vitrin üyeleri`;
+      descriptor = `${appliedCity} şehrinde ${appliedBrand} için ${appliedCategory} hizmeti veren`;
+    } else if (hasCity && hasBrand) {
+      descriptor = `${appliedCity} şehrinde ${appliedBrand} uzmanı`;
+    } else if (hasCity && hasCat) {
+      descriptor = `${appliedCity} şehrinde ${appliedCategory} hizmeti veren`;
+    } else if (hasBrand && hasCat) {
+      descriptor = `${appliedBrand} için ${appliedCategory} hizmeti veren`;
+    } else if (hasCity) {
+      descriptor = `${appliedCity} şehrindeki`;
+    } else if (hasBrand) {
+      descriptor = `${appliedBrand} uzmanı`;
+    } else if (hasCat) {
+      descriptor = `${appliedCategory} hizmeti veren`;
     }
-    if (hasCity && hasBrand) {
-      return `${appliedCity} şehrinde ${appliedBrand} uzmanı vitrin üyeleri`;
+
+    if (scope === "SHOWCASE_ONLY") {
+      return descriptor ? `${descriptor} vitrin üyeleri` : "Tüm Vitrin Üyeleri";
+    } else {
+      return descriptor ? `${descriptor} tüm ustalar ve servisler` : "Tüm Ustalar ve Servisler";
     }
-    if (hasCity && hasCat) {
-      return `${appliedCity} şehrinde ${appliedCategory} hizmeti veren vitrin üyeleri`;
-    }
-    if (hasBrand && hasCat) {
-      return `${appliedBrand} için ${appliedCategory} hizmeti veren vitrin üyeleri`;
-    }
-    if (hasCity) {
-      return `${appliedCity} şehrindeki vitrin üyeleri`;
-    }
-    if (hasBrand) {
-      return `${appliedBrand} uzmanı vitrin üyeleri`;
-    }
-    if (hasCat) {
-      return `${appliedCategory} hizmeti veren vitrin üyeleri`;
-    }
-    return "Tüm Vitrin Üyeleri";
   };
 
   return (
@@ -293,16 +328,38 @@ function IsiCepteOneriyorContent() {
             İşiCepte Öneriyor
           </h1>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Sadece aktif vitrin üyeleri arasından otomotiv ustalarını ve servisleri keşfedin.
+            {scope === "SHOWCASE_ONLY"
+              ? "Sadece aktif vitrin üyeleri arasından öne çıkan otomotiv ustalarını ve servisleri keşfedin."
+              : "TorqueScout onaylı tüm aktif İşiCepte otomotiv servislerini ve vitrin üyelerini keşfedin."}
           </p>
 
-          {/* Informative non-clickable chips */}
+          {/* Informative chips & view mode selector */}
           <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold select-none">
-              <ShieldCheck className="w-3.5 h-3.5" /> Sadece Vitrin Üyeleri
-            </span>
+            <button
+              type="button"
+              onClick={() => handleToggleScope("SHOWCASE_ONLY")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                scope === "SHOWCASE_ONLY"
+                  ? "bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 text-orange-400 font-bold shadow-sm"
+                  : "bg-white/5 border border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>👑 Vitrin Üyeleri {totalShowcase > 0 ? `(${totalShowcase})` : ""}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleScope("ALL_ELIGIBLE")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                scope === "ALL_ELIGIBLE"
+                  ? "bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold shadow-sm"
+                  : "bg-white/5 border border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🛠️ Tüm Ustaları Gör {totalAll > 0 ? `(${totalAll})` : ""}</span>
+            </button>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold select-none">
-              <Shuffle className="w-3.5 h-3.5" /> Rastgele Listeleme
+              <Shuffle className="w-3.5 h-3.5" /> Adil Sıralama
             </span>
           </div>
         </div>
@@ -378,18 +435,29 @@ function IsiCepteOneriyorContent() {
       </div>
 
       {/* Filtered Mode Context Bar & Chips */}
-      {isFiltered && (
+      {(isFiltered || scope === "ALL_ELIGIBLE") && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-white/10 animate-in fade-in duration-200">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-sm sm:text-base font-bold text-white">
               {getContextualSummaryTitle()}
             </h2>
             <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 text-xs font-mono font-bold">
-              {totalCount} sonuç
+              {scope === "SHOWCASE_ONLY" ? `${totalCount} vitrin üyesi` : `${totalCount} toplam işletme`}
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Scope Mode Indicator */}
+            {scope === "ALL_ELIGIBLE" && (
+              <button
+                type="button"
+                onClick={() => handleToggleScope("SHOWCASE_ONLY")}
+                className="px-3 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>← Sadece Vitrin Üyeleri</span>
+              </button>
+            )}
+
             {/* City Chip */}
             {appliedCity !== "Tüm Şehirler" && (
               <button
@@ -426,13 +494,15 @@ function IsiCepteOneriyorContent() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleClearAllFilters}
-              className="text-xs text-slate-400 hover:text-white underline font-semibold transition cursor-pointer ml-2"
-            >
-              Filtreleri Temizle
-            </button>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleClearAllFilters}
+                className="text-xs text-slate-400 hover:text-white underline font-semibold transition cursor-pointer ml-2"
+              >
+                Filtreleri Temizle
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -441,7 +511,9 @@ function IsiCepteOneriyorContent() {
       {loading && (
         <div className="py-24 flex flex-col items-center justify-center gap-3">
           <RefreshCw className="w-8 h-8 text-orange-500 animate-spin" />
-          <span className="text-xs text-slate-400 font-semibold">Vitrin üyeleri yükleniyor...</span>
+          <span className="text-xs text-slate-400 font-semibold">
+            {scope === "SHOWCASE_ONLY" ? "Vitrin üyeleri yükleniyor..." : "Tüm ustalar ve servisler yükleniyor..."}
+          </span>
         </div>
       )}
 
@@ -453,135 +525,177 @@ function IsiCepteOneriyorContent() {
           </div>
           <div className="space-y-1">
             <h3 className="text-base font-bold text-white">
-              {isFiltered
+              {scope === "SHOWCASE_ONLY"
+                ? "Bu filtrelere uygun aktif Vitrin üyesi bulunmuyor."
+                : isFiltered
                 ? "Seçtiğiniz şehir, marka ve kategoriye uygun işletme bulunamadı."
-                : "Şu anda İşiCepte Öneriyor bölümünde aktif vitrin üyesi bulunmuyor."}
+                : "Şu anda İşiCepte Öneriyor bölümünde aktif işletme bulunmuyor."}
             </h3>
             <p className="text-xs text-slate-400">
-              {isFiltered
-                ? "Filtreleri değiştirerek veya temizleyerek diğer vitrin üyelerini görebilirsiniz."
-                : "Yeni vitrin üyesi otomotiv servisleri eklendikçe burada listelenecektir."}
+              {scope === "SHOWCASE_ONLY" && totalAll > 0
+                ? `Bu filtrelerle eşleşen ${totalAll} standart usta ve servis bulunuyor. "Tüm Ustaları Gör" butonuna tıklayarak erişebilirsiniz.`
+                : isFiltered
+                ? "Filtreleri değiştirerek veya temizleyerek diğer servisleri görebilirsiniz."
+                : "Yeni üye otomotiv servisleri eklendikçe burada listelenecektir."}
             </p>
           </div>
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={handleClearAllFilters}
-              className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition cursor-pointer shadow-lg shadow-orange-600/20"
-            >
-              Tüm Vitrin Üyelerini Göster
-            </button>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {scope === "SHOWCASE_ONLY" && totalAll > 0 && (
+              <button
+                type="button"
+                onClick={() => handleToggleScope("ALL_ELIGIBLE")}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition cursor-pointer shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
+              >
+                <span>Tüm Ustaları Gör ({totalAll} İşletme)</span>
+                <span>➔</span>
+              </button>
+            )}
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleClearAllFilters}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer border border-white/10"
+              >
+                Filtreleri Temizle
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Provider Cards Grid (3 Columns Desktop, 2 Tablet, 1 Mobile) */}
       {!loading && items.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-          {items.map((provider) => (
-            <div
-              key={provider.id}
-              className="rounded-3xl bg-[#0b101e]/90 border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl overflow-hidden flex flex-col justify-between group"
-            >
-              {/* Card Top: Cover Image Area & Showcase Badge */}
-              <div>
-                <div className="relative h-48 w-full bg-slate-950 overflow-hidden flex items-center justify-center">
-                  {provider.coverImageUrl ? (
-                    <img
-                      src={provider.coverImageUrl}
-                      alt={provider.businessName}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex flex-col items-center justify-center text-slate-600 gap-2">
-                      <Wrench className="w-8 h-8 text-slate-500" />
-                      <span className="text-[11px] font-medium text-slate-400">İşiCepte Otomotiv Servisi</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b101e] via-transparent to-black/40" />
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+            {items.map((provider) => (
+              <div
+                key={provider.id}
+                className="rounded-3xl bg-[#0b101e]/90 border border-white/10 hover:border-white/20 transition-all duration-300 shadow-xl overflow-hidden flex flex-col justify-between group"
+              >
+                {/* Card Top: Cover Image Area & Showcase Badge */}
+                <div>
+                  <div className="relative h-48 w-full bg-slate-950 overflow-hidden flex items-center justify-center">
+                    {provider.coverImageUrl ? (
+                      <img
+                        src={provider.coverImageUrl}
+                        alt={provider.businessName}
+                        className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex flex-col items-center justify-center text-slate-600 gap-2">
+                        <Wrench className="w-8 h-8 text-slate-500" />
+                        <span className="text-[11px] font-medium text-slate-400">İşiCepte Otomotiv Servisi</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b101e] via-transparent to-black/40" />
 
-                  {/* Vitrin Üyesi Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[11px] font-black shadow-lg uppercase tracking-wider">
-                      👑 Vitrin Üyesi
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card Content */}
-                <div className="p-6 space-y-3.5">
-                  {/* Header: Name and Real Rating */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-lg font-bold text-white tracking-tight line-clamp-1">
-                      {provider.businessName}
-                    </h3>
-                    {provider.rating > 0 && (
-                      <div className="text-right shrink-0">
-                        <div className="flex items-center justify-end gap-1 text-orange-400 font-bold text-sm">
-                          <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
-                          <span>{provider.rating.toFixed(1)}</span>
-                        </div>
-                        {provider.reviewCount > 0 && (
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {provider.reviewCount} değerlendirme
-                          </div>
-                        )}
+                    {/* Vitrin Üyesi Badge (Only if real showcase active entitlement) */}
+                    {provider.isShowcase && (
+                      <div className="absolute top-3 left-3">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[11px] font-black shadow-lg uppercase tracking-wider">
+                          👑 Vitrin Üyesi
+                        </span>
                       </div>
                     )}
                   </div>
 
-                  {/* Location */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>
-                      {provider.city} {provider.district ? `/ ${provider.district}` : ""}
-                    </span>
+                  {/* Card Content */}
+                  <div className="p-6 space-y-3.5">
+                    {/* Header: Name and Real Rating */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-lg font-bold text-white tracking-tight line-clamp-1">
+                        {provider.businessName}
+                      </h3>
+                      {provider.rating > 0 && (
+                        <div className="text-right shrink-0">
+                          <div className="flex items-center justify-end gap-1 text-orange-400 font-bold text-sm">
+                            <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
+                            <span>{provider.rating.toFixed(1)}</span>
+                          </div>
+                          {provider.reviewCount > 0 && (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {provider.reviewCount} değerlendirme
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>
+                        {provider.city} {provider.district ? `/ ${provider.district}` : ""}
+                      </span>
+                    </div>
+
+                    {/* Supported Brands */}
+                    {provider.supportedBrands && provider.supportedBrands.length > 0 && (
+                      <div className="text-xs text-slate-300 font-medium">
+                        {provider.supportedBrands.join(" • ")}
+                      </div>
+                    )}
+
+                    {/* Canonical Service Categories Chips */}
+                    {provider.serviceCategories && provider.serviceCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {provider.serviceCategories.map((cat, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/5 text-slate-300 text-[11px] font-medium"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                </div>
 
-                  {/* Supported Brands */}
-                  {provider.supportedBrands && provider.supportedBrands.length > 0 && (
-                    <div className="text-xs text-slate-300 font-medium">
-                      {provider.supportedBrands.join(" • ")}
-                    </div>
-                  )}
-
-                  {/* Canonical Service Categories Chips */}
-                  {provider.serviceCategories && provider.serviceCategories.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {provider.serviceCategories.map((cat, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/5 text-slate-300 text-[11px] font-medium"
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                {/* Card Actions */}
+                <div className="p-6 pt-0 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDetailModal(provider)}
+                    className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition text-center shadow-lg shadow-orange-600/20 cursor-pointer"
+                  >
+                    Profili Gör
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOutboundClick(provider)}
+                    className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>İşiCepte&apos;de Aç</span>
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Card Actions */}
-              <div className="p-6 pt-0 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleOpenDetailModal(provider)}
-                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition text-center shadow-lg shadow-orange-600/20 cursor-pointer"
-                >
-                  Profili Gör
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOutboundClick(provider)}
-                  className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>İşiCepte&apos;de Aç</span>
-                </button>
+          {/* Under Vitrin Section CTA: "TÜM USTALARI GÖR" Button in Showcase View */}
+          {scope === "SHOWCASE_ONLY" && totalAll > 0 && (
+            <div className="p-6 rounded-3xl bg-slate-900/50 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <h3 className="text-base font-extrabold text-white">
+                  Tüm Ustaları ve Servisleri Görün
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Aynı filtre kriterlerine uyan toplam {totalAll} adet kayıtlı işletme bulunmaktadır.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => handleToggleScope("ALL_ELIGIBLE")}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition cursor-pointer shadow-lg shadow-blue-600/25 shrink-0 flex items-center gap-2"
+              >
+                <span>Tüm Ustaları Gör ({totalAll})</span>
+                <span>➔</span>
+              </button>
             </div>
-          ))}
+          )}
         </div>
       )}
 
