@@ -27,6 +27,8 @@ import {
   Tag,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
+import { resolveEffectiveListingStatus, matchesSellerListingFilter } from '@/utils/listingStatusResolver';
+import { AdminListingInspectionModal } from './AdminListingInspectionModal';
 
 interface AdminUserDrawerProps {
   userId: string | null;
@@ -53,10 +55,8 @@ export function AdminUserDrawer({
   // Listing filter inside drawer
   const [listingFilter, setListingFilter] = useState<string>('ALL');
 
-  // Full Read-Only Inspection Screen State
-  const [viewingListingDetail, setViewingListingDetail] = useState<any>(null);
-  const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
-  const [showLightbox, setShowLightbox] = useState<boolean>(false);
+  // Selected Listing Inspection Modal State
+  const [selectedInspectionListingId, setSelectedInspectionListingId] = useState<string | null>(null);
 
   // Moderation Action Reason Modal State
   const [moderationActionListing, setModerationActionListing] = useState<any>(null);
@@ -153,24 +153,10 @@ export function AdminUserDrawer({
 
   if (!isOpen) return null;
 
-  // Open Full Read-Only Listing Inspection Screen
-  const handleOpenFullInspection = async (listing: any) => {
+  // Open Full Listing Inspection Screen via canonical modal
+  const handleOpenFullInspection = (listing: any) => {
     setActiveMenuId(null);
-    const token = localStorage.getItem('accessToken');
-    try {
-      const res = await fetch(`${API_BASE_URL}/admin/listing-moderation/listings/${listing.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const fullData = await res.json();
-        setViewingListingDetail({ ...fullData, rawListing: listing });
-        setActiveImageIdx(0);
-      } else {
-        setViewingListingDetail({ listing: listing, rawListing: listing });
-      }
-    } catch (e) {
-      setViewingListingDetail({ listing: listing, rawListing: listing });
-    }
+    setSelectedInspectionListingId(listing.id);
   };
 
   // Moderation Action Handler
@@ -231,7 +217,7 @@ export function AdminUserDrawer({
 
       setModerationActionListing(null);
       setModerationActionType(null);
-      setViewingListingDetail(null);
+      setSelectedInspectionListingId(null);
 
       // Instant refetch without full page reload
       await fetchUserData();
@@ -380,7 +366,7 @@ export function AdminUserDrawer({
   // Remaining Entitlements Calculation
   const userListings = user?.listings || [];
   const listingsRight = {
-    used: userListings.filter((l: any) => l.status === 'ACTIVE').length,
+    used: userListings.filter((l: any) => resolveEffectiveListingStatus(l).effectiveStatus === 'ACTIVE').length,
     totalLimit: subscription?.limits?.activeListings || (user?.subscriptionTier === 'PROFESYONEL' ? 50 : user?.subscriptionTier === 'YETKIN' ? 10 : 1),
   };
 
@@ -389,11 +375,8 @@ export function AdminUserDrawer({
     totalLimit: subscription?.limits?.aiReports || (user?.subscriptionTier === 'PROFESYONEL' ? 50 : user?.subscriptionTier === 'YETKIN' ? 10 : 3),
   };
 
-  // Filtered Listings for İlanlar Tab
-  const filteredListings = userListings.filter((l: any) => {
-    if (listingFilter === 'ALL') return true;
-    return l.status === listingFilter;
-  });
+  // Filtered Listings for İlanlar Tab using canonical filter predicate
+  const filteredListings = userListings.filter((l: any) => matchesSellerListingFilter(l, listingFilter));
 
   return (
     <div className="relative z-50 font-sans">
@@ -640,31 +623,50 @@ export function AdminUserDrawer({
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Kullanıcının İlanları</h3>
-                      <span className="text-xs font-mono font-bold text-orange-400">Toplam: {userListings.length}</span>
+                      <span className="text-xs font-mono font-bold text-orange-400">Toplam: {filteredListings.length}</span>
                     </div>
 
-                    {/* STATUS FILTER BUTTONS */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold scrollbar-none">
-                      {[
-                        { key: 'ALL', label: 'Tümü' },
-                        { key: 'ACTIVE', label: 'Aktif' },
-                        { key: 'PENDING', label: 'Bekleyen' },
-                        { key: 'PASSIVE', label: 'Pasif' },
-                        { key: 'REJECTED', label: 'Reddedilen' },
-                      ].map((st) => (
-                        <button
-                          key={st.key}
-                          onClick={() => setListingFilter(st.key)}
-                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${
-                            listingFilter === st.key
-                              ? 'bg-orange-500 text-white font-bold'
-                              : 'bg-slate-900 text-slate-400 hover:text-white border border-white/5'
-                          }`}
-                        >
-                          {st.label}
-                        </button>
-                      ))}
-                    </div>
+                    {/* STATUS FILTER BUTTONS WITH CANONICAL COUNTS */}
+                    {(() => {
+                      const filterCounts: Record<string, number> = {
+                        ALL: userListings.length,
+                        ACTIVE: userListings.filter((l: any) => matchesSellerListingFilter(l, 'ACTIVE')).length,
+                        PENDING: userListings.filter((l: any) => matchesSellerListingFilter(l, 'PENDING')).length,
+                        PASSIVE: userListings.filter((l: any) => matchesSellerListingFilter(l, 'PASSIVE')).length,
+                        REJECTED: userListings.filter((l: any) => matchesSellerListingFilter(l, 'REJECTED')).length,
+                      };
+
+                      return (
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold scrollbar-none">
+                          {[
+                            { key: 'ALL', label: 'Tümü' },
+                            { key: 'ACTIVE', label: 'Aktif' },
+                            { key: 'PENDING', label: 'Bekleyen' },
+                            { key: 'PASSIVE', label: 'Pasif' },
+                            { key: 'REJECTED', label: 'Reddedilen' },
+                          ].map((st) => (
+                            <button
+                              key={st.key}
+                              onClick={() => setListingFilter(st.key)}
+                              className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                                listingFilter === st.key
+                                  ? 'bg-orange-500 text-white font-bold'
+                                  : 'bg-slate-900 text-slate-400 hover:text-white border border-white/5'
+                              }`}
+                            >
+                              <span>{st.label}</span>
+                              <span
+                                className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
+                                  listingFilter === st.key ? 'bg-white/25 text-white font-bold' : 'bg-slate-950 text-slate-400'
+                                }`}
+                              >
+                                {filterCounts[st.key] ?? 0}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* LISTINGS CARDS */}
                     <div className="space-y-2.5 text-xs">
@@ -674,11 +676,13 @@ export function AdminUserDrawer({
                           const modelName = l.vehicleVariant?.model?.name || l.customModel || '';
                           const trimName = l.vehicleVariant?.trim?.name || l.customEngine || '';
                           const vehicleTitle = l.title || `${l.modelYear || ''} ${brandName} ${modelName}`.trim() || 'Araç İlanı';
+                          const statusInfo = resolveEffectiveListingStatus(l);
 
                           return (
                             <div
                               key={l.id}
-                              className="p-3.5 bg-slate-900/70 rounded-2xl border border-white/5 space-y-2.5 hover:border-white/20 transition relative group"
+                              onClick={() => handleOpenFullInspection(l)}
+                              className="p-3.5 bg-slate-900/70 rounded-2xl border border-white/5 space-y-2.5 hover:border-orange-500/30 transition relative group cursor-pointer"
                             >
                               <div className="flex justify-between items-start">
                                 <div>
@@ -689,50 +693,38 @@ export function AdminUserDrawer({
                                   <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{trimName}</span>
                                 </div>
 
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                   <span
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
-                                      l.status === 'ACTIVE'
-                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                        : l.status === 'REJECTED'
-                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                        : l.status === 'PENDING'
-                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                                        : 'bg-slate-800 text-slate-400'
-                                    }`}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${statusInfo.badgeClass}`}
                                   >
-                                    {l.status}
+                                    {statusInfo.label}
                                   </span>
 
                                   {/* DROPDOWN ACTION MENU */}
                                   <div className="relative">
                                     <button
-                                      onClick={() => setActiveMenuId(activeMenuId === l.id ? null : l.id)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveMenuId(activeMenuId === l.id ? null : l.id);
+                                      }}
                                       className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
                                     >
                                       <MoreVertical className="w-4 h-4" />
                                     </button>
 
                                     {activeMenuId === l.id && (
-                                      <div className="absolute right-0 top-7 z-40 w-52 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1">
+                                      <div
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="absolute right-0 top-7 z-40 w-52 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1"
+                                      >
                                         <button
                                           onClick={() => handleOpenFullInspection(l)}
-                                          className="w-full text-left px-3 py-1.5 text-slate-200 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                          className="w-full text-left px-3 py-1.5 text-orange-400 hover:bg-orange-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
                                         >
-                                          <Eye className="w-3.5 h-3.5 text-orange-400" /> İlanı Gör (Read-Only)
+                                          <Eye className="w-3.5 h-3.5" /> İlanı İncele
                                         </button>
 
-                                        <button
-                                          onClick={() => {
-                                            setActiveMenuId(null);
-                                            setActiveTab('OVERVIEW');
-                                          }}
-                                          className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <MessageSquare className="w-3.5 h-3.5" /> Kullanıcıyı Gör
-                                        </button>
-
-                                        {l.status === 'PENDING' && (
+                                        {statusInfo.isPending && (
                                           <>
                                             <button
                                               onClick={() => handleTriggerModerationAction(l, 'APPROVE')}
@@ -761,7 +753,7 @@ export function AdminUserDrawer({
                                           </>
                                         )}
 
-                                        {l.status === 'ACTIVE' && (
+                                        {statusInfo.isActive && (
                                           <button
                                             onClick={() => handleTriggerModerationAction(l, 'PASSIVE')}
                                             className="w-full text-left px-3 py-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
@@ -770,7 +762,7 @@ export function AdminUserDrawer({
                                           </button>
                                         )}
 
-                                        {l.status === 'PASSIVE' && (
+                                        {statusInfo.effectiveStatus === 'PASSIVE' && (
                                           <button
                                             onClick={() => handleTriggerModerationAction(l, 'ACTIVATE')}
                                             className="w-full text-left px-3 py-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
@@ -779,7 +771,7 @@ export function AdminUserDrawer({
                                           </button>
                                         )}
 
-                                        {l.status === 'REJECTED' && (
+                                        {statusInfo.effectiveStatus === 'REJECTED' && (
                                           <button
                                             onClick={() => handleTriggerModerationAction(l, 'REOPEN')}
                                             className="w-full text-left px-3 py-1.5 text-cyan-400 hover:bg-cyan-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
@@ -790,9 +782,9 @@ export function AdminUserDrawer({
 
                                         <button
                                           onClick={() => handleOpenListingHistory(l)}
-                                          className="w-full text-left px-3 py-1.5 text-slate-400 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer border-t border-white/5 pt-1.5"
+                                          className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
                                         >
-                                          <History className="w-3.5 h-3.5" /> Moderasyon Geçmişi
+                                          <History className="w-3.5 h-3.5 text-slate-400" /> Moderasyon Geçmişi
                                         </button>
                                       </div>
                                     )}
@@ -800,20 +792,21 @@ export function AdminUserDrawer({
                                 </div>
                               </div>
 
-                              <div className="flex justify-between items-center pt-2 border-t border-white/5 font-mono text-[11px]">
-                                <span className="font-bold text-emerald-400 text-xs">
+                              <div className="flex items-center justify-between pt-2 border-t border-white/5 font-mono text-[11px]">
+                                <span className="font-bold text-white">
                                   ₺{Number(l.priceAmount || 0).toLocaleString('tr-TR')}
                                 </span>
-                                <div className="text-right text-[10px] text-slate-500">
-                                  <span>{l.city ? `${l.city}, ${l.district || ''}` : 'Şehir Yok'}</span> •{' '}
-                                  <span>{new Date(l.createdAt).toLocaleDateString('tr-TR')}</span>
-                                </div>
+                                <span className="text-slate-400">
+                                  {l.city ? `${l.city}, ${l.district || ''}` : 'Şehir Belirtilmedi'}
+                                  {' • '}
+                                  {new Date(l.createdAt).toLocaleDateString('tr-TR')}
+                                </span>
                               </div>
                             </div>
                           );
                         })
                       ) : (
-                        <div className="p-10 text-center text-slate-500 text-xs font-medium">
+                        <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-white/5 text-slate-500">
                           Bu sekmede gösterilecek ilan kaydı bulunmuyor.
                         </div>
                       )}
@@ -937,243 +930,20 @@ export function AdminUserDrawer({
               Kapat
             </button>
           </div>
+          {/* CANONICAL ADMIN LISTING INSPECTION MODAL */}
+          <AdminListingInspectionModal
+            listingId={selectedInspectionListingId}
+            isOpen={!!selectedInspectionListingId}
+            onClose={() => setSelectedInspectionListingId(null)}
+            onRefresh={async () => {
+              await fetchUserData();
+              if (onRefresh) onRefresh();
+            }}
+          />
         </aside>
       </div>
 
-      {/* NESTED MODAL 1: FULL READ-ONLY INSPECTION SCREEN MODAL */}
-      {viewingListingDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-          <div className="w-full max-w-4xl bg-[#0b0f19] border border-white/10 rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl font-sans text-xs my-auto max-h-[90vh] flex flex-col">
-            {/* INSPECTION HEADER */}
-            <div className="flex justify-between items-start pb-4 border-b border-white/10 shrink-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-orange-400 font-bold uppercase tracking-wider">
-                    İLAN NO: {viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
-                      (viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status) === 'ACTIVE'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                    }`}
-                  >
-                    {viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status}
-                  </span>
 
-                  {(viewingListingDetail.listing?.status === 'ACTIVE' || viewingListingDetail.rawListing?.status === 'ACTIVE') && (
-                    <a
-                      href={`/listings/${viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1 text-orange-400 hover:underline font-bold text-[11px] ml-2"
-                    >
-                      <span>Canlı İlanı Aç</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
-                <h2 className="text-lg md:text-xl font-black text-white mt-1">
-                  {viewingListingDetail.listing?.title || viewingListingDetail.rawListing?.title || 'Araç İlan Detayı'}
-                </h2>
-              </div>
-
-              <button
-                onClick={() => setViewingListingDetail(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* INSPECTION SCROLLABLE BODY */}
-            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-              {/* PHOTO GALLERY */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-orange-400" /> İlan Fotoğrafları ({viewingListingDetail.media?.length || 0})
-                </h3>
-
-                {viewingListingDetail.media && viewingListingDetail.media.length > 0 ? (
-                  <div className="space-y-2">
-                    <div
-                      onClick={() => setShowLightbox(true)}
-                      className="relative h-64 md:h-80 w-full bg-slate-950 rounded-2xl overflow-hidden border border-white/10 cursor-pointer group"
-                    >
-                      <img
-                        src={viewingListingDetail.media[activeImageIdx]?.url || '/placeholder.png'}
-                        alt="Listing Cover"
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      />
-                      <div className="absolute bottom-3 right-3 bg-black/75 backdrop-blur-md px-3 py-1 rounded-xl text-xs font-mono font-bold text-white flex items-center gap-1">
-                        <Eye className="w-3.5 h-3.5 text-orange-400" /> Büyük İncele ({activeImageIdx + 1}/{viewingListingDetail.media.length})
-                      </div>
-                    </div>
-
-                    {/* THUMBNAILS */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                      {viewingListingDetail.media.map((m: any, idx: number) => (
-                        <button
-                          key={m.id || idx}
-                          onClick={() => setActiveImageIdx(idx)}
-                          className={`w-16 h-16 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
-                            activeImageIdx === idx ? 'border-orange-500 scale-95' : 'border-white/10 opacity-60 hover:opacity-100'
-                          }`}
-                        >
-                          <img src={m.url} alt="thumb" className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center bg-slate-950 rounded-2xl border border-white/5 text-slate-500 font-medium">
-                    Fotoğraf mevcut değil.
-                  </div>
-                )}
-              </div>
-
-              {/* MAIN DETAILS & SPECS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* ANA FİYAT & KONUM */}
-                <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-3 font-mono">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Fiyat & Konum</span>
-                  <div className="text-2xl font-black text-emerald-400">
-                    ₺{Number(viewingListingDetail.listing?.price || viewingListingDetail.rawListing?.priceAmount || 0).toLocaleString('tr-TR')}
-                  </div>
-                  <div className="text-slate-300 font-sans text-xs">
-                    {viewingListingDetail.listing?.city || viewingListingDetail.rawListing?.city || 'Şehir Belirtilmedi'}, {viewingListingDetail.listing?.district || viewingListingDetail.rawListing?.district || ''}
-                  </div>
-                </div>
-
-                {/* ARAÇ SPECS SUMMARY */}
-                <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-2 text-xs">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block font-mono">Temel Özellikler</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><span className="text-slate-400">Marka/Model:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.brand || ''} {viewingListingDetail.listing?.model || ''}</strong></div>
-                    <div><span className="text-slate-400">Model Yılı:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.year || viewingListingDetail.rawListing?.modelYear || '-'}</strong></div>
-                    <div><span className="text-slate-400">Yakıt / Şanzıman:</span> <strong className="text-white font-bold block">{viewingListingDetail.listing?.fuelType || 'BENZİN'} / {viewingListingDetail.listing?.transmission || 'OTOMATİK'}</strong></div>
-                    <div><span className="text-slate-400">Kilometre:</span> <strong className="text-white font-bold block font-mono">{Number(viewingListingDetail.listing?.mileage || viewingListingDetail.rawListing?.kilometers || 0).toLocaleString('tr-TR')} km</strong></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SATICI AÇIKLAMASI (FULL DESCRIPTION) */}
-              <div className="p-5 bg-slate-900/60 rounded-2xl border border-white/5 space-y-2">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Satıcı Açıklaması (Tam Metin)</h4>
-                <p className="text-slate-200 leading-relaxed whitespace-pre-line text-xs font-sans">
-                  {viewingListingDetail.listing?.description || viewingListingDetail.rawListing?.description || 'Açıklama girilmemiş.'}
-                </p>
-              </div>
-
-              {/* ADMIN-ONLY TECHNICAL METADATA SECTION */}
-              <div className="p-5 bg-slate-950 rounded-2xl border border-white/10 space-y-3 font-mono text-xs">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider font-sans flex items-center gap-2">
-                  <Info className="w-4 h-4" /> Yönetici & Sistem Bilgileri (Admin-Only)
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-                  <div><span className="text-slate-500">Listing UUID:</span> <code className="text-slate-300 font-bold block">{viewingListingDetail.listing?.id || viewingListingDetail.rawListing?.id}</code></div>
-                  <div><span className="text-slate-500">Seller User ID:</span> <code className="text-slate-300 font-bold block">{viewingListingDetail.seller?.userId || viewingListingDetail.rawListing?.sellerId}</code></div>
-                  <div><span className="text-slate-500">Oluşturulma Tarihi:</span> <span className="text-slate-300 block">{new Date(viewingListingDetail.listing?.createdAt || viewingListingDetail.rawListing?.createdAt || Date.now()).toLocaleString('tr-TR')}</span></div>
-                  <div><span className="text-slate-500">Aktifleştirilebilir mi?:</span> <span className="text-emerald-400 font-bold block">{viewingListingDetail.canReactivate ? 'EVET' : 'HAYIR'}</span></div>
-                </div>
-                {viewingListingDetail.reactivationBlockedReason && (
-                  <div className="p-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-[10px]">
-                    <strong>Aktifleştirme Engeli:</strong> {viewingListingDetail.reactivationBlockedReason}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* MODERATION ACTION FOOTER */}
-            <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <span className="text-xs font-mono text-slate-400">
-                Durum: <strong className="text-white uppercase">{viewingListingDetail.listing?.status || viewingListingDetail.rawListing?.status}</strong>
-              </span>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {(viewingListingDetail.listing?.status === 'PENDING' || viewingListingDetail.rawListing?.status === 'PENDING') && (
-                  <>
-                    <button
-                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'APPROVE')}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
-                    >
-                      Onayla
-                    </button>
-                    <button
-                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'REQUEST_REVISION')}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
-                    >
-                      Düzeltme İste
-                    </button>
-                    <button
-                      onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'REJECT')}
-                      className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition cursor-pointer"
-                    >
-                      Reddet
-                    </button>
-                  </>
-                )}
-
-                {(viewingListingDetail.listing?.status === 'ACTIVE' || viewingListingDetail.rawListing?.status === 'ACTIVE') && (
-                  <button
-                    onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'PASSIVE')}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Pasife Al
-                  </button>
-                )}
-
-                {(viewingListingDetail.listing?.status === 'PASSIVE' || viewingListingDetail.rawListing?.status === 'PASSIVE') && (
-                  <button
-                    onClick={() => handleTriggerModerationAction(viewingListingDetail.rawListing || viewingListingDetail.listing, 'ACTIVATE')}
-                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Aktifleştir
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setViewingListingDetail(null)}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl transition cursor-pointer"
-                >
-                  Kapat
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LIGHTBOX FOR FULLSCREEN IMAGE VIEWING */}
-      {showLightbox && viewingListingDetail?.media && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <button onClick={() => setShowLightbox(false)} className="absolute top-6 right-6 text-slate-400 hover:text-white cursor-pointer z-50">
-            <X className="w-8 h-8" />
-          </button>
-
-          <button
-            onClick={() => setActiveImageIdx(Math.max(0, activeImageIdx - 1))}
-            disabled={activeImageIdx === 0}
-            className="absolute left-6 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer p-2 bg-black/50 rounded-2xl"
-          >
-            <ChevronLeft className="w-8 h-8" />
-          </button>
-
-          <img
-            src={viewingListingDetail.media[activeImageIdx]?.url}
-            alt="Full Photo"
-            className="max-h-[85vh] max-w-[85vw] object-contain rounded-2xl shadow-2xl"
-          />
-
-          <button
-            onClick={() => setActiveImageIdx(Math.min(viewingListingDetail.media.length - 1, activeImageIdx + 1))}
-            disabled={activeImageIdx === viewingListingDetail.media.length - 1}
-            className="absolute right-6 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer p-2 bg-black/50 rounded-2xl"
-          >
-            <ChevronRight className="w-8 h-8" />
-          </button>
-        </div>
-      )}
 
       {/* NESTED MODAL 2: MODERATION ACTION REASON MODAL (ZORUNLU NEDEN MODALI) */}
       {moderationActionListing && moderationActionType && (

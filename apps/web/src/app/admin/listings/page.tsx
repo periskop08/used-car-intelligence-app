@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { AdminUserDrawer } from '../components/AdminUserDrawer';
+import { AdminListingInspectionModal } from '../components/AdminListingInspectionModal';
 
 const STATUS_TABS = [
   { key: 'PENDING_REVIEW', label: 'Onay Bekleyenler' },
@@ -59,6 +60,9 @@ function AdminListingsContent() {
   const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
   const [drawerCustomerNo, setDrawerCustomerNo] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Selected Listing Inspection Modal
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
 
   // Action Menu State
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -299,8 +303,12 @@ function AdminListingsContent() {
                   const riskReason = item.heavyDamage ? 'Ağır Hasar Kaydı' : item.tramerAmount > 20000 ? 'Tramer / Hasar Anomalisi' : null;
 
                   return (
-                    <tr key={listingId} className="hover:bg-white/[0.03] transition group">
-                      <td className="p-4">
+                    <tr
+                      key={listingId}
+                      onClick={() => setSelectedListingId(listingId)}
+                      className="hover:bg-white/[0.04] transition group cursor-pointer"
+                    >
+                      <td className="p-4" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" className="rounded border-white/10 text-orange-500 focus:ring-0 cursor-pointer" />
                       </td>
 
@@ -320,10 +328,13 @@ function AdminListingsContent() {
                       </td>
 
                       {/* SATICI (Opens AdminUserDrawer with REAL seller.id) */}
-                      <td className="p-4 font-mono">
+                      <td className="p-4 font-mono" onClick={(e) => e.stopPropagation()}>
                         {seller ? (
                           <button
-                            onClick={() => handleOpenUserDrawer(seller)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenUserDrawer(seller);
+                            }}
                             className="flex items-center gap-2 text-left group-hover:text-orange-400 transition cursor-pointer"
                           >
                             <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-[10px] border border-orange-500/30 shrink-0">
@@ -375,18 +386,25 @@ function AdminListingsContent() {
                       </td>
 
                       {/* İŞLEMLER ACTION BUTTONS */}
-                      <td className="p-4 text-right relative">
+                      <td className="p-4 text-right relative" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            title="İlanı Görüntüle"
+                            title="İlanı İncele"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedListingId(listingId);
+                            }}
                             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-4 h-4 text-orange-400" />
                           </button>
 
-                          <div className="relative">
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => setActiveMenuId(activeMenuId === listingId ? null : listingId)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === listingId ? null : listingId);
+                              }}
                               className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer"
                             >
                               <MoreVertical className="w-4 h-4" />
@@ -394,8 +412,20 @@ function AdminListingsContent() {
 
                             {/* DROPDOWN ACTION MENU */}
                             {activeMenuId === listingId && (
-                              <div className="absolute right-0 top-8 z-30 w-44 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1 animate-in fade-in duration-100">
-                                {currentStatus === 'PENDING' && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-8 z-30 w-48 bg-[#0b0f19] border border-white/10 rounded-2xl p-1.5 shadow-2xl text-left font-sans text-xs space-y-1 animate-in fade-in duration-100"
+                              >
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    setSelectedListingId(listingId);
+                                  }}
+                                  className="w-full text-left px-3 py-1.5 text-orange-400 hover:bg-orange-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> İlanı İncele
+                                </button>
+                                {(currentStatus === 'PENDING_REVIEW' || currentStatus === 'PENDING' || currentStatus === 'REVISION_REQUIRED' || currentStatus === 'DETAILED_REVIEW') && (
                                   <>
                                     <button
                                       onClick={() => handleAction(listingId, 'APPROVE')}
@@ -419,7 +449,7 @@ function AdminListingsContent() {
                                     <Clock className="w-3.5 h-3.5" /> Pasife Al
                                   </button>
                                 )}
-                                {currentStatus === 'REJECTED' && (
+                                {(currentStatus === 'REJECTED' || currentStatus === 'PASSIVE') && (
                                   <button
                                     onClick={() => handleAction(listingId, 'REOPEN')}
                                     className="w-full text-left px-3 py-1.5 text-cyan-400 hover:bg-cyan-500/10 rounded-lg font-bold transition flex items-center gap-2 cursor-pointer"
@@ -497,7 +527,22 @@ function AdminListingsContent() {
         customerNo={drawerCustomerNo}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onRefresh={fetchListings}
+        onRefresh={() => {
+          fetchStatusCounts();
+          fetchListings();
+        }}
+      />
+
+      {/* CANONICAL ADMIN LISTING INSPECTION MODAL */}
+      <AdminListingInspectionModal
+        listingId={selectedListingId}
+        isOpen={!!selectedListingId}
+        onClose={() => setSelectedListingId(null)}
+        onRefresh={() => {
+          fetchStatusCounts();
+          fetchListings();
+        }}
+        onOpenSellerDrawer={(seller) => handleOpenUserDrawer(seller)}
       />
     </div>
   );

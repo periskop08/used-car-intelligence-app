@@ -148,6 +148,8 @@ export class ListingModerationService implements OnModuleInit {
             status: true,
             createdAt: true,
             updatedAt: true,
+            expiresAt: true,
+            publishedAt: true,
             priceAmount: true,
             kilometers: true,
             modelYear: true,
@@ -160,6 +162,7 @@ export class ListingModerationService implements OnModuleInit {
       take: 100,
     });
 
+    const now = new Date();
     const results = sellersWithListings.map((seller) => {
       const listings = seller.listings || [];
       const customerNo = this.formatCustomerNo(seller);
@@ -171,10 +174,10 @@ export class ListingModerationService implements OnModuleInit {
         pending: listings.filter((l) => l.status === 'PENDING_REVIEW').length,
         revisionRequired: listings.filter((l) => (l.status as any) === 'REVISION_REQUIRED').length,
         detailedReview: listings.filter((l) => (l.status as any) === 'DETAILED_REVIEW').length,
-        active: listings.filter((l) => l.status === 'ACTIVE').length,
+        active: listings.filter((l) => l.status === 'ACTIVE' && (!l.expiresAt || new Date(l.expiresAt) > now)).length,
         rejected: listings.filter((l) => l.status === 'REJECTED').length,
         passive: listings.filter((l) => l.status === 'PASSIVE').length,
-        expired: listings.filter((l) => l.status === 'EXPIRED').length,
+        expired: listings.filter((l) => l.status === 'EXPIRED' || (l.status === 'ACTIVE' && l.expiresAt && new Date(l.expiresAt) <= now)).length,
         reported: listings.filter((l) => (l.status as any) === 'REPORTED').length,
       };
 
@@ -279,10 +282,21 @@ export class ListingModerationService implements OnModuleInit {
 
     if (!seller) throw new NotFoundException('Satıcı bulunamadı.');
 
+    let statusFilter: any = undefined;
+    if (status) {
+      if (status === 'PENDING') {
+        statusFilter = { in: ['PENDING_REVIEW', 'REVISION_REQUIRED', 'DETAILED_REVIEW'] };
+      } else if (status === 'PASSIVE') {
+        statusFilter = { in: ['PASSIVE', 'EXPIRED'] };
+      } else {
+        statusFilter = status;
+      }
+    }
+
     const listings = await this.prisma.vehicleListing.findMany({
       where: {
         sellerId: seller.id,
-        ...(status ? { status: status as any } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
       },
       include: {
         media: true,
@@ -450,7 +464,9 @@ export class ListingModerationService implements OnModuleInit {
     const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
     const durationDays = isProTier ? 45 : 30;
 
-    const expiresAt = l.expiresAt || new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const expiresAt = (l.expiresAt && new Date(l.expiresAt) > now)
+      ? l.expiresAt
+      : new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     const updated = await this.prisma.vehicleListing.update({
       where: { id: listingId },
@@ -746,8 +762,27 @@ export class ListingModerationService implements OnModuleInit {
   }
 
   async getStatusCounts() {
+    const now = new Date();
     const countByStatus = async (st: string) => {
       try {
+        if (st === 'ACTIVE') {
+          return await this.prisma.vehicleListing.count({
+            where: {
+              status: 'ACTIVE',
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+          });
+        }
+        if (st === 'EXPIRED') {
+          return await this.prisma.vehicleListing.count({
+            where: {
+              OR: [
+                { status: 'EXPIRED' },
+                { status: 'ACTIVE', expiresAt: { lte: now } },
+              ],
+            },
+          });
+        }
         return await this.prisma.vehicleListing.count({ where: { status: st as any } });
       } catch (e) {
         return 0;
@@ -792,8 +827,24 @@ export class ListingModerationService implements OnModuleInit {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
+    const now = new Date();
 
-    const where: any = { status: status as any };
+    let where: any = {};
+    if (status === 'ACTIVE') {
+      where = {
+        status: 'ACTIVE',
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      };
+    } else if (status === 'EXPIRED') {
+      where = {
+        OR: [
+          { status: 'EXPIRED' },
+          { status: 'ACTIVE', expiresAt: { lte: now } },
+        ],
+      };
+    } else {
+      where = { status: status as any };
+    }
 
     if (query.sellerType && query.sellerType !== 'ALL') {
       where.sellerType = query.sellerType;
