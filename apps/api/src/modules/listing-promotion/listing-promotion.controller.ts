@@ -84,6 +84,9 @@ export class ListingPromotionController {
   @Post('webhooks/:provider')
   @Post('urgent/webhooks/:provider')
   public async handleWebhook(@Param('provider') provider: string, @Body() payload: any) {
+    if (provider.toLowerCase() === 'mock' && process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('MOCK_PAYMENT_DISABLED: Mock ödeme doğrulaması canlı (production) ortamda kullanılamaz.');
+    }
     const providerEventId = payload.eventId || payload.id || `evt_${Date.now()}`;
     const eventType = payload.eventType || payload.type || 'payment.success';
     return this.webhookService.processWebhook(provider, providerEventId, eventType, payload);

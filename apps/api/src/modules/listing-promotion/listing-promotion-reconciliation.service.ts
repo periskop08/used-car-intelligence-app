@@ -195,15 +195,19 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
     await this.expirePromotions().catch(() => null);
     await this.cleanupStaleCheckouts().catch(() => null);
 
-    // 2. Repair desynced urgent listings
+    // 2. Repair desynced urgent listings (Strictly on ACTIVE listings without active or pending entitlements)
     const desyncedUrgentListings = await this.prisma.vehicleListing.findMany({
       where: {
+        status: 'ACTIVE',
         isUrgent: true,
         promotionEntitlements: {
           none: {
             promotionType: ListingPromotionType.URGENT_LISTING,
-            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-            expiresAt: { gt: now },
+            lifecycleStatus: { in: [PromotionLifecycleStatus.ACTIVE, PromotionLifecycleStatus.PENDING_ACTIVATION] },
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: now } },
+            ],
           },
         },
       },
@@ -223,15 +227,19 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
       this.logger.warn(`Reconciliation: Repaired desynced isUrgent=false for listing ${listing.id}`);
     }
 
-    // 3. Repair desynced showcase listings
+    // 3. Repair desynced showcase listings (Strictly on ACTIVE listings without active or pending entitlements)
     const desyncedShowcaseListings = await this.prisma.vehicleListing.findMany({
       where: {
+        status: 'ACTIVE',
         isShowcaseFeedActive: true,
         promotionEntitlements: {
           none: {
             promotionType: ListingPromotionType.SHOWCASE_FEED,
-            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-            expiresAt: { gt: now },
+            lifecycleStatus: { in: [PromotionLifecycleStatus.ACTIVE, PromotionLifecycleStatus.PENDING_ACTIVATION] },
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: now } },
+            ],
           },
         },
       },

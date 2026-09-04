@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import BuyerPackagesSection from "../components/BuyerPackagesSection";
+import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -16,6 +17,7 @@ export default function Home() {
   const [models, setModels] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
+  const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
@@ -61,28 +63,24 @@ export default function Home() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Vitrin (Showcase) Listings on Load
+  // Fetch Vitrin / Acil promotional listings when promoTab changes
   useEffect(() => {
     setLoadingListings(true);
-    fetch(`${API_URL}/listings?showcaseOnly=true&limit=16`)
+    const queryParam = promoTab === 'vitrin' ? 'showcaseOnly=true' : 'urgentOnly=true';
+    fetch(`${API_URL}/listings?${queryParam}&limit=16`)
       .then((res) => res.json())
       .then((data) => {
-        const showcaseItems = data.items && Array.isArray(data.items) ? data.items : [];
-        if (showcaseItems.length > 0) {
-          setFeaturedListings(showcaseItems);
-          setLoadingListings(false);
-        } else {
-          fetch(`${API_URL}/listings?limit=16&sort=featured`)
-            .then((res) => res.json())
-            .then((d) => {
-              setFeaturedListings(d.items && Array.isArray(d.items) ? d.items : []);
-              setLoadingListings(false);
-            })
-            .catch(() => setLoadingListings(false));
-        }
+        const rawItems = data.items && Array.isArray(data.items) ? data.items : [];
+        // Deduplicate listings within the same section by listing.id
+        const uniqueItems = Array.from(new Map(rawItems.map((item: any) => [item.id, item])).values());
+        setFeaturedListings(uniqueItems);
+        setLoadingListings(false);
       })
-      .catch(() => setLoadingListings(false));
-  }, []);
+      .catch(() => {
+        setFeaturedListings([]);
+        setLoadingListings(false);
+      });
+  }, [promoTab]);
 
   // Auto-scroll loop for Featured Listings slider
   useEffect(() => {
@@ -870,22 +868,56 @@ export default function Home() {
 
       {/* Nasıl Çalışır section moved to bottom */}
 
-      {/* Featured Listings Section */}
-      {featuredListings.length > 0 && (
-        <div className="w-full max-w-5xl flex flex-col gap-8 py-8 border-t border-white/5">
-          <div className="text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-extrabold text-slate-200 canvas-title">Öne Çıkan İlanlar</h2>
-              <p className="text-sm text-slate-400 canvas-subtitle mt-1">Yapay zeka analizli ve ekspertiz kontrol noktaları hazır satılık araçlar.</p>
-            </div>
-            <a href="/listings" className="text-xs font-bold text-orange-500 hover:text-orange-400 transition flex items-center gap-1">
-              Tüm İlanları Gör →
-            </a>
+      {/* Promotional Showcase / Urgent Listings Section */}
+      <div className="w-full max-w-5xl flex flex-col gap-6 py-8 border-t border-white/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Direct 2-State Promotional Navigation Header */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-900/80 rounded-2xl border border-white/10 w-fit">
+            <button
+              type="button"
+              onClick={() => setPromoTab('vitrin')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition cursor-pointer ${
+                promoTab === 'vitrin'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span>⭐ Vitrin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPromoTab('acil')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-sm transition cursor-pointer ${
+                promoTab === 'acil'
+                  ? 'bg-gradient-to-r from-rose-600 to-red-500 text-white shadow-lg shadow-rose-600/25'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span>⚡ Acil İlanlar</span>
+            </button>
           </div>
 
+          <a
+            href={promoTab === 'vitrin' ? '/listings?showcaseOnly=true' : '/listings?urgentOnly=true'}
+            className="text-xs font-bold text-orange-500 hover:text-orange-400 transition flex items-center gap-1 self-end sm:self-center"
+          >
+            {promoTab === 'vitrin' ? 'Tüm Vitrin İlanlarını Gör →' : 'Tüm Acil İlanları Gör →'}
+          </a>
+        </div>
+
+        {/* Subtitle / Context note */}
+        <p className="text-xs text-slate-400 -mt-2">
+          {promoTab === 'vitrin'
+            ? 'Öne çıkan vitrin ve ayrıcalıklı vitrin araçları.'
+            : 'Hızlı satış amacıyla listelenen ve acil fiyat avantajı sunan araçlar.'}
+        </p>
+
+        {loadingListings ? (
+          <div className="py-16 text-center text-xs text-slate-400">İlanlar yükleniyor...</div>
+        ) : featuredListings.length > 0 ? (
           <div 
             ref={scrollRef} 
-            className="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-4"
+            className="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-2"
           >
             {featuredListings.map((listing: any) => {
               const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
@@ -901,11 +933,21 @@ export default function Home() {
                       alt={listing.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                     />
-                    {listing.isAiReady && (
-                      <span className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow-lg shadow-orange-950/20">
-                        ✨ AI Analizli
-                      </span>
-                    )}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
+                      {listing.isUrgent && (
+                        <UrgentListingBadge size="small" animated />
+                      )}
+                      {listing.isShowcaseFeedActive && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
+                          ⭐ Vitrin
+                        </span>
+                      )}
+                      {listing.isAiReady && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow-lg shadow-orange-950/20">
+                          ✨ AI Analizli
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="p-3 flex flex-col justify-between flex-1 gap-3">
@@ -934,8 +976,28 @@ export default function Home() {
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="py-14 text-center rounded-2xl bg-slate-950/50 border border-white/5 space-y-2">
+            <span className="text-2xl">{promoTab === 'vitrin' ? '⭐' : '⚡'}</span>
+            <p className="text-xs font-bold text-slate-300">
+              {promoTab === 'vitrin'
+                ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
+                : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Tüm satılık araçları incelemek için pazar yerine göz atabilirsiniz.
+            </p>
+            <div className="pt-2">
+              <a
+                href="/listings"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 text-xs font-bold transition"
+              >
+                Tüm Araç İlanları ➔
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Subscription Tiers Segment */}
       <div id="packages" className="w-full max-w-5xl flex flex-col gap-8 items-center py-8 border-t border-white/5">

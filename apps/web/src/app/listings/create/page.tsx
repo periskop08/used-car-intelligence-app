@@ -552,29 +552,63 @@ export default function CreateListing() {
           return listing;
         });
       })
-      .then((listing) => {
+      .then(async (listing) => {
         if (selectedPromotionSku) {
-          return fetch(`${API_URL}/listing-promotions/purchase`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              listingId: listing.id,
-              sku: selectedPromotionSku,
-              termsAccepted: true,
-            }),
-          })
-            .then((res) => res.json())
-            .then((purchaseRes) => {
-              setSaving(false);
-              router.push(purchaseRes.redirectUrl || "/dashboard/listings?tab=active");
-            })
-            .catch(() => {
-              setSaving(false);
-              router.push("/dashboard/listings?tab=active");
+          try {
+            // 1. Generate Quote
+            const quoteRes = await fetch(`${API_URL}/listing-promotions/quotes`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                listingId: listing.id,
+                productSku: selectedPromotionSku,
+              }),
             });
+            const quoteData = await quoteRes.json();
+            if (!quoteRes.ok) throw new Error(quoteData.message || "Teklif alınamadı.");
+
+            // 2. Initialize Checkout
+            const idempotencyKey = `chk_crt_${listing.id}_${selectedPromotionSku}_${Date.now()}`;
+            const checkoutRes = await fetch(`${API_URL}/listing-promotions/checkout/${listing.id}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                quoteId: quoteData.quoteId,
+                idempotencyKey,
+                termsAccepted: true,
+                termsVersion: quoteData.termsVersion || "v1",
+                entryPoint: "LISTING_CREATE",
+              }),
+            });
+            const checkoutData = await checkoutRes.json();
+            if (!checkoutRes.ok) throw new Error(checkoutData.message || "Ödeme başlatılamadı.");
+
+            // 3. Environment-gated development mock verification (Strictly prohibited in production)
+            if (process.env.NODE_ENV === "development" && checkoutData.purchaseId) {
+              await fetch(`${API_URL}/listing-promotions/webhooks/mock`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  eventType: "payment.success",
+                  purchaseId: checkoutData.purchaseId,
+                  paymentReferenceId: `PAY_DEV_${Date.now()}`,
+                }),
+              }).catch(() => null);
+            }
+
+            setSaving(false);
+            router.push(checkoutData.paymentProviderUrl || "/dashboard/listings?tab=active");
+          } catch (e) {
+            console.error("Listing promotion checkout error:", e);
+            setSaving(false);
+            router.push("/dashboard/listings?tab=active");
+          }
         } else {
           setSaving(false);
           router.push("/dashboard/listings?tab=active");

@@ -31,8 +31,10 @@ import {
   CreateLeadDto,
   ReplyToLeadDto,
 } from './listing.dto';
-import { ListingStatus, MediaModerationStatus } from '@prisma/client';
+import { ListingStatus, MediaModerationStatus, ListingPromotionType, PromotionLifecycleStatus } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
+import { Optional } from '@nestjs/common';
 
 @ApiTags('Listings')
 @Controller()
@@ -40,6 +42,7 @@ export class ListingController {
   constructor(
     private listingService: ListingService,
     private r2Service: R2Service,
+    @Optional() private promotionQueryService?: ListingPromotionQueryService,
   ) {}
 
   // ==========================================
@@ -92,8 +95,17 @@ export class ListingController {
     @Query('showcaseOnly') showcaseOnly?: string,
   ) {
     // Parse filters
+    const now = new Date();
     const filters: any = {
       status: ListingStatus.ACTIVE,
+      AND: [
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } },
+          ],
+        },
+      ],
       media: {
         some: {
           moderationStatus: MediaModerationStatus.APPROVED,
@@ -102,13 +114,23 @@ export class ListingController {
     };
 
     if (urgentOnly === 'true') {
-      filters.isUrgent = true;
-      filters.urgentExpiresAt = { gt: new Date() };
+      filters.promotionEntitlements = {
+        some: {
+          promotionType: ListingPromotionType.URGENT_LISTING,
+          lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+          expiresAt: { gt: now },
+        },
+      };
     }
 
     if (showcaseOnly === 'true') {
-      filters.isShowcaseFeedActive = true;
-      filters.showcaseFeedExpiresAt = { gt: new Date() };
+      filters.promotionEntitlements = {
+        some: {
+          promotionType: ListingPromotionType.SHOWCASE_FEED,
+          lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+          expiresAt: { gt: now },
+        },
+      };
     }
 
     if (sellerId) {
@@ -343,6 +365,16 @@ export class ListingController {
             vehicleVariant: {
               include: { brand: true, model: true },
             },
+            promotionEntitlements: {
+              where: {
+                lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+                expiresAt: { gt: now },
+              },
+              select: {
+                promotionType: true,
+                expiresAt: true,
+              },
+            },
           },
         }),
         this.listingService['prisma'].vehicleListing.count({ where: filters }),
@@ -363,10 +395,16 @@ export class ListingController {
       favoritedIds = new Set(userFavs.map((f) => f.listingId));
     }
 
-    const now = new Date();
     const mappedItems = items.map((item) => {
-      const isUrgent = !!(item.isUrgent && item.urgentExpiresAt && new Date(item.urgentExpiresAt) > now);
-      const isShowcaseFeedActive = !!(item.isShowcaseFeedActive && item.showcaseFeedExpiresAt && new Date(item.showcaseFeedExpiresAt) > now);
+      const hasUrgentEnt = item.promotionEntitlements?.some(
+        (e: any) => e.promotionType === ListingPromotionType.URGENT_LISTING && new Date(e.expiresAt) > now
+      );
+      const hasShowcaseEnt = item.promotionEntitlements?.some(
+        (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > now
+      );
+      const isUrgent = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && hasUrgentEnt);
+      const isShowcaseFeedActive = !!(item.status === ListingStatus.ACTIVE && (!item.expiresAt || new Date(item.expiresAt) > now) && hasShowcaseEnt);
+
       return {
         ...item,
         isUrgent,
@@ -568,6 +606,16 @@ export class ListingController {
             aiReports: { where: { status: 'APPROVED' } },
           },
         },
+        promotionEntitlements: {
+          where: {
+            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+            expiresAt: { gt: new Date() },
+          },
+          select: {
+            promotionType: true,
+            expiresAt: true,
+          },
+        },
       },
     });
 
@@ -624,8 +672,20 @@ export class ListingController {
       where: { listingId: id },
     });
 
+    const detailNow = new Date();
+    const hasUrgentEnt = listing.promotionEntitlements?.some(
+      (e: any) => e.promotionType === ListingPromotionType.URGENT_LISTING && new Date(e.expiresAt) > detailNow
+    );
+    const hasShowcaseEnt = listing.promotionEntitlements?.some(
+      (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > detailNow
+    );
+    const isUrgent = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasUrgentEnt);
+    const isShowcaseFeedActive = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasShowcaseEnt);
+
     return {
       ...listing,
+      isUrgent,
+      isShowcaseFeedActive,
       isFavorited,
       isSellerFavorited,
       favoriteCount,

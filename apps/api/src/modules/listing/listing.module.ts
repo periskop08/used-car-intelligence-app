@@ -5,8 +5,10 @@ import { R2Service } from './r2.service';
 import { ListingController } from './listing.controller';
 import { JwtService } from '@nestjs/jwt';
 
+import { ListingPromotionModule } from '../listing-promotion/listing-promotion.module';
+
 @Module({
-  imports: [],
+  imports: [ListingPromotionModule],
   controllers: [ListingController],
   providers: [PrismaService, ListingService, JwtService, R2Service],
   exports: [ListingService, R2Service],

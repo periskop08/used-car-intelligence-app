@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 
 import { ListingPromotionActivationService } from '../listing-promotion/listing-promotion-activation.service';
 import { ListingPromotionRefundService } from '../listing-promotion/listing-promotion-refund.service';
+import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
 import { Optional } from '@nestjs/common';
 
 const PRESET_REASONS = [
@@ -22,6 +23,7 @@ export class ListingModerationService implements OnModuleInit {
     private readonly prisma: PrismaService,
     @Optional() private readonly activationService?: ListingPromotionActivationService,
     @Optional() private readonly refundService?: ListingPromotionRefundService,
+    @Optional() private readonly queryService?: ListingPromotionQueryService,
   ) {}
 
   async onModuleInit() {
@@ -347,6 +349,10 @@ export class ListingModerationService implements OnModuleInit {
       include: {
         seller: true,
         media: true,
+        promotions: true,
+        promotionEntitlements: {
+          include: { purchase: true },
+        },
         vehicleVariant: {
           include: {
             model: {
@@ -390,6 +396,17 @@ export class ListingModerationService implements OnModuleInit {
       // fallback
     }
 
+    const promotionSummary = this.queryService
+      ? this.queryService.resolveEffectivePromotions(l)
+      : {
+          publicationType: 'STANDARD' as const,
+          urgent: { requested: !!l.isUrgent, status: 'NONE' as const, entitlementVerified: false, active: false, startsAt: null, expiresAt: null },
+          showcase: { requested: !!l.isShowcaseFeedActive, status: 'NONE' as const, entitlementVerified: false, active: false, startsAt: null, expiresAt: null },
+          paymentStatus: 'NONE' as const,
+          startsAt: null,
+          endsAt: null,
+        };
+
     return {
       listing: {
         id: l.id,
@@ -414,6 +431,7 @@ export class ListingModerationService implements OnModuleInit {
         createdAt: l.createdAt,
         updatedAt: l.updatedAt,
       },
+      promotionSummary,
       damageDeclaration: {
         hasDamageRecord: !!l.damageRecord,
         tramerFee: (l.tramerAmount || 0).toString(),
@@ -464,17 +482,17 @@ export class ListingModerationService implements OnModuleInit {
     const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
     const durationDays = isProTier ? 45 : 30;
 
-    const expiresAt = (l.expiresAt && new Date(l.expiresAt) > now)
-      ? l.expiresAt
-      : new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    // The publication period strictly starts from approval time (now),
+    // ensuring moderation review time does not shorten the seller's active publication period
+    const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     const updated = await this.prisma.vehicleListing.update({
       where: { id: listingId },
       data: {
         status: 'ACTIVE',
-        publishedAt: l.publishedAt || now,
+        publishedAt: now,
         expiresAt,
-        listingDurationDays: l.listingDurationDays || durationDays,
+        listingDurationDays: durationDays,
       },
     });
 
@@ -497,8 +515,38 @@ export class ListingModerationService implements OnModuleInit {
     }
 
     if (this.activationService) {
-      await this.activationService.tryActivateUrgentPromotion(listingId).catch(() => null);
+      await this.activationService.tryActivatePromotions(listingId).catch(() => null);
     }
+
+    // Verify whether any entitlement was actually activated, guaranteeing raw flags never grant free promotions
+    const hasActiveUrgentEntitlement = await this.prisma.listingPromotionEntitlement.findFirst({
+      where: {
+        listingId,
+        promotionType: 'URGENT_LISTING',
+        lifecycleStatus: 'ACTIVE',
+        expiresAt: { gt: now },
+      },
+    });
+    const hasActiveShowcaseEntitlement = await this.prisma.listingPromotionEntitlement.findFirst({
+      where: {
+        listingId,
+        promotionType: 'SHOWCASE_FEED',
+        lifecycleStatus: 'ACTIVE',
+        expiresAt: { gt: now },
+      },
+    });
+
+    await this.prisma.vehicleListing.update({
+      where: { id: listingId },
+      data: {
+        isUrgent: !!hasActiveUrgentEntitlement,
+        urgentSince: hasActiveUrgentEntitlement ? hasActiveUrgentEntitlement.activatedAt : null,
+        urgentExpiresAt: hasActiveUrgentEntitlement ? hasActiveUrgentEntitlement.expiresAt : null,
+        isShowcaseFeedActive: !!hasActiveShowcaseEntitlement,
+        showcaseFeedSince: hasActiveShowcaseEntitlement ? hasActiveShowcaseEntitlement.activatedAt : null,
+        showcaseFeedExpiresAt: hasActiveShowcaseEntitlement ? hasActiveShowcaseEntitlement.expiresAt : null,
+      },
+    });
 
     return updated;
   }

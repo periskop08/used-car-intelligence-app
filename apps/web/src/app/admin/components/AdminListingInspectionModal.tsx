@@ -23,6 +23,7 @@ import {
   Gauge,
   HelpCircle,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { resolveEffectiveListingStatus } from '@/utils/listingStatusResolver';
@@ -164,6 +165,7 @@ export function AdminListingInspectionModal({
   const damage = listingData?.damageDeclaration;
   const autoChecks = listingData?.autoChecks || [];
   const pastActions = listingData?.pastActions || [];
+  const promoSummary = listingData?.promotionSummary;
 
   const statusResolution = resolveEffectiveListingStatus({
     status: l?.status,
@@ -327,6 +329,132 @@ export function AdminListingInspectionModal({
                   <span className="text-[10px] text-slate-500 block">
                     {new Date(l.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
+                </div>
+              </div>
+
+              {/* YAYIN & GÖRÜNÜRLÜK (COMMERCIAL PROMOTION SUMMARY) */}
+              <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900/60 to-slate-950 border border-orange-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[11px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Yayın & Görünürlük</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    {promoSummary?.publicationType === 'SHOWCASE_URGENT'
+                      ? 'Vitrin + Acil'
+                      : promoSummary?.publicationType === 'SHOWCASE'
+                      ? 'Vitrin'
+                      : promoSummary?.publicationType === 'URGENT'
+                      ? 'Acil'
+                      : 'Standart'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Yayın Türü</span>
+                    <strong className="text-white font-bold block mt-0.5">
+                      {promoSummary?.publicationType === 'SHOWCASE_URGENT'
+                        ? 'Vitrin + Acil'
+                        : promoSummary?.publicationType === 'SHOWCASE'
+                        ? 'Vitrin'
+                        : promoSummary?.publicationType === 'URGENT'
+                        ? 'Acil'
+                        : 'Standart'}
+                    </strong>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Acil Durumu</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`w-2 h-2 rounded-full ${
+                        promoSummary?.urgent.status === 'ACTIVE'
+                          ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                          ? 'bg-amber-400'
+                          : 'bg-slate-600'
+                      }`} />
+                      <strong className={`font-bold ${
+                        promoSummary?.urgent.status === 'ACTIVE'
+                          ? 'text-rose-400'
+                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                          ? 'text-amber-300'
+                          : 'text-slate-400'
+                      }`}>
+                        {promoSummary?.urgent.status === 'ACTIVE'
+                          ? 'Evet — Aktif'
+                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                          ? 'Evet — Onay Bekliyor'
+                          : promoSummary?.urgent.status === 'EXPIRED'
+                          ? 'Süresi Doldu'
+                          : 'Hayır'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Vitrin Durumu</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`w-2 h-2 rounded-full ${
+                        promoSummary?.showcase.status === 'ACTIVE'
+                          ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                          ? 'bg-amber-400'
+                          : 'bg-slate-600'
+                      }`} />
+                      <strong className={`font-bold ${
+                        promoSummary?.showcase.status === 'ACTIVE'
+                          ? 'text-amber-400'
+                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                          ? 'text-amber-300'
+                          : 'text-slate-400'
+                      }`}>
+                        {promoSummary?.showcase.status === 'ACTIVE'
+                          ? 'Evet — Aktif'
+                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                          ? 'Evet — Onay Bekliyor'
+                          : promoSummary?.showcase.status === 'EXPIRED'
+                          ? 'Süresi Doldu'
+                          : 'Hayır'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Satın Alma / Ticari Hak</span>
+                    <strong className={`font-bold block mt-0.5 ${
+                      promoSummary?.paymentStatus === 'PAID'
+                        ? 'text-emerald-400'
+                        : promoSummary?.paymentStatus === 'PENDING'
+                        ? 'text-amber-400'
+                        : 'text-slate-400'
+                    }`}>
+                      {promoSummary?.paymentStatus === 'PAID'
+                        ? 'Doğrulandı'
+                        : promoSummary?.paymentStatus === 'PENDING'
+                        ? 'Ödeme Bekleniyor'
+                        : 'Yok'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-white/5 text-[11px]">
+                  <div>
+                    <span className="text-slate-500">Başlangıç: </span>
+                    <strong className="text-slate-200">
+                      {promoSummary?.startsAt
+                        ? new Date(promoSummary.startsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.startsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                        : 'Yayın onayı sonrası'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Bitiş: </span>
+                    <strong className="text-slate-200">
+                      {promoSummary?.endsAt
+                        ? new Date(promoSummary.endsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.endsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                        : (l?.expiresAt ? new Date(l.expiresAt).toLocaleDateString('tr-TR') : 'Yayın süresi sonu')}
+                    </strong>
+                  </div>
                 </div>
               </div>
 
