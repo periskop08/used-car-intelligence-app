@@ -10,16 +10,70 @@ import {
   Dimensions,
   Linking,
   Share,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 
 const { width } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
+
+const formatCloudflareImageUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  if (url.includes('r2.dev') || url.includes('cloudflarestorage.com')) {
+    let storageKey = '';
+    if (url.includes('.r2.dev/')) {
+      const parts = url.split('.r2.dev/');
+      if (parts.length > 1) storageKey = parts[1];
+    } else {
+      const parts = url.split('cloudflarestorage.com/');
+      if (parts.length > 1) {
+        const path = parts[1].replace(/^\//, '');
+        const pathParts = path.split('/');
+        if (pathParts[0] === 'torquescout-listings') {
+          storageKey = pathParts.slice(1).join('/');
+        } else {
+          storageKey = path;
+        }
+      }
+    }
+
+    if (storageKey) {
+      return `${API_URL}/listings/media-proxy/${storageKey}`;
+    }
+  }
+
+  if (url.startsWith('/')) {
+    return `${API_URL}${url}`;
+  }
+
+  return url;
+};
+
+const resolveVehicleImageUrl = (
+  url?: string | null,
+  brand?: string,
+  modelFamily?: string
+): string => {
+  const formatted = formatCloudflareImageUrl(url);
+  if (formatted) return formatted;
+
+  if (brand && modelFamily) {
+    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
+    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+    }
+  }
+
+  return 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80';
+};
 
 const FUEL_TYPE_LABELS: Record<string, string> = {
   PETROL: 'Benzin',
@@ -71,12 +125,12 @@ const CAR_BODY_PARTS: Record<string, string> = {
 export default function ListingDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const [listing, setListing] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     if (id === 'create') {
@@ -113,7 +167,6 @@ export default function ListingDetailScreen() {
       if (res.ok) {
         const data = await res.json();
         setListing(data);
-        setIsFavorited(!!data.isFavorited);
       } else {
         Alert.alert('Hata', 'İlan detayları yüklenemedi.');
       }
@@ -213,13 +266,6 @@ export default function ListingDetailScreen() {
     );
   }
 
-  const photos = Array.isArray(listing.media) && listing.media.length > 0
-    ? listing.media.map((m: any) => m.url).filter(Boolean)
-    : [];
-
-  const defaultImage = 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80';
-  const displayPhotos = photos.length > 0 ? photos : [defaultImage];
-
   const brandName = listing.vehicleVariant?.model?.brand?.name || listing.vehicleVariant?.brand?.name || listing.customBrand || '';
   const modelName = listing.vehicleVariant?.model?.name || listing.customModel || '';
   const trimName = listing.vehicleVariant?.trim?.name || '';
@@ -231,26 +277,25 @@ export default function ListingDetailScreen() {
   const sellerObj = listing.seller || listing.user || {};
   const sellerFullName = `${sellerObj.firstName || ''} ${sellerObj.lastName || ''}`.trim() || sellerObj.username || 'Satıcı';
 
+  const rawPhotos = Array.isArray(listing.media) && listing.media.length > 0
+    ? listing.media.map((m: any) => formatCloudflareImageUrl(m.url)).filter(Boolean)
+    : [];
+
+  const displayPhotos = rawPhotos.length > 0
+    ? rawPhotos
+    : [resolveVehicleImageUrl(null, brandName, modelName)];
+
   const painted = Array.isArray(listing.paintedParts) ? listing.paintedParts : [];
   const changed = Array.isArray(listing.changedParts) ? listing.changedParts : [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Header */}
-      <View style={styles.navbar}>
-        <TouchableOpacity style={styles.navBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#0f172a" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle} numberOfLines={1}>
-          {listing.title || `${brandName} ${modelName}`}
-        </Text>
-        <TouchableOpacity style={styles.navBtn} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={22} color="#0f172a" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Photo Carousel */}
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Full-bleed Hero Image Gallery */}
         <View style={styles.galleryWrap}>
           <ScrollView
             horizontal
@@ -275,6 +320,17 @@ export default function ListingDetailScreen() {
             ))}
           </ScrollView>
 
+          {/* Floating Top Controls (Edge-to-Edge) */}
+          <View style={[styles.floatingControlsRow, { top: Math.max(insets.top, 16) }]}>
+            <TouchableOpacity style={styles.floatingGlassBtn} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={22} color="#0f172a" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.floatingGlassBtn} onPress={handleShare}>
+              <Ionicons name="share-social-outline" size={20} color="#0f172a" />
+            </TouchableOpacity>
+          </View>
+
           {/* Photo Pagination Indicator */}
           {displayPhotos.length > 1 && (
             <View style={styles.photoIndexBadge}>
@@ -293,7 +349,7 @@ export default function ListingDetailScreen() {
         </View>
 
         {/* Price & Title Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, styles.topCard]}>
           <Text style={styles.priceText}>
             {Number(priceVal).toLocaleString('tr-TR')} {listing.currency || 'TL'}
           </Text>
@@ -541,7 +597,7 @@ export default function ListingDetailScreen() {
       </ScrollView>
 
       {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {!!sellerObj.phone && (
           <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller}>
             <Ionicons name="call" size={18} color="#ea580c" />
@@ -553,7 +609,7 @@ export default function ListingDetailScreen() {
           <Text style={styles.chatBtnText}>Satıcıya Mesaj Gönder</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -568,6 +624,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     gap: 12,
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
     fontSize: 14,
@@ -593,57 +650,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
-  navbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  navBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navTitle: {
-    flex: 1,
-    marginHorizontal: 12,
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'center',
-  },
   scrollContent: {
     paddingBottom: 110,
     gap: 14,
   },
   galleryWrap: {
     width,
-    height: 250,
+    height: 300,
     backgroundColor: '#0f172a',
     position: 'relative',
   },
   gallerySlide: {
     width,
-    height: 250,
+    height: 300,
   },
   galleryImage: {
     width: '100%',
     height: '100%',
   },
+  floatingControlsRow: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  floatingGlassBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   photoIndexBadge: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    bottom: 14,
+    right: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -655,8 +706,13 @@ const styles = StyleSheet.create({
   },
   urgentBadgeWrap: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    bottom: 14,
+    left: 14,
+  },
+  topCard: {
+    marginTop: -16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   card: {
     backgroundColor: '#ffffff',
@@ -673,7 +729,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   priceText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: '#ea580c',
     letterSpacing: -0.3,
@@ -932,7 +988,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
     flexDirection: 'row',
     gap: 10,
     shadowColor: '#000',
