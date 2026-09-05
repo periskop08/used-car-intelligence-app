@@ -333,127 +333,261 @@ export function AdminListingInspectionModal({
               </div>
 
               {/* YAYIN & GÖRÜNÜRLÜK (COMMERCIAL PROMOTION SUMMARY) */}
-              <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900/60 to-slate-950 border border-orange-500/30 rounded-2xl space-y-3">
+              <div className="p-4 bg-gradient-to-br from-slate-950 via-slate-900/60 to-slate-950 border border-white/10 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[11px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+
                     <Sparkles className="w-3.5 h-3.5 text-orange-400" />
                     <span>Yayın & Görünürlük</span>
                   </h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                    {promoSummary?.publicationType === 'SHOWCASE_URGENT'
-                      ? 'Vitrin + Acil'
-                      : promoSummary?.publicationType === 'SHOWCASE'
-                      ? 'Vitrin'
-                      : promoSummary?.publicationType === 'URGENT'
-                      ? 'Acil'
-                      : 'Standart'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Talep Edilen:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                      {(promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'SHOWCASE_URGENT'
+                        ? 'Vitrin + Acil'
+                        : (promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'SHOWCASE'
+                        ? 'Vitrin'
+                        : (promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'URGENT'
+                        ? 'Acil'
+                        : 'Standart'}
+                    </span>
+                  </div>
                 </div>
 
+                {/* 1. Header Overview: Talep Edilen Yayın vs Ticari Hak */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
                   <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Yayın Türü</span>
+                    <span className="text-slate-400 block text-[10px]">Talep Edilen Yayın</span>
                     <strong className="text-white font-bold block mt-0.5">
-                      {promoSummary?.publicationType === 'SHOWCASE_URGENT'
+                      {(promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'SHOWCASE_URGENT'
                         ? 'Vitrin + Acil'
-                        : promoSummary?.publicationType === 'SHOWCASE'
+                        : (promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'SHOWCASE'
                         ? 'Vitrin'
-                        : promoSummary?.publicationType === 'URGENT'
+                        : (promoSummary?.requestedPublicationType || promoSummary?.publicationType) === 'URGENT'
                         ? 'Acil'
                         : 'Standart'}
                     </strong>
                   </div>
 
                   <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Acil Durumu</span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-2 h-2 rounded-full ${
-                        promoSummary?.urgent.status === 'ACTIVE'
-                          ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
-                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
-                          ? 'bg-amber-400'
-                          : 'bg-slate-600'
-                      }`} />
-                      <strong className={`font-bold ${
-                        promoSummary?.urgent.status === 'ACTIVE'
-                          ? 'text-rose-400'
-                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
-                          ? 'text-amber-300'
-                          : 'text-slate-400'
-                      }`}>
-                        {promoSummary?.urgent.status === 'ACTIVE'
-                          ? 'Evet — Aktif'
-                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
-                          ? 'Evet — Onay Bekliyor'
-                          : promoSummary?.urgent.status === 'EXPIRED'
-                          ? 'Süresi Doldu'
-                          : 'Hayır'}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Vitrin Durumu</span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-2 h-2 rounded-full ${
-                        promoSummary?.showcase.status === 'ACTIVE'
-                          ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
-                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
-                          ? 'bg-amber-400'
-                          : 'bg-slate-600'
-                      }`} />
-                      <strong className={`font-bold ${
-                        promoSummary?.showcase.status === 'ACTIVE'
-                          ? 'text-amber-400'
-                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
-                          ? 'text-amber-300'
-                          : 'text-slate-400'
-                      }`}>
-                        {promoSummary?.showcase.status === 'ACTIVE'
-                          ? 'Evet — Aktif'
-                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
-                          ? 'Evet — Onay Bekliyor'
-                          : promoSummary?.showcase.status === 'EXPIRED'
-                          ? 'Süresi Doldu'
-                          : 'Hayır'}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[10px]">Satın Alma / Ticari Hak</span>
+                    <span className="text-slate-400 block text-[10px]">Ticari Hak</span>
                     <strong className={`font-bold block mt-0.5 ${
-                      promoSummary?.paymentStatus === 'PAID'
+                      promoSummary?.commercialAuthority === 'TEST'
+                        ? 'text-sky-400'
+                        : promoSummary?.paymentStatus === 'PAID'
                         ? 'text-emerald-400'
                         : promoSummary?.paymentStatus === 'PENDING'
                         ? 'text-amber-400'
                         : 'text-slate-400'
                     }`}>
-                      {promoSummary?.paymentStatus === 'PAID'
+                      {promoSummary?.commercialAuthority === 'TEST'
+                        ? 'Test Modu'
+                        : promoSummary?.commercialAuthority === 'ADMIN_GRANT'
+                        ? 'Admin Tanımlı'
+                        : promoSummary?.commercialAuthority === 'CAMPAIGN'
+                        ? 'Kampanya'
+                        : promoSummary?.paymentStatus === 'PAID'
                         ? 'Doğrulandı'
                         : promoSummary?.paymentStatus === 'PENDING'
                         ? 'Ödeme Bekleniyor'
                         : 'Yok'}
                     </strong>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-white/5 text-[11px]">
-                  <div>
-                    <span className="text-slate-500">Başlangıç: </span>
-                    <strong className="text-slate-200">
-                      {promoSummary?.startsAt
-                        ? new Date(promoSummary.startsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.startsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Ödeme / İşlem</span>
+                    <strong className={`font-bold block mt-0.5 ${
+                      promoSummary?.commercialAuthority === 'TEST'
+                        ? 'text-sky-300'
+                        : promoSummary?.paymentStatus === 'PAID'
+                        ? 'text-emerald-400'
+                        : promoSummary?.paymentStatus === 'PENDING'
+                        ? 'text-amber-400'
+                        : 'text-slate-400'
+                    }`}>
+                      {promoSummary?.commercialAuthority === 'TEST'
+                        ? 'Test nedeniyle atlandı'
+                        : promoSummary?.paymentStatus === 'PAID'
+                        ? 'Doğrulandı'
+                        : promoSummary?.paymentStatus === 'PENDING'
+                        ? 'Ödeme Bekleniyor'
+                        : 'Gerekli Değil'}
+                    </strong>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">İlan Yayını Başlangıç</span>
+                    <strong className="text-slate-200 block mt-0.5">
+                      {l?.publishedAt
+                        ? new Date(l.publishedAt).toLocaleDateString('tr-TR') + ' ' + new Date(l.publishedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                        : l?.status === 'ACTIVE'
+                        ? 'Aktif'
                         : 'Yayın onayı sonrası'}
                     </strong>
                   </div>
-                  <div>
-                    <span className="text-slate-500">Bitiş: </span>
-                    <strong className="text-slate-200">
-                      {promoSummary?.endsAt
-                        ? new Date(promoSummary.endsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.endsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-                        : (l?.expiresAt ? new Date(l.expiresAt).toLocaleDateString('tr-TR') : 'Yayın süresi sonu')}
-                    </strong>
+                </div>
+
+                {/* 2. Structured Canonical Separation Table: ACİL vs VİTRİN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-[11px]">
+                  {/* ACİL KAPASİTESİ */}
+                  <div className="p-3 bg-slate-900/40 rounded-xl border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-white/5">
+                      <span className="font-bold text-rose-400 flex items-center gap-1">
+                        <span>⚡ Acil İlan</span>
+                      </span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        promoSummary?.urgent.active
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {promoSummary?.urgent.active
+                          ? 'Aktif'
+                          : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                          ? 'Onay Bekliyor'
+                          : promoSummary?.urgent.status === 'EXPIRED'
+                          ? 'Süresi Doldu'
+                          : 'Aktif Değil'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-slate-500 block">Talebi:</span>
+                        <strong className={promoSummary?.urgent.requested ? 'text-amber-300 font-bold' : 'text-slate-400'}>
+                          {promoSummary?.urgent.requested ? 'Evet' : 'Hayır'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Ticari Hak:</span>
+                        <strong className={
+                          promoSummary?.commercialAuthority === 'TEST' && promoSummary?.urgent.entitlementVerified
+                            ? 'text-sky-400 font-bold'
+                            : promoSummary?.urgent.entitlementVerified
+                            ? 'text-emerald-400 font-bold'
+                            : 'text-slate-400'
+                        }>
+                          {promoSummary?.commercialAuthority === 'TEST' && promoSummary?.urgent.entitlementVerified
+                            ? 'Test Modu'
+                            : promoSummary?.urgent.entitlementVerified
+                            ? 'Doğrulandı'
+                            : promoSummary?.paymentStatus === 'PENDING'
+                            ? 'Beklemede'
+                            : promoSummary?.urgent.status === 'EXPIRED'
+                            ? 'Süresi Doldu'
+                            : 'Yok'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Public Durum:</span>
+                        <strong className={
+                          promoSummary?.urgent.active
+                            ? 'text-rose-400 font-bold'
+                            : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                            ? 'text-amber-300 font-bold'
+                            : promoSummary?.urgent.status === 'EXPIRED'
+                            ? 'text-slate-400'
+                            : 'text-slate-400'
+                        }>
+                          {promoSummary?.urgent.active
+                            ? 'Aktif'
+                            : promoSummary?.urgent.status === 'PENDING_APPROVAL'
+                            ? 'Onay Bekliyor'
+                            : promoSummary?.urgent.status === 'EXPIRED'
+                            ? 'Süresi Doldu'
+                            : 'Aktif Değil'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {(promoSummary?.urgent.startsAt || promoSummary?.urgent.expiresAt) && (
+                      <div className="pt-1.5 border-t border-white/5 text-[10px] text-slate-400 flex justify-between">
+                        <span>Başlangıç: <strong className="text-slate-200">{promoSummary.urgent.startsAt ? new Date(promoSummary.urgent.startsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.urgent.startsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></span>
+                        <span>Bitiş: <strong className="text-slate-200">{promoSummary.urgent.expiresAt ? new Date(promoSummary.urgent.expiresAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.urgent.expiresAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VİTRİN KAPASİTESİ */}
+                  <div className="p-3 bg-slate-900/40 rounded-xl border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-white/5">
+                      <span className="font-bold text-amber-400 flex items-center gap-1">
+                        <span>⭐ Vitrin Görünürlük</span>
+                      </span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        promoSummary?.showcase.active
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {promoSummary?.showcase.active
+                          ? 'Aktif'
+                          : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                          ? 'Onay Bekliyor'
+                          : promoSummary?.showcase.status === 'EXPIRED'
+                          ? 'Süresi Doldu'
+                          : 'Aktif Değil'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-slate-500 block">Talebi:</span>
+                        <strong className={promoSummary?.showcase.requested ? 'text-amber-300 font-bold' : 'text-slate-400'}>
+                          {promoSummary?.showcase.requested ? 'Evet' : 'Hayır'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Ticari Hak:</span>
+                        <strong className={
+                          promoSummary?.commercialAuthority === 'TEST' && promoSummary?.showcase.entitlementVerified
+                            ? 'text-sky-400 font-bold'
+                            : promoSummary?.showcase.entitlementVerified
+                            ? 'text-emerald-400 font-bold'
+                            : 'text-slate-400'
+                        }>
+                          {promoSummary?.commercialAuthority === 'TEST' && promoSummary?.showcase.entitlementVerified
+                            ? 'Test Modu'
+                            : promoSummary?.showcase.entitlementVerified
+                            ? 'Doğrulandı'
+                            : promoSummary?.paymentStatus === 'PENDING'
+                            ? 'Beklemede'
+                            : promoSummary?.showcase.status === 'EXPIRED'
+                            ? 'Süresi Doldu'
+                            : 'Yok'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Public Durum:</span>
+                        <strong className={
+                          promoSummary?.showcase.active
+                            ? 'text-amber-400 font-bold'
+                            : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                            ? 'text-amber-300 font-bold'
+                            : promoSummary?.showcase.status === 'EXPIRED'
+                            ? 'text-slate-400'
+                            : 'text-slate-400'
+                        }>
+                          {promoSummary?.showcase.active
+                            ? 'Aktif'
+                            : promoSummary?.showcase.status === 'PENDING_APPROVAL'
+                            ? 'Onay Bekliyor'
+                            : promoSummary?.showcase.status === 'EXPIRED'
+                            ? 'Süresi Doldu'
+                            : 'Aktif Değil'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {(promoSummary?.showcase.startsAt || promoSummary?.showcase.expiresAt) && (
+                      <div className="pt-1.5 border-t border-white/5 text-[10px] text-slate-400 flex justify-between">
+                        <span>Başlangıç: <strong className="text-slate-200">{promoSummary.showcase.startsAt ? new Date(promoSummary.showcase.startsAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.showcase.startsAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></span>
+                        <span>Bitiş: <strong className="text-slate-200">{promoSummary.showcase.expiresAt ? new Date(promoSummary.showcase.expiresAt).toLocaleDateString('tr-TR') + ' ' + new Date(promoSummary.showcase.expiresAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></span>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               </div>

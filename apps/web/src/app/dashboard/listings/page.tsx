@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
 import { AlertCircle, Trash2, X, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { formatImageUrl } from "@/utils/media";
+import { formatCurrency } from "@/utils/formatters";
 
 interface ConfirmModalState {
   isOpen: boolean;
@@ -537,9 +539,19 @@ function SellerDashboardContent() {
                     <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-slate-800 flex-shrink-0 border border-white/5">
                       {listing.media && listing.media.length > 0 ? (
                         <img
-                          src={listing.media[0].url}
+                          src={formatImageUrl(listing.media[0].url)}
                           alt={listing.title}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                            const parent = (e.target as HTMLElement).parentElement;
+                            if (parent && !parent.querySelector(".fallback-icon")) {
+                              const icon = document.createElement("div");
+                              icon.className = "fallback-icon w-full h-full flex items-center justify-center text-3xl";
+                              icon.textContent = "🚗";
+                              parent.appendChild(icon);
+                            }
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-3xl">🚗</div>
@@ -550,6 +562,11 @@ function SellerDashboardContent() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-base font-bold text-slate-200 truncate">{listing.title}</h2>
                         {listing.isUrgent && <UrgentListingBadge size="small" />}
+                        {listing.isShowcaseFeedActive && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
+                            ⭐ Vitrin
+                          </span>
+                        )}
                         <span
                           className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                             isResubmitted
@@ -558,8 +575,12 @@ function SellerDashboardContent() {
                               ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                               : listing.status === "ACTIVE"
                               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                              : listing.status === "DRAFT"
+                              : listing.status === "DRAFT" && (listing.urgentRequested || listing.showcaseRequested)
                               ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              : listing.status === "DRAFT"
+                              ? "bg-slate-700/40 text-slate-300 border border-white/10"
+                              : listing.status === "PENDING_REVIEW"
+                              ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                               : listing.status === "PASSIVE"
                               ? "bg-slate-700/40 text-slate-400 border border-white/10"
                               : listing.status === "SOLD"
@@ -573,6 +594,8 @@ function SellerDashboardContent() {
                             ? "DÜZELTME İSTENİYOR"
                             : listing.status === "ACTIVE"
                             ? "AKTİF"
+                            : listing.status === "DRAFT" && (listing.urgentRequested || listing.showcaseRequested)
+                            ? "ÖDEME BEKLİYOR"
                             : listing.status === "DRAFT"
                             ? "TASLAK (DRAFT)"
                             : listing.status === "PENDING_REVIEW"
@@ -583,11 +606,24 @@ function SellerDashboardContent() {
                             ? "SATILDI"
                             : listing.status}
                         </span>
+
+                        {listing.status === "PENDING_REVIEW" && (listing.urgentRequested || listing.showcaseRequested) && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                            {listing.urgentRequested && listing.showcaseRequested
+                              ? "Hızlı Satış"
+                              : listing.showcaseRequested
+                              ? "Vitrin + Akış"
+                              : "Acil"}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-                        <span>
-                          {listing.year} • {listing.mileage?.toLocaleString("tr-TR")} km • {listing.locationCity || "Şehir Belirtilmedi"}
+                        <span className="font-medium text-slate-300">
+                          {listing.modelYear || listing.year} • {(listing.kilometers ?? listing.mileage)?.toLocaleString("tr-TR")} km • {listing.city ? `${listing.city}${listing.district ? ` / ${listing.district}` : ""}` : (listing.locationCity || "Şehir Belirtilmedi")}
+                        </span>
+                        <span className="font-extrabold text-orange-400">
+                          {formatCurrency(listing.priceAmount || listing.price, listing.currency)}
                         </span>
                         <span className="text-rose-400 font-bold flex items-center gap-1">
                           ❤️ {listing._count?.favorites || listing.favoriteCount || 0} Favoriye Eklendi
@@ -604,6 +640,14 @@ function SellerDashboardContent() {
 
                   {/* Actions Column */}
                   <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {listing.status === "DRAFT" && (listing.urgentRequested || listing.showcaseRequested) && (
+                      <button
+                        onClick={() => router.push(`/listings/create?id=${listing.id}`)}
+                        className="text-xs font-bold px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                      >
+                        ⚡ Ödemeyi Tamamla
+                      </button>
+                    )}
                     <button
                       onClick={() => router.push(`/listings/${listing.id}`)}
                       className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition cursor-pointer"

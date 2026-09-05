@@ -4,6 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import BuyerPackagesSection from "../components/BuyerPackagesSection";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import { formatCurrency } from "@/utils/formatters";
+import { formatImageUrl } from "@/utils/media";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -897,19 +899,21 @@ export default function Home() {
             </button>
           </div>
 
-          <a
-            href={promoTab === 'vitrin' ? '/listings?showcaseOnly=true' : '/listings?urgentOnly=true'}
-            className="text-xs font-bold text-orange-500 hover:text-orange-400 transition flex items-center gap-1 self-end sm:self-center"
-          >
-            {promoTab === 'vitrin' ? 'Tüm Vitrin İlanlarını Gör →' : 'Tüm Acil İlanları Gör →'}
-          </a>
+          {featuredListings.length > 0 && (
+            <a
+              href={promoTab === 'vitrin' ? '/listings?showcaseOnly=true' : '/listings?urgentOnly=true'}
+              className="text-xs font-bold text-orange-500 hover:text-orange-400 transition flex items-center gap-1 self-end sm:self-center"
+            >
+              {promoTab === 'vitrin' ? 'Tüm Vitrin İlanlarını Gör →' : 'Tüm Acil İlanları Gör →'}
+            </a>
+          )}
         </div>
 
         {/* Subtitle / Context note */}
         <p className="text-xs text-slate-400 -mt-2">
           {promoTab === 'vitrin'
-            ? 'Öne çıkan vitrin ve ayrıcalıklı vitrin araçları.'
-            : 'Hızlı satış amacıyla listelenen ve acil fiyat avantajı sunan araçlar.'}
+            ? 'Vitrin görünürlük hakkı aktif olan araç ilanları.'
+            : 'Acil görünürlük hakkı aktif olan araç ilanları.'}
         </p>
 
         {loadingListings ? (
@@ -920,7 +924,9 @@ export default function Home() {
             className="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-2"
           >
             {featuredListings.map((listing: any) => {
-              const coverImg = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+              const coverImg = listing.media && listing.media[0] 
+                ? formatImageUrl(listing.media[0].url) 
+                : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
               return (
                 <a
                   key={listing.id}
@@ -932,6 +938,9 @@ export default function Home() {
                       src={coverImg}
                       alt={listing.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                      }}
                     />
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
                       {listing.isUrgent && (
@@ -965,13 +974,14 @@ export default function Home() {
 
                     <div className="border-t border-white/5 pt-2 flex items-center justify-between">
                       <span className="font-black text-slate-100 text-[13px]">
-                        {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
+                        {formatCurrency(listing.priceAmount, listing.currency)}
                       </span>
                       <span className="text-[9px] text-slate-500 font-mono">
                         {listing.vehicleVariant?.brand.name}
                       </span>
                     </div>
                   </div>
+
                 </a>
               );
             })}

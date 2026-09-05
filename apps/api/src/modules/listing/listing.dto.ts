@@ -195,6 +195,16 @@ export class CreateListingDto {
   @IsBoolean()
   @IsOptional()
   isUrgent?: boolean;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  urgentRequested?: boolean;
+
+  @ApiProperty({ example: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  showcaseRequested?: boolean;
 }
 
 export class UpdateListingDto {
@@ -205,6 +215,14 @@ export class UpdateListingDto {
   @IsBoolean()
   @IsOptional()
   isUrgent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  urgentRequested?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  showcaseRequested?: boolean;
 
   @IsString()
   @IsOptional()

@@ -72,9 +72,14 @@ export class ListingPromotionActivationService {
     // Determine target expiration date (Source of Truth: listing.expiresAt)
     let activeUntil = listing.expiresAt;
     if (!activeUntil) {
-      const tier = listing.seller?.subscriptionTier;
-      const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
-      const durationDays = isProTier ? 45 : 30;
+      const tier = (listing.seller?.subscriptionTier as any) || 'TANISMA';
+      const dbPlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { tier },
+      });
+      const planLimits = (dbPlan?.limits as any) || {};
+      const durationDays = planLimits?.listingDurationDays !== undefined && Number(planLimits.listingDurationDays) > 0
+        ? Number(planLimits.listingDurationDays)
+        : (tier === 'PROFESYONEL' || tier === 'PREMIUM' || tier === 'PRO' ? 45 : 30);
       activeUntil = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
     }
 

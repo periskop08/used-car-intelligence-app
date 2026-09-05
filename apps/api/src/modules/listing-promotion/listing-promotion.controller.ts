@@ -74,11 +74,40 @@ export class ListingPromotionController {
     return this.paymentService.checkout(req.user.id, listingId, dto);
   }
 
+  @Get('commerce-mode')
+  public getCommerceMode() {
+    return {
+      commerceMode: process.env.LISTING_PROMOTION_COMMERCE_MODE || 'TEST',
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('test-checkout/:listingId')
+  public async testCheckout(
+    @Req() req: any,
+    @Param('listingId') listingId: string,
+    @Body() body: { productSku: any }
+  ) {
+    return this.paymentService.createTestPromotionCheckout(req.user.id, listingId, body.productSku);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('status/:listingId')
   @Get('urgent/status/:listingId')
   public async getPromotionStatus(@Req() req: any, @Param('listingId') listingId: string) {
     return this.queryService.getUserPromotionStatusForListing(listingId, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('purchase-status/:purchaseId')
+  public async getPurchaseStatus(@Req() req: any, @Param('purchaseId') purchaseId: string) {
+    return this.paymentService.getPurchaseStatus(req.user.id, purchaseId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('abandon/:listingId')
+  public async abandonPromotion(@Req() req: any, @Param('listingId') listingId: string) {
+    return this.paymentService.abandonPromotion(req.user.id, listingId);
   }
 
   @Post('webhooks/:provider')

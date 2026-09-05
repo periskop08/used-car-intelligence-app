@@ -30,6 +30,9 @@ export class PromotionCheckoutResponseDto {
   priceAmount: number;
   amountMinor: number;
   currency: string;
+  checkoutAvailable: boolean;
   paymentProviderUrl?: string;
+  checkoutUnavailableCode?: string;
+  checkoutUnavailableMessage?: string;
   checkoutExpiresAt: string;
 }

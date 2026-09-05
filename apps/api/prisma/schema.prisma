@@ -1104,7 +1104,11 @@ model VehicleListing {
   packageAtPublish   ListingPackageType?
   listingDurationDays Int?              // 30 for FREE/STANDARD, 45 for PREMIUM
 
-  // Promotion derived fields
+  // Promotion intent / request tracking (Immutable seller intent - preserved across approval/expiry)
+  urgentRequested        Boolean            @default(false)
+  showcaseRequested      Boolean            @default(false)
+
+  // Promotion derived / active projection fields
   isUrgent               Boolean            @default(false)
   urgentSince            DateTime?
   urgentExpiresAt        DateTime?
@@ -2821,6 +2825,7 @@ enum ListingPromotionSource {
   PAYMENT
   ADMIN_GRANT
   CAMPAIGN
+  TEST
 }
 
 enum PromotionRefundMethod {

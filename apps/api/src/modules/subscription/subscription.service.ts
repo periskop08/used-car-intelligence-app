@@ -927,4 +927,39 @@ export class SubscriptionService {
       users: formattedUsers,
     };
   }
+
+  /**
+   * Authoritative Listing Duration Resolution (Days)
+   * Resolves duration strictly from user active subscription snapshot, plan limits in DB,
+   * or configured fallback. Eliminates ad-hoc hardcoded duration constants across services.
+   */
+  async getAuthoritativeListingDurationDays(userId?: string, fallbackTier?: string): Promise<number> {
+    if (userId) {
+      try {
+        const summary = await this.getSubscriptionSummary(userId);
+        if (summary?.rights?.listingDurationDays && Number(summary.rights.listingDurationDays) > 0) {
+          return Number(summary.rights.listingDurationDays);
+        }
+      } catch (e) {
+        // Continue to plan lookup
+      }
+    }
+
+
+    const effectiveTier = (fallbackTier as any) || SubscriptionTier.TANISMA;
+    try {
+      const dbPlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { tier: effectiveTier },
+      });
+      const planLimits = (dbPlan?.limits as any) || {};
+      if (planLimits?.listingDurationDays !== undefined && Number(planLimits.listingDurationDays) > 0) {
+        return Number(planLimits.listingDurationDays);
+      }
+    } catch (e) {
+      // Continue to canonical fallback
+    }
+
+    return 30;
+  }
 }
+

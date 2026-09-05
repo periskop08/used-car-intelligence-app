@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ListingFilters from "../../components/listings/ListingFilters";
 import ListingCard from "../../components/listings/ListingCard";
 import UrgentListingBadge from "../../components/listings/UrgentListingBadge";
+import { formatCurrency } from "@/utils/formatters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -23,6 +24,8 @@ function ListingsContent() {
   const [models, setModels] = useState<any[]>([]);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [selectedEngineId, setSelectedEngineId] = useState("");
+  const [vehicleVariantId, setVehicleVariantId] = useState("");
   const [minYear, setMinYear] = useState("");
   const [maxYear, setMaxYear] = useState("");
   const [minPrice, setMinPrice] = useState("");
@@ -33,6 +36,7 @@ function ListingsContent() {
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [showcaseOnly, setShowcaseOnly] = useState(false);
 
   // sahibinden.com style extended filters
   const [city, setCity] = useState("");
@@ -90,11 +94,9 @@ function ListingsContent() {
       .catch((e) => console.error("Error fetching models:", e));
   }, [selectedBrand]);
 
-  const [vehicleVariantId, setVehicleVariantId] = useState("");
-  const [selectedEngineId, setSelectedEngineId] = useState("");
-
   // Read URL parameters on load
   useEffect(() => {
+
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
     const engineVal = searchParams.get("engineId");
@@ -106,6 +108,7 @@ function ListingsContent() {
     const maxP = searchParams.get("maxPrice");
     const aiReady = searchParams.get("isAiReady") === "true";
     const urgentVal = searchParams.get("urgentOnly") === "true";
+    const showcaseVal = searchParams.get("showcaseOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
     const profileId = searchParams.get("preferenceProfileId");
@@ -122,6 +125,7 @@ function ListingsContent() {
     if (maxP) setMaxPrice(maxP);
     if (aiReady) setIsAiReady(true);
     if (urgentVal) setUrgentOnly(true);
+    if (showcaseVal) setShowcaseOnly(true);
     if (statusVal) setVehicleStatuses(statusVal.split(","));
     if (cityVal) setCity(cityVal);
     if (profileId) setPreferenceProfileId(profileId);
@@ -144,8 +148,10 @@ function ListingsContent() {
     if (maxKm) query += `&maxKm=${maxKm}`;
     if (isAiReady) query += `&isAiReady=true`;
     if (urgentOnly) query += `&urgentOnly=true`;
+    if (showcaseOnly) query += `&showcaseOnly=true`;
     if (preferenceProfileId) query += `&preferenceProfileId=${preferenceProfileId}`;
     if (prefSessionId) query += `&sessionId=${prefSessionId}`;
+
 
     if (city) query += `&city=${encodeURIComponent(city)}`;
     if (district) query += `&district=${encodeURIComponent(district)}`;
@@ -187,7 +193,8 @@ function ListingsContent() {
 
   useEffect(() => {
     fetchListings();
-  }, [page, sort, selectedBrand, selectedModel, vehicleVariantId, minPrice, maxPrice, fuelTypes, transmissions, bodyTypes, isAiReady, token, preferenceProfileId, prefSessionId]);
+  }, [page, sort, selectedBrand, selectedModel, vehicleVariantId, minPrice, maxPrice, fuelTypes, transmissions, bodyTypes, isAiReady, urgentOnly, showcaseOnly, token, preferenceProfileId, prefSessionId]);
+
 
   const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
     e.preventDefault();
@@ -240,6 +247,8 @@ function ListingsContent() {
     setMinKm("");
     setMaxKm("");
     setIsAiReady(false);
+    setUrgentOnly(false);
+    setShowcaseOnly(false);
     setCity("");
     setDistrict("");
     setSelectedCurrency("TRY");
@@ -753,6 +762,34 @@ function ListingsContent() {
             </label>
           </div>
 
+          {/* Acil İlanlar Toggle */}
+          <div className="flex items-center gap-2 cursor-pointer mt-2">
+            <input
+              type="checkbox"
+              id="urgentOnlyCheckbox"
+              checked={urgentOnly}
+              onChange={(e) => setUrgentOnly(e.target.checked)}
+              className="accent-red-500 rounded border-white/10"
+            />
+            <label htmlFor="urgentOnlyCheckbox" className="text-xs font-black text-rose-400 cursor-pointer select-none flex items-center gap-1">
+              ⚡ Yalnızca Acil İlanlar
+            </label>
+          </div>
+
+          {/* Vitrin İlanları Toggle */}
+          <div className="flex items-center gap-2 cursor-pointer mt-1">
+            <input
+              type="checkbox"
+              id="showcaseOnlyCheckbox"
+              checked={showcaseOnly}
+              onChange={(e) => setShowcaseOnly(e.target.checked)}
+              className="accent-amber-500 rounded border-white/10"
+            />
+            <label htmlFor="showcaseOnlyCheckbox" className="text-xs font-black text-amber-400 cursor-pointer select-none flex items-center gap-1">
+              ⭐ Yalnızca Vitrin İlanları
+            </label>
+          </div>
+
           {/* Sticky Apply Button */}
           <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-6 -mb-6 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
             <button
@@ -841,10 +878,18 @@ function ListingsContent() {
                         src={cover}
                         alt={listing.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
+                        }}
                       />
                       <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 items-start">
                         {listing.isUrgent && (
                           <UrgentListingBadge size="small" animated />
+                        )}
+                        {listing.isShowcaseFeedActive && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
+                            ⭐ Vitrin
+                          </span>
                         )}
                         {listing.isAiReady && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md flex items-center gap-1">
@@ -869,9 +914,10 @@ function ListingsContent() {
 
                       <div className="border-t border-white/5 pt-3 flex items-center justify-between">
                         <span className="font-black text-slate-100 text-sm">
-                          {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency === "TRY" ? "TL" : listing.currency}
+                          {formatCurrency(listing.priceAmount, listing.currency)}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono">
+
                           {listing.vehicleVariant?.brand.name}
                         </span>
                       </div>

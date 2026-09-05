@@ -41,8 +41,8 @@ export class FinanceReportsService {
     // 1. Payment status must be PAID or REFUNDED (if partial refund)
     if (p.paymentStatus !== 'PAID' && p.paymentStatus !== 'REFUNDED') return false;
 
-    // 2. Source must be PAYMENT (not ADMIN_GRANT)
-    if (p.source === 'ADMIN_GRANT' || p.grantedByAdminId) return false;
+    // 2. Source must be PAYMENT (not ADMIN_GRANT or TEST)
+    if (p.source === 'ADMIN_GRANT' || p.source === 'TEST' || p.grantedByAdminId) return false;
 
     // 3. Payment Provider must exist and NOT be a mock/test provider keyword
     if (!p.paymentProvider) return false;

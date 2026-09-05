@@ -7,9 +7,21 @@ import {
   ListingPromotionType, 
   ListingPromotionProductSku,
   PromotionLifecycleStatus, 
-  PromotionPaymentStatus 
+  PromotionPaymentStatus,
+  ListingStatus
 } from '@prisma/client';
 import * as crypto from 'crypto';
+
+function isListingSubmissionReady(listing: any): boolean {
+  if (!listing) return false;
+  if (!listing.title || !listing.title.trim()) return false;
+  if (!listing.priceAmount || Number(listing.priceAmount) <= 0) return false;
+  if (!listing.city || !listing.city.trim()) return false;
+  if (!listing.modelYear || listing.modelYear < 1900) return false;
+  if (listing.kilometers === null || listing.kilometers === undefined || listing.kilometers < 0) return false;
+  if (!listing.vehicleVariantId && (!listing.customBrand || !listing.customModel)) return false;
+  return true;
+}
 
 @Injectable()
 export class ListingPromotionPaymentService {
@@ -129,6 +141,15 @@ export class ListingPromotionPaymentService {
         return purchase;
       });
 
+      const configuredCheckoutBase = process.env.LISTING_PROMOTION_CHECKOUT_BASE_URL || process.env.CHECKOUT_URL;
+      const isConfiguredValidUrl = !!configuredCheckoutBase && !configuredCheckoutBase.includes('checkout.torquescout.com');
+
+      const paymentProviderUrl = isConfiguredValidUrl
+        ? `${configuredCheckoutBase.replace(/\/$/, '')}/pay/${result.id}`
+        : undefined;
+
+      const checkoutAvailable = !!paymentProviderUrl;
+
       return {
         purchaseId: result.id,
         listingId: result.listingId!,
@@ -138,7 +159,10 @@ export class ListingPromotionPaymentService {
         priceAmount: Number(result.priceAmount),
         amountMinor: result.amountMinor!,
         currency: result.currency!,
-        paymentProviderUrl: `https://checkout.torquescout.com/pay/${result.id}`,
+        checkoutAvailable,
+        paymentProviderUrl,
+        checkoutUnavailableCode: checkoutAvailable ? undefined : 'LISTING_PROMOTION_CHECKOUT_INFRASTRUCTURE_ACTION_REQUIRED',
+        checkoutUnavailableMessage: checkoutAvailable ? undefined : 'Ödeme altyapısı (checkout.torquescout.com) DNS veya dağıtım yapılandırması bekliyor. İlanınız taslak olarak güvenle saklandı.',
         checkoutExpiresAt: result.checkoutExpiresAt?.toISOString() || now.toISOString(),
       };
     } finally {
@@ -163,7 +187,7 @@ export class ListingPromotionPaymentService {
 
     const now = new Date();
 
-    // Execute Payment Status Update + Entitlements Creation inside Single DB Transaction
+    // Execute Payment Status Update + Entitlements Creation + Listing Status Sync inside Single DB Transaction
     await this.prisma.$transaction(async (tx) => {
       await tx.listingPromotionPurchase.update({
         where: { id: purchaseId },
@@ -213,11 +237,272 @@ export class ListingPromotionPaymentService {
           },
         });
       }
+
+      // Sync Listing state: validate readiness and transition DRAFT to PENDING_REVIEW
+      if (purchase.listingId) {
+        const listing = await tx.vehicleListing.findUnique({
+          where: { id: purchase.listingId },
+        });
+
+        if (listing) {
+          const urgentRequested = sku === ListingPromotionProductSku.URGENT_LISTING || sku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE;
+          const showcaseRequested = sku === ListingPromotionProductSku.SHOWCASE_FEED || sku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE;
+
+          const submissionReady = isListingSubmissionReady(listing);
+          const newStatus = (listing.status === ListingStatus.DRAFT && submissionReady)
+            ? ListingStatus.PENDING_REVIEW
+            : listing.status;
+
+          await tx.vehicleListing.update({
+            where: { id: purchase.listingId },
+            data: {
+              urgentRequested: listing.urgentRequested || urgentRequested,
+              showcaseRequested: listing.showcaseRequested || showcaseRequested,
+              status: newStatus,
+            },
+          });
+        }
+      }
     });
 
     // Attempt activation if listing is published/approved
     if (purchase.listingId) {
       await this.activationService.tryActivatePromotions(purchase.listingId);
     }
+  }
+
+  public async getPurchaseStatus(userId: string, purchaseId: string) {
+    const purchase = await this.prisma.listingPromotionPurchase.findUnique({
+      where: { id: purchaseId },
+      include: {
+        listing: {
+          select: { id: true, title: true, status: true, sellerId: true, urgentRequested: true, showcaseRequested: true }
+        },
+        entitlements: true,
+      },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException('PURCHASE_NOT_FOUND: Ödeme kaydı bulunamadı.');
+    }
+
+    if (purchase.listing?.sellerId !== userId) {
+      throw new ForbiddenException('UNAUTHORIZED: Bu işlem için yetkiniz yok.');
+    }
+
+    return {
+      purchaseId: purchase.id,
+      listingId: purchase.listingId,
+      productSku: purchase.productSku,
+      paymentStatus: purchase.paymentStatus,
+      lifecycleStatus: purchase.lifecycleStatus,
+      priceAmount: Number(purchase.priceAmount),
+      currency: purchase.currency,
+      listingStatus: purchase.listing?.status,
+      entitlements: purchase.entitlements.map(e => ({
+        id: e.id,
+        promotionType: e.promotionType,
+        lifecycleStatus: e.lifecycleStatus,
+      })),
+    };
+  }
+
+  public async abandonPromotion(userId: string, listingId: string): Promise<{ success: boolean; status: string }> {
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('LISTING_NOT_FOUND: İlan bulunamadı.');
+    }
+
+    if (listing.sellerId !== userId) {
+      throw new ForbiddenException('UNAUTHORIZED: Bu işlem için ilan sahibi olmalısınız.');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Cancel pending purchases
+      await tx.listingPromotionPurchase.updateMany({
+        where: {
+          listingId,
+          paymentStatus: PromotionPaymentStatus.PENDING,
+        },
+        data: {
+          paymentStatus: PromotionPaymentStatus.FAILED,
+          lifecycleStatus: PromotionLifecycleStatus.CANCELLED,
+          lastErrorCode: 'PROMOTION_ABANDONED_BY_SELLER',
+          lastErrorMessage: 'Satıcı promosyonsuz standart yayınlama yolunu seçti.',
+        },
+      });
+
+      // Clear active requested flags
+      const submissionReady = isListingSubmissionReady(listing);
+      const targetStatus = submissionReady ? ListingStatus.PENDING_REVIEW : listing.status;
+
+      const updated = await tx.vehicleListing.update({
+        where: { id: listingId },
+        data: {
+          urgentRequested: false,
+          showcaseRequested: false,
+          status: targetStatus,
+        },
+      });
+
+      // Record audit history preserving the intent that seller previously requested promotion but abandoned it
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'LISTING_PROMOTION_ABANDONED',
+          details: {
+            listingId,
+            previousUrgentRequested: listing.urgentRequested,
+            previousShowcaseRequested: listing.showcaseRequested,
+            targetStatus,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+
+      return {
+        success: true,
+        status: updated.status,
+      };
+    });
+  }
+
+  public async createTestPromotionCheckout(
+    userId: string,
+    listingId: string,
+    productSku: ListingPromotionProductSku
+  ): Promise<{
+    success: boolean;
+    purchaseId: string;
+    productSku: ListingPromotionProductSku;
+    status: ListingStatus;
+    commerceMode: 'TEST';
+  }> {
+    const isLiveMode = process.env.LISTING_PROMOTION_COMMERCE_MODE === 'LIVE';
+    if (isLiveMode) {
+      throw new ForbiddenException('TEST_MODE_DISABLED: Canlı (LIVE) ticaret modunda test yetkisi oluşturulamaz.');
+    }
+
+    const listing = await this.prisma.vehicleListing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('LISTING_NOT_FOUND: İlan bulunamadı.');
+    }
+
+    if (listing.sellerId !== userId) {
+      throw new ForbiddenException('UNAUTHORIZED: Bu işlem için ilan sahibi olmalısınız.');
+    }
+
+    const urgentRequested =
+      productSku === ListingPromotionProductSku.URGENT_LISTING ||
+      productSku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE;
+    const showcaseRequested =
+      productSku === ListingPromotionProductSku.SHOWCASE_FEED ||
+      productSku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE;
+
+    const promotionType =
+      productSku === ListingPromotionProductSku.SHOWCASE_FEED
+        ? ListingPromotionType.SHOWCASE_FEED
+        : ListingPromotionType.URGENT_LISTING;
+
+    const now = new Date();
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Create Purchase with explicit TEST source and NOT_REQUIRED payment status
+      const purchase = await tx.listingPromotionPurchase.create({
+        data: {
+          userId,
+          listingId,
+          source: ListingPromotionSource.TEST,
+          promotionType,
+          productSku,
+          lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+          paymentStatus: PromotionPaymentStatus.NOT_REQUIRED,
+          priceAmount: 0,
+          amountMinor: 0,
+          currency: 'TRY',
+          paymentProvider: 'CONTROLLED_TEST_MODE',
+          paymentReferenceId: `TEST_AUTH_${Date.now()}_${listingId.slice(0, 8)}`,
+          purchasedAt: now,
+        },
+      });
+
+      // 2. Create Entitlements
+      if (productSku === ListingPromotionProductSku.URGENT_SHOWCASE_BUNDLE) {
+        await tx.listingPromotionEntitlement.createMany({
+          data: [
+            {
+              purchaseId: purchase.id,
+              listingId,
+              promotionType: ListingPromotionType.URGENT_LISTING,
+              lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+            },
+            {
+              purchaseId: purchase.id,
+              listingId,
+              promotionType: ListingPromotionType.SHOWCASE_FEED,
+              lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+            },
+          ],
+        });
+      } else {
+        await tx.listingPromotionEntitlement.create({
+          data: {
+            purchaseId: purchase.id,
+            listingId,
+            promotionType,
+            lifecycleStatus: PromotionLifecycleStatus.PENDING_ACTIVATION,
+          },
+        });
+      }
+
+      // 3. Verify listing submission readiness
+      const submissionReady = isListingSubmissionReady(listing);
+      const targetStatus = submissionReady ? ListingStatus.PENDING_REVIEW : listing.status;
+
+      // 4. Update listing request flags and status
+      const updatedListing = await tx.vehicleListing.update({
+        where: { id: listingId },
+        data: {
+          urgentRequested,
+          showcaseRequested,
+          status: targetStatus,
+        },
+      });
+
+      // 5. Create AuditLog entry
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'LISTING_PROMOTION_TEST_AUTHORITY_GRANTED',
+          details: {
+            listingId,
+            productSku,
+            purchaseId: purchase.id,
+            source: 'TEST',
+            targetStatus,
+            timestamp: now.toISOString(),
+          },
+        },
+      });
+
+      // 6. If listing is already ACTIVE (e.g. promoting an already published listing), trigger activation
+      if (updatedListing.status === ListingStatus.ACTIVE) {
+        await this.activationService.tryActivatePromotions(listingId);
+      }
+
+      return {
+        success: true,
+        purchaseId: purchase.id,
+        productSku,
+        status: updatedListing.status,
+        commerceMode: 'TEST' as const,
+      };
+    });
   }
 }

@@ -7,6 +7,8 @@ import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, 
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
+import { formatCurrency } from "@/utils/formatters";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -305,9 +307,10 @@ export default function ListingDetail() {
           {/* Orta Kolon (lg:col-span-3): Fiyat (Araç Bilgileri Kartının Üstüne Alındı) */}
           <div className="lg:col-span-3 text-left">
             <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent block">
-              {Number(listing.priceAmount).toLocaleString('tr-TR')} {listing.currency}
+              {formatCurrency(listing.priceAmount, listing.currency)}
             </span>
           </div>
+
 
           {/* Sağ Kolon (lg:col-span-3): Satıcı Hizalaması */}
           <div className="hidden lg:block lg:col-span-3" />

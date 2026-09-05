@@ -218,13 +218,14 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
       await this.prisma.vehicleListing.update({
         where: { id: listing.id },
         data: {
+          urgentRequested: true, // Preserve historical seller intent permanently!
           isUrgent: false,
           urgentSince: null,
           urgentExpiresAt: null,
         },
       });
       repairedListings++;
-      this.logger.warn(`Reconciliation: Repaired desynced isUrgent=false for listing ${listing.id}`);
+      this.logger.warn(`Reconciliation: Repaired desynced isUrgent=false (preserved urgentRequested=true) for listing ${listing.id}`);
     }
 
     // 3. Repair desynced showcase listings (Strictly on ACTIVE listings without active or pending entitlements)
@@ -249,14 +250,16 @@ export class ListingPromotionReconciliationService implements OnModuleInit {
       await this.prisma.vehicleListing.update({
         where: { id: listing.id },
         data: {
+          showcaseRequested: true, // Preserve historical seller intent permanently!
           isShowcaseFeedActive: false,
           showcaseFeedSince: null,
           showcaseFeedExpiresAt: null,
         },
       });
       repairedListings++;
-      this.logger.warn(`Reconciliation: Repaired desynced isShowcaseFeedActive=false for listing ${listing.id}`);
+      this.logger.warn(`Reconciliation: Repaired desynced isShowcaseFeedActive=false (preserved showcaseRequested=true) for listing ${listing.id}`);
     }
+
 
     // 4. Restore active entitlements that were not marked on listing
     const activeUrgentEntitlementsNotMarked = await this.prisma.listingPromotionEntitlement.findMany({

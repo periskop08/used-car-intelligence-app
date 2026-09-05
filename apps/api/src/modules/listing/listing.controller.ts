@@ -758,14 +758,45 @@ export class ListingController {
         media: { orderBy: { sortOrder: 'asc' } },
         vehicleVariant: { include: { brand: true, model: true } },
         leads: { orderBy: { createdAt: 'desc' } },
+        promotions: { orderBy: { createdAt: 'desc' } },
+        promotionEntitlements: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return items.map((item) => ({
-      ...item,
-      favoriteCount: item._count?.favorites ?? 0,
-    }));
+    const now = new Date();
+
+    return items.map((item) => {
+      const promoSummary = this.promotionQueryService
+        ? this.promotionQueryService.resolveEffectivePromotions(item, now)
+        : null;
+
+      const primaryImage = item.media?.[0]?.url || null;
+      const formattedCity = item.city || '';
+      const formattedDistrict = item.district || '';
+      const locationCity = formattedCity
+        ? (formattedDistrict ? `${formattedCity} / ${formattedDistrict}` : formattedCity)
+        : 'Şehir Belirtilmedi';
+
+      return {
+        ...item,
+        city: formattedCity,
+        district: formattedDistrict,
+        locationCity,
+        kilometers: item.kilometers,
+        mileage: item.kilometers,
+        modelYear: item.modelYear,
+        year: item.modelYear,
+        priceAmount: Number(item.priceAmount),
+        price: item.priceAmount.toString(),
+        currency: item.currency || 'TRY',
+        primaryImage,
+        favoriteCount: item._count?.favorites ?? 0,
+        isUrgent: promoSummary?.urgent?.active ?? !!item.isUrgent,
+        isShowcaseFeedActive: promoSummary?.showcase?.active ?? !!item.isShowcaseFeedActive,
+        promotionSummary: promoSummary,
+      };
+    });
   }
 
   @Get('me/listing-quota')

@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma.service';
 import { ListingPromotionActivationService } from '../listing-promotion/listing-promotion-activation.service';
 import { ListingPromotionRefundService } from '../listing-promotion/listing-promotion-refund.service';
 import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { Optional } from '@nestjs/common';
 
 const PRESET_REASONS = [
@@ -24,7 +25,9 @@ export class ListingModerationService implements OnModuleInit {
     @Optional() private readonly activationService?: ListingPromotionActivationService,
     @Optional() private readonly refundService?: ListingPromotionRefundService,
     @Optional() private readonly queryService?: ListingPromotionQueryService,
+    @Optional() private readonly subscriptionService?: SubscriptionService,
   ) {}
+
 
   async onModuleInit() {
     const valuesToAdd = ['DETAILED_REVIEW', 'REVISION_REQUIRED', 'REPORTED', 'DELETED'];
@@ -110,6 +113,41 @@ export class ListingModerationService implements OnModuleInit {
     const num = listing.id ? listing.id.replace(/-/g, '').substring(0, 6).toUpperCase() : '000000';
     return `TS-ILAN-${year}${month}-${num}`;
   }
+
+  public async getAuthoritativeListingDurationDays(sellerId?: string, tier?: string): Promise<number> {
+    if (this.subscriptionService) {
+      return await this.subscriptionService.getAuthoritativeListingDurationDays(sellerId, tier);
+    }
+
+    const now = new Date();
+    if (sellerId) {
+      const activeSub = await this.prisma.subscription.findFirst({
+        where: {
+          userId: sellerId,
+          status: 'ACTIVE' as any,
+          expiresAt: { gt: now },
+        },
+        include: { plan: true },
+      });
+
+      const subLimits = (activeSub?.periodLimitsSnapshot as any) || (activeSub?.plan?.limits as any);
+      if (subLimits?.listingDurationDays !== undefined && Number(subLimits.listingDurationDays) > 0) {
+        return Number(subLimits.listingDurationDays);
+      }
+    }
+
+    const effectiveTier = (tier as any) || 'TANISMA';
+    const dbPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { tier: effectiveTier },
+    });
+    const planLimits = (dbPlan?.limits as any) || {};
+    if (planLimits?.listingDurationDays !== undefined && Number(planLimits.listingDurationDays) > 0) {
+      return Number(planLimits.listingDurationDays);
+    }
+
+    return 30;
+  }
+
 
   async getModerationReasons(actionType?: string) {
     let DBReasons: any[] = [];
@@ -428,6 +466,8 @@ export class ListingModerationService implements OnModuleInit {
         district: l.district || '',
         description: l.description,
         status: l.status,
+        publishedAt: l.publishedAt,
+        expiresAt: l.expiresAt,
         createdAt: l.createdAt,
         updatedAt: l.updatedAt,
       },
@@ -473,14 +513,22 @@ export class ListingModerationService implements OnModuleInit {
   async approveListing(listingId: string, adminUser: any) {
     const l = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
-      include: { seller: true },
+      include: { seller: true, promotions: true, promotionEntitlements: true },
     });
     if (!l) throw new NotFoundException('İlan bulunamadı.');
 
+    // Commercial Authority Gate:
+    // If promotion was requested, verify that valid commercial authority (PAID, ADMIN_GRANT, CAMPAIGN) exists!
+    if (l.urgentRequested || l.showcaseRequested) {
+      const hasAuthority = this.queryService ? this.queryService.hasValidPromotionAuthority(l) : false;
+      if (!hasAuthority) {
+        throw new BadRequestException('COMMERCIAL_AUTHORITY_REQUIRED: Ödemesi veya ticari hakkı doğrulanmamış promosyonlu ilan onaylanamaz. İlan taslağa alınmalı veya promosyonsuz yayınlanmalıdır.');
+      }
+    }
+
     const now = new Date();
     const tier = l.seller?.subscriptionTier;
-    const isProTier = tier === ('PROFESYONEL' as any) || tier === ('PREMIUM' as any) || tier === ('PRO' as any);
-    const durationDays = isProTier ? 45 : 30;
+    const durationDays = await this.getAuthoritativeListingDurationDays(l.sellerId, tier as any);
 
     // The publication period strictly starts from approval time (now),
     // ensuring moderation review time does not shorten the seller's active publication period
@@ -536,9 +584,16 @@ export class ListingModerationService implements OnModuleInit {
       },
     });
 
+    // CRITICAL: Preserve seller intent!
+    // A listing's requested status must NEVER be wiped upon approval just because entitlement is inactive.
+    const urgentRequestedPreserved = !!((l as any).urgentRequested || l.isUrgent);
+    const showcaseRequestedPreserved = !!((l as any).showcaseRequested || l.isShowcaseFeedActive);
+
     await this.prisma.vehicleListing.update({
       where: { id: listingId },
       data: {
+        urgentRequested: urgentRequestedPreserved,
+        showcaseRequested: showcaseRequestedPreserved,
         isUrgent: !!hasActiveUrgentEntitlement,
         urgentSince: hasActiveUrgentEntitlement ? hasActiveUrgentEntitlement.activatedAt : null,
         urgentExpiresAt: hasActiveUrgentEntitlement ? hasActiveUrgentEntitlement.expiresAt : null,
@@ -549,6 +604,7 @@ export class ListingModerationService implements OnModuleInit {
     });
 
     return updated;
+
   }
 
   async requestRevision(listingId: string, body: any, adminUser: any) {
@@ -821,6 +877,18 @@ export class ListingModerationService implements OnModuleInit {
             },
           });
         }
+        if (st === 'PENDING_REVIEW') {
+          return await this.prisma.vehicleListing.count({
+            where: {
+              status: 'PENDING_REVIEW',
+              OR: [
+                { urgentRequested: false, showcaseRequested: false },
+                { promotions: { some: { paymentStatus: 'PAID' } } },
+                { promotionEntitlements: { some: { lifecycleStatus: { in: ['ACTIVE', 'PENDING_ACTIVATION'] } } } },
+              ],
+            },
+          });
+        }
         if (st === 'EXPIRED') {
           return await this.prisma.vehicleListing.count({
             where: {
@@ -888,6 +956,15 @@ export class ListingModerationService implements OnModuleInit {
         OR: [
           { status: 'EXPIRED' },
           { status: 'ACTIVE', expiresAt: { lte: now } },
+        ],
+      };
+    } else if (status === 'PENDING_REVIEW') {
+      where = {
+        status: 'PENDING_REVIEW',
+        OR: [
+          { urgentRequested: false, showcaseRequested: false },
+          { promotions: { some: { paymentStatus: 'PAID' } } },
+          { promotionEntitlements: { some: { lifecycleStatus: { in: ['ACTIVE', 'PENDING_ACTIVATION'] } } } },
         ],
       };
     } else {

@@ -69,6 +69,7 @@ export class ListingPromotionPricingService {
       individualTotalMinor,
       savingsAmount: savingsAmountMinor / 100,
       savingsAmountMinor,
+      commerceMode: (process.env.LISTING_PROMOTION_COMMERCE_MODE || 'TEST') as 'TEST' | 'LIVE',
     };
   }
 

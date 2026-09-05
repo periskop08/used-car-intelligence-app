@@ -3,24 +3,38 @@ import { PrismaService } from '../../prisma.service';
 import { PromotionLifecycleStatus, ListingPromotionType } from '@prisma/client';
 
 export interface EffectivePromotionSummary {
+  requestedPublicationType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT';
+  effectivePromotionType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT';
   publicationType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT';
   urgent: {
     requested: boolean;
-    status: 'ACTIVE' | 'PENDING_APPROVAL' | 'EXPIRED' | 'NONE';
-    entitlementVerified: boolean;
+    entitled: boolean;
     active: boolean;
+    entitlementStatus: string | null;
+    purchaseStatus: string | null;
     startsAt: Date | null;
     expiresAt: Date | null;
+    endsAt: Date | null;
+    status: 'ACTIVE' | 'PENDING_APPROVAL' | 'EXPIRED' | 'NONE';
+    entitlementVerified: boolean;
   };
   showcase: {
     requested: boolean;
-    status: 'ACTIVE' | 'PENDING_APPROVAL' | 'EXPIRED' | 'NONE';
-    entitlementVerified: boolean;
+    entitled: boolean;
     active: boolean;
+    entitlementStatus: string | null;
+    purchaseStatus: string | null;
     startsAt: Date | null;
     expiresAt: Date | null;
+    endsAt: Date | null;
+    status: 'ACTIVE' | 'PENDING_APPROVAL' | 'EXPIRED' | 'NONE';
+    entitlementVerified: boolean;
   };
+  feedActive: boolean;
   paymentStatus: 'PAID' | 'PENDING' | 'NONE';
+  commercialAuthority: 'TEST' | 'PAID' | 'ADMIN_GRANT' | 'CAMPAIGN' | 'NONE';
+  paymentDisplay: string;
+  isTestMode: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
 }
@@ -70,18 +84,35 @@ export class ListingPromotionQueryService {
     const urgentActive = isListingActive && !!activeUrgentEntitlement;
     const showcaseActive = isListingActive && !!activeShowcaseEntitlement;
 
-    // Requested state (requested checkbox or entitlement/purchase exists)
+    // Entitled state (any active or pending commercial entitlement in DB)
+    const urgentEntitled = !!(activeUrgentEntitlement || pendingUrgentEntitlement);
+    const showcaseEntitled = !!(activeShowcaseEntitlement || pendingShowcaseEntitlement);
+
+    const urgentEntitlementStatus = activeUrgentEntitlement?.lifecycleStatus || pendingUrgentEntitlement?.lifecycleStatus || (expiredUrgentEntitlement ? 'EXPIRED' : null);
+    const showcaseEntitlementStatus = activeShowcaseEntitlement?.lifecycleStatus || pendingShowcaseEntitlement?.lifecycleStatus || (expiredShowcaseEntitlement ? 'EXPIRED' : null);
+
+    const urgentPurchase = purchases.find((p: any) => p.promotionType === ListingPromotionType.URGENT_LISTING || p.productSku === 'URGENT_SHOWCASE_BUNDLE');
+    const showcasePurchase = purchases.find((p: any) => p.promotionType === ListingPromotionType.SHOWCASE_FEED || p.productSku === 'URGENT_SHOWCASE_BUNDLE');
+
+    const urgentPurchaseStatus = activeUrgentEntitlement?.purchase?.paymentStatus || pendingUrgentEntitlement?.purchase?.paymentStatus || urgentPurchase?.paymentStatus || null;
+    const showcasePurchaseStatus = activeShowcaseEntitlement?.purchase?.paymentStatus || pendingShowcaseEntitlement?.purchase?.paymentStatus || showcasePurchase?.paymentStatus || null;
+
+    // Requested state (durable request column OR active/pending/expired entitlement OR historical purchase)
     const urgentRequested = !!(
+      listing.urgentRequested ||
       listing.isUrgent ||
       activeUrgentEntitlement ||
       pendingUrgentEntitlement ||
-      purchases.some((p: any) => p.promotionType === ListingPromotionType.URGENT_LISTING || p.productSku === 'URGENT_SHOWCASE_BUNDLE')
+      expiredUrgentEntitlement ||
+      urgentPurchase
     );
     const showcaseRequested = !!(
+      listing.showcaseRequested ||
       listing.isShowcaseFeedActive ||
       activeShowcaseEntitlement ||
       pendingShowcaseEntitlement ||
-      purchases.some((p: any) => p.promotionType === ListingPromotionType.SHOWCASE_FEED || p.productSku === 'URGENT_SHOWCASE_BUNDLE')
+      expiredShowcaseEntitlement ||
+      showcasePurchase
     );
 
     // Statuses
@@ -103,7 +134,27 @@ export class ListingPromotionQueryService {
       showcaseStatus = 'EXPIRED';
     }
 
-    // Publication Type
+    // Requested Publication Type (Represents seller intent, NEVER conflated with active state)
+    let requestedPublicationType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT' = 'STANDARD';
+    if (urgentRequested && showcaseRequested) {
+      requestedPublicationType = 'SHOWCASE_URGENT';
+    } else if (showcaseRequested) {
+      requestedPublicationType = 'SHOWCASE';
+    } else if (urgentRequested) {
+      requestedPublicationType = 'URGENT';
+    }
+
+    // Effective Active Promotion Type (Only strictly active promotions)
+    let effectivePromotionType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT' = 'STANDARD';
+    if (urgentActive && showcaseActive) {
+      effectivePromotionType = 'SHOWCASE_URGENT';
+    } else if (showcaseActive) {
+      effectivePromotionType = 'SHOWCASE';
+    } else if (urgentActive) {
+      effectivePromotionType = 'URGENT';
+    }
+
+    // Effective Publication Type (Active or Pending Approval for publication)
     let publicationType: 'STANDARD' | 'URGENT' | 'SHOWCASE' | 'SHOWCASE_URGENT' = 'STANDARD';
     const isUrgentConsidered = urgentActive || urgentStatus === 'PENDING_APPROVAL';
     const isShowcaseConsidered = showcaseActive || showcaseStatus === 'PENDING_APPROVAL';
@@ -116,16 +167,43 @@ export class ListingPromotionQueryService {
       publicationType = 'URGENT';
     }
 
-    // Payment Status
+    // Commercial Authority and Payment Status
+    const isLiveMode = process.env.LISTING_PROMOTION_COMMERCE_MODE === 'LIVE';
+    let commercialAuthority: 'TEST' | 'PAID' | 'ADMIN_GRANT' | 'CAMPAIGN' | 'NONE' = 'NONE';
     let paymentStatus: 'PAID' | 'PENDING' | 'NONE' = 'NONE';
+    let paymentDisplay = 'Yok';
+
     const allPurchases = [
       ...purchases,
       ...entitlements.map((e: any) => e.purchase).filter(Boolean),
     ];
-    if (allPurchases.some((p: any) => p.paymentStatus === 'PAID' || p.source === 'ADMIN_GRANT' || p.source === 'CAMPAIGN')) {
+
+    const hasTestAuthority = allPurchases.some((p: any) => p.source === 'TEST') ||
+      entitlements.some((e: any) => e.purchase?.source === 'TEST');
+    const hasAdminGrant = allPurchases.some((p: any) => p.source === 'ADMIN_GRANT');
+    const hasCampaign = allPurchases.some((p: any) => p.source === 'CAMPAIGN');
+    const hasPaid = allPurchases.some((p: any) => p.paymentStatus === 'PAID');
+    const hasPending = allPurchases.some((p: any) => p.paymentStatus === 'PENDING');
+
+    if (hasPaid) {
+      commercialAuthority = 'PAID';
       paymentStatus = 'PAID';
-    } else if (allPurchases.some((p: any) => p.paymentStatus === 'PENDING')) {
+      paymentDisplay = 'Doğrulandı';
+    } else if (hasAdminGrant) {
+      commercialAuthority = 'ADMIN_GRANT';
+      paymentStatus = 'PAID';
+      paymentDisplay = 'Admin Tanımlı';
+    } else if (hasCampaign) {
+      commercialAuthority = 'CAMPAIGN';
+      paymentStatus = 'PAID';
+      paymentDisplay = 'Kampanya';
+    } else if (hasTestAuthority && !isLiveMode) {
+      commercialAuthority = 'TEST';
+      paymentStatus = 'NONE'; // Explicitly not PAID
+      paymentDisplay = 'Test nedeniyle atlandı';
+    } else if (hasPending) {
       paymentStatus = 'PENDING';
+      paymentDisplay = 'Ödeme Bekleniyor';
     }
 
     // Date range
@@ -138,29 +216,75 @@ export class ListingPromotionQueryService {
       if (activeEnds.length > 0) endsAt = new Date(Math.max(...activeEnds.map((d: any) => new Date(d).getTime())));
     }
 
+    const urgentStart = activeUrgentEntitlement?.activatedAt ? new Date(activeUrgentEntitlement.activatedAt) : null;
+    const urgentEnd = activeUrgentEntitlement?.expiresAt ? new Date(activeUrgentEntitlement.expiresAt) : null;
+    const showcaseStart = activeShowcaseEntitlement?.activatedAt ? new Date(activeShowcaseEntitlement.activatedAt) : null;
+    const showcaseEnd = activeShowcaseEntitlement?.expiresAt ? new Date(activeShowcaseEntitlement.expiresAt) : null;
+
     return {
+      requestedPublicationType,
+      effectivePromotionType,
       publicationType,
       urgent: {
         requested: urgentRequested,
-        status: urgentStatus,
-        entitlementVerified: !!(activeUrgentEntitlement || pendingUrgentEntitlement),
+        entitled: urgentEntitled,
         active: urgentActive,
-        startsAt: activeUrgentEntitlement?.activatedAt ? new Date(activeUrgentEntitlement.activatedAt) : null,
-        expiresAt: activeUrgentEntitlement?.expiresAt ? new Date(activeUrgentEntitlement.expiresAt) : null,
+        entitlementStatus: urgentEntitlementStatus,
+        purchaseStatus: urgentPurchaseStatus,
+        status: urgentStatus,
+        entitlementVerified: urgentEntitled,
+        startsAt: urgentStart,
+        expiresAt: urgentEnd,
+        endsAt: urgentEnd,
       },
       showcase: {
         requested: showcaseRequested,
-        status: showcaseStatus,
-        entitlementVerified: !!(activeShowcaseEntitlement || pendingShowcaseEntitlement),
+        entitled: showcaseEntitled,
         active: showcaseActive,
-        startsAt: activeShowcaseEntitlement?.activatedAt ? new Date(activeShowcaseEntitlement.activatedAt) : null,
-        expiresAt: activeShowcaseEntitlement?.expiresAt ? new Date(activeShowcaseEntitlement.expiresAt) : null,
+        entitlementStatus: showcaseEntitlementStatus,
+        purchaseStatus: showcasePurchaseStatus,
+        status: showcaseStatus,
+        entitlementVerified: showcaseEntitled,
+        startsAt: showcaseStart,
+        expiresAt: showcaseEnd,
+        endsAt: showcaseEnd,
       },
+      feedActive: showcaseActive,
       paymentStatus,
+      commercialAuthority,
+      paymentDisplay,
+      isTestMode: !isLiveMode,
       startsAt,
       endsAt,
     };
   }
+
+  public hasValidPromotionAuthority(listing: any): boolean {
+    const isLiveMode = process.env.LISTING_PROMOTION_COMMERCE_MODE === 'LIVE';
+    const entitlements = listing.promotionEntitlements || [];
+    const purchases = listing.promotions || [];
+
+    const hasPaidPurchase = purchases.some(
+      (p: any) => p.paymentStatus === 'PAID' ||
+                  p.source === 'ADMIN_GRANT' ||
+                  p.source === 'CAMPAIGN' ||
+                  (!isLiveMode && p.source === 'TEST')
+    );
+    if (hasPaidPurchase) return true;
+
+    const hasValidEntitlement = entitlements.some(
+      (e: any) =>
+        (e.lifecycleStatus === PromotionLifecycleStatus.ACTIVE ||
+         e.lifecycleStatus === PromotionLifecycleStatus.PENDING_ACTIVATION) &&
+        (e.purchase?.paymentStatus === 'PAID' ||
+         e.purchase?.source === 'ADMIN_GRANT' ||
+         e.purchase?.source === 'CAMPAIGN' ||
+         (!isLiveMode && e.purchase?.source === 'TEST') ||
+         (!e.purchase && !e.purchaseId && (e.authoritySource === 'ADMIN_GRANT' || e.authoritySource === 'CAMPAIGN')))
+    );
+    return hasValidEntitlement;
+  }
+
 
   public buildActiveUrgentListingWhere(now: Date = new Date()): any {
     return {

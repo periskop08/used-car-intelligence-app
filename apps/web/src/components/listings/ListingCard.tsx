@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import UrgentListingBadge from "./UrgentListingBadge";
 import { formatImageUrl } from "../../utils/media";
+import { formatCurrency } from "../../utils/formatters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -26,8 +27,6 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
   const coverImage = listing.media && listing.media.length > 0 
     ? formatImageUrl(listing.media[0].url) 
     : "/placeholder-car.jpg";
-
-  const formattedPrice = Number(listing.priceAmount || 0).toLocaleString("tr-TR");
 
   const handleHeartClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,6 +71,9 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
           src={coverImage}
           alt={listing.title}
           className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
+          }}
         />
 
         {/* Top Left: Badges */}
@@ -105,7 +107,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
       <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span>{listing.modelYear} • {listing.kilometers?.toLocaleString("tr-TR")} KM</span>
+            <span>{listing.modelYear || listing.year} • {(listing.kilometers ?? listing.mileage)?.toLocaleString("tr-TR")} KM</span>
             <span>{listing.city}</span>
           </div>
           <h3 className="font-bold text-slate-100 group-hover:text-orange-400 transition text-sm line-clamp-1">
@@ -114,7 +116,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         </div>
 
         <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-          <span className="text-base font-black text-white">{formattedPrice} {listing.currency || "TRY"}</span>
+          <span className="text-base font-black text-white">{formatCurrency(listing.priceAmount, listing.currency)}</span>
           <span className="px-3 py-1.5 rounded-xl bg-orange-600/20 group-hover:bg-orange-600 text-orange-400 group-hover:text-white border border-orange-500/30 text-xs font-bold transition">
             İncele
           </span>

@@ -254,6 +254,8 @@ export class ListingService {
         plateHidden: dto.plateHidden ?? true,
         vinHidden: dto.vinHidden ?? true,
         status: ListingStatus.DRAFT,
+        urgentRequested: dto.urgentRequested ?? dto.isUrgent ?? false,
+        showcaseRequested: dto.showcaseRequested ?? false,
         isUrgent: dto.isUrgent ?? false,
         isAiReady,
       },
@@ -276,6 +278,17 @@ export class ListingService {
     }
 
     const dataToUpdate: any = { ...dto };
+    // Preserve seller intent: if seller originally requested urgent or requested now, keep true
+    if (dto.urgentRequested !== undefined) {
+      dataToUpdate.urgentRequested = dto.urgentRequested;
+    } else if (dto.isUrgent) {
+      dataToUpdate.urgentRequested = true;
+    }
+
+    if (dto.showcaseRequested !== undefined) {
+      dataToUpdate.showcaseRequested = dto.showcaseRequested;
+    }
+
     if (listing.status === ListingStatus.REJECTED) {
       dataToUpdate.status = ListingStatus.PENDING_REVIEW;
       dataToUpdate.rejectionReason = null;

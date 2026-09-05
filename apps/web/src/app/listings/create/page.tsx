@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TURKEY_CITIES, getDistrictsForCity, resolveHorsepower } from "@used-car-intelligence/shared";
-import { AlertCircle, AlertTriangle } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -68,7 +68,9 @@ export default function CreateListing() {
   const [selectedPromotionSku, setSelectedPromotionSku] = useState<PromotionSku>(null);
   const [promotionTermsAccepted, setPromotionTermsAccepted] = useState(false);
   const [promotionPricingDetails, setPromotionPricingDetails] = useState<any>(null);
-  const [paymentRecoveryOpen, setPaymentRecoveryOpen] = useState(false);
+  const [standardSuccessModalOpen, setStandardSuccessModalOpen] = useState(false);
+  const [checkoutUnavailableModalOpen, setCheckoutUnavailableModalOpen] = useState(false);
+  const [createdListingForModal, setCreatedListingForModal] = useState<any>(null);
   const [paymentError, setPaymentError] = useState("");
 
   // Step 1: Vehicle selection (Marka, Model, Yıl)
@@ -147,6 +149,12 @@ export default function CreateListing() {
       .then((res) => res.json())
       .then((data) => setBrands(Array.isArray(data) ? data : []))
       .catch((e) => console.error("Error fetching brands:", e));
+
+    // Fetch promotion catalog pricing
+    fetch(`${API_URL}/listing-promotions/catalog`)
+      .then((res) => res.json())
+      .then((data) => setPromotionPricingDetails(data))
+      .catch(() => null);
   }, []);
 
   // Fetch models on Brand change
@@ -506,7 +514,11 @@ export default function CreateListing() {
       customBrand: useCustomVariant ? customBrand : undefined,
       customModel: useCustomVariant ? customModel : undefined,
       customYear: useCustomVariant ? parseInt(customYear, 10) : undefined,
+      urgentRequested: selectedPromotionSku === "URGENT_LISTING" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
+      showcaseRequested: selectedPromotionSku === "SHOWCASE_FEED" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
     };
+
+    const isPaidPromotion = !!selectedPromotionSku;
 
     const savePromise = createdListingId
       ? fetch(`${API_URL}/listings/${createdListingId}`, {
@@ -527,69 +539,105 @@ export default function CreateListing() {
         });
 
     savePromise
-      .then((res) => {
+      .then(async (res) => {
         if (!res.ok) {
-          return res.json().then((err) => {
-            throw new Error(err.message || "İlan kaydedilemedi.");
-          });
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || "İlan kaydedilemedi.");
         }
         return res.json();
       })
-      .then((listing) => {
-        return fetch(`${API_URL}/listings/${listing.id}/status`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: "PENDING_REVIEW" }),
-        }).then((res) => {
-          if (!res.ok) {
-            return res.json().then((err) => {
-              throw new Error(err.message || "İlan incelemeye gönderilemedi.");
-            });
-          }
-          return listing;
-        });
-      })
       .then(async (listing) => {
-        if (selectedPromotionSku) {
+        setCreatedListingId(listing.id);
+        setCreatedListingForModal(listing);
+
+        // A. STANDARD LISTING (NO PROMOTION)
+        if (!isPaidPromotion) {
+          const statusRes = await fetch(`${API_URL}/listings/${listing.id}/status`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ status: "PENDING_REVIEW" }),
+          });
+          if (!statusRes.ok) {
+            const err = await statusRes.json().catch(() => ({}));
+            throw new Error(err.message || "İlan incelemeye gönderilemedi.");
+          }
+          setSaving(false);
+          setStandardSuccessModalOpen(true);
+          return;
+        }
+
+        // B. PROMOTION LISTING IN CONTROLLED TEST COMMERCE MODE
+        const isTestMode = promotionPricingDetails?.commerceMode !== "LIVE";
+        if (isTestMode) {
           try {
-            // 1. Generate Quote
-            const quoteRes = await fetch(`${API_URL}/listing-promotions/quotes`, {
+            const testRes = await fetch(`${API_URL}/listing-promotions/test-checkout/${listing.id}`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({
-                listingId: listing.id,
                 productSku: selectedPromotionSku,
               }),
             });
-            const quoteData = await quoteRes.json();
-            if (!quoteRes.ok) throw new Error(quoteData.message || "Teklif alınamadı.");
+            const testData = await testRes.json();
+            if (!testRes.ok) throw new Error(testData.message || "Test promosyon işlemi başlatılamadı.");
 
-            // 2. Initialize Checkout
-            const idempotencyKey = `chk_crt_${listing.id}_${selectedPromotionSku}_${Date.now()}`;
-            const checkoutRes = await fetch(`${API_URL}/listing-promotions/checkout/${listing.id}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                quoteId: quoteData.quoteId,
-                idempotencyKey,
-                termsAccepted: true,
-                termsVersion: quoteData.termsVersion || "v1",
-                entryPoint: "LISTING_CREATE",
-              }),
-            });
-            const checkoutData = await checkoutRes.json();
-            if (!checkoutRes.ok) throw new Error(checkoutData.message || "Ödeme başlatılamadı.");
+            setSaving(false);
+            setStandardSuccessModalOpen(true);
+            return;
+          } catch (e: any) {
+            console.error("Listing promotion test mode error:", e);
+            setSaving(false);
+            setErrorMsg(e.message || "Promosyonlu ilan incelemeye gönderilemedi.");
+            return;
+          }
+        }
 
-            // 3. Environment-gated development mock verification (Strictly prohibited in production)
+        // C. PROMOTION LISTING IN LIVE COMMERCE MODE (REQUIRES REAL GATEWAY)
+        try {
+          // 1. Generate Quote
+          const quoteRes = await fetch(`${API_URL}/listing-promotions/quotes`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              listingId: listing.id,
+              productSku: selectedPromotionSku,
+            }),
+          });
+          const quoteData = await quoteRes.json();
+          if (!quoteRes.ok) throw new Error(quoteData.message || "Teklif alınamadı.");
+
+          // 2. Initialize Checkout
+          const idempotencyKey = `chk_crt_${listing.id}_${selectedPromotionSku}_${Date.now()}`;
+          const checkoutRes = await fetch(`${API_URL}/listing-promotions/checkout/${listing.id}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              quoteId: quoteData.quoteId,
+              idempotencyKey,
+              termsAccepted: true,
+              termsVersion: quoteData.termsVersion || "v1",
+              entryPoint: "LISTING_CREATE",
+            }),
+          });
+          const checkoutData = await checkoutRes.json();
+          if (!checkoutRes.ok) throw new Error(checkoutData.message || "Ödeme başlatılamadı.");
+
+          setSaving(false);
+
+          // 3. Check if checkout destination is legitimately available
+          if (checkoutData.checkoutAvailable && checkoutData.paymentProviderUrl) {
+            // Development-only testing shortcut
             if (process.env.NODE_ENV === "development" && checkoutData.purchaseId) {
               await fetch(`${API_URL}/listing-promotions/webhooks/mock`, {
                 method: "POST",
@@ -600,24 +648,50 @@ export default function CreateListing() {
                   paymentReferenceId: `PAY_DEV_${Date.now()}`,
                 }),
               }).catch(() => null);
+              router.push(`/listings/checkout/status?purchaseId=${checkoutData.purchaseId}&listingId=${listing.id}`);
+              return;
             }
 
-            setSaving(false);
-            router.push(checkoutData.paymentProviderUrl || "/dashboard/listings?tab=active");
-          } catch (e) {
-            console.error("Listing promotion checkout error:", e);
-            setSaving(false);
-            router.push("/dashboard/listings?tab=active");
+            window.location.href = checkoutData.paymentProviderUrl;
+          } else {
+            // Checkout destination is unavailable / missing DNS. Retain draft safely!
+            setPaymentError(checkoutData.checkoutUnavailableMessage || "Ödeme işlemi şu anda başlatılamıyor.");
+            setCheckoutUnavailableModalOpen(true);
           }
-        } else {
+        } catch (e: any) {
+          console.error("Listing promotion checkout error:", e);
           setSaving(false);
-          router.push("/dashboard/listings?tab=active");
+          setPaymentError(e.message || "Ödeme başlatılamadı.");
+          setCheckoutUnavailableModalOpen(true);
         }
       })
       .catch((err) => {
         setErrorMsg(err.message || "İlan oluşturulurken bir hata oluştu.");
         setSaving(false);
       });
+  };
+
+  const handleAbandonPromotionSubmit = async () => {
+    if (!createdListingForModal?.id) return;
+    try {
+      setSaving(true);
+      const res = await fetch(`${API_URL}/listing-promotions/abandon/${createdListingForModal.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "İşlem gerçekleştirilemedi.");
+
+      setCheckoutUnavailableModalOpen(false);
+      setStandardSuccessModalOpen(true);
+    } catch (err: any) {
+      alert(err.message || "Bir hata oluştu.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCityChange = (newCity: string) => {
@@ -1267,6 +1341,7 @@ export default function CreateListing() {
               onSelectSku={(sku) => setSelectedPromotionSku(sku)}
               termsAccepted={promotionTermsAccepted}
               onTermsAcceptedChange={setPromotionTermsAccepted}
+              pricingDetails={promotionPricingDetails}
             />
           </div>
 
@@ -1289,6 +1364,13 @@ export default function CreateListing() {
             </label>
           </div>
 
+          {promotionPricingDetails?.commerceMode !== "LIVE" && selectedPromotionSku && (
+            <div className="p-3 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-xl text-xs font-medium flex items-center gap-2">
+              <span className="text-base">ℹ️</span>
+              <span>Test Modu Aktif: Promosyon talebiniz test yetkisiyle onaylanarak doğrudan incelemeye iletilecektir.</span>
+            </div>
+          )}
+
           <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(4)}
@@ -1298,11 +1380,93 @@ export default function CreateListing() {
             </button>
             <button
               onClick={handleFinalSubmit}
-              disabled={saving || !responsibilityAccepted}
+              disabled={saving || !responsibilityAccepted || (!!selectedPromotionSku && !promotionTermsAccepted)}
               className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
             >
-              {saving ? "Kaydediliyor..." : "İlanı İncelemeye Gönder ➔"}
+              {saving ? (
+                "İşleniyor..."
+              ) : selectedPromotionSku && promotionPricingDetails?.commerceMode === "LIVE" ? (
+                selectedPromotionSku === "URGENT_LISTING" ? (
+                  `Ödemeye Geç (${promotionPricingDetails?.urgentPriceAmount ?? 99} TL) ➔`
+                ) : selectedPromotionSku === "SHOWCASE_FEED" ? (
+                  `Ödemeye Geç (${promotionPricingDetails?.showcasePriceAmount ?? 199} TL) ➔`
+                ) : (
+                  `Ödemeye Geç (${promotionPricingDetails?.bundlePriceAmount ?? 249} TL) ➔`
+                )
+              ) : (
+                "İlanı İncelemeye Gönder ➔"
+              )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* STANDARD LISTING SUCCESS MODAL */}
+      {standardSuccessModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center space-y-5">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-100">İlanınız Başarıyla İncelemeye Gönderildi</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                İlanınız moderasyon ekibimiz tarafından kontrol edilecek. Durumu İlanlarım bölümünden takip edebilirsiniz.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full pt-2">
+              <button
+                onClick={() => router.push("/dashboard/listings?tab=active")}
+                className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition"
+              >
+                İlanlarıma Git
+              </button>
+              <button
+                onClick={() => router.push("/")}
+                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+              >
+                Ana Sayfaya Dön
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHECKOUT UNAVAILABLE / RECOVERY MODAL */}
+      {checkoutUnavailableModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center space-y-5">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-100">Ödeme İşlemi Başlatılamıyor</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {paymentError || "Ödeme altyapısı şu anda kullanılamıyor. İlanınız taslak olarak güvenle saklandı."}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2.5 w-full pt-2">
+              <button
+                onClick={handleFinalSubmit}
+                disabled={saving}
+                className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition disabled:opacity-50"
+              >
+                {saving ? "İşleniyor..." : "Ödemeyi Tekrar Dene"}
+              </button>
+              <button
+                onClick={handleAbandonPromotionSubmit}
+                disabled={saving}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition disabled:opacity-50"
+              >
+                Promosyonsuz İncelemeye Gönder
+              </button>
+              <button
+                onClick={() => router.push("/dashboard/listings")}
+                className="w-full py-2.5 rounded-xl bg-transparent text-slate-500 hover:text-slate-400 text-xs font-semibold transition"
+              >
+                İlanlarıma Git (Taslak Olarak Kalsın)
+              </button>
+            </div>
           </div>
         </div>
       )}
