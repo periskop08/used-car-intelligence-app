@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsBoolean, IsOptional, IsEnum } from 'class-validator';
+import { ListingPromotionProductSku } from '@prisma/client';
 
 export class CreatePromotionCheckoutDto {
   @IsString()
@@ -20,6 +21,13 @@ export class CreatePromotionCheckoutDto {
   @IsString()
   entryPoint?: 'LISTING_CREATE_STEP_5' | 'LISTING_MANAGEMENT';
 }
+
+export class TestPromotionCheckoutDto {
+  @IsEnum(ListingPromotionProductSku)
+  @IsNotEmpty()
+  productSku: ListingPromotionProductSku;
+}
+
 
 export class PromotionCheckoutResponseDto {
   purchaseId: string;

@@ -386,9 +386,14 @@ export class ListingPromotionPaymentService {
       throw new ForbiddenException('TEST_MODE_DISABLED: Canlı (LIVE) ticaret modunda test yetkisi oluşturulamaz.');
     }
 
+    if (!productSku || !Object.values(ListingPromotionProductSku).includes(productSku)) {
+      throw new BadRequestException('INVALID_PRODUCT_SKU: Geçersiz promosyon ürünü seçildi.');
+    }
+
     const listing = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
     });
+
 
     if (!listing) {
       throw new NotFoundException('LISTING_NOT_FOUND: İlan bulunamadı.');

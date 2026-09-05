@@ -31,8 +31,13 @@ export class ListingPromotionActivationService {
       return !!purchase.campaignId;
     }
 
+    if (purchase.source === ListingPromotionSource.TEST) {
+      return purchase.paymentStatus === PromotionPaymentStatus.NOT_REQUIRED;
+    }
+
     return false;
   }
+
 
   public async tryActivatePromotions(listingId: string): Promise<boolean> {
     const listing = await this.prisma.vehicleListing.findUnique({

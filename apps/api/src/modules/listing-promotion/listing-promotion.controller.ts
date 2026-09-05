@@ -18,7 +18,7 @@ import { ListingPromotionWebhookService } from './listing-promotion-webhook.serv
 import { ListingPromotionQueryService } from './listing-promotion-query.service';
 import { ListingPromotionReconciliationService } from './listing-promotion-reconciliation.service';
 import { CreatePromotionQuoteDto } from './dto/create-promotion-quote.dto';
-import { CreatePromotionCheckoutDto } from './dto/create-promotion-checkout.dto';
+import { CreatePromotionCheckoutDto, TestPromotionCheckoutDto } from './dto/create-promotion-checkout.dto';
 import { UpdateProductConfigDto } from './dto/promotion-product-config.dto';
 
 const ADMIN_EMAILS = [
@@ -86,10 +86,11 @@ export class ListingPromotionController {
   public async testCheckout(
     @Req() req: any,
     @Param('listingId') listingId: string,
-    @Body() body: { productSku: any }
+    @Body() dto: TestPromotionCheckoutDto
   ) {
-    return this.paymentService.createTestPromotionCheckout(req.user.id, listingId, body.productSku);
+    return this.paymentService.createTestPromotionCheckout(req.user.id, listingId, dto.productSku);
   }
+
 
   @UseGuards(JwtAuthGuard)
   @Get('status/:listingId')

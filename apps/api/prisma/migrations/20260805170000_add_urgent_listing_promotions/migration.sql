@@ -190,4 +190,10 @@ CHECK (
     AND "campaignId" IS NOT NULL
     AND "paymentStatus" = 'NOT_REQUIRED'
   )
+  OR
+  (
+    "source" = 'TEST'
+    AND "paymentStatus" = 'NOT_REQUIRED'
+  )
 );
+

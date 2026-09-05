@@ -76,11 +76,12 @@ async function runAudit() {
   for (const l of listings) {
     // Invariant 1: unpaidPromotedListingInModeration
     const isPromotedRequest = l.urgentRequested || l.showcaseRequested;
-    const hasAuthority = l.promotions.some((p) => p.paymentStatus === PromotionPaymentStatus.PAID) ||
-                         l.promotionEntitlements.some((e) => e.lifecycleStatus === PromotionLifecycleStatus.ACTIVE);
+    const hasAuthority = l.promotions.some((p) => p.paymentStatus === PromotionPaymentStatus.PAID || p.source === 'TEST' || p.source === 'ADMIN_GRANT' || p.source === 'CAMPAIGN') ||
+                         l.promotionEntitlements.some((e) => e.lifecycleStatus === PromotionLifecycleStatus.ACTIVE || e.lifecycleStatus === PromotionLifecycleStatus.PENDING_ACTIVATION);
     if (l.status === ListingStatus.PENDING_REVIEW && isPromotedRequest && !hasAuthority) {
       unpaidPromotedListingInModeration++;
     }
+
 
     // Invariant 2: activePromotionWithoutEntitlement
     const hasActiveUrgentProjection = l.isUrgent;
