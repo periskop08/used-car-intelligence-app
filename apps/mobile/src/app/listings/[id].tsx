@@ -334,7 +334,7 @@ export default function ListingDetailScreen() {
   const cityVal = listing.city || 'Belirtilmedi';
   const districtVal = listing.district ? `, ${listing.district}` : '';
   const sellerObj = listing.seller || listing.user || {};
-  const sellerFullName = `${sellerObj.firstName || ''} ${sellerObj.lastName || ''}`.trim() || sellerObj.username || 'Sahibinden Satıcı';
+  const sellerFullName = `${sellerObj.firstName || ''} ${sellerObj.lastName || ''}`.trim() || sellerObj.username || 'Satıcı';
 
   const rawPhotos = Array.isArray(listing.media) && listing.media.length > 0
     ? listing.media.map((m: any) => formatCloudflareImageUrl(m.url)).filter(Boolean)
@@ -366,10 +366,10 @@ export default function ListingDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 1. TOP HEADER (Sahibinden Dark Slate Header with Back, Title, Share, Fav) */}
+      {/* 1. TOP HEADER (White Background with Dark Icons) */}
       <View style={[styles.topHeaderBar, { paddingTop: Math.max(insets.top, 14) }]}>
         <TouchableOpacity style={styles.headerIconButton} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={26} color="#ffffff" />
+          <Ionicons name="chevron-back" size={26} color="#0f172a" />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -378,14 +378,14 @@ export default function ListingDetailScreen() {
 
         <View style={styles.headerRightActions}>
           <TouchableOpacity style={styles.headerIconButton} onPress={handleShare} activeOpacity={0.7}>
-            <Ionicons name="share-outline" size={22} color="#ffffff" />
+            <Ionicons name="share-outline" size={22} color="#0f172a" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.headerIconButton} onPress={toggleFavorite} activeOpacity={0.7}>
             <Ionicons
               name={isFavorite ? 'star' : 'star-outline'}
               size={23}
-              color={isFavorite ? '#fbbf24' : '#ffffff'}
+              color={isFavorite ? '#ea580c' : '#0f172a'}
             />
           </TouchableOpacity>
         </View>
@@ -395,7 +395,7 @@ export default function ListingDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. LISTING TITLE BANNER (Prominent uppercase/sentence header above photo) */}
+        {/* 2. LISTING TITLE BANNER (Prominent uppercase header above photo) */}
         <View style={styles.titleBanner}>
           <Text style={styles.titleBannerText}>
             {listing.title?.toUpperCase() || `${brandName} ${modelFamilyName} ${trimName}`.trim()}
@@ -427,7 +427,7 @@ export default function ListingDetailScreen() {
             ))}
           </ScrollView>
 
-          {/* Photo Pagination Badge (e.g. 3 / 16 centered at bottom) */}
+          {/* Photo Pagination Badge (e.g. 1 / 2 centered at bottom) */}
           <View style={styles.photoIndexBadge}>
             <Text style={styles.photoIndexText}>
               {activePhotoIndex + 1} / {displayPhotos.length}
@@ -444,12 +444,9 @@ export default function ListingDetailScreen() {
 
         {/* 4. SELLER INFO & BREADCRUMB CATEGORY & LOCATION STRIP */}
         <View style={styles.sellerBreadcrumbStrip}>
-          {/* Seller / Store Highlight */}
+          {/* Seller Name (without extra Sahibinden tag) */}
           <View style={styles.sellerHeaderRow}>
             <Text style={styles.sellerHighlightName}>{sellerFullName}</Text>
-            <View style={styles.sellerTypeTag}>
-              <Text style={styles.sellerTypeTagText}>{sellerTypeLabel}</Text>
-            </View>
           </View>
 
           {/* Breadcrumb Hierarchy */}
@@ -464,7 +461,7 @@ export default function ListingDetailScreen() {
           </Text>
         </View>
 
-        {/* 5. SEGMENTED TABS BAR (İlan Bilgileri | Açıklama | Konumu) */}
+        {/* 5. SEGMENTED TABS BAR (Active = Brand Orange) */}
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'SPECS' && styles.tabBtnActive]}
@@ -502,14 +499,14 @@ export default function ListingDetailScreen() {
           <View style={styles.tabContentContainer}>
             {/* Sahibinden-Style Spec Rows Table */}
             <View style={styles.tableContainer}>
-              {/* Fiyat Row (Highlighted) */}
+              {/* Fiyat Row (Brand Orange Highlighted) */}
               <View style={[styles.tableRow, styles.priceRow]}>
                 <Text style={styles.tableLabel}>Fiyat</Text>
                 <View style={styles.priceValWrap}>
                   <Text style={styles.priceHighlight}>
-                    {Number(priceVal).toLocaleString('tr-TR')} {listing.currency || 'TL'}
+                    {Number(priceVal).toLocaleString('tr-TR')} {listing.currency || 'TRY'}
                   </Text>
-                  <Ionicons name="time-outline" size={16} color="#0284c7" />
+                  <Ionicons name="time-outline" size={16} color="#ea580c" />
                 </View>
               </View>
 
@@ -812,9 +809,9 @@ export default function ListingDetailScreen() {
         )}
       </ScrollView>
 
-      {/* 6. BOTTOM STICKY ACTION BAR (Sahibinden Style: Blue / Orange Dual Action) */}
+      {/* 6. BOTTOM STICKY ACTION BAR (Brand Orange Dual Action) */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller} activeOpacity={0.85}>
           <Ionicons name="call" size={18} color="#ffffff" />
           <Text style={styles.callBtnText}>Ara</Text>
         </TouchableOpacity>
@@ -867,12 +864,14 @@ const styles = StyleSheet.create({
   },
   /* Top Bar */
   topHeaderBar: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   headerIconButton: {
     width: 40,
@@ -883,7 +882,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#0f172a',
     letterSpacing: -0.2,
   },
   headerRightActions: {
@@ -956,28 +955,17 @@ const styles = StyleSheet.create({
   sellerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
   sellerHighlightName: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0284c7',
-  },
-  sellerTypeTag: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  sellerTypeTagText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#0369a1',
+    color: '#0f172a',
   },
   breadcrumbText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#0284c7',
+    color: '#ea580c',
     textAlign: 'center',
   },
   locationSubText: {
@@ -1003,19 +991,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#e2e8f0',
   },
   tabBtnActive: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#d97706',
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
   },
   tabBtnText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#334155',
+    color: '#64748b',
   },
   tabBtnTextActive: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontWeight: '900',
   },
   /* Tab Content */
@@ -1023,7 +1011,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
-  /* Sahibinden Table */
+  /* Table */
   tableContainer: {
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
@@ -1063,7 +1051,7 @@ const styles = StyleSheet.create({
   priceHighlight: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#0284c7',
+    color: '#ea580c',
     letterSpacing: -0.2,
   },
   /* AI Banner */
@@ -1339,7 +1327,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#ea580c',
     borderRadius: 10,
     paddingVertical: 12,
   },
@@ -1354,7 +1342,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#1d4ed8',
+    backgroundColor: '#ea580c',
     borderRadius: 10,
     paddingVertical: 12,
   },
