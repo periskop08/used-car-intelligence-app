@@ -47,6 +47,17 @@ describe('Listing Promotion End-to-End State Machine Integrity', () => {
       expect(queryService.hasValidPromotionAuthority(listing)).toBe(true);
     });
 
+    it('returns TRUE for TEST authority entitlement', () => {
+      const listing = {
+        id: 'l-test',
+        urgentRequested: true,
+        promotions: [{ source: 'TEST', paymentStatus: 'NOT_REQUIRED' }],
+        promotionEntitlements: [],
+      };
+      expect(queryService.hasValidPromotionAuthority(listing)).toBe(true);
+    });
+
+
     it('returns FALSE for unpaid PENDING purchase attempt', () => {
       const listing = {
         id: 'l-4',
