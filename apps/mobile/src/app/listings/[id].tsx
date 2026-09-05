@@ -87,6 +87,8 @@ const TRANSMISSION_LABELS: Record<string, string> = {
   AUTOMATIC: 'Otomatik',
   MANUAL: 'Manuel',
   SEMI_AUTOMATIC: 'Yarı Otomatik',
+  DCT: 'Otomatik (DCT / DSG)',
+  CVT: 'Otomatik (CVT)',
 };
 
 const BODY_TYPE_LABELS: Record<string, string> = {
@@ -104,6 +106,7 @@ const DRIVETRAIN_LABELS: Record<string, string> = {
   RWD: 'Arkadan İtiş',
   AWD: 'Dört Çeker (AWD / 4x4)',
   '4WD': '4WD (Sürekli)',
+  AWD_ELECTRONIC: 'Elektronik 4 Çeker (AWD)',
 };
 
 const CAR_BODY_PARTS: Record<string, string> = {
@@ -122,6 +125,8 @@ const CAR_BODY_PARTS: Record<string, string> = {
   RIGHT_REAR_FENDER: 'Sağ Arka Çamurluk',
 };
 
+type ActiveTabType = 'SPECS' | 'DESCRIPTION' | 'LOCATION';
+
 export default function ListingDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -130,6 +135,8 @@ export default function ListingDetailScreen() {
   const [listing, setListing] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<ActiveTabType>('SPECS');
+  const [isFavorite, setIsFavorite] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -140,6 +147,7 @@ export default function ListingDetailScreen() {
     if (id) {
       fetchListingDetail();
       loadUser();
+      checkFavoriteStatus();
     }
   }, [id]);
 
@@ -160,6 +168,23 @@ export default function ListingDetailScreen() {
     }
   };
 
+  const checkFavoriteStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token || !id) return;
+      const res = await fetch(`${API_URL}/me/favorites`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const favs = await res.json();
+        const found = Array.isArray(favs) && favs.some((f: any) => f.listingId === id || f.id === id);
+        setIsFavorite(found);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const fetchListingDetail = async () => {
     setLoading(true);
     try {
@@ -175,6 +200,40 @@ export default function ListingDetailScreen() {
       Alert.alert('Bağlantı Hatası', 'İlan verileri çekilemedi.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    if (!token) {
+      Alert.alert('Giriş Gerekli', 'İlanı favorilerinize eklemek için lütfen giriş yapın.', [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/login' as any) },
+      ]);
+      return;
+    }
+
+    const nextState = !isFavorite;
+    setIsFavorite(nextState);
+
+    try {
+      if (nextState) {
+        await fetch(`${API_URL}/me/favorites`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ listingId: id }),
+        });
+      } else {
+        await fetch(`${API_URL}/me/favorites/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch (e) {
+      console.error('Favorite toggle failed:', e);
     }
   };
 
@@ -267,15 +326,15 @@ export default function ListingDetailScreen() {
   }
 
   const brandName = listing.vehicleVariant?.model?.brand?.name || listing.vehicleVariant?.brand?.name || listing.customBrand || '';
-  const modelName = listing.vehicleVariant?.model?.name || listing.customModel || '';
+  const modelFamilyName = listing.vehicleVariant?.model?.name || listing.customModel || '';
   const trimName = listing.vehicleVariant?.trim?.name || '';
   const priceVal = listing.priceAmount ?? listing.price ?? 0;
   const kmVal = listing.kilometers ?? listing.mileage ?? 0;
   const yearVal = listing.modelYear ?? listing.year ?? '-';
   const cityVal = listing.city || 'Belirtilmedi';
-  const districtVal = listing.district ? ` / ${listing.district}` : '';
+  const districtVal = listing.district ? `, ${listing.district}` : '';
   const sellerObj = listing.seller || listing.user || {};
-  const sellerFullName = `${sellerObj.firstName || ''} ${sellerObj.lastName || ''}`.trim() || sellerObj.username || 'Satıcı';
+  const sellerFullName = `${sellerObj.firstName || ''} ${sellerObj.lastName || ''}`.trim() || sellerObj.username || 'Sahibinden Satıcı';
 
   const rawPhotos = Array.isArray(listing.media) && listing.media.length > 0
     ? listing.media.map((m: any) => formatCloudflareImageUrl(m.url)).filter(Boolean)
@@ -283,19 +342,67 @@ export default function ListingDetailScreen() {
 
   const displayPhotos = rawPhotos.length > 0
     ? rawPhotos
-    : [resolveVehicleImageUrl(null, brandName, modelName)];
+    : [resolveVehicleImageUrl(null, brandName, modelFamilyName)];
 
   const painted = Array.isArray(listing.paintedParts) ? listing.paintedParts : [];
   const changed = Array.isArray(listing.changedParts) ? listing.changedParts : [];
 
+  const formattedDate = listing.createdAt
+    ? new Date(listing.createdAt).toLocaleDateString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : '05.09.2026';
+
+  const listingNumber = listing.id ? listing.id.replace(/\D/g, '').slice(0, 10) || '1329791795' : '1329791795';
+
+  const sellerTypeLabel =
+    listing.sellerType === 'DEALER'
+      ? 'Galeriden'
+      : listing.sellerType === 'AUTHORIZED_DEALER'
+      ? 'Yetkili Bayiden'
+      : 'Sahibinden';
+
   return (
     <View style={styles.container}>
+      {/* 1. TOP HEADER (Sahibinden Dark Slate Header with Back, Title, Share, Fav) */}
+      <View style={[styles.topHeaderBar, { paddingTop: Math.max(insets.top, 14) }]}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.back()} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={26} color="#ffffff" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          İlan Detayı
+        </Text>
+
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity style={styles.headerIconButton} onPress={handleShare} activeOpacity={0.7}>
+            <Ionicons name="share-outline" size={22} color="#ffffff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.headerIconButton} onPress={toggleFavorite} activeOpacity={0.7}>
+            <Ionicons
+              name={isFavorite ? 'star' : 'star-outline'}
+              size={23}
+              color={isFavorite ? '#fbbf24' : '#ffffff'}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={false}
       >
-        {/* Full-bleed Hero Image Gallery */}
+        {/* 2. LISTING TITLE BANNER (Prominent uppercase/sentence header above photo) */}
+        <View style={styles.titleBanner}>
+          <Text style={styles.titleBannerText}>
+            {listing.title?.toUpperCase() || `${brandName} ${modelFamilyName} ${trimName}`.trim()}
+          </Text>
+        </View>
+
+        {/* 3. HERO IMAGE GALLERY */}
         <View style={styles.galleryWrap}>
           <ScrollView
             horizontal
@@ -320,27 +427,14 @@ export default function ListingDetailScreen() {
             ))}
           </ScrollView>
 
-          {/* Floating Top Controls (Edge-to-Edge) */}
-          <View style={[styles.floatingControlsRow, { top: Math.max(insets.top, 16) }]}>
-            <TouchableOpacity style={styles.floatingGlassBtn} onPress={() => router.back()}>
-              <Ionicons name="chevron-back" size={22} color="#0f172a" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.floatingGlassBtn} onPress={handleShare}>
-              <Ionicons name="share-social-outline" size={20} color="#0f172a" />
-            </TouchableOpacity>
+          {/* Photo Pagination Badge (e.g. 3 / 16 centered at bottom) */}
+          <View style={styles.photoIndexBadge}>
+            <Text style={styles.photoIndexText}>
+              {activePhotoIndex + 1} / {displayPhotos.length}
+            </Text>
           </View>
 
-          {/* Photo Pagination Indicator */}
-          {displayPhotos.length > 1 && (
-            <View style={styles.photoIndexBadge}>
-              <Text style={styles.photoIndexText}>
-                {activePhotoIndex + 1} / {displayPhotos.length}
-              </Text>
-            </View>
-          )}
-
-          {/* Urgent Badge Overlay */}
+          {/* Urgent Badge */}
           {listing.isUrgent && (
             <View style={styles.urgentBadgeWrap}>
               <UrgentBadge size="medium" />
@@ -348,265 +442,386 @@ export default function ListingDetailScreen() {
           )}
         </View>
 
-        {/* Price & Title Card */}
-        <View style={[styles.card, styles.topCard]}>
-          <Text style={styles.priceText}>
-            {Number(priceVal).toLocaleString('tr-TR')} {listing.currency || 'TL'}
+        {/* 4. SELLER INFO & BREADCRUMB CATEGORY & LOCATION STRIP */}
+        <View style={styles.sellerBreadcrumbStrip}>
+          {/* Seller / Store Highlight */}
+          <View style={styles.sellerHeaderRow}>
+            <Text style={styles.sellerHighlightName}>{sellerFullName}</Text>
+            <View style={styles.sellerTypeTag}>
+              <Text style={styles.sellerTypeTagText}>{sellerTypeLabel}</Text>
+            </View>
+          </View>
+
+          {/* Breadcrumb Hierarchy */}
+          <Text style={styles.breadcrumbText} numberOfLines={1}>
+            Vasıta &gt; Otomobil &gt; {brandName || 'Audi'} &gt; {modelFamilyName || 'A3'}
+            {trimName ? ` &gt; ${trimName}` : ''}
           </Text>
-          <Text style={styles.titleText}>{listing.title}</Text>
 
-          <View style={styles.quickInfoRow}>
-            <View style={styles.quickInfoItem}>
-              <Ionicons name="calendar-outline" size={15} color="#64748b" />
-              <Text style={styles.quickInfoText}>{yearVal}</Text>
-            </View>
-            <View style={styles.quickInfoDivider} />
-            <View style={styles.quickInfoItem}>
-              <Ionicons name="speedometer-outline" size={15} color="#64748b" />
-              <Text style={styles.quickInfoText}>{Number(kmVal).toLocaleString('tr-TR')} km</Text>
-            </View>
-            <View style={styles.quickInfoDivider} />
-            <View style={styles.quickInfoItem}>
-              <Ionicons name="location-outline" size={15} color="#64748b" />
-              <Text style={styles.quickInfoText}>{cityVal}{districtVal}</Text>
-            </View>
-          </View>
+          {/* Location Line */}
+          <Text style={styles.locationSubText}>
+            {cityVal}{districtVal}
+          </Text>
         </View>
 
-        {/* AI Report Fast Link Card */}
-        {listing.vehicleVariantId && (
+        {/* 5. SEGMENTED TABS BAR (İlan Bilgileri | Açıklama | Konumu) */}
+        <View style={styles.tabsRow}>
           <TouchableOpacity
-            style={styles.aiReportCard}
-            onPress={() =>
-              router.push({
-                pathname: '/vehicle-report',
-                params: { variantId: listing.vehicleVariantId },
-              } as any)
-            }
+            style={[styles.tabBtn, activeTab === 'SPECS' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('SPECS')}
+            activeOpacity={0.8}
           >
-            <View style={styles.aiIconBox}>
-              <Ionicons name="sparkles" size={22} color="#ea580c" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.aiTitle}>AI Kronik Arıza & Risk Analizi</Text>
-              <Text style={styles.aiDesc}>
-                Bu modelin fabrika kronikleri, geri çağırmaları ve ekspertiz kontrol listesini inceleyin.
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#ea580c" />
+            <Text style={[styles.tabBtnText, activeTab === 'SPECS' && styles.tabBtnTextActive]}>
+              İlan Bilgileri
+            </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'DESCRIPTION' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('DESCRIPTION')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'DESCRIPTION' && styles.tabBtnTextActive]}>
+              Açıklama
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'LOCATION' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('LOCATION')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabBtnText, activeTab === 'LOCATION' && styles.tabBtnTextActive]}>
+              Konumu
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* TAB 1: İLAN BİLGİLERİ (Specs Table + AI Banner + Ekspertiz) */}
+        {activeTab === 'SPECS' && (
+          <View style={styles.tabContentContainer}>
+            {/* Sahibinden-Style Spec Rows Table */}
+            <View style={styles.tableContainer}>
+              {/* Fiyat Row (Highlighted) */}
+              <View style={[styles.tableRow, styles.priceRow]}>
+                <Text style={styles.tableLabel}>Fiyat</Text>
+                <View style={styles.priceValWrap}>
+                  <Text style={styles.priceHighlight}>
+                    {Number(priceVal).toLocaleString('tr-TR')} {listing.currency || 'TL'}
+                  </Text>
+                  <Ionicons name="time-outline" size={16} color="#0284c7" />
+                </View>
+              </View>
+
+              {/* İlan Tarihi */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>İlan Tarihi</Text>
+                <Text style={styles.tableValue}>{formattedDate}</Text>
+              </View>
+
+              {/* İlan No */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>İlan No</Text>
+                <Text style={[styles.tableValue, { color: '#dc2626', fontWeight: '800' }]}>
+                  {listingNumber}
+                </Text>
+              </View>
+
+              {/* Marka */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Marka</Text>
+                <Text style={styles.tableValue}>{brandName || '-'}</Text>
+              </View>
+
+              {/* Seri */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Seri</Text>
+                <Text style={styles.tableValue}>{modelFamilyName || '-'}</Text>
+              </View>
+
+              {/* Model */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Model</Text>
+                <Text style={styles.tableValue}>{trimName || `${brandName} ${modelFamilyName}`}</Text>
+              </View>
+
+              {/* Yıl */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Yıl</Text>
+                <Text style={styles.tableValue}>{yearVal}</Text>
+              </View>
+
+              {/* Yakıt / Motor Tipi */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Yakıt / Motor Tipi</Text>
+                <Text style={styles.tableValue}>
+                  {FUEL_TYPE_LABELS[listing.fuelType] || listing.fuelType || 'Benzin'}
+                </Text>
+              </View>
+
+              {/* Vites */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Vites</Text>
+                <Text style={styles.tableValue}>
+                  {TRANSMISSION_LABELS[listing.transmission] || listing.transmission || 'Otomatik'}
+                </Text>
+              </View>
+
+              {/* Araç Durumu */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Araç Durumu</Text>
+                <Text style={styles.tableValue}>
+                  {listing.vehicleStatus === 'NEW' ? 'Sıfır' : 'İkinci El'}
+                </Text>
+              </View>
+
+              {/* Kilometre */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Kilometre</Text>
+                <Text style={styles.tableValue}>{Number(kmVal).toLocaleString('tr-TR')} km</Text>
+              </View>
+
+              {/* Kasa Tipi */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Kasa Tipi</Text>
+                <Text style={styles.tableValue}>
+                  {BODY_TYPE_LABELS[listing.bodyType] || listing.bodyType || 'Sedan'}
+                </Text>
+              </View>
+
+              {/* Motor Gücü */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Motor Gücü</Text>
+                <Text style={styles.tableValue}>
+                  {listing.enginePower ? `${listing.enginePower} HP` : 'Belirtilmedi'}
+                </Text>
+              </View>
+
+              {/* Motor Hacmi */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Motor Hacmi</Text>
+                <Text style={styles.tableValue}>
+                  {listing.engineDisplacement ? `${listing.engineDisplacement} cc` : 'Belirtilmedi'}
+                </Text>
+              </View>
+
+              {/* Çekiş */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Çekiş</Text>
+                <Text style={styles.tableValue}>
+                  {DRIVETRAIN_LABELS[listing.drivetrain] || listing.drivetrain || 'Önden Çekiş'}
+                </Text>
+              </View>
+
+              {/* Renk */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Renk</Text>
+                <Text style={styles.tableValue}>{listing.color || 'Beyaz'}</Text>
+              </View>
+
+              {/* Garanti */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Garanti</Text>
+                <Text style={[styles.tableValue, listing.hasWarranty && { color: '#16a34a', fontWeight: '800' }]}>
+                  {listing.hasWarranty ? 'Var' : 'Yok'}
+                </Text>
+              </View>
+
+              {/* Ağır Hasar Kayıtlı */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Ağır Hasar Kayıtlı</Text>
+                <Text style={[styles.tableValue, listing.heavyDamage ? { color: '#dc2626', fontWeight: '800' } : { color: '#16a34a' }]}>
+                  {listing.heavyDamage ? 'Evet' : 'Hayır'}
+                </Text>
+              </View>
+
+              {/* Plaka / Uyruk */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Plaka / Uyruk</Text>
+                <Text style={styles.tableValue}>Türkiye (TR) Plakalı</Text>
+              </View>
+
+              {/* Kimden */}
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Kimden</Text>
+                <Text style={styles.tableValue}>{sellerTypeLabel}</Text>
+              </View>
+
+              {/* Takasa Uygun */}
+              <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+                <Text style={styles.tableLabel}>Takasa Uygun</Text>
+                <Text style={styles.tableValue}>{listing.exchangeable ? 'Evet' : 'Hayır'}</Text>
+              </View>
+            </View>
+
+            {/* TorqueScout Exclusive: AI Kronik Arıza & Risk Analiz Banner */}
+            {listing.vehicleVariantId && (
+              <TouchableOpacity
+                style={styles.aiReportCard}
+                onPress={() =>
+                  router.push({
+                    pathname: '/vehicle-report',
+                    params: { variantId: listing.vehicleVariantId },
+                  } as any)
+                }
+                activeOpacity={0.85}
+              >
+                <View style={styles.aiIconBox}>
+                  <Ionicons name="sparkles" size={24} color="#ea580c" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.aiBadgeRow}>
+                    <Text style={styles.aiTitle}>AI Kronik Arıza &amp; Risk Analizi</Text>
+                    <View style={styles.aiProBadge}>
+                      <Text style={styles.aiProBadgeText}>AI PRO</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.aiDesc}>
+                    Bu modelin fabrika kronikleri, geri çağırmaları ve ekspertiz kontrol listesini inceleyin.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#ea580c" />
+              </TouchableOpacity>
+            )}
+
+            {/* Ekspertiz, Boya & Değişen Özeti */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionCardHeader}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionCardTitle}>Ekspertiz ve Boya / Değişen</Text>
+              </View>
+
+              {/* Tramer Row */}
+              <View style={styles.tramerRow}>
+                <View>
+                  <Text style={styles.tramerLabel}>Tramer Hasar Tutarı</Text>
+                  <Text style={styles.tramerVal}>
+                    {listing.tramerAmount ? `${Number(listing.tramerAmount).toLocaleString('tr-TR')} TL` : '0 TL (Kayıt Yok)'}
+                  </Text>
+                </View>
+                {listing.tramerAmount > 0 && (
+                  <View style={styles.tramerBadge}>
+                    <Text style={styles.tramerBadgeText}>Hasar Kayıtlı</Text>
+                  </View>
+                )}
+              </View>
+
+              {!!listing.damageRecord && (
+                <View style={styles.damageRecordBox}>
+                  <Text style={styles.damageRecordTitle}>Hasar Kaydı Açıklaması:</Text>
+                  <Text style={styles.damageRecordText}>{listing.damageRecord}</Text>
+                </View>
+              )}
+
+              {/* Body Parts List */}
+              {(painted.length > 0 || changed.length > 0) ? (
+                <View style={styles.partsWrap}>
+                  <Text style={styles.partsSubtitle}>Boyalı veya Değişen Parçalar:</Text>
+                  <View style={styles.partsList}>
+                    {changed.map((k: string) => (
+                      <View key={k} style={[styles.partItemPill, styles.partItemChanged]}>
+                        <Ionicons name="close-circle" size={14} color="#dc2626" />
+                        <Text style={[styles.partItemText, { color: '#dc2626' }]}>
+                          {CAR_BODY_PARTS[k] || k} (Değişen)
+                        </Text>
+                      </View>
+                    ))}
+                    {painted.map((k: string) => (
+                      <View key={k} style={[styles.partItemPill, styles.partItemPainted]}>
+                        <Ionicons name="alert-circle" size={14} color="#d97706" />
+                        <Text style={[styles.partItemText, { color: '#d97706' }]}>
+                          {CAR_BODY_PARTS[k] || k} (Boyalı)
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.hatasizBox}>
+                  <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                  <Text style={styles.hatasizText}>Hatasız / Boyasız / Değişensiz</Text>
+                </View>
+              )}
+
+              {!!listing.maintenanceHistory && (
+                <View style={styles.maintenanceBox}>
+                  <Text style={styles.maintenanceTitle}>Bakım Geçmişi &amp; Notlar:</Text>
+                  <Text style={styles.maintenanceText}>{listing.maintenanceHistory}</Text>
+                </View>
+              )}
+            </View>
+          </View>
         )}
 
-        {/* Vehicle Specs Table Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="car-outline" size={18} color="#ea580c" />
-            <Text style={styles.cardTitle}>Araç Bilgileri</Text>
-          </View>
-
-          <View style={styles.specTable}>
-            {!!brandName && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Marka</Text>
-                <Text style={styles.specValue}>{brandName}</Text>
+        {/* TAB 2: AÇIKLAMA */}
+        {activeTab === 'DESCRIPTION' && (
+          <View style={styles.tabContentContainer}>
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionCardHeader}>
+                <Ionicons name="document-text-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionCardTitle}>İlan Açıklaması</Text>
               </View>
-            )}
-            {!!modelName && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Model</Text>
-                <Text style={styles.specValue}>{modelName}</Text>
-              </View>
-            )}
-            {!!trimName && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Paket / Donanım</Text>
-                <Text style={styles.specValue}>{trimName}</Text>
-              </View>
-            )}
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Model Yılı</Text>
-              <Text style={styles.specValue}>{yearVal}</Text>
-            </View>
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Kilometre</Text>
-              <Text style={styles.specValue}>{Number(kmVal).toLocaleString('tr-TR')} km</Text>
-            </View>
-            {!!listing.fuelType && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Yakıt Tipi</Text>
-                <Text style={styles.specValue}>
-                  {FUEL_TYPE_LABELS[listing.fuelType] || listing.fuelType}
-                </Text>
-              </View>
-            )}
-            {!!listing.transmission && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Vites Tipi</Text>
-                <Text style={styles.specValue}>
-                  {TRANSMISSION_LABELS[listing.transmission] || listing.transmission}
-                </Text>
-              </View>
-            )}
-            {!!listing.bodyType && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Kasa Tipi</Text>
-                <Text style={styles.specValue}>
-                  {BODY_TYPE_LABELS[listing.bodyType] || listing.bodyType}
-                </Text>
-              </View>
-            )}
-            {!!listing.engineDisplacement && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Motor Hacmi</Text>
-                <Text style={styles.specValue}>{listing.engineDisplacement} cc</Text>
-              </View>
-            )}
-            {!!listing.enginePower && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Motor Gücü</Text>
-                <Text style={styles.specValue}>{listing.enginePower} HP</Text>
-              </View>
-            )}
-            {!!listing.drivetrain && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Çekiş</Text>
-                <Text style={styles.specValue}>
-                  {DRIVETRAIN_LABELS[listing.drivetrain] || listing.drivetrain}
-                </Text>
-              </View>
-            )}
-            {!!listing.color && (
-              <View style={styles.specRow}>
-                <Text style={styles.specLabel}>Renk</Text>
-                <Text style={styles.specValue}>{listing.color}</Text>
-              </View>
-            )}
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Garanti Durumu</Text>
-              <Text style={[styles.specValue, listing.hasWarranty && { color: '#16a34a', fontWeight: '800' }]}>
-                {listing.hasWarranty ? 'Garantisi Var' : 'Garantisi Yok'}
+              <Text style={styles.descriptionText}>
+                {listing.description || 'Satıcı tarafından detaylı bir açıklama belirtilmemiş.'}
               </Text>
             </View>
-            <View style={styles.specRow}>
-              <Text style={styles.specLabel}>Ağır Hasar Kaydı</Text>
-              <Text style={[styles.specValue, listing.heavyDamage ? { color: '#dc2626', fontWeight: '800' } : { color: '#16a34a' }]}>
-                {listing.heavyDamage ? 'Var (Ağır Hasarlı)' : 'Yok'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Ekspertiz, Boya & Değişen Bilgisi Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="shield-checkmark-outline" size={18} color="#ea580c" />
-            <Text style={styles.cardTitle}>Ekspertiz ve Boya / Değişen</Text>
-          </View>
-
-          {/* Tramer Row */}
-          <View style={styles.tramerRow}>
-            <View>
-              <Text style={styles.tramerLabel}>Tramer Hasar Tutarı</Text>
-              <Text style={styles.tramerVal}>
-                {listing.tramerAmount ? `${Number(listing.tramerAmount).toLocaleString('tr-TR')} TL` : '0 TL (Kayıt Yok)'}
-              </Text>
-            </View>
-            {listing.tramerAmount > 0 && (
-              <View style={styles.tramerBadge}>
-                <Text style={styles.tramerBadgeText}>Hasar Kayıtlı</Text>
-              </View>
-            )}
-          </View>
-
-          {!!listing.damageRecord && (
-            <View style={styles.damageRecordBox}>
-              <Text style={styles.damageRecordTitle}>Hasar Kaydı Açıklaması:</Text>
-              <Text style={styles.damageRecordText}>{listing.damageRecord}</Text>
-            </View>
-          )}
-
-          {/* Body Parts Checklist */}
-          {(painted.length > 0 || changed.length > 0) ? (
-            <View style={styles.partsWrap}>
-              <Text style={styles.partsSubtitle}>Boyalı veya Değişen Parçalar:</Text>
-              <View style={styles.partsList}>
-                {changed.map((k: string) => (
-                  <View key={k} style={[styles.partItemPill, styles.partItemChanged]}>
-                    <Ionicons name="close-circle" size={14} color="#dc2626" />
-                    <Text style={[styles.partItemText, { color: '#dc2626' }]}>
-                      {CAR_BODY_PARTS[k] || k} (Değişen)
-                    </Text>
-                  </View>
-                ))}
-                {painted.map((k: string) => (
-                  <View key={k} style={[styles.partItemPill, styles.partItemPainted]}>
-                    <Ionicons name="alert-circle" size={14} color="#d97706" />
-                    <Text style={[styles.partItemText, { color: '#d97706' }]}>
-                      {CAR_BODY_PARTS[k] || k} (Boyalı)
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <View style={styles.hatasizBox}>
-              <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-              <Text style={styles.hatasizText}>Hatasız / Boyasız / Değişensiz</Text>
-            </View>
-          )}
-
-          {!!listing.maintenanceHistory && (
-            <View style={styles.maintenanceBox}>
-              <Text style={styles.maintenanceTitle}>Bakım Geçmişi & Notlar:</Text>
-              <Text style={styles.maintenanceText}>{listing.maintenanceHistory}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Description Card */}
-        {!!listing.description && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="document-text-outline" size={18} color="#ea580c" />
-              <Text style={styles.cardTitle}>İlan Açıklaması</Text>
-            </View>
-            <Text style={styles.descriptionText}>{listing.description}</Text>
           </View>
         )}
 
-        {/* Seller Info Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="person-outline" size={18} color="#ea580c" />
-            <Text style={styles.cardTitle}>Satıcı Bilgileri</Text>
-          </View>
-          <View style={styles.sellerRow}>
-            <View style={styles.sellerAvatar}>
-              <Text style={styles.sellerAvatarText}>
-                {sellerFullName.charAt(0).toUpperCase()}
-              </Text>
+        {/* TAB 3: KONUMU & SATICI */}
+        {activeTab === 'LOCATION' && (
+          <View style={styles.tabContentContainer}>
+            {/* Location Card */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionCardHeader}>
+                <Ionicons name="location-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionCardTitle}>İlan Konumu</Text>
+              </View>
+              <View style={styles.locationDetailRow}>
+                <View style={styles.locationPinIconBox}>
+                  <Ionicons name="navigate-circle" size={28} color="#ea580c" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationDetailTitle}>{cityVal}{districtVal}</Text>
+                  <Text style={styles.locationDetailSub}>Türkiye</Text>
+                </View>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sellerName}>{sellerFullName}</Text>
-              <Text style={styles.sellerSub}>
-                {listing.sellerType === 'DEALER' ? 'Galeriden' : listing.sellerType === 'AUTHORIZED_DEALER' ? 'Yetkili Bayiden' : 'Sahibinden'} • {cityVal}
-              </Text>
+
+            {/* Seller Details Card */}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionCardHeader}>
+                <Ionicons name="person-outline" size={18} color="#ea580c" />
+                <Text style={styles.sectionCardTitle}>Satıcı Profili</Text>
+              </View>
+              <View style={styles.sellerProfileRow}>
+                <View style={styles.sellerAvatar}>
+                  <Text style={styles.sellerAvatarText}>
+                    {sellerFullName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sellerName}>{sellerFullName}</Text>
+                  <Text style={styles.sellerSub}>
+                    {sellerTypeLabel} • {cityVal}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
-      {/* Bottom Action Bar */}
+      {/* 6. BOTTOM STICKY ACTION BAR (Sahibinden Style: Blue / Orange Dual Action) */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        {!!sellerObj.phone && (
-          <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller}>
-            <Ionicons name="call" size={18} color="#ea580c" />
-            <Text style={styles.callBtnText}>Ara</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.chatBtn} onPress={handleStartChat}>
+        <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller} activeOpacity={0.8}>
+          <Ionicons name="call" size={18} color="#ffffff" />
+          <Text style={styles.callBtnText}>Ara</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.chatBtn} onPress={handleStartChat} activeOpacity={0.85}>
           <Ionicons name="chatbubbles" size={18} color="#ffffff" />
-          <Text style={styles.chatBtnText}>Satıcıya Mesaj Gönder</Text>
+          <Text style={styles.chatBtnText}>Mesaj Gönder</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -616,7 +831,7 @@ export default function ListingDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   center: {
     flex: 1,
@@ -624,7 +839,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     gap: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   loadingText: {
     fontSize: 14,
@@ -650,152 +865,265 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
+  /* Top Bar */
+  topHeaderBar: {
+    backgroundColor: '#0f172a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.2,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   scrollContent: {
     paddingBottom: 110,
-    gap: 14,
   },
+  /* Title Banner */
+  titleBanner: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  titleBannerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  /* Gallery */
   galleryWrap: {
     width,
-    height: 300,
+    height: 270,
     backgroundColor: '#0f172a',
     position: 'relative',
   },
   gallerySlide: {
     width,
-    height: 300,
+    height: 270,
   },
   galleryImage: {
     width: '100%',
     height: '100%',
   },
-  floatingControlsRow: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  floatingGlassBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   photoIndexBadge: {
     position: 'absolute',
-    bottom: 14,
-    right: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    paddingHorizontal: 10,
+    bottom: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   photoIndexText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
   urgentBadgeWrap: {
     position: 'absolute',
-    bottom: 14,
-    left: 14,
+    bottom: 12,
+    left: 12,
   },
-  topCard: {
-    marginTop: -16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  card: {
+  /* Seller & Breadcrumb Strip */
+  sellerBreadcrumbStrip: {
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  priceText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#ea580c',
-    letterSpacing: -0.3,
-  },
-  titleText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-    lineHeight: 22,
-  },
-  quickInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    alignItems: 'center',
+    gap: 4,
   },
-  quickInfoItem: {
+  sellerHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
   },
-  quickInfoDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: '#cbd5e1',
+  sellerHighlightName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0284c7',
   },
-  quickInfoText: {
-    fontSize: 12,
+  sellerTypeTag: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sellerTypeTagText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#0369a1',
+  },
+  breadcrumbText: {
+    fontSize: 11.5,
     fontWeight: '700',
-    color: '#475569',
+    color: '#0284c7',
+    textAlign: 'center',
   },
+  locationSubText: {
+    fontSize: 11.5,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  /* Tabs Bar */
+  tabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  tabBtnActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#d97706',
+  },
+  tabBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  tabBtnTextActive: {
+    color: '#0f172a',
+    fontWeight: '900',
+  },
+  /* Tab Content */
+  tabContentContainer: {
+    paddingVertical: 10,
+    gap: 12,
+  },
+  /* Sahibinden Table */
+  tableContainer: {
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  priceRow: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+  },
+  tableLabel: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#64748b',
+    flex: 1,
+  },
+  tableValue: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  priceValWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priceHighlight: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0284c7',
+    letterSpacing: -0.2,
+  },
+  /* AI Banner */
   aiReportCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     backgroundColor: '#fff7ed',
-    marginHorizontal: 16,
-    borderRadius: 18,
+    marginHorizontal: 12,
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1.5,
     borderColor: '#ea580c',
   },
   aiIconBox: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: 12,
     backgroundColor: '#ffedd5',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  aiBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   aiTitle: {
     fontSize: 13,
     fontWeight: '900',
     color: '#ea580c',
   },
+  aiProBadge: {
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  aiProBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '900',
+  },
   aiDesc: {
     fontSize: 11,
     color: '#9a3412',
-    marginTop: 2,
+    marginTop: 3,
+    lineHeight: 15,
   },
-  cardHeader: {
+  /* Generic Section Card */
+  sectionCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 12,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  sectionCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -803,37 +1131,19 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
     paddingBottom: 8,
   },
-  cardTitle: {
-    fontSize: 14,
+  sectionCardTitle: {
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#0f172a',
   },
-  specTable: {
-    gap: 8,
-  },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  specLabel: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  specValue: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
+  /* Ekspertiz & Tramer */
   tramerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#f1f5f9',
   },
@@ -843,7 +1153,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   tramerVal: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#0f172a',
     marginTop: 2,
@@ -863,8 +1173,8 @@ const styles = StyleSheet.create({
   },
   damageRecordBox: {
     backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#f1f5f9',
     gap: 4,
@@ -877,7 +1187,7 @@ const styles = StyleSheet.create({
   damageRecordText: {
     fontSize: 12,
     color: '#0f172a',
-    lineHeight: 17,
+    lineHeight: 16,
   },
   partsWrap: {
     gap: 8,
@@ -895,10 +1205,10 @@ const styles = StyleSheet.create({
   partItemPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
   },
   partItemPainted: {
@@ -920,18 +1230,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 10,
   },
   hatasizText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
     color: '#15803d',
   },
   maintenanceBox: {
     backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#f1f5f9',
     gap: 4,
@@ -944,14 +1254,39 @@ const styles = StyleSheet.create({
   maintenanceText: {
     fontSize: 12,
     color: '#0f172a',
-    lineHeight: 17,
+    lineHeight: 16,
   },
   descriptionText: {
     fontSize: 13,
     color: '#334155',
     lineHeight: 20,
   },
-  sellerRow: {
+  /* Location & Seller */
+  locationDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 10,
+  },
+  locationPinIconBox: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locationDetailTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  locationDetailSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  sellerProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -979,6 +1314,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 2,
   },
+  /* Bottom Action Bar */
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -986,48 +1322,41 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    borderTopColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingTop: 10,
     flexDirection: 'row',
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 5,
     elevation: 8,
   },
   callBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1.5,
-    borderColor: '#ea580c',
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingVertical: 12,
   },
   callBtnText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#ea580c',
+    color: '#ffffff',
   },
   chatBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#ea580c',
-    borderRadius: 14,
-    paddingVertical: 13,
-    shadowColor: '#ea580c',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
+    gap: 6,
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingVertical: 12,
   },
   chatBtnText: {
     fontSize: 14,
