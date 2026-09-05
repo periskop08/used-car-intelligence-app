@@ -139,7 +139,17 @@ export default function ChatDetailScreen() {
       if (res.ok) {
         const data = await res.json();
         setConversation(data);
-        setMessages(Array.isArray(data?.messages) ? data.messages : []);
+        const uniqueMessages: MessageItem[] = [];
+        const seenIds = new Set<string>();
+        if (Array.isArray(data?.messages)) {
+          for (const m of data.messages) {
+            if (m?.id && !seenIds.has(m.id)) {
+              seenIds.add(m.id);
+              uniqueMessages.push(m);
+            }
+          }
+        }
+        setMessages(uniqueMessages);
       }
     } catch (e) {
       console.error('Chat load error:', e);
@@ -162,7 +172,17 @@ export default function ChatDetailScreen() {
       if (res.ok) {
         const data = await res.json();
         setConversation(data);
-        setMessages(Array.isArray(data?.messages) ? data.messages : []);
+        const uniqueMessages: MessageItem[] = [];
+        const seenIds = new Set<string>();
+        if (Array.isArray(data?.messages)) {
+          for (const m of data.messages) {
+            if (m?.id && !seenIds.has(m.id)) {
+              seenIds.add(m.id);
+              uniqueMessages.push(m);
+            }
+          }
+        }
+        setMessages(uniqueMessages);
       }
     } catch (e) {}
   };
@@ -189,7 +209,11 @@ export default function ChatDetailScreen() {
 
       if (res.ok) {
         const created = await res.json();
-        setMessages((prev) => [...prev, created]);
+        setMessages((prev) => {
+          if (!created?.id) return prev;
+          if (prev.some((m) => m.id === created.id)) return prev;
+          return [...prev, created];
+        });
         setInputText('');
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       } else {
@@ -273,7 +297,7 @@ export default function ChatDetailScreen() {
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={(item, index) => item.id || String(index)}
+            keyExtractor={(item, index) => (item?.id ? `${item.id}-${index}` : `msg-${index}`)}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
