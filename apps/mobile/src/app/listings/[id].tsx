@@ -399,7 +399,9 @@ export default function ListingDetailScreen() {
       })
     : '05.09.2026';
 
-  const listingNumber = listing.id ? listing.id.replace(/\D/g, '').slice(0, 10) || '1329791795' : '1329791795';
+  const listingNumber =
+    listing.listingNo ||
+    (listing.id ? listing.id.substring(0, 8).toUpperCase() : '-');
 
   const sellerTypeLabel =
     listing.sellerType === 'DEALER'

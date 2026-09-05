@@ -604,7 +604,7 @@ export default function ListingDetail() {
               {/* İlan No */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan No</span>
-                <span className="font-black text-red-400 font-mono text-right">{listing.listingNo || listing.id.slice(0, 10).toUpperCase()}</span>
+                <span className="font-black text-red-400 font-mono text-right">{listing.listingNo || listing.id.slice(0, 8).toUpperCase()}</span>
               </div>
 
               {/* İlan Tarihi */}

@@ -304,9 +304,8 @@ export default function ListingFeedScreen() {
     }
   };
 
-  const handleCall = (item: ListingFeedItem) => {
-    logAnalyticsEvent('listing_feed_call_clicked', { listingId: item.id });
-    alert('Satıcı telefon detayları için ilan detay sayfasına yönlendiriliyorsunuz.');
+  const handleGoToListing = (item: ListingFeedItem) => {
+    logAnalyticsEvent('listing_feed_go_to_listing_clicked', { listingId: item.id });
     router.push(`/listings/${item.id}` as any);
   };
 
@@ -545,11 +544,21 @@ export default function ListingFeedScreen() {
           {/* BOTTOM SECTION: CTA Action Buttons */}
           <View style={styles.cardContentBottom}>
             <View style={styles.ctaContainer}>
-              <TouchableOpacity onPress={() => handleCall(item)} style={styles.ctaBtnOutline}>
-                <Text style={styles.ctaTextOutline}>📞 Arama Başlat</Text>
+              <TouchableOpacity
+                onPress={() => handleGoToListing(item)}
+                style={styles.ctaBtnOutline}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="document-text-outline" size={15} color="#0f172a" style={{ marginRight: 5 }} />
+                <Text style={styles.ctaTextOutline}>İlana Git</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleMessage(item)} style={styles.ctaBtnSolid}>
-                <Text style={styles.ctaTextSolid}>💬 Mesaj Gönder</Text>
+              <TouchableOpacity
+                onPress={() => handleMessage(item)}
+                style={styles.ctaBtnSolid}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="chatbubbles-outline" size={15} color="#ffffff" style={{ marginRight: 5 }} />
+                <Text style={styles.ctaTextSolid}>Mesaj Gönder</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -970,6 +979,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -983,6 +993,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: '#ea580c',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#ea580c',
