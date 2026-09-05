@@ -273,7 +273,7 @@ export default function ListingDetailScreen() {
         return;
       }
 
-      const res = await fetch(`${API_URL}/messages/rooms`, {
+      const res = await fetch(`${API_URL}/conversations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -281,7 +281,7 @@ export default function ListingDetailScreen() {
         },
         body: JSON.stringify({
           listingId: listing.id,
-          recipientId: sellerId,
+          firstMessage: 'Merhaba, ilanınız hakkında bilgi alabilir miyim?',
         }),
       });
 
