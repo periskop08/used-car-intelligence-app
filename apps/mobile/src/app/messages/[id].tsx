@@ -34,6 +34,19 @@ const resolveMediaUrl = (url?: string | null): string | null => {
   return url;
 };
 
+const formatMessageTime = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  } catch (e) {
+    return '';
+  }
+};
+
 interface MessageItem {
   id: string;
   body: string;
@@ -53,7 +66,7 @@ interface ConversationDetail {
     priceAmount?: number;
     city?: string;
   } | null;
-  buyer: {
+  buyer?: {
     id: string;
     firstName: string | null;
     lastName: string | null;
@@ -61,7 +74,7 @@ interface ConversationDetail {
     email: string;
     profilePhotoUrl: string | null;
   };
-  seller: {
+  seller?: {
     id: string;
     firstName: string | null;
     lastName: string | null;
@@ -115,7 +128,7 @@ export default function ChatDetailScreen() {
       });
       if (userRes.ok) {
         const u = await userRes.json();
-        setCurrentUserId(u.id);
+        setCurrentUserId(u?.id || null);
       }
 
       // 2. Fetch conversation detail
@@ -126,7 +139,7 @@ export default function ChatDetailScreen() {
       if (res.ok) {
         const data = await res.json();
         setConversation(data);
-        setMessages(data.messages || []);
+        setMessages(Array.isArray(data?.messages) ? data.messages : []);
       }
     } catch (e) {
       console.error('Chat load error:', e);
@@ -148,7 +161,8 @@ export default function ChatDetailScreen() {
 
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        setConversation(data);
+        setMessages(Array.isArray(data?.messages) ? data.messages : []);
       }
     } catch (e) {}
   };
@@ -188,49 +202,54 @@ export default function ChatDetailScreen() {
     }
   };
 
-  const getOtherParticipant = () => {
+  const getOtherParticipant = (): string => {
     if (!conversation) return 'Kullanıcı';
     const isBuyer = currentUserId === conversation.buyerId;
     const other = isBuyer ? conversation.seller : conversation.buyer;
     if (!other) return 'Kullanıcı';
-    if (other.firstName || other.lastName) {
-      return `${other.firstName || ''} ${other.lastName || ''}`.trim();
-    }
-    return other.username || other.email?.split('@')[0] || 'Kullanıcı';
+    const fullName = `${other.firstName || ''} ${other.lastName || ''}`.trim();
+    if (fullName) return fullName;
+    if (other.username) return other.username;
+    if (other.email) return other.email.split('@')[0];
+    return 'Kullanıcı';
   };
 
-  const getOtherParticipantPhoto = () => {
+  const getOtherParticipantPhoto = (): string | null => {
     if (!conversation) return null;
     const isBuyer = currentUserId === conversation.buyerId;
     const other = isBuyer ? conversation.seller : conversation.buyer;
     return other?.profilePhotoUrl || null;
   };
 
+  const otherName = getOtherParticipant();
+  const avatarLetter = (otherName && otherName.length > 0 ? otherName[0] : 'K').toUpperCase();
+  const otherPhoto = getOtherParticipantPhoto();
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.headerBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
 
         <View style={styles.headerUserWrap}>
           <View style={styles.headerAvatar}>
-            {getOtherParticipantPhoto() ? (
+            {otherPhoto ? (
               <ExpoImage
-                source={{ uri: resolveMediaUrl(getOtherParticipantPhoto()) || '' }}
+                source={{ uri: resolveMediaUrl(otherPhoto) || '' }}
                 style={styles.headerAvatarImg}
                 contentFit="cover"
               />
             ) : (
-              <Text style={styles.headerAvatarText}>
-                {(getOtherParticipant()[0] || 'K').toUpperCase()}
-              </Text>
+              <Text style={styles.headerAvatarText}>{avatarLetter}</Text>
             )}
           </View>
-          <View>
-            <Text style={styles.headerName}>{getOtherParticipant()}</Text>
-            {conversation?.listing?.title && (
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherName}
+            </Text>
+            {!!conversation?.listing?.title && (
               <Text style={styles.headerListingTitle} numberOfLines={1}>
                 {conversation.listing.title}
               </Text>
@@ -245,7 +264,6 @@ export default function ChatDetailScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {loading ? (
           <View style={styles.center}>
@@ -255,7 +273,7 @@ export default function ChatDetailScreen() {
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => item.id || String(index)}
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
@@ -287,10 +305,7 @@ export default function ChatDetailScreen() {
                         isMine ? styles.myTimeText : styles.theirTimeText,
                       ]}
                     >
-                      {new Date(item.createdAt).toLocaleTimeString('tr-TR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatMessageTime(item.createdAt)}
                     </Text>
                   </View>
                 </View>
@@ -317,6 +332,7 @@ export default function ChatDetailScreen() {
             ]}
             onPress={() => handleSendMessage()}
             disabled={!inputText.trim() || sending}
+            activeOpacity={0.8}
           >
             {sending ? (
               <ActivityIndicator size="small" color="#ffffff" />
@@ -348,42 +364,38 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#e2e8f0',
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerUserWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flex: 1,
-    marginLeft: 8,
+    marginHorizontal: 8,
   },
   headerAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-    overflow: 'hidden',
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   headerAvatarImg: {
     width: '100%',
     height: '100%',
   },
   headerAvatarText: {
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: '900',
-    color: '#ea580c',
+    fontWeight: '800',
   },
   headerName: {
     fontSize: 14,
@@ -393,15 +405,16 @@ const styles = StyleSheet.create({
   headerListingTitle: {
     fontSize: 11,
     color: '#64748b',
-    maxWidth: 200,
+    marginTop: 1,
   },
   messagesList: {
-    padding: 16,
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 10,
   },
   messageBubbleWrap: {
     flexDirection: 'row',
-    marginVertical: 3,
+    width: '100%',
   },
   myBubbleWrap: {
     justifyContent: 'flex-end',
@@ -413,8 +426,7 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 18,
-    gap: 4,
+    borderRadius: 16,
   },
   myMessageBubble: {
     backgroundColor: '#ea580c',
@@ -427,46 +439,46 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    fontSize: 13.5,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   myMessageText: {
     color: '#ffffff',
-    fontWeight: '500',
   },
   theirMessageText: {
     color: '#0f172a',
-    fontWeight: '500',
   },
   messageTimeText: {
-    fontSize: 9.5,
-    alignSelf: 'flex-end',
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'right',
   },
   myTimeText: {
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   theirTimeText: {
     color: '#94a3b8',
   },
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: '#e2e8f0',
   },
   inputField: {
     flex: 1,
     backgroundColor: '#f1f5f9',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
     fontSize: 14,
     color: '#0f172a',
-    maxHeight: 90,
+    maxHeight: 100,
   },
   sendButton: {
     width: 40,
