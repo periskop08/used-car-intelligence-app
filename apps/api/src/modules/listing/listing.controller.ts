@@ -547,6 +547,7 @@ export class ListingController {
       return {
         id: item.id,
         title: item.title,
+        description: item.description || '',
         price: parseFloat(item.priceAmount.toString()),
         currency: item.currency,
         listingDate: new Date(item.publishedAt || item.createdAt).toLocaleDateString('tr-TR'),
