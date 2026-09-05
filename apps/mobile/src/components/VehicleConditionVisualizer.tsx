@@ -55,29 +55,33 @@ export default function VehicleConditionVisualizer({
 
     switch (status) {
       case 'CHANGED':
+        // Değişen: Canlı Kırmızı
         return {
-          fill: '#fee2e2',
-          stroke: isSelected ? '#b91c1c' : '#ef4444',
-          strokeWidth: isSelected ? '2.5' : '1.5',
+          fill: '#fca5a5',
+          stroke: isSelected ? '#7f1d1d' : '#dc2626',
+          strokeWidth: isSelected ? '3' : '2',
         };
       case 'PAINTED':
+        // Boyalı: Canlı Mavi (Sarı ve Kırmızıdan %100 ayrışan ve sektör standardı olan renk)
         return {
-          fill: '#ffedd5',
-          stroke: isSelected ? '#c2410c' : '#ea580c',
-          strokeWidth: isSelected ? '2.5' : '1.5',
+          fill: '#93c5fd',
+          stroke: isSelected ? '#1e3a8a' : '#2563eb',
+          strokeWidth: isSelected ? '3' : '2',
         };
       case 'LOCAL':
+        // Lokal Boyalı: Canlı Sarı / Altın Sarısı
         return {
-          fill: '#fef3c7',
-          stroke: isSelected ? '#b45309' : '#f59e0b',
-          strokeWidth: isSelected ? '2.5' : '1.5',
+          fill: '#fde047',
+          stroke: isSelected ? '#713f12' : '#ca8a04',
+          strokeWidth: isSelected ? '3' : '2',
         };
       case 'ORIGINAL':
       default:
+        // Orijinal: Temiz Beyaz & Gri Çizgiler
         return {
-          fill: '#f8fafc',
-          stroke: isSelected ? '#0f172a' : '#cbd5e1',
-          strokeWidth: isSelected ? '2' : '1.2',
+          fill: '#ffffff',
+          stroke: isSelected ? '#0f172a' : '#94a3b8',
+          strokeWidth: isSelected ? '2.5' : '1.5',
         };
     }
   };
@@ -94,23 +98,23 @@ export default function VehicleConditionVisualizer({
         </View>
       </View>
 
-      {/* Legend Badges Row */}
+      {/* Legend Badges Row (Solid colorful boxes) */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: '#f8fafc', borderColor: '#cbd5e1' }]} />
+          <View style={[styles.legendBox, { backgroundColor: '#ffffff', borderColor: '#94a3b8' }]} />
           <Text style={styles.legendText}>Orijinal</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]} />
-          <Text style={styles.legendText}>Lokal Boyalı</Text>
+          <View style={[styles.legendBox, { backgroundColor: '#facc15', borderColor: '#ca8a04' }]} />
+          <Text style={[styles.legendText, { color: '#854d0e', fontWeight: '800' }]}>Lokal Boyalı</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: '#ffedd5', borderColor: '#ea580c' }]} />
-          <Text style={styles.legendText}>Boyalı</Text>
+          <View style={[styles.legendBox, { backgroundColor: '#3b82f6', borderColor: '#1d4ed8' }]} />
+          <Text style={[styles.legendText, { color: '#1d4ed8', fontWeight: '800' }]}>Boyalı</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: '#fee2e2', borderColor: '#ef4444' }]} />
-          <Text style={styles.legendText}>Değişen</Text>
+          <View style={[styles.legendBox, { backgroundColor: '#ef4444', borderColor: '#b91c1c' }]} />
+          <Text style={[styles.legendText, { color: '#b91c1c', fontWeight: '800' }]}>Değişen</Text>
         </View>
       </View>
 
@@ -237,7 +241,7 @@ export default function VehicleConditionVisualizer({
               getPartStatus(selectedPart) === 'CHANGED'
                 ? '#dc2626'
                 : getPartStatus(selectedPart) === 'PAINTED'
-                ? '#ea580c'
+                ? '#2563eb'
                 : getPartStatus(selectedPart) === 'LOCAL'
                 ? '#b45309'
                 : '#16a34a',
@@ -280,11 +284,11 @@ export default function VehicleConditionVisualizer({
 
           {painted.length > 0 && (
             <View style={styles.partGroup}>
-              <Text style={styles.partGroupTitleOrange}>🟠 Boyalı Parçalar ({painted.length})</Text>
+              <Text style={styles.partGroupTitleBlue}>🔵 Boyalı Parçalar ({painted.length})</Text>
               <View style={styles.pillWrap}>
                 {painted.map((p) => (
-                  <View key={p} style={[styles.pill, styles.pillOrange]}>
-                    <Text style={[styles.pillText, { color: '#c2410c' }]}>
+                  <View key={p} style={[styles.pill, styles.pillBlue]}>
+                    <Text style={[styles.pillText, { color: '#1d4ed8' }]}>
                       {PART_LABELS[p] || p}
                     </Text>
                   </View>
@@ -299,7 +303,7 @@ export default function VehicleConditionVisualizer({
               <View style={styles.pillWrap}>
                 {local.map((p) => (
                   <View key={p} style={[styles.pill, styles.pillYellow]}>
-                    <Text style={[styles.pillText, { color: '#b45309' }]}>
+                    <Text style={[styles.pillText, { color: '#854d0e' }]}>
                       {PART_LABELS[p] || p}
                     </Text>
                   </View>
@@ -379,23 +383,27 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   legendBox: {
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     borderRadius: 3,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   legendText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#64748b',
+    color: '#475569',
   },
   blueprintWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   svg: {
     alignSelf: 'center',
@@ -448,19 +456,19 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   partGroupTitleRed: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#dc2626',
   },
-  partGroupTitleOrange: {
-    fontSize: 11,
+  partGroupTitleBlue: {
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#c2410c',
+    color: '#1d4ed8',
   },
   partGroupTitleYellow: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#b45309',
+    color: '#854d0e',
   },
   pillWrap: {
     flexDirection: 'row',
@@ -475,15 +483,15 @@ const styles = StyleSheet.create({
   },
   pillRed: {
     backgroundColor: '#fee2e2',
-    borderColor: '#fecaca',
+    borderColor: '#fca5a5',
   },
-  pillOrange: {
-    backgroundColor: '#ffedd5',
-    borderColor: '#fed7aa',
+  pillBlue: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#93c5fd',
   },
   pillYellow: {
-    backgroundColor: '#fef3c7',
-    borderColor: '#fde68a',
+    backgroundColor: '#fef9c3',
+    borderColor: '#fde047',
   },
   pillText: {
     fontSize: 11,

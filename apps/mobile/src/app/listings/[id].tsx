@@ -309,8 +309,40 @@ export default function ListingDetailScreen() {
     Linking.openURL(`tel:${phone}`);
   };
 
+  const touchStartY = useRef<number>(0);
+  const touchStartX = useRef<number>(0);
+  const [lightboxTranslateY, setLightboxTranslateY] = useState<number>(0);
+
+  const handleLightboxTouchStart = (e: any) => {
+    touchStartY.current = e.nativeEvent.pageY;
+    touchStartX.current = e.nativeEvent.pageX;
+  };
+
+  const handleLightboxTouchMove = (e: any) => {
+    const currentY = e.nativeEvent.pageY;
+    const diffY = currentY - touchStartY.current;
+    const diffX = Math.abs(e.nativeEvent.pageX - touchStartX.current);
+
+    if (diffY > 10 && diffY > diffX) {
+      setLightboxTranslateY(diffY);
+    }
+  };
+
+  const handleLightboxTouchEnd = (e: any) => {
+    const diffY = e.nativeEvent.pageY - touchStartY.current;
+    const diffX = Math.abs(e.nativeEvent.pageX - touchStartX.current);
+
+    if (diffY > 50 && diffY > diffX * 0.7) {
+      setIsLightboxOpen(false);
+      setLightboxTranslateY(0);
+    } else {
+      setLightboxTranslateY(0);
+    }
+  };
+
   const openLightboxAt = (index: number) => {
     setActivePhotoIndex(index);
+    setLightboxTranslateY(0);
     setIsLightboxOpen(true);
     setTimeout(() => {
       lightboxScrollRef.current?.scrollTo({ x: index * width, animated: false });
@@ -768,7 +800,7 @@ export default function ListingDetailScreen() {
         onRequestClose={() => setIsLightboxOpen(false)}
       >
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
-        <View style={styles.lightboxContainer} {...panResponder.panHandlers}>
+        <View style={styles.lightboxContainer}>
           {/* Lightbox Top Controls */}
           <View style={[styles.lightboxHeader, { paddingTop: Math.max(insets.top, 16) }]}>
             <Text style={styles.lightboxCounter}>
@@ -777,7 +809,10 @@ export default function ListingDetailScreen() {
 
             <TouchableOpacity
               style={styles.lightboxCloseBtn}
-              onPress={() => setIsLightboxOpen(false)}
+              onPress={() => {
+                setIsLightboxOpen(false);
+                setLightboxTranslateY(0);
+              }}
               activeOpacity={0.7}
             >
               <Text style={styles.lightboxCloseText}>Kapat</Text>
@@ -799,7 +834,17 @@ export default function ListingDetailScreen() {
             style={styles.lightboxScroll}
           >
             {displayPhotos.map((uri: string, idx: number) => (
-              <View key={idx} style={styles.lightboxSlide}>
+              <View
+                key={idx}
+                style={[
+                  styles.lightboxSlide,
+                  lightboxTranslateY > 0 ? { transform: [{ translateY: lightboxTranslateY }] } : null,
+                ]}
+                onTouchStart={handleLightboxTouchStart}
+                onTouchMove={handleLightboxTouchMove}
+                onTouchEnd={handleLightboxTouchEnd}
+                onTouchCancel={() => setLightboxTranslateY(0)}
+              >
                 <ExpoImage
                   source={{ uri }}
                   style={styles.lightboxImage}
