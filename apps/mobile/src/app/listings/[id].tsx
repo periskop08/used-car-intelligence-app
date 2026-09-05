@@ -281,7 +281,6 @@ export default function ListingDetailScreen() {
         },
         body: JSON.stringify({
           listingId: listing.id,
-          firstMessage: 'Merhaba, ilanınız hakkında bilgi alabilir miyim?',
         }),
       });
 
@@ -289,7 +288,10 @@ export default function ListingDetailScreen() {
       if (res.ok && data.id) {
         router.push({
           pathname: '/messages/[id]',
-          params: { id: data.id },
+          params: {
+            id: data.id,
+            initialDraft: 'Merhaba, ilanınız hakkında bilgi alabilir miyim?',
+          },
         } as any);
       } else {
         Alert.alert('Bilgi', data.message || 'Sohbet odası oluşturulamadı.');

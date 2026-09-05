@@ -74,15 +74,21 @@ interface ConversationDetail {
 
 export default function ChatDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, initialDraft } = useLocalSearchParams<{ id: string; initialDraft?: string }>();
 
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(initialDraft || '');
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    if (initialDraft) {
+      setInputText(initialDraft);
+    }
+  }, [initialDraft]);
 
   useEffect(() => {
     loadProfileAndChat();

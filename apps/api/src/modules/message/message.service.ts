@@ -150,36 +150,40 @@ export class MessageService {
       },
     });
 
-    const sanitizedBody = this.sanitizeHtml(dto.firstMessage);
-
     if (conversation) {
-      // Append message to existing conversation
-      await this.prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          senderId: buyerId,
-          body: sanitizedBody,
-        },
-      });
+      if (dto.firstMessage && dto.firstMessage.trim()) {
+        const sanitizedBody = this.sanitizeHtml(dto.firstMessage);
+        await this.prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            senderId: buyerId,
+            body: sanitizedBody,
+          },
+        });
 
-      await this.prisma.conversation.update({
-        where: { id: conversation.id },
-        data: { lastMessageAt: new Date() },
-      });
+        await this.prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { lastMessageAt: new Date() },
+        });
+      }
     } else {
-      // Create new conversation and message
+      const hasFirstMessage = !!(dto.firstMessage && dto.firstMessage.trim());
       conversation = await this.prisma.conversation.create({
         data: {
           listingId: dto.listingId,
           buyerId,
           sellerId,
           lastMessageAt: new Date(),
-          messages: {
-            create: {
-              senderId: buyerId,
-              body: sanitizedBody,
-            },
-          },
+          ...(hasFirstMessage
+            ? {
+                messages: {
+                  create: {
+                    senderId: buyerId,
+                    body: this.sanitizeHtml(dto.firstMessage!),
+                  },
+                },
+              }
+            : {}),
         },
       });
     }
