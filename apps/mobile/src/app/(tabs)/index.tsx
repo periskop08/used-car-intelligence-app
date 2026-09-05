@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle, Line, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
@@ -469,7 +469,16 @@ function TorkScoutWebExactAnimatedLogo() {
 
 export default function MobileDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<{ email: string; firstName?: string; role?: string } | null>(null);
+  const [user, setUser] = useState<{
+    id?: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    profilePhotoUrl?: string;
+    role?: string;
+  } | null>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [vitrinListings, setVitrinListings] = useState<ShowcaseItem[]>(DEFAULT_VITRIN_ITEMS);
   const [loadingListings, setLoadingListings] = useState(false);
 
@@ -600,7 +609,7 @@ export default function MobileDashboard() {
 
   const checkUserSession = async () => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
+      const token = await AsyncStorage.getItem('accessToken') || await AsyncStorage.getItem('token');
       if (token) {
         const res = await fetch(`${API_URL}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -610,12 +619,41 @@ export default function MobileDashboard() {
           setUser(profile);
         } else {
           await AsyncStorage.removeItem('accessToken');
+          setUser(null);
         }
+      } else {
+        setUser(null);
       }
     } catch (err) {
       console.error('Session check error:', err);
     }
   };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken') || await AsyncStorage.getItem('token');
+      if (!token) {
+        setUnreadCount(0);
+        return;
+      }
+      const res = await fetch(`${API_URL}/conversations/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(Number(data?.unreadCount || data?.count || 0));
+      }
+    } catch (e) {
+      // silent
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      checkUserSession();
+      fetchUnreadCount();
+    }, [])
+  );
 
   const fetchFeaturedListings = async () => {
     setLoadingListings(true);
@@ -1219,10 +1257,36 @@ export default function MobileDashboard() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.searchIconButton}
+            style={styles.headerProfileButton}
             onPress={() => router.push('/(tabs)/profile' as any)}
+            activeOpacity={0.8}
           >
-            <Ionicons name="person-circle-outline" size={24} color="#0f172a" />
+            {user?.profilePhotoUrl ? (
+              <ExpoImage
+                source={{ uri: formatCloudflareImageUrl(user.profilePhotoUrl) }}
+                style={styles.headerProfileImg}
+                contentFit="cover"
+              />
+            ) : user?.firstName || user?.username ? (
+              <View style={styles.headerProfileInitialBox}>
+                <Text style={styles.headerProfileInitialText}>
+                  {(user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.headerProfileIconBox}>
+                <Ionicons name="person-outline" size={18} color="#0f172a" />
+              </View>
+            )}
+
+            {/* Notification Count Badge */}
+            {unreadCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -2199,6 +2263,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#334155',
+  },
+  headerProfileButton: {
+    position: 'relative',
+    marginLeft: 6,
+  },
+  headerProfileImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#ea580c',
+  },
+  headerProfileInitialBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ea580c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fed7aa',
+  },
+  headerProfileInitialText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  headerProfileIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  headerBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
   },
   searchIconButton: {
     width: 36,
