@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,7 +10,9 @@ import {
   Dimensions,
   Linking,
   Share,
-  Platform,
+  Modal,
+  PanResponder,
+  StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
@@ -19,8 +21,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
+import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
 const formatCloudflareImageUrl = (url?: string | null): string => {
@@ -109,22 +112,6 @@ const DRIVETRAIN_LABELS: Record<string, string> = {
   AWD_ELECTRONIC: 'Elektronik 4 Çeker (AWD)',
 };
 
-const CAR_BODY_PARTS: Record<string, string> = {
-  FRONT_BUMPER: 'Ön Tampon',
-  REAR_BUMPER: 'Arka Tampon',
-  HOOD: 'Motor Kaputu',
-  ROOF: 'Tavan',
-  TRUNK: 'Bagaj Kapağı',
-  LEFT_FRONT_FENDER: 'Sol Ön Çamurluk',
-  RIGHT_FRONT_FENDER: 'Sağ Ön Çamurluk',
-  LEFT_FRONT_DOOR: 'Sol Ön Kapı',
-  RIGHT_FRONT_DOOR: 'Sağ Ön Kapı',
-  LEFT_REAR_DOOR: 'Sol Arka Kapı',
-  RIGHT_REAR_DOOR: 'Sağ Arka Kapı',
-  LEFT_REAR_FENDER: 'Sol Arka Çamurluk',
-  RIGHT_REAR_FENDER: 'Sağ Arka Çamurluk',
-};
-
 type ActiveTabType = 'SPECS' | 'DESCRIPTION' | 'LOCATION';
 
 export default function ListingDetailScreen() {
@@ -138,6 +125,10 @@ export default function ListingDetailScreen() {
   const [activeTab, setActiveTab] = useState<ActiveTabType>('SPECS');
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  const heroScrollRef = useRef<ScrollView>(null);
+  const lightboxScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (id === 'create') {
@@ -150,6 +141,20 @@ export default function ListingDetailScreen() {
       checkFavoriteStatus();
     }
   }, [id]);
+
+  // PanResponder to dismiss full-screen lightbox on vertical swipe down/up
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 25 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 50 || gestureState.dy < -50) {
+          setIsLightboxOpen(false);
+        }
+      },
+    })
+  ).current;
 
   const loadUser = async () => {
     try {
@@ -304,6 +309,14 @@ export default function ListingDetailScreen() {
     Linking.openURL(`tel:${phone}`);
   };
 
+  const openLightboxAt = (index: number) => {
+    setActivePhotoIndex(index);
+    setIsLightboxOpen(true);
+    setTimeout(() => {
+      lightboxScrollRef.current?.scrollTo({ x: index * width, animated: false });
+    }, 50);
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -343,9 +356,6 @@ export default function ListingDetailScreen() {
   const displayPhotos = rawPhotos.length > 0
     ? rawPhotos
     : [resolveVehicleImageUrl(null, brandName, modelFamilyName)];
-
-  const painted = Array.isArray(listing.paintedParts) ? listing.paintedParts : [];
-  const changed = Array.isArray(listing.changedParts) ? listing.changedParts : [];
 
   const formattedDate = listing.createdAt
     ? new Date(listing.createdAt).toLocaleDateString('tr-TR', {
@@ -395,16 +405,17 @@ export default function ListingDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 2. LISTING TITLE BANNER (Prominent uppercase header above photo) */}
+        {/* 2. LISTING TITLE BANNER */}
         <View style={styles.titleBanner}>
           <Text style={styles.titleBannerText}>
             {listing.title?.toUpperCase() || `${brandName} ${modelFamilyName} ${trimName}`.trim()}
           </Text>
         </View>
 
-        {/* 3. HERO IMAGE GALLERY */}
+        {/* 3. HERO IMAGE GALLERY (Tap to open Fullscreen Lightbox) */}
         <View style={styles.galleryWrap}>
           <ScrollView
+            ref={heroScrollRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -416,23 +427,32 @@ export default function ListingDetailScreen() {
             scrollEventThrottle={16}
           >
             {displayPhotos.map((uri: string, idx: number) => (
-              <View key={idx} style={styles.gallerySlide}>
+              <TouchableOpacity
+                key={idx}
+                style={styles.gallerySlide}
+                activeOpacity={0.95}
+                onPress={() => openLightboxAt(idx)}
+              >
                 <ExpoImage
                   source={{ uri }}
                   style={styles.galleryImage}
                   contentFit="cover"
                   transition={200}
                 />
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
 
-          {/* Photo Pagination Badge (e.g. 1 / 2 centered at bottom) */}
-          <View style={styles.photoIndexBadge}>
+          {/* Photo Pagination Badge */}
+          <TouchableOpacity
+            style={styles.photoIndexBadge}
+            onPress={() => openLightboxAt(activePhotoIndex)}
+            activeOpacity={0.8}
+          >
             <Text style={styles.photoIndexText}>
               {activePhotoIndex + 1} / {displayPhotos.length}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           {/* Urgent Badge */}
           {listing.isUrgent && (
@@ -444,24 +464,21 @@ export default function ListingDetailScreen() {
 
         {/* 4. SELLER INFO & BREADCRUMB CATEGORY & LOCATION STRIP */}
         <View style={styles.sellerBreadcrumbStrip}>
-          {/* Seller Name (without extra Sahibinden tag) */}
           <View style={styles.sellerHeaderRow}>
             <Text style={styles.sellerHighlightName}>{sellerFullName}</Text>
           </View>
 
-          {/* Breadcrumb Hierarchy */}
           <Text style={styles.breadcrumbText} numberOfLines={1}>
             Vasıta &gt; Otomobil &gt; {brandName || 'Audi'} &gt; {modelFamilyName || 'A3'}
             {trimName ? ` &gt; ${trimName}` : ''}
           </Text>
 
-          {/* Location Line */}
           <Text style={styles.locationSubText}>
             {cityVal}{districtVal}
           </Text>
         </View>
 
-        {/* 5. SEGMENTED TABS BAR (Active = Brand Orange) */}
+        {/* 5. SEGMENTED TABS BAR */}
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'SPECS' && styles.tabBtnActive]}
@@ -494,12 +511,11 @@ export default function ListingDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* TAB 1: İLAN BİLGİLERİ (Specs Table + AI Banner + Ekspertiz) */}
+        {/* TAB 1: İLAN BİLGİLERİ */}
         {activeTab === 'SPECS' && (
           <View style={styles.tabContentContainer}>
-            {/* Sahibinden-Style Spec Rows Table */}
+            {/* Specs Table */}
             <View style={styles.tableContainer}>
-              {/* Fiyat Row (Brand Orange Highlighted) */}
               <View style={[styles.tableRow, styles.priceRow]}>
                 <Text style={styles.tableLabel}>Fiyat</Text>
                 <View style={styles.priceValWrap}>
@@ -510,13 +526,11 @@ export default function ListingDetailScreen() {
                 </View>
               </View>
 
-              {/* İlan Tarihi */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>İlan Tarihi</Text>
                 <Text style={styles.tableValue}>{formattedDate}</Text>
               </View>
 
-              {/* İlan No */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>İlan No</Text>
                 <Text style={[styles.tableValue, { color: '#dc2626', fontWeight: '800' }]}>
@@ -524,31 +538,26 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Marka */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Marka</Text>
                 <Text style={styles.tableValue}>{brandName || '-'}</Text>
               </View>
 
-              {/* Seri */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Seri</Text>
                 <Text style={styles.tableValue}>{modelFamilyName || '-'}</Text>
               </View>
 
-              {/* Model */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Model</Text>
                 <Text style={styles.tableValue}>{trimName || `${brandName} ${modelFamilyName}`}</Text>
               </View>
 
-              {/* Yıl */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Yıl</Text>
                 <Text style={styles.tableValue}>{yearVal}</Text>
               </View>
 
-              {/* Yakıt / Motor Tipi */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Yakıt / Motor Tipi</Text>
                 <Text style={styles.tableValue}>
@@ -556,7 +565,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Vites */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Vites</Text>
                 <Text style={styles.tableValue}>
@@ -564,7 +572,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Araç Durumu */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Araç Durumu</Text>
                 <Text style={styles.tableValue}>
@@ -572,13 +579,11 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Kilometre */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Kilometre</Text>
                 <Text style={styles.tableValue}>{Number(kmVal).toLocaleString('tr-TR')} km</Text>
               </View>
 
-              {/* Kasa Tipi */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Kasa Tipi</Text>
                 <Text style={styles.tableValue}>
@@ -586,7 +591,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Motor Gücü */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Motor Gücü</Text>
                 <Text style={styles.tableValue}>
@@ -594,7 +598,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Motor Hacmi */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Motor Hacmi</Text>
                 <Text style={styles.tableValue}>
@@ -602,7 +605,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Çekiş */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Çekiş</Text>
                 <Text style={styles.tableValue}>
@@ -610,13 +612,11 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Renk */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Renk</Text>
                 <Text style={styles.tableValue}>{listing.color || 'Beyaz'}</Text>
               </View>
 
-              {/* Garanti */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Garanti</Text>
                 <Text style={[styles.tableValue, listing.hasWarranty && { color: '#16a34a', fontWeight: '800' }]}>
@@ -624,7 +624,6 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Ağır Hasar Kayıtlı */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Ağır Hasar Kayıtlı</Text>
                 <Text style={[styles.tableValue, listing.heavyDamage ? { color: '#dc2626', fontWeight: '800' } : { color: '#16a34a' }]}>
@@ -632,26 +631,23 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
 
-              {/* Plaka / Uyruk */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Plaka / Uyruk</Text>
                 <Text style={styles.tableValue}>Türkiye (TR) Plakalı</Text>
               </View>
 
-              {/* Kimden */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Kimden</Text>
                 <Text style={styles.tableValue}>{sellerTypeLabel}</Text>
               </View>
 
-              {/* Takasa Uygun */}
               <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.tableLabel}>Takasa Uygun</Text>
                 <Text style={styles.tableValue}>{listing.exchangeable ? 'Evet' : 'Hayır'}</Text>
               </View>
             </View>
 
-            {/* TorqueScout Exclusive: AI Kronik Arıza & Risk Analiz Banner */}
+            {/* TorqueScout AI Kronik Arıza & Risk Raporu Banner */}
             {listing.vehicleVariantId && (
               <TouchableOpacity
                 style={styles.aiReportCard}
@@ -681,72 +677,15 @@ export default function ListingDetailScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Ekspertiz, Boya & Değişen Özeti */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionCardHeader}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#ea580c" />
-                <Text style={styles.sectionCardTitle}>Ekspertiz ve Boya / Değişen</Text>
-              </View>
-
-              {/* Tramer Row */}
-              <View style={styles.tramerRow}>
-                <View>
-                  <Text style={styles.tramerLabel}>Tramer Hasar Tutarı</Text>
-                  <Text style={styles.tramerVal}>
-                    {listing.tramerAmount ? `${Number(listing.tramerAmount).toLocaleString('tr-TR')} TL` : '0 TL (Kayıt Yok)'}
-                  </Text>
-                </View>
-                {listing.tramerAmount > 0 && (
-                  <View style={styles.tramerBadge}>
-                    <Text style={styles.tramerBadgeText}>Hasar Kayıtlı</Text>
-                  </View>
-                )}
-              </View>
-
-              {!!listing.damageRecord && (
-                <View style={styles.damageRecordBox}>
-                  <Text style={styles.damageRecordTitle}>Hasar Kaydı Açıklaması:</Text>
-                  <Text style={styles.damageRecordText}>{listing.damageRecord}</Text>
-                </View>
-              )}
-
-              {/* Body Parts List */}
-              {(painted.length > 0 || changed.length > 0) ? (
-                <View style={styles.partsWrap}>
-                  <Text style={styles.partsSubtitle}>Boyalı veya Değişen Parçalar:</Text>
-                  <View style={styles.partsList}>
-                    {changed.map((k: string) => (
-                      <View key={k} style={[styles.partItemPill, styles.partItemChanged]}>
-                        <Ionicons name="close-circle" size={14} color="#dc2626" />
-                        <Text style={[styles.partItemText, { color: '#dc2626' }]}>
-                          {CAR_BODY_PARTS[k] || k} (Değişen)
-                        </Text>
-                      </View>
-                    ))}
-                    {painted.map((k: string) => (
-                      <View key={k} style={[styles.partItemPill, styles.partItemPainted]}>
-                        <Ionicons name="alert-circle" size={14} color="#d97706" />
-                        <Text style={[styles.partItemText, { color: '#d97706' }]}>
-                          {CAR_BODY_PARTS[k] || k} (Boyalı)
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.hatasizBox}>
-                  <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-                  <Text style={styles.hatasizText}>Hatasız / Boyasız / Değişensiz</Text>
-                </View>
-              )}
-
-              {!!listing.maintenanceHistory && (
-                <View style={styles.maintenanceBox}>
-                  <Text style={styles.maintenanceTitle}>Bakım Geçmişi &amp; Notlar:</Text>
-                  <Text style={styles.maintenanceText}>{listing.maintenanceHistory}</Text>
-                </View>
-              )}
-            </View>
+            {/* 2D Ekspertiz, Boya & Değişen Şeması */}
+            <VehicleConditionVisualizer
+              paintedParts={listing.paintedParts}
+              changedParts={listing.changedParts}
+              localPaintedParts={listing.localPaintedParts}
+              damageRecord={listing.damageRecord}
+              tramerAmount={listing.tramerAmount}
+              maintenanceHistory={listing.maintenanceHistory}
+            />
           </View>
         )}
 
@@ -768,7 +707,6 @@ export default function ListingDetailScreen() {
         {/* TAB 3: KONUMU & SATICI */}
         {activeTab === 'LOCATION' && (
           <View style={styles.tabContentContainer}>
-            {/* Location Card */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionCardHeader}>
                 <Ionicons name="location-outline" size={18} color="#ea580c" />
@@ -785,7 +723,6 @@ export default function ListingDetailScreen() {
               </View>
             </View>
 
-            {/* Seller Details Card */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionCardHeader}>
                 <Ionicons name="person-outline" size={18} color="#ea580c" />
@@ -809,7 +746,7 @@ export default function ListingDetailScreen() {
         )}
       </ScrollView>
 
-      {/* 6. BOTTOM STICKY ACTION BAR (Brand Orange Dual Action) */}
+      {/* 6. BOTTOM STICKY ACTION BAR */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity style={styles.callBtn} onPress={handleCallSeller} activeOpacity={0.85}>
           <Ionicons name="call" size={18} color="#ffffff" />
@@ -821,6 +758,66 @@ export default function ListingDetailScreen() {
           <Text style={styles.chatBtnText}>Mesaj Gönder</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 7. FULLSCREEN LIGHTBOX MODAL GALLERY */}
+      <Modal
+        visible={isLightboxOpen}
+        transparent={false}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setIsLightboxOpen(false)}
+      >
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <View style={styles.lightboxContainer} {...panResponder.panHandlers}>
+          {/* Lightbox Top Controls */}
+          <View style={[styles.lightboxHeader, { paddingTop: Math.max(insets.top, 16) }]}>
+            <Text style={styles.lightboxCounter}>
+              {activePhotoIndex + 1} / {displayPhotos.length}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.lightboxCloseBtn}
+              onPress={() => setIsLightboxOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.lightboxCloseText}>Kapat</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Fullscreen Horizontal Swipe Gallery */}
+          <ScrollView
+            ref={lightboxScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => {
+              const offset = e.nativeEvent.contentOffset.x;
+              const idx = Math.round(offset / width);
+              setActivePhotoIndex(idx);
+            }}
+            scrollEventThrottle={16}
+            style={styles.lightboxScroll}
+          >
+            {displayPhotos.map((uri: string, idx: number) => (
+              <View key={idx} style={styles.lightboxSlide}>
+                <ExpoImage
+                  source={{ uri }}
+                  style={styles.lightboxImage}
+                  contentFit="contain"
+                  transition={150}
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Pull to dismiss hint */}
+          <View style={[styles.lightboxFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <Text style={styles.lightboxFooterHint}>
+              Kapatmak için aşağı kaydırın veya Kapat'a dokunun
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1124,126 +1121,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0f172a',
   },
-  /* Ekspertiz & Tramer */
-  tramerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  tramerLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  tramerVal: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginTop: 2,
-  },
-  tramerBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-  },
-  tramerBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#b45309',
-  },
-  damageRecordBox: {
-    backgroundColor: '#f8fafc',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    gap: 4,
-  },
-  damageRecordTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  damageRecordText: {
-    fontSize: 12,
-    color: '#0f172a',
-    lineHeight: 16,
-  },
-  partsWrap: {
-    gap: 8,
-  },
-  partsSubtitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#334155',
-  },
-  partsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  partItemPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  partItemPainted: {
-    backgroundColor: '#fef3c7',
-    borderColor: '#fde68a',
-  },
-  partItemChanged: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#fecaca',
-  },
-  partItemText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  hatasizBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    padding: 10,
-    borderRadius: 10,
-  },
-  hatasizText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#15803d',
-  },
-  maintenanceBox: {
-    backgroundColor: '#f8fafc',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    gap: 4,
-  },
-  maintenanceTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  maintenanceText: {
-    fontSize: 12,
-    color: '#0f172a',
-    lineHeight: 16,
-  },
   descriptionText: {
     fontSize: 13,
     color: '#334155',
@@ -1350,5 +1227,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     color: '#ffffff',
+  },
+  /* Fullscreen Lightbox Styles */
+  lightboxContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'space-between',
+  },
+  lightboxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    zIndex: 20,
+  },
+  lightboxCounter: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  lightboxCloseBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+  },
+  lightboxCloseText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  lightboxScroll: {
+    flex: 1,
+  },
+  lightboxSlide: {
+    width,
+    height: height * 0.78,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lightboxImage: {
+    width: '100%',
+    height: '100%',
+  },
+  lightboxFooter: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 20,
+  },
+  lightboxFooterHint: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
