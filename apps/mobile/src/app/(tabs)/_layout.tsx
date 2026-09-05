@@ -192,6 +192,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="profile"
           options={{
+            headerShown: false,
             title: 'Profilim & Hesabım',
             href: null,
           }}

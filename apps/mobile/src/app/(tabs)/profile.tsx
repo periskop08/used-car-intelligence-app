@@ -144,7 +144,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top Header */}
       <View style={styles.topHeader}>
-        <Text style={styles.topHeaderTitle}>Hesabım & Profil</Text>
+        <Text style={styles.topHeaderTitle}>Profilim & Hesabım</Text>
       </View>
 
       <ScrollView
