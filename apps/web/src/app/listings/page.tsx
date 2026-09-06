@@ -6,6 +6,17 @@ import ListingFilters from "../../components/listings/ListingFilters";
 import ListingCard from "../../components/listings/ListingCard";
 import UrgentListingBadge from "../../components/listings/UrgentListingBadge";
 import { formatCurrency } from "@/utils/formatters";
+import {
+  VEHICLE_COLORS,
+  isApprovedVehicleColor,
+  normalizeVehicleColor,
+  HORSEPOWER_RANGES,
+  ENGINE_DISPLACEMENT_RANGES,
+  getHpRangeById,
+  getCcRangeById,
+  isValidHpRangeId,
+  isValidCcRangeId,
+} from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -46,10 +57,11 @@ function ListingsContent() {
   const [transmissions, setTransmissions] = useState<string[]>([]);
   const [vehicleStatuses, setVehicleStatuses] = useState<string[]>([]);
   const [bodyTypes, setBodyTypes] = useState<string[]>([]);
-  const [minHp, setMinHp] = useState("");
-  const [maxHp, setMaxHp] = useState("");
-  const [minCc, setMinCc] = useState("");
-  const [maxCc, setMaxCc] = useState("");
+  const [powerRanges, setPowerRanges] = useState<string[]>([]);
+  const [displacementRanges, setDisplacementRanges] = useState<string[]>([]);
+  const [isPowerExpanded, setIsPowerExpanded] = useState(false);
+  const [isDisplacementExpanded, setIsDisplacementExpanded] = useState(false);
+  const [isColorExpanded, setIsColorExpanded] = useState(false);
   const [drivetrains, setDrivetrains] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [hasWarranty, setHasWarranty] = useState<string>(""); 
@@ -96,7 +108,6 @@ function ListingsContent() {
 
   // Read URL parameters on load
   useEffect(() => {
-
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
     const engineVal = searchParams.get("engineId");
@@ -113,6 +124,10 @@ function ListingsContent() {
     const cityVal = searchParams.get("city");
     const profileId = searchParams.get("preferenceProfileId");
     const sId = searchParams.get("sessionId");
+
+    const colorsParam = searchParams.get("colors") || searchParams.get("color");
+    const powerParam = searchParams.get("powerRanges");
+    const dispParam = searchParams.get("displacementRanges");
     
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
@@ -130,6 +145,31 @@ function ListingsContent() {
     if (cityVal) setCity(cityVal);
     if (profileId) setPreferenceProfileId(profileId);
     if (sId) setPrefSessionId(sId);
+
+    // Safe hydration: filter out any invalid/stale values without crashing
+    if (colorsParam) {
+      const validCols = colorsParam
+        .split(",")
+        .map((x) => x.trim())
+        .filter((c) => isApprovedVehicleColor(c))
+        .map((c) => normalizeVehicleColor(c)!)
+        .filter(Boolean);
+      if (validCols.length > 0) setColors(validCols);
+    }
+    if (powerParam) {
+      const validPower = powerParam
+        .split(",")
+        .map((x) => x.trim())
+        .filter((id) => isValidHpRangeId(id));
+      if (validPower.length > 0) setPowerRanges(validPower);
+    }
+    if (dispParam) {
+      const validDisp = dispParam
+        .split(",")
+        .map((x) => x.trim())
+        .filter((id) => isValidCcRangeId(id));
+      if (validDisp.length > 0) setDisplacementRanges(validDisp);
+    }
   }, [searchParams]);
 
   // Main Fetch function
@@ -152,7 +192,6 @@ function ListingsContent() {
     if (preferenceProfileId) query += `&preferenceProfileId=${preferenceProfileId}`;
     if (prefSessionId) query += `&sessionId=${prefSessionId}`;
 
-
     if (city) query += `&city=${encodeURIComponent(city)}`;
     if (district) query += `&district=${encodeURIComponent(district)}`;
     if (selectedCurrency) query += `&currency=${selectedCurrency}`;
@@ -160,12 +199,10 @@ function ListingsContent() {
     if (transmissions.length > 0) query += `&transmission=${transmissions.join(",")}`;
     if (vehicleStatuses.length > 0) query += `&vehicleStatus=${vehicleStatuses.join(",")}`;
     if (bodyTypes.length > 0) query += `&bodyType=${bodyTypes.join(",")}`;
-    if (minHp) query += `&minEnginePower=${minHp}`;
-    if (maxHp) query += `&maxEnginePower=${maxHp}`;
-    if (minCc) query += `&minEngineDisplacement=${minCc}`;
-    if (maxCc) query += `&maxEngineDisplacement=${maxCc}`;
     if (drivetrains.length > 0) query += `&drivetrain=${drivetrains.join(",")}`;
-    if (colors.length > 0) query += `&color=${colors.join(",")}`;
+    if (colors.length > 0) query += `&colors=${encodeURIComponent(colors.join(","))}`;
+    if (powerRanges.length > 0) query += `&powerRanges=${encodeURIComponent(powerRanges.join(","))}`;
+    if (displacementRanges.length > 0) query += `&displacementRanges=${encodeURIComponent(displacementRanges.join(","))}`;
     if (hasWarranty) query += `&hasWarranty=${hasWarranty}`;
     if (heavyDamage) query += `&heavyDamage=${heavyDamage}`;
     if (plateTypes.length > 0) query += `&plateType=${plateTypes.join(",")}`;
@@ -194,7 +231,6 @@ function ListingsContent() {
   useEffect(() => {
     fetchListings();
   }, [page, sort, selectedBrand, selectedModel, vehicleVariantId, minPrice, maxPrice, fuelTypes, transmissions, bodyTypes, isAiReady, urgentOnly, showcaseOnly, token, preferenceProfileId, prefSessionId]);
-
 
   const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
     e.preventDefault();
@@ -234,6 +270,42 @@ function ListingsContent() {
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
+
+    // Sync URL query state so that active filters survive pagination, refresh, and browser back/forward
+    const params = new URLSearchParams();
+    if (selectedBrand) params.set("brandId", selectedBrand);
+    if (selectedModel) params.set("modelId", selectedModel);
+    if (selectedEngineId) params.set("engineId", selectedEngineId);
+    if (vehicleVariantId) params.set("vehicleVariantId", vehicleVariantId);
+    if (minYear) params.set("minYear", minYear);
+    if (maxYear) params.set("maxYear", maxYear);
+    if (minPrice) params.set("minPrice", minPrice);
+    if (maxPrice) params.set("maxPrice", maxPrice);
+    if (minKm) params.set("minKm", minKm);
+    if (maxKm) params.set("maxKm", maxKm);
+    if (isAiReady) params.set("isAiReady", "true");
+    if (urgentOnly) params.set("urgentOnly", "true");
+    if (showcaseOnly) params.set("showcaseOnly", "true");
+    if (city) params.set("city", city);
+    if (district) params.set("district", district);
+    if (fuelTypes.length > 0) params.set("fuelType", fuelTypes.join(","));
+    if (transmissions.length > 0) params.set("transmission", transmissions.join(","));
+    if (vehicleStatuses.length > 0) params.set("vehicleStatus", vehicleStatuses.join(","));
+    if (bodyTypes.length > 0) params.set("bodyType", bodyTypes.join(","));
+    if (drivetrains.length > 0) params.set("drivetrain", drivetrains.join(","));
+    if (colors.length > 0) params.set("colors", colors.join(","));
+    if (powerRanges.length > 0) params.set("powerRanges", powerRanges.join(","));
+    if (displacementRanges.length > 0) params.set("displacementRanges", displacementRanges.join(","));
+    if (hasWarranty) params.set("hasWarranty", hasWarranty);
+    if (heavyDamage) params.set("heavyDamage", heavyDamage);
+    if (plateTypes.length > 0) params.set("plateType", plateTypes.join(","));
+    if (sellerType) params.set("sellerType", sellerType);
+    if (exchangeable) params.set("exchangeable", exchangeable);
+    if (keyword) params.set("keyword", keyword);
+    if (includeDescription) params.set("includeDescription", "true");
+
+    const newQuery = params.toString();
+    router.push(newQuery ? `/listings?${newQuery}` : "/listings");
     fetchListings();
   };
 
@@ -256,10 +328,8 @@ function ListingsContent() {
     setTransmissions([]);
     setVehicleStatuses([]);
     setBodyTypes([]);
-    setMinHp("");
-    setMaxHp("");
-    setMinCc("");
-    setMaxCc("");
+    setPowerRanges([]);
+    setDisplacementRanges([]);
     setDrivetrains([]);
     setColors([]);
     setHasWarranty("");
@@ -292,9 +362,16 @@ function ListingsContent() {
   const toggleColor = (val: string) => {
     setColors(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
   };
+  const togglePowerRange = (val: string) => {
+    setPowerRanges(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
+  };
+  const toggleDisplacementRange = (val: string) => {
+    setDisplacementRanges(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
+  };
   const togglePlateType = (val: string) => {
     setPlateTypes(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
   };
+
 
   return (
     <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-8">
@@ -546,45 +623,112 @@ function ListingsContent() {
 
           <div className="border-t border-white/5 my-1"></div>
 
-          {/* Motor Hacmi & Gücü */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Motor Gücü (HP)</label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={minHp}
-                onChange={(e) => setMinHp(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none text-center"
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={maxHp}
-                onChange={(e) => setMaxHp(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none text-center"
-              />
+          {/* Motor Gücü (HP) - Collapsible Multi-Select */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Motor Gücü (HP)
+              </label>
+              {powerRanges.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPowerRanges([])}
+                  className="text-[10px] text-orange-400 hover:underline"
+                >
+                  Sıfırla
+                </button>
+              )}
             </div>
+            <button
+              type="button"
+              aria-expanded={isPowerExpanded}
+              onClick={() => setIsPowerExpanded(!isPowerExpanded)}
+              className="w-full bg-slate-900 border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-xs text-slate-200 flex items-center justify-between transition focus:outline-none focus:border-orange-500"
+            >
+              <span className="truncate">
+                {powerRanges.length === 0
+                  ? "Motor Gücü Seçiniz"
+                  : powerRanges.length === 1
+                  ? getHpRangeById(powerRanges[0])?.label || "1 seçim"
+                  : `${powerRanges.length} aralık seçildi`}
+              </span>
+              <span className={`text-[10px] text-slate-400 transition-transform duration-200 ${isPowerExpanded ? "rotate-180" : ""}`}>
+                ▼
+              </span>
+            </button>
+            {isPowerExpanded && (
+              <div className="flex flex-col gap-1 p-2 bg-slate-950/70 border border-white/5 rounded-xl max-h-56 overflow-y-auto custom-scrollbar">
+                {HORSEPOWER_RANGES.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-2 p-1 rounded-md hover:bg-white/5 cursor-pointer select-none text-xs text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={powerRanges.includes(item.id)}
+                      onChange={() => togglePowerRange(item.id)}
+                      className="accent-orange-500 rounded border-white/10 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Motor Hacmi (cc)</label>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={minCc}
-                onChange={(e) => setMinCc(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none text-center"
-              />
-              <input
-                type="number"
-                placeholder="Max"
-                value={maxCc}
-                onChange={(e) => setMaxCc(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none text-center"
-              />
+          <div className="border-t border-white/5 my-1"></div>
+
+          {/* Motor Hacmi (CC) - Collapsible Multi-Select */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Motor Hacmi (CC)
+              </label>
+              {displacementRanges.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDisplacementRanges([])}
+                  className="text-[10px] text-orange-400 hover:underline"
+                >
+                  Sıfırla
+                </button>
+              )}
             </div>
+            <button
+              type="button"
+              aria-expanded={isDisplacementExpanded}
+              onClick={() => setIsDisplacementExpanded(!isDisplacementExpanded)}
+              className="w-full bg-slate-900 border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-xs text-slate-200 flex items-center justify-between transition focus:outline-none focus:border-orange-500"
+            >
+              <span className="truncate">
+                {displacementRanges.length === 0
+                  ? "Motor Hacmi Seçiniz"
+                  : displacementRanges.length === 1
+                  ? getCcRangeById(displacementRanges[0])?.label || "1 seçim"
+                  : `${displacementRanges.length} aralık seçildi`}
+              </span>
+              <span className={`text-[10px] text-slate-400 transition-transform duration-200 ${isDisplacementExpanded ? "rotate-180" : ""}`}>
+                ▼
+              </span>
+            </button>
+            {isDisplacementExpanded && (
+              <div className="flex flex-col gap-1 p-2 bg-slate-950/70 border border-white/5 rounded-xl max-h-56 overflow-y-auto custom-scrollbar">
+                {ENGINE_DISPLACEMENT_RANGES.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-2 p-1 rounded-md hover:bg-white/5 cursor-pointer select-none text-xs text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={displacementRanges.includes(item.id)}
+                      onChange={() => toggleDisplacementRange(item.id)}
+                      className="accent-orange-500 rounded border-white/10 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-white/5 my-1"></div>
@@ -614,23 +758,61 @@ function ListingsContent() {
 
           <div className="border-t border-white/5 my-1"></div>
 
-          {/* Renk */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Renk</label>
-            <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-300">
-              {["Beyaz", "Siyah", "Gri", "Gümüş", "Kırmızı", "Mavi", "Sarı", "Yeşil"].map((col) => (
-                <label key={col} className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={colors.includes(col)}
-                    onChange={() => toggleColor(col)}
-                    className="accent-orange-500 rounded border-white/10"
-                  />
-                  <span>{col}</span>
-                </label>
-              ))}
+          {/* Renk - Collapsible Multi-Select */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Renk
+              </label>
+              {colors.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setColors([])}
+                  className="text-[10px] text-orange-400 hover:underline"
+                >
+                  Sıfırla
+                </button>
+              )}
             </div>
+            <button
+              type="button"
+              aria-expanded={isColorExpanded}
+              onClick={() => setIsColorExpanded(!isColorExpanded)}
+              className="w-full bg-slate-900 border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-xs text-slate-200 flex items-center justify-between transition focus:outline-none focus:border-orange-500"
+            >
+              <span className="truncate">
+                {colors.length === 0
+                  ? "Renk Seçiniz"
+                  : colors.length === 1
+                  ? colors[0]
+                  : colors.length === 2
+                  ? `${colors[0]}, ${colors[1]}`
+                  : `${colors.length} renk seçildi`}
+              </span>
+              <span className={`text-[10px] text-slate-400 transition-transform duration-200 ${isColorExpanded ? "rotate-180" : ""}`}>
+                ▼
+              </span>
+            </button>
+            {isColorExpanded && (
+              <div className="grid grid-cols-2 gap-1 p-2 bg-slate-950/70 border border-white/5 rounded-xl max-h-56 overflow-y-auto custom-scrollbar">
+                {VEHICLE_COLORS.map((col) => (
+                  <label
+                    key={col}
+                    className="flex items-center gap-1.5 p-1 rounded-md hover:bg-white/5 cursor-pointer select-none text-xs text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={colors.includes(col)}
+                      onChange={() => toggleColor(col)}
+                      className="accent-orange-500 rounded border-white/10 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span className="truncate">{col}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
+
 
           <div className="border-t border-white/5 my-1"></div>
 

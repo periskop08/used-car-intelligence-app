@@ -42,6 +42,10 @@ import {
   detectImageContentType,
   getBaseProxyUrl,
 } from './media-resolver.util';
+import {
+  validateMarketplaceFilters,
+  buildMarketplaceListingWhere,
+} from './marketplace-filter.builder';
 
 @ApiTags('Listings')
 @Controller()
@@ -94,6 +98,9 @@ export class ListingController {
     @Query('drivetrain') drivetrain?: string,
     @Query('district') district?: string,
     @Query('color') color?: string,
+    @Query('colors') colors?: string,
+    @Query('powerRanges') powerRanges?: string,
+    @Query('displacementRanges') displacementRanges?: string,
     @Query('bodyType') bodyType?: string,
     @Query('keyword') keyword?: string,
     @Query('includeDescription') includeDescription?: string,
@@ -102,179 +109,50 @@ export class ListingController {
     @Query('urgentOnly') urgentOnly?: string,
     @Query('showcaseOnly') showcaseOnly?: string,
   ) {
-    // Parse filters
     const now = new Date();
-    const filters: any = {
-      status: ListingStatus.ACTIVE,
-      AND: [
-        {
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: now } },
-          ],
-        },
-      ],
-      media: {
-        some: {
-          moderationStatus: MediaModerationStatus.APPROVED,
-        },
-      },
+    const filterParams = {
+      now,
+      urgentOnly,
+      showcaseOnly,
+      sellerId,
+      vehicleVariantId,
+      brandId,
+      modelId,
+      minYear,
+      maxYear,
+      minPrice,
+      maxPrice,
+      minKm,
+      maxKm,
+      city,
+      district,
+      currency,
+      fuelType,
+      transmission,
+      bodyType,
+      vehicleStatus,
+      hasWarranty,
+      heavyDamage,
+      plateType,
+      sellerType,
+      exchangeable,
+      drivetrain,
+      keyword,
+      includeDescription,
+      isAiReady,
+      powerRanges,
+      displacementRanges,
+      colors,
+      color,
+      minEnginePower,
+      maxEnginePower,
+      minEngineDisplacement,
+      maxEngineDisplacement,
     };
 
-    if (urgentOnly === 'true') {
-      filters.promotionEntitlements = {
-        some: {
-          promotionType: ListingPromotionType.URGENT_LISTING,
-          lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-          expiresAt: { gt: now },
-        },
-      };
-    }
+    const validatedFilters = validateMarketplaceFilters(filterParams);
+    const filters = buildMarketplaceListingWhere(filterParams, validatedFilters);
 
-    if (showcaseOnly === 'true') {
-      filters.promotionEntitlements = {
-        some: {
-          promotionType: ListingPromotionType.SHOWCASE_FEED,
-          lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-          expiresAt: { gt: now },
-        },
-      };
-    }
-
-    if (sellerId) {
-      filters.sellerId = sellerId;
-    }
-
-    if (vehicleVariantId) {
-      filters.vehicleVariantId = vehicleVariantId;
-    } else {
-      if (brandId || modelId) {
-        filters.vehicleVariant = {};
-        if (brandId) filters.vehicleVariant.brandId = brandId;
-        if (modelId) filters.vehicleVariant.modelId = modelId;
-      }
-    }
-
-    if (minYear || maxYear) {
-      filters.modelYear = {};
-      if (minYear) filters.modelYear.gte = parseInt(minYear, 10);
-      if (maxYear) filters.modelYear.lte = parseInt(maxYear, 10);
-    }
-
-    if (minPrice || maxPrice) {
-      filters.priceAmount = {};
-      if (minPrice) filters.priceAmount.gte = parseFloat(minPrice);
-      if (maxPrice) filters.priceAmount.lte = parseFloat(maxPrice);
-    }
-
-    if (minKm || maxKm) {
-      filters.kilometers = {};
-      if (minKm) filters.kilometers.gte = parseInt(minKm, 10);
-      if (maxKm) filters.kilometers.lte = parseInt(maxKm, 10);
-    }
-
-    if (city) {
-      filters.city = city;
-    }
-
-    if (district) {
-      const list = district.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.district = { in: list };
-      }
-    }
-
-    if (currency) {
-      filters.currency = currency;
-    }
-
-    if (fuelType) {
-      const list = fuelType.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.fuelType = { in: list };
-      }
-    }
-
-    if (transmission) {
-      const list = transmission.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.transmission = { in: list };
-      }
-    }
-
-    if (bodyType) {
-      const list = bodyType.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.bodyType = { in: list };
-      }
-    }
-
-    if (color) {
-      const list = color.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.color = { in: list };
-      }
-    }
-
-    if (vehicleStatus) {
-      filters.vehicleStatus = vehicleStatus;
-    }
-
-    if (hasWarranty !== undefined && hasWarranty !== '') {
-      filters.hasWarranty = hasWarranty === 'true';
-    }
-
-    if (heavyDamage !== undefined && heavyDamage !== '') {
-      filters.heavyDamage = heavyDamage === 'true';
-    }
-
-    if (plateType) {
-      const list = plateType.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.plateType = { in: list };
-      }
-    }
-
-    if (sellerType) {
-      filters.sellerType = sellerType;
-    }
-
-    if (exchangeable !== undefined && exchangeable !== '') {
-      filters.exchangeable = exchangeable === 'true';
-    }
-
-    if (minEngineDisplacement || maxEngineDisplacement) {
-      filters.engineDisplacement = {};
-      if (minEngineDisplacement) filters.engineDisplacement.gte = parseInt(minEngineDisplacement, 10);
-      if (maxEngineDisplacement) filters.engineDisplacement.lte = parseInt(maxEngineDisplacement, 10);
-    }
-
-    if (minEnginePower || maxEnginePower) {
-      filters.enginePower = {};
-      if (minEnginePower) filters.enginePower.gte = parseInt(minEnginePower, 10);
-      if (maxEnginePower) filters.enginePower.lte = parseInt(maxEnginePower, 10);
-    }
-
-    if (drivetrain) {
-      const list = drivetrain.split(',').map(x => x.trim()).filter(Boolean);
-      if (list.length > 0) {
-        filters.drivetrain = { in: list };
-      }
-    }
-
-    if (keyword) {
-      const searchConditions: any[] = [
-        { title: { contains: keyword, mode: 'insensitive' } }
-      ];
-      if (includeDescription === 'true') {
-        searchConditions.push({ description: { contains: keyword, mode: 'insensitive' } });
-      }
-      filters.OR = searchConditions;
-    }
-
-    if (isAiReady !== undefined && isAiReady !== '') {
-      filters.isAiReady = isAiReady === 'true';
-    }
 
     // Sort mappings
     let orderBy: any = { createdAt: 'desc' };
