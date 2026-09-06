@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { TURKEY_CITIES, getDistrictsForCity } from "@used-car-intelligence/shared";
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -138,7 +138,10 @@ export default function CreateListing() {
   // Technical Specs Enrichment States (cc & HP)
   const [loadingTechSpecs, setLoadingTechSpecs] = useState(false);
   const [techSpecsVerified, setTechSpecsVerified] = useState(false);
+  const [displacementVerified, setDisplacementVerified] = useState(false);
+  const [powerVerified, setPowerVerified] = useState(false);
   const [techSpecsConflict, setTechSpecsConflict] = useState(false);
+  const activeVariantEnrichmentRef = useRef<string>("");
 
   // Custom details fallback if variant doesn't exist
   const [useCustomVariant, setUseCustomVariant] = useState(false);
@@ -438,35 +441,59 @@ export default function CreateListing() {
 
   const resolveTechnicalSpecs = async (variantId: string) => {
     if (!variantId) return;
+    activeVariantEnrichmentRef.current = variantId;
     setLoadingTechSpecs(true);
     setTechSpecsConflict(false);
     try {
-      // 1. Read existing verified technical facts
+      // 1. Read existing verified technical facts (Side-effect free GET)
       let specs = await vehicleTaxonomyApi.getTechnicalSpecs(variantId);
 
+      // Stale response guard: if user selected another variant while waiting, discard
+      if (activeVariantEnrichmentRef.current !== variantId) {
+        return;
+      }
+
       // 2. If missing cc or HP, trigger controlled authenticated enrichment
-      if ((!specs?.engineDisplacementCc || !specs?.enginePowerHp) && token) {
+      const needsDisplacement = !specs?.engineDisplacement?.verified && !specs?.engineDisplacementCc;
+      const needsPower = !specs?.enginePower?.verified && !specs?.enginePowerHp;
+      if ((needsDisplacement || needsPower) && token) {
         const enriched = await vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
         if (enriched) specs = enriched;
       }
 
-      if (specs?.isCatalogVerified && specs.engineDisplacementCc && specs.enginePowerHp) {
-        setEngineDisplacement(String(specs.engineDisplacementCc));
-        setEnginePower(String(specs.enginePowerHp));
-        setTechSpecsVerified(true);
-        setTechSpecsConflict(false);
-      } else if (specs?.engineDisplacementCc || specs?.enginePowerHp) {
-        if (specs.engineDisplacementCc) setEngineDisplacement(String(specs.engineDisplacementCc));
-        if (specs.enginePowerHp) setEnginePower(String(specs.enginePowerHp));
-        setTechSpecsVerified(true);
-      } else {
-        setTechSpecsConflict(true);
+      // Stale response guard again after enrichment
+      if (activeVariantEnrichmentRef.current !== variantId) {
+        return;
       }
+
+      const dispVal = specs?.engineDisplacement?.valueCc ?? specs?.engineDisplacementCc;
+      const isDispVerified = !!(specs?.engineDisplacement?.verified || (dispVal && specs?.isCatalogVerified));
+
+      const pwrVal = specs?.enginePower?.valueHp ?? specs?.enginePowerHp;
+      const isPwrVerified = !!(specs?.enginePower?.verified || (pwrVal && specs?.isCatalogVerified));
+
+      if (dispVal) {
+        setEngineDisplacement(String(dispVal));
+      }
+      setDisplacementVerified(isDispVerified);
+
+      if (pwrVal) {
+        setEnginePower(String(pwrVal));
+      }
+      setPowerVerified(isPwrVerified);
+
+      const allVerified = isDispVerified && isPwrVerified && !!dispVal && !!pwrVal;
+      setTechSpecsVerified(allVerified);
+      setTechSpecsConflict(!allVerified && !dispVal && !pwrVal);
     } catch (err) {
       console.error("Technical specs resolution error:", err);
-      setTechSpecsConflict(true);
+      if (activeVariantEnrichmentRef.current === variantId) {
+        setTechSpecsConflict(true);
+      }
     } finally {
-      setLoadingTechSpecs(false);
+      if (activeVariantEnrichmentRef.current === variantId) {
+        setLoadingTechSpecs(false);
+      }
     }
   };
 
@@ -628,7 +655,7 @@ export default function CreateListing() {
         setErrorMsg("Motor teknik verileri (cc ve HP) doğrulanıyor, lütfen birkaç saniye bekleyin...");
         return;
       }
-      if (techSpecsConflict || !engineDisplacement || !enginePower) {
+      if (!displacementVerified || !powerVerified || !engineDisplacement || !enginePower) {
         setErrorMsg("Seçilen katalog aracı için motor teknik özellikleri (cc / HP) henüz doğrulanamadı (TECHNICAL_SPEC_CONFLICT_REQUIRES_REVIEW). Lütfen araç seçimini gözden geçirin.");
         return;
       }
@@ -1297,7 +1324,7 @@ export default function CreateListing() {
                       <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
                         Doğrulanıyor...
                       </span>
-                    ) : techSpecsVerified && engineDisplacement ? (
+                    ) : displacementVerified && engineDisplacement ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
                       </span>
@@ -1308,10 +1335,10 @@ export default function CreateListing() {
                   type="number"
                   value={engineDisplacement}
                   onChange={(e) => setEngineDisplacement(e.target.value)}
-                  readOnly={!useCustomVariant && !!selectedVariant && techSpecsVerified}
+                  readOnly={!useCustomVariant && !!selectedVariant && displacementVerified}
                   placeholder={loadingTechSpecs ? "Doğrulanıyor..." : "Örn: 1498"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
-                    !useCustomVariant && selectedVariant && techSpecsVerified
+                    !useCustomVariant && selectedVariant && displacementVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
                       : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
                   }`}
@@ -1325,7 +1352,7 @@ export default function CreateListing() {
                       <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
                         Doğrulanıyor...
                       </span>
-                    ) : techSpecsVerified && enginePower ? (
+                    ) : powerVerified && enginePower ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
                       </span>
@@ -1336,10 +1363,10 @@ export default function CreateListing() {
                   type="number"
                   value={enginePower}
                   onChange={(e) => setEnginePower(e.target.value)}
-                  readOnly={!useCustomVariant && !!selectedVariant && techSpecsVerified}
+                  readOnly={!useCustomVariant && !!selectedVariant && powerVerified}
                   placeholder={loadingTechSpecs ? "Doğrulanıyor..." : "Örn: 150"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
-                    !useCustomVariant && selectedVariant && techSpecsVerified
+                    !useCustomVariant && selectedVariant && powerVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
                       : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
                   }`}
@@ -1626,6 +1653,17 @@ export default function CreateListing() {
             </div>
           )}
 
+          {!useCustomVariant && selectedVariant && (loadingTechSpecs || !displacementVerified || !powerVerified) && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-medium flex items-center gap-2.5">
+              <span className="text-base">⏳</span>
+              <span>
+                {loadingTechSpecs
+                  ? "Aracın fabrika motor teknik özellikleri (cc ve HP) doğrulanıyor, lütfen bekleyin..."
+                  : "Seçilen katalog aracı için motor teknik özellikleri henüz doğrulanamadı (TECHNICAL_SPEC_CONFLICT_REQUIRES_REVIEW). İlan bu aşamada yayına alınamaz."}
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-4 mt-4">
             <button
               onClick={() => setStep(4)}
@@ -1635,11 +1673,18 @@ export default function CreateListing() {
             </button>
             <button
               onClick={handleFinalSubmit}
-              disabled={saving || !responsibilityAccepted || (!!selectedPromotionSku && !promotionTermsAccepted)}
+              disabled={
+                saving ||
+                !responsibilityAccepted ||
+                (!!selectedPromotionSku && !promotionTermsAccepted) ||
+                (!useCustomVariant && !!selectedVariant && (loadingTechSpecs || !displacementVerified || !powerVerified))
+              }
               className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
             >
               {saving ? (
                 "İşleniyor..."
+              ) : !useCustomVariant && selectedVariant && loadingTechSpecs ? (
+                "Teknik Bilgiler Doğrulanıyor..."
               ) : selectedPromotionSku && promotionPricingDetails?.commerceMode === "LIVE" ? (
                 selectedPromotionSku === "URGENT_LISTING" ? (
                   `Ödemeye Geç (${promotionPricingDetails?.urgentPriceAmount ?? 99} TL) ➔`

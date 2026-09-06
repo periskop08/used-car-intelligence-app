@@ -6,8 +6,24 @@ import { PowerVerificationStatus } from '@prisma/client';
 import { convertPowerUnits } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
+export interface TechnicalFactField<T> {
+  value: T | null;
+  verified: boolean;
+  sourceType: string | null;
+}
+
 export interface VariantTechnicalFactsResult {
   variantId: string;
+  engineDisplacement: {
+    valueCc: number | null;
+    verified: boolean;
+    sourceType: string | null;
+  };
+  enginePower: {
+    valueHp: number | null;
+    verified: boolean;
+    sourceType: string | null;
+  };
   engineDisplacementCc: number | null;
   enginePowerHp: number | null;
   isComplete: boolean;
@@ -118,6 +134,16 @@ export class VariantTechnicalFactsService {
 
     return {
       variantId,
+      engineDisplacement: {
+        valueCc: displacementCc,
+        verified: displacementCc !== null,
+        sourceType: displacementSource || null,
+      },
+      enginePower: {
+        valueHp: powerHp,
+        verified: powerHp !== null,
+        sourceType: powerSource || null,
+      },
       engineDisplacementCc: displacementCc,
       enginePowerHp: powerHp,
       isComplete,
@@ -126,6 +152,7 @@ export class VariantTechnicalFactsService {
         displacement: displacementSource,
         power: powerSource,
       },
+      unresolvedConflict: false,
     };
   }
 
@@ -253,6 +280,16 @@ export class VariantTechnicalFactsService {
     const isComplete = finalCc !== null && finalHp !== null;
     return {
       variantId,
+      engineDisplacement: {
+        valueCc: finalCc,
+        verified: finalCc !== null,
+        sourceType: displacementSource || null,
+      },
+      enginePower: {
+        valueHp: finalHp,
+        verified: finalHp !== null,
+        sourceType: powerSource || null,
+      },
       engineDisplacementCc: finalCc,
       enginePowerHp: finalHp,
       isComplete,

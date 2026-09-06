@@ -158,11 +158,22 @@ export const vehicleTaxonomyApi = {
 
   async getTechnicalSpecs(variantId: string): Promise<{
     variantId: string;
+    engineDisplacement?: {
+      valueCc: number | null;
+      verified: boolean;
+      sourceType: string | null;
+    };
+    enginePower?: {
+      valueHp: number | null;
+      verified: boolean;
+      sourceType: string | null;
+    };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
     isComplete: boolean;
     isCatalogVerified: boolean;
     sources?: { displacement?: string; power?: string };
+    unresolvedConflict?: boolean;
   } | null> {
     if (!variantId) return null;
     try {
@@ -176,11 +187,22 @@ export const vehicleTaxonomyApi = {
 
   async enrichTechnicalSpecs(variantId: string, token?: string): Promise<{
     variantId: string;
+    engineDisplacement?: {
+      valueCc: number | null;
+      verified: boolean;
+      sourceType: string | null;
+    };
+    enginePower?: {
+      valueHp: number | null;
+      verified: boolean;
+      sourceType: string | null;
+    };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
     isComplete: boolean;
     isCatalogVerified: boolean;
     sources?: { displacement?: string; power?: string };
+    unresolvedConflict?: boolean;
   } | null> {
     if (!variantId) return null;
     try {

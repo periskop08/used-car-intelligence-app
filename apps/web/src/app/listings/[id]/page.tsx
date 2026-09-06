@@ -676,11 +676,8 @@ export default function ListingDetail() {
                 <span className="font-bold text-slate-400">Motor Gücü</span>
                 <span className="font-semibold text-slate-200 text-right">
                   {(() => {
-                    const specs = (listing.vehicleVariant?.specs?.specs as Record<string, any>) || {};
-                    const vHp = (listing.vehicleVariant?.powerEnrichment?.verificationStatus === 'VERIFIED' && typeof listing.vehicleVariant.powerEnrichment.powerHp === 'number')
-                      ? listing.vehicleVariant.powerEnrichment.powerHp
-                      : (specs.isVerified && typeof specs.enginePowerHp === 'number' ? specs.enginePowerHp : null);
-                    if (vHp) return `${vHp} HP`;
+                    const tf = (listing as any).technicalFacts?.enginePower;
+                    if (tf?.verified && tf?.valueHp) return `${tf.valueHp} HP`;
                     if (listing.enginePower) return `${listing.enginePower} HP`;
                     if (listing.vehicleVariant?.engine?.horsepower) return `${listing.vehicleVariant.engine.horsepower} HP`;
                     return listing.vehicleVariant?.power || "-";
@@ -693,11 +690,8 @@ export default function ListingDetail() {
                 <span className="font-bold text-slate-400">Motor Hacmi</span>
                 <span className="font-semibold text-slate-200 text-right">
                   {(() => {
-                    const specs = (listing.vehicleVariant?.specs?.specs as Record<string, any>) || {};
-                    const vCc = specs.isVerified && typeof specs.engineDisplacementCc === 'number'
-                      ? specs.engineDisplacementCc
-                      : null;
-                    if (vCc) return `${vCc} cc`;
+                    const tf = (listing as any).technicalFacts?.engineDisplacement;
+                    if (tf?.verified && tf?.valueCc) return `${tf.valueCc} cc`;
                     if (listing.engineDisplacement) return `${listing.engineDisplacement} cc`;
                     if (listing.vehicleVariant?.engine?.displacement) return `${listing.vehicleVariant.engine.displacement} cc`;
                     return listing.vehicleVariant?.engineCapacity || "-";

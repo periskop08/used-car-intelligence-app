@@ -34,6 +34,7 @@ import {
 import { ListingStatus, MediaModerationStatus, ListingPromotionType, PromotionLifecycleStatus } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
+import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import { Optional } from '@nestjs/common';
 
 @ApiTags('Listings')
@@ -43,6 +44,7 @@ export class ListingController {
     private listingService: ListingService,
     private r2Service: R2Service,
     @Optional() private promotionQueryService?: ListingPromotionQueryService,
+    @Optional() private variantTechnicalFactsService?: VariantTechnicalFactsService,
   ) {}
 
   // ==========================================
@@ -604,7 +606,6 @@ export class ListingController {
             transmission: true,
             trim: true,
             specs: true,
-            engine: true,
             powerEnrichment: true,
             problems: { where: { status: 'APPROVED' } },
             recalls: { where: { status: 'APPROVED' } },
@@ -689,8 +690,22 @@ export class ListingController {
     const isUrgent = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasUrgentEnt);
     const isShowcaseFeedActive = !!(listing.status === ListingStatus.ACTIVE && (!listing.expiresAt || new Date(listing.expiresAt) > detailNow) && hasShowcaseEnt);
 
+    let technicalFacts: any = null;
+    if (listing.vehicleVariantId && this.variantTechnicalFactsService) {
+      try {
+        const facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(listing.vehicleVariantId);
+        technicalFacts = {
+          engineDisplacement: facts.engineDisplacement,
+          enginePower: facts.enginePower,
+        };
+      } catch {
+        // Safe fallback
+      }
+    }
+
     return {
       ...listing,
+      technicalFacts,
       isUrgent,
       isShowcaseFeedActive,
       isFavorited,
