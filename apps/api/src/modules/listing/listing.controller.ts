@@ -599,6 +599,10 @@ export class ListingController {
           include: {
             brand: true,
             model: true,
+            generation: true,
+            engine: true,
+            transmission: true,
+            trim: true,
             specs: true,
             problems: { where: { status: 'APPROVED' } },
             recalls: { where: { status: 'APPROVED' } },

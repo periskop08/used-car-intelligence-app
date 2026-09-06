@@ -374,6 +374,7 @@ export default function ListingDetailScreen() {
 
   const brandName = listing.vehicleVariant?.model?.brand?.name || listing.vehicleVariant?.brand?.name || listing.customBrand || '';
   const modelFamilyName = listing.vehicleVariant?.model?.name || listing.customModel || '';
+  const engineName = listing.vehicleVariant?.engine?.code || listing.vehicleVariant?.engine?.name || '';
   const trimName = listing.vehicleVariant?.trim?.name || '';
   const priceVal = listing.priceAmount ?? listing.price ?? 0;
   const kmVal = listing.kilometers ?? listing.mileage ?? 0;
@@ -505,7 +506,8 @@ export default function ListingDetailScreen() {
           </View>
 
           <Text style={styles.breadcrumbText} numberOfLines={1}>
-            Vasıta &gt; Otomobil &gt; {brandName || 'Audi'} &gt; {modelFamilyName || 'A3'}
+            Vasıta &gt; Otomobil &gt; {brandName || 'BMW'} &gt; {modelFamilyName || '3 Serisi'}
+            {engineName ? ` &gt; ${engineName}` : ''}
             {trimName ? ` &gt; ${trimName}` : ''}
           </Text>
 
@@ -585,8 +587,13 @@ export default function ListingDetailScreen() {
               </View>
 
               <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Model</Text>
-                <Text style={styles.tableValue}>{trimName || `${brandName} ${modelFamilyName}`}</Text>
+                <Text style={styles.tableLabel}>Model / Motor</Text>
+                <Text style={styles.tableValue}>{engineName ? `${modelFamilyName} ${engineName}` : modelFamilyName || '-'}</Text>
+              </View>
+
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>Paket / Donanım</Text>
+                <Text style={styles.tableValue}>{trimName || 'Standart'}</Text>
               </View>
 
               <View style={styles.tableRow}>
@@ -684,13 +691,22 @@ export default function ListingDetailScreen() {
             </View>
 
             {/* TorqueScout AI Kronik Arıza & Risk Raporu Banner */}
-            {listing.vehicleVariantId && (
+            {(listing.vehicleVariantId || (brandName && modelFamilyName)) && (
               <TouchableOpacity
                 style={styles.aiReportCard}
                 onPress={() =>
                   router.push({
                     pathname: '/vehicle-report',
-                    params: { variantId: listing.vehicleVariantId },
+                    params: {
+                      variantId: listing.vehicleVariantId || undefined,
+                      brand: brandName,
+                      model: modelFamilyName,
+                      year: String(yearVal),
+                      engine: engineName || undefined,
+                      fuelType: listing.fuelType || undefined,
+                      transmission: listing.transmission || undefined,
+                      trim: trimName || undefined,
+                    },
                   } as any)
                 }
                 activeOpacity={0.85}

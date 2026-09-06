@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -63,6 +63,18 @@ const TURKISH_CITIES = [
   'Aydın',
   'Hatay',
 ];
+
+const FUEL_TYPE_LABELS: Record<string, string> = {
+  PETROL: 'Benzin',
+  DIESEL: 'Dizel',
+  LPG: 'Benzin & LPG',
+  HYBRID: 'Hibrit',
+  ELECTRIC: 'Elektrik',
+  BENZIN: 'Benzin',
+  DIZEL: 'Dizel',
+  HIBRIT: 'Hibrit',
+  ELEKTRIK: 'Elektrik',
+};
 
 const FUEL_TYPES = [
   { label: 'Benzin', val: 'PETROL' },
@@ -202,9 +214,16 @@ export default function CreateListingScreen() {
   // Photos
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
+  // Selected Engine & Trim
+  const [selectedEngine, setSelectedEngine] = useState('');
+  const [selectedTrim, setSelectedTrim] = useState('');
+
   // Modals & Submitting
   const [brandModalVisible, setBrandModalVisible] = useState(false);
   const [modelModalVisible, setModelModalVisible] = useState(false);
+  const [yearModalVisible, setYearModalVisible] = useState(false);
+  const [engineModalVisible, setEngineModalVisible] = useState(false);
+  const [trimModalVisible, setTrimModalVisible] = useState(false);
   const [cityModalVisible, setCityModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -220,6 +239,8 @@ export default function CreateListingScreen() {
       setSelectedModel(null);
       setVariants([]);
       setSelectedVariant(null);
+      setSelectedEngine('');
+      setSelectedTrim('');
     }
   }, [selectedBrand]);
 
@@ -229,30 +250,122 @@ export default function CreateListingScreen() {
     } else {
       setVariants([]);
       setSelectedVariant(null);
+      setSelectedEngine('');
+      setSelectedTrim('');
     }
   }, [selectedModel]);
 
-  // Auto match variant from variants list
-  useEffect(() => {
-    if (variants.length > 0) {
-      if (selectedYear) {
-        const yearNum = Number(selectedYear);
-        const matched = variants.filter((v) => v.year === yearNum);
-        if (matched.length > 0) {
-          const perfect = matched.find(
-            (v) =>
-              (v.fuelType === fuelType || !v.fuelType) &&
-              (v.transmission?.type === transmission || !v.transmission?.type)
-          ) || matched[0];
-          setSelectedVariant(perfect);
-          return;
-        }
+  // Unique available years for selected model
+  const availableYears = useMemo(() => {
+    const set = new Set<number>();
+    variants.forEach((v) => {
+      if (v.year) set.add(v.year);
+    });
+    return Array.from(set).sort((a, b) => b - a);
+  }, [variants]);
+
+  // Unique available engines for selected model & year
+  const availableEngines = useMemo(() => {
+    const list: { code: string; displayName: string; hp?: number; cc?: number; fuel?: string }[] = [];
+    const seen = new Set<string>();
+
+    variants.forEach((v: any) => {
+      if (selectedYear && v.year !== Number(selectedYear)) return;
+      const code = v.engine?.code || v.engine?.name || '';
+      if (code && !seen.has(code)) {
+        seen.add(code);
+        const hp = v.engine?.horsepower || v.engine?.powerHp || v.specs?.enginePowerHp;
+        const cc = v.engine?.displacementCc || v.engine?.displacement || v.specs?.engineDisplacementCc;
+        const fuel = v.fuelType ? (FUEL_TYPE_LABELS[v.fuelType.toUpperCase()] || v.fuelType) : '';
+        const hpStr = hp ? ` (${hp} HP${fuel ? ` • ${fuel}` : ''})` : fuel ? ` (${fuel})` : '';
+        list.push({
+          code,
+          displayName: `${code}${hpStr}`,
+          hp,
+          cc,
+          fuel: v.fuelType,
+        });
       }
-      setSelectedVariant(variants[0]);
-    } else {
-      setSelectedVariant(null);
+    });
+    return list.sort((a, b) => a.code.localeCompare(b.code, 'tr'));
+  }, [variants, selectedYear]);
+
+  // Unique available trims for selected model & year & engine
+  const availableTrims = useMemo(() => {
+    const list: { id: string; name: string }[] = [];
+    const seen = new Set<string>();
+
+    variants.forEach((v: any) => {
+      if (selectedYear && v.year !== Number(selectedYear)) return;
+      if (selectedEngine && v.engine?.code !== selectedEngine && v.engine?.name !== selectedEngine) return;
+      const trimName = v.trim?.name || 'Standart';
+      if (!seen.has(trimName)) {
+        seen.add(trimName);
+        list.push({ id: v.trim?.id || trimName, name: trimName });
+      }
+    });
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  }, [variants, selectedYear, selectedEngine]);
+
+  const handleSelectTrim = (trimName: string) => {
+    setSelectedTrim(trimName);
+    setTrimModalVisible(false);
+
+    const matched: any = variants.find((v: any) =>
+      (!selectedYear || v.year === Number(selectedYear)) &&
+      (!selectedEngine || v.engine?.code === selectedEngine || v.engine?.name === selectedEngine) &&
+      (!trimName || v.trim?.name === trimName || (!v.trim && trimName === 'Standart'))
+    ) || variants.find((v: any) =>
+      (!selectedYear || v.year === Number(selectedYear)) &&
+      (!selectedEngine || v.engine?.code === selectedEngine || v.engine?.name === selectedEngine)
+    ) || variants.find((v: any) =>
+      (!selectedYear || v.year === Number(selectedYear))
+    ) || variants[0];
+
+    if (matched) {
+      setSelectedVariant(matched);
+      if (matched.fuelType) setFuelType(matched.fuelType);
+      if (matched.transmission?.type) setTransmission(matched.transmission.type);
+      if (matched.bodyType) setBodyType(matched.bodyType);
+      const hp = matched.engine?.horsepower || matched.engine?.powerHp || matched.specs?.enginePowerHp;
+      if (hp) setEnginePower(String(hp));
+      const cc = matched.engine?.displacementCc || matched.engine?.displacement || matched.specs?.engineDisplacementCc;
+      if (cc) setEngineDisplacement(String(cc));
     }
-  }, [variants, selectedYear, fuelType, transmission]);
+  };
+
+  const handleSelectEngine = (engCode: string) => {
+    setSelectedEngine(engCode);
+    setEngineModalVisible(false);
+    setSelectedTrim('');
+
+    const trimsForEng = Array.from(new Set(variants.filter((v: any) =>
+      (!selectedYear || v.year === Number(selectedYear)) &&
+      (v.engine?.code === engCode || v.engine?.name === engCode)
+    ).map((v: any) => v.trim?.name).filter(Boolean)));
+
+    if (trimsForEng.length === 1) {
+      handleSelectTrim(trimsForEng[0] as string);
+    } else if (trimsForEng.length > 1) {
+      setTimeout(() => setTrimModalVisible(true), 250);
+    } else {
+      handleSelectTrim('Standart');
+    }
+  };
+
+  const handleSelectYear = (yr: string) => {
+    setSelectedYear(yr);
+    setYearModalVisible(false);
+    setSelectedEngine('');
+    setSelectedTrim('');
+
+    const enginesForYr = Array.from(new Set(variants.filter((v: any) => v.year === Number(yr)).map((v: any) => v.engine?.code || v.engine?.name).filter(Boolean)));
+    if (enginesForYr.length === 1) {
+      handleSelectEngine(enginesForYr[0] as string);
+    } else if (enginesForYr.length > 1) {
+      setTimeout(() => setEngineModalVisible(true), 250);
+    }
+  };
 
   const fetchBrands = async () => {
     try {
@@ -585,19 +698,108 @@ export default function CreateListingScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Yıl Girişi */}
+            {/* Yıl Seçimi */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Model Yılı (Örn: 2021) *</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Örn: 2021"
-                placeholderTextColor="#94a3b8"
-                keyboardType="numeric"
-                value={selectedYear}
-                onChangeText={(t) => setSelectedYear(parseNumberInput(t))}
-                maxLength={4}
-              />
+              <Text style={styles.inputLabel}>Model Yılı *</Text>
+              {availableYears.length > 0 ? (
+                <TouchableOpacity
+                  style={[styles.selectorBtn, !selectedModel && { opacity: 0.5 }]}
+                  disabled={!selectedModel}
+                  onPress={() => setYearModalVisible(true)}
+                >
+                  <Text
+                    style={[
+                      styles.selectorBtnText,
+                      !!selectedYear && styles.selectorSelectedText,
+                    ]}
+                  >
+                    {selectedYear || 'Yıl Seçin'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              ) : (
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: 2021"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                  value={selectedYear}
+                  onChangeText={(t) => setSelectedYear(parseNumberInput(t))}
+                  maxLength={4}
+                />
+              )}
             </View>
+
+            {/* Motor / Versiyon Seçimi */}
+            {selectedModel && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Motor / Versiyon *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorBtn,
+                    (!selectedYear || availableEngines.length === 0) && { opacity: 0.5 },
+                  ]}
+                  disabled={!selectedYear || availableEngines.length === 0}
+                  onPress={() => setEngineModalVisible(true)}
+                >
+                  <Text
+                    style={[
+                      styles.selectorBtnText,
+                      !!selectedEngine && styles.selectorSelectedText,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectedEngine
+                      ? availableEngines.find((e) => e.code === selectedEngine)?.displayName || selectedEngine
+                      : availableEngines.length > 0
+                      ? 'Motor / Versiyon Seçin'
+                      : 'Motor Bilgisi Otomatik'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Donanım Paketi (Trim) Seçimi */}
+            {selectedModel && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Donanım Paketi *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.selectorBtn,
+                    (!selectedEngine || availableTrims.length === 0) && { opacity: 0.5 },
+                  ]}
+                  disabled={!selectedEngine || availableTrims.length === 0}
+                  onPress={() => setTrimModalVisible(true)}
+                >
+                  <Text
+                    style={[
+                      styles.selectorBtnText,
+                      !!selectedTrim && styles.selectorSelectedText,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectedTrim || (availableTrims.length > 0 ? 'Donanım Paketi Seçin' : 'Paket Bilgisi')}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* SEÇİLEN VARYANT ÖZET KARTI (AI Eşleşme Onayı) */}
+            {selectedVariant && (
+              <View style={styles.variantSuccessCard}>
+                <View style={styles.variantSuccessRow}>
+                  <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.variantSuccessTitle}>AI Raporu &amp; Teknik Veri Eşleşti</Text>
+                    <Text style={styles.variantSuccessDesc}>
+                      {selectedBrand?.name} {selectedModel?.name} {selectedEngine} {selectedTrim} ({selectedYear})
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* 2. TEMEL İLAN DETAYLARI CARD */}
@@ -1230,6 +1432,157 @@ export default function CreateListingScreen() {
           </View>
         </Modal>
 
+        {/* YEAR MODAL */}
+        <Modal
+          visible={yearModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setYearModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {selectedModel ? `${selectedModel.name} Model Yılları` : 'Model Yılı Seçin'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setYearModalVisible(false)}
+                >
+                  <Ionicons name="close" size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={{ maxHeight: 400 }}
+                contentContainerStyle={{ padding: 14, gap: 8 }}
+              >
+                {availableYears.map((yr) => (
+                  <TouchableOpacity
+                    key={yr}
+                    style={[
+                      styles.pickerOption,
+                      selectedYear === String(yr) && styles.pickerOptionActive,
+                    ]}
+                    onPress={() => handleSelectYear(String(yr))}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        selectedYear === String(yr) && styles.pickerOptionTextActive,
+                      ]}
+                    >
+                      {yr}
+                    </Text>
+                    {selectedYear === String(yr) && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ENGINE MODAL */}
+        <Modal
+          visible={engineModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setEngineModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Motor / Versiyon Seçin</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setEngineModalVisible(false)}
+                >
+                  <Ionicons name="close" size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={{ maxHeight: 400 }}
+                contentContainerStyle={{ padding: 14, gap: 8 }}
+              >
+                {availableEngines.map((eng) => (
+                  <TouchableOpacity
+                    key={eng.code}
+                    style={[
+                      styles.pickerOption,
+                      selectedEngine === eng.code && styles.pickerOptionActive,
+                    ]}
+                    onPress={() => handleSelectEngine(eng.code)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          selectedEngine === eng.code && styles.pickerOptionTextActive,
+                        ]}
+                      >
+                        {eng.displayName}
+                      </Text>
+                    </View>
+                    {selectedEngine === eng.code && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* TRIM MODAL */}
+        <Modal
+          visible={trimModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setTrimModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Donanım Paketi Seçin</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setTrimModalVisible(false)}
+                >
+                  <Ionicons name="close" size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={{ maxHeight: 400 }}
+                contentContainerStyle={{ padding: 14, gap: 8 }}
+              >
+                {availableTrims.map((t) => (
+                  <TouchableOpacity
+                    key={t.name}
+                    style={[
+                      styles.pickerOption,
+                      selectedTrim === t.name && styles.pickerOptionActive,
+                    ]}
+                    onPress={() => handleSelectTrim(t.name)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        selectedTrim === t.name && styles.pickerOptionTextActive,
+                      ]}
+                    >
+                      {t.name}
+                    </Text>
+                    {selectedTrim === t.name && (
+                      <Ionicons name="checkmark-circle" size={18} color="#ea580c" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
         {/* CITY MODAL */}
         <Modal
           visible={cityModalVisible}
@@ -1637,5 +1990,29 @@ const styles = StyleSheet.create({
   pickerOptionTextActive: {
     color: '#ea580c',
     fontWeight: '900',
+  },
+  variantSuccessCard: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#bbf7d0',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 6,
+  },
+  variantSuccessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  variantSuccessTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  variantSuccessDesc: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+    marginTop: 2,
   },
 });
