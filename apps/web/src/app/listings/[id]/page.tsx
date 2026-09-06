@@ -8,6 +8,7 @@ import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
 import { formatCurrency } from "@/utils/formatters";
+import { VehicleBodyConditionMap } from "@/components/VehicleBodyConditionMap";
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -45,7 +46,6 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activePhoto, setActivePhoto] = useState("");
-  const [hoveredPart, setHoveredPart] = useState("");
   const [isSellerFavorited, setIsSellerFavorited] = useState(false);
   const [togglingSellerFav, setTogglingSellerFav] = useState(false);
 
@@ -218,22 +218,6 @@ export default function ListingDetail() {
     );
   }
 
-  const PART_LABELS: Record<string, string> = {
-    FRONT_BUMPER: "Ön Tampon",
-    LEFT_FRONT_FENDER: "Sol Ön Çamurluk",
-    HOOD: "Kaput (Motor Kaputu)",
-    RIGHT_FRONT_FENDER: "Sağ Ön Çamurluk",
-    LEFT_FRONT_DOOR: "Sol Ön Kapı",
-    ROOF: "Tavan",
-    RIGHT_FRONT_DOOR: "Sağ Ön Kapı",
-    LEFT_REAR_DOOR: "Sol Arka Kapı",
-    RIGHT_REAR_DOOR: "Sağ Arka Kapı",
-    LEFT_REAR_FENDER: "Sol Arka Çamurluk",
-    TRUNK: "Bagaj Kapağı",
-    RIGHT_REAR_FENDER: "Sağ Arka Çamurluk",
-    REAR_BUMPER: "Arka Tampon"
-  };
-
   const translateFuelType = (fuel: string) => {
     if (!fuel) return "-";
     const mapping: Record<string, string> = {
@@ -256,23 +240,6 @@ export default function ListingDetail() {
       SEMI_AUTOMATIC: "Yarı Otomatik"
     };
     return mapping[trans.toUpperCase()] || trans;
-  };
-
-  const getPartColorClass = (partKey: string) => {
-    const isChanged = Array.isArray(listing.changedParts) && listing.changedParts.includes(partKey);
-    const isPainted = Array.isArray(listing.paintedParts) && listing.paintedParts.includes(partKey);
-    const isLocalPainted = Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.includes(partKey);
-
-    if (isChanged) {
-      return "fill-red-500/25 stroke-red-500/50";
-    }
-    if (isPainted) {
-      return "fill-blue-500/25 stroke-blue-500/50";
-    }
-    if (isLocalPainted) {
-      return "fill-orange-500/25 stroke-orange-500/50";
-    }
-    return "fill-slate-900/50 stroke-white/10";
   };
 
   const defaultImage = "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80";
@@ -384,201 +351,26 @@ export default function ListingDetail() {
           <div className="flex flex-col gap-4 p-5 bg-slate-900/20 border border-white/5 rounded-2xl">
             <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2">Ekspertiz ve Boya/Değişen Durumu</h3>
 
-            {/* Visual Car Silhouette Grid (Read-only) */}
-            <div className="flex flex-col gap-3 bg-slate-950/20 p-4 border border-white/5 rounded-2xl mt-1">
-              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">Boyalı veya Değişen Parça Görseli</span>
-              
-              <div className="flex items-center gap-3 text-[10px] font-bold mt-1 flex-wrap">
-                <span className="flex items-center gap-1 text-slate-400">
-                  <span className="w-2.5 h-2.5 rounded bg-slate-900 border border-white/10 block"></span> Orijinal
-                </span>
-                <span className="flex items-center gap-1 text-orange-400">
-                  <span className="w-2.5 h-2.5 rounded bg-orange-500/25 border border-orange-500/40 block"></span> Lokal Boyalı
-                </span>
-                <span className="flex items-center gap-1 text-blue-400">
-                  <span className="w-2.5 h-2.5 rounded bg-blue-500/25 border border-blue-500/40 block"></span> Boyalı
-                </span>
-                <span className="flex items-center gap-1 text-red-400">
-                  <span className="w-2.5 h-2.5 rounded bg-red-500/25 border border-red-500/40 block"></span> Değişen
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center mt-2">
-                {/* 1. Car Visual Silhouette (SVG - Read-only) */}
-                <div className="md:col-span-6 flex flex-col items-center gap-1">
-                  <div className="relative w-full max-w-[200px] p-3 bg-slate-950/40 border border-white/5 rounded-2xl flex justify-center shadow-xl">
-                    <svg viewBox="0 0 200 380" className="w-full h-auto">
-                      {/* Static Tires */}
-                      <rect x="23" y="55" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="163" y="55" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="23" y="280" width="14" height="32" rx="4" fill="#1e293b" />
-                      <rect x="163" y="280" width="14" height="32" rx="4" fill="#1e293b" />
-
-                      {/* FRONT BUMPER */}
-                      <path
-                        d="M 50 35 Q 100 20 150 35 L 142 45 Q 100 35 58 45 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["FRONT_BUMPER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("FRONT_BUMPER")}`}
-                      />
-
-                      {/* HOOD */}
-                      <path
-                        d="M 58 45 Q 100 35 142 45 L 135 110 L 65 110 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["HOOD"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("HOOD")}`}
-                      />
-
-                      {/* LEFT FRONT FENDER */}
-                      <path
-                        d="M 50 35 L 58 45 L 65 110 L 38 110 C 34 85 36 55 50 35 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_FRONT_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("LEFT_FRONT_FENDER")}`}
-                      />
-
-                      {/* RIGHT FRONT FENDER */}
-                      <path
-                        d="M 150 35 C 164 55 166 85 162 110 L 135 110 L 142 45 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_FRONT_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("RIGHT_FRONT_FENDER")}`}
-                      />
-
-                      {/* LEFT FRONT DOOR */}
-                      <path
-                        d="M 38 110 L 65 110 L 65 180 L 38 180 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_FRONT_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("LEFT_FRONT_DOOR")}`}
-                      />
-
-                      {/* RIGHT FRONT DOOR */}
-                      <path
-                        d="M 135 110 L 162 110 L 162 180 L 135 180 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_FRONT_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("RIGHT_FRONT_DOOR")}`}
-                      />
-
-                      {/* ROOF */}
-                      <rect
-                        x="65" y="110" width="70" height="140" rx="8"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["ROOF"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("ROOF")}`}
-                      />
-
-                      {/* LEFT REAR DOOR */}
-                      <path
-                        d="M 38 180 L 65 180 L 65 250 L 38 250 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_REAR_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("LEFT_REAR_DOOR")}`}
-                      />
-
-                      {/* RIGHT REAR DOOR */}
-                      <path
-                        d="M 135 180 L 162 180 L 162 250 L 135 250 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_REAR_DOOR"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("RIGHT_REAR_DOOR")}`}
-                      />
-
-                      {/* LEFT REAR FENDER */}
-                      <path
-                        d="M 38 250 L 65 250 L 60 330 L 53 340 C 36 320 34 280 38 250 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["LEFT_REAR_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("LEFT_REAR_FENDER")}`}
-                      />
-
-                      {/* TRUNK */}
-                      <path
-                        d="M 65 250 L 135 250 L 140 330 Q 100 340 60 330 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["TRUNK"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("TRUNK")}`}
-                      />
-
-                      {/* RIGHT REAR FENDER */}
-                      <path
-                        d="M 135 250 L 162 250 C 166 280 164 320 147 340 L 140 330 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["RIGHT_REAR_FENDER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("RIGHT_REAR_FENDER")}`}
-                      />
-
-                      {/* REAR BUMPER */}
-                      <path
-                        d="M 53 340 Q 100 350 147 340 L 152 350 Q 100 365 48 350 Z"
-                        onMouseEnter={() => setHoveredPart(PART_LABELS["REAR_BUMPER"])}
-                        onMouseLeave={() => setHoveredPart("")}
-                        className={`transition duration-200 ${getPartColorClass("REAR_BUMPER")}`}
-                      />
-
-                      {/* Headlights and Tail lights */}
-                      <ellipse cx="61" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(-10 61 41)" opacity="0.9" pointerEvents="none" />
-                      <ellipse cx="139" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(10 139 41)" opacity="0.9" pointerEvents="none" />
-                      <rect x="52" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" pointerEvents="none" />
-                      <rect x="138" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" pointerEvents="none" />
-                    </svg>
-                  </div>
-                  
-                  {/* Hover status label indicator */}
-                  <span className="text-[10px] font-bold text-slate-400 min-h-[14px] block text-center mt-1">
-                    {hoveredPart ? hoveredPart : "Ekspertiz detayı için parçanın üzerine gelin"}
-                  </span>
-                </div>
-
-                {/* 2. Side Lists: Summarizing current selections */}
-                <div className="md:col-span-6 flex flex-col gap-3">
-                  <div className="flex flex-col gap-1 bg-slate-950/45 p-3 border border-white/5 rounded-xl">
-                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-wider">🎨 Boyalı Parçalar</span>
-                    <ul className="text-[10px] text-slate-350 flex flex-col gap-1">
-                      {Array.isArray(listing.localPaintedParts) && listing.localPaintedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-orange-500/10 px-2 py-0.5 rounded text-[9px] border border-orange-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-orange-400">Lokal Boya</span>
-                        </li>
-                      ))}
-                      {Array.isArray(listing.paintedParts) && listing.paintedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-blue-500/10 px-2 py-0.5 rounded text-[9px] border border-blue-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-blue-400">Boyalı</span>
-                        </li>
-                      ))}
-                      {(!listing.localPaintedParts || listing.localPaintedParts.length === 0) && (!listing.paintedParts || listing.paintedParts.length === 0) && (
-                        <span className="text-slate-500 font-bold text-[9px] italic">Boyalı parça yok.</span>
-                      )}
-                    </ul>
-                  </div>
-
-                  <div className="flex flex-col gap-1 bg-slate-950/45 p-3 border border-white/5 rounded-xl">
-                    <span className="text-[9px] font-black text-red-400 uppercase tracking-wider">🔄 Değişen Parçalar</span>
-                    <ul className="text-[10px] text-slate-350 flex flex-col gap-1">
-                      {Array.isArray(listing.changedParts) && listing.changedParts.map((p: string) => (
-                        <li key={p} className="flex items-center justify-between bg-red-500/10 px-2 py-0.5 rounded text-[9px] border border-red-500/10">
-                          <span>{PART_LABELS[p] || p.replace(/_/g, " ")}</span>
-                          <span className="font-bold text-red-400">Değişen</span>
-                        </li>
-                      ))}
-                      {(!listing.changedParts || listing.changedParts.length === 0) && (
-                        <span className="text-slate-500 font-bold text-[9px] italic">Değişen parça yok.</span>
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+            {/* Visual Car Silhouette (Read-only) */}
+            <div className="mt-1">
+              <VehicleBodyConditionMap
+                mode="readOnly"
+                localPaintedParts={listing.localPaintedParts}
+                paintedParts={listing.paintedParts}
+                changedParts={listing.changedParts}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/5 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-white/5 text-xs">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-slate-400">Tramer Kaydı:</span>
                 <span className="text-xs font-black text-red-400 mt-0.5">
                   {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasar Kaydı Yok"}
                 </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400">Hasar Kaydı Açıklaması:</span>
+                <span className="text-xs text-slate-300 mt-0.5">{listing.damageRecord || "Belirtilmedi"}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-slate-400">Bakım Geçmişi:</span>

@@ -986,3 +986,4 @@ export * from './types/vehicle-report';
 export * from './turkeyLocations';
 export * from './utils/resolveHorsepower';
 export * from './utils/powerConversions';
+export * from './vehicleConditionAndColors';

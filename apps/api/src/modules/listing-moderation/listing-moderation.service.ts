@@ -474,6 +474,7 @@ export class ListingModerationService implements OnModuleInit {
       promotionSummary,
       damageDeclaration: {
         hasDamageRecord: !!l.damageRecord,
+        damageRecordDescription: l.damageRecord || null,
         tramerFee: (l.tramerAmount || 0).toString(),
         isHeavyDamaged: l.heavyDamage,
         paintedParts: (l.paintedParts as any) || [],

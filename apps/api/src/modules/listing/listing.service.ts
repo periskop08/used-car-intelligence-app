@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto';
 import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier } from '@prisma/client';
 import { R2Service } from './r2.service';
-import { isValidCityAndDistrict } from '@used-car-intelligence/shared';
+import { isValidCityAndDistrict, isApprovedVehicleColor, normalizeVehicleColor, sanitizeBodyPartArrays, VEHICLE_COLORS } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -217,6 +217,20 @@ export class ListingService {
 
     const isAiReady = false; // Will set to true if connected to approved variant
 
+    let validatedColor: string | undefined = undefined;
+    if (dto.color !== undefined && dto.color !== null && dto.color.trim() !== '') {
+      if (!isApprovedVehicleColor(dto.color)) {
+        throw new BadRequestException(`Geçersiz araç rengi: "${dto.color}". Onaylı renkler: ${VEHICLE_COLORS.join(', ')}`);
+      }
+      validatedColor = normalizeVehicleColor(dto.color);
+    }
+
+    const sanitizedParts = sanitizeBodyPartArrays({
+      localPaintedParts: dto.localPaintedParts,
+      paintedParts: dto.paintedParts,
+      changedParts: dto.changedParts,
+    });
+
     return this.prisma.vehicleListing.create({
       data: {
         sellerId: userId,
@@ -234,7 +248,7 @@ export class ListingService {
         fuelType: dto.fuelType,
         transmission: dto.transmission,
         bodyType: dto.bodyType,
-        color: dto.color,
+        color: validatedColor !== undefined ? validatedColor : dto.color,
         vehicleStatus: dto.vehicleStatus,
         hasWarranty: dto.hasWarranty ?? false,
         heavyDamage: dto.heavyDamage ?? false,
@@ -246,9 +260,9 @@ export class ListingService {
         drivetrain: dto.drivetrain,
         damageRecord: dto.damageRecord,
         tramerAmount: dto.tramerAmount || 0,
-        paintedParts: dto.paintedParts || [],
-        changedParts: dto.changedParts || [],
-        localPaintedParts: dto.localPaintedParts || [],
+        paintedParts: sanitizedParts.paintedParts,
+        changedParts: sanitizedParts.changedParts,
+        localPaintedParts: sanitizedParts.localPaintedParts,
         maintenanceHistory: dto.maintenanceHistory,
         expertiseReportUrl: dto.expertiseReportUrl,
         plateHidden: dto.plateHidden ?? true,
@@ -278,6 +292,31 @@ export class ListingService {
     }
 
     const dataToUpdate: any = { ...dto };
+
+    // Validate color if updated
+    if (dto.color !== undefined && dto.color !== null && dto.color.trim() !== '') {
+      if (!isApprovedVehicleColor(dto.color)) {
+        // If unchanged legacy color, keep it; if newly modified, reject
+        if (dto.color !== listing.color) {
+          throw new BadRequestException(`Geçersiz araç rengi: "${dto.color}". Onaylı renkler: ${VEHICLE_COLORS.join(', ')}`);
+        }
+      } else {
+        dataToUpdate.color = normalizeVehicleColor(dto.color);
+      }
+    }
+
+    // Sanitize body part arrays to enforce single-status invariant
+    if (dto.localPaintedParts !== undefined || dto.paintedParts !== undefined || dto.changedParts !== undefined) {
+      const sanitizedParts = sanitizeBodyPartArrays({
+        localPaintedParts: dto.localPaintedParts !== undefined ? dto.localPaintedParts : (listing.localPaintedParts as any),
+        paintedParts: dto.paintedParts !== undefined ? dto.paintedParts : (listing.paintedParts as any),
+        changedParts: dto.changedParts !== undefined ? dto.changedParts : (listing.changedParts as any),
+      });
+      dataToUpdate.localPaintedParts = sanitizedParts.localPaintedParts;
+      dataToUpdate.paintedParts = sanitizedParts.paintedParts;
+      dataToUpdate.changedParts = sanitizedParts.changedParts;
+    }
+
     // Preserve seller intent: if seller originally requested urgent or requested now, keep true
     if (dto.urgentRequested !== undefined) {
       dataToUpdate.urgentRequested = dto.urgentRequested;

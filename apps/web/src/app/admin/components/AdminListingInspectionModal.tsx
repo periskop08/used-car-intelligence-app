@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { resolveEffectiveListingStatus } from '@/utils/listingStatusResolver';
+import { VehicleBodyConditionMap } from '@/components/VehicleBodyConditionMap';
 
 interface AdminListingInspectionModalProps {
   listingId: string | null;
@@ -659,13 +660,20 @@ export function AdminListingInspectionModal({
                     </div>
 
                     <div className="p-2.5 bg-slate-900 rounded-xl">
-                      <span className="text-slate-500 block">Boyalı Parçalar:</span>
-                      <strong className="font-bold text-slate-200 block mt-0.5 truncate">
-                        {Array.isArray(damage.paintedParts) && damage.paintedParts.length > 0
-                          ? damage.paintedParts.join(', ')
-                          : 'Boya Belirtilmedi'}
+                      <span className="text-slate-500 block">Hasar Kaydı Açıklaması:</span>
+                      <strong className="font-bold text-slate-200 block mt-0.5">
+                        {damage.damageRecordDescription || 'Açıklama Belirtilmedi'}
                       </strong>
                     </div>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-white/5">
+                    <VehicleBodyConditionMap
+                      mode="readOnly"
+                      localPaintedParts={damage.localPaintedParts}
+                      paintedParts={damage.paintedParts}
+                      changedParts={damage.changedParts}
+                    />
                   </div>
                 </div>
               )}

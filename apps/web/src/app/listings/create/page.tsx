@@ -4,6 +4,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { TURKEY_CITIES, getDistrictsForCity } from "@used-car-intelligence/shared";
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { VehicleBodyConditionMap } from "@/components/VehicleBodyConditionMap";
+import { VehicleColorSelect } from "@/components/VehicleColorSelect";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -148,6 +150,7 @@ export default function CreateListing() {
   const [customBrand, setCustomBrand] = useState("");
   const [customModel, setCustomModel] = useState("");
   const [customYear, setCustomYear] = useState("");
+  const lastCommittedVehicleRef = useRef<string>("");
 
   // Step 2: Basic Details
   const [title, setTitle] = useState("");
@@ -526,9 +529,9 @@ export default function CreateListing() {
   };
 
 
-  // Fetch quota info when arriving at Step 5
+  // Fetch quota info when arriving at Step 6
   useEffect(() => {
-    if (step === 5 && token) {
+    if (step === 6 && token) {
       setLoadingQuota(true);
       fetch(`${API_URL}/me/listing-quota`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -927,8 +930,8 @@ export default function CreateListing() {
 
       {/* Step Progress Bar */}
       <div className="flex items-center justify-between bg-slate-900/30 border border-white/5 p-4 rounded-2xl">
-        <div className="grid grid-cols-5 gap-2 w-full">
-          {[1, 2, 3, 4, 5].map((s) => (
+        <div className="grid grid-cols-6 gap-2 w-full">
+          {[1, 2, 3, 4, 5, 6].map((s) => (
             <div
               key={s}
               className={`h-2 rounded-full transition-all duration-300 ${
@@ -1157,10 +1160,15 @@ export default function CreateListing() {
 
           <button
             onClick={() => {
-              if (!title) {
-                const autoTitle = `${selectedBrand || customBrand} ${selectedModel || customModel} ${selectedTrim || ""}`.trim();
-                setTitle(autoTitle);
+              const currentVehicleIdentity = useCustomVariant
+                ? `custom:${customBrand}:${customModel}:${customYear}`
+                : `variant:${selectedVariant}`;
+
+              if (lastCommittedVehicleRef.current && lastCommittedVehicleRef.current !== currentVehicleIdentity) {
+                // User changed to a different vehicle -> clear stale title
+                setTitle("");
               }
+              lastCommittedVehicleRef.current = currentVehicleIdentity;
               setStep(2);
             }}
             disabled={!useCustomVariant ? (!selectedVariant) : (!customBrand || !customModel || !customYear)}
@@ -1294,13 +1302,7 @@ export default function CreateListing() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Renk</label>
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  placeholder="Örn: Beyaz"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                />
+                <VehicleColorSelect value={color} onChange={setColor} />
               </div>
             </div>
 
@@ -1468,7 +1470,7 @@ export default function CreateListing() {
                 }
                 className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
               >
-                Devam Et (Boya & Hasar Adımı)
+                Devam Et (İlan Açıklaması)
               </button>
             </div>
             {!useCustomVariant && !!selectedVariant && (!displacementVerified || !powerVerified || loadingTechSpecs) && (
@@ -1481,10 +1483,48 @@ export default function CreateListing() {
         </div>
       )}
 
-      {/* STEP 3: Condition & Paint checklist */}
+      {/* STEP 3: Main Listing Description */}
       {step === 3 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
-          <h2 className="text-lg font-bold text-slate-200">🛠️ Adım 3: Boya, Değişen ve Tramer Bilgisi</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-bold text-slate-200">📝 Adım 3: İlan Açıklaması</h2>
+            <p className="text-xs text-slate-400">Aracınızı ve ilanınızı alıcılar için açıklayın.</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase">İlan Açıklaması</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Aracınızın genel durumu, donanım özellikleri, kullanım geçmişi vb. detayları yazabilirsiniz..."
+              rows={8}
+              className="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-y leading-relaxed font-sans"
+            />
+          </div>
+
+          <div className="flex gap-4 mt-4">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              Geri
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="w-2/3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
+            >
+              Devam Et (Boya & Hasar Adımı)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4: Condition & Paint Map (Old Step 3) */}
+      {step === 4 && (
+        <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
+          <h2 className="text-lg font-bold text-slate-200">🛠️ Adım 4: Boya, Değişen ve Tramer Bilgisi</h2>
           <p className="text-xs text-slate-400">Aracınızın kaporta ve ekspertiz durumunu şeffafça işaretleyin.</p>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1510,40 +1550,18 @@ export default function CreateListing() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-bold text-slate-300">Boya & Değişen Parçaları Seçin:</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {PAINTED_COMPONENTS.map((part) => {
-                const isPainted = paintedParts.includes(part);
-                const isChanged = changedParts.includes(part);
-                return (
-                  <div key={part} className="flex flex-col gap-1 bg-slate-900/60 p-3 rounded-xl border border-white/5">
-                    <span className="text-[11px] font-bold text-slate-300 truncate">{PART_LABELS[part] || part}</span>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePart(part, "painted")}
-                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                          isPainted ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        Boyalı
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePart(part, "changed")}
-                        className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                          isChanged ? "bg-rose-500 text-white" : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        Değişen
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* Interactive Vehicle Body Condition Map */}
+          <VehicleBodyConditionMap
+            mode="editable"
+            localPaintedParts={localPaintedParts}
+            paintedParts={paintedParts}
+            changedParts={changedParts}
+            onChange={(updated) => {
+              setLocalPaintedParts(updated.localPaintedParts);
+              setPaintedParts(updated.paintedParts);
+              setChangedParts(updated.changedParts);
+            }}
+          />
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-bold text-slate-400 uppercase">Bakım Geçmişi & Notlar</label>
@@ -1558,13 +1576,15 @@ export default function CreateListing() {
 
           <div className="flex gap-4 mt-4">
             <button
-              onClick={() => setStep(2)}
+              type="button"
+              onClick={() => setStep(3)}
               className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
-              onClick={() => setStep(4)}
+              type="button"
+              onClick={() => setStep(5)}
               className="w-2/3 bg-orange-600 hover:bg-orange-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Devam Et (Fotoğraf Yükleme)
@@ -1573,10 +1593,10 @@ export default function CreateListing() {
         </div>
       )}
 
-      {/* STEP 4: Photo uploads */}
-      {step === 4 && (
+      {/* STEP 5: Photo uploads (Old Step 4) */}
+      {step === 5 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
-          <h2 className="text-lg font-bold text-slate-200">📸 Adım 4: Araç Fotoğrafları</h2>
+          <h2 className="text-lg font-bold text-slate-200">📸 Adım 5: Araç Fotoğrafları</h2>
           <p className="text-xs text-slate-400">İlanınız için en fazla 10 fotoğraf yükleyebilirsiniz. En az 1 görsel gereklidir.</p>
 
           {mediaError && (
@@ -1622,13 +1642,15 @@ export default function CreateListing() {
 
           <div className="flex gap-4 mt-4">
             <button
-              onClick={() => setStep(3)}
+              type="button"
+              onClick={() => setStep(4)}
               className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
             </button>
             <button
-              onClick={() => setStep(5)}
+              type="button"
+              onClick={() => setStep(6)}
               disabled={uploadedPhotos.length === 0}
               className="w-2/3 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
@@ -1638,10 +1660,10 @@ export default function CreateListing() {
         </div>
       )}
 
-      {/* STEP 5: Quota & Confirm */}
-      {step === 5 && (
+      {/* STEP 6: Quota & Confirm (Old Step 5) */}
+      {step === 6 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6 font-sans">
-          <h2 className="text-lg font-bold text-slate-200">🚀 Adım 5: İlanı İncelemeye Gönder</h2>
+          <h2 className="text-lg font-bold text-slate-200">🚀 Adım 6: İlanı İncelemeye Gönder</h2>
 
           {loadingQuota ? (
             <div className="text-xs text-slate-400">Kota bilgisi kontrol ediliyor...</div>
@@ -1703,7 +1725,8 @@ export default function CreateListing() {
 
           <div className="flex gap-4 mt-4">
             <button
-              onClick={() => setStep(4)}
+              type="button"
+              onClick={() => setStep(5)}
               className="w-1/3 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-3.5 rounded-2xl transition cursor-pointer"
             >
               Geri
