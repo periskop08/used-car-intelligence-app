@@ -597,14 +597,14 @@ export default function ListingDetailScreen() {
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Yakıt / Motor Tipi</Text>
                 <Text style={styles.tableValue}>
-                  {FUEL_TYPE_LABELS[listing.fuelType] || listing.fuelType || 'Benzin'}
+                  {FUEL_TYPE_LABELS[listing.fuelType?.toUpperCase()] || FUEL_TYPE_LABELS[listing.fuelType] || listing.fuelType || 'Benzin'}
                 </Text>
               </View>
 
               <View style={styles.tableRow}>
                 <Text style={styles.tableLabel}>Vites</Text>
                 <Text style={styles.tableValue}>
-                  {TRANSMISSION_LABELS[listing.transmission] || listing.transmission || 'Otomatik'}
+                  {TRANSMISSION_LABELS[listing.transmission?.toUpperCase()] || TRANSMISSION_LABELS[listing.transmission] || listing.transmission || 'Otomatik'}
                 </Text>
               </View>
 

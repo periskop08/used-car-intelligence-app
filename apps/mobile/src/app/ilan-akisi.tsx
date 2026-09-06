@@ -78,6 +78,41 @@ const resolveVehicleImageUrl = (
   return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
 };
 
+const FUEL_TYPE_LABELS: Record<string, string> = {
+  PETROL: 'Benzin',
+  DIESEL: 'Dizel',
+  LPG: 'Benzin & LPG',
+  HYBRID: 'Hibrit',
+  ELECTRIC: 'Elektrik',
+  BENZIN: 'Benzin',
+  DIZEL: 'Dizel',
+  HIBRIT: 'Hibrit',
+  ELEKTRIK: 'Elektrik',
+};
+
+const TRANSMISSION_LABELS: Record<string, string> = {
+  AUTOMATIC: 'Otomatik',
+  MANUAL: 'Manuel',
+  SEMI_AUTOMATIC: 'Yarı Otomatik',
+  DCT: 'Otomatik (DCT / DSG)',
+  CVT: 'Otomatik (CVT)',
+  OTOMATIK: 'Otomatik',
+  MANUEL: 'Manuel',
+  YARI_OTOMATIK: 'Yarı Otomatik',
+};
+
+const formatFuelType = (fuel?: string | null): string => {
+  if (!fuel) return '-';
+  const upper = fuel.toUpperCase();
+  return FUEL_TYPE_LABELS[upper] || fuel;
+};
+
+const formatTransmission = (trans?: string | null): string => {
+  if (!trans) return '-';
+  const upper = trans.toUpperCase();
+  return TRANSMISSION_LABELS[upper] || trans;
+};
+
 interface Photo {
   id: string;
   url: string;
@@ -504,7 +539,9 @@ export default function ListingFeedScreen() {
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Yakıt / Vites</Text>
-                    <Text style={styles.infoValue}>{item.vehicle.fuelType} • {item.vehicle.transmissionType}</Text>
+                    <Text style={styles.infoValue}>
+                      {formatFuelType(item.vehicle.fuelType)} • {formatTransmission(item.vehicle.transmissionType)}
+                    </Text>
                   </View>
                 </View>
               ) : (
