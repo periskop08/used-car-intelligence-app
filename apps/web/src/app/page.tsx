@@ -6,6 +6,7 @@ import BuyerPackagesSection from "../components/BuyerPackagesSection";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
+import { vehicleTaxonomyApi } from "@/services/vehicleTaxonomyApi";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -214,15 +215,12 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingYears(true);
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => parseInt(item.value));
-          setYears(list);
-          if (list.length === 1) {
-            setSelectedYear(list[0].toString());
-          }
+    vehicleTaxonomyApi.getYears(brandName, modelName)
+      .then(data => {
+        const list = data.map((item) => parseInt(item.value, 10));
+        setYears(list);
+        if (list.length === 1) {
+          setSelectedYear(list[0].toString());
         }
         setLoadingYears(false);
       })
@@ -251,15 +249,12 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingBodyTypes(true);
-    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${selectedYear}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value.toUpperCase());
-          setBodyTypes(list);
-          if (list.length === 1) {
-            setSelectedBodyType(list[0]);
-          }
+    vehicleTaxonomyApi.getBodyTypes(brandName, modelName, selectedYear)
+      .then(data => {
+        const list = data.map((item) => item.value.toUpperCase());
+        setBodyTypes(list);
+        if (list.length === 1) {
+          setSelectedBodyType(list[0]);
         }
         setLoadingBodyTypes(false);
       })
@@ -285,15 +280,12 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingEngines(true);
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setEngines(list);
-          if (list.length === 1) {
-            setSelectedEngine(list[0]);
-          }
+    vehicleTaxonomyApi.getEngines(brandName, modelName, selectedYear, selectedBodyType)
+      .then(data => {
+        const list = data.map((item) => item.value);
+        setEngines(list);
+        if (list.length === 1) {
+          setSelectedEngine(list[0]);
         }
         setLoadingEngines(false);
       })
@@ -318,18 +310,15 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingFuels(true);
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setFuelTypes(list);
-          if (list.length === 1) {
-            setSelectedFuelType(list[0]);
-            setIsFuelTypeAutoSelected(true);
-          } else {
-            setIsFuelTypeAutoSelected(false);
-          }
+    vehicleTaxonomyApi.getFuelTypes(brandName, modelName, selectedYear, selectedBodyType, selectedEngine)
+      .then(data => {
+        const list = data.map((item) => item.value);
+        setFuelTypes(list);
+        if (list.length === 1) {
+          setSelectedFuelType(list[0]);
+          setIsFuelTypeAutoSelected(true);
+        } else {
+          setIsFuelTypeAutoSelected(false);
         }
         setLoadingFuels(false);
       })
@@ -351,15 +340,12 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingTransmissions(true);
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const list = res.data.map((item: any) => item.value);
-          setTransmissions(list);
-          if (list.length === 1) {
-            setSelectedTransmission(list[0]);
-          }
+    vehicleTaxonomyApi.getTransmissions(brandName, modelName, selectedYear, selectedBodyType, selectedEngine, selectedFuelType)
+      .then(data => {
+        const list = data.map((item) => item.value);
+        setTransmissions(list);
+        if (list.length === 1) {
+          setSelectedTransmission(list[0]);
         }
         setLoadingTransmissions(false);
       })
@@ -379,28 +365,23 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingTrims(true);
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&bodyType=${encodeURIComponent(selectedBodyType)}&year=${selectedYear}&engineVersion=${encodeURIComponent(selectedEngine)}&fuelType=${encodeURIComponent(selectedFuelType)}&transmissionType=${encodeURIComponent(selectedTransmission)}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          const rawTrims = res.data.map((item: any) => item.value);
-          const cleanTrims = rawTrims.filter((t: string) => {
-            if (!t) return false;
-            const lower = t.toLowerCase().trim();
-            return !['bilmiyorum', 'seçiniz veya bilmiyorum', 'boş bırak', 'genel', 'farketmez', 'yok', 'none', 'null'].includes(lower);
-          });
-          
-          setTrims(cleanTrims);
-          if (cleanTrims.length === 1) {
-            setSelectedTrim(cleanTrims[0]);
-          }
-          if (cleanTrims.length === 0) {
-            setNoTrimFound(true);
-          } else {
-            setNoTrimFound(false);
-          }
-        } else {
+    vehicleTaxonomyApi.getTrims(brandName, modelName, selectedYear, selectedBodyType, selectedEngine, selectedFuelType, selectedTransmission)
+      .then(data => {
+        const rawTrims = data.map((item) => item.value);
+        const cleanTrims = rawTrims.filter((t: string) => {
+          if (!t) return false;
+          const lower = t.toLowerCase().trim();
+          return !['bilmiyorum', 'seçiniz veya bilmiyorum', 'boş bırak', 'genel', 'farketmez', 'yok', 'none', 'null'].includes(lower);
+        });
+        
+        setTrims(cleanTrims);
+        if (cleanTrims.length === 1) {
+          setSelectedTrim(cleanTrims[0]);
+        }
+        if (cleanTrims.length === 0) {
           setNoTrimFound(true);
+        } else {
+          setNoTrimFound(false);
         }
         setLoadingTrims(false);
       })
@@ -431,19 +412,16 @@ export default function Home() {
     if (!brandName || !modelName) return;
     
     setLoadingMatch(true);
-    const queryParams = new URLSearchParams({
+    vehicleTaxonomyApi.matchVariant({
       brand: brandName,
-      modelFamily: modelName,
+      model: modelName,
       year: selectedYear,
       bodyType: selectedBodyType,
-      engineVersion: selectedEngine,
+      engine: selectedEngine,
       fuelType: selectedFuelType,
-      transmissionType: selectedTransmission,
-      trimPackage: selectedTrim,
-    });
-
-    fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
-      .then(res => res.json())
+      transmission: selectedTransmission,
+      trim: selectedTrim,
+    })
       .then(res => {
         if (res.success && res.variantId) {
           setMatchedVariantId(res.variantId);

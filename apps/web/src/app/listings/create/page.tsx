@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TURKEY_CITIES, getDistrictsForCity, resolveHorsepower } from "@used-car-intelligence/shared";
+import { TURKEY_CITIES, getDistrictsForCity } from "@used-car-intelligence/shared";
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -56,6 +56,37 @@ import QuotaBadge from "@/components/QuotaBadge";
 import ListingPromotionCards, { PromotionSku } from "@/components/listings/ListingPromotionCards";
 import UrgentListingPaymentRecovery from "@/components/listings/UrgentListingPaymentRecovery";
 import { formatImageUrl } from "@/utils/media";
+import { vehicleTaxonomyApi, TaxonomyOption } from "@/services/vehicleTaxonomyApi";
+
+const mapToBodyTypeEnum = (bt: string): string => {
+  const clean = (bt || "").toLowerCase().trim();
+  if (clean === "sedan") return "SEDAN";
+  if (clean === "hatchback") return "HATCHBACK";
+  if (clean === "suv") return "SUV";
+  if (clean === "coupe") return "COUPE";
+  if (clean === "cabrio" || clean === "cabriolet" || clean === "convertible") return "CONVERTIBLE";
+  if (clean === "station wagon" || clean === "wagon") return "WAGON";
+  if (clean === "minivan" || clean === "mpv") return "MINIVAN";
+  if (clean === "panelvan" || clean === "van") return "VAN";
+  if (clean === "pick-up" || clean === "pickup") return "PICKUP";
+  return "SEDAN";
+};
+
+const mapToFuelTypeEnum = (ft: string): string => {
+  const clean = (ft || "").toLowerCase().trim();
+  if (clean === "benzin") return "PETROL";
+  if (clean === "dizel") return "DIESEL";
+  if (clean === "hibrit") return "HYBRID";
+  if (clean === "elektrik") return "ELECTRIC";
+  if (clean === "lpg" || clean.includes("lpg")) return "LPG";
+  return "PETROL";
+};
+
+const mapToTransmissionEnum = (tr: string): string => {
+  const clean = (tr || "").toLowerCase().trim();
+  if (clean === "manuel" || clean.includes("manuel") || clean.includes("düz")) return "MANUAL";
+  return "AUTOMATIC";
+};
 
 export default function CreateListing() {
   const router = useRouter();
@@ -73,13 +104,35 @@ export default function CreateListing() {
   const [createdListingForModal, setCreatedListingForModal] = useState<any>(null);
   const [paymentError, setPaymentError] = useState("");
 
-  // Step 1: Vehicle selection (Marka, Model, Yıl)
-  const [brands, setBrands] = useState<any[]>([]);
-  const [models, setModels] = useState<any[]>([]);
-  const [variants, setVariants] = useState<any[]>([]);
+  // Step 1: Canonical Vehicle Taxonomy State
+  const [brands, setBrands] = useState<TaxonomyOption[]>([]);
+  const [models, setModels] = useState<TaxonomyOption[]>([]);
+  const [years, setYears] = useState<TaxonomyOption[]>([]);
+  const [bodyTypes, setBodyTypes] = useState<TaxonomyOption[]>([]);
+  const [engines, setEngines] = useState<TaxonomyOption[]>([]);
+  const [fuelTypes, setFuelTypes] = useState<TaxonomyOption[]>([]);
+  const [transmissions, setTransmissions] = useState<TaxonomyOption[]>([]);
+  const [trims, setTrims] = useState<TaxonomyOption[]>([]);
+
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [loadingYears, setLoadingYears] = useState(false);
+  const [loadingBodyTypes, setLoadingBodyTypes] = useState(false);
+  const [loadingEngines, setLoadingEngines] = useState(false);
+  const [loadingFuels, setLoadingFuels] = useState(false);
+  const [loadingTransmissions, setLoadingTransmissions] = useState(false);
+  const [loadingTrims, setLoadingTrims] = useState(false);
+  const [matchingVariant, setMatchingVariant] = useState(false);
+
+  // Selected Dimensions (Canonical strings)
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
+  const [selectedBodyType, setSelectedBodyType] = useState("");
+  const [selectedEngine, setSelectedEngine] = useState("");
+  const [selectedFuelType, setSelectedFuelType] = useState("");
+  const [selectedTransmission, setSelectedTransmission] = useState("");
+  const [selectedTrim, setSelectedTrim] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(""); // Exact vehicleVariantId
 
   // Custom details fallback if variant doesn't exist
@@ -87,11 +140,6 @@ export default function CreateListing() {
   const [customBrand, setCustomBrand] = useState("");
   const [customModel, setCustomModel] = useState("");
   const [customYear, setCustomYear] = useState("");
-
-  // Step 2: Canonical Vehicle Attributes
-  const [selectedBodyType, setSelectedBodyType] = useState("");
-  const [selectedTrim, setSelectedTrim] = useState("");
-  const [selectedEngineVariant, setSelectedEngineVariant] = useState("");
 
   // Step 2: Basic Details
   const [title, setTitle] = useState("");
@@ -144,11 +192,17 @@ export default function CreateListing() {
     }
     setToken(savedToken);
 
-    // Fetch Brands
-    fetch(`${API_URL}/vehicles/brands`)
-      .then((res) => res.json())
-      .then((data) => setBrands(Array.isArray(data) ? data : []))
-      .catch((e) => console.error("Error fetching brands:", e));
+    // Fetch Brands via shared vehicleTaxonomyApi
+    setLoadingBrands(true);
+    vehicleTaxonomyApi.getBrands()
+      .then((data) => {
+        setBrands(data);
+        setLoadingBrands(false);
+      })
+      .catch((e) => {
+        console.error("Error fetching brands:", e);
+        setLoadingBrands(false);
+      });
 
     // Fetch promotion catalog pricing
     fetch(`${API_URL}/listing-promotions/catalog`)
@@ -157,168 +211,229 @@ export default function CreateListing() {
       .catch(() => null);
   }, []);
 
-  // Fetch models on Brand change
-  useEffect(() => {
+  // Cascade Handlers for 8 Canonical Dimensions
+  const handleBrandChange = async (brand: string) => {
+    setSelectedBrand(brand);
     setSelectedModel("");
     setSelectedYear("");
-    setVariants([]);
-    setSelectedVariant("");
     setSelectedBodyType("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
     setSelectedTrim("");
-    setSelectedEngineVariant("");
+    setSelectedVariant("");
 
-    if (!selectedBrand) {
-      setModels([]);
-      return;
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!brand) return;
+    setLoadingModels(true);
+    try {
+      const data = await vehicleTaxonomyApi.getModels(brand);
+      setModels(data);
+    } finally {
+      setLoadingModels(false);
     }
+  };
 
-    fetch(`${API_URL}/vehicles/models?brandId=${selectedBrand}`)
-      .then((res) => res.json())
-      .then((data) => setModels(Array.isArray(data) ? data : []))
-      .catch((e) => console.error("Error fetching models:", e));
-  }, [selectedBrand]);
-
-  // Fetch variants on Model change
-  useEffect(() => {
+  const handleModelChange = async (model: string) => {
+    setSelectedModel(model);
     setSelectedYear("");
-    setSelectedVariant("");
     setSelectedBodyType("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
     setSelectedTrim("");
-    setSelectedEngineVariant("");
+    setSelectedVariant("");
 
-    if (!selectedModel) {
-      setVariants([]);
-      return;
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!model || !selectedBrand) return;
+    setLoadingYears(true);
+    try {
+      const data = await vehicleTaxonomyApi.getYears(selectedBrand, model);
+      setYears(data);
+      if (data.length === 1) {
+        handleYearChange(data[0].value, model);
+      }
+    } finally {
+      setLoadingYears(false);
     }
+  };
 
-    fetch(`${API_URL}/vehicles/variants?modelId=${selectedModel}`)
-      .then((res) => res.json())
-      .then((data) => setVariants(Array.isArray(data) ? data : []))
-      .catch((e) => console.error("Error fetching variants:", e));
-  }, [selectedModel]);
+  const handleYearChange = async (year: string, currentModel = selectedModel) => {
+    setSelectedYear(year);
+    setSelectedBodyType("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setSelectedVariant("");
 
-  // Compute available years from variants
-  const availableYears = Array.from(
-    new Set(variants.map((v) => v.year).filter(Boolean))
-  ).sort((a, b) => Number(b) - Number(a));
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
 
-  // Step 2 Candidates Filtering
-  const yearCandidates = variants.filter(
-    (v) => String(v.year) === String(selectedYear)
-  );
-
-  const availableBodyTypes = Array.from(
-    new Set(yearCandidates.map((v) => v.bodyType || "SEDAN").filter(Boolean))
-  );
-
-  useEffect(() => {
-    if (availableBodyTypes.length === 1 && !selectedBodyType) {
-      setSelectedBodyType(availableBodyTypes[0]);
+    if (!year || !currentModel || !selectedBrand) return;
+    setLoadingBodyTypes(true);
+    try {
+      const data = await vehicleTaxonomyApi.getBodyTypes(selectedBrand, currentModel, year);
+      setBodyTypes(data);
+      if (data.length === 1) {
+        handleBodyTypeChange(data[0].value, year, currentModel);
+      }
+    } finally {
+      setLoadingBodyTypes(false);
     }
-  }, [availableBodyTypes, selectedBodyType]);
+  };
 
-  const bodyCandidates = yearCandidates.filter(
-    (v) => (v.bodyType || "SEDAN") === selectedBodyType
-  );
+  const handleBodyTypeChange = async (body: string, currentYear = selectedYear, currentModel = selectedModel) => {
+    setSelectedBodyType(body);
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setSelectedVariant("");
 
-  const availableTrims = Array.from(
-    new Set(bodyCandidates.map((v) => v.trim?.name).filter(Boolean))
-  );
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
 
-  useEffect(() => {
-    if (availableTrims.length === 1 && !selectedTrim) {
-      setSelectedTrim(availableTrims[0]);
+    if (!body || !currentYear || !currentModel || !selectedBrand) return;
+    setLoadingEngines(true);
+    try {
+      const data = await vehicleTaxonomyApi.getEngines(selectedBrand, currentModel, currentYear, body);
+      setEngines(data);
+      if (data.length === 1) {
+        handleEngineChange(data[0].value, body, currentYear, currentModel);
+      }
+    } finally {
+      setLoadingEngines(false);
     }
-  }, [availableTrims, selectedTrim]);
+  };
 
-  const trimCandidates = bodyCandidates.filter(
-    (v) => !selectedTrim || v.trim?.name === selectedTrim
-  );
+  const handleEngineChange = async (engine: string, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+    setSelectedEngine(engine);
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setSelectedVariant("");
 
-  const availableEngineVariants = Array.from(
-    new Set(
-      trimCandidates
-        .map((v) => `${v.engine?.code || v.engine?.name || ""} (${v.transmission?.name || ""})`.trim())
-        .filter(Boolean)
-    )
-  );
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
 
-  const finalCandidates = selectedEngineVariant
-    ? trimCandidates.filter(
-        (v) =>
-          `${v.engine?.code || v.engine?.name || ""} (${v.transmission?.name || ""})`.trim() ===
-          selectedEngineVariant
-      )
-    : trimCandidates;
-
-  const availableDisplacements = Array.from(
-    new Set(
-      finalCandidates
-        .map((v) => v.engine?.displacement || v.engine?.displacementCc || (typeof v.specs?.specs === 'object' ? v.specs?.specs?.engineDisplacement : v.specs?.engineDisplacement))
-        .filter(Boolean)
-    )
-  );
-
-  const brandObj = brands.find((b) => b.id === selectedBrand);
-  const modelObj = models.find((m) => m.id === selectedModel);
-
-  const availablePowers = Array.from(
-    new Set(
-      finalCandidates
-        .map((v) =>
-          v.powerEnrichment?.verificationStatus === 'VERIFIED' && v.powerEnrichment.powerHp
-            ? v.powerEnrichment.powerHp
-            : resolveHorsepower({
-                ...v,
-                brandName: v.brand?.name || brandObj?.name,
-                modelName: v.model?.name || modelObj?.name,
-              })
-        )
-        .filter(Boolean) as number[]
-    )
-  );
-
-  useEffect(() => {
-    if (!useCustomVariant && availableDisplacements.length > 0) {
-      setEngineDisplacement(String(availableDisplacements[0]));
+    if (!engine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
+    setLoadingFuels(true);
+    try {
+      const data = await vehicleTaxonomyApi.getFuelTypes(selectedBrand, currentModel, currentYear, currentBody, engine);
+      setFuelTypes(data);
+      if (data.length === 1) {
+        handleFuelTypeChange(data[0].value, engine, currentBody, currentYear, currentModel);
+      }
+    } finally {
+      setLoadingFuels(false);
     }
-  }, [availableDisplacements, useCustomVariant]);
+  };
 
-  useEffect(() => {
-    if (!useCustomVariant && availablePowers.length > 0) {
-      setEnginePower(String(availablePowers[0]));
+  const handleFuelTypeChange = async (fuel: string, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+    setSelectedFuelType(fuel);
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setSelectedVariant("");
+
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!fuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
+    setLoadingTransmissions(true);
+    try {
+      const data = await vehicleTaxonomyApi.getTransmissions(selectedBrand, currentModel, currentYear, currentBody, currentEngine, fuel);
+      setTransmissions(data);
+      if (data.length === 1) {
+        handleTransmissionChange(data[0].value, fuel, currentEngine, currentBody, currentYear, currentModel);
+      }
+    } finally {
+      setLoadingTransmissions(false);
     }
-  }, [availablePowers, useCustomVariant]);
+  };
 
-  // Exact Variant Resolution Effect
-  useEffect(() => {
-    if (useCustomVariant) return;
+  const handleTransmissionChange = async (trans: string, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+    setSelectedTransmission(trans);
+    setSelectedTrim("");
+    setSelectedVariant("");
 
-    if (finalCandidates.length === 1) {
-      const exact = finalCandidates[0];
-      setSelectedVariant(exact.id);
+    setTrims([]);
 
-      // Auto populate / sync technical fields
-      if (exact.fuelType) setFuelType(exact.fuelType);
-      if (exact.transmission?.type) setTransmission(exact.transmission.type);
-      if (exact.bodyType) setBodyType(exact.bodyType);
+    if (!trans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
+    setLoadingTrims(true);
+    try {
+      const data = await vehicleTaxonomyApi.getTrims(selectedBrand, currentModel, currentYear, currentBody, currentEngine, currentFuel, trans);
+      setTrims(data);
+      if (data.length === 1) {
+        handleTrimChange(data[0].value, trans, currentFuel, currentEngine, currentBody, currentYear, currentModel);
+      }
+    } finally {
+      setLoadingTrims(false);
+    }
+  };
 
-      const disp = exact.engine?.displacement || exact.engine?.displacementCc || (typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.engineDisplacement : exact.specs?.engineDisplacement);
-      if (disp) setEngineDisplacement(String(disp));
+  const handleTrimChange = async (trim: string, currentTrans = selectedTransmission, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+    setSelectedTrim(trim);
+    setSelectedVariant("");
 
-      const hp = resolveHorsepower({
-        ...exact,
-        brandName: exact.brand?.name || brandObj?.name,
-        modelName: exact.model?.name || modelObj?.name,
+    if (!trim || !currentTrans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
+
+    setMatchingVariant(true);
+    try {
+      const res = await vehicleTaxonomyApi.matchVariant({
+        brand: selectedBrand,
+        model: currentModel,
+        year: currentYear,
+        bodyType: currentBody,
+        engine: currentEngine,
+        fuelType: currentFuel,
+        transmission: currentTrans,
+        trim,
       });
-      if (hp) setEnginePower(String(hp));
 
-      const dt = typeof exact.specs?.specs === 'object' ? exact.specs?.specs?.drivetrain : exact.specs?.drivetrain;
-      if (dt) setDrivetrain(dt);
-    } else {
+      if (res.success && res.variantId) {
+        setSelectedVariant(res.variantId);
+        setBodyType(mapToBodyTypeEnum(currentBody));
+        setFuelType(mapToFuelTypeEnum(currentFuel));
+        setTransmission(mapToTransmissionEnum(currentTrans));
+
+        // Safely check powerEnrichment if verified (RULE 2: DO NOT FABRICATE OR OVERWRITE UNVERIFIED DATA)
+        try {
+          const detail = await vehicleTaxonomyApi.getVariantDetail(res.variantId, token);
+          if (detail?.powerEnrichment?.verificationStatus === 'VERIFIED' && detail.powerEnrichment.powerHp) {
+            setEnginePower((prev) => prev || String(detail.powerEnrichment.powerHp));
+          }
+        } catch {}
+      } else {
+        setSelectedVariant("");
+      }
+    } catch (e) {
+      console.error("Error matching variant:", e);
       setSelectedVariant("");
+    } finally {
+      setMatchingVariant(false);
     }
-  }, [finalCandidates, useCustomVariant]);
+  };
+
 
   // Fetch quota info when arriving at Step 5
   useEffect(() => {
@@ -345,11 +460,10 @@ export default function CreateListing() {
     const parsedPrice = parseNumberInput(priceAmount);
     const parsedKm = parseNumberInput(kilometers);
 
-    const brandObj = brands.find((b) => b.id === selectedBrand);
-    const modelObj = models.find((m) => m.id === selectedModel);
+    const vehicleTitleDefault = `${selectedBrand || customBrand} ${selectedModel || customModel} ${selectedTrim || ""}`.trim();
 
     const draftPayload = {
-      title: title || `${brandObj?.name || customBrand} ${modelObj?.name || customModel}`,
+      title: title || vehicleTitleDefault || "Araç İlanı",
       description: description || "Henüz açıklama girilmedi.",
       priceAmount: parsedPrice ? parseFloat(parsedPrice) : 0,
       currency: "TRY",
@@ -358,9 +472,9 @@ export default function CreateListing() {
       district: district || "Kadıköy",
       modelYear: parseInt(selectedYear || customYear || "2020", 10),
       kilometers: parsedKm ? parseInt(parsedKm, 10) : 0,
-      fuelType,
-      transmission,
-      bodyType: selectedBodyType || bodyType,
+      fuelType: !useCustomVariant && selectedFuelType ? mapToFuelTypeEnum(selectedFuelType) : fuelType,
+      transmission: !useCustomVariant && selectedTransmission ? mapToTransmissionEnum(selectedTransmission) : transmission,
+      bodyType: !useCustomVariant && selectedBodyType ? mapToBodyTypeEnum(selectedBodyType) : bodyType,
       color: color || "Belirtilmedi",
       vehicleStatus,
       hasWarranty,
@@ -478,9 +592,6 @@ export default function CreateListing() {
     const parsedPrice = parseNumberInput(priceAmount);
     const parsedKm = parseNumberInput(kilometers);
 
-    const brandObj = brands.find((b) => b.id === selectedBrand);
-    const modelObj = models.find((m) => m.id === selectedModel);
-
     const payload = {
       title,
       description,
@@ -491,9 +602,9 @@ export default function CreateListing() {
       district,
       modelYear: parseInt(selectedYear || customYear, 10),
       kilometers: parseInt(parsedKm, 10) || 0,
-      fuelType,
-      transmission,
-      bodyType: selectedBodyType || bodyType,
+      fuelType: !useCustomVariant && selectedFuelType ? mapToFuelTypeEnum(selectedFuelType) : fuelType,
+      transmission: !useCustomVariant && selectedTransmission ? mapToTransmissionEnum(selectedTransmission) : transmission,
+      bodyType: !useCustomVariant && selectedBodyType ? mapToBodyTypeEnum(selectedBodyType) : bodyType,
       color,
       vehicleStatus,
       hasWarranty,
@@ -730,14 +841,19 @@ export default function CreateListing() {
       {step === 1 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
           <h2 className="text-lg font-bold text-slate-200">🚗 Adım 1: Araç Seçimi</h2>
-          <p className="text-xs text-slate-400">Aracınızın veritabanı kaydına bağlanabilmesi için Marka, Model ve Model Yılı seçiniz.</p>
+          <p className="text-xs text-slate-400">Aracınızın doğru teknik katalog verisine ve yapay zeka analizine bağlanabilmesi için aracınızı seçiniz.</p>
 
           <div className="flex items-center gap-2 cursor-pointer bg-slate-900/40 p-4 rounded-xl border border-white/5">
             <input
               type="checkbox"
               id="customVariantToggle"
               checked={useCustomVariant}
-              onChange={(e) => setUseCustomVariant(e.target.checked)}
+              onChange={(e) => {
+                setUseCustomVariant(e.target.checked);
+                if (e.target.checked) {
+                  setSelectedVariant("");
+                }
+              }}
               className="accent-orange-500 rounded border-white/10"
             />
             <label htmlFor="customVariantToggle" className="text-xs font-bold text-slate-300 cursor-pointer select-none">
@@ -746,50 +862,155 @@ export default function CreateListing() {
           </div>
 
           {!useCustomVariant ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Marka</label>
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
-                >
-                  <option value="">Seçiniz...</option>
-                  {brands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+            <div className="flex flex-col gap-5">
+              {/* Row 1: Marka | Model | Model Yılı | Kasa Tipi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Marka</label>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => handleBrandChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                    disabled={loadingBrands}
+                  >
+                    <option value="">{loadingBrands ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {brands.map((b) => (
+                      <option key={b.value} value={b.value}>{b.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Model</label>
+                  <select
+                    value={selectedModel}
+                    disabled={!selectedBrand || loadingModels}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingModels ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {models.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
+                  <select
+                    value={selectedYear}
+                    disabled={!selectedModel || loadingYears || years.length === 0}
+                    onChange={(e) => handleYearChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingYears ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {years.map((y) => (
+                      <option key={y.value} value={y.value}>{y.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
+                  <select
+                    value={selectedBodyType}
+                    disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
+                    onChange={(e) => handleBodyTypeChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingBodyTypes ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {bodyTypes.map((bt) => (
+                      <option key={bt.value} value={bt.value}>{BODY_TYPE_LABELS[bt.value] || bt.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Model</label>
-                <select
-                  value={selectedModel}
-                  disabled={!selectedBrand}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
-                >
-                  <option value="">Seçiniz...</option>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
+              {/* Row 2: Motor / Versiyon | Yakıt Türü | Şanzıman Tipi | Donanım Paketi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
+                  <select
+                    value={selectedEngine}
+                    disabled={!selectedBodyType || loadingEngines || engines.length === 0}
+                    onChange={(e) => handleEngineChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingEngines ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {engines.map((eng) => (
+                      <option key={eng.value} value={eng.value}>{eng.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
+                  <select
+                    value={selectedFuelType}
+                    disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0}
+                    onChange={(e) => handleFuelTypeChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingFuels ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {fuelTypes.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
+                  <select
+                    value={selectedTransmission}
+                    disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
+                    onChange={(e) => handleTransmissionChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingTransmissions ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {transmissions.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
+                  <select
+                    value={selectedTrim}
+                    disabled={!selectedTransmission || loadingTrims || trims.length === 0}
+                    onChange={(e) => handleTrimChange(e.target.value)}
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
+                  >
+                    <option value="">{loadingTrims ? "Yükleniyor..." : "Seçiniz..."}</option>
+                    {trims.map((tr) => (
+                      <option key={tr.value} value={tr.value}>{tr.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
-                <select
-                  value={selectedYear}
-                  disabled={!selectedModel || availableYears.length === 0}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-40"
-                >
-                  <option value="">Seçiniz...</option>
-                  {availableYears.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Resolution Status Banner */}
+              {matchingVariant ? (
+                <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <span>Varyant doğrulanıyor ve eşleştiriliyor...</span>
+                </div>
+              ) : selectedVariant ? (
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim} (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
+                </div>
+              ) : (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine && selectedFuelType && selectedTransmission && selectedTrim) ? (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                  <span>❌ Bu kombinasyon için net varyant eşleşmesi bulunamadı. Lütfen seçimlerinizi kontrol ediniz veya &quot;Aracımı listede bulamadım&quot; seçeneğini işaretleyiniz.</span>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span>ℹ️ İlerlemeden önce lütfen aracın tüm özelliklerini (8 kriter) eksiksiz seçiniz.</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -823,13 +1044,19 @@ export default function CreateListing() {
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
                 />
               </div>
-              <p className="text-[10px] text-amber-500 italic">⚠️ Manuel varyant girişinde ilanınız yayında kalır fakat "AI Analizli İlan" rozeti alamaz.</p>
+              <p className="text-[10px] text-amber-500 italic">⚠️ Manuel varyant girişinde ilanınız yayında kalır fakat &quot;AI Analizli İlan&quot; rozeti alamaz.</p>
             </div>
           )}
 
           <button
-            onClick={() => setStep(2)}
-            disabled={!useCustomVariant ? (!selectedBrand || !selectedModel || !selectedYear) : (!customBrand || !customModel || !customYear)}
+            onClick={() => {
+              if (!title) {
+                const autoTitle = `${selectedBrand || customBrand} ${selectedModel || customModel} ${selectedTrim || ""}`.trim();
+                setTitle(autoTitle);
+              }
+              setStep(2);
+            }}
+            disabled={!useCustomVariant ? (!selectedVariant) : (!customBrand || !customModel || !customYear)}
             className="w-full mt-4 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
           >
             Devam Et
@@ -842,71 +1069,23 @@ export default function CreateListing() {
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
           <h2 className="text-lg font-bold text-slate-200">📝 Adım 2: İlan Detayları</h2>
 
-          {!useCustomVariant && (
-            <div className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col gap-3">
-              <span className="text-xs font-bold text-orange-400">🚗 Seçilen Araç Kombinasyonu:</span>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
-                  <select
-                    value={selectedBodyType}
-                    onChange={(e) => setSelectedBodyType(e.target.value)}
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Kasa Tipi Seçiniz...</option>
-                    {availableBodyTypes.map((bt) => (
-                      <option key={bt} value={bt}>{BODY_TYPE_LABELS[bt] || bt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
-                  <select
-                    value={selectedTrim}
-                    onChange={(e) => setSelectedTrim(e.target.value)}
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Donanım Paketi Seçiniz...</option>
-                    {availableTrims.map((tr) => (
-                      <option key={tr} value={tr}>{tr}</option>
-                    ))}
-                  </select>
-                </div>
+          {!useCustomVariant ? (
+            <div className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col gap-2">
+              <span className="text-xs font-bold text-orange-400">🚗 Seçilen Doğrulanmış Araç:</span>
+              <div className="text-sm font-bold text-slate-100">
+                {selectedBrand} {selectedModel} ({selectedYear}) • {selectedBodyType} • {selectedEngine} • {selectedFuelType} • {selectedTransmission} • <span className="text-orange-400">{selectedTrim}</span>
               </div>
-
-              {availableEngineVariants.length > 1 && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
-                  <select
-                    value={selectedEngineVariant}
-                    onChange={(e) => setSelectedEngineVariant(e.target.value)}
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-orange-500"
-                  >
-                    <option value="">Motor Versiyonu Seçiniz...</option>
-                    {availableEngineVariants.map((ev) => (
-                      <option key={ev} value={ev}>{ev}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Match Resolution Banner */}
-              {finalCandidates.length === 0 ? (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                  <span>Seçilen araç kombinasyonu araç veritabanıyla eşleştirilemedi. Lütfen araç bilgilerini kontrol edin.</span>
-                </div>
-              ) : finalCandidates.length === 1 ? (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
-                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: (ID: {finalCandidates[0].id.slice(0, 8)}...)</span>
-                </div>
-              ) : (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
-                  <span>ℹ️ Tam araç eşleşmesi için lütfen Donanım Paketi / Motor Versiyonunu seçiniz ({finalCandidates.length} aday eşleşti).</span>
-                </div>
-              )}
+              <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>TorqueScout Araç Kataloğu Eşleşmesi Doğrulandı (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-slate-900/60 border border-amber-500/20 rounded-2xl flex flex-col gap-1">
+              <span className="text-xs font-bold text-amber-400">⚠️ Manuel Araç Girişi:</span>
+              <div className="text-sm font-bold text-slate-200">
+                {customBrand} {customModel} ({customYear})
+              </div>
             </div>
           )}
 
@@ -983,7 +1162,7 @@ export default function CreateListing() {
                 <select
                   value={fuelType}
                   onChange={(e) => setFuelType(e.target.value)}
-                  disabled={!useCustomVariant && finalCandidates.length === 1}
+                  disabled={!useCustomVariant && !!selectedVariant}
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500 disabled:opacity-60"
                 >
                   <option value="PETROL">Benzin</option>
@@ -998,7 +1177,7 @@ export default function CreateListing() {
                 <select
                   value={transmission}
                   onChange={(e) => setTransmission(e.target.value)}
-                  disabled={!useCustomVariant && finalCandidates.length === 1}
+                  disabled={!useCustomVariant && !!selectedVariant}
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500 disabled:opacity-60"
                 >
                   <option value="MANUAL">Manuel</option>
@@ -1071,14 +1250,9 @@ export default function CreateListing() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
-                  {finalCandidates.length === 1 && finalCandidates[0].powerEnrichment?.verificationStatus === 'VERIFIED' && (
+                  {selectedVariant && (
                     <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      TR/EU Katalog Doğrulandı
-                    </span>
-                  )}
-                  {(!useCustomVariant && availablePowers.length === 0) && (
-                    <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                      Doğrulanıyor
+                      Katalog Eşleşti
                     </span>
                   )}
                 </div>
