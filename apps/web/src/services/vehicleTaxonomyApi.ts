@@ -159,14 +159,24 @@ export const vehicleTaxonomyApi = {
   async getTechnicalSpecs(variantId: string): Promise<{
     variantId: string;
     engineDisplacement?: {
-      valueCc: number | null;
+      value?: number | null;
+      valueCc?: number | null;
+      status?: 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
       verified: boolean;
       sourceType: string | null;
+      evidence?: string | null;
+      evidenceQuality?: 'STRONG' | 'MODERATE' | 'WEAK' | null;
+      suspicionReason?: string | null;
     };
     enginePower?: {
-      valueHp: number | null;
+      value?: number | null;
+      valueHp?: number | null;
+      status?: 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
       verified: boolean;
       sourceType: string | null;
+      evidence?: string | null;
+      evidenceQuality?: 'STRONG' | 'MODERATE' | 'WEAK' | null;
+      suspicionReason?: string | null;
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
@@ -188,14 +198,24 @@ export const vehicleTaxonomyApi = {
   async enrichTechnicalSpecs(variantId: string, token?: string): Promise<{
     variantId: string;
     engineDisplacement?: {
-      valueCc: number | null;
+      value?: number | null;
+      valueCc?: number | null;
+      status?: 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
       verified: boolean;
       sourceType: string | null;
+      evidence?: string | null;
+      evidenceQuality?: 'STRONG' | 'MODERATE' | 'WEAK' | null;
+      suspicionReason?: string | null;
     };
     enginePower?: {
-      valueHp: number | null;
+      value?: number | null;
+      valueHp?: number | null;
+      status?: 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
       verified: boolean;
       sourceType: string | null;
+      evidence?: string | null;
+      evidenceQuality?: 'STRONG' | 'MODERATE' | 'WEAK' | null;
+      suspicionReason?: string | null;
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;

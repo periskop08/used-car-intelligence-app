@@ -679,8 +679,7 @@ export default function ListingDetail() {
                     const tf = (listing as any).technicalFacts?.enginePower;
                     if (tf?.verified && tf?.valueHp) return `${tf.valueHp} HP`;
                     if (listing.enginePower) return `${listing.enginePower} HP`;
-                    if (listing.vehicleVariant?.engine?.horsepower) return `${listing.vehicleVariant.engine.horsepower} HP`;
-                    return listing.vehicleVariant?.power || "-";
+                    return "-";
                   })()}
                 </span>
               </div>
@@ -693,8 +692,7 @@ export default function ListingDetail() {
                     const tf = (listing as any).technicalFacts?.engineDisplacement;
                     if (tf?.verified && tf?.valueCc) return `${tf.valueCc} cc`;
                     if (listing.engineDisplacement) return `${listing.engineDisplacement} cc`;
-                    if (listing.vehicleVariant?.engine?.displacement) return `${listing.vehicleVariant.engine.displacement} cc`;
-                    return listing.vehicleVariant?.engineCapacity || "-";
+                    return "-";
                   })()}
                 </span>
               </div>

@@ -6,24 +6,31 @@ import { PowerVerificationStatus } from '@prisma/client';
 import { convertPowerUnits } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
+export type TechnicalFactStatus = 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
+export type EvidenceQuality = 'STRONG' | 'MODERATE' | 'WEAK';
+
 export interface TechnicalFactField<T> {
   value: T | null;
+  status: TechnicalFactStatus;
   verified: boolean;
   sourceType: string | null;
+  evidence?: string | null;
+  evidenceQuality?: EvidenceQuality | null;
+  suspicionReason?: string | null;
+}
+
+export interface DisplacementFactField extends TechnicalFactField<number> {
+  valueCc: number | null;
+}
+
+export interface PowerFactField extends TechnicalFactField<number> {
+  valueHp: number | null;
 }
 
 export interface VariantTechnicalFactsResult {
   variantId: string;
-  engineDisplacement: {
-    valueCc: number | null;
-    verified: boolean;
-    sourceType: string | null;
-  };
-  enginePower: {
-    valueHp: number | null;
-    verified: boolean;
-    sourceType: string | null;
-  };
+  engineDisplacement: DisplacementFactField;
+  enginePower: PowerFactField;
   engineDisplacementCc: number | null;
   enginePowerHp: number | null;
   isComplete: boolean;
@@ -47,8 +54,153 @@ export class VariantTechnicalFactsService {
   ) {}
 
   /**
+   * Evaluates displacement candidate against physical limits, badge identity, report narrative, and provenance.
+   * Suppresses conflicting or unverified legacy numbers.
+   * Weak signals (narrative, marketed badge) trigger suspicion/conflict for unverified candidates, but never override strong verified evidence.
+   */
+  evaluateDisplacementConsistency(
+    candidateCc: number | null | undefined,
+    variant: any,
+    existingReport?: any,
+    isExplicitlyVerifiedSpec: boolean = false,
+  ): {
+    status: TechnicalFactStatus;
+    validCc: number | null;
+    evidence?: string;
+    evidenceQuality?: EvidenceQuality;
+    suspicionReason?: string;
+    reason?: string;
+  } {
+    if (candidateCc === null || candidateCc === undefined) {
+      return { status: 'MISSING', validCc: null, reason: 'No candidate displacement' };
+    }
+
+    const cc = Math.round(candidateCc);
+
+    // 1. Physical passenger car bounds
+    if (cc < 600 || cc > 8000) {
+      return {
+        status: 'CONFLICT',
+        validCc: null,
+        reason: `Displacement ${cc} cc out of automotive bounds (600-8000 cc)`,
+      };
+    }
+
+    const engineCode = (variant.engine?.code || '').trim();
+    const engineDesc = (variant.engine?.description || '').trim();
+
+    // 2. Report narrative check: Generated LLM text is a WEAK SIGNAL / CONFLICT SIGNAL only.
+    // It can flag an unverified legacy candidate as suspicious/conflicting, but CANNOT create exact displacement truth.
+    let narrativeSuspicion: string | undefined;
+    if (existingReport && existingReport.reportData) {
+      const execSummary =
+        existingReport.reportData.expertDecisionSynthesis?.executiveSummary?.content ||
+        JSON.stringify(existingReport.reportData.expertDecisionSynthesis || {});
+      const textMatch = execSummary.match(/([1-9]\.[0-9])\s*(?:L|litrelik|litre|lt)\b/i);
+      if (textMatch && textMatch[1]) {
+        const reportNominalL = parseFloat(textMatch[1]);
+        const reportNominalCc = Math.round(reportNominalL * 1000);
+        // E.g. Report narrative mentions "1.5L" (~1500 cc nominal), while candidate is 1600 cc.
+        // Difference is > 70 cc -> discrepancy / suspicion signal
+        if (Math.abs(cc - reportNominalCc) > 70) {
+          narrativeSuspicion = `Report narrative mentions "${textMatch[0]}", which conflicts with candidate ${cc} cc`;
+        }
+      }
+    }
+
+    // 3. Marketed decimal badge check (e.g. "1.5", "1.6", "2.0")
+    // This is also a WEAK SIGNAL: marketed classes do not follow one fixed cc tolerance globally.
+    let badgeSuspicion: string | undefined;
+    const decimalMatch = `${engineCode} ${engineDesc}`.match(/\b([1-9]\.[0-9])\b/);
+    if (decimalMatch && decimalMatch[1]) {
+      const badgeNominalL = parseFloat(decimalMatch[1]);
+      const badgeNominalCc = Math.round(badgeNominalL * 1000);
+      if (Math.abs(cc - badgeNominalCc) > 70) {
+        badgeSuspicion = `Marketed engine badge "${decimalMatch[1]}L" conflicts with candidate ${cc} cc`;
+      }
+    }
+
+    // 4. Provenance verification:
+    // If it has explicit TechnicalSpec verification with provenance, and passed physical checks:
+    if (isExplicitlyVerifiedSpec) {
+      return {
+        status: 'VERIFIED',
+        validCc: cc,
+        evidenceQuality: 'STRONG',
+      };
+    }
+
+    // 5. Unverified / Legacy Candidate (e.g. from Engine.displacement):
+    // WEAK SIGNALS trigger CONFLICT/RESEARCH_REQUIRED. Legacy Engine metadata NEVER becomes VERIFIED!
+    if (narrativeSuspicion || badgeSuspicion) {
+      const suspicion = narrativeSuspicion || badgeSuspicion;
+      return {
+        status: 'CONFLICT',
+        validCc: null,
+        evidence: suspicion,
+        suspicionReason: suspicion,
+        reason: suspicion,
+      };
+    }
+
+    // If candidate came from unverified legacy Engine table:
+    return {
+      status: 'MISSING',
+      validCc: null,
+      reason: 'Candidate comes from unverified legacy Engine table; requires targeted research',
+    };
+  }
+
+  /**
+   * Evaluates horsepower candidate against physical limits and provenance.
+   * Physical plausibility does NOT equal verification. Only strong evidence grants VERIFIED status.
+   */
+  evaluatePowerConsistency(
+    candidateHp: number | null | undefined,
+    variant: any,
+    isExplicitlyVerified: boolean = false,
+  ): {
+    status: TechnicalFactStatus;
+    validHp: number | null;
+    evidenceQuality?: EvidenceQuality;
+    reason?: string;
+  } {
+    if (candidateHp === null || candidateHp === undefined) {
+      return { status: 'MISSING', validHp: null, reason: 'No power candidate available' };
+    }
+
+    const hp = Math.round(candidateHp);
+
+    // 1. Physical bounds (Sanity check only - physical plausibility does NOT equal verification)
+    if (hp < 30 || hp > 1500) {
+      return {
+        status: 'CONFLICT',
+        validHp: null,
+        reason: `Power ${hp} HP is outside valid automotive bounds (30-1500 HP)`,
+      };
+    }
+
+    // 2. Provenance check: ONLY strong evidence grants VERIFIED status
+    if (isExplicitlyVerified) {
+      return {
+        status: 'VERIFIED',
+        validHp: hp,
+        evidenceQuality: 'STRONG',
+      };
+    }
+
+    // Legacy Engine.horsepower (which often has dummy values like 100/110) cannot be served as verified
+    return {
+      status: 'MISSING',
+      validHp: null,
+      reason: 'Unverified power candidate; requires verified provenance',
+    };
+  }
+
+  /**
    * READ-ONLY: Retrieves already-resolved/verified technical specs for a variant.
    * Strictly SAFE for public anonymous callers. Never triggers paid research or database mutations.
+   * Runs candidate values through the canonical Consistency Gate.
    */
   async getVariantTechnicalFacts(variantId: string): Promise<VariantTechnicalFactsResult> {
     if (!variantId) {
@@ -61,6 +213,10 @@ export class VariantTechnicalFactsService {
         specs: true,
         powerEnrichment: true,
         engine: true,
+        brand: true,
+        model: true,
+        trim: true,
+        generation: true,
       },
     });
 
@@ -72,87 +228,147 @@ export class VariantTechnicalFactsService {
     let powerHp: number | null = null;
     let displacementSource: string | undefined;
     let powerSource: string | undefined;
+    let dispStatus: TechnicalFactStatus = 'MISSING';
+    let powerStatus: TechnicalFactStatus = 'MISSING';
+    let dispEvidence: string | undefined;
+    let dispQuality: EvidenceQuality | null = null;
+    let powerQuality: EvidenceQuality | null = null;
+    let dispSuspicionReason: string | undefined;
+
+    // Fetch existing report for context if present (for EXACT variantId only)
+    const existingReport = await this.prisma.generatedVehicleReport.findFirst({
+      where: {
+        variantId,
+        status: 'COMPLETED',
+      },
+      orderBy: { completedAt: 'desc' },
+    });
 
     // LEVEL 1: Check verified TechnicalSpec and VehiclePowerEnrichment
     const specsObj = (variant.specs?.specs as Record<string, any>) || {};
     if (specsObj.isVerified && typeof specsObj.engineDisplacementCc === 'number') {
-      displacementCc = specsObj.engineDisplacementCc;
-      displacementSource = specsObj.displacementSource || 'TECHNICAL_SPEC_VERIFIED';
+      const gateResult = this.evaluateDisplacementConsistency(
+        specsObj.engineDisplacementCc,
+        variant,
+        existingReport,
+        true,
+      );
+      dispStatus = gateResult.status;
+      if (gateResult.status === 'VERIFIED') {
+        displacementCc = gateResult.validCc;
+        displacementSource = specsObj.displacementSource || 'TECHNICAL_SPEC_VERIFIED';
+        dispEvidence = specsObj.displacementEvidence;
+        dispQuality = gateResult.evidenceQuality || 'STRONG';
+      }
     }
 
     if (
       variant.powerEnrichment?.verificationStatus === PowerVerificationStatus.VERIFIED &&
       typeof variant.powerEnrichment?.powerHp === 'number'
     ) {
-      powerHp = Math.round(variant.powerEnrichment.powerHp);
-      powerSource = 'POWER_ENRICHMENT_VERIFIED';
+      const gateResult = this.evaluatePowerConsistency(variant.powerEnrichment.powerHp, variant, true);
+      powerStatus = gateResult.status;
+      if (gateResult.status === 'VERIFIED') {
+        powerHp = gateResult.validHp;
+        powerQuality = gateResult.evidenceQuality || 'STRONG';
+        powerSource = 'POWER_ENRICHMENT_VERIFIED';
+      }
     }
 
     // LEVEL 2: Structured facts from GeneratedVehicleReport for the EXACT SAME variantId only
-    if (displacementCc === null || powerHp === null) {
-      const existingReport = await this.prisma.generatedVehicleReport.findFirst({
-        where: {
-          variantId,
-          status: 'COMPLETED',
-        },
-        orderBy: { completedAt: 'desc' },
-      });
+    if (existingReport && existingReport.reportData) {
+      const reportData = existingReport.reportData as any;
+      const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications;
+      const perfUsage = reportData.performanceUsage;
 
-      if (existingReport && existingReport.reportData) {
-        const reportData = existingReport.reportData as any;
-        const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications;
-        const perfUsage = reportData.performanceUsage;
-        const vehIdentity = reportData.vehicleIdentity;
-
-        if (powerHp === null) {
-          const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp || vehIdentity?.enginePowerHp;
-          if (typeof rPower === 'number' && rPower > 30 && rPower < 1500) {
-            powerHp = Math.round(rPower);
+      // Power resolution from report structured facts
+      if (powerStatus !== 'VERIFIED') {
+        const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp;
+        if (typeof rPower === 'number') {
+          const pGate = this.evaluatePowerConsistency(rPower, variant, true);
+          if (pGate.status === 'VERIFIED') {
+            powerHp = pGate.validHp;
+            powerStatus = 'VERIFIED';
+            powerQuality = pGate.evidenceQuality || 'STRONG';
             powerSource = 'GENERATED_REPORT_STRUCTURED_FACT';
+          } else if (pGate.status === 'CONFLICT') {
+            powerStatus = 'CONFLICT';
           }
         }
+      }
 
-        if (displacementCc === null) {
-          const rCc = techSpecs?.engineDisplacementCc || vehIdentity?.engineDisplacementCc;
-          if (typeof rCc === 'number' && rCc > 500 && rCc < 8500) {
-            // Guard against unverified round numbers (e.g. 2000 for 2.0) unless verified
-            const engineCode = (variant.engine?.code || '').trim();
-            const isRoundThousand = rCc % 1000 === 0;
-            const matchesCodeDirectly = engineCode.includes('.') && Math.round(parseFloat(engineCode) * 1000) === rCc;
-            
-            if (!isRoundThousand || !matchesCodeDirectly) {
-              displacementCc = Math.round(rCc);
-              displacementSource = 'GENERATED_REPORT_STRUCTURED_FACT';
+      // Displacement resolution: ONLY trust explicit technicalSpecifications, NEVER unverified vehicleIdentity copy
+      if (dispStatus !== 'VERIFIED') {
+        const rCc = techSpecs?.engineDisplacementCc;
+        if (typeof rCc === 'number') {
+          const dGate = this.evaluateDisplacementConsistency(rCc, variant, existingReport, true);
+          if (dGate.status === 'VERIFIED') {
+            displacementCc = dGate.validCc;
+            dispStatus = 'VERIFIED';
+            dispQuality = dGate.evidenceQuality || 'STRONG';
+            displacementSource = 'GENERATED_REPORT_STRUCTURED_FACT';
+          } else if (dGate.status === 'CONFLICT') {
+            dispStatus = 'CONFLICT';
+            dispEvidence = dGate.evidence;
+            dispSuspicionReason = dGate.suspicionReason;
+          }
+        } else {
+          // If legacy engine displacement exists, check if it CONFLICTS with narrative or badge
+          const rawCandidateCc = variant.engine?.displacement;
+          if (rawCandidateCc) {
+            const auditCheck = this.evaluateDisplacementConsistency(rawCandidateCc, variant, existingReport, false);
+            if (auditCheck.status === 'CONFLICT') {
+              dispStatus = 'CONFLICT';
+              dispEvidence = auditCheck.evidence;
+              dispSuspicionReason = auditCheck.suspicionReason;
             }
           }
         }
       }
     }
 
-    const isComplete = displacementCc !== null && powerHp !== null;
+    // LEVEL 3: Fallback check on raw variant engine if still MISSING (Audit check only)
+    if (dispStatus === 'MISSING' && variant.engine?.displacement) {
+      const engineCheck = this.evaluateDisplacementConsistency(variant.engine.displacement, variant, existingReport, false);
+      if (engineCheck.status === 'CONFLICT') {
+        dispStatus = 'CONFLICT';
+        dispEvidence = engineCheck.evidence;
+        dispSuspicionReason = engineCheck.suspicionReason;
+      }
+    }
+
+    const isComplete = dispStatus === 'VERIFIED' && powerStatus === 'VERIFIED' && displacementCc !== null && powerHp !== null;
     const isCatalogVerified = isComplete;
 
     return {
       variantId,
       engineDisplacement: {
-        valueCc: displacementCc,
-        verified: displacementCc !== null,
-        sourceType: displacementSource || null,
+        value: dispStatus === 'VERIFIED' ? displacementCc : null,
+        valueCc: dispStatus === 'VERIFIED' ? displacementCc : null,
+        status: dispStatus,
+        verified: dispStatus === 'VERIFIED',
+        sourceType: dispStatus === 'VERIFIED' ? displacementSource || null : null,
+        evidence: dispEvidence,
+        evidenceQuality: dispQuality,
+        suspicionReason: dispSuspicionReason,
       },
       enginePower: {
-        valueHp: powerHp,
-        verified: powerHp !== null,
-        sourceType: powerSource || null,
+        value: powerStatus === 'VERIFIED' ? powerHp : null,
+        valueHp: powerStatus === 'VERIFIED' ? powerHp : null,
+        status: powerStatus,
+        verified: powerStatus === 'VERIFIED',
+        sourceType: powerStatus === 'VERIFIED' ? powerSource || null : null,
+        evidenceQuality: powerQuality,
       },
-      engineDisplacementCc: displacementCc,
-      enginePowerHp: powerHp,
+      engineDisplacementCc: dispStatus === 'VERIFIED' ? displacementCc : null,
+      enginePowerHp: powerStatus === 'VERIFIED' ? powerHp : null,
       isComplete,
       isCatalogVerified,
       sources: {
-        displacement: displacementSource,
-        power: powerSource,
+        displacement: dispStatus === 'VERIFIED' ? displacementSource : undefined,
+        power: powerStatus === 'VERIFIED' ? powerSource : undefined,
       },
-      unresolvedConflict: false,
+      unresolvedConflict: dispStatus === 'CONFLICT' || powerStatus === 'CONFLICT',
     };
   }
 
@@ -223,83 +439,86 @@ export class VariantTechnicalFactsService {
     let powerSource = currentFacts.sources.power;
     let displacementSource = currentFacts.sources.displacement;
 
-    // STEP A: Resolve Power if missing
-    if (finalHp === null) {
-      this.logger.log(`[TARGETED_RESEARCH] Researching missing power for variant ${variantId}`);
+    // STEP A: Resolve Power if missing OR in conflict
+    const powerNeedsResearch =
+      currentFacts.enginePower.status === 'MISSING' ||
+      currentFacts.enginePower.status === 'CONFLICT' ||
+      finalHp === null;
+
+    if (powerNeedsResearch) {
+      this.logger.log(`[TARGETED_RESEARCH] Researching power for variant ${variantId} (current status: ${currentFacts.enginePower.status})`);
       try {
         const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
         if (powerEnrichment && powerEnrichment.powerHp) {
-          finalHp = Math.round(powerEnrichment.powerHp);
-          powerSource = 'RESEARCH_POWER_ENRICHMENT';
+          const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
+          if (pGate.status === 'VERIFIED') {
+            finalHp = pGate.validHp;
+            powerSource = 'RESEARCH_POWER_ENRICHMENT';
+          }
         }
       } catch (err: any) {
         this.logger.error(`Failed to research power for variant ${variantId}: ${err.message}`);
       }
     }
 
-    // STEP B: Resolve Displacement if missing
-    if (finalCc === null) {
-      this.logger.log(`[TARGETED_RESEARCH] Researching missing displacement for variant ${variantId}`);
+    // STEP B: Resolve Displacement if missing OR in conflict
+    const dispNeedsResearch =
+      currentFacts.engineDisplacement.status === 'MISSING' ||
+      currentFacts.engineDisplacement.status === 'CONFLICT' ||
+      finalCc === null;
+
+    if (dispNeedsResearch) {
+      this.logger.log(`[TARGETED_RESEARCH] Researching displacement for variant ${variantId} (current status: ${currentFacts.engineDisplacement.status})`);
       try {
         const researchedCc = await this.researchVariantDisplacement(variant);
         if (researchedCc && researchedCc.displacementCc) {
-          finalCc = researchedCc.displacementCc;
-          displacementSource = researchedCc.source;
+          // Validate researched cc through consistency gate
+          const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
+          if (dGate.status === 'VERIFIED' && dGate.validCc) {
+            finalCc = dGate.validCc;
+            displacementSource = researchedCc.source;
 
-          // Persist displacement into TechnicalSpec
-          const existingSpecs = (variant.specs?.specs as Record<string, any>) || {};
-          await this.prisma.technicalSpec.upsert({
-            where: { variantId },
-            create: {
-              variantId,
-              specs: {
-                ...existingSpecs,
-                engineDisplacementCc: finalCc,
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                displacementSource,
+            // Persist verified displacement into TechnicalSpec
+            const existingSpecs = (variant.specs?.specs as Record<string, any>) || {};
+            await this.prisma.technicalSpec.upsert({
+              where: { variantId },
+              create: {
+                variantId,
+                specs: {
+                  ...existingSpecs,
+                  engineDisplacementCc: finalCc,
+                  isVerified: true,
+                  verifiedAt: new Date().toISOString(),
+                  displacementSource,
+                  displacementEvidence: (researchedCc as any).evidence || null,
+                },
               },
-            },
-            update: {
-              specs: {
-                ...existingSpecs,
-                engineDisplacementCc: finalCc,
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                displacementSource,
+              update: {
+                specs: {
+                  ...existingSpecs,
+                  engineDisplacementCc: finalCc,
+                  isVerified: true,
+                  verifiedAt: new Date().toISOString(),
+                  displacementSource,
+                  displacementEvidence: (researchedCc as any).evidence || null,
+                },
               },
-            },
-          });
+            });
+
+            // Note: Per invariant silentHistoricalReportMutation = FALSE,
+            // we do NOT rewrite historical GeneratedVehicleReport snapshots.
+            // Canonical VariantTechnicalFactsService serves as the single source of truth.
+          } else {
+            this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
+          }
         }
       } catch (err: any) {
         this.logger.error(`Failed to research displacement for variant ${variantId}: ${err.message}`);
       }
     }
 
-    // Reconcile and return
-    const isComplete = finalCc !== null && finalHp !== null;
-    return {
-      variantId,
-      engineDisplacement: {
-        valueCc: finalCc,
-        verified: finalCc !== null,
-        sourceType: displacementSource || null,
-      },
-      enginePower: {
-        valueHp: finalHp,
-        verified: finalHp !== null,
-        sourceType: powerSource || null,
-      },
-      engineDisplacementCc: finalCc,
-      enginePowerHp: finalHp,
-      isComplete,
-      isCatalogVerified: isComplete,
-      sources: {
-        displacement: displacementSource,
-        power: powerSource,
-      },
-      unresolvedConflict: !isComplete,
-    };
+    // Return fresh canonically gated facts
+    return await this.getVariantTechnicalFacts(variantId);
   }
 
   /**
