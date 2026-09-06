@@ -1,4 +1,4 @@
-import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Param, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma.service';
 import { CanonicalDisplayService } from './canonical-display.service';
@@ -64,13 +64,26 @@ export function getTransmissionTr(name: string): string {
   return 'Otomatik';
 }
 
+import { VariantTechnicalFactsService } from './variant-technical-facts.service';
+
 @ApiTags('Vehicle Filters')
 @Controller('vehicle-filters')
 export class VehicleFiltersController {
   constructor(
     private prisma: PrismaService,
     private canonicalDisplayService: CanonicalDisplayService,
+    private variantTechnicalFactsService: VariantTechnicalFactsService,
   ) {}
+
+  @Get('variants/:id/technical-specs')
+  @ApiOperation({ summary: 'Varyanta Ait Doğrulanmış Motor Hacmi ve Gücü Verisini Al (Read-Only)' })
+  async getVariantTechnicalSpecs(@Param('id') id: string) {
+    const facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(id);
+    return {
+      success: true,
+      data: facts,
+    };
+  }
 
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })

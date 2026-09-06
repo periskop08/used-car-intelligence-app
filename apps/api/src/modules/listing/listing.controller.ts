@@ -604,6 +604,8 @@ export class ListingController {
             transmission: true,
             trim: true,
             specs: true,
+            engine: true,
+            powerEnrichment: true,
             problems: { where: { status: 'APPROVED' } },
             recalls: { where: { status: 'APPROVED' } },
             checklists: { where: { status: 'APPROVED' } },

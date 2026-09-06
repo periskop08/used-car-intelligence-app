@@ -155,4 +155,47 @@ export const vehicleTaxonomyApi = {
     if (!res.ok) return null;
     return await res.json();
   },
+
+  async getTechnicalSpecs(variantId: string): Promise<{
+    variantId: string;
+    engineDisplacementCc: number | null;
+    enginePowerHp: number | null;
+    isComplete: boolean;
+    isCatalogVerified: boolean;
+    sources?: { displacement?: string; power?: string };
+  } | null> {
+    if (!variantId) return null;
+    try {
+      const res = await fetch(`${API_URL}/vehicles/variants/${variantId}/technical-specs`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async enrichTechnicalSpecs(variantId: string, token?: string): Promise<{
+    variantId: string;
+    engineDisplacementCc: number | null;
+    enginePowerHp: number | null;
+    isComplete: boolean;
+    isCatalogVerified: boolean;
+    sources?: { displacement?: string; power?: string };
+  } | null> {
+    if (!variantId) return null;
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_URL}/vehicles/variants/${variantId}/enrich-technical-specs`, {
+        method: "POST",
+        headers,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
 };

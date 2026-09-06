@@ -675,7 +675,16 @@ export default function ListingDetail() {
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Gücü</span>
                 <span className="font-semibold text-slate-200 text-right">
-                  {listing.vehicleVariant?.engine?.horsepower ? `${listing.vehicleVariant.engine.horsepower} HP` : listing.enginePower ? `${listing.enginePower} HP` : listing.vehicleVariant?.power || "-"}
+                  {(() => {
+                    const specs = (listing.vehicleVariant?.specs?.specs as Record<string, any>) || {};
+                    const vHp = (listing.vehicleVariant?.powerEnrichment?.verificationStatus === 'VERIFIED' && typeof listing.vehicleVariant.powerEnrichment.powerHp === 'number')
+                      ? listing.vehicleVariant.powerEnrichment.powerHp
+                      : (specs.isVerified && typeof specs.enginePowerHp === 'number' ? specs.enginePowerHp : null);
+                    if (vHp) return `${vHp} HP`;
+                    if (listing.enginePower) return `${listing.enginePower} HP`;
+                    if (listing.vehicleVariant?.engine?.horsepower) return `${listing.vehicleVariant.engine.horsepower} HP`;
+                    return listing.vehicleVariant?.power || "-";
+                  })()}
                 </span>
               </div>
 
@@ -683,7 +692,16 @@ export default function ListingDetail() {
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Motor Hacmi</span>
                 <span className="font-semibold text-slate-200 text-right">
-                  {listing.vehicleVariant?.engine?.displacement ? `${listing.vehicleVariant.engine.displacement} cc` : listing.engineDisplacement ? `${listing.engineDisplacement} cc` : listing.vehicleVariant?.engineCapacity || "-"}
+                  {(() => {
+                    const specs = (listing.vehicleVariant?.specs?.specs as Record<string, any>) || {};
+                    const vCc = specs.isVerified && typeof specs.engineDisplacementCc === 'number'
+                      ? specs.engineDisplacementCc
+                      : null;
+                    if (vCc) return `${vCc} cc`;
+                    if (listing.engineDisplacement) return `${listing.engineDisplacement} cc`;
+                    if (listing.vehicleVariant?.engine?.displacement) return `${listing.vehicleVariant.engine.displacement} cc`;
+                    return listing.vehicleVariant?.engineCapacity || "-";
+                  })()}
                 </span>
               </div>
 

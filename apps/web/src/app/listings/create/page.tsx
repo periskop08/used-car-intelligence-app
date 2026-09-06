@@ -135,6 +135,11 @@ export default function CreateListing() {
   const [selectedTrim, setSelectedTrim] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(""); // Exact vehicleVariantId
 
+  // Technical Specs Enrichment States (cc & HP)
+  const [loadingTechSpecs, setLoadingTechSpecs] = useState(false);
+  const [techSpecsVerified, setTechSpecsVerified] = useState(false);
+  const [techSpecsConflict, setTechSpecsConflict] = useState(false);
+
   // Custom details fallback if variant doesn't exist
   const [useCustomVariant, setUseCustomVariant] = useState(false);
   const [customBrand, setCustomBrand] = useState("");
@@ -416,21 +421,52 @@ export default function CreateListing() {
         setFuelType(mapToFuelTypeEnum(currentFuel));
         setTransmission(mapToTransmissionEnum(currentTrans));
 
-        // Safely check powerEnrichment if verified (RULE 2: DO NOT FABRICATE OR OVERWRITE UNVERIFIED DATA)
-        try {
-          const detail = await vehicleTaxonomyApi.getVariantDetail(res.variantId, token);
-          if (detail?.powerEnrichment?.verificationStatus === 'VERIFIED' && detail.powerEnrichment.powerHp) {
-            setEnginePower((prev) => prev || String(detail.powerEnrichment.powerHp));
-          }
-        } catch {}
+        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP)
+        resolveTechnicalSpecs(res.variantId);
       } else {
         setSelectedVariant("");
+        setTechSpecsVerified(false);
       }
     } catch (e) {
       console.error("Error matching variant:", e);
       setSelectedVariant("");
+      setTechSpecsVerified(false);
     } finally {
       setMatchingVariant(false);
+    }
+  };
+
+  const resolveTechnicalSpecs = async (variantId: string) => {
+    if (!variantId) return;
+    setLoadingTechSpecs(true);
+    setTechSpecsConflict(false);
+    try {
+      // 1. Read existing verified technical facts
+      let specs = await vehicleTaxonomyApi.getTechnicalSpecs(variantId);
+
+      // 2. If missing cc or HP, trigger controlled authenticated enrichment
+      if ((!specs?.engineDisplacementCc || !specs?.enginePowerHp) && token) {
+        const enriched = await vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
+        if (enriched) specs = enriched;
+      }
+
+      if (specs?.isCatalogVerified && specs.engineDisplacementCc && specs.enginePowerHp) {
+        setEngineDisplacement(String(specs.engineDisplacementCc));
+        setEnginePower(String(specs.enginePowerHp));
+        setTechSpecsVerified(true);
+        setTechSpecsConflict(false);
+      } else if (specs?.engineDisplacementCc || specs?.enginePowerHp) {
+        if (specs.engineDisplacementCc) setEngineDisplacement(String(specs.engineDisplacementCc));
+        if (specs.enginePowerHp) setEnginePower(String(specs.enginePowerHp));
+        setTechSpecsVerified(true);
+      } else {
+        setTechSpecsConflict(true);
+      }
+    } catch (err) {
+      console.error("Technical specs resolution error:", err);
+      setTechSpecsConflict(true);
+    } finally {
+      setLoadingTechSpecs(false);
     }
   };
 
@@ -585,6 +621,17 @@ export default function CreateListing() {
     if (!responsibilityAccepted) {
       setErrorMsg("Lütfen ilan yayınlama kurallarını ve sorumluluk beyanını kabul edin.");
       return;
+    }
+
+    if (!useCustomVariant && selectedVariant) {
+      if (loadingTechSpecs) {
+        setErrorMsg("Motor teknik verileri (cc ve HP) doğrulanıyor, lütfen birkaç saniye bekleyin...");
+        return;
+      }
+      if (techSpecsConflict || !engineDisplacement || !enginePower) {
+        setErrorMsg("Seçilen katalog aracı için motor teknik özellikleri (cc / HP) henüz doğrulanamadı (TECHNICAL_SPEC_CONFLICT_REQUIRES_REVIEW). Lütfen araç seçimini gözden geçirin.");
+        return;
+      }
     }
 
     setSaving(true);
@@ -995,10 +1042,15 @@ export default function CreateListing() {
                   <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                   <span>Varyant doğrulanıyor ve eşleştiriliyor...</span>
                 </div>
+              ) : loadingTechSpecs ? (
+                <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <span>Motor teknik bilgileri doğrulanıyor (cc ve HP)...</span>
+                </div>
               ) : selectedVariant ? (
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim} (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
+                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim} {engineDisplacement ? `• ${engineDisplacement} cc` : ""} {enginePower ? `• ${enginePower} HP` : ""} (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
                 </div>
               ) : (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine && selectedFuelType && selectedTransmission && selectedTrim) ? (
                 <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
@@ -1238,30 +1290,59 @@ export default function CreateListing() {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
+                  {!useCustomVariant && selectedVariant && (
+                    loadingTechSpecs ? (
+                      <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
+                        Doğrulanıyor...
+                      </span>
+                    ) : techSpecsVerified && engineDisplacement ? (
+                      <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                        ✓ Katalogdan
+                      </span>
+                    ) : null
+                  )}
+                </div>
                 <input
                   type="number"
                   value={engineDisplacement}
                   onChange={(e) => setEngineDisplacement(e.target.value)}
-                  placeholder="Örn: 1498"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  readOnly={!useCustomVariant && !!selectedVariant && techSpecsVerified}
+                  placeholder={loadingTechSpecs ? "Doğrulanıyor..." : "Örn: 1498"}
+                  className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
+                    !useCustomVariant && selectedVariant && techSpecsVerified
+                      ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
+                      : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
+                  }`}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Gücü (HP)</label>
-                  {selectedVariant && (
-                    <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      Katalog Eşleşti
-                    </span>
+                  {!useCustomVariant && selectedVariant && (
+                    loadingTechSpecs ? (
+                      <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
+                        Doğrulanıyor...
+                      </span>
+                    ) : techSpecsVerified && enginePower ? (
+                      <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                        ✓ Katalogdan
+                      </span>
+                    ) : null
                   )}
                 </div>
                 <input
                   type="number"
                   value={enginePower}
                   onChange={(e) => setEnginePower(e.target.value)}
-                  placeholder="Örn: 150"
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                  readOnly={!useCustomVariant && !!selectedVariant && techSpecsVerified}
+                  placeholder={loadingTechSpecs ? "Doğrulanıyor..." : "Örn: 150"}
+                  className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
+                    !useCustomVariant && selectedVariant && techSpecsVerified
+                      ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
+                      : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
+                  }`}
                 />
               </div>
               <div className="flex flex-col gap-1.5">

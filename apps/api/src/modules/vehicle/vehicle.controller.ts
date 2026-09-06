@@ -8,6 +8,7 @@ import { GetUser, UserPayload } from '../auth/get-user.decorator';
 
 
 import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.service';
+import { VariantTechnicalFactsService } from './variant-technical-facts.service';
 
 @ApiTags('Vehicles')
 @Controller('vehicles')
@@ -16,6 +17,7 @@ export class VehicleController {
     private vehicleService: VehicleService,
     private jwtService: JwtService,
     private powerEnrichmentService: VehiclePowerEnrichmentService,
+    private variantTechnicalFactsService: VariantTechnicalFactsService,
   ) {}
 
   @Get('brands')
@@ -36,13 +38,27 @@ export class VehicleController {
   }
 
   @Get('variants')
-  @ApiOperation({ summary: 'Modele Ait Onaylı Varyantları Al' })
+  @ApiOperation({ summary: 'Modele Ait Varyantları Al' })
   @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })
   getVariants(@Query('modelId') modelId: string) {
     if (!modelId) {
       throw new BadRequestException('modelId query parametresi gereklidir.');
     }
     return this.vehicleService.getVariants(modelId);
+  }
+
+  @Get('variants/:id/technical-specs')
+  @ApiOperation({ summary: 'Varyanta Ait Doğrulanmış Motor Hacmi ve Gücü Verisini Al (Read-Only)' })
+  getVariantTechnicalSpecs(@Param('id') id: string) {
+    return this.variantTechnicalFactsService.getVariantTechnicalFacts(id);
+  }
+
+  @Post('variants/:id/enrich-technical-specs')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eksikse Varyant Motor Hacmi ve Gücünü Hedefe Yönelik Araştır ve Doğrula (Yetkili)' })
+  enrichVariantTechnicalSpecs(@Param('id') id: string, @GetUser() user: UserPayload) {
+    return this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(id, user?.id);
   }
 
   @Get('variants/:id/power-enrichment')

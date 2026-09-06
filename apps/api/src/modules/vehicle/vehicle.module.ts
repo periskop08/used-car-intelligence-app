@@ -12,6 +12,7 @@ import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.servic
 import { EngineIdentityResolverService } from './engine-identity-resolver.service';
 import { WebSearchProvider } from '../research/providers/web-search.provider';
 import { CanonicalDisplayService } from './canonical-display.service';
+import { VariantTechnicalFactsService } from './variant-technical-facts.service';
 
 @Module({
   controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController, DataQualityController],
@@ -24,7 +25,8 @@ import { CanonicalDisplayService } from './canonical-display.service';
     EngineIdentityResolverService,
     WebSearchProvider,
     CanonicalDisplayService,
+    VariantTechnicalFactsService,
   ],
-  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService, EngineIdentityResolverService, CanonicalDisplayService],
+  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService, EngineIdentityResolverService, CanonicalDisplayService, VariantTechnicalFactsService],
 })
 export class VehicleModule {}
