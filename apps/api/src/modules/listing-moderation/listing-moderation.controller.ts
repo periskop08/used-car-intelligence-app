@@ -71,7 +71,7 @@ export class ListingModerationController {
   @Get('listings/:listingId')
   async getListingDetails(@Param('listingId') listingId: string, @Req() req: any) {
     this.verifyAdminAccess(req);
-    return this.moderationService.getListingDetails(listingId);
+    return this.moderationService.getListingDetails(listingId, req);
   }
 
   @Post('listings/:listingId/approve')

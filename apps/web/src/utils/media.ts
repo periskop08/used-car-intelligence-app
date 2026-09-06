@@ -1,6 +1,8 @@
 export const formatImageUrl = (url?: string | null) => {
   if (!url) return "";
-  
+
+  // Idempotency safety: if already routed through media-proxy or is a local data URI, return as-is
+  if (url.includes("/listings/media-proxy/")) return url;
   if (url.startsWith("/") || url.startsWith("data:")) return url;
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
+import { detectImageContentType } from './media-resolver.util';
 
 @Injectable()
 export class R2Service {
@@ -30,6 +31,7 @@ export class R2Service {
   /**
    * Optimizes an image with sharp (scales down to 1600px width max, converts to webp)
    * and uploads to Cloudflare R2 bucket with fallback if R2 credentials are missing or fail.
+   * Guarantees that storageKey extension strictly matches the buffer's magic bytes.
    */
   async uploadImage(
     fileBuffer: Buffer,
@@ -40,6 +42,9 @@ export class R2Service {
 
     // Optimize image
     let optimizedBuffer: Buffer;
+    let actualMime = 'image/webp';
+    let fileExt = 'webp';
+
     try {
       optimizedBuffer = await sharp(fileBuffer)
         .resize(1600, null, {
@@ -48,12 +53,17 @@ export class R2Service {
         })
         .webp({ quality: 80 })
         .toBuffer();
+      actualMime = 'image/webp';
+      fileExt = 'webp';
     } catch (e) {
+      this.logger.warn('Sharp optimization failed, preserving original image format and magic bytes:', e);
       optimizedBuffer = fileBuffer;
+      actualMime = detectImageContentType(fileBuffer, 'image/jpeg');
+      fileExt = actualMime === 'image/png' ? 'png' : actualMime === 'image/webp' ? 'webp' : 'jpg';
     }
 
     const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    const storageKey = `${folderPath}/${uniqueId}.webp`;
+    const storageKey = `${folderPath}/${uniqueId}.${fileExt}`;
 
     if (this.s3Client && bucketName && publicUrl) {
       try {
@@ -62,7 +72,7 @@ export class R2Service {
             Bucket: bucketName,
             Key: storageKey,
             Body: optimizedBuffer,
-            ContentType: 'image/webp',
+            ContentType: actualMime,
           }),
         );
 
@@ -71,7 +81,7 @@ export class R2Service {
           url,
           storageKey,
           fileSize: optimizedBuffer.length,
-          mimeType: 'image/webp',
+          mimeType: actualMime,
         };
       } catch (err) {
         this.logger.warn('Cloudflare R2 upload failed, falling back to Data URL:', err);
@@ -82,13 +92,13 @@ export class R2Service {
 
     // Fallback: Return Data URL for local/testing environments without R2 config
     const base64Data = optimizedBuffer.toString('base64');
-    const fallbackUrl = `data:image/webp;base64,${base64Data}`;
+    const fallbackUrl = `data:${actualMime};base64,${base64Data}`;
 
     return {
       url: fallbackUrl,
       storageKey,
       fileSize: optimizedBuffer.length,
-      mimeType: 'image/webp',
+      mimeType: actualMime,
     };
   }
 
@@ -171,6 +181,20 @@ export class R2Service {
 
     // Return original source URL if copy could not be performed
     return { url: sourceUrlOrKey, storageKey: sourceKey, success: false };
+  }
+
+  /**
+   * Retrieves an object including Body and metadata from Cloudflare R2.
+   */
+  async getObject(storageKey: string) {
+    if (!this.s3Client) return null;
+    const bucketName = process.env.R2_BUCKET_NAME;
+    return this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: storageKey,
+      }),
+    );
   }
 
   /**

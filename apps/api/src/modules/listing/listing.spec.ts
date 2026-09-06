@@ -141,6 +141,7 @@ describe('Listing Module Tests', () => {
         priceAmount: 500000,
         city: 'Istanbul',
         countryCode: 'TR',
+        color: 'Beyaz',
         seller: { id: 'user-free', subscriptionTier: SubscriptionTier.FREE },
         media: [
           { id: 'media-1', moderationStatus: MediaModerationStatus.APPROVED },
@@ -239,6 +240,7 @@ describe('Listing Module Tests', () => {
         priceAmount: 500000,
         city: 'Istanbul',
         countryCode: 'TR',
+        color: 'Beyaz',
         seller: { id: 'user-free', subscriptionTier: SubscriptionTier.FREE },
         media: [
           { id: 'media-1', moderationStatus: MediaModerationStatus.APPROVED },
@@ -277,6 +279,7 @@ describe('Listing Module Tests', () => {
         priceAmount: 500000,
         city: 'Istanbul',
         countryCode: 'TR',
+        color: 'Beyaz',
         seller: { id: 'user-premium', subscriptionTier: SubscriptionTier.PREMIUM },
         media: [
           { id: 'media-1', moderationStatus: MediaModerationStatus.APPROVED },

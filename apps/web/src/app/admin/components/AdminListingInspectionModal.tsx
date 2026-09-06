@@ -28,6 +28,7 @@ import {
 import { API_BASE_URL } from '@/utils/apiConfig';
 import { resolveEffectiveListingStatus } from '@/utils/listingStatusResolver';
 import { VehicleBodyConditionMap } from '@/components/VehicleBodyConditionMap';
+import { formatImageUrl } from '@/utils/media';
 
 interface AdminListingInspectionModalProps {
   listingId: string | null;
@@ -266,9 +267,12 @@ export function AdminListingInspectionModal({
                       className="h-64 sm:h-80 w-full rounded-2xl bg-slate-950 overflow-hidden relative group cursor-pointer border border-white/5 flex items-center justify-center"
                     >
                       <img
-                        src={media[activeImageIdx]?.url}
+                        src={formatImageUrl(media[activeImageIdx]?.url)}
                         alt="İlan Görseli"
                         className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.opacity = '0.5';
+                        }}
                       />
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                         <span className="px-4 py-2 rounded-xl bg-black/75 text-white text-xs font-bold border border-white/20 flex items-center gap-2">
@@ -287,7 +291,14 @@ export function AdminListingInspectionModal({
                             activeImageIdx === idx ? 'border-orange-500 scale-105 shadow-md' : 'border-white/10 opacity-70 hover:opacity-100'
                           }`}
                         >
-                          <img src={m.url} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                          <img
+                            src={formatImageUrl(m.url)}
+                            alt={`Thumbnail ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.opacity = '0.5';
+                            }}
+                          />
                         </button>
                       ))}
                     </div>
@@ -977,9 +988,12 @@ export function AdminListingInspectionModal({
 
           <div className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center">
             <img
-              src={media[activeImageIdx]?.url}
+              src={formatImageUrl(media[activeImageIdx]?.url)}
               alt="Lightbox View"
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              onError={(e) => {
+                (e.target as HTMLElement).style.opacity = '0.5';
+              }}
             />
 
             {activeImageIdx > 0 && (

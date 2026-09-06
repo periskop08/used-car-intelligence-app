@@ -36,6 +36,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import { Optional } from '@nestjs/common';
+import {
+  resolveCanonicalMediaList,
+  resolveCanonicalMediaItem,
+  detectImageContentType,
+  getBaseProxyUrl,
+} from './media-resolver.util';
 
 @ApiTags('Listings')
 @Controller()
@@ -433,20 +439,37 @@ export class ListingController {
     @Res() res: Response,
   ) {
     const parts = req.url.split('/listings/media-proxy/');
-    const storageKey = parts[1]?.split('?')[0];
+    let storageKey = parts[1]?.split('?')[0];
 
     if (!storageKey) {
       console.error('Proxy Media: No storageKey found in URL:', req.url);
       throw new NotFoundException('Görsel bulunamadı.');
     }
 
+    storageKey = decodeURIComponent(storageKey);
+
+    // Security: sanitize path, reject traversal and non-listing keys
+    if (storageKey.includes('..') || !storageKey.startsWith('listings/')) {
+      throw new BadRequestException('Geçersiz görsel anahtarı.');
+    }
+
     try {
-      const stream = await this.r2Service.downloadStream(storageKey);
-      res.setHeader('Content-Type', 'image/webp');
-      res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
-      (stream as any).pipe(res);
+      const obj = await this.r2Service.getObject(storageKey);
+      if (!obj || !obj.Body) {
+        throw new NotFoundException('Görsel bulunamadı.');
+      }
+
+      const byteArray = await (obj.Body as any).transformToByteArray();
+      const buffer = Buffer.from(byteArray);
+      const actualContentType = detectImageContentType(buffer, obj.ContentType);
+
+      res.setHeader('Content-Type', actualContentType);
+      res.setHeader('Content-Length', buffer.length);
+      if (obj.ETag) res.setHeader('ETag', obj.ETag);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.end(buffer);
     } catch (err) {
-      console.error(`Proxy Media: Failed to stream media for key ${storageKey}:`, err);
+      console.error(`Proxy Media: Failed to serve media for key ${storageKey}:`, err);
       throw new NotFoundException('Görsel bulunamadı.');
     }
   }
@@ -913,6 +936,7 @@ export class ListingController {
     @Param('id') id: string,
     @GetUser() user: UserPayload,
     @UploadedFile() file: any,
+    @Req() req: Request,
   ) {
     if (!file) {
       throw new BadRequestException('Lütfen yüklenecek bir dosya seçin.');
@@ -922,11 +946,13 @@ export class ListingController {
       throw new BadRequestException('Dosya içeriği okunamadı.');
     }
 
-    return this.listingService.addMedia(id, user.id, {
+    const media = await this.listingService.addMedia(id, user.id, {
       buffer: file.buffer,
       size: file.size,
       mimetype: file.mimetype,
     });
+
+    return resolveCanonicalMediaItem(media, getBaseProxyUrl(req));
   }
 
   @Delete('listings/:id/media/:mediaId')
@@ -965,12 +991,12 @@ export class ListingController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Tüm ilanları listele (Admin)' })
-  async getAdminListings(@GetUser() user: UserPayload) {
+  async getAdminListings(@GetUser() user: UserPayload, @Req() req: Request) {
     if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Bu işlem için yetkiniz bulunmamaktadır.');
     }
 
-    return this.listingService['prisma'].vehicleListing.findMany({
+    const listings = await this.listingService['prisma'].vehicleListing.findMany({
       include: {
         seller: true,
         media: { orderBy: { sortOrder: 'asc' } },
@@ -978,6 +1004,11 @@ export class ListingController {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return listings.map((l) => ({
+      ...l,
+      media: l.media ? resolveCanonicalMediaList(l.media, req) : [],
+    }));
   }
 
   @Patch('admin/listings/:id/status')
@@ -1102,25 +1133,6 @@ export class ListingController {
   }
 
   private formatMediaUrls(mediaList: any[], req: Request) {
-    const publicUrl = process.env.R2_PUBLIC_URL;
-    if (publicUrl && !publicUrl.includes('r2.dev')) {
-      return mediaList;
-    }
-
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const baseProxyUrl = `${protocol}://${host}/listings/media-proxy`;
-
-    return mediaList.map((m) => {
-      if (m.storageKey && !m.url?.startsWith('http')) {
-        return {
-          ...m,
-          url: `${baseProxyUrl}/${m.storageKey}`,
-          thumbnailUrl: `${baseProxyUrl}/${m.storageKey}`,
-          mediumUrl: `${baseProxyUrl}/${m.storageKey}`,
-        };
-      }
-      return m;
-    });
+    return resolveCanonicalMediaList(mediaList, req);
   }
 }

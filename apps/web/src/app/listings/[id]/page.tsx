@@ -25,16 +25,7 @@ const mockSimilarListings = [
   { id: 'sim-9', title: 'Peugeot 308 1.2 PureTech GT', year: 2021, km: '53.000', location: 'İstanbul / Maltepe', price: '1.120.000 TL', imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&auto=format&fit=crop&q=80' },
 ];
 
-const formatImageUrl = (url?: string) => {
-  if (!url) return "";
-  if (url.includes("r2.dev") || url.includes("cloudflarestorage.com")) {
-    const parts = url.split(".r2.dev/");
-    if (parts.length > 1) {
-      return `${API_URL}/listings/media-proxy/${parts[1]}`;
-    }
-  }
-  return url;
-};
+import { formatImageUrl } from "@/utils/media";
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -308,9 +299,12 @@ export default function ListingDetail() {
               </button>
 
               <img
-                src={activePhoto || defaultImage}
+                src={formatImageUrl(activePhoto) || defaultImage}
                 alt={listing.title}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.opacity = '0.5';
+                }}
               />
               {listing.isAiReady && (
                 <span className="absolute top-2.5 left-2.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-600/90 text-white border border-orange-500/30 backdrop-blur-sm">
@@ -330,7 +324,14 @@ export default function ListingDetail() {
                       activePhoto === img.url ? "border-orange-500 scale-95" : "border-transparent opacity-70 hover:opacity-100"
                     }`}
                   >
-                    <img src={img.url} alt="thumbnail" className="w-full h-full object-cover" />
+                    <img
+                      src={formatImageUrl(img.url)}
+                      alt="thumbnail"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.opacity = '0.5';
+                      }}
+                    />
                   </button>
                 ))}
               </div>

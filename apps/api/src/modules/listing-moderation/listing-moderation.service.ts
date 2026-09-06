@@ -6,6 +6,7 @@ import { ListingPromotionRefundService } from '../listing-promotion/listing-prom
 import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { Optional } from '@nestjs/common';
+import { resolveCanonicalMediaList } from '../listing/media-resolver.util';
 
 const PRESET_REASONS = [
   { code: 'PHOTO_INSUFFICIENT', actionType: 'REVISION_REQUIRED', title: 'Araç fotoğrafları yetersiz', defaultSellerMessage: 'İlanınızdaki fotoğraflar yetersizdir. Lütfen aracın ön, arka, yan ve iç mekan fotoğraflarını net biçimde yükleyin.', requiresSellerNote: true, allowsResubmission: true },
@@ -381,7 +382,7 @@ export class ListingModerationService implements OnModuleInit {
     });
   }
 
-  async getListingDetails(listingId: string) {
+  async getListingDetails(listingId: string, req?: any) {
     const l = await this.prisma.vehicleListing.findUnique({
       where: { id: listingId },
       include: {
@@ -491,7 +492,7 @@ export class ListingModerationService implements OnModuleInit {
         sellerType: l.sellerType === 'DEALER' || l.sellerType === 'AUTHORIZED_DEALER' ? 'CORPORATE' : 'INDIVIDUAL',
         packageName: l.seller.subscriptionTier,
       },
-      media: l.media.map((m, idx) => ({
+      media: resolveCanonicalMediaList(l.media, req).map((m, idx) => ({
         id: m.id,
         url: m.url,
         order: m.sortOrder || idx + 1,

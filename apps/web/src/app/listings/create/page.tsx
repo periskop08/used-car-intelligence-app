@@ -186,6 +186,8 @@ export default function CreateListing() {
   // Step 4: Photo uploads
   const [uploadedPhotos, setUploadedPhotos] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBlobUrl, setUploadingBlobUrl] = useState<string | null>(null);
+  const currentBlobRef = useRef<string | null>(null);
   const [mediaError, setMediaError] = useState("");
 
   // Step 5: Quota & Confirm
@@ -194,6 +196,15 @@ export default function CreateListing() {
   const [loadingQuota, setLoadingQuota] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Safely revoke object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      if (currentBlobRef.current) {
+        URL.revokeObjectURL(currentBlobRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
@@ -569,7 +580,7 @@ export default function CreateListing() {
       fuelType: !useCustomVariant && selectedFuelType ? mapToFuelTypeEnum(selectedFuelType) : fuelType,
       transmission: !useCustomVariant && selectedTransmission ? mapToTransmissionEnum(selectedTransmission) : transmission,
       bodyType: !useCustomVariant && selectedBodyType ? mapToBodyTypeEnum(selectedBodyType) : bodyType,
-      color: color || "Belirtilmedi",
+      color: color || null,
       vehicleStatus,
       hasWarranty,
       heavyDamage,
@@ -622,7 +633,15 @@ export default function CreateListing() {
       return;
     }
 
+    // Create immediate local preview object URL
+    const blobUrl = URL.createObjectURL(file);
+    if (currentBlobRef.current) {
+      URL.revokeObjectURL(currentBlobRef.current);
+    }
+    currentBlobRef.current = blobUrl;
+    setUploadingBlobUrl(blobUrl);
     setUploading(true);
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -640,10 +659,22 @@ export default function CreateListing() {
       })
       .then((mediaRecord) => {
         setUploadedPhotos((prev) => [...prev, mediaRecord]);
+        // Safely revoke object URL once server returns verified canonical media
+        if (currentBlobRef.current) {
+          URL.revokeObjectURL(currentBlobRef.current);
+          currentBlobRef.current = null;
+        }
+        setUploadingBlobUrl(null);
         setUploading(false);
       })
       .catch((err) => {
         setMediaError(err.message || "Fotoğraf yüklenirken bir hata oluştu.");
+        // Safely revoke object URL on failure
+        if (currentBlobRef.current) {
+          URL.revokeObjectURL(currentBlobRef.current);
+          currentBlobRef.current = null;
+        }
+        setUploadingBlobUrl(null);
         setUploading(false);
       });
   };
@@ -1465,6 +1496,7 @@ export default function CreateListing() {
                   !kilometers ||
                   !city ||
                   !district ||
+                  !color ||
                   (!useCustomVariant && !selectedVariant) ||
                   (!useCustomVariant && !!selectedVariant && (!displacementVerified || !powerVerified || loadingTechSpecs))
                 }
@@ -1473,6 +1505,12 @@ export default function CreateListing() {
                 Devam Et (İlan Açıklaması)
               </button>
             </div>
+            {!color && title && priceAmount && kilometers && city && district && (
+              <p className="text-[11px] text-amber-400 text-center flex items-center justify-center gap-1.5 font-medium">
+                <span>⚠️</span>
+                <span>Lütfen araç rengini seçin.</span>
+              </p>
+            )}
             {!useCustomVariant && !!selectedVariant && (!displacementVerified || !powerVerified || loadingTechSpecs) && (
               <p className="text-[11px] text-amber-400 text-center flex items-center justify-center gap-1.5 animate-pulse font-medium">
                 <span>⏳</span>
@@ -1608,7 +1646,14 @@ export default function CreateListing() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {uploadedPhotos.map((photo, idx) => (
               <div key={photo.id || idx} className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-white/10 group">
-                <img src={photo.url} alt="Uploaded" className="w-full h-full object-cover" />
+                <img
+                  src={formatImageUrl(photo.url)}
+                  alt={`İlan Fotoğrafı ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.opacity = '0.5';
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => handleDeletePhoto(photo.id)}
@@ -1619,11 +1664,26 @@ export default function CreateListing() {
               </div>
             ))}
 
-            {uploadedPhotos.length < 10 && (
+            {uploadingBlobUrl && (
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-900 border border-orange-500/50 group animate-pulse">
+                <img
+                  src={uploadingBlobUrl}
+                  alt="Yükleniyor..."
+                  className="w-full h-full object-cover opacity-75"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <span className="text-xs font-bold text-white bg-black/70 px-3 py-1 rounded-full border border-white/20">
+                    Yükleniyor...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {uploadedPhotos.length + (uploadingBlobUrl ? 1 : 0) < 10 && (
               <label className="aspect-square rounded-2xl border-2 border-dashed border-white/10 hover:border-orange-500/50 flex flex-col items-center justify-center cursor-pointer transition bg-slate-900/30">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handlePhotoUpload}
                   disabled={uploading}
                   className="hidden"

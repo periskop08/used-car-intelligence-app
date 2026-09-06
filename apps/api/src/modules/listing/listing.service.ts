@@ -142,6 +142,9 @@ export class ListingService {
     if (!listing.priceAmount || !listing.city || !listing.countryCode) {
       throw new BadRequestException('priceAmount, city, countryCode gibi zorunlu ilan alanları dolu olmalı.');
     }
+    if (!listing.color || !isApprovedVehicleColor(listing.color)) {
+      throw new BadRequestException('İlanın yayına alınabilmesi için onaylı bir araç rengi seçimi zorunludur.');
+    }
 
     // Stamp duration fields
     const pkgType =
@@ -355,6 +358,9 @@ export class ListingService {
       if (!listing.vehicleVariantId) {
         throw new BadRequestException('İlanı incelemeye göndermek için araç varyantı seçimi zorunludur.');
       }
+      if (!listing.color || !isApprovedVehicleColor(listing.color)) {
+        throw new BadRequestException('İlanı incelemeye göndermek için onaylı bir araç rengi seçimi zorunludur.');
+      }
     }
 
     if (status === ListingStatus.ACTIVE) {
@@ -401,6 +407,9 @@ export class ListingService {
 
     if (!listing) throw new NotFoundException('İlan bulunamadı.');
     if (listing.sellerId !== userId) throw new ForbiddenException('Bu işlem için yetkiniz yok.');
+    if (!listing.color || !isApprovedVehicleColor(listing.color)) {
+      throw new BadRequestException('İlanı incelemeye göndermek için onaylı bir araç rengi seçimi zorunludur.');
+    }
 
     return this.prisma.vehicleListing.update({
       where: { id },
