@@ -64,7 +64,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
   return (
     <a 
       href={`/listings/${listing.id}`}
-      className="group bg-[#0b0f19] border border-white/10 rounded-2xl overflow-hidden hover:border-orange-500/40 transition duration-300 shadow-xl flex flex-col justify-between relative cursor-pointer"
+      className="group bg-[#0b0f19] border border-white/10 rounded-xl overflow-hidden hover:border-orange-500/40 transition duration-300 shadow-xl flex flex-col justify-between relative cursor-pointer"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950">
         <img
@@ -77,7 +77,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         />
 
         {/* Top Left: Badges */}
-        <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start">
+        <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
           {listing.isUrgent && <UrgentListingBadge size="small" animated />}
           {listing.isShowcaseFeedActive && (
             <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
@@ -90,7 +90,7 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         <button
           type="button"
           onClick={handleHeartClick}
-          className={`absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-md transition text-xs font-bold shadow-lg ${
+          className={`absolute top-2 right-2 z-20 px-2 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-md transition text-[11px] font-bold shadow-lg ${
             favState 
               ? "bg-red-500/90 text-white border border-red-400/50" 
               : "bg-slate-950/80 text-slate-300 hover:text-white border border-white/15"
@@ -99,25 +99,25 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         >
           <span>{favState ? "❤️" : "🤍"}</span>
           {favCount > 0 && (
-            <span className="text-[11px] font-extrabold">{favCount}</span>
+            <span className="text-[10px] font-extrabold">{favCount}</span>
           )}
         </button>
       </div>
 
-      <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+      <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
             <span>{listing.modelYear || listing.year} • {(listing.kilometers ?? listing.mileage)?.toLocaleString("tr-TR")} KM</span>
             <span>{listing.city}</span>
           </div>
-          <h3 className="font-bold text-slate-100 group-hover:text-orange-400 transition text-sm line-clamp-1">
+          <h3 className="font-bold text-slate-100 group-hover:text-orange-400 transition text-[13px] line-clamp-1">
             {listing.title}
           </h3>
         </div>
 
         <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-          <span className="text-base font-black text-white">{formatCurrency(listing.priceAmount, listing.currency)}</span>
-          <span className="px-3 py-1.5 rounded-xl bg-orange-600/20 group-hover:bg-orange-600 text-orange-400 group-hover:text-white border border-orange-500/30 text-xs font-bold transition">
+          <span className="text-sm font-black text-white">{formatCurrency(listing.priceAmount, listing.currency)}</span>
+          <span className="px-2.5 py-1 rounded-lg bg-orange-600/20 group-hover:bg-orange-600 text-orange-400 group-hover:text-white border border-orange-500/30 text-xs font-bold transition">
             İncele
           </span>
         </div>

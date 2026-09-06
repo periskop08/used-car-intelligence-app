@@ -909,7 +909,7 @@ export default function Home() {
                 <a
                   key={listing.id}
                   href={`/listings/${listing.id}`}
-                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[280px] sm:w-[340px] lg:w-[242px] flex-shrink-0 snap-start"
+                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[230px] sm:w-[280px] lg:w-[205px] flex-shrink-0 snap-start"
                 >
                   <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
                     <img
@@ -925,19 +925,19 @@ export default function Home() {
                         <UrgentListingBadge size="small" animated />
                       )}
                       {listing.isShowcaseFeedActive && (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow border border-amber-300/40">
                           ⭐ Vitrin
                         </span>
                       )}
                       {listing.isAiReady && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow-lg shadow-orange-950/20">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">
                           ✨ AI Analizli
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="p-3 flex flex-col justify-between flex-1 gap-3">
+                  <div className="p-3 flex flex-col justify-between flex-1 gap-2.5">
                     <div>
                       <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
                         {listing.modelYear} • {listing.city}
