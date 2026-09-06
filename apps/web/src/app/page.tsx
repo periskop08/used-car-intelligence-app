@@ -899,7 +899,7 @@ export default function Home() {
         ) : featuredListings.length > 0 ? (
           <div 
             ref={scrollRef} 
-            className="grid grid-rows-2 grid-flow-col gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-2"
+            className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-2"
           >
             {featuredListings.map((listing: any) => {
               const coverImg = listing.media && listing.media[0] 
