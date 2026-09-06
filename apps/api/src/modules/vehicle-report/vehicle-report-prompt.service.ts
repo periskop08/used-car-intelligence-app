@@ -162,6 +162,11 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
   2. İlgili aksamın/kronik durumun ciddi tamir/parça masrafı doğurabileceği konusunda uyar.
   3. Belirtilen risklerin fiziki olarak ekspertiz kontrolünde (ustasına/uzmanına) teyit ettirilmesini ve tespit edilen masrafların satın alma fiyat pazarlığında göz önünde bulundurulmasını tavsiye eden dengeli, yönlendirici ve uzman üslubu kullan.
 - KESİNLİKLE METNİ VEYA CÜMLEYİ YARIDA KESME! 'detailedAssessment' ve tüm açıklama metinlerini NOKTA (.) ile biten %100 TAM VE EKSİKSİZ CÜMLELERLE tamamla. Son kelimeyi veya düşünceyi asla yarım bırakma!
+- KRONOLOJİK VE VARYANT-YIL ÇELİŞKİ DEDEKTÖRÜ (ANOMALİ TESPİTİ):
+  Eğer incelenen araçta belirtilen Model Yılı ile seçilen Motor varyantı, Kasa jenerasyonu veya Donanım paketi resmi fabrika üretim yılları/takvimi açısından uyuşmuyorsa (örneğin motorun üretimi belirtilen model yılından önce bitmişse veya o yıl yeni nesle / farklı motor koduna geçilmişse [örn. Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 makyaj öncesi dönemde sunulmuşken aracın 2020 girilmiş olması gibi]):
+  1. 'vehicleCharacter.detailedAssessment' metninin hemen başında "⚠️ **İlan / Varyant Kronolojik Uyumsuzluk Tespiti:**" başlığıyla bu durumu samimi bir uzman gözüyle açıkla (örn. bu motorun resmi üretiminin daha önceki yıllarda sonlandığı, belirtilen model yılında farklı bir motor/jenerasyon olması gerektiği, ilandaki aracın ya önceki yıllara ait olabileceği ya da motor varyantının ilanda sehven yanlış seçilmiş olabileceği).
+  2. 'executiveSummary.keyWarnings' dizisine birinci öncelikli uyarı olarak ekle.
+  3. Alıcının satın alma ve ekspertiz öncesinde araç ruhsatından ve şasi numarasından (VIN) motor kodunu ve gerçek model yılını teyit etmesini net bir tavsiye olarak belirt.
 - Sen TorqueScout Yapay Zeka Danışmanısın. Kullanıcıya tam otomotiv uzmanı gözüyle doğrudan, net, detaylı ve tatmin edici yanıtlar ver.
 - Yalnızca geçerli JSON üret. JSON dışında başlık veya açıklama metni ekleme.`;
   }
@@ -220,7 +225,12 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    İncelenen "${trim}" donanım seviyesinde Sunroof (açılır tavan), panoramik cam tavan, dijital klima, mercekli farlar gibi çok sorulan aksamların bulunma durumunu raporda açıkça belirt.
 7. MAKYAJ / FACELIFT GEÇİŞ DÖNEMİ BİLGİLENDİRMESİ:
    Eğer araç yılı bir makyaj veya kasa/motor geçiş yılına denk geliyorsa (örneğin 2014 VW Polo 1.2 TSI modellerinde makyaj öncesi 105 HP [EA111 / CBZB] ve makyaj sonrası 90 HP [EA211 / CJZD Euro 6] kasaların her ikisinin de bulunması gibi), bu durumu 'vehicleCharacter.detailedAssessment' ve 'executiveSummary' bölümlerinde açıkça vurgula! "Bu model yılı makyaj geçiş dönemi olduğundan araç makyaj öncesi (105 HP) veya makyaj sonrası (90 HP) versiyona sahip olabilir, motor kodundan (CBZB / CJZD) kontrol edilmelidir" tarzında kullanıcıyı bilgilendiren samimi ve uzman notu ekle!
-8. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
+8. KRONOLOJİK VE VARYANT-YIL TUTARSIZLIK TESPİTİ (ANOMALİ VE İLAN ÇELİŞKİ DEDEKTÖRÜ):
+   Eğer kullanıcının/ilanın girdiği Üretim Yılı (${year}) ile seçilen Motor (${engine}) / Kasa Tipi (${body}) / Donanım (${trim}) arasında resmi fabrika üretim ve pazar yılları açısından bariz bir kronolojik tutarsızlık / uyumsuzluk varsa (örneğin Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 yılları arasında makyaj öncesi sunulmuş olup 2016 makyajıyla sonlandırılmışken aracın 2020 model seçilmesi; ya da 2020 yılında 1.5 TSI 35 TFSI / 8Y yeni nesile geçilmişken 1.8 TFSI seçilmiş olması gibi):
+   - Bu durumu 'vehicleCharacter.detailedAssessment' alanında en başta açıkça vurgula: '⚠️ İlan / Varyant Kronolojik Uyumsuzluk Tespiti: Bu ilanda belirtilen ${engine} seçeneği resmi fabrika kataloğunda ${year} yılından önce/sonra yer almaktadır...'.
+   - 'executiveSummary' bölümünün uyarılarına ('keyWarnings') birinci sıradan bu kronolojik uyuşmazlık uyarısını ekle.
+   - Kullanıcıya ilandaki aracın ya önceki bir model yılına ait olabileceği ya da ilan girişinde motor varyantının sehven yanlış seçilmiş olabileceği bilgisini vererek, satın alma/ekspertiz öncesinde araç ruhsatı ve şasi numarasından (VIN) motor kodu ve model yılının mutlaka fiziki teyit edilmesini tavsiye et!
+9. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
    Yukarıdaki 8 kimlik filtresini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
    - Motor Hacmi cc ("engineDisplacementCc")
    - Motor Gücü HP ("enginePowerHp" — örn. 2022 Kia Cerato 1.6 MPI için 128, 2014 Polo 1.2 TSI için 90)
@@ -235,7 +245,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - Bagaj Hacmi Litre ("trunkCapacityLiters")
    - Boş Ağırlık kg ("curbWeightKg")
 
-Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına, makyaj geçiş notlarına ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
+Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına, makyaj geçiş notlarına, kronolojik anomali denetimine ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
