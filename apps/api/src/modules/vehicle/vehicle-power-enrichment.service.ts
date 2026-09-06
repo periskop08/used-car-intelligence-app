@@ -61,6 +61,14 @@ const NON_EU_FORBIDDEN_DOMAINS = [
 export class VehiclePowerEnrichmentService {
   private readonly logger = new Logger(VehiclePowerEnrichmentService.name);
 
+  public readonly metrics = {
+    externalWebSearchCalls: 0,
+  };
+
+  resetMetrics(): void {
+    this.metrics.externalWebSearchCalls = 0;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly webSearchProvider: WebSearchProvider,
@@ -174,6 +182,7 @@ export class VehiclePowerEnrichmentService {
       const trQuery = `${brandName} ${modelName} ${year} ${engineCode} ${trimName} hp bg kw motor gücü teknik özellikleri`.trim();
       this.logger.log(`[TR_PRIMARY] Researching power for ${brandName} ${modelName} (${year}): "${trQuery}"`);
 
+      this.metrics.externalWebSearchCalls++;
       const trSearchResults = await this.webSearchProvider.search(trQuery, 'tr', 'tr');
       const trEvidences = this.extractPowerEvidences(trSearchResults, PowerSourceMarket.TURKEY);
 
@@ -188,6 +197,7 @@ export class VehiclePowerEnrichmentService {
       const euQuery = `${brandName} ${modelName} ${year} ${engineCode} specs kW PS HP europe`.trim();
       this.logger.log(`[EU_FALLBACK] Researching power for ${brandName} ${modelName} (${year}): "${euQuery}"`);
 
+      this.metrics.externalWebSearchCalls++;
       const euSearchResults = await this.webSearchProvider.search(euQuery, 'en', 'eu');
       const euEvidences = this.extractPowerEvidences(euSearchResults, PowerSourceMarket.EUROPE);
 

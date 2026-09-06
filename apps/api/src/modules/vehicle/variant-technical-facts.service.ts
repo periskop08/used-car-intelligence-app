@@ -8,6 +8,7 @@ import OpenAI from 'openai';
 
 export type TechnicalFactStatus = 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
 export type EvidenceQuality = 'STRONG' | 'MODERATE' | 'WEAK';
+export const DISTRIBUTED_RESEARCH_LEASE_MS = 120000; // 120 seconds (2 minutes) distributed lock lease
 
 export interface TechnicalFactField<T> {
   value: T | null;
@@ -47,11 +48,54 @@ export class VariantTechnicalFactsService {
   private readonly logger = new Logger(VariantTechnicalFactsService.name);
   private inFlightEnrichments = new Map<string, Promise<VariantTechnicalFactsResult>>();
 
+  public readonly metrics = {
+    cacheHitCount: 0,
+    cacheMissCount: 0,
+    researchTriggeredCount: 0,
+    researchDeduplicatedCount: 0,
+    externalWebSearchCalls: 0,
+    externalLLMCalls: 0,
+    externalLLMResearchOperations: 0,
+    researchLocksAcquired: 0,
+    researchLocksContended: 0,
+    researchJobsCreated: 0,
+    reportQuotaConsumed: 0,
+    duplicateResearchTriggered: 0,
+  };
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly powerEnrichmentService: VehiclePowerEnrichmentService,
     private readonly webSearchProvider: WebSearchProvider,
   ) {}
+
+  /**
+   * Returns combined external web search calls across displacement and power services.
+   */
+  get totalExternalWebSearchCalls(): number {
+    return this.metrics.externalWebSearchCalls + (this.powerEnrichmentService?.metrics?.externalWebSearchCalls || 0);
+  }
+
+  /**
+   * Resets internal telemetry counters (useful for isolated tests/audits).
+   */
+  resetMetrics(): void {
+    this.metrics.cacheHitCount = 0;
+    this.metrics.cacheMissCount = 0;
+    this.metrics.researchTriggeredCount = 0;
+    this.metrics.researchDeduplicatedCount = 0;
+    this.metrics.externalWebSearchCalls = 0;
+    this.metrics.externalLLMCalls = 0;
+    this.metrics.externalLLMResearchOperations = 0;
+    this.metrics.researchLocksAcquired = 0;
+    this.metrics.researchLocksContended = 0;
+    this.metrics.researchJobsCreated = 0;
+    this.metrics.reportQuotaConsumed = 0;
+    this.metrics.duplicateResearchTriggered = 0;
+    if (this.powerEnrichmentService && typeof (this.powerEnrichmentService as any).resetMetrics === 'function') {
+      (this.powerEnrichmentService as any).resetMetrics();
+    }
+  }
 
   /**
    * Evaluates displacement candidate against physical limits, badge identity, report narrative, and provenance.
@@ -340,6 +384,33 @@ export class VariantTechnicalFactsService {
     const isComplete = dispStatus === 'VERIFIED' && powerStatus === 'VERIFIED' && displacementCc !== null && powerHp !== null;
     const isCatalogVerified = isComplete;
 
+    if (isComplete) {
+      this.metrics.cacheHitCount++;
+    } else {
+      this.metrics.cacheMissCount++;
+    }
+
+    // If power was verified from authoritative report but powerEnrichment row didn't exist,
+    // durably mirror into VehiclePowerEnrichment side-car for permanent canonical authority.
+    if (!variant.powerEnrichment && powerHp !== null && powerStatus === 'VERIFIED') {
+      this.prisma.vehiclePowerEnrichment.upsert({
+        where: { vehicleVariantId: variantId },
+        create: {
+          vehicleVariantId: variantId,
+          powerHp,
+          verificationStatus: PowerVerificationStatus.VERIFIED,
+          sourceMarket: 'TURKEY',
+          marketResolution: 'TR_PRIMARY',
+          researchedAt: new Date(),
+          verifiedAt: new Date(),
+          identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+        },
+        update: {},
+      }).catch((err) => {
+        this.logger.warn(`Failed to mirror powerEnrichment for ${variantId}: ${err.message}`);
+      });
+    }
+
     return {
       variantId,
       engineDisplacement: {
@@ -378,14 +449,16 @@ export class VariantTechnicalFactsService {
    * Concurrency-safe, distributed deduplicated, and persists results for future callers.
    */
   async enrichVariantTechnicalSpecs(variantId: string, userId?: string): Promise<VariantTechnicalFactsResult> {
-    // 1. Check if already complete
+    // 1. Primary hard invariant short-circuit: Read canonical persisted facts first
     const existing = await this.getVariantTechnicalFacts(variantId);
     if (existing.isComplete) {
+      this.logger.log(`[SHORT_CIRCUIT] Variant ${variantId} technical facts already VERIFIED. Zero external research triggered.`);
       return existing;
     }
 
     // 2. In-memory deduplication for concurrent requests in same process
     if (this.inFlightEnrichments.has(variantId)) {
+      this.metrics.researchDeduplicatedCount++;
       this.logger.log(`[DEDUPE] In-flight enrichment exists for variant ${variantId}, joining existing promise.`);
       return await this.inFlightEnrichments.get(variantId)!;
     }
@@ -398,6 +471,86 @@ export class VariantTechnicalFactsService {
     } finally {
       this.inFlightEnrichments.delete(variantId);
     }
+  }
+
+  private async attemptAcquireDistributedLease(
+    variantId: string,
+    powerNeedsResearch: boolean,
+    dispNeedsResearch: boolean,
+    variantIdentity: any,
+  ): Promise<{ powerAcquired: boolean; dispAcquired: boolean }> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Row lock on VehicleVariant serializes concurrent claims without race condition
+      await tx.$executeRaw`SELECT 1 FROM "VehicleVariant" WHERE "id" = ${variantId} FOR UPDATE`;
+
+      const freshPower = await tx.vehiclePowerEnrichment.findUnique({
+        where: { vehicleVariantId: variantId },
+      });
+      const freshSpec = await tx.technicalSpec.findUnique({
+        where: { variantId },
+      });
+      const freshSpecsObj = (freshSpec?.specs as Record<string, any>) || {};
+
+      let powerAcquired = false;
+      let dispAcquired = false;
+
+      // Check Power lease
+      if (powerNeedsResearch) {
+        const isPowerResearching =
+          freshPower?.verificationStatus === PowerVerificationStatus.RESEARCHING &&
+          freshPower?.researchedAt &&
+          Date.now() - new Date(freshPower.researchedAt).getTime() < DISTRIBUTED_RESEARCH_LEASE_MS;
+
+        if (!isPowerResearching) {
+          powerAcquired = true;
+          await tx.vehiclePowerEnrichment.upsert({
+            where: { vehicleVariantId: variantId },
+            create: {
+              vehicleVariantId: variantId,
+              verificationStatus: PowerVerificationStatus.RESEARCHING,
+              researchedAt: new Date(),
+              identityFingerprint: `${variantIdentity.brand?.name || ''}:${variantIdentity.model?.name || ''}:${variantIdentity.year}`.toLowerCase().replace(/\s+/g, '_'),
+            },
+            update: {
+              verificationStatus: PowerVerificationStatus.RESEARCHING,
+              researchedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      // Check Displacement lease
+      if (dispNeedsResearch) {
+        const isDispResearching =
+          freshSpecsObj.displacementStatus === 'RESEARCHING' &&
+          freshSpecsObj.displacementResearchStartedAt &&
+          Date.now() - new Date(freshSpecsObj.displacementResearchStartedAt).getTime() < DISTRIBUTED_RESEARCH_LEASE_MS;
+
+        if (!isDispResearching) {
+          dispAcquired = true;
+          await tx.technicalSpec.upsert({
+            where: { variantId },
+            create: {
+              variantId,
+              specs: {
+                ...freshSpecsObj,
+                displacementStatus: 'RESEARCHING',
+                displacementResearchStartedAt: new Date().toISOString(),
+              },
+            },
+            update: {
+              specs: {
+                ...freshSpecsObj,
+                displacementStatus: 'RESEARCHING',
+                displacementResearchStartedAt: new Date().toISOString(),
+              },
+            },
+          });
+        }
+      }
+
+      return { powerAcquired, dispAcquired };
+    });
   }
 
   private async executeTargetedEnrichment(
@@ -422,98 +575,173 @@ export class VariantTechnicalFactsService {
       throw new NotFoundException(`VehicleVariant ${variantId} not found`);
     }
 
-    // Distributed Deduplication via DB state:
-    // If another backend node marked RESEARCHING within last 90s, wait briefly and check
-    if (
-      variant.powerEnrichment?.verificationStatus === PowerVerificationStatus.RESEARCHING &&
-      variant.powerEnrichment?.researchedAt &&
-      Date.now() - new Date(variant.powerEnrichment.researchedAt).getTime() < 90000
-    ) {
-      this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} is currently being researched by another worker. Waiting 3s...`);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      return await this.getVariantTechnicalFacts(variantId);
-    }
-
     let finalHp = currentFacts.enginePowerHp;
     let finalCc = currentFacts.engineDisplacementCc;
     let powerSource = currentFacts.sources.power;
     let displacementSource = currentFacts.sources.displacement;
 
-    // STEP A: Resolve Power if missing OR in conflict
+    // Determine field-level research requirements
     const powerNeedsResearch =
       currentFacts.enginePower.status === 'MISSING' ||
       currentFacts.enginePower.status === 'CONFLICT' ||
       finalHp === null;
 
-    if (powerNeedsResearch) {
-      this.logger.log(`[TARGETED_RESEARCH] Researching power for variant ${variantId} (current status: ${currentFacts.enginePower.status})`);
-      try {
-        const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
-        if (powerEnrichment && powerEnrichment.powerHp) {
-          const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
-          if (pGate.status === 'VERIFIED') {
-            finalHp = pGate.validHp;
-            powerSource = 'RESEARCH_POWER_ENRICHMENT';
-          }
-        }
-      } catch (err: any) {
-        this.logger.error(`Failed to research power for variant ${variantId}: ${err.message}`);
-      }
-    }
-
-    // STEP B: Resolve Displacement if missing OR in conflict
     const dispNeedsResearch =
       currentFacts.engineDisplacement.status === 'MISSING' ||
       currentFacts.engineDisplacement.status === 'CONFLICT' ||
       finalCc === null;
 
-    if (dispNeedsResearch) {
-      this.logger.log(`[TARGETED_RESEARCH] Researching displacement for variant ${variantId} (current status: ${currentFacts.engineDisplacement.status})`);
-      try {
-        const researchedCc = await this.researchVariantDisplacement(variant);
-        if (researchedCc && researchedCc.displacementCc) {
-          // Validate researched cc through consistency gate
-          const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
-          if (dGate.status === 'VERIFIED' && dGate.validCc) {
-            finalCc = dGate.validCc;
-            displacementSource = researchedCc.source;
+    // Atomically claim distributed research lease via serializing PostgreSQL row transaction
+    const leaseClaim = await this.attemptAcquireDistributedLease(
+      variantId,
+      powerNeedsResearch,
+      dispNeedsResearch,
+      variant,
+    );
 
-            // Persist verified displacement into TechnicalSpec
-            const existingSpecs = (variant.specs?.specs as Record<string, any>) || {};
-            await this.prisma.technicalSpec.upsert({
-              where: { variantId },
-              create: {
-                variantId,
-                specs: {
-                  ...existingSpecs,
-                  engineDisplacementCc: finalCc,
-                  isVerified: true,
-                  verifiedAt: new Date().toISOString(),
-                  displacementSource,
-                  displacementEvidence: (researchedCc as any).evidence || null,
-                },
-              },
-              update: {
-                specs: {
-                  ...existingSpecs,
-                  engineDisplacementCc: finalCc,
-                  isVerified: true,
-                  verifiedAt: new Date().toISOString(),
-                  displacementSource,
-                  displacementEvidence: (researchedCc as any).evidence || null,
-                },
-              },
-            });
-
-            // Note: Per invariant silentHistoricalReportMutation = FALSE,
-            // we do NOT rewrite historical GeneratedVehicleReport snapshots.
-            // Canonical VariantTechnicalFactsService serves as the single source of truth.
-          } else {
-            this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
+    // STEP A: Resolve Power if missing OR in conflict
+    if (powerNeedsResearch) {
+      if (!leaseClaim.powerAcquired) {
+        this.metrics.researchLocksContended++;
+        this.metrics.researchDeduplicatedCount++;
+        this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} power is currently being researched by another worker. Waiting up to 25s...`);
+        let waitElapsed = 0;
+        while (waitElapsed < 45000) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          waitElapsed += 1000;
+          const rechecked = await this.getVariantTechnicalFacts(variantId);
+          if (rechecked.enginePower.status === 'VERIFIED') {
+            finalHp = rechecked.enginePowerHp;
+            powerSource = rechecked.sources.power;
+            break;
           }
         }
-      } catch (err: any) {
-        this.logger.error(`Failed to research displacement for variant ${variantId}: ${err.message}`);
+      } else {
+        this.metrics.researchLocksAcquired++;
+        this.metrics.researchTriggeredCount++;
+        this.logger.log(`[TARGETED_RESEARCH] Researching power for variant ${variantId} (current status: ${currentFacts.enginePower.status})`);
+
+        try {
+          const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
+          if (powerEnrichment && powerEnrichment.powerHp) {
+            const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
+            if (pGate.status === 'VERIFIED') {
+              finalHp = pGate.validHp;
+              powerSource = 'RESEARCH_POWER_ENRICHMENT';
+            }
+          }
+        } catch (err: any) {
+          this.logger.error(`Failed to research power for variant ${variantId}: ${err.message}`);
+        }
+      }
+    }
+
+    // STEP B: Resolve Displacement if missing OR in conflict
+    if (dispNeedsResearch) {
+      if (!leaseClaim.dispAcquired) {
+        this.metrics.researchLocksContended++;
+        this.metrics.researchDeduplicatedCount++;
+        this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} displacement is currently being researched by another worker. Waiting up to 45s...`);
+        let waitElapsed = 0;
+        while (waitElapsed < 45000) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          waitElapsed += 1000;
+          const rechecked = await this.getVariantTechnicalFacts(variantId);
+          if (rechecked.engineDisplacement.status === 'VERIFIED') {
+            finalCc = rechecked.engineDisplacementCc;
+            displacementSource = rechecked.sources.displacement;
+            break;
+          }
+        }
+      } else {
+        this.metrics.researchLocksAcquired++;
+        this.metrics.researchTriggeredCount++;
+        this.logger.log(`[TARGETED_RESEARCH] Researching displacement for variant ${variantId} (current status: ${currentFacts.engineDisplacement.status})`);
+
+        // Renew lease timestamp for displacement execution phase
+        const freshSpec = await this.prisma.technicalSpec.findUnique({
+          where: { variantId },
+        });
+        const freshSpecsObj = (freshSpec?.specs as Record<string, any>) || {};
+
+        await this.prisma.technicalSpec.upsert({
+          where: { variantId },
+          create: {
+            variantId,
+            specs: {
+              ...freshSpecsObj,
+              displacementStatus: 'RESEARCHING',
+              displacementResearchStartedAt: new Date().toISOString(),
+            },
+          },
+          update: {
+            specs: {
+              ...freshSpecsObj,
+              displacementStatus: 'RESEARCHING',
+              displacementResearchStartedAt: new Date().toISOString(),
+            },
+          },
+        });
+
+        try {
+          const researchedCc = await this.researchVariantDisplacement(variant);
+          if (researchedCc && researchedCc.displacementCc) {
+            // Validate researched cc through consistency gate
+            const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
+            if (dGate.status === 'VERIFIED' && dGate.validCc) {
+              finalCc = dGate.validCc;
+              displacementSource = researchedCc.source;
+
+              // Persist verified displacement into TechnicalSpec
+              await this.prisma.technicalSpec.upsert({
+                where: { variantId },
+                create: {
+                  variantId,
+                  specs: {
+                    ...freshSpecsObj,
+                    engineDisplacementCc: finalCc,
+                    isVerified: true,
+                    verifiedAt: new Date().toISOString(),
+                    displacementSource,
+                    displacementEvidence: (researchedCc as any).evidence || null,
+                    displacementStatus: 'VERIFIED',
+                  },
+                },
+                update: {
+                  specs: {
+                    ...freshSpecsObj,
+                    engineDisplacementCc: finalCc,
+                    isVerified: true,
+                    verifiedAt: new Date().toISOString(),
+                    displacementSource,
+                    displacementEvidence: (researchedCc as any).evidence || null,
+                    displacementStatus: 'VERIFIED',
+                  },
+                },
+              });
+            } else {
+              this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
+              await this.prisma.technicalSpec.upsert({
+                where: { variantId },
+                create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+                update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+              });
+            }
+          } else {
+            await this.prisma.technicalSpec.upsert({
+              where: { variantId },
+              create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
+              update: { specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
+            });
+          }
+        } catch (err: any) {
+          this.logger.error(`Failed to research displacement for variant ${variantId}: ${err.message}`);
+          await this.prisma.technicalSpec.upsert({
+            where: { variantId },
+            create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+            update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+          });
+        }
       }
     }
 
@@ -546,6 +774,7 @@ export class VariantTechnicalFactsService {
     const query = `${brandName} ${modelName} ${generationName ? generationName + ' ' : ''}${year} ${engineCode} ${trimName} silindir hacmi motor hacmi cc teknik özellikleri`.trim();
     this.logger.log(`[DISPLACEMENT_SEARCH] Query: "${query}" (Full Identity: "${identityParts}")`);
 
+    this.metrics.externalWebSearchCalls++;
     const searchResults = await this.webSearchProvider.search(query, 'tr', 'tr');
     if (!searchResults || searchResults.length === 0) {
       return null;
@@ -595,6 +824,7 @@ export class VariantTechnicalFactsService {
     vehicleIdentity: string,
     evidenceText: string,
   ): Promise<{ displacementCc?: number; sourceUrl?: string; evidence?: string } | null> {
+    this.metrics.externalLLMResearchOperations++;
     const openaiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
 
@@ -616,6 +846,7 @@ CRITICAL RULES:
 
     if (openaiKey) {
       try {
+        this.metrics.externalLLMCalls++;
         const openai = new OpenAI({ apiKey: openaiKey });
         const response = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
@@ -651,6 +882,7 @@ CRITICAL RULES:
 
     if (geminiKey) {
       try {
+        this.metrics.externalLLMCalls++;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const res = await fetch(url, {
           method: 'POST',
