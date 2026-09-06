@@ -506,9 +506,9 @@ export default function ListingDetailScreen() {
           </View>
 
           <Text style={styles.breadcrumbText} numberOfLines={1}>
-            Vasıta &gt; Otomobil &gt; {brandName || 'BMW'} &gt; {modelFamilyName || '3 Serisi'}
-            {engineName ? ` &gt; ${engineName}` : ''}
-            {trimName ? ` &gt; ${trimName}` : ''}
+            {['Vasıta', 'Otomobil', brandName, modelFamilyName, engineName, trimName]
+              .filter(Boolean)
+              .join(' > ')}
           </Text>
 
           <Text style={styles.locationSubText}>
