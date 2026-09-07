@@ -191,6 +191,8 @@ export default function CreateListing() {
   const [displacementVerified, setDisplacementVerified] = useState(false);
   const [powerVerified, setPowerVerified] = useState(false);
   const [techSpecsConflict, setTechSpecsConflict] = useState(false);
+  const [candidatePowers, setCandidatePowers] = useState<number[]>([]);
+  const [selectedCandidateHp, setSelectedCandidateHp] = useState<number | null>(null);
   const activeVariantEnrichmentRef = useRef<string>("");
   const lastPrefetchedVariantIdRef = useRef<string>("");
 
@@ -534,6 +536,9 @@ export default function CreateListing() {
         setDrivetrain(specs.drivetrain);
       }
 
+      const initialCandidates = specs?.candidatePowers && specs.candidatePowers.length > 1 ? specs.candidatePowers : [];
+      setCandidatePowers(initialCandidates);
+
       // Check initial field-level status from Consistency Gate
       const initDispStatus = specs?.engineDisplacement?.status || (specs?.engineDisplacement?.verified ? "VERIFIED" : "MISSING");
       const initPwrStatus = specs?.enginePower?.status || (specs?.enginePower?.verified ? "VERIFIED" : "MISSING");
@@ -550,6 +555,9 @@ export default function CreateListing() {
       if (initPwrStatus === "VERIFIED" && specs?.enginePower?.valueHp) {
         setEnginePower(String(specs.enginePower.valueHp));
         setPowerVerified(true);
+      } else if (initialCandidates.length > 1 && selectedCandidateHp && initialCandidates.includes(selectedCandidateHp)) {
+        setEnginePower(String(selectedCandidateHp));
+        setPowerVerified(true);
       } else {
         setEnginePower("");
         setPowerVerified(false);
@@ -557,7 +565,7 @@ export default function CreateListing() {
 
       // 2. If displacement or power is MISSING or CONFLICT, trigger controlled authenticated enrichment
       const needsDisplacement = initDispStatus !== "VERIFIED";
-      const needsPower = initPwrStatus !== "VERIFIED";
+      const needsPower = initPwrStatus !== "VERIFIED" && initialCandidates.length <= 1;
 
       const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") : "") || "";
       if ((needsDisplacement || needsPower) && authToken) {
@@ -583,11 +591,14 @@ export default function CreateListing() {
         setDrivetrain(specs.drivetrain);
       }
 
+      const finalCandidates = specs?.candidatePowers && specs.candidatePowers.length > 1 ? specs.candidatePowers : initialCandidates;
+      setCandidatePowers(finalCandidates);
+
       const finalDispStatus = specs?.engineDisplacement?.status || (specs?.engineDisplacement?.verified ? "VERIFIED" : "MISSING");
       const finalPwrStatus = specs?.enginePower?.status || (specs?.enginePower?.verified ? "VERIFIED" : "MISSING");
 
       const isDispVerified = finalDispStatus === "VERIFIED" && typeof specs?.engineDisplacement?.valueCc === "number";
-      const isPwrVerified = finalPwrStatus === "VERIFIED" && typeof specs?.enginePower?.valueHp === "number";
+      let isPwrVerified = finalPwrStatus === "VERIFIED" && typeof specs?.enginePower?.valueHp === "number";
 
       if (isDispVerified && specs?.engineDisplacement?.valueCc) {
         setEngineDisplacement(String(specs.engineDisplacement.valueCc));
@@ -600,6 +611,10 @@ export default function CreateListing() {
       if (isPwrVerified && specs?.enginePower?.valueHp) {
         setEnginePower(String(specs.enginePower.valueHp));
         setPowerVerified(true);
+      } else if (finalCandidates.length > 1 && selectedCandidateHp && finalCandidates.includes(selectedCandidateHp)) {
+        setEnginePower(String(selectedCandidateHp));
+        setPowerVerified(true);
+        isPwrVerified = true;
       } else {
         setEnginePower("");
         setPowerVerified(false);
@@ -607,7 +622,7 @@ export default function CreateListing() {
 
       const allVerified = isDispVerified && isPwrVerified;
       setTechSpecsVerified(allVerified);
-      setTechSpecsConflict(finalDispStatus === "CONFLICT" || finalPwrStatus === "CONFLICT");
+      setTechSpecsConflict((finalDispStatus === "CONFLICT" || finalPwrStatus === "CONFLICT") && finalCandidates.length <= 1);
     } catch (err) {
       console.error("Technical specs resolution error:", err);
       if (activeVariantEnrichmentRef.current === variantId) {
@@ -1498,6 +1513,14 @@ export default function CreateListing() {
                       <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
                         Doğrulanıyor... ⏳
                       </span>
+                    ) : candidatePowers.length > 1 && powerVerified && enginePower ? (
+                      <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                        ✓ Fabrika Seçimi ({enginePower} HP)
+                      </span>
+                    ) : candidatePowers.length > 1 && !powerVerified ? (
+                      <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse">
+                        ⚡ Seçim Bekleniyor
+                      </span>
                     ) : powerVerified && enginePower ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
@@ -1514,13 +1537,44 @@ export default function CreateListing() {
                   value={powerVerified ? enginePower : ""}
                   onChange={(e) => setEnginePower(e.target.value)}
                   readOnly={!useCustomVariant && !!selectedVariant && powerVerified}
-                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : "Doğrulanamadı") : "Örn: 150"}
+                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : candidatePowers.length > 1 ? "Aşağıdan seçiniz" : "Doğrulanamadı") : "Örn: 150"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
                     !useCustomVariant && selectedVariant && powerVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
+                      : candidatePowers.length > 1 && !powerVerified
+                      ? "bg-slate-900/80 border-amber-500/40 text-amber-200"
                       : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
                   }`}
                 />
+                {candidatePowers.length > 1 && (
+                  <div className="flex flex-col gap-1 p-2 rounded-xl bg-orange-500/10 border border-orange-500/25">
+                    <span className="text-[9px] font-bold text-orange-300">
+                      ⚡ Fabrika Güç Seçenekleri (Ruhsatınıza göre seçin):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {candidatePowers.map((hp) => (
+                        <button
+                          key={hp}
+                          type="button"
+                          onClick={() => {
+                            setEnginePower(String(hp));
+                            setSelectedCandidateHp(hp);
+                            setPowerVerified(true);
+                            setTechSpecsConflict(false);
+                          }}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer border flex items-center gap-1 ${
+                            enginePower === String(hp)
+                              ? "bg-orange-500 text-white border-orange-400 shadow-sm"
+                              : "bg-slate-900/90 hover:bg-slate-800 text-orange-200 border-orange-500/30 hover:border-orange-400"
+                          }`}
+                        >
+                          <span>{hp} HP</span>
+                          {enginePower === String(hp) && <span>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
@@ -1617,6 +1671,15 @@ export default function CreateListing() {
                   <span>⏳</span>
                   <span>Motor teknik bilgileri doğrulanıyor...</span>
                 </p>
+              ) : candidatePowers.length > 1 && !powerVerified ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-amber-200">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <span className="text-base">⚡</span>
+                    <span>
+                      Bu motor için fabrika çıkışı birden fazla güç seçeneği ({candidatePowers.join(", ")} HP) bulunmaktadır. Lütfen ruhsatınızdaki beygir gücünü yukarıdaki seçeneklerden tıklayınız.
+                    </span>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300">
                   <div className="flex items-center gap-2 text-xs font-medium">

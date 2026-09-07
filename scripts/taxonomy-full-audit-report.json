@@ -1,0 +1,2487 @@
+{
+  "generatedAt": "2026-09-07T23:17:51.430Z",
+  "totalVariantsTested": 575324,
+  "nullDimensionSummary": {
+    "total": 575324,
+    "missing_body": 0,
+    "missing_engine": 0,
+    "missing_trim": 0,
+    "missing_transmission": 0
+  },
+  "duplicateBrands": [
+    {
+      "key": "gaz",
+      "entries": [
+        {
+          "id": "4b59796e-2a08-4cec-93a2-5406de416759",
+          "name": "GAZ",
+          "count": 0
+        },
+        {
+          "id": "6fed3ed8-8c98-4b56-a85f-6f6ff7903993",
+          "name": "Gaz",
+          "count": 98
+        }
+      ]
+    },
+    {
+      "key": "mg",
+      "entries": [
+        {
+          "id": "84213df0-33b7-4d9e-89c1-9db0c2d77792",
+          "name": "MG",
+          "count": 0
+        },
+        {
+          "id": "e19d8d1d-df06-4183-a964-a1361d8478fc",
+          "name": "Mg",
+          "count": 376
+        }
+      ]
+    },
+    {
+      "key": "mercedesbenz",
+      "entries": [
+        {
+          "id": "f0cab014-f2d2-46e6-bbec-08f037adce6f",
+          "name": "Mercedes - Benz",
+          "count": 8486
+        },
+        {
+          "id": "36d68686-66ba-4a9c-91e9-39092f85d55d",
+          "name": "Mercedes-Benz",
+          "count": 21285
+        }
+      ]
+    },
+    {
+      "key": "rks",
+      "entries": [
+        {
+          "id": "d936630f-b920-4e5e-8cb3-5e3e62ea88df",
+          "name": "RKS",
+          "count": 0
+        },
+        {
+          "id": "23afb94a-94ee-406f-92bb-eca69a28392c",
+          "name": "Rks",
+          "count": 60
+        }
+      ]
+    },
+    {
+      "key": "togg",
+      "entries": [
+        {
+          "id": "270e16cf-e55f-4a30-b2b5-82fc66ca3cda",
+          "name": "TOGG",
+          "count": 24
+        },
+        {
+          "id": "b61bc419-0a07-4db4-b008-8110843e3e55",
+          "name": "Togg",
+          "count": 105
+        }
+      ]
+    }
+  ],
+  "majorModelAudits": [
+    {
+      "brand": "Renault",
+      "model": "Megane",
+      "totalVariants": 9326,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "CONVERTIBLE",
+        "WAGON",
+        "COUPE",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "SEDAN kasa tipi şu yıllarda eksik: 2013, 2014, 2015, 2021, 2022, 2023, 2024, 2025, 2026"
+      ]
+    },
+    {
+      "brand": "Renault",
+      "model": "Clio",
+      "totalVariants": 6252,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "HATCHBACK",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Renault",
+      "model": "Symbol",
+      "totalVariants": 1569,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Renault",
+      "model": "Fluence",
+      "totalVariants": 1435,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Renault",
+      "model": "Taliant",
+      "totalVariants": 84,
+      "years": [
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Fiat",
+      "model": "Egea",
+      "totalVariants": 2295,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN",
+        "HATCHBACK",
+        "SUV"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Fiat",
+      "model": "Linea",
+      "totalVariants": 1746,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Fiat",
+      "model": "Punto",
+      "totalVariants": 3635,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "COUPE",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Fiat",
+      "model": "Fiorino",
+      "totalVariants": 0,
+      "years": [],
+      "bodyTypes": [],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Fiat",
+      "model": "Doblo",
+      "totalVariants": 0,
+      "years": [],
+      "bodyTypes": [],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Passat",
+      "totalVariants": 4191,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Golf",
+      "totalVariants": 7113,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "WAGON",
+        "CONVERTIBLE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Polo",
+      "totalVariants": 1812,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "SEDAN",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Jetta",
+      "totalVariants": 419,
+      "years": [
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "T-Roc",
+      "totalVariants": 0,
+      "years": [],
+      "bodyTypes": [],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Taigo",
+      "totalVariants": 65,
+      "years": [
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Kasa tipi hatalı: Taigo veritabanında SEDAN kayıtlı, gerçekte SUV"
+      ]
+    },
+    {
+      "brand": "Volkswagen",
+      "model": "Tiguan",
+      "totalVariants": 924,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SUV"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Ford",
+      "model": "Focus",
+      "totalVariants": 5983,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "CONVERTIBLE",
+        "COUPE",
+        "WAGON",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Ford",
+      "model": "Fiesta",
+      "totalVariants": 4111,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "COUPE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Ford",
+      "model": "Mondeo",
+      "totalVariants": 1663,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "WAGON",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Ford",
+      "model": "Kuga",
+      "totalVariants": 318,
+      "years": [
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Toyota",
+      "model": "Corolla",
+      "totalVariants": 7043,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "VAN",
+        "SEDAN",
+        "MINIVAN",
+        "HATCHBACK",
+        "WAGON",
+        "SUV"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Toyota",
+      "model": "Yaris",
+      "totalVariants": 4247,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SUV",
+        "HATCHBACK",
+        "MINIVAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Toyota",
+      "model": "Auris",
+      "totalVariants": 992,
+      "years": [
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "VAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Honda",
+      "model": "Civic",
+      "totalVariants": 5663,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "SEDAN",
+        "COUPE",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Honda",
+      "model": "City",
+      "totalVariants": 174,
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Hyundai",
+      "model": "i20",
+      "totalVariants": 1230,
+      "years": [
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "COUPE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Hyundai",
+      "model": "Elantra",
+      "totalVariants": 3177,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Hyundai",
+      "model": "Accent",
+      "totalVariants": 4115,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Hyundai",
+      "model": "Tucson",
+      "totalVariants": 2021,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SUV"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Peugeot",
+      "model": "208",
+      "totalVariants": 1796,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "COUPE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Peugeot",
+      "model": "308",
+      "totalVariants": 3712,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "HATCHBACK",
+        "COUPE",
+        "CONVERTIBLE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Peugeot",
+      "model": "301",
+      "totalVariants": 381,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Peugeot",
+      "model": "508",
+      "totalVariants": 1514,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Peugeot",
+      "model": "3008",
+      "totalVariants": 2784,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SUV",
+        "COUPE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Opel",
+      "model": "Astra",
+      "totalVariants": 8737,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN",
+        "HATCHBACK",
+        "COUPE",
+        "VAN",
+        "CONVERTIBLE",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Opel",
+      "model": "Corsa",
+      "totalVariants": 4957,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "VAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Opel",
+      "model": "Insignia",
+      "totalVariants": 5213,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "BMW",
+      "model": "1 Serisi",
+      "totalVariants": 3187,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "COUPE",
+        "CONVERTIBLE",
+        "VAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "BMW",
+      "model": "2 Serisi",
+      "totalVariants": 4333,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "HATCHBACK",
+        "CONVERTIBLE",
+        "COUPE",
+        "MINIVAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "BMW",
+      "model": "3 Serisi",
+      "totalVariants": 10524,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "VAN",
+        "COUPE",
+        "HATCHBACK",
+        "SEDAN",
+        "CONVERTIBLE",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "BMW",
+      "model": "4 Serisi",
+      "totalVariants": 3773,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "COUPE",
+        "CONVERTIBLE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Eksik kasa: Gran Coupe (4 Kapı / Fastback) kasası eksik (yalnızca Coupe ve Cabrio var)"
+      ]
+    },
+    {
+      "brand": "BMW",
+      "model": "5 Serisi",
+      "totalVariants": 7007,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "SEDAN",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "model": "C Serisi",
+      "totalVariants": 2625,
+      "years": [
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Eksik kasalar: Coupe, Cabrio veya Station Wagon (Estate) ana model altında bulunmuyor (yalnızca SEDAN var)"
+      ]
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "model": "E Serisi",
+      "totalVariants": 3028,
+      "years": [
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Eksik kasalar: Coupe, Cabrio veya Station Wagon (Estate) ana model altında bulunmuyor (yalnızca SEDAN var)"
+      ]
+    },
+    {
+      "brand": "Mercedes-Benz",
+      "model": "CLA",
+      "totalVariants": 774,
+      "years": [
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Audi",
+      "model": "A3",
+      "totalVariants": 5814,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "CONVERTIBLE",
+        "VAN",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Audi",
+      "model": "A4",
+      "totalVariants": 10401,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN",
+        "CONVERTIBLE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Audi",
+      "model": "A5",
+      "totalVariants": 6555,
+      "years": [
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "CONVERTIBLE",
+        "SEDAN",
+        "COUPE",
+        "HATCHBACK",
+        "VAN",
+        "WAGON"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Audi",
+      "model": "A6",
+      "totalVariants": 7411,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Skoda",
+      "model": "Octavia",
+      "totalVariants": 6078,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "HATCHBACK",
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Skoda",
+      "model": "Superb",
+      "totalVariants": 2197,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "WAGON",
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Seat",
+      "model": "Leon",
+      "totalVariants": 3395,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK",
+        "WAGON",
+        "COUPE"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Seat",
+      "model": "Ibiza",
+      "totalVariants": 4702,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "COUPE",
+        "WAGON",
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Cupra",
+      "model": "Formentor",
+      "totalVariants": 82,
+      "years": [
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SEDAN"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Kasa tipi hatalı: Formentor veritabanında SEDAN olarak kayıtlı, gerçekte SUV/Crossover"
+      ]
+    },
+    {
+      "brand": "Cupra",
+      "model": "Leon",
+      "totalVariants": 75,
+      "years": [
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": [
+        "Eksik kasa: Sportstourer (Station Wagon) kasası eksik"
+      ]
+    },
+    {
+      "brand": "Dacia",
+      "model": "Duster",
+      "totalVariants": 1272,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "SUV"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    },
+    {
+      "brand": "Dacia",
+      "model": "Sandero",
+      "totalVariants": 1366,
+      "years": [
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "bodyTypes": [
+        "HATCHBACK"
+      ],
+      "missingDimensions": {
+        "missingBodyType": 0,
+        "missingEngine": 0,
+        "missingTrim": 0,
+        "missingTransmission": 0
+      },
+      "gaps": []
+    }
+  ]
+}

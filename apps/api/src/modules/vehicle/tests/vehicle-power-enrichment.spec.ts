@@ -7,6 +7,7 @@ import {
   PowerSourceMarket,
   PowerMarketResolution,
   convertPowerUnits,
+  TechnicalSourceTier,
 } from '@used-car-intelligence/shared';
 
 describe('VehiclePowerEnrichmentService (Data Safety & Scoped Side-Car System)', () => {
@@ -149,5 +150,20 @@ describe('VehiclePowerEnrichmentService (Data Safety & Scoped Side-Car System)',
 
     expect(report.variantIntegrityPreserved).toBe(true);
     expect(report.sampleVariantRowCounts.before).toBe(report.sampleVariantRowCounts.after);
+  });
+
+  it('5. Scenario 2 Candidate Powers: Identifies multiple factory power options (e.g. 150 HP and 190 HP)', () => {
+    const evidences = [
+      { reportedValue: 150, reportedUnit: 'HP', sourceMarket: PowerSourceMarket.TURKEY, sourceTier: TechnicalSourceTier.TIER_3_CATALOG },
+      { reportedValue: 150, reportedUnit: 'PS', sourceMarket: PowerSourceMarket.TURKEY, sourceTier: TechnicalSourceTier.TIER_3_CATALOG },
+      { reportedValue: 190, reportedUnit: 'HP', sourceMarket: PowerSourceMarket.TURKEY, sourceTier: TechnicalSourceTier.TIER_3_CATALOG },
+      { reportedValue: 190, reportedUnit: 'PS', sourceMarket: PowerSourceMarket.TURKEY, sourceTier: TechnicalSourceTier.TIER_3_CATALOG },
+    ];
+
+    const result = (service as any).evaluateEvidences(evidences, PowerSourceMarket.TURKEY, PowerMarketResolution.TR_PRIMARY);
+    expect(result.candidatePowers).toBeDefined();
+    expect(result.candidatePowers).toContain(150);
+    expect(result.candidatePowers).toContain(190);
+    expect(result.candidatePowers.length).toBe(2);
   });
 });

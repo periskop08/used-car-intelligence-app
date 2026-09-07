@@ -275,7 +275,10 @@ export class VehiclePowerEnrichmentService {
 
       if (trEvidences.length > 0) {
         const verifiedResult = this.evaluateEvidences(trEvidences, PowerSourceMarket.TURKEY, PowerMarketResolution.TR_PRIMARY);
-        if (verifiedResult.status === PowerVerificationStatus.VERIFIED) {
+        if (
+          verifiedResult.status === PowerVerificationStatus.VERIFIED ||
+          (verifiedResult.status === PowerVerificationStatus.CONFLICT && verifiedResult.candidatePowers && verifiedResult.candidatePowers.length > 1)
+        ) {
           return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, trEvidences);
         }
       }
@@ -325,7 +328,10 @@ export class VehiclePowerEnrichmentService {
 
       if (euEvidences.length > 0) {
         const verifiedResult = this.evaluateEvidences(euEvidences, PowerSourceMarket.EUROPE, PowerMarketResolution.EU_FALLBACK);
-        if (verifiedResult.status === PowerVerificationStatus.VERIFIED) {
+        if (
+          verifiedResult.status === PowerVerificationStatus.VERIFIED ||
+          (verifiedResult.status === PowerVerificationStatus.CONFLICT && verifiedResult.candidatePowers && verifiedResult.candidatePowers.length > 1)
+        ) {
           return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, euEvidences);
         }
       }
@@ -515,6 +521,7 @@ export class VehiclePowerEnrichmentService {
     confidence: number;
     market: PowerSourceMarket;
     resolution: PowerMarketResolution;
+    candidatePowers?: number[];
   } {
     if (evidences.length === 0) {
       return {
@@ -583,6 +590,14 @@ export class VehiclePowerEnrichmentService {
     clusters.sort((a, b) => b.count - a.count);
     const topCluster = clusters[0];
 
+    // Identify candidate factory powers (distinct clusters separated by > 10 HP with support)
+    const validCandidateClusters = clusters.filter(
+      (c) => c.count >= 2 || (c === topCluster && c.count >= 1),
+    );
+    const candidatePowers = validCandidateClusters
+      .map((c) => c.representativeHp)
+      .sort((a, b) => a - b);
+
     // Genuine conflict check:
     // Conflict only occurs if there is a competing cluster with significant support (>= 2 authoritative sources and >= 40% of top cluster count)
     // that differs by > 15 HP.
@@ -596,11 +611,13 @@ export class VehiclePowerEnrichmentService {
       this.logger.warn(
         `[CONFLICT] Incompatible competing power clusters found across authoritative sources: ${topCluster.representativeHp} HP (${topCluster.count} sources) vs ${runnerUp.representativeHp} HP (${runnerUp.count} sources)`
       );
+      const conflictCandidates = [topCluster.representativeHp, runnerUp.representativeHp].sort((a, b) => a - b);
       return {
         status: PowerVerificationStatus.CONFLICT,
         confidence: 0.3,
         market,
         resolution,
+        candidatePowers: conflictCandidates,
       };
     }
 
@@ -613,6 +630,7 @@ export class VehiclePowerEnrichmentService {
       confidence: Math.min(1.0, 0.7 + topCluster.count * 0.1),
       market,
       resolution,
+      candidatePowers: candidatePowers.length > 1 ? candidatePowers : undefined,
     };
   }
 
@@ -624,7 +642,16 @@ export class VehiclePowerEnrichmentService {
     evalResult: ReturnType<typeof this.evaluateEvidences>,
     evidences: any[],
   ) {
-    const { status, power, confidence, market, resolution } = evalResult;
+    const { status, power, confidence, market, resolution, candidatePowers } = evalResult;
+
+    const existingEnrich = await this.prisma.vehiclePowerEnrichment.findUnique({
+      where: { vehicleVariantId },
+      select: { identitySnapshot: true },
+    });
+    const snapshot = (existingEnrich?.identitySnapshot as Record<string, any>) || {};
+    if (candidatePowers && candidatePowers.length > 1) {
+      snapshot.candidatePowers = candidatePowers;
+    }
 
     const enrichment = await this.prisma.vehiclePowerEnrichment.update({
       where: { vehicleVariantId },
@@ -638,6 +665,7 @@ export class VehiclePowerEnrichmentService {
         powerHp: power?.powerHp ?? null,
         sourceReportedValue: power?.sourceReportedValue ?? null,
         sourceReportedUnit: power?.sourceReportedUnit ?? null,
+        identitySnapshot: Object.keys(snapshot).length > 0 ? snapshot : undefined,
         verifiedAt: new Date(),
       },
     });
@@ -673,7 +701,11 @@ export class VehiclePowerEnrichmentService {
       });
     }
 
-    return await this.getEnrichmentByVariantId(vehicleVariantId);
+    const finalRecord: any = await this.getEnrichmentByVariantId(vehicleVariantId);
+    if (finalRecord && candidatePowers && candidatePowers.length > 1) {
+      finalRecord.candidatePowers = candidatePowers;
+    }
+    return finalRecord;
   }
 
   /**

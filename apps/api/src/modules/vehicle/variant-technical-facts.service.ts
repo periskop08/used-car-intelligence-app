@@ -285,6 +285,7 @@ export interface VariantTechnicalFactsResult {
   enginePower: PowerFactField;
   engineDisplacementCc: number | null;
   enginePowerHp: number | null;
+  candidatePowers?: number[];
   drivetrain: 'FWD' | 'RWD' | 'AWD' | null;
   drivetrainNameTr: string | null;
   isComplete: boolean;
@@ -1031,6 +1032,38 @@ export class VariantTechnicalFactsService {
 
     const dt = resolveCanonicalDrivetrain(variant);
 
+    // Extract candidatePowers if multiple factory output powers are documented or if sibling variants have distinct powers
+    let candidatePowers: number[] | undefined = undefined;
+    const peSnapshot = variant.powerEnrichment?.identitySnapshot as any;
+    if (Array.isArray(peSnapshot?.candidatePowers) && peSnapshot.candidatePowers.length > 1) {
+      candidatePowers = peSnapshot.candidatePowers;
+    } else if (variant.brandId && variant.modelId && variant.engineId && variant.year) {
+      const siblingEnrichments = await this.prisma.vehiclePowerEnrichment.findMany({
+        where: {
+          variant: {
+            brandId: variant.brandId,
+            modelId: variant.modelId,
+            engineId: variant.engineId,
+            year: variant.year,
+          },
+          verificationStatus: PowerVerificationStatus.VERIFIED,
+          powerHp: { not: null },
+        },
+        select: { powerHp: true, powerPs: true },
+      });
+      const distinctPowers = Array.from(
+        new Set(
+          siblingEnrichments
+            .map((se) => (se.powerPs ? Math.round(se.powerPs) : se.powerHp ? Math.round(se.powerHp) : null))
+            .filter((hp): hp is number => typeof hp === 'number' && hp > 0),
+        ),
+      ).sort((a, b) => a - b);
+
+      if (distinctPowers.length > 1) {
+        candidatePowers = distinctPowers;
+      }
+    }
+
     return {
       variantId,
       engineDisplacement: {
@@ -1053,6 +1086,7 @@ export class VariantTechnicalFactsService {
       },
       engineDisplacementCc: dispStatus === 'VERIFIED' ? displacementCc : null,
       enginePowerHp: powerStatus === 'VERIFIED' ? powerHp : null,
+      candidatePowers,
       drivetrain: dt.drivetrain,
       drivetrainNameTr: dt.drivetrainNameTr,
       isComplete,
@@ -1225,6 +1259,7 @@ export class VariantTechnicalFactsService {
     };
     powerCandidate?: {
       valueHp: number | null;
+      candidatePowers?: number[];
       source?: string;
       evidence?: string | null;
       quality?: EvidenceQuality;
@@ -1386,13 +1421,23 @@ export class VariantTechnicalFactsService {
     }
 
     // 2. CANONICAL POWER RECONCILIATION
-    if (powerCandidate && typeof powerCandidate.valueHp === 'number') {
+    if (powerCandidate && (typeof powerCandidate.valueHp === 'number' || (powerCandidate.candidatePowers && powerCandidate.candidatePowers.length > 1))) {
       const isVerifiedEvidence =
         (powerCandidate.quality === 'STRONG' && Boolean(powerCandidate.evidence)) ||
         Boolean(powerCandidate.isExplicitlyVerified);
 
-      const pGate = this.evaluatePowerConsistency(powerCandidate.valueHp, variant, isVerifiedEvidence);
+      const pGate = typeof powerCandidate.valueHp === 'number'
+        ? this.evaluatePowerConsistency(powerCandidate.valueHp, variant, isVerifiedEvidence)
+        : { status: 'CONFLICT' as TechnicalFactStatus, validHp: null };
       powerStatus = pGate.status;
+
+      const currentSnapshot = (variant.powerEnrichment?.identitySnapshot as Record<string, any>) || {};
+      const updatedSnapshot = {
+        ...currentSnapshot,
+        ...(powerCandidate.candidatePowers && powerCandidate.candidatePowers.length > 1
+          ? { candidatePowers: powerCandidate.candidatePowers }
+          : {}),
+      };
 
       if (pGate.status === 'VERIFIED' && pGate.validHp !== null) {
         resolvedHp = pGate.validHp;
@@ -1408,6 +1453,7 @@ export class VariantTechnicalFactsService {
             researchedAt: new Date(),
             verifiedAt: new Date(),
             identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+            identitySnapshot: Object.keys(updatedSnapshot).length > 0 ? updatedSnapshot : undefined,
           },
           update: {
             powerHp: resolvedHp,
@@ -1416,6 +1462,7 @@ export class VariantTechnicalFactsService {
             verifiedAt: new Date(),
             sourceMarket: powerCandidate.market || PowerSourceMarket.TURKEY,
             marketResolution: powerCandidate.marketResolution || PowerMarketResolution.TR_PRIMARY,
+            identitySnapshot: Object.keys(updatedSnapshot).length > 0 ? updatedSnapshot : undefined,
           },
         });
         this.logger.log(`[CANONICAL_RECONCILE] (${trigger}) Power ${resolvedHp} HP VERIFIED and persisted for variant ${variantId}`);
@@ -1428,10 +1475,12 @@ export class VariantTechnicalFactsService {
             researchedAt: new Date(),
             verifiedAt: new Date(),
             identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+            identitySnapshot: Object.keys(updatedSnapshot).length > 0 ? updatedSnapshot : undefined,
           },
           update: {
             verificationStatus: PowerVerificationStatus.CONFLICT,
             verifiedAt: new Date(),
+            identitySnapshot: Object.keys(updatedSnapshot).length > 0 ? updatedSnapshot : undefined,
           },
         });
       }
@@ -1659,12 +1708,13 @@ export class VariantTechnicalFactsService {
 
           try {
             const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
-            if (powerEnrichment && powerEnrichment.powerHp) {
+            if (powerEnrichment && (powerEnrichment.powerHp || (powerEnrichment as any).candidatePowers)) {
               const reconcileRes = await this.reconcileCanonicalTechnicalFacts({
                 variantId,
                 trigger: 'EXPLICIT_ENRICHMENT',
                 powerCandidate: {
                   valueHp: powerEnrichment.powerHp,
+                  candidatePowers: (powerEnrichment as any).candidatePowers,
                   source: powerEnrichment.sourceMarket || 'RESEARCH_POWER_ENRICHMENT',
                   evidence: (powerEnrichment as any).evidenceExcerpt || 'Authoritative web research consensus',
                   quality: powerEnrichment.verificationStatus === PowerVerificationStatus.VERIFIED ? 'STRONG' : 'WEAK',

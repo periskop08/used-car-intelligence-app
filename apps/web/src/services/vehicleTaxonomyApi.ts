@@ -180,6 +180,7 @@ export const vehicleTaxonomyApi = {
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
+    candidatePowers?: number[];
     drivetrain?: 'FWD' | 'RWD' | 'AWD' | null;
     drivetrainNameTr?: string | null;
     isComplete: boolean;
@@ -221,6 +222,7 @@ export const vehicleTaxonomyApi = {
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
+    candidatePowers?: number[];
     drivetrain?: 'FWD' | 'RWD' | 'AWD' | null;
     drivetrainNameTr?: string | null;
     isComplete: boolean;
