@@ -1919,17 +1919,17 @@ export default function CreateListingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: '#f8fafc',
   },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#e2e8f0',
   },
   backBtn: {
     flexDirection: 'row',
@@ -1948,7 +1948,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#0b0f19',
+    backgroundColor: '#f8fafc',
   },
   scrollContent: {
     padding: 16,
