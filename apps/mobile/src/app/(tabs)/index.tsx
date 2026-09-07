@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image as ExpoImage } from 'expo-image';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
+import ShowcaseBadge from '../../components/ShowcaseBadge';
 
 const { width: windowWidth } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -99,6 +100,8 @@ interface ShowcaseItem {
   mileage: number;
   city: string;
   isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
+  isAiReady?: boolean;
   imageUrl: string;
   brandName: string;
   modelName: string;
@@ -479,7 +482,8 @@ export default function MobileDashboard() {
     role?: string;
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [vitrinListings, setVitrinListings] = useState<ShowcaseItem[]>(DEFAULT_VITRIN_ITEMS);
+  const [vitrinListings, setVitrinListings] = useState<ShowcaseItem[]>([]);
+  const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
   const [loadingListings, setLoadingListings] = useState(false);
 
   // FULL 8-FILTER CASCADING VEHICLE QUERY STATE:
@@ -655,10 +659,11 @@ export default function MobileDashboard() {
     }, [])
   );
 
-  const fetchFeaturedListings = async () => {
+  const fetchFeaturedListings = async (tab: 'vitrin' | 'acil' = promoTab) => {
     setLoadingListings(true);
     try {
-      const res = await fetch(`${API_URL}/listings?limit=6`);
+      const queryParam = tab === 'vitrin' ? 'showcaseOnly=true' : 'urgentOnly=true';
+      const res = await fetch(`${API_URL}/listings?${queryParam}&limit=12`);
       if (res.ok) {
         const data = await res.json();
         const apiItems = Array.isArray(data)
@@ -699,17 +704,24 @@ export default function MobileDashboard() {
               year: yearVal,
               mileage: kmVal,
               city: item.city ? item.city.trim() : 'İstanbul',
-              isUrgent: item.isUrgent || idx === 0,
+              isUrgent: !!item.isUrgent,
+              isShowcaseFeedActive: !!item.isShowcaseFeedActive,
+              isAiReady: !!item.isAiReady,
               imageUrl: imgUrl,
               brandName: brandStr || 'Marka',
               modelName: modelStr || 'Model',
             };
           });
           setVitrinListings(formatted);
+        } else {
+          setVitrinListings([]);
         }
+      } else {
+        setVitrinListings([]);
       }
     } catch (err) {
       console.error('Fetch listings error:', err);
+      setVitrinListings([]);
     } finally {
       setLoadingListings(false);
     }
@@ -1374,71 +1386,171 @@ export default function MobileDashboard() {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* VİTRİN SECTION */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Vitrin</Text>
-          <TouchableOpacity onPress={() => router.push('/listings')}>
-            <Text style={styles.sectionLinkText}>Tümünü Gör</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loadingListings ? (
-          <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 30 }} />
-        ) : (
-          <View style={styles.vitrinGrid}>
-            {vitrinListings.map((item) => {
-              const isFav = !!favorites[item.id];
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.vitrinCard}
-                  activeOpacity={0.9}
-                  onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+        {/* VİTRİN / ACİL PROMOTIONAL SECTION */}
+        <View style={styles.promoSectionContainer}>
+          <View style={styles.promoHeaderRow}>
+            {/* Direct 2-State Segmented Navigation Header */}
+            <View style={styles.promoSegmentWrap}>
+              <TouchableOpacity
+                style={[
+                  styles.promoSegmentBtn,
+                  promoTab === 'vitrin' && styles.promoSegmentBtnVitrinActive,
+                ]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setPromoTab('vitrin');
+                  fetchFeaturedListings('vitrin');
+                }}
+              >
+                <Ionicons
+                  name="star"
+                  size={13}
+                  color={promoTab === 'vitrin' ? '#0f172a' : '#64748b'}
+                />
+                <Text
+                  style={[
+                    styles.promoSegmentText,
+                    promoTab === 'vitrin' && styles.promoSegmentTextVitrinActive,
+                  ]}
                 >
-                  <View style={styles.vitrinImageContainer}>
-                    <ExpoImage
-                      source={{ uri: item.imageUrl }}
-                      style={styles.vitrinCarImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
+                  Vitrin
+                </Text>
+              </TouchableOpacity>
 
-                    {item.isUrgent && (
-                      <View style={{ position: 'absolute', top: 10, left: 10 }}>
-                        <UrgentBadge size="small" />
-                      </View>
-                    )}
+              <TouchableOpacity
+                style={[
+                  styles.promoSegmentBtn,
+                  promoTab === 'acil' && styles.promoSegmentBtnAcilActive,
+                ]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setPromoTab('acil');
+                  fetchFeaturedListings('acil');
+                }}
+              >
+                <Ionicons
+                  name="flame"
+                  size={13}
+                  color={promoTab === 'acil' ? '#ffffff' : '#64748b'}
+                />
+                <Text
+                  style={[
+                    styles.promoSegmentText,
+                    promoTab === 'acil' && styles.promoSegmentTextAcilActive,
+                  ]}
+                >
+                  Acil İlanlar
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-                    <TouchableOpacity
-                      style={styles.favCircleButton}
-                      onPress={() => toggleFavorite(item.id)}
-                    >
-                      <Ionicons
-                        name={isFav ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={isFav ? '#ef4444' : '#ffffff'}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.vitrinCardBody}>
-                    <Text style={styles.vitrinTitle} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-
-                    <Text style={styles.vitrinSpecs}>
-                      {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                    </Text>
-
-                    <Text style={styles.vitrinPrice}>
-                      {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {vitrinListings.length > 0 && (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: '/listings',
+                    params: promoTab === 'vitrin' ? { showcaseOnly: 'true' } : { urgentOnly: 'true' },
+                  })
+                }
+                style={styles.promoAllLink}
+              >
+                <Text style={styles.promoAllLinkText}>
+                  {promoTab === 'vitrin' ? 'Tüm Vitrin İlanları' : 'Tüm Acil İlanlar'}
+                </Text>
+                <Ionicons name="chevron-forward" size={13} color="#ea580c" />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
+
+          <Text style={styles.promoSubDesc}>
+            {promoTab === 'vitrin'
+              ? 'Vitrin görünürlük hakkı aktif olan öne çıkan araç ilanları.'
+              : 'Acil satılık rozeti aktif olan fırsat araç ilanları.'}
+          </Text>
+
+          {loadingListings ? (
+            <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 32 }} />
+          ) : vitrinListings.length > 0 ? (
+            <View style={styles.vitrinGrid}>
+              {vitrinListings.map((item) => {
+                const isFav = !!favorites[item.id];
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.vitrinCard}
+                    activeOpacity={0.9}
+                    onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                  >
+                    <View style={styles.vitrinImageContainer}>
+                      <ExpoImage
+                        source={{ uri: item.imageUrl }}
+                        style={styles.vitrinCarImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+
+                      {/* Floating Badges Overlay (Vitrin & Acil) */}
+                      <View style={styles.vitrinBadgesOverlay}>
+                        {item.isUrgent && <UrgentBadge size="small" />}
+                        {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.favCircleButton}
+                        onPress={() => toggleFavorite(item.id)}
+                      >
+                        <Ionicons
+                          name={isFav ? 'heart' : 'heart-outline'}
+                          size={17}
+                          color={isFav ? '#ef4444' : '#ffffff'}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.vitrinCardBody}>
+                      <Text style={styles.vitrinTitle} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+
+                      <Text style={styles.vitrinSpecs}>
+                        {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                      </Text>
+
+                      <View style={styles.vitrinPriceRow}>
+                        <Text style={styles.vitrinPrice}>
+                          {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                        </Text>
+                        <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyPromoBox}>
+              <Ionicons
+                name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
+                size={34}
+                color="#94a3b8"
+              />
+              <Text style={styles.emptyPromoTitle}>
+                {promoTab === 'vitrin'
+                  ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
+                  : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
+              </Text>
+              <Text style={styles.emptyPromoSub}>
+                Tüm satılık araçları incelemek için İlan Akışı'na göz atabilirsiniz.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyPromoBtn}
+                onPress={() => router.push('/ilan-akisi')}
+              >
+                <Text style={styles.emptyPromoBtnText}>İlan Akışına Git ➔</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       {/* SINGLE UNIFIED MODAL MATCHING REFERENCE UI */}
@@ -2454,6 +2566,86 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  promoSectionContainer: {
+    marginTop: 10,
+    marginBottom: 24,
+  },
+  promoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  promoSegmentWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    padding: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  promoSegmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 9,
+  },
+  promoSegmentBtnVitrinActive: {
+    backgroundColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  promoSegmentBtnAcilActive: {
+    backgroundColor: '#dc2626',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  promoSegmentText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  promoSegmentTextVitrinActive: {
+    color: '#0f172a',
+  },
+  promoSegmentTextAcilActive: {
+    color: '#ffffff',
+  },
+  promoAllLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  promoAllLinkText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  promoSubDesc: {
+    fontSize: 11.5,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  vitrinBadgesOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+    zIndex: 10,
+  },
   vitrinGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2483,20 +2675,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  urgentBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  urgentBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
   favCircleButton: {
     position: 'absolute',
     top: 8,
@@ -2504,9 +2682,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 11,
   },
   vitrinCardBody: {
     padding: 10,
@@ -2524,10 +2703,58 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginBottom: 6,
   },
+  vitrinPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   vitrinPrice: {
     fontSize: 14,
     fontWeight: '900',
     color: '#ea580c',
+  },
+  vitrinCityBadge: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  emptyPromoBox: {
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 4,
+    gap: 6,
+  },
+  emptyPromoTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  emptyPromoSub: {
+    fontSize: 11.5,
+    color: '#64748b',
+    textAlign: 'center',
+    maxWidth: 280,
+    lineHeight: 16,
+  },
+  emptyPromoBtn: {
+    marginTop: 8,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  emptyPromoBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   fullModalContainer: {
     flex: 1,

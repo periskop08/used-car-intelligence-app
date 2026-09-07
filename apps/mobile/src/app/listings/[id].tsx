@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
+import ShowcaseBadge from '../../components/ShowcaseBadge';
 import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
 
 const { width, height } = Dimensions.get('window');
@@ -491,10 +492,11 @@ export default function ListingDetailScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Urgent Badge */}
-          {listing.isUrgent && (
-            <View style={styles.urgentBadgeWrap}>
-              <UrgentBadge size="medium" />
+          {/* Promotional Badges: Urgent & Showcase */}
+          {(listing.isUrgent || listing.isShowcaseFeedActive) && (
+            <View style={styles.promoBadgesWrap}>
+              {listing.isUrgent && <UrgentBadge size="medium" />}
+              {listing.isShowcaseFeedActive && <ShowcaseBadge size="medium" />}
             </View>
           )}
         </View>
@@ -999,10 +1001,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  urgentBadgeWrap: {
+  promoBadgesWrap: {
     position: 'absolute',
     bottom: 12,
     left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 10,
   },
   /* Seller & Breadcrumb Strip */
   sellerBreadcrumbStrip: {
