@@ -13,7 +13,7 @@ import {
   classifySourceTier,
   TechnicalSourceTier,
 } from '@used-car-intelligence/shared';
-import { verifyVehicleApplicationMatch } from './variant-technical-facts.service';
+import { verifyVehicleApplicationMatch, isModelMentionedInText } from './variant-technical-facts.service';
 
 export interface PowerEnrichmentReport {
   totalTested: number;
@@ -395,6 +395,7 @@ export class VehiclePowerEnrichmentService {
 
     const targetModel = (targetVariant?.model?.name || '').toLowerCase().trim();
     const targetBrand = (targetVariant?.brand?.name || targetVariant?.model?.brand?.name || '').toLowerCase().trim();
+    const targetEngine = (targetVariant?.engine?.code || '').toLowerCase().trim();
 
     for (const res of results) {
       const url = String(res.resolvedUrl || res.url || '');
@@ -433,7 +434,7 @@ export class VehiclePowerEnrichmentService {
       const fullTextLower = `${titleLower} ${snippetLower}`;
 
       if (targetModel && targetBrand && fullTextLower.includes(targetBrand)) {
-        if (!fullTextLower.includes(targetModel)) {
+        if (!isModelMentionedInText(fullTextLower, targetModel, targetEngine)) {
           this.logger.log(`[FOREIGN_MODEL_DISCARD] Discarding snippet not mentioning target model "${targetModel}": "${res.title}"`);
           continue;
         }

@@ -137,6 +137,42 @@ export function deriveEvidenceQualityFromSource(
  * sourceTierAutomaticallyImpliesApplicationMatch = FALSE
  * officialDomainButWrongApplicationAccepted = FALSE
  */
+export function isModelMentionedInText(text: string, modelName: string, engineCode?: string): boolean {
+  if (!modelName) return true;
+  const m = modelName.toLowerCase().trim();
+  if (text.includes(m)) return true;
+
+  // Handle "X Serisi" -> "X Series", "Xer", "X-Class" or engineCode presence
+  if (m.includes(' serisi')) {
+    const seriesPrefix = m.replace(/\s*serisi/g, '').trim();
+    if (
+      text.includes(`${seriesPrefix} series`) ||
+      text.includes(`${seriesPrefix}er`) ||
+      text.includes(`${seriesPrefix}-class`) ||
+      text.includes(`${seriesPrefix} serisi`)
+    ) {
+      return true;
+    }
+    // If engineCode (e.g. 320i, 520i, C200, A180) is mentioned in text, it firmly identifies the model
+    if (engineCode) {
+      const eng = engineCode.toLowerCase().trim();
+      if (eng && text.includes(eng)) {
+        return true;
+      }
+    }
+  }
+
+  // Handle "X Class" / "X Sınıfı"
+  if (m.includes(' class') || m.includes(' sınıfı')) {
+    const classPrefix = m.replace(/\s*(class|sınıfı)/g, '').trim();
+    if (text.includes(`${classPrefix} serisi`) || text.includes(`${classPrefix}-class`)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function verifyVehicleApplicationMatch(
   targetVariant: {
     brand?: { name?: string };
@@ -153,10 +189,11 @@ export function verifyVehicleApplicationMatch(
   const brand = (targetVariant.brand?.name || '').toLowerCase().trim();
   const model = (targetVariant.model?.name || '').toLowerCase().trim();
   const trim = (targetVariant.trim?.name || '').toLowerCase().trim();
+  const engineCode = (targetVariant.engine?.code || '').toLowerCase().trim();
 
   // 1. Target brand & model must be respected
   if (brand && model && text.includes(brand)) {
-    if (!text.includes(model)) {
+    if (!isModelMentionedInText(text, model, engineCode)) {
       return { match: false, reason: `Source discusses brand "${brand}" but omits target model "${model}"` };
     }
   }
@@ -1742,12 +1779,15 @@ export class VariantTechnicalFactsService {
 
     const cleanTokens = (str: string) =>
       str
-        .replace(/\b(standart|standard|default)\b/gi, '')
+        .replace(/\b(standart|standard|default|jenerasyonu|jenerasyon|nesil|generation)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
 
     const cleanTrim = cleanTokens(trimName);
-    const cleanGen = cleanTokens(generationName);
+    let cleanGen = cleanTokens(generationName);
+    if (modelName && cleanGen.toLowerCase().includes(modelName.toLowerCase())) {
+      cleanGen = cleanTokens(cleanGen.replace(new RegExp(modelName, 'gi'), ''));
+    }
 
     // ----------------------------------------------------
     // PHASE 1: TURKEY PRIMARY RESEARCH
@@ -1793,7 +1833,7 @@ export class VariantTechnicalFactsService {
     const candidateResults = allResults.filter((res) => {
       const fullText = `${res.title || ''} ${res.snippet || ''}`.toLowerCase();
       if (targetBrand && targetModel && fullText.includes(targetBrand)) {
-        if (!fullText.includes(targetModel)) {
+        if (!isModelMentionedInText(fullText, targetModel, engineCode)) {
           return false;
         }
       }
