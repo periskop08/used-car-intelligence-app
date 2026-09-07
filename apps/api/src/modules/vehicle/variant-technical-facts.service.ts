@@ -713,6 +713,9 @@ export class VariantTechnicalFactsService {
         const hasAcceptedAuthoritativeEvidence = storedVerification.evidence.some((e) => {
           const tier = e.sourceTier || classifySourceTier(e.url || e.domain, variant.brand?.name).tier;
           const hasProvider = e.provider === 'serper' || e.provider === 'gemini_grounding' || e.provider === 'direct_fetch';
+          const hasConclusiveExcerpt = Boolean(
+            (e.evidenceExcerpt || (e as any).retrievedText || '').length > 20
+          );
           const isNotForum = tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM;
           return (
             hasProvider &&
@@ -722,7 +725,8 @@ export class VariantTechnicalFactsService {
             (tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
               tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
               tier === TechnicalSourceTier.TIER_3_CATALOG ||
-              (tier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA && (storedVerification.consensus?.independentDomainCount || 0) >= 2))
+              (tier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA &&
+                ((storedVerification.consensus?.independentDomainCount || 0) >= 2 || hasConclusiveExcerpt)))
           );
         });
 

@@ -459,6 +459,14 @@ export class VehiclePowerEnrichmentService {
         const unitRaw = match[2].toUpperCase();
 
         if (val >= 40 && val <= 1000) {
+          // Physical passenger vehicle plausibility gate:
+          // A stock 1.0L - 1.6L passenger engine cannot produce 230+ HP (that belongs to high-performance 2.0L+ trims like VZ on the same page)
+          const engineDisplacement = targetVariant?.engine?.displacement;
+          const isSmallEngine = engineDisplacement && engineDisplacement <= 1600;
+          if (isSmallEngine && val > 225) {
+            continue; // Discard alien trim mentions like 300 HP or 325 HP
+          }
+
           const unit = unitRaw === 'BG' ? 'PS' : unitRaw;
           evidences.push({
             sourceUrl: url,
@@ -541,14 +549,53 @@ export class VehiclePowerEnrichmentService {
 
     // Determine consensus using authoritative published sources (Tiers 1-4)
     const consensusList = nonForumEvidences;
-    const uniqueHpValues = Array.from(new Set(consensusList.map((c) => c.converted.powerHp)));
 
-    // Check for major conflict (e.g., difference > 15 HP across valid authoritative sources)
-    const minHp = Math.min(...uniqueHpValues);
-    const maxHp = Math.max(...uniqueHpValues);
+    // Cluster power values within a tolerance window of ±4 HP (handling 150 PS = 148 HP)
+    interface PowerCluster {
+      representativeHp: number;
+      minHp: number;
+      maxHp: number;
+      count: number;
+      items: typeof consensusList;
+    }
 
-    if (maxHp - minHp > 15 && uniqueHpValues.length > 1) {
-      this.logger.warn(`[CONFLICT] Incompatible power values found across authoritative sources: ${uniqueHpValues.join(', ')} HP`);
+    const clusters: PowerCluster[] = [];
+    for (const item of consensusList) {
+      const hp = item.converted.powerHp;
+      const existingCluster = clusters.find((c) => Math.abs(c.representativeHp - hp) <= 4);
+      if (existingCluster) {
+        existingCluster.count++;
+        existingCluster.items.push(item);
+        existingCluster.minHp = Math.min(existingCluster.minHp, hp);
+        existingCluster.maxHp = Math.max(existingCluster.maxHp, hp);
+      } else {
+        clusters.push({
+          representativeHp: hp,
+          minHp: hp,
+          maxHp: hp,
+          count: 1,
+          items: [item],
+        });
+      }
+    }
+
+    // Sort clusters by evidence count descending
+    clusters.sort((a, b) => b.count - a.count);
+    const topCluster = clusters[0];
+
+    // Genuine conflict check:
+    // Conflict only occurs if there is a competing cluster with significant support (>= 2 authoritative sources and >= 40% of top cluster count)
+    // that differs by > 15 HP.
+    const runnerUp = clusters[1];
+    if (
+      runnerUp &&
+      runnerUp.count >= 2 &&
+      runnerUp.count >= topCluster.count * 0.4 &&
+      Math.abs(topCluster.representativeHp - runnerUp.representativeHp) > 15
+    ) {
+      this.logger.warn(
+        `[CONFLICT] Incompatible competing power clusters found across authoritative sources: ${topCluster.representativeHp} HP (${topCluster.count} sources) vs ${runnerUp.representativeHp} HP (${runnerUp.count} sources)`
+      );
       return {
         status: PowerVerificationStatus.CONFLICT,
         confidence: 0.3,
@@ -557,28 +604,13 @@ export class VehiclePowerEnrichmentService {
       };
     }
 
-    // Consensus power (use most frequent HP value among authoritative sources)
-    const hpCounts = new Map<number, number>();
-    for (const item of consensusList) {
-      const hp = item.converted.powerHp;
-      hpCounts.set(hp, (hpCounts.get(hp) || 0) + 1);
-    }
-
-    let topHp = uniqueHpValues[0];
-    let maxCount = 0;
-    for (const [hp, count] of hpCounts.entries()) {
-      if (count > maxCount) {
-        maxCount = count;
-        topHp = hp;
-      }
-    }
-
-    const topItem = consensusList.find((c) => c.converted.powerHp === topHp)!;
+    // Top cluster is verified consensus!
+    const topItem = topCluster.items.sort((a, b) => (a.tier || 4) - (b.tier || 4))[0];
 
     return {
       status: PowerVerificationStatus.VERIFIED,
       power: topItem.converted,
-      confidence: Math.min(1.0, 0.7 + maxCount * 0.1),
+      confidence: Math.min(1.0, 0.7 + topCluster.count * 0.1),
       market,
       resolution,
     };
