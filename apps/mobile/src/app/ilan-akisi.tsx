@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
+import UrgentBadge from '../components/UrgentBadge';
+import ShowcaseBadge from '../components/ShowcaseBadge';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -171,6 +173,8 @@ interface ListingFeedItem {
   technicalSummary: TechnicalSummary;
   breadcrumb: string[];
   isFavorite: boolean;
+  isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
   detailUrl: string;
 }
 
@@ -446,6 +450,14 @@ export default function ListingFeedScreen() {
                 contentFit="cover"
                 cachePolicy="memory-disk"
               />
+              {/* Promotional Badges: Urgent & Showcase */}
+              {(item.isUrgent || item.isShowcaseFeedActive) && (
+                <View style={styles.promoBadgesWrap}>
+                  {item.isUrgent && <UrgentBadge size="small" />}
+                  {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                </View>
+              )}
+
               {item.photos.length > 1 && (
                 <View style={styles.photoCountBadge}>
                   <Text style={styles.photoCountText}>
@@ -811,6 +823,15 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  promoBadgesWrap: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 10,
   },
   photoCountBadge: {
     position: 'absolute',

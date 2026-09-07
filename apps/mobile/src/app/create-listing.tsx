@@ -211,6 +211,12 @@ export default function CreateListingScreen() {
   const [heavyDamage, setHeavyDamage] = useState(false);
   const [isUrgent, setIsUrgent] = useState(false);
 
+  // Promotional Package Sku
+  const [selectedPromotionSku, setSelectedPromotionSku] = useState<
+    'URGENT_LISTING' | 'SHOWCASE_FEED' | 'URGENT_SHOWCASE_BUNDLE' | null
+  >(null);
+  const [promotionTermsAccepted, setPromotionTermsAccepted] = useState(false);
+
   // Photos
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
@@ -510,10 +516,20 @@ export default function CreateListingScreen() {
         return;
       }
 
+      if (selectedPromotionSku && !promotionTermsAccepted) {
+        Alert.alert(
+          'Promosyon Koşulları',
+          'Lütfen seçtiğiniz ilan promosyonuna ilişkin onay kutusunu işaretleyin.'
+        );
+        setSubmitting(false);
+        return;
+      }
+
       const yearNum = Number(parseNumberInput(selectedYear)) || 2020;
       const rawDisplacement = parseNumberInput(engineDisplacement);
       const rawPower = parseNumberInput(enginePower);
       const rawTramer = parseNumberInput(tramerAmount);
+      const effectiveUrgent = isUrgent || selectedPromotionSku === 'URGENT_LISTING' || selectedPromotionSku === 'URGENT_SHOWCASE_BUNDLE';
 
       const payload: any = {
         title: title.trim(),
@@ -531,7 +547,7 @@ export default function CreateListingScreen() {
         sellerType,
         hasWarranty,
         heavyDamage,
-        isUrgent,
+        isUrgent: effectiveUrgent,
         engineDisplacement: rawDisplacement ? Number(rawDisplacement) : undefined,
         enginePower: rawPower ? Number(rawPower) : undefined,
         drivetrain,
@@ -592,7 +608,25 @@ export default function CreateListingScreen() {
         }
       }
 
-      // 3. Submit for Moderation Review (PENDING_REVIEW)
+      // 3. Activate Selected Promotional Package (if chosen)
+      if (selectedPromotionSku && listingId) {
+        try {
+          await fetch(`${API_URL}/listing-promotions/test-checkout/${listingId}`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              productSku: selectedPromotionSku,
+            }),
+          });
+        } catch (promoErr) {
+          console.warn('Listing promotion activation warning:', promoErr);
+        }
+      }
+
+      // 4. Submit for Moderation Review (PENDING_REVIEW)
       const statusRes = await fetch(`${API_URL}/listings/${listingId}/status`, {
         method: 'PATCH',
         headers: {
@@ -1284,32 +1318,189 @@ export default function CreateListingScreen() {
               <Text style={styles.checkboxText}>Ağır Hasar Kaydı Var</Text>
             </TouchableOpacity>
 
-            {/* Acil İlan Toggle */}
-            <TouchableOpacity
-              style={[styles.urgentCard, isUrgent && styles.urgentCardActive]}
-              onPress={() => setIsUrgent(!isUrgent)}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons
-                  name="flame"
-                  size={24}
-                  color={isUrgent ? '#ef4444' : '#94a3b8'}
-                />
+            {/* PROMOTIONAL PACKAGE SELECTION CARDS */}
+            <View style={styles.promoSectionWrap}>
+              <View style={styles.promoSectionHeader}>
+                <Ionicons name="rocket-outline" size={20} color="#ea580c" />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.urgentTitle, isUrgent && { color: '#ef4444' }]}>
-                    Acil Satış Olarak Yayınla
-                  </Text>
-                  <Text style={styles.urgentSub}>
-                    İlanınız vitrinlerde alev rozetiyle öne çıkarılır.
+                  <Text style={styles.promoSectionTitle}>İlanını Öne Çıkar & Satışını Hızlandır</Text>
+                  <Text style={styles.promoSectionSub}>
+                    İlanınızın görünürlüğünü artırmak için opsiyonel bir promosyon paketi seçebilirsiniz.
                   </Text>
                 </View>
               </View>
-              <Ionicons
-                name={isUrgent ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={isUrgent ? '#ef4444' : '#cbd5e1'}
-              />
-            </TouchableOpacity>
+
+              <View style={styles.promoCardsList}>
+                {/* 1. Standart İlan */}
+                <TouchableOpacity
+                  style={[
+                    styles.promoOptionCard,
+                    selectedPromotionSku === null && styles.promoOptionCardActiveStandart,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedPromotionSku(null)}
+                >
+                  <View style={styles.promoOptionHeader}>
+                    <View style={styles.promoOptionIconWrapStandart}>
+                      <Ionicons name="car-outline" size={18} color="#0f172a" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoOptionTitle}>Standart İlan</Text>
+                      <Text style={styles.promoOptionDesc}>Ücretsiz temel listeleme</Text>
+                    </View>
+                    <View style={styles.promoOptionRadio}>
+                      <Ionicons
+                        name={selectedPromotionSku === null ? 'radio-button-on' : 'radio-button-off'}
+                        size={20}
+                        color={selectedPromotionSku === null ? '#0f172a' : '#cbd5e1'}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.promoOptionFooter}>
+                    <Text style={styles.promoOptionFreeBadge}>Ücretsiz</Text>
+                    <Text style={styles.promoOptionPrice}>0 ₺</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* 2. Acil İlan (99 TL) */}
+                <TouchableOpacity
+                  style={[
+                    styles.promoOptionCard,
+                    selectedPromotionSku === 'URGENT_LISTING' && styles.promoOptionCardActiveUrgent,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setSelectedPromotionSku(
+                      selectedPromotionSku === 'URGENT_LISTING' ? null : 'URGENT_LISTING'
+                    )
+                  }
+                >
+                  <View style={styles.promoOptionHeader}>
+                    <View style={styles.promoOptionIconWrapUrgent}>
+                      <Ionicons name="flame" size={18} color="#dc2626" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoOptionTitle}>Acil İlan</Text>
+                      <Text style={styles.promoOptionDesc}>Kırmızı ACİL rozeti & Acil listesi</Text>
+                    </View>
+                    <View style={styles.promoOptionRadio}>
+                      <Ionicons
+                        name={selectedPromotionSku === 'URGENT_LISTING' ? 'radio-button-on' : 'radio-button-off'}
+                        size={20}
+                        color={selectedPromotionSku === 'URGENT_LISTING' ? '#dc2626' : '#cbd5e1'}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.promoOptionFooter}>
+                    <Text style={styles.promoOptionFeatureNote}>✓ Acil İlanlar Sekmesinde Gösterim</Text>
+                    <Text style={styles.promoOptionPriceUrgent}>99 ₺</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* 3. Vitrin + Akış (199 TL) */}
+                <TouchableOpacity
+                  style={[
+                    styles.promoOptionCard,
+                    selectedPromotionSku === 'SHOWCASE_FEED' && styles.promoOptionCardActiveVitrin,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setSelectedPromotionSku(
+                      selectedPromotionSku === 'SHOWCASE_FEED' ? null : 'SHOWCASE_FEED'
+                    )
+                  }
+                >
+                  <View style={styles.promoOptionHeader}>
+                    <View style={styles.promoOptionIconWrapVitrin}>
+                      <Ionicons name="star" size={18} color="#f59e0b" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoOptionTitle}>Vitrin + Akış</Text>
+                      <Text style={styles.promoOptionDesc}>Ana Sayfa Vitrin ve İlan Akışı</Text>
+                    </View>
+                    <View style={styles.promoOptionRadio}>
+                      <Ionicons
+                        name={selectedPromotionSku === 'SHOWCASE_FEED' ? 'radio-button-on' : 'radio-button-off'}
+                        size={20}
+                        color={selectedPromotionSku === 'SHOWCASE_FEED' ? '#f59e0b' : '#cbd5e1'}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.promoOptionFooter}>
+                    <Text style={styles.promoOptionFeatureNote}>✓ Maksimum Ana Sayfa Görünürlüğü</Text>
+                    <Text style={styles.promoOptionPriceVitrin}>199 ₺</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* 4. Hızlı Satış Paketi (Kombo 249 TL) */}
+                <TouchableOpacity
+                  style={[
+                    styles.promoOptionCard,
+                    selectedPromotionSku === 'URGENT_SHOWCASE_BUNDLE' && styles.promoOptionCardActiveBundle,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setSelectedPromotionSku(
+                      selectedPromotionSku === 'URGENT_SHOWCASE_BUNDLE' ? null : 'URGENT_SHOWCASE_BUNDLE'
+                    )
+                  }
+                >
+                  <View style={styles.promoRibbon}>
+                    <Text style={styles.promoRibbonText}>🔥 EN AVANTAJLI PAKET</Text>
+                  </View>
+
+                  <View style={styles.promoOptionHeader}>
+                    <View style={styles.promoOptionIconWrapBundle}>
+                      <Ionicons name="flash" size={18} color="#ea580c" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.promoOptionTitle}>Hızlı Satış Paketi</Text>
+                      <Text style={styles.promoOptionDesc}>Acil İlan + Vitrin + İlan Akışı Kombo</Text>
+                    </View>
+                    <View style={styles.promoOptionRadio}>
+                      <Ionicons
+                        name={
+                          selectedPromotionSku === 'URGENT_SHOWCASE_BUNDLE'
+                            ? 'radio-button-on'
+                            : 'radio-button-off'
+                        }
+                        size={20}
+                        color={selectedPromotionSku === 'URGENT_SHOWCASE_BUNDLE' ? '#ea580c' : '#cbd5e1'}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.promoOptionFooter}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.promoStrikethroughPrice}>298 ₺</Text>
+                      <Text style={styles.promoOptionSavingsBadge}>%16 İndirim</Text>
+                    </View>
+                    <Text style={styles.promoOptionPriceBundle}>249 ₺</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Terms Checkbox */}
+              {selectedPromotionSku !== null && (
+                <TouchableOpacity
+                  style={styles.promoTermsBox}
+                  activeOpacity={0.8}
+                  onPress={() => setPromotionTermsAccepted(!promotionTermsAccepted)}
+                >
+                  <Ionicons
+                    name={promotionTermsAccepted ? 'checkbox' : 'square-outline'}
+                    size={20}
+                    color={promotionTermsAccepted ? '#ea580c' : '#94a3b8'}
+                  />
+                  <Text style={styles.promoTermsText}>
+                    Seçtiğim ilan promosyonunun abonelik paketimden bağımsız,{' '}
+                    <Text style={{ fontWeight: '700', color: '#0f172a' }}>
+                      tek seferlik ek bir hizmet
+                    </Text>{' '}
+                    olduğunu ve ilanın aktif yayın süresi boyunca geçerli olduğunu kabul ediyorum.
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* SUBMIT BUTTON */}
@@ -2014,5 +2205,204 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#166534',
     marginTop: 2,
+  },
+  /* PROMOTIONAL PACKAGE SELECTOR STYLES */
+  promoSectionWrap: {
+    marginTop: 10,
+    marginBottom: 8,
+    gap: 12,
+  },
+  promoSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#fff7ed',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ffedd5',
+  },
+  promoSectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  promoSectionSub: {
+    fontSize: 11.5,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  promoCardsList: {
+    gap: 10,
+  },
+  promoOptionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    padding: 12,
+    gap: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  promoOptionCardActiveStandart: {
+    borderColor: '#0f172a',
+    backgroundColor: '#f8fafc',
+  },
+  promoOptionCardActiveUrgent: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  promoOptionCardActiveVitrin: {
+    borderColor: '#f59e0b',
+    backgroundColor: '#fffbeb',
+  },
+  promoOptionCardActiveBundle: {
+    borderColor: '#ea580c',
+    backgroundColor: '#fff7ed',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  promoRibbon: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderBottomLeftRadius: 8,
+  },
+  promoRibbonText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  promoOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  promoOptionIconWrapStandart: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoOptionIconWrapUrgent: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#fee2e2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoOptionIconWrapVitrin: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoOptionIconWrapBundle: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#ffedd5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoOptionTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  promoOptionDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  promoOptionRadio: {
+    marginLeft: 4,
+  },
+  promoOptionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  promoOptionFreeBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  promoOptionFeatureNote: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  promoOptionPrice: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  promoOptionPriceUrgent: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#dc2626',
+  },
+  promoOptionPriceVitrin: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#b45309',
+  },
+  promoOptionPriceBundle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#ea580c',
+  },
+  promoStrikethroughPrice: {
+    fontSize: 11,
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
+  },
+  promoOptionSavingsBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ea580c',
+    backgroundColor: '#fff7ed',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  promoTermsBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 2,
+  },
+  promoTermsText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
   },
 });

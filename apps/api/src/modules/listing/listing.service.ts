@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto';
-import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier } from '@prisma/client';
+import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier, PromotionLifecycleStatus } from '@prisma/client';
 import { R2Service } from './r2.service';
 import { isValidCityAndDistrict } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
@@ -738,6 +738,16 @@ CRITICAL SAFETY RULES:
             transmission: true,
             trim: true,
             specs: true,
+          },
+        },
+        promotionEntitlements: {
+          where: {
+            lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+            expiresAt: { gt: new Date() },
+          },
+          select: {
+            promotionType: true,
+            expiresAt: true,
           },
         },
       },

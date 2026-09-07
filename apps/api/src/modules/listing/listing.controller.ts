@@ -544,6 +544,16 @@ export class ListingController {
         variant?.model?.name || '',
       ].filter(Boolean);
 
+      const feedNow = new Date();
+      const hasUrgentEnt = (item as any).promotionEntitlements?.some(
+        (e: any) => e.promotionType === ListingPromotionType.URGENT_LISTING && new Date(e.expiresAt) > feedNow
+      );
+      const hasShowcaseEnt = (item as any).promotionEntitlements?.some(
+        (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > feedNow
+      );
+      const isUrgent = !!((item as any).status === ListingStatus.ACTIVE && (!(item as any).expiresAt || new Date((item as any).expiresAt) > feedNow) && hasUrgentEnt);
+      const isShowcaseFeedActive = !!((item as any).status === ListingStatus.ACTIVE && (!(item as any).expiresAt || new Date((item as any).expiresAt) > feedNow) && hasShowcaseEnt);
+
       return {
         id: item.id,
         title: item.title,
@@ -559,6 +569,8 @@ export class ListingController {
         technicalSummary,
         breadcrumb,
         isFavorite: favoritedIds.has(item.id),
+        isUrgent,
+        isShowcaseFeedActive,
         detailUrl: `/listings/${item.id}`,
       };
     });
