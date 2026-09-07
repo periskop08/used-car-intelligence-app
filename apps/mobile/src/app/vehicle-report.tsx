@@ -484,6 +484,21 @@ export default function VehicleReportScreen() {
     }
   };
 
+  const openChatModal = () => {
+    if (chatMessages.length === 0) {
+      const carName = report
+        ? `${report.vehicleIdentity.modelYear} ${report.vehicleIdentity.brand} ${report.vehicleIdentity.model}`
+        : 'bu araç';
+      setChatMessages([
+        {
+          sender: 'ai',
+          text: `Merhabalar! Ben TorqueScout AI Araç Danışmanıyım. **${carName}** için aklınıza takılan tüm soruları bana yazabilirsiniz.`,
+        },
+      ]);
+    }
+    setIsChatModalVisible(true);
+  };
+
   const handleSendChat = async (presetText?: string) => {
     const textToSend = (presetText || chatQuestion).trim();
     if (!textToSend) return;
@@ -1438,7 +1453,7 @@ export default function VehicleReportScreen() {
         <TouchableOpacity
           style={styles.floatingChatFab}
           activeOpacity={0.88}
-          onPress={() => setIsChatModalVisible(true)}
+          onPress={openChatModal}
         >
           <View style={styles.floatingChatIconWrap}>
             <Ionicons name="chatbubbles" size={20} color="#ffffff" />
@@ -1539,20 +1554,48 @@ export default function VehicleReportScreen() {
               showsVerticalScrollIndicator={true}
               onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
             >
-              {chatMessages.length === 0 ? (
-                <View style={styles.chatEmptyState}>
-                  <View style={styles.chatBotIconCircle}>
-                    <Text style={{ fontSize: 32 }}>🤖</Text>
-                  </View>
-                  <Text style={styles.chatEmptyTitle}>
-                    Bu Araç Hakkında Merak Ettiğinizi Sorun!
-                  </Text>
-                  <Text style={styles.chatEmptySubtitle}>
-                    Motor sağlığı, kronik arıza riskleri, şanzıman tepkileri veya satın alma tavsiyesi hakkında dilediğinizi sorabilirsiniz.
-                  </Text>
+              <View style={styles.chatMessagesList}>
+                {chatMessages.map((msg, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.chatBubbleRow,
+                      msg.sender === 'user' ? styles.chatBubbleRowUser : styles.chatBubbleRowAi,
+                    ]}
+                  >
+                    {msg.sender === 'ai' && (
+                      <View style={styles.chatAiAvatarBox}>
+                        <Text style={{ fontSize: 13 }}>🤖</Text>
+                      </View>
+                    )}
 
-                  {/* Suggestion Chips */}
-                  <View style={styles.chatSuggestionsGrid}>
+                    <View
+                      style={[
+                        styles.chatBubbleCard,
+                        msg.sender === 'user' ? styles.chatBubbleCardUser : styles.chatBubbleCardAi,
+                      ]}
+                    >
+                      {msg.sender === 'user' ? (
+                        <Text style={styles.chatUserText}>{msg.text}</Text>
+                      ) : (
+                        renderChatAiText(msg.text)
+                      )}
+                    </View>
+
+                    {msg.sender === 'user' && (
+                      <View style={styles.chatUserAvatarBox}>
+                        <Text style={{ fontSize: 13 }}>🧑‍💻</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+
+                {/* Suggestion Chips shown when conversation has just started */}
+                {chatMessages.length <= 1 && (
+                  <View style={[styles.chatSuggestionsGrid, { marginTop: 8, marginBottom: 6 }]}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', marginBottom: 2 }}>
+                      Hızlı Öneri Sorular:
+                    </Text>
                     <TouchableOpacity
                       style={styles.chatSuggestionChip}
                       activeOpacity={0.8}
@@ -1585,57 +1628,20 @@ export default function VehicleReportScreen() {
                       <Text style={styles.chatSuggestionText}>💡 Şehir içi yakıt tüketimi nasıldır?</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
-              ) : (
-                <View style={styles.chatMessagesList}>
-                  {chatMessages.map((msg, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.chatBubbleRow,
-                        msg.sender === 'user' ? styles.chatBubbleRowUser : styles.chatBubbleRowAi,
-                      ]}
-                    >
-                      {msg.sender === 'ai' && (
-                        <View style={styles.chatAiAvatarBox}>
-                          <Text style={{ fontSize: 13 }}>🤖</Text>
-                        </View>
-                      )}
+                )}
 
-                      <View
-                        style={[
-                          styles.chatBubbleCard,
-                          msg.sender === 'user' ? styles.chatBubbleCardUser : styles.chatBubbleCardAi,
-                        ]}
-                      >
-                        {msg.sender === 'user' ? (
-                          <Text style={styles.chatUserText}>{msg.text}</Text>
-                        ) : (
-                          renderChatAiText(msg.text)
-                        )}
-                      </View>
-
-                      {msg.sender === 'user' && (
-                        <View style={styles.chatUserAvatarBox}>
-                          <Text style={{ fontSize: 13 }}>🧑‍💻</Text>
-                        </View>
-                      )}
+                {sendingChat && (
+                  <View style={[styles.chatBubbleRow, styles.chatBubbleRowAi]}>
+                    <View style={styles.chatAiAvatarBox}>
+                      <Text style={{ fontSize: 13 }}>🤖</Text>
                     </View>
-                  ))}
-
-                  {sendingChat && (
-                    <View style={[styles.chatBubbleRow, styles.chatBubbleRowAi]}>
-                      <View style={styles.chatAiAvatarBox}>
-                        <Text style={{ fontSize: 13 }}>🤖</Text>
-                      </View>
-                      <View style={[styles.chatBubbleCard, styles.chatBubbleCardAi, styles.chatThinkingBox]}>
-                        <ActivityIndicator size="small" color="#ea580c" />
-                        <Text style={styles.chatThinkingText}>Yapay zeka analiz ediyor...</Text>
-                      </View>
+                    <View style={[styles.chatBubbleCard, styles.chatBubbleCardAi, styles.chatThinkingBox]}>
+                      <ActivityIndicator size="small" color="#ea580c" />
+                      <Text style={styles.chatThinkingText}>Yapay zeka analiz ediyor...</Text>
                     </View>
-                  )}
-                </View>
-              )}
+                  </View>
+                )}
+              </View>
             </ScrollView>
 
             {/* Error Banner */}
