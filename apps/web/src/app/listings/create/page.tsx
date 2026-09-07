@@ -493,8 +493,17 @@ export default function CreateListing() {
       const needsPower = initPwrStatus !== "VERIFIED";
 
       if ((needsDisplacement || needsPower) && token) {
-        const enriched = await vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
-        if (enriched) specs = enriched;
+        // Enforce 15s bounded timeout on client enrichment request to eliminate infinite spinner
+        const enrichmentPromise = vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
+        const timeoutPromise = new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error("TECHNICAL_ENRICHMENT_TIMEOUT")), 15000)
+        );
+        try {
+          const enriched = await Promise.race([enrichmentPromise, timeoutPromise]);
+          if (enriched) specs = enriched;
+        } catch (enrichErr) {
+          console.warn("Targeted technical enrichment timeout or error:", enrichErr);
+        }
       }
 
       // Stale response guard again after enrichment
@@ -1381,13 +1390,17 @@ export default function CreateListing() {
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Motor Hacmi (cc)</label>
                   {!useCustomVariant && selectedVariant && (
-                    (loadingTechSpecs || !displacementVerified) ? (
+                    (loadingTechSpecs && !displacementVerified) ? (
                       <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
                         Doğrulanıyor... ⏳
                       </span>
                     ) : displacementVerified && engineDisplacement ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
+                      </span>
+                    ) : !displacementVerified ? (
+                      <span className="text-[9px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                        Doğrulanamadı
                       </span>
                     ) : null
                   )}
@@ -1397,7 +1410,7 @@ export default function CreateListing() {
                   value={displacementVerified ? engineDisplacement : ""}
                   onChange={(e) => setEngineDisplacement(e.target.value)}
                   readOnly={!useCustomVariant && !!selectedVariant && displacementVerified}
-                  placeholder={!useCustomVariant && selectedVariant && !displacementVerified ? "Doğrulanıyor..." : "Örn: 1498"}
+                  placeholder={!useCustomVariant && selectedVariant && !displacementVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : "Doğrulanamadı") : "Örn: 1498"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
                     !useCustomVariant && selectedVariant && displacementVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
@@ -1417,6 +1430,10 @@ export default function CreateListing() {
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
                       </span>
+                    ) : !powerVerified ? (
+                      <span className="text-[9px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                        Doğrulanamadı
+                      </span>
                     ) : null
                   )}
                 </div>
@@ -1425,7 +1442,7 @@ export default function CreateListing() {
                   value={powerVerified ? enginePower : ""}
                   onChange={(e) => setEnginePower(e.target.value)}
                   readOnly={!useCustomVariant && !!selectedVariant && powerVerified}
-                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? "Doğrulanıyor..." : "Örn: 150"}
+                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : "Doğrulanamadı") : "Örn: 150"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
                     !useCustomVariant && selectedVariant && powerVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
@@ -1512,10 +1529,31 @@ export default function CreateListing() {
               </p>
             )}
             {!useCustomVariant && !!selectedVariant && (!displacementVerified || !powerVerified || loadingTechSpecs) && (
-              <p className="text-[11px] text-amber-400 text-center flex items-center justify-center gap-1.5 animate-pulse font-medium">
-                <span>⏳</span>
-                <span>Motor teknik bilgileri doğrulanıyor...</span>
-              </p>
+              loadingTechSpecs ? (
+                <p className="text-[11px] text-amber-400 text-center flex items-center justify-center gap-1.5 animate-pulse font-medium">
+                  <span>⏳</span>
+                  <span>Motor teknik bilgileri doğrulanıyor...</span>
+                </p>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <span className="text-base">⚠️</span>
+                    <span>
+                      {techSpecsConflict
+                        ? "Bu varyant için teknik motor verilerinde çelişki tespit edildi."
+                        : "Motor teknik bilgileri (cc / HP) doğrulanamadı. İlan verebilmek için katalog bilgileri gereklidir."}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => resolveTechnicalSpecs(selectedVariant)}
+                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold rounded-xl border border-rose-500/30 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <span>🔄</span>
+                    <span>Tekrar Doğrula</span>
+                  </button>
+                </div>
+              )
             )}
           </div>
         </div>

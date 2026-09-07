@@ -322,12 +322,18 @@ export class VariantTechnicalFactsService {
     // LEVEL 2: Structured facts from GeneratedVehicleReport for the EXACT SAME variantId only
     if (existingReport && existingReport.reportData) {
       const reportData = existingReport.reportData as any;
-      const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications;
+      const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications || reportData.technicalSpecifications;
       const perfUsage = reportData.performanceUsage;
+      const vehicleIdentity = reportData.vehicleIdentity;
 
-      // Power resolution from report structured facts
+      // Power resolution from report structured facts (never from prose narrative)
       if (powerStatus !== 'VERIFIED') {
-        const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp;
+        const rPower =
+          techSpecs?.enginePowerHp ||
+          techSpecs?.powerHp ||
+          perfUsage?.powerHp ||
+          vehicleIdentity?.enginePowerHp;
+
         if (typeof rPower === 'number') {
           const pGate = this.evaluatePowerConsistency(rPower, variant, true);
           if (pGate.status === 'VERIFIED') {
@@ -341,9 +347,13 @@ export class VariantTechnicalFactsService {
         }
       }
 
-      // Displacement resolution: ONLY trust explicit technicalSpecifications, NEVER unverified vehicleIdentity copy
+      // Displacement resolution: Structured facts from exact completed report
       if (dispStatus !== 'VERIFIED') {
-        const rCc = techSpecs?.engineDisplacementCc;
+        const rCc =
+          techSpecs?.engineDisplacementCc ||
+          techSpecs?.displacementCc ||
+          vehicleIdentity?.engineDisplacementCc;
+
         if (typeof rCc === 'number') {
           const dGate = this.evaluateDisplacementConsistency(rCc, variant, existingReport, true);
           if (dGate.status === 'VERIFIED') {
@@ -390,25 +400,68 @@ export class VariantTechnicalFactsService {
       this.metrics.cacheMissCount++;
     }
 
-    // If power was verified from authoritative report but powerEnrichment row didn't exist,
-    // durably mirror into VehiclePowerEnrichment side-car for permanent canonical authority.
-    if (!variant.powerEnrichment && powerHp !== null && powerStatus === 'VERIFIED') {
-      this.prisma.vehiclePowerEnrichment.upsert({
-        where: { vehicleVariantId: variantId },
-        create: {
-          vehicleVariantId: variantId,
-          powerHp,
-          verificationStatus: PowerVerificationStatus.VERIFIED,
-          sourceMarket: 'TURKEY',
-          marketResolution: 'TR_PRIMARY',
-          researchedAt: new Date(),
-          verifiedAt: new Date(),
-          identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
-        },
-        update: {},
-      }).catch((err) => {
-        this.logger.warn(`Failed to mirror powerEnrichment for ${variantId}: ${err.message}`);
-      });
+    // DURABLE CANONICAL RECONCILIATION:
+    // If power was verified (from report or specs), durably reconcile into VehiclePowerEnrichment
+    if (powerStatus === 'VERIFIED' && powerHp !== null) {
+      if (
+        !variant.powerEnrichment ||
+        variant.powerEnrichment.verificationStatus !== PowerVerificationStatus.VERIFIED ||
+        variant.powerEnrichment.powerHp !== powerHp
+      ) {
+        this.prisma.vehiclePowerEnrichment.upsert({
+          where: { vehicleVariantId: variantId },
+          create: {
+            vehicleVariantId: variantId,
+            powerHp,
+            verificationStatus: PowerVerificationStatus.VERIFIED,
+            sourceMarket: 'TURKEY',
+            marketResolution: 'TR_PRIMARY',
+            researchedAt: new Date(),
+            verifiedAt: new Date(),
+            identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+          },
+          update: {
+            powerHp,
+            verificationStatus: PowerVerificationStatus.VERIFIED,
+            verifiedAt: new Date(),
+          },
+        }).catch((err) => {
+          this.logger.warn(`Failed to reconcile powerEnrichment for ${variantId}: ${err.message}`);
+        });
+      }
+    }
+
+    // If displacement was verified, durably reconcile into TechnicalSpec
+    if (dispStatus === 'VERIFIED' && displacementCc !== null) {
+      const currentSpecs = (variant.specs?.specs as Record<string, any>) || {};
+      if (currentSpecs.displacementStatus !== 'VERIFIED' || currentSpecs.engineDisplacementCc !== displacementCc) {
+        this.prisma.technicalSpec.upsert({
+          where: { variantId },
+          create: {
+            variantId,
+            specs: {
+              ...currentSpecs,
+              engineDisplacementCc: displacementCc,
+              displacementStatus: 'VERIFIED',
+              isVerified: true,
+              verifiedAt: new Date().toISOString(),
+              displacementSource: displacementSource || 'GENERATED_REPORT_STRUCTURED_FACT',
+            },
+          },
+          update: {
+            specs: {
+              ...currentSpecs,
+              engineDisplacementCc: displacementCc,
+              displacementStatus: 'VERIFIED',
+              isVerified: true,
+              verifiedAt: new Date().toISOString(),
+              displacementSource: displacementSource || 'GENERATED_REPORT_STRUCTURED_FACT',
+            },
+          },
+        }).catch((err) => {
+          this.logger.warn(`Failed to reconcile technicalSpec for ${variantId}: ${err.message}`);
+        });
+      }
     }
 
     return {
@@ -553,6 +606,89 @@ export class VariantTechnicalFactsService {
     });
   }
 
+  /**
+   * Reconciles structured verified technical facts from a completed GeneratedVehicleReport
+   * into canonical persistent stores (VehiclePowerEnrichment and TechnicalSpec) for an exact variantId.
+   */
+  async reconcileFactsFromCompletedReport(variantId: string, reportData: any): Promise<void> {
+    if (!variantId || !reportData) return;
+
+    try {
+      const variant = await this.prisma.vehicleVariant.findUnique({
+        where: { id: variantId },
+        include: { specs: true, powerEnrichment: true, engine: true, brand: true, model: true },
+      });
+      if (!variant) return;
+
+      const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications || reportData.technicalSpecifications;
+      const perfUsage = reportData.performanceUsage;
+      const vehicleIdentity = reportData.vehicleIdentity;
+
+      // 1. Structured power reconciliation
+      const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp || vehicleIdentity?.enginePowerHp;
+      if (typeof rPower === 'number') {
+        const pGate = this.evaluatePowerConsistency(rPower, variant, true);
+        if (pGate.status === 'VERIFIED' && pGate.validHp) {
+          await this.prisma.vehiclePowerEnrichment.upsert({
+            where: { vehicleVariantId: variantId },
+            create: {
+              vehicleVariantId: variantId,
+              powerHp: pGate.validHp,
+              verificationStatus: PowerVerificationStatus.VERIFIED,
+              sourceMarket: 'TURKEY',
+              marketResolution: 'TR_PRIMARY',
+              researchedAt: new Date(),
+              verifiedAt: new Date(),
+              identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+            },
+            update: {
+              powerHp: pGate.validHp,
+              verificationStatus: PowerVerificationStatus.VERIFIED,
+              verifiedAt: new Date(),
+            },
+          });
+          this.logger.log(`[REPORT_FACT_RECONCILE] Reconciled power ${pGate.validHp} HP for variant ${variantId} from completed report.`);
+        }
+      }
+
+      // 2. Structured displacement reconciliation
+      const rCc = techSpecs?.engineDisplacementCc || techSpecs?.displacementCc || vehicleIdentity?.engineDisplacementCc;
+      if (typeof rCc === 'number') {
+        const dGate = this.evaluateDisplacementConsistency(rCc, variant, undefined, true);
+        if (dGate.status === 'VERIFIED' && dGate.validCc) {
+          const currentSpecs = (variant.specs?.specs as Record<string, any>) || {};
+          await this.prisma.technicalSpec.upsert({
+            where: { variantId },
+            create: {
+              variantId,
+              specs: {
+                ...currentSpecs,
+                engineDisplacementCc: dGate.validCc,
+                displacementStatus: 'VERIFIED',
+                isVerified: true,
+                verifiedAt: new Date().toISOString(),
+                displacementSource: 'GENERATED_REPORT_STRUCTURED_FACT',
+              },
+            },
+            update: {
+              specs: {
+                ...currentSpecs,
+                engineDisplacementCc: dGate.validCc,
+                displacementStatus: 'VERIFIED',
+                isVerified: true,
+                verifiedAt: new Date().toISOString(),
+                displacementSource: 'GENERATED_REPORT_STRUCTURED_FACT',
+              },
+            },
+          });
+          this.logger.log(`[REPORT_FACT_RECONCILE] Reconciled displacement ${dGate.validCc} cc for variant ${variantId} from completed report.`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to reconcile facts from report for variant ${variantId}: ${err.message}`);
+    }
+  }
+
   private async executeTargetedEnrichment(
     variantId: string,
     currentFacts: VariantTechnicalFactsResult,
@@ -591,6 +727,10 @@ export class VariantTechnicalFactsService {
       currentFacts.engineDisplacement.status === 'CONFLICT' ||
       finalCc === null;
 
+    if (!powerNeedsResearch && !dispNeedsResearch) {
+      return currentFacts;
+    }
+
     // Atomically claim distributed research lease via serializing PostgreSQL row transaction
     const leaseClaim = await this.attemptAcquireDistributedLease(
       variantId,
@@ -599,150 +739,161 @@ export class VariantTechnicalFactsService {
       variant,
     );
 
+    const tasks: Promise<void>[] = [];
+
     // STEP A: Resolve Power if missing OR in conflict
     if (powerNeedsResearch) {
-      if (!leaseClaim.powerAcquired) {
-        this.metrics.researchLocksContended++;
-        this.metrics.researchDeduplicatedCount++;
-        this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} power is currently being researched by another worker. Waiting up to 25s...`);
-        let waitElapsed = 0;
-        while (waitElapsed < 45000) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          waitElapsed += 1000;
-          const rechecked = await this.getVariantTechnicalFacts(variantId);
-          if (rechecked.enginePower.status === 'VERIFIED') {
-            finalHp = rechecked.enginePowerHp;
-            powerSource = rechecked.sources.power;
-            break;
-          }
-        }
-      } else {
-        this.metrics.researchLocksAcquired++;
-        this.metrics.researchTriggeredCount++;
-        this.logger.log(`[TARGETED_RESEARCH] Researching power for variant ${variantId} (current status: ${currentFacts.enginePower.status})`);
-
-        try {
-          const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
-          if (powerEnrichment && powerEnrichment.powerHp) {
-            const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
-            if (pGate.status === 'VERIFIED') {
-              finalHp = pGate.validHp;
-              powerSource = 'RESEARCH_POWER_ENRICHMENT';
+      tasks.push((async () => {
+        if (!leaseClaim.powerAcquired) {
+          this.metrics.researchLocksContended++;
+          this.metrics.researchDeduplicatedCount++;
+          this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} power is currently being researched by another worker. Bounded waiting up to 15s...`);
+          let waitElapsed = 0;
+          while (waitElapsed < 15000) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            waitElapsed += 1000;
+            const rechecked = await this.getVariantTechnicalFacts(variantId);
+            if (rechecked.enginePower.status === 'VERIFIED') {
+              finalHp = rechecked.enginePowerHp;
+              powerSource = rechecked.sources.power;
+              break;
             }
           }
-        } catch (err: any) {
-          this.logger.error(`Failed to research power for variant ${variantId}: ${err.message}`);
+        } else {
+          this.metrics.researchLocksAcquired++;
+          this.metrics.researchTriggeredCount++;
+          this.logger.log(`[TARGETED_RESEARCH] Researching power for variant ${variantId} (current status: ${currentFacts.enginePower.status})`);
+
+          try {
+            const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
+            if (powerEnrichment && powerEnrichment.powerHp) {
+              const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
+              if (pGate.status === 'VERIFIED') {
+                finalHp = pGate.validHp;
+                powerSource = 'RESEARCH_POWER_ENRICHMENT';
+              }
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to research power for variant ${variantId}: ${err.message}`);
+          }
         }
-      }
+      })());
     }
 
     // STEP B: Resolve Displacement if missing OR in conflict
     if (dispNeedsResearch) {
-      if (!leaseClaim.dispAcquired) {
-        this.metrics.researchLocksContended++;
-        this.metrics.researchDeduplicatedCount++;
-        this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} displacement is currently being researched by another worker. Waiting up to 45s...`);
-        let waitElapsed = 0;
-        while (waitElapsed < 45000) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          waitElapsed += 1000;
-          const rechecked = await this.getVariantTechnicalFacts(variantId);
-          if (rechecked.engineDisplacement.status === 'VERIFIED') {
-            finalCc = rechecked.engineDisplacementCc;
-            displacementSource = rechecked.sources.displacement;
-            break;
-          }
-        }
-      } else {
-        this.metrics.researchLocksAcquired++;
-        this.metrics.researchTriggeredCount++;
-        this.logger.log(`[TARGETED_RESEARCH] Researching displacement for variant ${variantId} (current status: ${currentFacts.engineDisplacement.status})`);
-
-        // Renew lease timestamp for displacement execution phase
-        const freshSpec = await this.prisma.technicalSpec.findUnique({
-          where: { variantId },
-        });
-        const freshSpecsObj = (freshSpec?.specs as Record<string, any>) || {};
-
-        await this.prisma.technicalSpec.upsert({
-          where: { variantId },
-          create: {
-            variantId,
-            specs: {
-              ...freshSpecsObj,
-              displacementStatus: 'RESEARCHING',
-              displacementResearchStartedAt: new Date().toISOString(),
-            },
-          },
-          update: {
-            specs: {
-              ...freshSpecsObj,
-              displacementStatus: 'RESEARCHING',
-              displacementResearchStartedAt: new Date().toISOString(),
-            },
-          },
-        });
-
-        try {
-          const researchedCc = await this.researchVariantDisplacement(variant);
-          if (researchedCc && researchedCc.displacementCc) {
-            // Validate researched cc through consistency gate
-            const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
-            if (dGate.status === 'VERIFIED' && dGate.validCc) {
-              finalCc = dGate.validCc;
-              displacementSource = researchedCc.source;
-
-              // Persist verified displacement into TechnicalSpec
-              await this.prisma.technicalSpec.upsert({
-                where: { variantId },
-                create: {
-                  variantId,
-                  specs: {
-                    ...freshSpecsObj,
-                    engineDisplacementCc: finalCc,
-                    isVerified: true,
-                    verifiedAt: new Date().toISOString(),
-                    displacementSource,
-                    displacementEvidence: (researchedCc as any).evidence || null,
-                    displacementStatus: 'VERIFIED',
-                  },
-                },
-                update: {
-                  specs: {
-                    ...freshSpecsObj,
-                    engineDisplacementCc: finalCc,
-                    isVerified: true,
-                    verifiedAt: new Date().toISOString(),
-                    displacementSource,
-                    displacementEvidence: (researchedCc as any).evidence || null,
-                    displacementStatus: 'VERIFIED',
-                  },
-                },
-              });
-            } else {
-              this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
-              await this.prisma.technicalSpec.upsert({
-                where: { variantId },
-                create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
-                update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
-              });
+      tasks.push((async () => {
+        if (!leaseClaim.dispAcquired) {
+          this.metrics.researchLocksContended++;
+          this.metrics.researchDeduplicatedCount++;
+          this.logger.log(`[DISTRIBUTED_DEDUPE] Variant ${variantId} displacement is currently being researched by another worker. Bounded waiting up to 15s...`);
+          let waitElapsed = 0;
+          while (waitElapsed < 15000) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            waitElapsed += 1000;
+            const rechecked = await this.getVariantTechnicalFacts(variantId);
+            if (rechecked.engineDisplacement.status === 'VERIFIED') {
+              finalCc = rechecked.engineDisplacementCc;
+              displacementSource = rechecked.sources.displacement;
+              break;
             }
-          } else {
-            await this.prisma.technicalSpec.upsert({
-              where: { variantId },
-              create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
-              update: { specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
-            });
           }
-        } catch (err: any) {
-          this.logger.error(`Failed to research displacement for variant ${variantId}: ${err.message}`);
+        } else {
+          this.metrics.researchLocksAcquired++;
+          this.metrics.researchTriggeredCount++;
+          this.logger.log(`[TARGETED_RESEARCH] Researching displacement for variant ${variantId} (current status: ${currentFacts.engineDisplacement.status})`);
+
+          // Renew lease timestamp for displacement execution phase
+          const freshSpec = await this.prisma.technicalSpec.findUnique({
+            where: { variantId },
+          });
+          const freshSpecsObj = (freshSpec?.specs as Record<string, any>) || {};
+
           await this.prisma.technicalSpec.upsert({
             where: { variantId },
-            create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
-            update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+            create: {
+              variantId,
+              specs: {
+                ...freshSpecsObj,
+                displacementStatus: 'RESEARCHING',
+                displacementResearchStartedAt: new Date().toISOString(),
+              },
+            },
+            update: {
+              specs: {
+                ...freshSpecsObj,
+                displacementStatus: 'RESEARCHING',
+                displacementResearchStartedAt: new Date().toISOString(),
+              },
+            },
           });
+
+          try {
+            const researchedCc = await this.researchVariantDisplacement(variant);
+            if (researchedCc && researchedCc.displacementCc) {
+              // Validate researched cc through consistency gate
+              const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
+              if (dGate.status === 'VERIFIED' && dGate.validCc) {
+                finalCc = dGate.validCc;
+                displacementSource = researchedCc.source;
+
+                // Persist verified displacement into TechnicalSpec
+                await this.prisma.technicalSpec.upsert({
+                  where: { variantId },
+                  create: {
+                    variantId,
+                    specs: {
+                      ...freshSpecsObj,
+                      engineDisplacementCc: finalCc,
+                      isVerified: true,
+                      verifiedAt: new Date().toISOString(),
+                      displacementSource,
+                      displacementEvidence: (researchedCc as any).evidence || null,
+                      displacementStatus: 'VERIFIED',
+                    },
+                  },
+                  update: {
+                    specs: {
+                      ...freshSpecsObj,
+                      engineDisplacementCc: finalCc,
+                      isVerified: true,
+                      verifiedAt: new Date().toISOString(),
+                      displacementSource,
+                      displacementEvidence: (researchedCc as any).evidence || null,
+                      displacementStatus: 'VERIFIED',
+                    },
+                  },
+                });
+              } else {
+                this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
+                await this.prisma.technicalSpec.upsert({
+                  where: { variantId },
+                  create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+                  update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+                });
+              }
+            } else {
+              await this.prisma.technicalSpec.upsert({
+                where: { variantId },
+                create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
+                update: { specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
+              });
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to research displacement for variant ${variantId}: ${err.message}`);
+            await this.prisma.technicalSpec.upsert({
+              where: { variantId },
+              create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+              update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
+            });
+          }
         }
-      }
+      })());
+    }
+
+    // Parallelize execution when both fields need resolution
+    if (tasks.length > 0) {
+      await Promise.all(tasks);
     }
 
     // Return fresh canonically gated facts

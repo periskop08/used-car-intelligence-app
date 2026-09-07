@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportController } from './vehicle-report.controller';
 import { VehicleReportService } from './vehicle-report.service';
@@ -19,9 +19,10 @@ import { ResearchEvidenceValidationService } from './research-evidence-validatio
 import { AuthModule } from '../auth/auth.module';
 import { ResearchModule } from '../research/research.module';
 import { ListingAiModule } from '../listing-ai/listing-ai.module';
+import { VehicleModule } from '../vehicle/vehicle.module';
 
 @Module({
-  imports: [AuthModule, ResearchModule, ListingAiModule],
+  imports: [AuthModule, ResearchModule, ListingAiModule, forwardRef(() => VehicleModule)],
   controllers: [VehicleReportController],
   providers: [
     PrismaService,

@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportProviderService } from './vehicle-report-provider.service';
 import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobStatus, VehicleReportStatus } from '@prisma/client';
+import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 
 @Injectable()
 export class VehicleReportJobWorkerService implements OnModuleInit {
@@ -13,6 +14,8 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
     private prisma: PrismaService,
     private providerService: VehicleReportProviderService,
     private quotaService: VehicleReportQuotaService,
+    @Inject(forwardRef(() => VariantTechnicalFactsService))
+    private variantTechnicalFactsService: VariantTechnicalFactsService,
   ) {}
 
   onModuleInit() {
@@ -96,6 +99,13 @@ export class VehicleReportJobWorkerService implements OnModuleInit {
           completedAt: new Date(),
         },
       });
+
+      // Opportunistically feed canonical technical facts store from accepted exact report facts
+      if (job.report.variantId && result.report.status !== 'SAFE_FALLBACK') {
+        this.variantTechnicalFactsService
+          .reconcileFactsFromCompletedReport(job.report.variantId, result.report)
+          .catch((e) => this.logger.warn(`Failed to reconcile technical facts from job report for variant ${job.report.variantId}: ${e.message}`));
+      }
 
       // Complete job
       await this.prisma.vehicleReportResearchJob.update({

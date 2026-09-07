@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportContextBuilderService } from './vehicle-report-context-builder.service';
 import { ListingReportContextService } from './listing-report-context.service';
@@ -8,6 +8,7 @@ import { VehicleReportFallbackService } from './vehicle-report-fallback.service'
 import { VehicleReportProviderService } from './vehicle-report-provider.service';
 import { CreateVehicleReportDto } from './vehicle-report.dto';
 import { VehicleReportMode, AiQuotaFeature, VehicleReportStatus, VehicleReportJobStatus } from '@prisma/client';
+import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -22,6 +23,8 @@ export class VehicleReportService implements OnModuleInit {
     private quotaService: VehicleReportQuotaService,
     private fallbackService: VehicleReportFallbackService,
     private providerService: VehicleReportProviderService,
+    @Inject(forwardRef(() => VariantTechnicalFactsService))
+    private variantTechnicalFactsService: VariantTechnicalFactsService,
   ) {}
 
   async onModuleInit() {
@@ -370,6 +373,13 @@ export class VehicleReportService implements OnModuleInit {
           completedAt: new Date(),
         },
       });
+
+      // Opportunistically feed canonical technical facts store from accepted exact report facts
+      if (variantId && report.status === VehicleReportStatus.COMPLETED) {
+        this.variantTechnicalFactsService
+          .reconcileFactsFromCompletedReport(variantId, providerRes.report)
+          .catch((e) => this.logger.warn(`Failed to reconcile technical facts from report for variant ${variantId}: ${e.message}`));
+      }
 
       // 8. Consume quota upon successful report creation
       if (quotaUsageId) {
