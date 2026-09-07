@@ -428,6 +428,7 @@ export default function VehicleReportScreen() {
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
 
   // AI Chatbot States & Live Rights Integration
+  const [isChatModalVisible, setIsChatModalVisible] = useState(false);
   const [chatQuestion, setChatQuestion] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([]);
   const [sendingChat, setSendingChat] = useState(false);
@@ -439,6 +440,7 @@ export default function VehicleReportScreen() {
     totalLimit?: number;
     used?: number;
   } | null>(null);
+  const chatScrollRef = useRef<ScrollView>(null);
 
   const statusMessages = [
     'Araç verileri toplanıyor...',
@@ -1417,16 +1419,63 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* 7. TORQUESCOUT YAPAY ZEKA DANIŞMANI (AI CHATBOT & CANLI HAK KOTASI) */}
-          <View style={styles.chatSectionCard}>
+          {/* Bottom Disclaimer Banner */}
+          <View style={styles.bottomBannerLight}>
+            <Ionicons name="information-circle" size={20} color="#2563eb" />
+            <Text style={styles.bottomBannerText}>
+              Bu rapor, seçtiğin varyanta özel hazırlanmıştır. Bilgiler düzenli olarak güncellenmektedir.
+            </Text>
+          </View>
+        </ScrollView>
+      ) : (
+        <View style={styles.loadingContainerLight}>
+          <Text style={styles.loadingTitleLight}>Rapor Bulunamadı</Text>
+        </View>
+      )}
+
+      {/* FLOATING ACTION BUBBLE (AI CHATBOT) */}
+      {Boolean(report) && (
+        <TouchableOpacity
+          style={styles.floatingChatFab}
+          activeOpacity={0.88}
+          onPress={() => setIsChatModalVisible(true)}
+        >
+          <View style={styles.floatingChatIconWrap}>
+            <Ionicons name="chatbubbles" size={20} color="#ffffff" />
+            <View style={styles.floatingLiveDot} />
+          </View>
+          <View style={styles.floatingChatTextWrap}>
+            <Text style={styles.floatingChatTitle}>AI Danışman</Text>
+            <Text style={styles.floatingChatSub}>
+              {userRights ? (userRights.isUnlimited ? 'Sınırsız' : `${userRights.remaining ?? 0} Soru`) : 'Sor'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* AI CHATBOT SLIDE-UP MODAL DRAWER */}
+      <Modal
+        visible={isChatModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsChatModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.chatModalOverlay}
+        >
+          <View style={styles.chatModalContainer}>
+            {/* Top Handle Bar */}
+            <View style={styles.modalHandleBar} />
+
             {/* Header */}
             <View style={styles.chatHeaderRow}>
               <View style={styles.chatHeaderLeft}>
                 <View style={styles.chatAvatarHeaderBox}>
-                  <Ionicons name="chatbubbles" size={20} color="#ea580c" />
+                  <Ionicons name="chatbubbles" size={18} color="#ea580c" />
                 </View>
                 <View>
-                  <Text style={styles.chatHeaderTitle}>TorqueScout Yapay Zeka Danışmanı</Text>
+                  <Text style={styles.chatHeaderTitle}>TorqueScout AI Danışmanı</Text>
                   <View style={styles.chatLiveRow}>
                     <View style={styles.chatLiveDot} />
                     <Text style={styles.chatLiveText}>Çevrimiçi • Rapor Verilerine Hakim</Text>
@@ -1434,31 +1483,47 @@ export default function VehicleReportScreen() {
                 </View>
               </View>
 
-              {/* Rights Badge Pill */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => router.push('/profile/package-rights')}
-                style={styles.chatRightsBadgePill}
-              >
-                <Text style={styles.chatRightsBadgeText}>
-                  ⚡ {userRights
-                    ? userRights.isUnlimited
-                      ? 'Sınırsız Hak'
-                      : `${userRights.remaining ?? 0} Soru Hakkı`
-                    : 'Kullanım Hakkı'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {/* Rights Badge Pill */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setIsChatModalVisible(false);
+                    router.push('/profile/package-rights');
+                  }}
+                  style={styles.chatRightsBadgePill}
+                >
+                  <Text style={styles.chatRightsBadgeText}>
+                    ⚡ {userRights
+                      ? userRights.isUnlimited
+                        ? 'Sınırsız'
+                        : `${userRights.remaining ?? 0} Hak`
+                      : 'Kullanım'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Close Button */}
+                <TouchableOpacity
+                  style={styles.chatModalCloseBtn}
+                  onPress={() => setIsChatModalVisible(false)}
+                >
+                  <Ionicons name="close" size={20} color="#0f172a" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Quota Exhaustion Warning (if 0 remaining) */}
             {userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0 && (
               <View style={styles.chatQuotaWarningBanner}>
-                <Ionicons name="alert-circle" size={18} color="#c2410c" />
+                <Ionicons name="alert-circle" size={16} color="#c2410c" />
                 <Text style={styles.chatQuotaWarningText}>
-                  Soru hakkınız kalmadı. Ek hak için paketleri inceleyin.
+                  Soru hakkınız doldu. Ek hak için paketleri inceleyin.
                 </Text>
                 <TouchableOpacity
-                  onPress={() => router.push('/(tabs)/packages')}
+                  onPress={() => {
+                    setIsChatModalVisible(false);
+                    router.push('/(tabs)/packages');
+                  }}
                   style={styles.chatQuotaPackageBtn}
                 >
                   <Text style={styles.chatQuotaPackageBtnText}>Paketler</Text>
@@ -1466,12 +1531,18 @@ export default function VehicleReportScreen() {
               </View>
             )}
 
-            {/* Messages Area */}
-            <View style={styles.chatMessagesContainer}>
+            {/* Messages Area (Scrollable without overflow) */}
+            <ScrollView
+              ref={chatScrollRef}
+              style={styles.chatMessagesScrollView}
+              contentContainerStyle={styles.chatMessagesScrollContent}
+              showsVerticalScrollIndicator={true}
+              onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+            >
               {chatMessages.length === 0 ? (
                 <View style={styles.chatEmptyState}>
                   <View style={styles.chatBotIconCircle}>
-                    <Text style={{ fontSize: 28 }}>🤖</Text>
+                    <Text style={{ fontSize: 32 }}>🤖</Text>
                   </View>
                   <Text style={styles.chatEmptyTitle}>
                     Bu Araç Hakkında Merak Ettiğinizi Sorun!
@@ -1565,7 +1636,7 @@ export default function VehicleReportScreen() {
                   )}
                 </View>
               )}
-            </View>
+            </ScrollView>
 
             {/* Error Banner */}
             {Boolean(chatError) && (
@@ -1604,20 +1675,8 @@ export default function VehicleReportScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Bottom Disclaimer Banner */}
-          <View style={styles.bottomBannerLight}>
-            <Ionicons name="information-circle" size={20} color="#2563eb" />
-            <Text style={styles.bottomBannerText}>
-              Bu rapor, seçtiğin varyanta özel hazırlanmıştır. Bilgiler düzenli olarak güncellenmektedir.
-            </Text>
-          </View>
-        </ScrollView>
-      ) : (
-        <View style={styles.loadingContainerLight}>
-          <Text style={styles.loadingTitleLight}>Rapor Bulunamadı</Text>
-        </View>
-      )}
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -2168,20 +2227,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // 7. AI Chatbot Section Styles
-  chatSectionCard: {
+  // 7. Floating AI Chatbot & Modal Drawer Styles
+  floatingChatFab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ea580c',
+    borderRadius: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 10,
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 99,
+  },
+  floatingChatIconWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingLiveDot: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22c55e',
+    borderWidth: 1.5,
+    borderColor: '#ea580c',
+  },
+  floatingChatTextWrap: {
+    flexDirection: 'column',
+  },
+  floatingChatTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
+  floatingChatSub: {
+    color: '#ffedd5',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  chatModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  chatModalContainer: {
     backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 18,
-    padding: 14,
-    gap: 12,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    marginTop: 4,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
+    paddingBottom: 24,
+    height: '82%',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
   },
   chatHeaderRow: {
     flexDirection: 'row',
@@ -2194,13 +2307,13 @@ const styles = StyleSheet.create({
   chatHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flex: 1,
   },
   chatAvatarHeaderBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: '#fff7ed',
     borderWidth: 1,
     borderColor: '#fed7aa',
@@ -2242,37 +2355,47 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ea580c',
   },
+  chatModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   chatQuotaWarningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff7ed',
     borderWidth: 1,
     borderColor: '#fed7aa',
-    padding: 10,
-    borderRadius: 12,
-    gap: 8,
+    padding: 8,
+    borderRadius: 10,
+    gap: 6,
   },
   chatQuotaWarningText: {
     flex: 1,
     fontSize: 11,
     color: '#c2410c',
     fontWeight: '600',
-    lineHeight: 15,
+    lineHeight: 14,
   },
   chatQuotaPackageBtn: {
     backgroundColor: '#ea580c',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   chatQuotaPackageBtnText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
-  chatMessagesContainer: {
-    minHeight: 140,
-    maxHeight: 400,
+  chatMessagesScrollView: {
+    flex: 1,
+  },
+  chatMessagesScrollContent: {
+    paddingVertical: 8,
   },
   chatEmptyState: {
     alignItems: 'center',
