@@ -180,9 +180,11 @@ export const vehicleTaxonomyApi = {
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
+    drivetrain?: 'FWD' | 'RWD' | 'AWD' | null;
+    drivetrainNameTr?: string | null;
     isComplete: boolean;
     isCatalogVerified: boolean;
-    sources?: { displacement?: string; power?: string };
+    sources?: { displacement?: string; power?: string; drivetrain?: string };
     unresolvedConflict?: boolean;
   } | null> {
     if (!variantId) return null;
@@ -219,9 +221,11 @@ export const vehicleTaxonomyApi = {
     };
     engineDisplacementCc: number | null;
     enginePowerHp: number | null;
+    drivetrain?: 'FWD' | 'RWD' | 'AWD' | null;
+    drivetrainNameTr?: string | null;
     isComplete: boolean;
     isCatalogVerified: boolean;
-    sources?: { displacement?: string; power?: string };
+    sources?: { displacement?: string; power?: string; drivetrain?: string };
     unresolvedConflict?: boolean;
   } | null> {
     if (!variantId) return null;

@@ -220,17 +220,79 @@ export function verifyVehicleApplicationMatch(
   return { match: true };
 }
 
+export function resolveCanonicalDrivetrain(variant: any): {
+  drivetrain: 'FWD' | 'RWD' | 'AWD';
+  drivetrainNameTr: string;
+} {
+  const brandName = (variant?.brand?.name || '').trim().toLowerCase();
+  const modelName = (variant?.model?.name || '').trim().toLowerCase();
+  const engineCode = (variant?.engine?.code || '').trim().toLowerCase();
+  const trimName = (variant?.trim?.name || '').trim().toLowerCase();
+  const combined = `${brandName} ${modelName} ${engineCode} ${trimName}`;
+
+  // 1. Explicit AWD / 4WD
+  if (/xdrive|4matic|quattro|4motion|allgrip|awd|4x4|4wd|4-motion|e-four|syncro|symmetrical/i.test(combined)) {
+    return { drivetrain: 'AWD', drivetrainNameTr: 'Dört Çeker (AWD / 4x4)' };
+  }
+
+  // 2. BMW Architecture
+  if (brandName === 'bmw') {
+    // UKL / FAAR front-wheel-drive platforms (1 Serisi F40+, 2 Serisi Active Tourer/Gran Tourer/Gran Coupe, X1/X2 sDrive)
+    const isFwdBmw = /1 serisi|active tourer|gran tourer|gran coupe/i.test(modelName);
+    if (isFwdBmw) {
+      return { drivetrain: 'FWD', drivetrainNameTr: 'Önden Çekiş' };
+    }
+    // Classic BMW longitudinal RWD architecture (3 Serisi, 4 Serisi Coupe, 5 Serisi, 6 Serisi, 7 Serisi, 8 Serisi, Z4, etc.)
+    return { drivetrain: 'RWD', drivetrainNameTr: 'Arkadan İtiş' };
+  }
+
+  // 3. Mercedes-Benz Architecture
+  if (brandName.includes('mercedes')) {
+    // MFA transverse FWD platforms (A Serisi, B Serisi, CLA, GLA, GLB)
+    const isFwdBenz = /a serisi|b serisi|cla|gla|glb/i.test(modelName);
+    if (isFwdBenz) {
+      return { drivetrain: 'FWD', drivetrainNameTr: 'Önden Çekiş' };
+    }
+    // C Serisi, E Serisi, S Serisi, CLS, SL, etc.
+    return { drivetrain: 'RWD', drivetrainNameTr: 'Arkadan İtiş' };
+  }
+
+  // 4. Alfa Romeo
+  if (brandName.includes('alfa') && /giulia|4c/i.test(modelName)) {
+    return { drivetrain: 'RWD', drivetrainNameTr: 'Arkadan İtiş' };
+  }
+
+  // 5. Ford Mustang
+  if (brandName === 'ford' && /mustang/i.test(modelName)) {
+    return { drivetrain: 'RWD', drivetrainNameTr: 'Arkadan İtiş' };
+  }
+
+  // 6. Porsche
+  if (brandName === 'porsche') {
+    if (/cayenne|macan/i.test(modelName)) {
+      return { drivetrain: 'AWD', drivetrainNameTr: 'Dört Çeker (AWD / 4x4)' };
+    }
+    return { drivetrain: 'RWD', drivetrainNameTr: 'Arkadan İtiş' };
+  }
+
+  // Default to FWD
+  return { drivetrain: 'FWD', drivetrainNameTr: 'Önden Çekiş' };
+}
+
 export interface VariantTechnicalFactsResult {
   variantId: string;
   engineDisplacement: DisplacementFactField;
   enginePower: PowerFactField;
   engineDisplacementCc: number | null;
   enginePowerHp: number | null;
+  drivetrain: 'FWD' | 'RWD' | 'AWD' | null;
+  drivetrainNameTr: string | null;
   isComplete: boolean;
   isCatalogVerified: boolean;
   sources: {
     displacement?: string;
     power?: string;
+    drivetrain?: string;
   };
   unresolvedConflict?: boolean;
 }
@@ -356,6 +418,24 @@ export class VariantTechnicalFactsService {
         // Candidate is identical to badge * 1000 (e.g. 2000 for 2.0 / 2.0R).
         // WEAK SUSPICION SIGNAL ONLY: Does NOT auto-reject, but requires strong verified catalog evidence.
         isNominalBadgeCandidate = true;
+      }
+    }
+
+    // 3b. Manufacturer brand / market sanity guard (e.g. BMW Turkey 1.6L B48B16)
+    const brandName = (variant.brand?.name || '').toLowerCase();
+    if (brandName.includes('bmw')) {
+      // In Turkey, 320i, 420i, 520i are 1.6L (1598 cc B48B16 TR spec) or 2.0L (1998 cc global spec).
+      // They are NEVER 1.5L / ~1497 cc!
+      if (/320i|420i|520i/i.test(engineCode)) {
+        if (cc >= 1450 && cc <= 1550) {
+          return {
+            status: 'CONFLICT',
+            validCc: null,
+            evidenceQuality: 'WEAK',
+            suspicionReason: `BMW ${engineCode} in Turkey is 1.6L (1598 cc B48B16) or 2.0L (1998 cc). ${cc} cc is an erroneous secondary media scraping artifact.`,
+            reason: `BMW ${engineCode} cannot be ${cc} cc`,
+          };
+        }
       }
     }
 
@@ -945,6 +1025,8 @@ export class VariantTechnicalFactsService {
       this.metrics.cacheMissCount++;
     }
 
+    const dt = resolveCanonicalDrivetrain(variant);
+
     return {
       variantId,
       engineDisplacement: {
@@ -967,11 +1049,14 @@ export class VariantTechnicalFactsService {
       },
       engineDisplacementCc: dispStatus === 'VERIFIED' ? displacementCc : null,
       enginePowerHp: powerStatus === 'VERIFIED' ? powerHp : null,
+      drivetrain: dt.drivetrain,
+      drivetrainNameTr: dt.drivetrainNameTr,
       isComplete,
       isCatalogVerified,
       sources: {
         displacement: dispStatus === 'VERIFIED' ? displacementSource : undefined,
         power: powerStatus === 'VERIFIED' ? powerSource : undefined,
+        drivetrain: 'CANONICAL_VEHICLE_ARCHITECTURE',
       },
       unresolvedConflict: dispStatus === 'CONFLICT' || powerStatus === 'CONFLICT',
     };

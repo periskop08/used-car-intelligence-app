@@ -4,6 +4,7 @@ import {
   TechnicalFactEvidenceItem,
   DisplacementVerificationData,
   VariantTechnicalFactsService,
+  resolveCanonicalDrivetrain,
 } from '../variant-technical-facts.service';
 import { TechnicalSourceTier } from '@used-car-intelligence/shared';
 
@@ -236,6 +237,90 @@ describe('Canonical Technical Fact Provenance Hardening Specification', () => {
 
       // Ensure that without genuine provider origin, the fact requires fresh authentic verification
       expect(historicalEvidenceWithoutMetadata.provider).toBeUndefined();
+    });
+  });
+
+  describe('6. Canonical Drivetrain Architecture Inference', () => {
+    it('should correctly infer RWD (Arkadan İtiş) for BMW 3 Serisi Sedan', () => {
+      const result = resolveCanonicalDrivetrain({
+        brand: { name: 'BMW' },
+        model: { name: '3 Serisi' },
+        engine: { code: '320i' },
+        trim: { name: 'M Sport' },
+      });
+      expect(result.drivetrain).toBe('RWD');
+      expect(result.drivetrainNameTr).toBe('Arkadan İtiş');
+    });
+
+    it('should correctly infer AWD (Dört Çeker) for BMW xDrive model', () => {
+      const result = resolveCanonicalDrivetrain({
+        brand: { name: 'BMW' },
+        model: { name: '3 Serisi' },
+        engine: { code: '330i xDrive' },
+        trim: { name: 'Edition M Sport' },
+      });
+      expect(result.drivetrain).toBe('AWD');
+      expect(result.drivetrainNameTr).toBe('Dört Çeker (AWD / 4x4)');
+    });
+
+    it('should correctly infer FWD (Önden Çekiş) for BMW UKL platform (1 Serisi)', () => {
+      const result = resolveCanonicalDrivetrain({
+        brand: { name: 'BMW' },
+        model: { name: '1 Serisi' },
+        engine: { code: '118i' },
+        trim: { name: 'Sport Line' },
+      });
+      expect(result.drivetrain).toBe('FWD');
+      expect(result.drivetrainNameTr).toBe('Önden Çekiş');
+    });
+
+    it('should correctly infer RWD for Mercedes C Serisi and AWD for 4MATIC', () => {
+      const rwd = resolveCanonicalDrivetrain({
+        brand: { name: 'Mercedes-Benz' },
+        model: { name: 'C Serisi' },
+        engine: { code: 'C 200' },
+        trim: { name: 'AMG' },
+      });
+      expect(rwd.drivetrain).toBe('RWD');
+
+      const awd = resolveCanonicalDrivetrain({
+        brand: { name: 'Mercedes-Benz' },
+        model: { name: 'C Serisi' },
+        engine: { code: 'C 200 4MATIC' },
+        trim: { name: 'AMG' },
+      });
+      expect(awd.drivetrain).toBe('AWD');
+    });
+
+    it('should correctly infer FWD for standard consumer cars like Fiat Egea / VW Golf', () => {
+      const result = resolveCanonicalDrivetrain({
+        brand: { name: 'Fiat' },
+        model: { name: 'Egea' },
+        engine: { code: '1.4 Fire' },
+        trim: { name: 'Urban' },
+      });
+      expect(result.drivetrain).toBe('FWD');
+    });
+  });
+
+  describe('7. Manufacturer Engine Badge & Market Sanity Guard', () => {
+    it('should flag BMW 320i 1497 cc web scraping hallucination as CONFLICT', () => {
+      const mockService = new (VariantTechnicalFactsService as any)(null, null);
+      const res = mockService.evaluateDisplacementConsistency(
+        1497,
+        {
+          brand: { name: 'BMW' },
+          model: { name: '3 Serisi' },
+          engine: { code: '320i' },
+          trim: { name: 'M Sport' },
+        },
+        null,
+        false,
+        { source: 'https://www.arabalar.com.tr' }
+      );
+      expect(res.status).toBe('CONFLICT');
+      expect(res.validCc).toBeNull();
+      expect(res.reason).toContain('BMW 320i cannot be 1497 cc');
     });
   });
 });

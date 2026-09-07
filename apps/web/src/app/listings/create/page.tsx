@@ -90,6 +90,54 @@ const mapToTransmissionEnum = (tr: string): string => {
   return "AUTOMATIC";
 };
 
+const inferDrivetrain = (brand?: string, model?: string, engine?: string, trim?: string): "FWD" | "RWD" | "AWD" => {
+  const fullContext = `${brand || ""} ${model || ""} ${engine || ""} ${trim || ""}`.toLowerCase();
+
+  // 1. Explicit AWD / 4WD
+  if (/xdrive|4matic|quattro|4motion|allgrip|awd|4x4|4wd|4-motion|e-four|syncro|symmetrical/i.test(fullContext)) {
+    return "AWD";
+  }
+
+  const brandNorm = (brand || "").toLowerCase().trim();
+  const modelNorm = (model || "").toLowerCase().trim();
+
+  // 2. BMW Architecture
+  if (brandNorm === "bmw") {
+    // UKL / FAAR front-wheel-drive platforms (1 Serisi F40+, 2 Serisi Active Tourer/Gran Tourer/Gran Coupe, X1/X2 sDrive)
+    const isFwdBmw = /1 serisi|active tourer|gran tourer|gran coupe/i.test(modelNorm);
+    if (isFwdBmw) return "FWD";
+    // Classic BMW longitudinal RWD architecture (3 Serisi, 4 Serisi, 5 Serisi, 6 Serisi, 7 Serisi, 8 Serisi, Z4, etc.)
+    return "RWD";
+  }
+
+  // 3. Mercedes-Benz Architecture
+  if (brandNorm.includes("mercedes")) {
+    // MFA transverse FWD platforms (A Serisi, B Serisi, CLA, GLA, GLB)
+    const isFwdBenz = /a serisi|b serisi|cla|gla|glb/i.test(modelNorm);
+    if (isFwdBenz) return "FWD";
+    // C Serisi, E Serisi, S Serisi, CLS, SL, etc.
+    return "RWD";
+  }
+
+  // 4. Alfa Romeo
+  if (brandNorm.includes("alfa") && /giulia|4c/i.test(modelNorm)) {
+    return "RWD";
+  }
+
+  // 5. Ford Mustang
+  if (brandNorm === "ford" && /mustang/i.test(modelNorm)) {
+    return "RWD";
+  }
+
+  // 6. Porsche
+  if (brandNorm === "porsche") {
+    if (/cayenne|macan/i.test(modelNorm)) return "AWD";
+    return "RWD";
+  }
+
+  return "FWD";
+};
+
 export default function CreateListing() {
   const router = useRouter();
 
@@ -445,7 +493,11 @@ export default function CreateListing() {
         setFuelType(mapToFuelTypeEnum(currentFuel));
         setTransmission(mapToTransmissionEnum(currentTrans));
 
-        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP)
+        // Intelligently auto-populate verified drivetrain based on vehicle architecture
+        const initialDrivetrain = inferDrivetrain(selectedBrand, currentModel, currentEngine, trim);
+        setDrivetrain(initialDrivetrain);
+
+        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP + Drivetrain)
         resolveTechnicalSpecs(res.variantId);
       } else {
         setSelectedVariant("");
@@ -476,6 +528,10 @@ export default function CreateListing() {
       // Stale response guard: if user selected another variant while waiting, discard
       if (activeVariantEnrichmentRef.current !== variantId) {
         return;
+      }
+
+      if (specs?.drivetrain) {
+        setDrivetrain(specs.drivetrain);
       }
 
       // Check initial field-level status from Consistency Gate
@@ -521,6 +577,10 @@ export default function CreateListing() {
       // Stale response guard again after enrichment
       if (activeVariantEnrichmentRef.current !== variantId) {
         return;
+      }
+
+      if (specs?.drivetrain) {
+        setDrivetrain(specs.drivetrain);
       }
 
       const finalDispStatus = specs?.engineDisplacement?.status || (specs?.engineDisplacement?.verified ? "VERIFIED" : "MISSING");
@@ -1463,11 +1523,22 @@ export default function CreateListing() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                  {!useCustomVariant && selectedVariant && (
+                    <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                      ✓ Katalogdan
+                    </span>
+                  )}
+                </div>
                 <select
                   value={drivetrain}
                   onChange={(e) => setDrivetrain(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  className={`border rounded-xl px-4 py-3 text-xs outline-none transition ${
+                    !useCustomVariant && selectedVariant
+                      ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold"
+                      : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
+                  }`}
                 >
                   <option value="FWD">Önden Çekiş</option>
                   <option value="RWD">Arkadan İtiş</option>

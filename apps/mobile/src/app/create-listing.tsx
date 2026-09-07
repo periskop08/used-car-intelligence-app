@@ -132,6 +132,50 @@ const BODY_TYPES = [
   { label: 'Cabrio', val: 'CABRIO' },
 ];
 
+const inferDrivetrain = (brand?: string, model?: string, engine?: string, trim?: string): 'FWD' | 'RWD' | 'AWD' => {
+  const fullContext = `${brand || ''} ${model || ''} ${engine || ''} ${trim || ''}`.toLowerCase();
+
+  // 1. Explicit AWD / 4WD
+  if (/xdrive|4matic|quattro|4motion|allgrip|awd|4x4|4wd|4-motion|e-four|syncro|symmetrical/i.test(fullContext)) {
+    return 'AWD';
+  }
+
+  const brandNorm = (brand || '').toLowerCase().trim();
+  const modelNorm = (model || '').toLowerCase().trim();
+
+  // 2. BMW Architecture
+  if (brandNorm === 'bmw') {
+    const isFwdBmw = /1 serisi|active tourer|gran tourer|gran coupe/i.test(modelNorm);
+    if (isFwdBmw) return 'FWD';
+    return 'RWD';
+  }
+
+  // 3. Mercedes-Benz Architecture
+  if (brandNorm.includes('mercedes')) {
+    const isFwdBenz = /a serisi|b serisi|cla|gla|glb/i.test(modelNorm);
+    if (isFwdBenz) return 'FWD';
+    return 'RWD';
+  }
+
+  // 4. Alfa Romeo
+  if (brandNorm.includes('alfa') && /giulia|4c/i.test(modelNorm)) {
+    return 'RWD';
+  }
+
+  // 5. Ford Mustang
+  if (brandNorm === 'ford' && /mustang/i.test(modelNorm)) {
+    return 'RWD';
+  }
+
+  // 6. Porsche
+  if (brandNorm === 'porsche') {
+    if (/cayenne|macan/i.test(modelNorm)) return 'AWD';
+    return 'RWD';
+  }
+
+  return 'FWD';
+};
+
 const DRIVETRAINS = [
   { label: 'Önden Çekiş', val: 'FWD' },
   { label: 'Arkadan İtiş', val: 'RWD' },
@@ -640,6 +684,9 @@ export default function CreateListingScreen() {
         setFuelType(mapToFuelTypeEnum(currentFuel));
         setTransmission(mapToTransmissionEnum(currentTrans));
 
+        const initialDt = inferDrivetrain(currentBrand, currentModel, currentEngine, trimVal);
+        setDrivetrain(initialDt);
+
         // Auto-fill engine cc and hp from variant details
         try {
           const token =
@@ -681,6 +728,10 @@ export default function CreateListingScreen() {
               detail.engine?.displacement ||
               detail.specs?.engineDisplacement;
             if (cc) setEngineDisplacement(String(cc));
+
+            if (detail.specs?.drivetrain) {
+              setDrivetrain(detail.specs.drivetrain);
+            }
 
             if (!title) {
               setTitle(`${currentBrand} ${currentModel} ${currentEngine} ${trimVal} (${currentYear})`.trim());
