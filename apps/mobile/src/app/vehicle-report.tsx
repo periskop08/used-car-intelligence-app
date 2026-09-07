@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,6 +10,9 @@ import {
   Share,
   Image,
   Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -424,6 +427,19 @@ export default function VehicleReportScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [activeModalData, setActiveModalData] = useState<ModalDetailData | null>(null);
 
+  // AI Chatbot States & Live Rights Integration
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([]);
+  const [sendingChat, setSendingChat] = useState(false);
+  const [chatError, setChatError] = useState('');
+  const [userRights, setUserRights] = useState<{
+    tierName?: string;
+    isUnlimited?: boolean;
+    remaining?: number;
+    totalLimit?: number;
+    used?: number;
+  } | null>(null);
+
   const statusMessages = [
     'Araç verileri toplanıyor...',
     'Kullanıcı yorumları taranıyor...',
@@ -435,7 +451,149 @@ export default function VehicleReportScreen() {
 
   useEffect(() => {
     initReportLoad();
+    fetchUserRights();
   }, [rawVariantId]);
+
+  const fetchUserRights = async () => {
+    try {
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
+      if (!token) {
+        setUserRights(null);
+        return;
+      }
+      const res = await fetch(`${API_URL}/subscriptions/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const chatRight = data?.rights?.aiChat;
+        setUserRights({
+          tierName: data?.tierName || 'Tanışma Paketi',
+          isUnlimited: Boolean(data?.isUnlimited || chatRight?.isUnlimited),
+          remaining: chatRight?.remaining ?? 3,
+          totalLimit: chatRight?.totalLimit ?? 3,
+          used: chatRight?.used ?? 0,
+        });
+      }
+    } catch (e) {
+      console.error('Fetch user rights error:', e);
+    }
+  };
+
+  const handleSendChat = async (presetText?: string) => {
+    const textToSend = (presetText || chatQuestion).trim();
+    if (!textToSend) return;
+    if (!activeVariantId) {
+      Alert.alert('Bilgi', 'Araç verileri henüz yüklenmedi, lütfen bekleyin.');
+      return;
+    }
+
+    try {
+      const token =
+        (await AsyncStorage.getItem('accessToken')) ||
+        (await AsyncStorage.getItem('token'));
+      if (!token) {
+        Alert.alert(
+          'Giriş Gerekli',
+          'TorqueScout Yapay Zeka Danışmanına soru sormak ve soru haklarınızı kullanmak için lütfen giriş yapın.',
+          [
+            { text: 'Vazgeç', style: 'cancel' },
+            { text: 'Giriş Yap', onPress: () => router.push('/login') },
+          ]
+        );
+        return;
+      }
+
+      // Pre-check quota locally if loaded and not unlimited
+      if (userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0) {
+        Alert.alert(
+          'Soru Hakkınız Doldu',
+          'Mevcut AI Chatbot soru limitinizi doldurdunuz. Ek soru hakkı almak veya paketinizi yükseltmek için paketler sayfasını ziyaret edin.',
+          [
+            { text: 'Kapat', style: 'cancel' },
+            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
+          ]
+        );
+        return;
+      }
+
+      setChatQuestion('');
+      setSendingChat(true);
+      setChatError('');
+
+      // Add user question to list
+      setChatMessages((prev) => [...prev, { sender: 'user', text: textToSend }]);
+
+      const res = await fetch(`${API_URL}/reports/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          variantId: activeVariantId,
+          question: textToSend,
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson.message || 'Yapay zeka yanıt veremedi. Lütfen tekrar deneyin.';
+        setChatError(errMsg);
+        if (res.status === 403) {
+          Alert.alert('Limit Uyarısı', errMsg, [
+            { text: 'Kapat', style: 'cancel' },
+            { text: 'Paketleri İncele', onPress: () => router.push('/(tabs)/packages') },
+          ]);
+        }
+      } else {
+        const data = await res.json();
+        setChatMessages((prev) => [...prev, { sender: 'ai', text: data.response }]);
+        // Refresh live user rights quota
+        fetchUserRights();
+      }
+    } catch (err: any) {
+      setChatError(err.message || 'Bağlantı hatası oluştu.');
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  const renderChatAiText = (content: string) => {
+    if (!content) return null;
+    const lines = content.split('\n');
+    return (
+      <View style={{ gap: 4 }}>
+        {lines.map((line, lIdx) => {
+          const trimmed = line.trim();
+          if (!trimmed) return null;
+          const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ');
+          const rawText = isBullet ? trimmed.substring(2) : trimmed;
+          const parts = rawText.split(/(\*\*.*?\*\*)/g);
+
+          return (
+            <View key={lIdx} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              {isBullet && <Text style={styles.chatBullet}>• </Text>}
+              <Text style={styles.chatAiText}>
+                {parts.map((part, pIdx) => {
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    return (
+                      <Text key={pIdx} style={styles.chatBoldText}>
+                        {part.slice(2, -2)}
+                      </Text>
+                    );
+                  }
+                  return part;
+                })}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
   const resolveVariantIdFromParams = async (): Promise<string | null> => {
     try {
@@ -1259,6 +1417,194 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
+          {/* 7. TORQUESCOUT YAPAY ZEKA DANIŞMANI (AI CHATBOT & CANLI HAK KOTASI) */}
+          <View style={styles.chatSectionCard}>
+            {/* Header */}
+            <View style={styles.chatHeaderRow}>
+              <View style={styles.chatHeaderLeft}>
+                <View style={styles.chatAvatarHeaderBox}>
+                  <Ionicons name="chatbubbles" size={20} color="#ea580c" />
+                </View>
+                <View>
+                  <Text style={styles.chatHeaderTitle}>TorqueScout Yapay Zeka Danışmanı</Text>
+                  <View style={styles.chatLiveRow}>
+                    <View style={styles.chatLiveDot} />
+                    <Text style={styles.chatLiveText}>Çevrimiçi • Rapor Verilerine Hakim</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Rights Badge Pill */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push('/profile/package-rights')}
+                style={styles.chatRightsBadgePill}
+              >
+                <Text style={styles.chatRightsBadgeText}>
+                  ⚡ {userRights
+                    ? userRights.isUnlimited
+                      ? 'Sınırsız Hak'
+                      : `${userRights.remaining ?? 0} Soru Hakkı`
+                    : 'Kullanım Hakkı'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quota Exhaustion Warning (if 0 remaining) */}
+            {userRights && !userRights.isUnlimited && (userRights.remaining ?? 0) <= 0 && (
+              <View style={styles.chatQuotaWarningBanner}>
+                <Ionicons name="alert-circle" size={18} color="#c2410c" />
+                <Text style={styles.chatQuotaWarningText}>
+                  Soru hakkınız kalmadı. Ek hak için paketleri inceleyin.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/packages')}
+                  style={styles.chatQuotaPackageBtn}
+                >
+                  <Text style={styles.chatQuotaPackageBtnText}>Paketler</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Messages Area */}
+            <View style={styles.chatMessagesContainer}>
+              {chatMessages.length === 0 ? (
+                <View style={styles.chatEmptyState}>
+                  <View style={styles.chatBotIconCircle}>
+                    <Text style={{ fontSize: 28 }}>🤖</Text>
+                  </View>
+                  <Text style={styles.chatEmptyTitle}>
+                    Bu Araç Hakkında Merak Ettiğinizi Sorun!
+                  </Text>
+                  <Text style={styles.chatEmptySubtitle}>
+                    Motor sağlığı, kronik arıza riskleri, şanzıman tepkileri veya satın alma tavsiyesi hakkında dilediğinizi sorabilirsiniz.
+                  </Text>
+
+                  {/* Suggestion Chips */}
+                  <View style={styles.chatSuggestionsGrid}>
+                    <TouchableOpacity
+                      style={styles.chatSuggestionChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleSendChat('Bu aracın kronik motor problemi var mı?')}
+                    >
+                      <Text style={styles.chatSuggestionText}>💡 Kronik motor problemi var mı?</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.chatSuggestionChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleSendChat('Şanzımanı uzun vadede üzer mi?')}
+                    >
+                      <Text style={styles.chatSuggestionText}>💡 Şanzımanı uzun vadede üzer mi?</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.chatSuggestionChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleSendChat('Ekspertizde özellikle nelere baktırmalıyım?')}
+                    >
+                      <Text style={styles.chatSuggestionText}>💡 Ekspertizde nelere baktırmalıyım?</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.chatSuggestionChip}
+                      activeOpacity={0.8}
+                      onPress={() => handleSendChat('Şehir içi gerçek yakıt tüketimi nasıldır?')}
+                    >
+                      <Text style={styles.chatSuggestionText}>💡 Şehir içi yakıt tüketimi nasıldır?</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.chatMessagesList}>
+                  {chatMessages.map((msg, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.chatBubbleRow,
+                        msg.sender === 'user' ? styles.chatBubbleRowUser : styles.chatBubbleRowAi,
+                      ]}
+                    >
+                      {msg.sender === 'ai' && (
+                        <View style={styles.chatAiAvatarBox}>
+                          <Text style={{ fontSize: 13 }}>🤖</Text>
+                        </View>
+                      )}
+
+                      <View
+                        style={[
+                          styles.chatBubbleCard,
+                          msg.sender === 'user' ? styles.chatBubbleCardUser : styles.chatBubbleCardAi,
+                        ]}
+                      >
+                        {msg.sender === 'user' ? (
+                          <Text style={styles.chatUserText}>{msg.text}</Text>
+                        ) : (
+                          renderChatAiText(msg.text)
+                        )}
+                      </View>
+
+                      {msg.sender === 'user' && (
+                        <View style={styles.chatUserAvatarBox}>
+                          <Text style={{ fontSize: 13 }}>🧑‍💻</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+
+                  {sendingChat && (
+                    <View style={[styles.chatBubbleRow, styles.chatBubbleRowAi]}>
+                      <View style={styles.chatAiAvatarBox}>
+                        <Text style={{ fontSize: 13 }}>🤖</Text>
+                      </View>
+                      <View style={[styles.chatBubbleCard, styles.chatBubbleCardAi, styles.chatThinkingBox]}>
+                        <ActivityIndicator size="small" color="#ea580c" />
+                        <Text style={styles.chatThinkingText}>Yapay zeka analiz ediyor...</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Error Banner */}
+            {Boolean(chatError) && (
+              <View style={styles.chatErrorBox}>
+                <Ionicons name="warning" size={14} color="#dc2626" />
+                <Text style={styles.chatErrorText}>{chatError}</Text>
+              </View>
+            )}
+
+            {/* Input Bar */}
+            <View style={styles.chatInputRow}>
+              <TextInput
+                value={chatQuestion}
+                onChangeText={setChatQuestion}
+                placeholder="Bu araca dair sorunuzu yazın..."
+                placeholderTextColor="#94a3b8"
+                style={styles.chatTextInput}
+                returnKeyType="send"
+                onSubmitEditing={() => handleSendChat()}
+                editable={!sendingChat}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.chatSendBtn,
+                  (!chatQuestion.trim() || sendingChat) && styles.chatSendBtnDisabled,
+                ]}
+                activeOpacity={0.8}
+                disabled={!chatQuestion.trim() || sendingChat}
+                onPress={() => handleSendChat()}
+              >
+                {sendingChat ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Ionicons name="send" size={16} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Bottom Disclaimer Banner */}
           <View style={styles.bottomBannerLight}>
             <Ionicons name="information-circle" size={20} color="#2563eb" />
@@ -1820,6 +2166,288 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 16,
     fontWeight: '600',
+  },
+
+  // 7. AI Chatbot Section Styles
+  chatSectionCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginTop: 4,
+  },
+  chatHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  chatHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  chatAvatarHeaderBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  chatLiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  chatLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16a34a',
+  },
+  chatLiveText: {
+    fontSize: 10,
+    color: '#16a34a',
+    fontWeight: '700',
+  },
+  chatRightsBadgePill: {
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  chatRightsBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ea580c',
+  },
+  chatQuotaWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    padding: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  chatQuotaWarningText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#c2410c',
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  chatQuotaPackageBtn: {
+    backgroundColor: '#ea580c',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  chatQuotaPackageBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  chatMessagesContainer: {
+    minHeight: 140,
+    maxHeight: 400,
+  },
+  chatEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  chatBotIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatEmptyTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  chatEmptySubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 10,
+  },
+  chatSuggestionsGrid: {
+    width: '100%',
+    gap: 6,
+    marginTop: 8,
+  },
+  chatSuggestionChip: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chatSuggestionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  chatMessagesList: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  chatBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginVertical: 2,
+  },
+  chatBubbleRowUser: {
+    justifyContent: 'flex-end',
+  },
+  chatBubbleRowAi: {
+    justifyContent: 'flex-start',
+  },
+  chatUserAvatarBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  chatAiAvatarBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  chatBubbleCard: {
+    maxWidth: '82%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  chatBubbleCardUser: {
+    backgroundColor: '#ea580c',
+    borderTopRightRadius: 2,
+  },
+  chatBubbleCardAi: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderTopLeftRadius: 2,
+  },
+  chatUserText: {
+    color: '#ffffff',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  chatAiText: {
+    color: '#1e293b',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  chatBoldText: {
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  chatBullet: {
+    color: '#ea580c',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  chatThinkingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  chatThinkingText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  chatErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 10,
+    padding: 8,
+    gap: 6,
+  },
+  chatErrorText: {
+    color: '#dc2626',
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  chatTextInput: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  chatSendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#ea580c',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatSendBtnDisabled: {
+    backgroundColor: '#cbd5e1',
   },
 
   loadingContainerLight: {
