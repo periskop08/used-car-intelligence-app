@@ -656,6 +656,40 @@ export class VariantTechnicalFactsService {
       }
     }
 
+    // Generic Engine-Identity Fact Propagation (Read Path):
+    // If exact variant displacement is MISSING but another variant sharing the EXACT SAME engineId,
+    // brandId, and modelId is VERIFIED with authoritative provider provenance, resolve it cleanly.
+    if (dispStatus === 'MISSING' && variant.engineId && variant.modelId && variant.brandId) {
+      const verifiedSibling = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brandId: variant.brandId,
+          modelId: variant.modelId,
+          engineId: variant.engineId,
+          id: { not: variant.id },
+          specs: {
+            specs: {
+              path: ['displacementVerification', 'status'],
+              equals: 'VERIFIED',
+            },
+          },
+        },
+        include: { specs: true },
+      });
+
+      if (verifiedSibling?.specs?.specs) {
+        const sibSpecs = verifiedSibling.specs.specs as Record<string, any>;
+        const sibVerif = sibSpecs.displacementVerification as DisplacementVerificationData;
+        if (sibVerif && sibVerif.status === 'VERIFIED' && sibVerif.valueCc && Array.isArray(sibVerif.evidence)) {
+          const primaryEv = sibVerif.evidence.find((e) => e.accepted) || sibVerif.evidence[0];
+          dispStatus = 'VERIFIED';
+          displacementCc = sibVerif.valueCc;
+          displacementSource = primaryEv?.url || sibSpecs.displacementSource || 'CANONICAL_ENGINE_CATALOG_REUSE';
+          dispEvidence = primaryEv?.evidenceExcerpt || sibSpecs.displacementEvidence;
+          dispQuality = 'STRONG';
+        }
+      }
+    }
+
     if (
       variant.powerEnrichment?.verificationStatus === PowerVerificationStatus.VERIFIED &&
       (typeof variant.powerEnrichment?.powerHp === 'number' || typeof variant.powerEnrichment?.powerPs === 'number')
@@ -697,6 +731,61 @@ export class VariantTechnicalFactsService {
           powerHp = gateResult.validHp;
           powerQuality = gateResult.evidenceQuality || 'STRONG';
           powerSource = 'POWER_ENRICHMENT_VERIFIED';
+        }
+      }
+    }
+
+    // Generic Engine-Identity Power Fact Propagation (Read Path):
+    // If exact variant power is MISSING but another variant sharing the EXACT SAME engineId,
+    // brandId, and modelId has verified powerEnrichment with authoritative provenance, resolve it cleanly.
+    if (powerStatus === 'MISSING' && variant.engineId && variant.modelId && variant.brandId) {
+      const verifiedPowerSibling = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brandId: variant.brandId,
+          modelId: variant.modelId,
+          engineId: variant.engineId,
+          id: { not: variant.id },
+          powerEnrichment: {
+            verificationStatus: PowerVerificationStatus.VERIFIED,
+          },
+        },
+        include: {
+          powerEnrichment: {
+            include: { evidences: true },
+          },
+        },
+      });
+
+      if (verifiedPowerSibling?.powerEnrichment) {
+        const pe = verifiedPowerSibling.powerEnrichment;
+        const evidences = pe.evidences || [];
+        const hasAcceptedEvidence =
+          evidences.length > 0 &&
+          evidences.some((e: any) => {
+            const meta = e.metadata as any;
+            const hasProvider =
+              meta && (meta.provider === 'serper' || meta.provider === 'gemini_grounding' || meta.provider === 'direct_fetch');
+            const tier = classifySourceTier(e.sourceUrl || e.sourceDomain, variant.brand?.name).tier;
+            return hasProvider && tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM && meta.applicationMatch !== false;
+          });
+
+        if (hasAcceptedEvidence) {
+          let canonicalHp = pe.powerHp;
+          if (typeof pe.powerPs === 'number' && pe.powerPs > 0) {
+            canonicalHp = Math.round(pe.powerPs);
+          } else if (typeof pe.sourceReportedValue === 'number' && pe.sourceReportedUnit) {
+            canonicalHp = convertPowerUnits(pe.sourceReportedValue, pe.sourceReportedUnit).powerHp;
+          }
+          if (typeof canonicalHp === 'number') {
+            const gateResult = this.evaluatePowerConsistency(canonicalHp, variant, true);
+            if (gateResult.status === 'VERIFIED') {
+              const primaryEv = evidences.find((e: any) => e.sourceUrl) || evidences[0];
+              powerStatus = 'VERIFIED';
+              powerHp = gateResult.validHp;
+              powerQuality = gateResult.evidenceQuality || 'STRONG';
+              powerSource = primaryEv?.sourceUrl || 'CANONICAL_ENGINE_CATALOG_REUSE';
+            }
+          }
         }
       }
     }
@@ -865,6 +954,32 @@ export class VariantTechnicalFactsService {
     const existing = await this.getVariantTechnicalFacts(variantId);
     if (!options?.forceRefresh && existing.isComplete) {
       this.logger.log(`[SHORT_CIRCUIT] Variant ${variantId} technical facts already VERIFIED. Zero external research triggered.`);
+      // If displacement was resolved via engine propagation and variant's own specs is not yet persisted:
+      try {
+        const currentSpec = await this.prisma.technicalSpec.findUnique({ where: { variantId } });
+        const currentSpecsObj = (currentSpec?.specs as Record<string, any>) || {};
+        if (
+          existing.engineDisplacement.status === 'VERIFIED' &&
+          existing.engineDisplacementCc &&
+          (!currentSpecsObj.displacementVerification ||
+            currentSpecsObj.displacementVerification.status !== 'VERIFIED' ||
+            currentSpecsObj.displacementSource !== existing.sources.displacement)
+        ) {
+          await this.reconcileCanonicalTechnicalFacts({
+            variantId,
+            trigger: 'EXPLICIT_ENRICHMENT',
+            displacementCandidate: {
+              valueCc: existing.engineDisplacementCc,
+              source: existing.sources.displacement,
+              evidence: existing.engineDisplacement.evidence,
+              quality: 'STRONG',
+              isExplicitlyVerified: true,
+            },
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not eagerly persist propagated facts for ${variantId}: ${err.message}`);
+      }
       return existing;
     }
 
@@ -1591,10 +1706,55 @@ export class VariantTechnicalFactsService {
     const targetModel = modelName.toLowerCase();
     const targetBrand = brandName.toLowerCase();
 
+    // Prioritize generic engine-identity propagation before expensive web queries:
+    if (variant.brandId && variant.modelId && variant.engineId) {
+      const verifiedSibling = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brandId: variant.brandId,
+          modelId: variant.modelId,
+          engineId: variant.engineId,
+          id: { not: variant.id },
+          specs: {
+            specs: {
+              path: ['displacementVerification', 'status'],
+              equals: 'VERIFIED',
+            },
+          },
+        },
+        include: { specs: true },
+      });
+
+      if (verifiedSibling?.specs?.specs) {
+        const sibSpecs = verifiedSibling.specs.specs as Record<string, any>;
+        const sibVerif = sibSpecs.displacementVerification as DisplacementVerificationData;
+        if (sibVerif && sibVerif.status === 'VERIFIED' && sibVerif.valueCc && Array.isArray(sibVerif.evidence) && sibVerif.evidence.length > 0) {
+          this.logger.log(`[CANONICAL_ENGINE_PROPAGATION] Reusing verified displacement ${sibVerif.valueCc} cc from sibling variant ${verifiedSibling.id} (engineId: ${variant.engineId})`);
+          const primaryEv = sibVerif.evidence.find((e) => e.accepted) || sibVerif.evidence[0];
+          return {
+            displacementCc: sibVerif.valueCc,
+            source: primaryEv.url || sibSpecs.displacementSource || 'CANONICAL_ENGINE_CATALOG_REUSE',
+            evidence: primaryEv.evidenceExcerpt || sibSpecs.displacementEvidence,
+            evidences: sibVerif.evidence,
+          };
+        }
+      }
+    }
+
+    const cleanTokens = (str: string) =>
+      str
+        .replace(/\b(standart|standard|default)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const cleanTrim = cleanTokens(trimName);
+    const cleanGen = cleanTokens(generationName);
+
     // ----------------------------------------------------
     // PHASE 1: TURKEY PRIMARY RESEARCH
     // ----------------------------------------------------
-    const trQuery = `${brandName} ${modelName} ${generationName ? generationName + ' ' : ''}${year} ${engineCode} ${trimName} silindir hacmi motor hacmi cc teknik özellikleri`.trim();
+    const trQuery = `${brandName} ${modelName} ${cleanGen ? cleanGen + ' ' : ''}${year} ${engineCode} ${cleanTrim} silindir hacmi motor hacmi cc teknik özellikleri`
+      .replace(/\s+/g, ' ')
+      .trim();
     this.logger.log(`[DISPLACEMENT_SEARCH] (TR_PRIMARY) Query: "${trQuery}" (Full Identity: "${identityParts}")`);
 
     this.metrics.externalWebSearchCalls++;

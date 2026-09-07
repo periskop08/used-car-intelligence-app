@@ -57,6 +57,13 @@ const TIER_3_CATALOG_DOMAINS = [
   'autoweek.nl',
   'arabam.com',
   'sahibinden.com',
+  'epey.com',
+  'drive.place',
+  'conceptcarz.com',
+  'car.info',
+  'auto-types.com',
+  'cars-directory.net',
+  'supercars.net',
   'auto-catalog.com',
   'specs.cars',
 ];
