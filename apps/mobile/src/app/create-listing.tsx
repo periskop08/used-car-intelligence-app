@@ -652,17 +652,33 @@ export default function CreateListingScreen() {
             const detail = await detailRes.json();
             setMatchedVariantDetail(detail);
 
-            const hp =
+            let hp =
               detail.powerEnrichment?.powerHp ||
+              detail.specs?.specs?.enginePowerHp ||
+              detail.specs?.specs?.powerHp ||
+              detail.specs?.enginePowerHp ||
               detail.engine?.powerHp ||
-              detail.engine?.horsepower ||
-              detail.specs?.enginePowerHp;
+              detail.engine?.horsepower;
+
+            if (!hp) {
+              try {
+                const enrichRes = await fetch(`${API_URL}/vehicles/variants/${json.variantId}/power-enrichment`);
+                if (enrichRes.ok) {
+                  const enrichJson = await enrichRes.json();
+                  if (enrichJson?.powerHp) {
+                    hp = enrichJson.powerHp;
+                  }
+                }
+              } catch (enrichErr) {}
+            }
+
             if (hp) setEnginePower(String(hp));
 
             const cc =
+              detail.specs?.specs?.engineDisplacementCc ||
+              detail.specs?.engineDisplacementCc ||
               detail.engine?.displacementCc ||
               detail.engine?.displacement ||
-              detail.specs?.engineDisplacementCc ||
               detail.specs?.engineDisplacement;
             if (cc) setEngineDisplacement(String(cc));
 
@@ -1476,10 +1492,18 @@ export default function CreateListingScreen() {
             {/* Motor Hacmi (cc) & Motor Gücü (HP) */}
             <View style={styles.rowTwoCols}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Motor Hacmi (cc)</Text>
+                <View style={styles.labelWithBadgeRow}>
+                  <Text style={styles.inputLabel}>Motor Hacmi (cc)</Text>
+                  {!!selectedVariantId && !!engineDisplacement && (
+                    <View style={styles.catalogBadge}>
+                      <Ionicons name="checkmark" size={10} color="#16a34a" />
+                      <Text style={styles.catalogBadgeText}>Katalogdan</Text>
+                    </View>
+                  )}
+                </View>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: 1798"
+                  placeholder="Örn: 1498"
                   placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={engineDisplacement}
@@ -1487,10 +1511,18 @@ export default function CreateListingScreen() {
                 />
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Motor Gücü (HP)</Text>
+                <View style={styles.labelWithBadgeRow}>
+                  <Text style={styles.inputLabel}>Motor Gücü (HP)</Text>
+                  {!!selectedVariantId && !!enginePower && (
+                    <View style={styles.catalogBadge}>
+                      <Ionicons name="checkmark" size={10} color="#16a34a" />
+                      <Text style={styles.catalogBadgeText}>Katalogdan</Text>
+                    </View>
+                  )}
+                </View>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Örn: 180"
+                  placeholder="Örn: 150"
                   placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                   value={enginePower}
@@ -2499,5 +2531,25 @@ const styles = StyleSheet.create({
   pickerOptionTextActive: {
     color: '#ea580c',
     fontWeight: '700',
+  },
+  labelWithBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  catalogBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  catalogBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#15803d',
   },
 });

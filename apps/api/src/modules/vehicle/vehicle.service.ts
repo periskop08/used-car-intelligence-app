@@ -101,6 +101,7 @@ export class VehicleService {
         trim: true,
         country: true,
         specs: true,
+        powerEnrichment: true,
         problems: {
           where: { status: ApprovalStatus.APPROVED },
           include: { translations: true },
