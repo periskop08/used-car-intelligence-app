@@ -13,6 +13,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -442,6 +444,40 @@ export default function VehicleReportScreen() {
   } | null>(null);
   const chatScrollRef = useRef<ScrollView>(null);
 
+  // Swipe-Down-To-Dismiss PanResponder
+  const chatPanY = useRef(new Animated.Value(0)).current;
+  const chatPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 5;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          chatPanY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 80 || gestureState.vy > 0.6) {
+          Animated.timing(chatPanY, {
+            toValue: 600,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => {
+            setIsChatModalVisible(false);
+            chatPanY.setValue(0);
+          });
+        } else {
+          Animated.spring(chatPanY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   const statusMessages = [
     'Araç verileri toplanıyor...',
     'Kullanıcı yorumları taranıyor...',
@@ -485,6 +521,7 @@ export default function VehicleReportScreen() {
   };
 
   const openChatModal = () => {
+    chatPanY.setValue(0);
     if (chatMessages.length === 0) {
       const carName = report
         ? `${report.vehicleIdentity.modelYear} ${report.vehicleIdentity.brand} ${report.vehicleIdentity.model}`
@@ -1479,12 +1516,21 @@ export default function VehicleReportScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.chatModalOverlay}
         >
-          <View style={styles.chatModalContainer}>
-            {/* Top Handle Bar */}
-            <View style={styles.modalHandleBar} />
+          <Animated.View
+            style={[
+              styles.chatModalContainer,
+              {
+                transform: [{ translateY: chatPanY }],
+              },
+            ]}
+          >
+            {/* Top Drag Handle Area (Swipe Down to Dismiss) */}
+            <View {...chatPanResponder.panHandlers} style={styles.chatDragHandleArea}>
+              <View style={styles.modalHandleBar} />
+            </View>
 
             {/* Header */}
-            <View style={styles.chatHeaderRow}>
+            <View {...chatPanResponder.panHandlers} style={styles.chatHeaderRow}>
               <View style={styles.chatHeaderLeft}>
                 <View style={styles.chatAvatarHeaderBox}>
                   <Ionicons name="chatbubbles" size={18} color="#ea580c" />
@@ -1680,7 +1726,7 @@ export default function VehicleReportScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -2293,14 +2339,21 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 24,
-    height: '82%',
+    height: '84%',
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 10,
+  },
+  chatDragHandleArea: {
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   chatHeaderRow: {
     flexDirection: 'row',
