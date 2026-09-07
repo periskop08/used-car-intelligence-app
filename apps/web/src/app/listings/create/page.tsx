@@ -144,6 +144,7 @@ export default function CreateListing() {
   const [powerVerified, setPowerVerified] = useState(false);
   const [techSpecsConflict, setTechSpecsConflict] = useState(false);
   const activeVariantEnrichmentRef = useRef<string>("");
+  const lastPrefetchedVariantIdRef = useRef<string>("");
 
   // Custom details fallback if variant doesn't exist
   const [useCustomVariant, setUseCustomVariant] = useState(false);
@@ -232,6 +233,12 @@ export default function CreateListing() {
       .then((data) => setPromotionPricingDetails(data))
       .catch(() => null);
   }, []);
+
+  const clearSelectedVariant = () => {
+    setSelectedVariant("");
+    activeVariantEnrichmentRef.current = "";
+    lastPrefetchedVariantIdRef.current = "";
+  };
 
   // Cascade Handlers for 8 Canonical Dimensions
   const handleBrandChange = async (brand: string) => {
@@ -453,8 +460,12 @@ export default function CreateListing() {
     }
   };
 
-  const resolveTechnicalSpecs = async (variantId: string) => {
+  const resolveTechnicalSpecs = async (variantId: string, forceRetry: boolean = false) => {
     if (!variantId) return;
+    if (!forceRetry && lastPrefetchedVariantIdRef.current === variantId) {
+      return;
+    }
+    lastPrefetchedVariantIdRef.current = variantId;
     activeVariantEnrichmentRef.current = variantId;
     setLoadingTechSpecs(true);
     setTechSpecsConflict(false);
@@ -492,9 +503,10 @@ export default function CreateListing() {
       const needsDisplacement = initDispStatus !== "VERIFIED";
       const needsPower = initPwrStatus !== "VERIFIED";
 
-      if ((needsDisplacement || needsPower) && token) {
+      const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") : "") || "";
+      if ((needsDisplacement || needsPower) && authToken) {
         // Enforce 15s bounded timeout on client enrichment request to eliminate infinite spinner
-        const enrichmentPromise = vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
+        const enrichmentPromise = vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, authToken);
         const timeoutPromise = new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error("TECHNICAL_ENRICHMENT_TIMEOUT")), 15000)
         );
@@ -1546,7 +1558,7 @@ export default function CreateListing() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => resolveTechnicalSpecs(selectedVariant)}
+                    onClick={() => resolveTechnicalSpecs(selectedVariant, true)}
                     className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold rounded-xl border border-rose-500/30 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                   >
                     <span>🔄</span>

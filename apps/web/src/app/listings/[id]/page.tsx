@@ -471,6 +471,8 @@ export default function ListingDetail() {
                   {(() => {
                     const tf = (listing as any).technicalFacts?.enginePower;
                     if (tf?.verified && tf?.valueHp) return `${tf.valueHp} HP`;
+                    const variantHp = (listing as any).vehicleVariant?.powerEnrichment?.powerHp;
+                    if (variantHp) return `${variantHp} HP`;
                     if (listing.enginePower) return `${listing.enginePower} HP`;
                     return "-";
                   })()}
@@ -484,6 +486,8 @@ export default function ListingDetail() {
                   {(() => {
                     const tf = (listing as any).technicalFacts?.engineDisplacement;
                     if (tf?.verified && tf?.valueCc) return `${tf.valueCc} cc`;
+                    const variantCc = (listing as any).vehicleVariant?.specs?.specs?.engineDisplacementCc;
+                    if (variantCc) return `${variantCc} cc`;
                     if (listing.engineDisplacement) return `${listing.engineDisplacement} cc`;
                     return "-";
                   })()}

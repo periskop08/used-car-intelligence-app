@@ -28,43 +28,60 @@ export interface ConvertedPower {
 /**
  * Converts reported power values (HP, PS, kW) to canonical normalized units
  * using standard automotive physics conversion constants.
+ *
+ * TORQUESCOUT USER-FACING POWER CONVENTION:
+ * The field displayed to Turkish users as "Motor Gücü (HP)" uses the manufacturer-market
+ * nominal metric horsepower value (PS / bg) as the canonical user-facing integer power convention.
+ * Therefore: 147 kW / 200 PS -> TorqueScout displays 200 HP.
  */
 export function convertPowerUnits(value: number, unit: string): ConvertedPower {
-  const normalizedUnit = (unit || 'HP').trim().toUpperCase();
+  const normalizedUnit = (unit || 'PS').trim().toUpperCase();
   const val = Number(value);
 
   if (normalizedUnit === 'KW') {
-    const hp = Math.round(val * 1.34102);
     const ps = Math.round(val * 1.35962);
     return {
       sourceReportedValue: val,
       sourceReportedUnit: 'KW',
       powerKw: val,
       powerPs: ps,
-      powerHp: hp,
+      powerHp: ps, // Canonical TorqueScout convention: PS/bg is the user-facing HP integer
     };
   }
 
   if (normalizedUnit === 'PS' || normalizedUnit === 'BG') {
-    const hp = Math.round(val * 0.98632);
-    const kw = Math.round((val * 0.7355) * 10) / 10;
+    const ps = Math.round(val);
+    const kw = Math.round((val * 0.73549875) * 10) / 10;
     return {
       sourceReportedValue: val,
       sourceReportedUnit: 'PS',
       powerKw: kw,
-      powerPs: val,
-      powerHp: hp,
+      powerPs: ps,
+      powerHp: ps, // Nominal manufacturer PS/bg used directly as user-facing HP
     };
   }
 
-  // Default: HP (BHP)
-  const ps = Math.round(val * 1.01387);
-  const kw = Math.round((val * 0.7457) * 10) / 10;
+  // Imperial BHP: normalize to canonical metric horsepower convention
+  if (normalizedUnit === 'BHP') {
+    const ps = Math.round(val * 1.01387);
+    const kw = Math.round((val * 0.7457) * 10) / 10;
+    return {
+      sourceReportedValue: val,
+      sourceReportedUnit: 'HP',
+      powerKw: kw,
+      powerPs: ps,
+      powerHp: ps,
+    };
+  }
+
+  // Generic HP: In Turkish/EU automotive context, 'HP' in catalog sources usually means PS/bg (e.g. 200 HP = 200 PS).
+  const ps = Math.round(val);
+  const kw = Math.round((val * 0.73549875) * 10) / 10;
   return {
     sourceReportedValue: val,
     sourceReportedUnit: 'HP',
     powerKw: kw,
     powerPs: ps,
-    powerHp: val,
+    powerHp: ps,
   };
 }

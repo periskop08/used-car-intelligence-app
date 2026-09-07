@@ -14,6 +14,34 @@ export interface SearchResultItem {
   score?: number;
   sourceKind?: any;
   reliabilityScore?: number;
+  provider?: 'serper' | 'gemini_grounding' | 'direct_fetch' | string;
+  providerResultId?: string;
+  providerCitationUri?: string;
+  resolvedUrl?: string;
+  providerSnippet?: string | null;
+  retrievedPageExcerpt?: string | null;
+  retrievedPageText?: string | null;
+  contentHash?: string;
+  retrievedAt?: string;
+}
+
+export interface RetrievedSource {
+  sourceId?: string; // Request-local only: "S1", "S2", ...
+  provider: 'serper' | 'gemini_grounding' | 'direct_fetch';
+  providerResultId?: string;
+  providerCitationUri?: string;
+  resolvedUrl: string;
+  url: string;
+  domain: string;
+  title: string;
+  snippet: string;
+  providerSnippet?: string | null;
+  retrievedPageExcerpt?: string | null;
+  retrievedPageText?: string | null;
+  contentHash?: string;
+  retrievedAt: string;
+  sourceKind?: any;
+  reliabilityScore?: number;
 }
 
 export interface SearchResponse {

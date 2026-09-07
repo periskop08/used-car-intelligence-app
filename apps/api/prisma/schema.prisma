@@ -3250,6 +3250,7 @@ model VehiclePowerEvidence {
   title           String?
   evidenceExcerpt String?
   retrievedAt     DateTime               @default(now())
+  metadata        Json?
 
   enrichment      VehiclePowerEnrichment @relation(fields: [enrichmentId], references: [id], onDelete: Cascade)
 

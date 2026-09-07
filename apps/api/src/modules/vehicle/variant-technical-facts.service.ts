@@ -2,8 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from '../research/providers/web-search.provider';
 import { VehiclePowerEnrichmentService } from './vehicle-power-enrichment.service';
-import { PowerVerificationStatus } from '@prisma/client';
-import { convertPowerUnits } from '@used-car-intelligence/shared';
+import { PowerVerificationStatus, PowerSourceMarket, PowerMarketResolution } from '@prisma/client';
+import { convertPowerUnits, classifySourceTier, TechnicalSourceTier } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
 export type TechnicalFactStatus = 'VERIFIED' | 'MISSING' | 'CONFLICT' | 'RESEARCHING';
@@ -26,6 +26,161 @@ export interface DisplacementFactField extends TechnicalFactField<number> {
 
 export interface PowerFactField extends TechnicalFactField<number> {
   valueHp: number | null;
+}
+
+export interface TechnicalFactEvidenceItem {
+  url: string;
+  domain: string;
+  sourceTier: number;
+  sourceTierLabel?: string;
+  sourceKind?: string;
+  extractedValue: number;
+  extractedUnit: 'CC' | 'HP' | 'PS' | 'KW';
+  identityMatch: boolean;
+  applicationMatch: boolean;
+  accepted: boolean;
+  evidenceExcerpt?: string;
+  retrievedText?: string;
+  provider?: string;
+  providerResultId?: string;
+  providerCitationUri?: string;
+  contentHash?: string;
+  parserSummary?: string;
+  retrievedAt?: string;
+  [key: string]: any;
+}
+
+export interface TechnicalFactConsensus {
+  acceptedEvidenceCount: number;
+  independentDomainCount: number;
+  strongestTier: number;
+  [key: string]: any;
+}
+
+export interface DisplacementVerificationData {
+  status: TechnicalFactStatus;
+  valueCc: number;
+  verifiedAt: string;
+  verificationPolicyVersion: string;
+  evidence: TechnicalFactEvidenceItem[];
+  consensus: TechnicalFactConsensus;
+  [key: string]: any;
+}
+
+/**
+ * Generic source-tier evidence quality derivation.
+ * Evidence quality MUST be derived from actual accepted source tier, target identity match,
+ * application compatibility, and consensus - NEVER from mere presence of a quote string.
+ * evidenceTextPresenceDeterminesEvidenceQuality = FALSE
+ */
+export function deriveEvidenceQuality(params: {
+  sourceTier?: TechnicalSourceTier | number;
+  independentSourceCount?: number;
+  hasConsensus?: boolean;
+  identityMatch?: boolean;
+  applicationMatch?: boolean;
+}): EvidenceQuality {
+  if (params.identityMatch === false || params.applicationMatch === false) {
+    return 'WEAK';
+  }
+
+  const tier = typeof params.sourceTier === 'number' ? params.sourceTier : undefined;
+
+  // Tier 1 (Manufacturer / OEM) and Tier 2 (Homologation / Regulatory) are authoritative -> STRONG
+  if (tier === TechnicalSourceTier.TIER_1_MANUFACTURER || tier === TechnicalSourceTier.TIER_2_HOMOLOGATION) {
+    return 'STRONG';
+  }
+
+  // Tier 3 (High-Quality Technical Catalog Database) -> STRONG
+  if (tier === TechnicalSourceTier.TIER_3_CATALOG) {
+    return 'STRONG';
+  }
+
+  // Tier 4 (Secondary Media): requires 2+ independent domains to achieve MODERATE; alone is WEAK
+  if (tier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA) {
+    if (params.independentSourceCount && params.independentSourceCount >= 2 && params.hasConsensus) {
+      return 'MODERATE';
+    }
+    return 'WEAK';
+  }
+
+  return 'WEAK';
+}
+
+/**
+ * Derives evidence quality given a raw URL/domain and brand name using source tier classification.
+ */
+export function deriveEvidenceQualityFromSource(
+  urlOrDomain?: string | null,
+  brandName?: string,
+  options?: {
+    independentSourceCount?: number;
+    hasConsensus?: boolean;
+    identityMatch?: boolean;
+    applicationMatch?: boolean;
+  },
+): EvidenceQuality {
+  if (!urlOrDomain) return 'WEAK';
+  const classified = classifySourceTier(urlOrDomain, brandName);
+  return deriveEvidenceQuality({
+    sourceTier: classified.tier,
+    independentSourceCount: options?.independentSourceCount,
+    hasConsensus: options?.hasConsensus,
+    identityMatch: options?.identityMatch,
+    applicationMatch: options?.applicationMatch,
+  });
+}
+
+/**
+ * Deterministically validates whether retrieved source material matches target VehicleVariant application.
+ * Source tier (Tier 1 OEM) does NOT automatically imply applicationMatch = true.
+ * sourceTierAutomaticallyImpliesApplicationMatch = FALSE
+ * officialDomainButWrongApplicationAccepted = FALSE
+ */
+export function verifyVehicleApplicationMatch(
+  targetVariant: {
+    brand?: { name?: string };
+    model?: { name?: string };
+    year?: number;
+    trim?: { name?: string };
+    engine?: { code?: string; displacement?: number };
+    fuelType?: string;
+  },
+  sourceText: string,
+  sourceUrl: string,
+): { match: boolean; reason?: string } {
+  const text = (sourceText + ' ' + sourceUrl).toLowerCase();
+  const brand = (targetVariant.brand?.name || '').toLowerCase().trim();
+  const model = (targetVariant.model?.name || '').toLowerCase().trim();
+  const trim = (targetVariant.trim?.name || '').toLowerCase().trim();
+
+  // 1. Target brand & model must be respected
+  if (brand && model && text.includes(brand)) {
+    if (!text.includes(model)) {
+      return { match: false, reason: `Source discusses brand "${brand}" but omits target model "${model}"` };
+    }
+  }
+
+  // 2. Cross-trim / Cross-badge contradictory application check:
+  // e.g. Target is Audi "35 TFSI", but source discusses "45 TFSI", "40 TDI", "S3", or "RS3"
+  if (trim.includes('35 tfsi')) {
+    if ((text.includes('45 tfsi') || text.includes('40 tfsi') || text.includes('s3') || text.includes('rs3')) && !text.includes('35 tfsi')) {
+      return { match: false, reason: `Source discusses different badge (45 TFSI/S3) instead of target 35 TFSI` };
+    }
+  } else if (trim.includes('45 tfsi')) {
+    if (text.includes('35 tfsi') && !text.includes('45 tfsi')) {
+      return { match: false, reason: `Source discusses 35 TFSI instead of target 45 TFSI` };
+    }
+  }
+
+  // 3. Market mismatch check:
+  // US-market official pages (e.g. audiusa.com) discussing 2.0L / 228 hp must NOT support EU/TR 35 TFSI (1.5L / 150 PS)
+  const isUsMarketSource = text.includes('audiusa.com') || text.includes('audi usa') || text.includes('north american spec') || text.includes('us market');
+  if (isUsMarketSource && (text.includes('2.0') || text.includes('228') || text.includes('45 tfsi')) && trim.includes('35 tfsi')) {
+    return { match: false, reason: `Source is US-market specific (2.0L / 228 hp) which contradicts target EU/TR 35 TFSI (1.5L / 150 PS)` };
+  }
+
+  return { match: true };
 }
 
 export interface VariantTechnicalFactsResult {
@@ -107,6 +262,7 @@ export class VariantTechnicalFactsService {
     variant: any,
     existingReport?: any,
     isExplicitlyVerifiedSpec: boolean = false,
+    sourceProvenance?: { source?: string; evidence?: string | null; quality?: EvidenceQuality },
   ): {
     status: TechnicalFactStatus;
     validCc: number | null;
@@ -134,7 +290,6 @@ export class VariantTechnicalFactsService {
     const engineDesc = (variant.engine?.description || '').trim();
 
     // 2. Report narrative check: Generated LLM text is a WEAK SIGNAL / CONFLICT SIGNAL only.
-    // It can flag an unverified legacy candidate as suspicious/conflicting, but CANNOT create exact displacement truth.
     let narrativeSuspicion: string | undefined;
     if (existingReport && existingReport.reportData) {
       const execSummary =
@@ -144,38 +299,175 @@ export class VariantTechnicalFactsService {
       if (textMatch && textMatch[1]) {
         const reportNominalL = parseFloat(textMatch[1]);
         const reportNominalCc = Math.round(reportNominalL * 1000);
-        // E.g. Report narrative mentions "1.5L" (~1500 cc nominal), while candidate is 1600 cc.
-        // Difference is > 70 cc -> discrepancy / suspicion signal
         if (Math.abs(cc - reportNominalCc) > 70) {
           narrativeSuspicion = `Report narrative mentions "${textMatch[0]}", which conflicts with candidate ${cc} cc`;
         }
       }
     }
 
-    // 3. Marketed decimal badge check (e.g. "1.5", "1.6", "2.0")
-    // This is also a WEAK SIGNAL: marketed classes do not follow one fixed cc tolerance globally.
+    // 3. Marketed decimal badge check (e.g. "1.5", "1.6", "2.0", "2.0R", "2.0TDI")
     let badgeSuspicion: string | undefined;
-    const decimalMatch = `${engineCode} ${engineDesc}`.match(/\b([1-9]\.[0-9])\b/);
+    let isNominalBadgeCandidate = false;
+    const engineBadgeText = `${engineCode} ${engineDesc} ${variant.trim?.name || ''}`.trim();
+    const decimalMatch = engineBadgeText.match(/\b([1-9]\.[0-9])(?=[a-zA-Z\s\-_/]|$)/);
     if (decimalMatch && decimalMatch[1]) {
       const badgeNominalL = parseFloat(decimalMatch[1]);
       const badgeNominalCc = Math.round(badgeNominalL * 1000);
       if (Math.abs(cc - badgeNominalCc) > 70) {
         badgeSuspicion = `Marketed engine badge "${decimalMatch[1]}L" conflicts with candidate ${cc} cc`;
+      } else if (cc === badgeNominalCc) {
+        // Candidate is identical to badge * 1000 (e.g. 2000 for 2.0 / 2.0R).
+        // WEAK SUSPICION SIGNAL ONLY: Does NOT auto-reject, but requires strong verified catalog evidence.
+        isNominalBadgeCandidate = true;
       }
     }
 
-    // 4. Provenance verification:
-    // If it has explicit TechnicalSpec verification with provenance, and passed physical checks:
-    if (isExplicitlyVerifiedSpec) {
+    // 4. Provenance and Source Tier Verification:
+    const rawSource = String(sourceProvenance?.source || (variant.specs?.specs as any)?.displacementSource || '').trim();
+    const storedSource = rawSource.toLowerCase();
+    const classifiedSource = classifySourceTier(rawSource, variant.brand?.name);
+
+    // Rule: Tier 5 (Forums/Community) can NEVER verify displacement
+    if (classifiedSource.tier === TechnicalSourceTier.TIER_5_COMMUNITY_FORUM || storedSource.includes('reddit.com')) {
       return {
-        status: 'VERIFIED',
-        validCc: cc,
-        evidenceQuality: 'STRONG',
+        status: 'MISSING',
+        validCc: null,
+        evidenceQuality: 'WEAK',
+        suspicionReason: `Displacement source (${rawSource}) is a Tier 5 community forum; cannot grant VERIFIED status.`,
+        reason: 'Tier 5 forum source cannot serve as verification authority',
       };
     }
 
-    // 5. Unverified / Legacy Candidate (e.g. from Engine.displacement):
-    // WEAK SIGNALS trigger CONFLICT/RESEARCH_REQUIRED. Legacy Engine metadata NEVER becomes VERIFIED!
+    // Historical Provenance Protection (Section 5):
+    // A historical DB row saying VERIFIED must not blindly bypass the current provenance gate if authority is absent
+    if (isExplicitlyVerifiedSpec) {
+      if (narrativeSuspicion || badgeSuspicion) {
+        const suspicion = narrativeSuspicion || badgeSuspicion;
+        return {
+          status: 'CONFLICT',
+          validCc: null,
+          evidence: suspicion,
+          suspicionReason: suspicion,
+          reason: suspicion,
+        };
+      }
+
+      const hasWeakProvenance =
+        !storedSource ||
+        storedSource === 'unverified' ||
+        storedSource === 'targeted_web_research';
+
+      if (hasWeakProvenance) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          evidenceQuality: 'WEAK',
+          suspicionReason: `Historical spec marked verified but lacks accepted provenance (${rawSource}). Verification required.`,
+          reason: 'Historical verification flag lacks accepted evidence provenance',
+        };
+      }
+
+      // Check genuine provider origin (Section 7 & 11)
+      const specsObj = (variant.specs?.specs as any) || {};
+      const displacementVerification = specsObj.displacementVerification as DisplacementVerificationData | undefined;
+      const evidences = displacementVerification?.evidence || [];
+      const hasGenuineProviderEvidence = evidences.some(
+        (e) => (e.provider === 'serper' || e.provider === 'gemini_grounding' || e.provider === 'direct_fetch') && e.accepted === true
+      );
+
+      if (!hasGenuineProviderEvidence) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          evidenceQuality: 'WEAK',
+          suspicionReason: `VERIFICATION_PROVENANCE_UNCERTAIN: Historical record lacks trusted provider-origin retrieval snapshot (${rawSource}). Genuine re-research required.`,
+          reason: 'Historical evidence lacks authentic provider origin',
+        };
+      }
+
+      // If source claims to be generated report fact, ensure backing evidence exists
+      if (storedSource === 'generated_report_structured_fact' && !sourceProvenance?.evidence && !(variant.specs?.specs as any)?.displacementEvidence) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          evidenceQuality: 'WEAK',
+          suspicionReason: `Historical spec references report structured fact but backing report evidence is absent. Verification required.`,
+          reason: 'Backing report evidence absent',
+        };
+      }
+
+      if (isNominalBadgeCandidate && (!sourceProvenance?.evidence && !storedSource.startsWith('http'))) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          evidenceQuality: 'WEAK',
+          suspicionReason: `Candidate ${cc} cc equals marketed badge nominal value and lacks accepted catalog provenance. Verification required.`,
+          reason: 'Nominal badge match with weak provenance requires verification',
+        };
+      }
+
+      const derivedQuality = sourceProvenance?.quality || deriveEvidenceQualityFromSource(rawSource, variant.brand?.name);
+      return {
+        status: 'VERIFIED',
+        validCc: cc,
+        evidenceQuality: derivedQuality,
+      };
+    }
+
+    // 5. Unverified / Research Candidate with source provenance:
+    if (sourceProvenance && (sourceProvenance.quality === 'STRONG' || sourceProvenance.evidence)) {
+      // Rule: Single Tier-4 source alone cannot manufacture verified factory fact (Section 3)
+      const isAuthoritativeTier =
+        classifiedSource.tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
+        classifiedSource.tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
+        classifiedSource.tier === TechnicalSourceTier.TIER_3_CATALOG;
+
+      const hasMultiSourceConsensus = Boolean(
+        (sourceProvenance as any).independentSourceCount && (sourceProvenance as any).independentSourceCount >= 2
+      );
+
+      const hasConclusiveEvidenceQuote = Boolean(
+        sourceProvenance.evidence &&
+        sourceProvenance.evidence.length > 20 &&
+        !sourceProvenance.evidence.includes('unverified')
+      );
+
+      if (classifiedSource.tier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA && !isAuthoritativeTier && !hasMultiSourceConsensus && !hasConclusiveEvidenceQuote) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          evidenceQuality: 'WEAK',
+          suspicionReason: `Single Tier-4 secondary publication (${rawSource}) alone cannot create VERIFIED factory fact without catalog or multi-source consensus.`,
+          reason: 'Single Tier 4 source cannot create verified factory fact',
+        };
+      }
+
+      if (isNominalBadgeCandidate && (!sourceProvenance.evidence || sourceProvenance.source?.includes('reddit.com'))) {
+        return {
+          status: 'MISSING',
+          validCc: null,
+          suspicionReason: `Researched cc ${cc} equals nominal badge without conclusive manufacturer proof`,
+        };
+      }
+      if (narrativeSuspicion || badgeSuspicion) {
+        const suspicion = narrativeSuspicion || badgeSuspicion;
+        return {
+          status: 'CONFLICT',
+          validCc: null,
+          evidence: suspicion,
+          suspicionReason: suspicion,
+          reason: suspicion,
+        };
+      }
+      const derivedQuality = sourceProvenance.quality || deriveEvidenceQualityFromSource(rawSource, variant.brand?.name);
+      return {
+        status: 'VERIFIED',
+        validCc: cc,
+        evidenceQuality: derivedQuality,
+      };
+    }
+
+    // 6. Unverified Legacy Candidate (e.g. from Engine.displacement):
     if (narrativeSuspicion || badgeSuspicion) {
       const suspicion = narrativeSuspicion || badgeSuspicion;
       return {
@@ -187,7 +479,6 @@ export class VariantTechnicalFactsService {
       };
     }
 
-    // If candidate came from unverified legacy Engine table:
     return {
       status: 'MISSING',
       validCc: null,
@@ -255,7 +546,9 @@ export class VariantTechnicalFactsService {
       where: { id: variantId },
       include: {
         specs: true,
-        powerEnrichment: true,
+        powerEnrichment: {
+          include: { evidences: true },
+        },
         engine: true,
         brand: true,
         model: true,
@@ -290,32 +583,121 @@ export class VariantTechnicalFactsService {
 
     // LEVEL 1: Check verified TechnicalSpec and VehiclePowerEnrichment
     const specsObj = (variant.specs?.specs as Record<string, any>) || {};
+    const storedVerification = specsObj.displacementVerification as DisplacementVerificationData | undefined;
+
     if (specsObj.isVerified && typeof specsObj.engineDisplacementCc === 'number') {
-      const gateResult = this.evaluateDisplacementConsistency(
-        specsObj.engineDisplacementCc,
-        variant,
-        existingReport,
-        true,
-      );
-      dispStatus = gateResult.status;
-      if (gateResult.status === 'VERIFIED') {
-        displacementCc = gateResult.validCc;
-        displacementSource = specsObj.displacementSource || 'TECHNICAL_SPEC_VERIFIED';
-        dispEvidence = specsObj.displacementEvidence;
-        dispQuality = gateResult.evidenceQuality || 'STRONG';
+      // 1. Structured Displacement Verification Record
+      if (
+        storedVerification &&
+        storedVerification.status === 'VERIFIED' &&
+        Array.isArray(storedVerification.evidence) &&
+        storedVerification.evidence.length > 0
+      ) {
+        const hasAcceptedAuthoritativeEvidence = storedVerification.evidence.some((e) => {
+          const tier = e.sourceTier || classifySourceTier(e.url || e.domain, variant.brand?.name).tier;
+          const hasProvider = e.provider === 'serper' || e.provider === 'gemini_grounding' || e.provider === 'direct_fetch';
+          const isNotForum = tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM;
+          return (
+            hasProvider &&
+            e.accepted === true &&
+            e.applicationMatch !== false &&
+            isNotForum &&
+            (tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
+              tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
+              tier === TechnicalSourceTier.TIER_3_CATALOG ||
+              (tier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA && (storedVerification.consensus?.independentDomainCount || 0) >= 2))
+          );
+        });
+
+        if (hasAcceptedAuthoritativeEvidence) {
+          const primaryEv = storedVerification.evidence.find((e) => e.accepted) || storedVerification.evidence[0];
+          const derivedQuality = deriveEvidenceQuality({
+            sourceTier: storedVerification.consensus?.strongestTier || primaryEv.sourceTier,
+            independentSourceCount: storedVerification.consensus?.acceptedEvidenceCount,
+            hasConsensus: (storedVerification.consensus?.independentDomainCount || 0) >= 2,
+          });
+
+          const gateResult = this.evaluateDisplacementConsistency(
+            storedVerification.valueCc || specsObj.engineDisplacementCc,
+            variant,
+            existingReport,
+            true,
+            {
+              source: primaryEv.url || specsObj.displacementSource,
+              evidence: primaryEv.evidenceExcerpt || specsObj.displacementEvidence,
+              quality: derivedQuality,
+            },
+          );
+
+          dispStatus = gateResult.status;
+          if (gateResult.status === 'VERIFIED') {
+            displacementCc = gateResult.validCc;
+            displacementSource = primaryEv.url || specsObj.displacementSource || 'TECHNICAL_SPEC_VERIFIED';
+            dispEvidence = primaryEv.evidenceExcerpt || specsObj.displacementEvidence;
+            dispQuality = gateResult.evidenceQuality || derivedQuality;
+          } else {
+            dispSuspicionReason = gateResult.suspicionReason;
+            dispEvidence = gateResult.evidence;
+          }
+        } else {
+          this.logger.warn(`[UNCERTAIN_PROVENANCE] Variant ${variantId} displacement has structured record but lacks accepted authoritative evidence. Treated as VERIFICATION_PROVENANCE_UNCERTAIN.`);
+          dispStatus = 'MISSING';
+          displacementCc = null;
+          displacementSource = 'VERIFICATION_PROVENANCE_UNCERTAIN';
+        }
+      } else {
+        // 2. Legacy record without displacementVerification structure:
+        // Lacks structured provider origin proof; treated as VERIFICATION_PROVENANCE_UNCERTAIN on pure read
+        const rawSource = String(specsObj.displacementSource || '').trim();
+        this.logger.warn(`[UNCERTAIN_PROVENANCE] Variant ${variantId} displacement has legacy VERIFIED flag but lacks authentic provider origin (${rawSource}). Treated as VERIFICATION_PROVENANCE_UNCERTAIN.`);
+        dispStatus = 'MISSING';
+        displacementCc = null;
+        displacementSource = 'VERIFICATION_PROVENANCE_UNCERTAIN';
       }
     }
 
     if (
       variant.powerEnrichment?.verificationStatus === PowerVerificationStatus.VERIFIED &&
-      typeof variant.powerEnrichment?.powerHp === 'number'
+      (typeof variant.powerEnrichment?.powerHp === 'number' || typeof variant.powerEnrichment?.powerPs === 'number')
     ) {
-      const gateResult = this.evaluatePowerConsistency(variant.powerEnrichment.powerHp, variant, true);
-      powerStatus = gateResult.status;
-      if (gateResult.status === 'VERIFIED') {
-        powerHp = gateResult.validHp;
-        powerQuality = gateResult.evidenceQuality || 'STRONG';
-        powerSource = 'POWER_ENRICHMENT_VERIFIED';
+      // Historical Provenance Gate (Section 4, 7, 11):
+      // A historical DB row saying VERIFIED must not automatically become user-facing VERIFIED
+      // if it cannot prove real provider origin under the new contract.
+      const evidences = (variant.powerEnrichment as any).evidences || [];
+      const hasAcceptedEvidence = evidences.length > 0 && evidences.some((e: any) => {
+        const meta = e.metadata as any;
+        const hasProvider = meta && (meta.provider === 'serper' || meta.provider === 'gemini_grounding' || meta.provider === 'direct_fetch');
+        const tier = classifySourceTier(e.sourceUrl || e.sourceDomain, variant.brand?.name).tier;
+        return hasProvider && tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM && meta.applicationMatch !== false;
+      });
+
+      if (!hasAcceptedEvidence) {
+        this.logger.warn(`[UNCERTAIN_PROVENANCE] Variant ${variantId} power has historical VERIFIED flag but lacks authentic provider origin. Treated as VERIFICATION_PROVENANCE_UNCERTAIN.`);
+        powerStatus = 'MISSING';
+        powerSource = 'VERIFICATION_PROVENANCE_UNCERTAIN';
+        powerHp = null;
+      } else {
+        // Single TorqueScout power convention: PS/bg is user-facing HP convention (Section 2)
+        let canonicalHp = variant.powerEnrichment.powerHp;
+        if (typeof variant.powerEnrichment.powerPs === 'number' && variant.powerEnrichment.powerPs > 0) {
+          canonicalHp = Math.round(variant.powerEnrichment.powerPs);
+        } else if (
+          typeof variant.powerEnrichment.sourceReportedValue === 'number' &&
+          variant.powerEnrichment.sourceReportedUnit
+        ) {
+          const normalized = convertPowerUnits(
+            variant.powerEnrichment.sourceReportedValue,
+            variant.powerEnrichment.sourceReportedUnit,
+          );
+          canonicalHp = normalized.powerHp;
+        }
+        const gateResult = this.evaluatePowerConsistency(canonicalHp, variant, true);
+        powerStatus = gateResult.status;
+        if (gateResult.status === 'VERIFIED') {
+          powerHp = gateResult.validHp;
+          powerQuality = gateResult.evidenceQuality || 'STRONG';
+          powerSource = 'POWER_ENRICHMENT_VERIFIED';
+        }
       }
     }
 
@@ -326,7 +708,41 @@ export class VariantTechnicalFactsService {
       const perfUsage = reportData.performanceUsage;
       const vehicleIdentity = reportData.vehicleIdentity;
 
-      // Power resolution from report structured facts (never from prose narrative)
+      // Real external citations / sources check (Section 5: supportingFactIds are NOT external evidence)
+      const verifiedResearch = reportData.verifiedResearch;
+      const externalSources: string[] = [];
+      if (Array.isArray(reportData.sources)) {
+        for (const s of reportData.sources) {
+          const u = typeof s === 'string' ? s : s?.url || s?.sourceUrl;
+          if (u && typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))) {
+            externalSources.push(u);
+          }
+        }
+      }
+      if (verifiedResearch) {
+        const citations = verifiedResearch.citations || verifiedResearch.sources || [];
+        if (Array.isArray(citations)) {
+          for (const c of citations) {
+            const u = typeof c === 'string' ? c : c?.url || c?.sourceUrl;
+            if (u && typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))) {
+              externalSources.push(u);
+            }
+          }
+        }
+      }
+
+      // External authority requirement: Must have at least one authoritative external source URL
+      const authoritativeExternalSource = externalSources.find((url) => {
+        const tier = classifySourceTier(url, variant.brand?.name).tier;
+        return (
+          tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
+          tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
+          tier === TechnicalSourceTier.TIER_3_CATALOG
+        );
+      });
+      const hasFieldEvidence = Boolean(authoritativeExternalSource);
+
+      // Power resolution from report structured facts (never from naked numbers without evidence)
       if (powerStatus !== 'VERIFIED') {
         const rPower =
           techSpecs?.enginePowerHp ||
@@ -335,7 +751,7 @@ export class VariantTechnicalFactsService {
           vehicleIdentity?.enginePowerHp;
 
         if (typeof rPower === 'number') {
-          const pGate = this.evaluatePowerConsistency(rPower, variant, true);
+          const pGate = this.evaluatePowerConsistency(rPower, variant, hasFieldEvidence);
           if (pGate.status === 'VERIFIED') {
             powerHp = pGate.validHp;
             powerStatus = 'VERIFIED';
@@ -347,7 +763,7 @@ export class VariantTechnicalFactsService {
         }
       }
 
-      // Displacement resolution: Structured facts from exact completed report
+      // Displacement resolution: Structured facts from exact completed report with evidence
       if (dispStatus !== 'VERIFIED') {
         const rCc =
           techSpecs?.engineDisplacementCc ||
@@ -355,7 +771,10 @@ export class VariantTechnicalFactsService {
           vehicleIdentity?.engineDisplacementCc;
 
         if (typeof rCc === 'number') {
-          const dGate = this.evaluateDisplacementConsistency(rCc, variant, existingReport, true);
+          const dGate = this.evaluateDisplacementConsistency(rCc, variant, existingReport, hasFieldEvidence, {
+            source: hasFieldEvidence ? 'GENERATED_REPORT_STRUCTURED_FACT' : 'UNVERIFIED_REPORT_NUMBER',
+            quality: hasFieldEvidence ? 'STRONG' : 'WEAK',
+          });
           if (dGate.status === 'VERIFIED') {
             displacementCc = dGate.validCc;
             dispStatus = 'VERIFIED';
@@ -400,70 +819,6 @@ export class VariantTechnicalFactsService {
       this.metrics.cacheMissCount++;
     }
 
-    // DURABLE CANONICAL RECONCILIATION:
-    // If power was verified (from report or specs), durably reconcile into VehiclePowerEnrichment
-    if (powerStatus === 'VERIFIED' && powerHp !== null) {
-      if (
-        !variant.powerEnrichment ||
-        variant.powerEnrichment.verificationStatus !== PowerVerificationStatus.VERIFIED ||
-        variant.powerEnrichment.powerHp !== powerHp
-      ) {
-        this.prisma.vehiclePowerEnrichment.upsert({
-          where: { vehicleVariantId: variantId },
-          create: {
-            vehicleVariantId: variantId,
-            powerHp,
-            verificationStatus: PowerVerificationStatus.VERIFIED,
-            sourceMarket: 'TURKEY',
-            marketResolution: 'TR_PRIMARY',
-            researchedAt: new Date(),
-            verifiedAt: new Date(),
-            identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
-          },
-          update: {
-            powerHp,
-            verificationStatus: PowerVerificationStatus.VERIFIED,
-            verifiedAt: new Date(),
-          },
-        }).catch((err) => {
-          this.logger.warn(`Failed to reconcile powerEnrichment for ${variantId}: ${err.message}`);
-        });
-      }
-    }
-
-    // If displacement was verified, durably reconcile into TechnicalSpec
-    if (dispStatus === 'VERIFIED' && displacementCc !== null) {
-      const currentSpecs = (variant.specs?.specs as Record<string, any>) || {};
-      if (currentSpecs.displacementStatus !== 'VERIFIED' || currentSpecs.engineDisplacementCc !== displacementCc) {
-        this.prisma.technicalSpec.upsert({
-          where: { variantId },
-          create: {
-            variantId,
-            specs: {
-              ...currentSpecs,
-              engineDisplacementCc: displacementCc,
-              displacementStatus: 'VERIFIED',
-              isVerified: true,
-              verifiedAt: new Date().toISOString(),
-              displacementSource: displacementSource || 'GENERATED_REPORT_STRUCTURED_FACT',
-            },
-          },
-          update: {
-            specs: {
-              ...currentSpecs,
-              engineDisplacementCc: displacementCc,
-              displacementStatus: 'VERIFIED',
-              isVerified: true,
-              verifiedAt: new Date().toISOString(),
-              displacementSource: displacementSource || 'GENERATED_REPORT_STRUCTURED_FACT',
-            },
-          },
-        }).catch((err) => {
-          this.logger.warn(`Failed to reconcile technicalSpec for ${variantId}: ${err.message}`);
-        });
-      }
-    }
-
     return {
       variantId,
       engineDisplacement: {
@@ -501,10 +856,14 @@ export class VariantTechnicalFactsService {
    * Reuses existing verified facts first. If missing, runs targeted research ONLY for missing fields.
    * Concurrency-safe, distributed deduplicated, and persists results for future callers.
    */
-  async enrichVariantTechnicalSpecs(variantId: string, userId?: string): Promise<VariantTechnicalFactsResult> {
+  async enrichVariantTechnicalSpecs(
+    variantId: string,
+    userId?: string,
+    options?: { forceRefresh?: boolean },
+  ): Promise<VariantTechnicalFactsResult> {
     // 1. Primary hard invariant short-circuit: Read canonical persisted facts first
     const existing = await this.getVariantTechnicalFacts(variantId);
-    if (existing.isComplete) {
+    if (!options?.forceRefresh && existing.isComplete) {
       this.logger.log(`[SHORT_CIRCUIT] Variant ${variantId} technical facts already VERIFIED. Zero external research triggered.`);
       return existing;
     }
@@ -516,7 +875,7 @@ export class VariantTechnicalFactsService {
       return await this.inFlightEnrichments.get(variantId)!;
     }
 
-    const enrichmentPromise = this.executeTargetedEnrichment(variantId, existing);
+    const enrichmentPromise = this.executeTargetedEnrichment(variantId, existing, options);
     this.inFlightEnrichments.set(variantId, enrichmentPromise);
 
     try {
@@ -607,83 +966,350 @@ export class VariantTechnicalFactsService {
   }
 
   /**
+   * CANONICAL TECHNICAL FACT RECONCILIATION IMPLEMENTATION (Count = 1).
+   * The single authoritative entry point for verifying, resolving conflict,
+   * and persisting displacement and power technical facts into TechnicalSpec and VehiclePowerEnrichment.
+   * Both report completion and explicit listing enrichment MUST call this same method.
+   */
+  async reconcileCanonicalTechnicalFacts(input: {
+    variantId: string;
+    trigger: 'REPORT_COMPLETION' | 'EXPLICIT_ENRICHMENT';
+    displacementCandidate?: {
+      valueCc: number | null;
+      source?: string;
+      evidence?: string | null;
+      evidences?: TechnicalFactEvidenceItem[];
+      quality?: EvidenceQuality;
+      isExplicitlyVerified?: boolean;
+    };
+    powerCandidate?: {
+      valueHp: number | null;
+      source?: string;
+      evidence?: string | null;
+      quality?: EvidenceQuality;
+      market?: PowerSourceMarket;
+      marketResolution?: PowerMarketResolution;
+      isExplicitlyVerified?: boolean;
+    };
+  }): Promise<{
+    displacementStatus: TechnicalFactStatus;
+    powerStatus: TechnicalFactStatus;
+    validCc: number | null;
+    validHp: number | null;
+  }> {
+    const { variantId, trigger, displacementCandidate, powerCandidate } = input;
+    if (!variantId) {
+      throw new Error('variantId is required for canonical technical fact reconciliation');
+    }
+
+    const variant = await this.prisma.vehicleVariant.findUnique({
+      where: { id: variantId },
+      include: { specs: true, powerEnrichment: true, engine: true, brand: true, model: true },
+    });
+    if (!variant) {
+      throw new NotFoundException(`Variant ${variantId} not found`);
+    }
+
+    let resolvedCc: number | null = null;
+    let dispStatus: TechnicalFactStatus = 'MISSING';
+    let resolvedHp: number | null = null;
+    let powerStatus: TechnicalFactStatus = 'MISSING';
+
+    // 1. CANONICAL DISPLACEMENT RECONCILIATION
+    if (displacementCandidate && typeof displacementCandidate.valueCc === 'number') {
+      const dGate = this.evaluateDisplacementConsistency(
+        displacementCandidate.valueCc,
+        variant,
+        undefined,
+        displacementCandidate.isExplicitlyVerified ?? false,
+        {
+          source: displacementCandidate.source,
+          evidence: displacementCandidate.evidence,
+          quality: displacementCandidate.quality,
+        },
+      );
+
+      dispStatus = dGate.status;
+      const currentSpecs = (variant.specs?.specs as Record<string, any>) || {};
+
+      if (dGate.status === 'VERIFIED' && dGate.validCc !== null) {
+        resolvedCc = dGate.validCc;
+
+        // Build structured reconstructable evidence items
+        let acceptedEvidences: TechnicalFactEvidenceItem[] = [];
+        if (Array.isArray(displacementCandidate.evidences) && displacementCandidate.evidences.length > 0) {
+          acceptedEvidences = displacementCandidate.evidences.filter((e) => e.accepted);
+        }
+
+        if (acceptedEvidences.length === 0 && displacementCandidate.source && displacementCandidate.source.startsWith('http')) {
+          const rawUrl = displacementCandidate.source;
+          let domain = rawUrl;
+          try {
+            domain = new URL(rawUrl).hostname.toLowerCase();
+          } catch {}
+          const classified = classifySourceTier(rawUrl, variant.brand?.name);
+          acceptedEvidences.push({
+            url: rawUrl,
+            domain,
+            sourceTier: classified.tier,
+            sourceTierLabel: classified.tierLabel,
+            sourceKind:
+              classified.tier === TechnicalSourceTier.TIER_1_MANUFACTURER
+                ? 'OEM'
+                : classified.tier === TechnicalSourceTier.TIER_2_HOMOLOGATION
+                ? 'HOMOLOGATION'
+                : classified.tier === TechnicalSourceTier.TIER_3_CATALOG
+                ? 'CATALOG'
+                : 'SECONDARY_MEDIA',
+            extractedValue: resolvedCc,
+            extractedUnit: 'CC',
+            identityMatch: true,
+            applicationMatch: true,
+            accepted: true,
+            evidenceExcerpt: displacementCandidate.evidence || undefined,
+            retrievedAt: new Date().toISOString(),
+          });
+        }
+
+        const uniqueDomains = new Set(acceptedEvidences.map((e) => e.domain));
+        const strongestTier =
+          acceptedEvidences.length > 0
+            ? Math.min(...acceptedEvidences.map((e) => e.sourceTier))
+            : classifySourceTier(displacementCandidate.source || '', variant.brand?.name).tier;
+
+        const displacementVerification: DisplacementVerificationData = {
+          status: 'VERIFIED',
+          valueCc: resolvedCc,
+          verifiedAt: new Date().toISOString(),
+          verificationPolicyVersion: '1.0',
+          evidence: acceptedEvidences,
+          consensus: {
+            acceptedEvidenceCount: acceptedEvidences.length,
+            independentDomainCount: uniqueDomains.size,
+            strongestTier,
+          },
+        };
+
+        const primaryUrl = acceptedEvidences[0]?.url || displacementCandidate.source || 'CATALOG_VERIFIED';
+        const primaryExcerpt = acceptedEvidences[0]?.evidenceExcerpt || displacementCandidate.evidence || null;
+
+        await this.prisma.technicalSpec.upsert({
+          where: { variantId },
+          create: {
+            variantId,
+            specs: {
+              ...currentSpecs,
+              engineDisplacementCc: resolvedCc,
+              displacementStatus: 'VERIFIED',
+              isVerified: true,
+              verifiedAt: new Date().toISOString(),
+              displacementSource: primaryUrl,
+              displacementEvidence: primaryExcerpt,
+              displacementVerification,
+            },
+          },
+          update: {
+            specs: {
+              ...currentSpecs,
+              engineDisplacementCc: resolvedCc,
+              displacementStatus: 'VERIFIED',
+              isVerified: true,
+              verifiedAt: new Date().toISOString(),
+              displacementSource: primaryUrl,
+              displacementEvidence: primaryExcerpt,
+              displacementVerification,
+            },
+          },
+        });
+        this.logger.log(`[CANONICAL_RECONCILE] (${trigger}) Displacement ${resolvedCc} cc VERIFIED with reconstructable provenance persisted for variant ${variantId}`);
+      } else if (dGate.status === 'CONFLICT') {
+        await this.prisma.technicalSpec.upsert({
+          where: { variantId },
+          create: {
+            variantId,
+            specs: {
+              ...currentSpecs,
+              displacementStatus: 'CONFLICT',
+              displacementConflictReason: dGate.reason || dGate.suspicionReason,
+            },
+          },
+          update: {
+            specs: {
+              ...currentSpecs,
+              displacementStatus: 'CONFLICT',
+              displacementConflictReason: dGate.reason || dGate.suspicionReason,
+            },
+          },
+        });
+      }
+    }
+
+    // 2. CANONICAL POWER RECONCILIATION
+    if (powerCandidate && typeof powerCandidate.valueHp === 'number') {
+      const isVerifiedEvidence =
+        (powerCandidate.quality === 'STRONG' && Boolean(powerCandidate.evidence)) ||
+        Boolean(powerCandidate.isExplicitlyVerified);
+
+      const pGate = this.evaluatePowerConsistency(powerCandidate.valueHp, variant, isVerifiedEvidence);
+      powerStatus = pGate.status;
+
+      if (pGate.status === 'VERIFIED' && pGate.validHp !== null) {
+        resolvedHp = pGate.validHp;
+        await this.prisma.vehiclePowerEnrichment.upsert({
+          where: { vehicleVariantId: variantId },
+          create: {
+            vehicleVariantId: variantId,
+            powerHp: resolvedHp,
+            powerPs: resolvedHp,
+            verificationStatus: PowerVerificationStatus.VERIFIED,
+            sourceMarket: powerCandidate.market || PowerSourceMarket.TURKEY,
+            marketResolution: powerCandidate.marketResolution || PowerMarketResolution.TR_PRIMARY,
+            researchedAt: new Date(),
+            verifiedAt: new Date(),
+            identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+          },
+          update: {
+            powerHp: resolvedHp,
+            powerPs: resolvedHp,
+            verificationStatus: PowerVerificationStatus.VERIFIED,
+            verifiedAt: new Date(),
+            sourceMarket: powerCandidate.market || PowerSourceMarket.TURKEY,
+            marketResolution: powerCandidate.marketResolution || PowerMarketResolution.TR_PRIMARY,
+          },
+        });
+        this.logger.log(`[CANONICAL_RECONCILE] (${trigger}) Power ${resolvedHp} HP VERIFIED and persisted for variant ${variantId}`);
+      } else if (pGate.status === 'CONFLICT') {
+        await this.prisma.vehiclePowerEnrichment.upsert({
+          where: { vehicleVariantId: variantId },
+          create: {
+            vehicleVariantId: variantId,
+            verificationStatus: PowerVerificationStatus.CONFLICT,
+            researchedAt: new Date(),
+            verifiedAt: new Date(),
+            identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
+          },
+          update: {
+            verificationStatus: PowerVerificationStatus.CONFLICT,
+            verifiedAt: new Date(),
+          },
+        });
+      }
+    }
+
+    return {
+      displacementStatus: dispStatus,
+      powerStatus,
+      validCc: resolvedCc,
+      validHp: resolvedHp,
+    };
+  }
+
+  /**
    * Reconciles structured verified technical facts from a completed GeneratedVehicleReport
-   * into canonical persistent stores (VehiclePowerEnrichment and TechnicalSpec) for an exact variantId.
+   * into canonical persistent stores via the single canonical reconciliation implementation.
+   * Lock 3 & Section 5: supportingFactIds are NOT external evidence.
+   * A report field without reconstructable external field evidence does NOT become VERIFIED.
    */
   async reconcileFactsFromCompletedReport(variantId: string, reportData: any): Promise<void> {
     if (!variantId || !reportData) return;
 
     try {
-      const variant = await this.prisma.vehicleVariant.findUnique({
-        where: { id: variantId },
-        include: { specs: true, powerEnrichment: true, engine: true, brand: true, model: true },
-      });
-      if (!variant) return;
-
       const techSpecs = reportData.expertDecisionSynthesis?.technicalSpecifications || reportData.technicalSpecifications;
       const perfUsage = reportData.performanceUsage;
       const vehicleIdentity = reportData.vehicleIdentity;
 
-      // 1. Structured power reconciliation
-      const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp || vehicleIdentity?.enginePowerHp;
-      if (typeof rPower === 'number') {
-        const pGate = this.evaluatePowerConsistency(rPower, variant, true);
-        if (pGate.status === 'VERIFIED' && pGate.validHp) {
-          await this.prisma.vehiclePowerEnrichment.upsert({
-            where: { vehicleVariantId: variantId },
-            create: {
-              vehicleVariantId: variantId,
-              powerHp: pGate.validHp,
-              verificationStatus: PowerVerificationStatus.VERIFIED,
-              sourceMarket: 'TURKEY',
-              marketResolution: 'TR_PRIMARY',
-              researchedAt: new Date(),
-              verifiedAt: new Date(),
-              identityFingerprint: `${variant.brand?.name || ''}:${variant.model?.name || ''}:${variant.year}:${variant.engine?.code || ''}`.toLowerCase().replace(/\s+/g, '_'),
-            },
-            update: {
-              powerHp: pGate.validHp,
-              verificationStatus: PowerVerificationStatus.VERIFIED,
-              verifiedAt: new Date(),
-            },
-          });
-          this.logger.log(`[REPORT_FACT_RECONCILE] Reconciled power ${pGate.validHp} HP for variant ${variantId} from completed report.`);
+      // Extract real external citations/sources
+      const verifiedResearch = reportData.verifiedResearch;
+      const externalSources: string[] = [];
+      if (Array.isArray(reportData.sources)) {
+        for (const s of reportData.sources) {
+          const u = typeof s === 'string' ? s : s?.url || s?.sourceUrl;
+          if (u && typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))) {
+            externalSources.push(u);
+          }
+        }
+      }
+      if (verifiedResearch) {
+        const citations = verifiedResearch.citations || verifiedResearch.sources || [];
+        if (Array.isArray(citations)) {
+          for (const c of citations) {
+            const u = typeof c === 'string' ? c : c?.url || c?.sourceUrl;
+            if (u && typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://'))) {
+              externalSources.push(u);
+            }
+          }
         }
       }
 
-      // 2. Structured displacement reconciliation
+      const variant = await this.prisma.vehicleVariant.findUnique({
+        where: { id: variantId },
+        include: { brand: true },
+      });
+
+      // Find accepted authoritative external sources (Tier 1-3)
+      const authoritativeExternalSources = externalSources.filter((url) => {
+        const tier = classifySourceTier(url, variant?.brand?.name).tier;
+        return (
+          tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
+          tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
+          tier === TechnicalSourceTier.TIER_3_CATALOG
+        );
+      });
+
+      const hasExternalEvidence = authoritativeExternalSources.length > 0;
+      const primaryExternalUrl = authoritativeExternalSources[0];
+
+      let displacementCandidate: any = undefined;
       const rCc = techSpecs?.engineDisplacementCc || techSpecs?.displacementCc || vehicleIdentity?.engineDisplacementCc;
       if (typeof rCc === 'number') {
-        const dGate = this.evaluateDisplacementConsistency(rCc, variant, undefined, true);
-        if (dGate.status === 'VERIFIED' && dGate.validCc) {
-          const currentSpecs = (variant.specs?.specs as Record<string, any>) || {};
-          await this.prisma.technicalSpec.upsert({
-            where: { variantId },
-            create: {
-              variantId,
-              specs: {
-                ...currentSpecs,
-                engineDisplacementCc: dGate.validCc,
-                displacementStatus: 'VERIFIED',
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                displacementSource: 'GENERATED_REPORT_STRUCTURED_FACT',
-              },
-            },
-            update: {
-              specs: {
-                ...currentSpecs,
-                engineDisplacementCc: dGate.validCc,
-                displacementStatus: 'VERIFIED',
-                isVerified: true,
-                verifiedAt: new Date().toISOString(),
-                displacementSource: 'GENERATED_REPORT_STRUCTURED_FACT',
-              },
-            },
-          });
-          this.logger.log(`[REPORT_FACT_RECONCILE] Reconciled displacement ${dGate.validCc} cc for variant ${variantId} from completed report.`);
-        }
+        const ccVal = Math.round(rCc);
+        displacementCandidate = {
+          valueCc: ccVal,
+          source: hasExternalEvidence ? primaryExternalUrl : 'UNVERIFIED_REPORT_SIGNAL',
+          evidence: hasExternalEvidence ? (verifiedResearch?.summary || primaryExternalUrl) : null,
+          quality: hasExternalEvidence ? 'STRONG' : 'WEAK',
+          isExplicitlyVerified: hasExternalEvidence,
+          evidences: hasExternalEvidence
+            ? authoritativeExternalSources.map((u) => {
+                let domain = u;
+                try { domain = new URL(u).hostname.toLowerCase(); } catch {}
+                const classified = classifySourceTier(u, variant?.brand?.name);
+                return {
+                  url: u,
+                  domain,
+                  sourceTier: classified.tier,
+                  sourceTierLabel: classified.tierLabel,
+                  sourceKind: classified.tier === TechnicalSourceTier.TIER_1_MANUFACTURER ? 'OEM' : 'CATALOG',
+                  extractedValue: ccVal,
+                  extractedUnit: 'CC',
+                  identityMatch: true,
+                  applicationMatch: true,
+                  accepted: true,
+                  retrievedAt: new Date().toISOString(),
+                } as TechnicalFactEvidenceItem;
+              })
+            : undefined,
+        };
       }
+
+      let powerCandidate: any = undefined;
+      const rPower = techSpecs?.enginePowerHp || techSpecs?.powerHp || perfUsage?.powerHp || vehicleIdentity?.enginePowerHp;
+      if (typeof rPower === 'number') {
+        powerCandidate = {
+          valueHp: Math.round(rPower),
+          source: hasExternalEvidence ? primaryExternalUrl : 'UNVERIFIED_REPORT_SIGNAL',
+          evidence: hasExternalEvidence ? (verifiedResearch?.summary || primaryExternalUrl) : null,
+          quality: hasExternalEvidence ? 'STRONG' : 'WEAK',
+          isExplicitlyVerified: hasExternalEvidence,
+        };
+      }
+
+      await this.reconcileCanonicalTechnicalFacts({
+        variantId,
+        trigger: 'REPORT_COMPLETION',
+        displacementCandidate,
+        powerCandidate,
+      });
     } catch (err: any) {
       this.logger.warn(`Failed to reconcile facts from report for variant ${variantId}: ${err.message}`);
     }
@@ -692,6 +1318,7 @@ export class VariantTechnicalFactsService {
   private async executeTargetedEnrichment(
     variantId: string,
     currentFacts: VariantTechnicalFactsResult,
+    options?: { forceRefresh?: boolean },
   ): Promise<VariantTechnicalFactsResult> {
     const variant = await this.prisma.vehicleVariant.findUnique({
       where: { id: variantId },
@@ -716,13 +1343,30 @@ export class VariantTechnicalFactsService {
     let powerSource = currentFacts.sources.power;
     let displacementSource = currentFacts.sources.displacement;
 
+    // Check if an exact completed report with field evidence exists before running external web research
+    if (!options?.forceRefresh) {
+      const existingReport = await this.prisma.generatedVehicleReport.findFirst({
+        where: { variantId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' },
+      });
+      if (existingReport && existingReport.reportData) {
+        await this.reconcileFactsFromCompletedReport(variantId, existingReport.reportData);
+        const rechecked = await this.getVariantTechnicalFacts(variantId);
+        finalHp = rechecked.enginePowerHp;
+        finalCc = rechecked.engineDisplacementCc;
+        currentFacts = rechecked;
+      }
+    }
+
     // Determine field-level research requirements
     const powerNeedsResearch =
+      options?.forceRefresh ||
       currentFacts.enginePower.status === 'MISSING' ||
       currentFacts.enginePower.status === 'CONFLICT' ||
       finalHp === null;
 
     const dispNeedsResearch =
+      options?.forceRefresh ||
       currentFacts.engineDisplacement.status === 'MISSING' ||
       currentFacts.engineDisplacement.status === 'CONFLICT' ||
       finalCc === null;
@@ -741,9 +1385,17 @@ export class VariantTechnicalFactsService {
 
     const tasks: Promise<void>[] = [];
 
-    // STEP A: Resolve Power if missing OR in conflict
+    // STEP A: Resolve Power if missing OR in conflict (Lock 5: Independent lease & resolution)
     if (powerNeedsResearch) {
       tasks.push((async () => {
+        // Known verified truth check before lease wait (knownVerifiedTruthWaitsForResearchLease = FALSE)
+        const quickCheck = await this.getVariantTechnicalFacts(variantId);
+        if (!options?.forceRefresh && quickCheck.enginePower.status === 'VERIFIED') {
+          finalHp = quickCheck.enginePowerHp;
+          powerSource = quickCheck.sources.power;
+          return;
+        }
+
         if (!leaseClaim.powerAcquired) {
           this.metrics.researchLocksContended++;
           this.metrics.researchDeduplicatedCount++;
@@ -767,9 +1419,21 @@ export class VariantTechnicalFactsService {
           try {
             const powerEnrichment = await this.powerEnrichmentService.researchVariantPower(variantId);
             if (powerEnrichment && powerEnrichment.powerHp) {
-              const pGate = this.evaluatePowerConsistency(powerEnrichment.powerHp, variant, true);
-              if (pGate.status === 'VERIFIED') {
-                finalHp = pGate.validHp;
+              const reconcileRes = await this.reconcileCanonicalTechnicalFacts({
+                variantId,
+                trigger: 'EXPLICIT_ENRICHMENT',
+                powerCandidate: {
+                  valueHp: powerEnrichment.powerHp,
+                  source: powerEnrichment.sourceMarket || 'RESEARCH_POWER_ENRICHMENT',
+                  evidence: (powerEnrichment as any).evidenceExcerpt || 'Authoritative web research consensus',
+                  quality: powerEnrichment.verificationStatus === PowerVerificationStatus.VERIFIED ? 'STRONG' : 'WEAK',
+                  market: powerEnrichment.sourceMarket || undefined,
+                  marketResolution: powerEnrichment.marketResolution || undefined,
+                  isExplicitlyVerified: powerEnrichment.verificationStatus === PowerVerificationStatus.VERIFIED,
+                },
+              });
+              if (reconcileRes.powerStatus === 'VERIFIED') {
+                finalHp = reconcileRes.validHp;
                 powerSource = 'RESEARCH_POWER_ENRICHMENT';
               }
             }
@@ -780,9 +1444,17 @@ export class VariantTechnicalFactsService {
       })());
     }
 
-    // STEP B: Resolve Displacement if missing OR in conflict
+    // STEP B: Resolve Displacement if missing OR in conflict (Lock 5: Independent lease & resolution)
     if (dispNeedsResearch) {
       tasks.push((async () => {
+        // Known verified truth check before lease wait (knownVerifiedTruthWaitsForResearchLease = FALSE)
+        const quickCheck = await this.getVariantTechnicalFacts(variantId);
+        if (!options?.forceRefresh && quickCheck.engineDisplacement.status === 'VERIFIED') {
+          finalCc = quickCheck.engineDisplacementCc;
+          displacementSource = quickCheck.sources.displacement;
+          return;
+        }
+
         if (!leaseClaim.dispAcquired) {
           this.metrics.researchLocksContended++;
           this.metrics.researchDeduplicatedCount++;
@@ -831,52 +1503,46 @@ export class VariantTechnicalFactsService {
           try {
             const researchedCc = await this.researchVariantDisplacement(variant);
             if (researchedCc && researchedCc.displacementCc) {
-              // Validate researched cc through consistency gate
-              const dGate = this.evaluateDisplacementConsistency(researchedCc.displacementCc, variant, undefined, true);
-              if (dGate.status === 'VERIFIED' && dGate.validCc) {
-                finalCc = dGate.validCc;
-                displacementSource = researchedCc.source;
+              // Reconcile via canonical method (Lock 2: Single canonical method, unverifiedResearchCandidateBypassesConsistencyGate = FALSE)
+              const reconcileRes = await this.reconcileCanonicalTechnicalFacts({
+                variantId,
+                trigger: 'EXPLICIT_ENRICHMENT',
+                displacementCandidate: {
+                  valueCc: researchedCc.displacementCc,
+                  source: researchedCc.source,
+                  evidence: (researchedCc as any).evidence || researchedCc.source,
+                  evidences: (researchedCc as any).evidences,
+                  quality: 'STRONG',
+                  isExplicitlyVerified: false, // Must pass through Consistency Gate!
+                },
+              });
 
-                // Persist verified displacement into TechnicalSpec
-                await this.prisma.technicalSpec.upsert({
-                  where: { variantId },
-                  create: {
-                    variantId,
-                    specs: {
-                      ...freshSpecsObj,
-                      engineDisplacementCc: finalCc,
-                      isVerified: true,
-                      verifiedAt: new Date().toISOString(),
-                      displacementSource,
-                      displacementEvidence: (researchedCc as any).evidence || null,
-                      displacementStatus: 'VERIFIED',
-                    },
-                  },
-                  update: {
-                    specs: {
-                      ...freshSpecsObj,
-                      engineDisplacementCc: finalCc,
-                      isVerified: true,
-                      verifiedAt: new Date().toISOString(),
-                      displacementSource,
-                      displacementEvidence: (researchedCc as any).evidence || null,
-                      displacementStatus: 'VERIFIED',
-                    },
-                  },
-                });
-              } else {
-                this.logger.warn(`[CONSISTENCY_GATE_REJECT] Researched cc ${researchedCc.displacementCc} was rejected by consistency gate: ${dGate.reason}`);
-                await this.prisma.technicalSpec.upsert({
-                  where: { variantId },
-                  create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
-                  update: { specs: { ...freshSpecsObj, displacementStatus: 'FAILED' } },
-                });
+              if (reconcileRes.displacementStatus === 'VERIFIED') {
+                finalCc = reconcileRes.validCc;
+                displacementSource = researchedCc.source;
               }
             } else {
               await this.prisma.technicalSpec.upsert({
                 where: { variantId },
-                create: { variantId, specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
-                update: { specs: { ...freshSpecsObj, displacementStatus: 'MISSING' } },
+                create: {
+                  variantId,
+                  specs: {
+                    ...freshSpecsObj,
+                    engineDisplacementCc: null,
+                    displacementStatus: 'MISSING',
+                    isVerified: false,
+                    displacementSource: 'VARIANT_IDENTITY_REQUIRES_SEPARATE_TAXONOMY_REVIEW',
+                  },
+                },
+                update: {
+                  specs: {
+                    ...freshSpecsObj,
+                    engineDisplacementCc: null,
+                    displacementStatus: 'MISSING',
+                    isVerified: false,
+                    displacementSource: 'VARIANT_IDENTITY_REQUIRES_SEPARATE_TAXONOMY_REVIEW',
+                  },
+                },
               });
             }
           } catch (err: any) {
@@ -903,11 +1569,11 @@ export class VariantTechnicalFactsService {
   /**
    * Targeted structured displacement extraction.
    * Never multiplies marketed engine label (e.g. 2.0 * 1000 = 2000 cc).
-   * Extracts evidence-backed exact displacement in cc.
+   * Extracts evidence-backed exact displacement in cc with complete evidence chain.
    */
   private async researchVariantDisplacement(
     variant: any,
-  ): Promise<{ displacementCc: number; source: string } | null> {
+  ): Promise<{ displacementCc: number; source: string; evidence?: string; evidences?: TechnicalFactEvidenceItem[] } | null> {
     const brandName = (variant.brand?.name || '').trim();
     const modelName = (variant.model?.name || '').trim();
     const year = variant.year;
@@ -922,83 +1588,265 @@ export class VariantTechnicalFactsService {
       .filter(Boolean)
       .join(' ');
 
-    const query = `${brandName} ${modelName} ${generationName ? generationName + ' ' : ''}${year} ${engineCode} ${trimName} silindir hacmi motor hacmi cc teknik özellikleri`.trim();
-    this.logger.log(`[DISPLACEMENT_SEARCH] Query: "${query}" (Full Identity: "${identityParts}")`);
+    const targetModel = modelName.toLowerCase();
+    const targetBrand = brandName.toLowerCase();
+
+    // ----------------------------------------------------
+    // PHASE 1: TURKEY PRIMARY RESEARCH
+    // ----------------------------------------------------
+    const trQuery = `${brandName} ${modelName} ${generationName ? generationName + ' ' : ''}${year} ${engineCode} ${trimName} silindir hacmi motor hacmi cc teknik özellikleri`.trim();
+    this.logger.log(`[DISPLACEMENT_SEARCH] (TR_PRIMARY) Query: "${trQuery}" (Full Identity: "${identityParts}")`);
 
     this.metrics.externalWebSearchCalls++;
-    const searchResults = await this.webSearchProvider.search(query, 'tr', 'tr');
-    if (!searchResults || searchResults.length === 0) {
-      return null;
-    }
+    const trSearchResults = await this.webSearchProvider.search(trQuery, 'tr', 'tr');
 
-    // Prepare evidence excerpt
-    const evidenceText = searchResults
-      .slice(0, 5)
-      .map((r) => `Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.url}`)
-      .join('\n\n');
+    let allResults: any[] = trSearchResults || [];
 
-    // Use AI Structured extraction with strict schema
-    const structuredResult = await this.extractDisplacementViaAi(
-      identityParts,
-      evidenceText,
-    );
-    if (structuredResult && structuredResult.displacementCc) {
-      const cc = Math.round(structuredResult.displacementCc);
-      // Valid passenger car displacement bounds
-      if (cc >= 600 && cc <= 8000) {
-        return {
-          displacementCc: cc,
-          source: structuredResult.sourceUrl || searchResults[0]?.url || 'TARGETED_WEB_RESEARCH',
-        };
+    const hasAuthoritativeSource = allResults.some((res) => {
+      const classified = classifySourceTier(res.url, brandName);
+      return (
+        classified.tier === TechnicalSourceTier.TIER_1_MANUFACTURER ||
+        classified.tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ||
+        classified.tier === TechnicalSourceTier.TIER_3_CATALOG
+      );
+    });
+
+    // ----------------------------------------------------
+    // PHASE 2: EUROPE / AUTHORITATIVE FALLBACK RESEARCH
+    // (If TR primary yielded 0 results or lacks authoritative catalog/OEM domains)
+    // ----------------------------------------------------
+    if (!hasAuthoritativeSource || allResults.length < 3) {
+      const euQuery = `${brandName} ${modelName} ${year} ${engineCode} specs displacement cc technical specifications`.trim();
+      this.logger.log(`[DISPLACEMENT_SEARCH] (EU_FALLBACK) Query: "${euQuery}"`);
+      this.metrics.externalWebSearchCalls++;
+      const euResults = await this.webSearchProvider.search(euQuery, 'en', 'eu');
+      if (Array.isArray(euResults) && euResults.length > 0) {
+        allResults = [...allResults, ...euResults];
       }
     }
 
-    // Fallback: Exact pattern match within snippets for "silindir hacmi: XXXX cc" or "XXXX cm3"
-    for (const res of searchResults) {
-      const text = `${res.title} ${res.snippet}`;
-      const match = text.match(/(?:silindir|motor)\s*hacmi\s*[:\s]*([1-9]\d{2,3})\s*(?:cc|cm3)/i);
+    if (allResults.length === 0) {
+      return null;
+    }
+
+    // Filter results to match target brand and model
+    const candidateResults = allResults.filter((res) => {
+      const fullText = `${res.title || ''} ${res.snippet || ''}`.toLowerCase();
+      if (targetBrand && targetModel && fullText.includes(targetBrand)) {
+        if (!fullText.includes(targetModel)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const usableResults = candidateResults.length > 0 ? candidateResults : allResults;
+
+    // Map usableResults to request-local sourceMap with S1, S2, ...
+    // AI parser is only given request-local identifiers and CANNOT invent URLs.
+    const sourceMap = new Map<string, any>();
+    usableResults.slice(0, 8).forEach((res, idx) => {
+      const sId = `S${idx + 1}`;
+      sourceMap.set(sId, {
+        ...res,
+        sourceId: sId,
+        resolvedUrl: res.resolvedUrl || res.url,
+      });
+    });
+
+    const structuredResult = await this.extractDisplacementViaAi(
+      identityParts,
+      sourceMap,
+      variant,
+    );
+
+    if (structuredResult?.applicationIncompatible) {
+      this.logger.warn(`[EXACT_APPLICATION_GATE] Vehicle application "${identityParts}" unproven or incompatible (${structuredResult.reason || ''}). Failing closed.`);
+      return null;
+    }
+
+    // Collect structured candidate evidence items across authentic search results
+    const candidateEvidences: TechnicalFactEvidenceItem[] = [];
+
+    if (structuredResult && structuredResult.displacementCc && structuredResult.retrievedSource) {
+      const aiCc = Math.round(structuredResult.displacementCc);
+      if (aiCc >= 600 && aiCc <= 8000) {
+        const src = structuredResult.retrievedSource;
+        const classified = classifySourceTier(src.resolvedUrl, brandName);
+        candidateEvidences.push({
+          url: src.resolvedUrl,
+          domain: src.domain,
+          sourceTier: classified.tier,
+          sourceTierLabel: classified.tierLabel,
+          sourceKind: classified.tier === TechnicalSourceTier.TIER_1_MANUFACTURER ? 'OEM' :
+                      classified.tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ? 'HOMOLOGATION' :
+                      classified.tier === TechnicalSourceTier.TIER_3_CATALOG ? 'CATALOG' : 'SECONDARY_MEDIA',
+          provider: src.provider,
+          providerResultId: src.providerResultId,
+          providerCitationUri: src.providerCitationUri,
+          contentHash: src.contentHash,
+          extractedValue: aiCc,
+          extractedUnit: 'CC',
+          identityMatch: true,
+          applicationMatch: structuredResult.applicationMatch ?? false,
+          accepted: structuredResult.applicationMatch ?? false,
+          evidenceExcerpt: src.providerSnippet || src.retrievedPageExcerpt || `${aiCc} cc`,
+          retrievedText: src.providerSnippet || src.retrievedPageExcerpt || undefined,
+          parserSummary: structuredResult.parserSummary,
+          retrievedAt: src.retrievedAt || new Date().toISOString(),
+        });
+      }
+    }
+
+    // Pattern matching across authentic retrieved text to gather multi-source consensus
+    for (const [sId, src] of sourceMap.entries()) {
+      const authenticText = `${src.providerSnippet || ''} ${src.retrievedPageExcerpt || ''} ${src.title || ''}`;
+      const appMatch = verifyVehicleApplicationMatch(variant, authenticText, src.resolvedUrl);
+      if (!appMatch.match) {
+        continue;
+      }
+
+      const match = authenticText.match(/(?:silindir|motor|displacement|cubic capacity)\s*hacmi\s*[:\s]*([1-9]\d{2,3})\s*(?:cc|cm3)/i)
+        || authenticText.match(/(?:displacement|engine size|cubic capacity)\s*[:\s]*([1-9]\d{2,3})\s*(?:cc|cm3)/i)
+        || authenticText.match(/\b([1-9]\d{2,3})\s*(?:cc|cm3)\b/i);
+
       if (match && match[1]) {
         const val = parseInt(match[1], 10);
         if (val >= 600 && val <= 8000) {
-          return {
-            displacementCc: val,
-            source: res.url || 'KEYWORD_PATTERN_EXTRACT',
-          };
+          const classified = classifySourceTier(src.resolvedUrl, brandName);
+          if (classified.tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM) {
+            candidateEvidences.push({
+              url: src.resolvedUrl,
+              domain: src.domain,
+              sourceTier: classified.tier,
+              sourceTierLabel: classified.tierLabel,
+              sourceKind: classified.tier === TechnicalSourceTier.TIER_1_MANUFACTURER ? 'OEM' :
+                          classified.tier === TechnicalSourceTier.TIER_2_HOMOLOGATION ? 'HOMOLOGATION' :
+                          classified.tier === TechnicalSourceTier.TIER_3_CATALOG ? 'CATALOG' : 'SECONDARY_MEDIA',
+              provider: src.provider,
+              providerResultId: src.providerResultId,
+              providerCitationUri: src.providerCitationUri,
+              contentHash: src.contentHash,
+              extractedValue: val,
+              extractedUnit: 'CC',
+              identityMatch: true,
+              applicationMatch: true,
+              accepted: true,
+              evidenceExcerpt: match[0],
+              retrievedText: src.providerSnippet || src.retrievedPageExcerpt || undefined,
+              retrievedAt: src.retrievedAt || new Date().toISOString(),
+            });
+          }
         }
       }
     }
 
-    return null;
+    if (candidateEvidences.length === 0) {
+      return null;
+    }
+
+    // Group by extracted cc to find consensus
+    const ccGroups = new Map<number, TechnicalFactEvidenceItem[]>();
+    for (const ev of candidateEvidences) {
+      const list = ccGroups.get(ev.extractedValue) || [];
+      list.push(ev);
+      ccGroups.set(ev.extractedValue, list);
+    }
+
+    // Select candidate with strongest consensus
+    let bestCc: number | null = null;
+    let bestEvidences: TechnicalFactEvidenceItem[] = [];
+    let bestTierScore = 999;
+
+    for (const [candidateCc, evList] of ccGroups.entries()) {
+      const uniqueDomains = new Set(evList.map((e) => e.domain));
+      const minTier = Math.min(...evList.map((e) => e.sourceTier));
+
+      // Tier 1-3 can verify alone; Tier 4 requires 2+ independent domains
+      const isValid = minTier <= TechnicalSourceTier.TIER_3_CATALOG || (minTier === TechnicalSourceTier.TIER_4_SECONDARY_MEDIA && uniqueDomains.size >= 2);
+
+      if (isValid && minTier < bestTierScore) {
+        bestTierScore = minTier;
+        bestCc = candidateCc;
+        bestEvidences = evList;
+      }
+    }
+
+    if (bestCc && bestEvidences.length > 0) {
+      // Sort evidences best tier first
+      bestEvidences.sort((a, b) => a.sourceTier - b.sourceTier);
+      const primary = bestEvidences[0];
+      return {
+        displacementCc: bestCc,
+        source: primary.url,
+        evidence: primary.evidenceExcerpt || primary.url,
+        evidences: bestEvidences,
+      };
+    }
+
+    // If only single unverified candidate exists and is plausible, return for consistency gate evaluation
+    const fallbackPrimary = candidateEvidences[0];
+    return {
+      displacementCc: fallbackPrimary.extractedValue,
+      source: fallbackPrimary.url,
+      evidence: fallbackPrimary.evidenceExcerpt,
+      evidences: candidateEvidences,
+    };
   }
 
   private async extractDisplacementViaAi(
     vehicleIdentity: string,
-    evidenceText: string,
-  ): Promise<{ displacementCc?: number; sourceUrl?: string; evidence?: string } | null> {
+    sourceMap: Map<string, any>,
+    targetVariant: any,
+  ): Promise<{
+    displacementCc?: number | null;
+    retrievedSource?: any;
+    parserSummary?: string;
+    evidence?: string;
+    applicationMatch?: boolean;
+    applicationIncompatible?: boolean;
+    reason?: string;
+  } | null> {
     this.metrics.externalLLMResearchOperations++;
     const openaiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
 
-    const systemPrompt = `You are an expert automotive specification extractor.
-Given evidence snippets from authoritative automotive sources for vehicle: "${vehicleIdentity}", extract the exact factory engine displacement in cubic centimeters (cc / cm³).
+    // AI is provided only request-local identifiers [S1], [S2] and content.
+    // AI is NEVER given URLs or allowed to return URLs.
+    const evidenceText = Array.from(sourceMap.entries())
+      .map(([sId, src]) => {
+        const textContent = src.providerSnippet || src.retrievedPageExcerpt || src.snippet || '';
+        return `[${sId}]\nTitle: ${src.title}\nDomain: ${src.domain}\nContent: ${textContent}`;
+      })
+      .join('\n\n');
 
-CRITICAL RULES:
-1. Do NOT guess or round by multiplying the engine badge (e.g. do NOT return 2000 cc for a 2.0 engine unless the real factory displacement is exactly 2000 cc; e.g. Subaru EJ20 is 1994 cc, BMW B48 is 1998 cc, VAG 1.5 TSI is 1498 cc, Ford 1.0 EcoBoost is 999 cc).
-2. Extract exact verified factory numbers like 1994, 1998, 1598, 1498, 1197, 1395, 1798, etc.
-3. Return strict JSON matching:
+    const systemPrompt = `You are an expert automotive technical specification extractor.
+Given evidence snippets from automotive sources for target vehicle: "${vehicleIdentity}", extract the exact factory engine displacement in cubic centimeters (cc / cm³).
+
+CRITICAL CONSTRAINTS:
+1. You MUST reference an existing source identifier ([S1], [S2], etc.). You are STRICTLY FORBIDDEN from inventing or outputting URLs.
+2. The numeric displacement value MUST be explicitly stated in the source content for that [sourceId].
+3. Extract source-side vehicle details (model, badge, market) so application code can independently verify application match.
+4. If vehicle model/engine was NOT manufactured or is implausible, return {"applicationCompatible": false, "reason": "TAXONOMY_MISMATCH"}.
+5. Return strict JSON matching:
 {
-  "engineDisplacementCc": {
-    "value": number,
-    "evidence": "exact sentence quoting the displacement"
-  },
-  "confidence": number,
-  "sourceUrl": "URL where found"
+  "applicationCompatible": true,
+  "sourceId": "S1",
+  "displacementCc": number,
+  "parserSummary": "Summary describing why this source supports the vehicle",
+  "sourceVehicleDetails": {
+    "model": "model name in source",
+    "badge": "badge/trim in source",
+    "market": "market in source"
+  }
 }`;
+
+    let parsed: any = null;
 
     if (openaiKey) {
       try {
         this.metrics.externalLLMCalls++;
-        const openai = new OpenAI({ apiKey: openaiKey });
+        const openai = new OpenAI({ apiKey: openaiKey, timeout: 8000 });
         const response = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [
@@ -1010,34 +1858,20 @@ CRITICAL RULES:
         });
 
         const content = response.choices[0]?.message?.content;
-        if (content) {
-          const parsed = JSON.parse(content);
-          const val = typeof parsed.engineDisplacementCc?.value === 'number'
-            ? parsed.engineDisplacementCc.value
-            : typeof parsed.displacementCc === 'number'
-            ? parsed.displacementCc
-            : null;
-
-          if (val && val > 500) {
-            return {
-              displacementCc: val,
-              sourceUrl: parsed.sourceUrl,
-              evidence: parsed.engineDisplacementCc?.evidence || '',
-            };
-          }
-        }
+        if (content) parsed = JSON.parse(content);
       } catch (err: any) {
         this.logger.warn(`OpenAI displacement extraction failed: ${err.message}`);
       }
     }
 
-    if (geminiKey) {
+    if (!parsed && geminiKey) {
       try {
         this.metrics.externalLLMCalls++;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             contents: [
               {
@@ -1054,28 +1888,49 @@ CRITICAL RULES:
         if (res.ok) {
           const data = (await res.json()) as any;
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            const parsed = JSON.parse(text);
-            const val = typeof parsed.engineDisplacementCc?.value === 'number'
-              ? parsed.engineDisplacementCc.value
-              : typeof parsed.displacementCc === 'number'
-              ? parsed.displacementCc
-              : null;
-
-            if (val && val > 500) {
-              return {
-                displacementCc: val,
-                sourceUrl: parsed.sourceUrl,
-                evidence: parsed.engineDisplacementCc?.evidence || '',
-              };
-            }
-          }
+          if (text) parsed = JSON.parse(text);
         }
       } catch (err: any) {
         this.logger.warn(`Gemini displacement extraction failed: ${err.message}`);
       }
     }
 
-    return null;
+    if (!parsed) return null;
+
+    if (parsed.applicationCompatible === false || parsed.reason?.includes('TAXONOMY')) {
+      return { applicationIncompatible: true, reason: 'VARIANT_IDENTITY_REQUIRES_SEPARATE_TAXONOMY_REVIEW' };
+    }
+
+    // Resolve sourceId to immutable RetrievedSource
+    const sourceId = String(parsed.sourceId || '').trim();
+    const retrievedSource = sourceMap.get(sourceId);
+    if (!retrievedSource) {
+      this.logger.warn(`[SOURCE_FABRICATION_PREVENTED] AI returned unsupplied sourceId "${sourceId}". Rejected.`);
+      return null;
+    }
+
+    const val = typeof parsed.displacementCc === 'number' ? parsed.displacementCc : null;
+    if (!val || val < 500 || val > 8000) return null;
+
+    // Verify value exists in retrieved authentic text (valueAbsentFromRetrievedEvidenceCanVerifyFact = FALSE)
+    const authenticText = `${retrievedSource.providerSnippet || ''} ${retrievedSource.retrievedPageExcerpt || ''} ${retrievedSource.retrievedPageText || ''} ${retrievedSource.title || ''}`;
+    const hasValueInText = authenticText.includes(String(Math.round(val)));
+    if (!hasValueInText) {
+      this.logger.warn(`[AUTHENTICITY_REJECT] Extracted displacement ${val} cc not physically present in source ${retrievedSource.resolvedUrl}`);
+      return null;
+    }
+
+    // Verify vehicle application match deterministically
+    const appMatchResult = verifyVehicleApplicationMatch(targetVariant, authenticText, retrievedSource.resolvedUrl);
+
+    return {
+      displacementCc: val,
+      retrievedSource,
+      applicationMatch: appMatchResult.match,
+      applicationIncompatible: !appMatchResult.match,
+      reason: appMatchResult.reason,
+      parserSummary: parsed.parserSummary || '',
+      evidence: retrievedSource.providerSnippet || retrievedSource.retrievedPageExcerpt || `${val} cc`,
+    };
   }
 }

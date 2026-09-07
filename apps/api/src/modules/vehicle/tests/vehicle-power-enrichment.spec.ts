@@ -130,17 +130,18 @@ describe('VehiclePowerEnrichmentService (Data Safety & Scoped Side-Car System)',
     );
   });
 
-  it('3. Unit Conversion Utility: Accurately converts kW, PS, and HP', () => {
+  it('3. Unit Conversion Utility: Accurately converts kW, PS, and HP to canonical TorqueScout convention', () => {
     const kwResult = convertPowerUnits(94, 'KW');
-    expect(kwResult.powerHp).toBe(126); // 94 * 1.34102 = 126.05 -> 126 HP
+    expect(kwResult.powerHp).toBe(128); // 94 * 1.35962 = 127.8 -> 128 HP (TorqueScout PS/bg convention)
+    expect(kwResult.powerPs).toBe(128);
 
     const psResult = convertPowerUnits(150, 'PS');
-    expect(psResult.powerHp).toBe(148); // 150 * 0.98632 = 147.9 -> 148 HP
-    expect(psResult.powerKw).toBe(110.3); // 150 * 0.7355 = 110.325 -> 110.3 kW
+    expect(psResult.powerHp).toBe(150); // 150 PS -> 150 HP (TorqueScout PS/bg convention)
+    expect(psResult.powerKw).toBe(110.3); // 150 * 0.7355 = 110.3 kW
 
     const hpResult = convertPowerUnits(128, 'HP');
     expect(hpResult.powerHp).toBe(128);
-    expect(hpResult.powerPs).toBe(130); // 128 * 1.01387 = 129.77 -> 130 PS
+    expect(hpResult.powerPs).toBe(128);
   });
 
   it('4. Data Integrity Assertion: VehicleVariant row count remains unchanged before and after batch', async () => {
