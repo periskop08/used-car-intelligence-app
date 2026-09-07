@@ -520,6 +520,47 @@ export default function MobileDashboard() {
   // Favorites Map
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
+  // Auto-scroll state for Keşfet discovery cards
+  const kesfetScrollRef = useRef<ScrollView>(null);
+  const kesfetContentWidthRef = useRef<number>(0);
+  const kesfetLayoutWidthRef = useRef<number>(0);
+  const kesfetDirectionRef = useRef<'right' | 'left'>('right');
+  const kesfetUserInteractingRef = useRef<boolean>(false);
+  const kesfetInteractionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const autoScrollInterval = setInterval(() => {
+      if (kesfetUserInteractingRef.current) return;
+      const maxOffset = kesfetContentWidthRef.current - kesfetLayoutWidthRef.current;
+      if (maxOffset <= 10) return;
+
+      if (kesfetDirectionRef.current === 'right') {
+        kesfetScrollRef.current?.scrollTo({ x: maxOffset, animated: true });
+        kesfetDirectionRef.current = 'left';
+      } else {
+        kesfetScrollRef.current?.scrollTo({ x: 0, animated: true });
+        kesfetDirectionRef.current = 'right';
+      }
+    }, 3200);
+
+    return () => {
+      clearInterval(autoScrollInterval);
+      if (kesfetInteractionTimerRef.current) {
+        clearTimeout(kesfetInteractionTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleKesfetUserTouch = useCallback(() => {
+    kesfetUserInteractingRef.current = true;
+    if (kesfetInteractionTimerRef.current) {
+      clearTimeout(kesfetInteractionTimerRef.current);
+    }
+    kesfetInteractionTimerRef.current = setTimeout(() => {
+      kesfetUserInteractingRef.current = false;
+    }, 5000);
+  }, []);
+
   useEffect(() => {
     checkUserSession();
     fetchFeaturedListings();
@@ -1351,7 +1392,20 @@ export default function MobileDashboard() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kesfetScrollRow}>
+        <ScrollView
+          ref={kesfetScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.kesfetScrollRow}
+          onContentSizeChange={(w) => {
+            kesfetContentWidthRef.current = w;
+          }}
+          onLayout={(e) => {
+            kesfetLayoutWidthRef.current = e.nativeEvent.layout.width;
+          }}
+          onTouchStart={handleKesfetUserTouch}
+          onScrollBeginDrag={handleKesfetUserTouch}
+        >
           {/* 1. Araç Rehberi */}
           <TouchableOpacity
             style={styles.kesfetCard}
