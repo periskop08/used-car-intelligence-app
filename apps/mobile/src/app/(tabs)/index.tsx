@@ -1352,37 +1352,52 @@ export default function MobileDashboard() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kesfetScrollRow}>
+          {/* 1. Araç Rehberi */}
           <TouchableOpacity
             style={styles.kesfetCard}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => router.push('/(tabs)/vehicle-guide')}
           >
-            <View style={styles.kesfetIconBox}>
-              <Ionicons name="book-outline" size={26} color="#1e3a8a" />
+            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxIndigo]}>
+              <Ionicons name="book" size={20} color="#4f46e5" />
             </View>
-            <Text style={styles.kesfetCardText}>Araç Rehberi</Text>
+            <View style={styles.kesfetCardContent}>
+              <Text style={styles.kesfetCardText}>Araç Rehberi</Text>
+              <Text style={styles.kesfetCardSubText}>Kronik &amp; Teknik</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
 
+          {/* 2. Aracını Bul */}
           <TouchableOpacity
             style={styles.kesfetCard}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => router.push('/(tabs)/aracini-bul')}
           >
-            <View style={styles.kesfetIconBox}>
-              <Ionicons name="search-circle-outline" size={28} color="#ea580c" />
+            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxOrange]}>
+              <Ionicons name="compass" size={20} color="#ea580c" />
             </View>
-            <Text style={styles.kesfetCardText}>Aracını Bul</Text>
+            <View style={styles.kesfetCardContent}>
+              <Text style={styles.kesfetCardText}>Aracını Bul</Text>
+              <Text style={styles.kesfetCardSubText}>Kriterli Filtrele</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
 
+          {/* 3. İlan Akışı */}
           <TouchableOpacity
             style={styles.kesfetCard}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => router.push('/ilan-akisi')}
           >
-            <View style={styles.kesfetIconBox}>
-              <Ionicons name="newspaper-outline" size={26} color="#0284c7" />
+            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxCyan]}>
+              <Ionicons name="newspaper" size={20} color="#0284c7" />
             </View>
-            <Text style={styles.kesfetCardText}>İlan Akışı</Text>
+            <View style={styles.kesfetCardContent}>
+              <Text style={styles.kesfetCardText}>İlan Akışı</Text>
+              <Text style={styles.kesfetCardSubText}>Canlı Satılıklar</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
         </ScrollView>
 
@@ -2543,28 +2558,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     gap: 10,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowRadius: 5,
     elevation: 2,
   },
   kesfetIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#f8fafc',
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+  },
+  kesfetIconBoxIndigo: {
+    backgroundColor: '#eef2ff',
+    borderColor: '#c7d2fe',
+  },
+  kesfetIconBoxOrange: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+  },
+  kesfetIconBoxCyan: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#bae6fd',
+  },
+  kesfetCardContent: {
+    gap: 1.5,
   },
   kesfetCardText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '800',
     color: '#0f172a',
+    letterSpacing: -0.2,
+  },
+  kesfetCardSubText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748b',
   },
   promoSectionContainer: {
     marginTop: 10,
