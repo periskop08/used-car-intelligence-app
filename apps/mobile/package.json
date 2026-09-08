@@ -13,32 +13,32 @@
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@used-car-intelligence/shared": "file:../../packages/shared",
-    "expo": "~54.0.37",
-    "expo-constants": "~18.0.13",
-    "expo-font": "~14.0.0",
-    "expo-image": "~3.0.11",
-    "expo-image-picker": "16.0.6",
-    "expo-linking": "~8.0.12",
-    "expo-router": "~6.0.24",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-svg": "^15.11.2"
+    "expo": "~57.0.20",
+    "expo-constants": "~57.0.17",
+    "expo-font": "~57.0.3",
+    "expo-image": "~57.0.4",
+    "expo-image-picker": "~57.0.16",
+    "expo-linking": "~57.0.9",
+    "expo-router": "~57.0.19",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@expo/ngrok": "^4.1.3",
-    "@types/react": "~19.1.10",
-    "babel-preset-expo": "~54.0.10",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.2.4",
+    "babel-preset-expo": "~57.0.0",
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "react-native": {
-      "react": "19.1.0"
+      "react": "19.2.3"
     },
-    "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0"
   }
 }
