@@ -374,7 +374,7 @@ function ListingsContent() {
 
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-6 py-12 flex flex-col gap-8">
+    <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
       {/* Title Header */}
       <div>
         <h1 className="text-3xl font-black text-slate-200 canvas-title tracking-tight">Araç İlanları</h1>
@@ -1030,7 +1030,7 @@ function ListingsContent() {
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                 return (
