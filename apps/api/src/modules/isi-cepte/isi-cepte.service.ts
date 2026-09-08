@@ -8,7 +8,7 @@ export interface PublicRecommendationParams {
   page?: number;
   limit?: number;
   seed?: string;
-  scope?: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE';
+  scope?: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE' | 'SHOWCASE_WITH_FALLBACK';
 }
 
 /**
@@ -122,19 +122,7 @@ export class IsiCepteService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Purge any temporary mock/sample providers created during development
-    try {
-      const deleted = await this.prisma.isiCepteProvider.deleteMany({
-        where: {
-          isicepteProviderId: { startsWith: 'IC-PROV-' },
-        },
-      });
-      if (deleted.count > 0) {
-        this.logger.log(`Purged ${deleted.count} mock/sample İşiCepte providers from database.`);
-      }
-    } catch (err) {
-      this.logger.warn(`Could not purge mock providers on init: ${(err as any)?.message}`);
-    }
+    this.logger.log('İşiCepte recommendation service initialized.');
   }
 
   /**
@@ -186,8 +174,11 @@ export class IsiCepteService implements OnModuleInit {
     const seedString = params.seed || new Date().toISOString().slice(0, 10);
 
     let itemsToPaginate: any[] = [];
+    let rotatedShowcase: any[] = [];
+    let rotatedRegular: any[] = [];
     let total = 0;
     let totalShowcase = 0;
+    let totalRegular = 0;
     let totalAll = 0;
 
     if (scope === 'SHOWCASE_ONLY') {
@@ -205,11 +196,49 @@ export class IsiCepteService implements OnModuleInit {
 
       totalShowcase = showcaseProviders.length;
       totalAll = totalAllCount;
+      totalRegular = Math.max(0, totalAll - totalShowcase);
       total = totalShowcase;
 
       // Apply fair rotation among eligible showcase providers
-      const rotated = this.applyDeterministicFairRotation(showcaseProviders, seedString);
-      itemsToPaginate = rotated;
+      rotatedShowcase = this.applyDeterministicFairRotation(showcaseProviders, seedString);
+      itemsToPaginate = rotatedShowcase;
+    } else if (scope === 'SHOWCASE_WITH_FALLBACK') {
+      // Showcase members prioritized, fallback to regular members if 0 showcase
+      const showcaseWhere = {
+        ...baseWhere,
+        isShowcaseActive: true,
+        showcaseExpiresAt: { gt: now },
+      };
+
+      const [showcaseProviders, totalAllCount] = await Promise.all([
+        this.prisma.isiCepteProvider.findMany({ where: showcaseWhere }),
+        this.prisma.isiCepteProvider.count({ where: baseWhere }),
+      ]);
+
+      totalShowcase = showcaseProviders.length;
+      totalAll = totalAllCount;
+      totalRegular = Math.max(0, totalAll - totalShowcase);
+      rotatedShowcase = this.applyDeterministicFairRotation(showcaseProviders, seedString);
+
+      if (totalShowcase > 0) {
+        total = totalShowcase;
+        itemsToPaginate = rotatedShowcase;
+      } else {
+        const regularWhere = {
+          ...baseWhere,
+          OR: [
+            { isShowcaseActive: false },
+            { showcaseExpiresAt: null },
+            { showcaseExpiresAt: { lte: now } },
+          ],
+        };
+        const regularProviders = await this.prisma.isiCepteProvider.findMany({
+          where: regularWhere,
+        });
+        total = regularProviders.length;
+        rotatedRegular = this.applyDeterministicFairRotation(regularProviders, `${seedString}-reg`);
+        itemsToPaginate = rotatedRegular;
+      }
     } else {
       // ALL_ELIGIBLE ("Tüm Ustaları Gör")
       const allMatchingProviders = await this.prisma.isiCepteProvider.findMany({
@@ -227,21 +256,21 @@ export class IsiCepteService implements OnModuleInit {
       );
 
       totalShowcase = showcaseList.length;
+      totalRegular = standardList.length;
       total = totalAll;
 
       // Rotate each group fairly and place showcase members first
-      const rotatedShowcase = this.applyDeterministicFairRotation(showcaseList, seedString);
-      const rotatedStandard = this.applyDeterministicFairRotation(standardList, `${seedString}-std`);
+      rotatedShowcase = this.applyDeterministicFairRotation(showcaseList, seedString);
+      rotatedRegular = this.applyDeterministicFairRotation(standardList, `${seedString}-std`);
 
-      itemsToPaginate = [...rotatedShowcase, ...rotatedStandard];
+      itemsToPaginate = [...rotatedShowcase, ...rotatedRegular];
     }
 
     // Pagination
     const startIndex = (page - 1) * limit;
     const paginatedItems = itemsToPaginate.slice(startIndex, startIndex + limit);
 
-    // Format for Public UI Safe Consumption
-    const items = paginatedItems.map((p) => {
+    const formatProvider = (p: any) => {
       const isShowcaseActiveNow = Boolean(
         p.isShowcaseActive === true && p.showcaseExpiresAt && p.showcaseExpiresAt > now
       );
@@ -251,6 +280,7 @@ export class IsiCepteService implements OnModuleInit {
         businessName: p.businessName,
         slug: p.slug,
         coverImageUrl: p.coverImageUrl || null,
+        avatarUrl: p.avatarUrl || null,
         city: p.city,
         district: p.district || null,
         address: p.address || null,
@@ -262,7 +292,11 @@ export class IsiCepteService implements OnModuleInit {
         reviewCount: p.reviewCount || 0,
         isShowcase: isShowcaseActiveNow,
       };
-    });
+    };
+
+    const items = paginatedItems.map(formatProvider);
+    const showcaseItems = rotatedShowcase.map(formatProvider);
+    const regularItems = rotatedRegular.map(formatProvider);
 
     // Collect available cities & canonical brands for filter dropdowns
     const [allActiveEligible, canonicalBrandsDb] = await Promise.all([
@@ -300,8 +334,11 @@ export class IsiCepteService implements OnModuleInit {
     return {
       success: true,
       items,
+      showcaseItems,
+      regularItems,
       total,
       totalShowcase,
+      totalRegular,
       totalAll,
       page,
       limit,

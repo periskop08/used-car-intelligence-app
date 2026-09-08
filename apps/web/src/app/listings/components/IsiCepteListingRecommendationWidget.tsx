@@ -1,27 +1,33 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Wrench,
   MapPin,
-  Star,
   ChevronDown,
+  ChevronRight,
   X,
   ExternalLink,
-  Search,
-  CheckCircle2,
+  Star,
   Building,
+  Wrench,
   ShieldCheck,
   Phone,
+  FileText,
+  ArrowRight,
+  Car,
+  CheckCircle2,
+  Search,
+  Map,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
-interface IsiCepteShowcaseItem {
+export interface IsiCepteShowcaseItem {
   id: string;
   isicepteProviderId: string;
   businessName: string;
   slug: string;
   coverImageUrl?: string | null;
+  avatarUrl?: string | null;
   city: string;
   district?: string | null;
   address?: string | null;
@@ -134,9 +140,9 @@ export default function IsiCepteListingRecommendationWidget({
   initialUserCity,
   className = '',
 }: IsiCepteListingRecommendationWidgetProps) {
-  // Determine selected city from prop, localStorage or listing
+  // City state: prioritizes initialUserCity, then localStorage, or fallback empty (all cities)
   const [selectedCity, setSelectedCity] = useState<string>(() => {
-    if (initialUserCity && initialUserCity !== 'Belirtilmedi') return initialUserCity;
+    if (initialUserCity && initialUserCity.trim() !== '') return initialUserCity.trim();
     if (typeof window !== 'undefined') {
       const storedCity = localStorage.getItem('userSelectedCity');
       if (storedCity) return storedCity;
@@ -145,19 +151,24 @@ export default function IsiCepteListingRecommendationWidget({
   });
 
   const [items, setItems] = useState<IsiCepteShowcaseItem[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
+  const [showcaseItems, setShowcaseItems] = useState<IsiCepteShowcaseItem[]>([]);
+  const [regularItems, setRegularItems] = useState<IsiCepteShowcaseItem[]>([]);
+  const [totalShowcase, setTotalShowcase] = useState<number>(0);
+  const [totalRegular, setTotalRegular] = useState<number>(0);
+  const [totalAll, setTotalAll] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modal / Dropdown states
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState<boolean>(false);
   const [isExpandedModalOpen, setIsExpandedModalOpen] = useState<boolean>(false);
+  const [expandedActiveTab, setExpandedActiveTab] = useState<'ALL' | 'SHOWCASE' | 'REGULAR'>('ALL');
   const [detailModalProvider, setDetailModalProvider] = useState<IsiCepteShowcaseItem | null>(null);
   const [citySearch, setCitySearch] = useState<string>('');
 
-  // Stable seed per component lifecycle
+  // Randomized seed per page load so Vitrin list order changes on each refresh (Rule 9)
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
 
-  // Fetch strictly active showcase providers matching brand & city
+  // Fetch recommendations with SHOWCASE_WITH_FALLBACK scope
   const fetchRecommendations = useCallback(async () => {
     setLoading(true);
     try {
@@ -168,19 +179,26 @@ export default function IsiCepteListingRecommendationWidget({
       if (selectedCity && selectedCity !== 'Tüm Şehirler') {
         query.append('city', selectedCity);
       }
-      query.append('limit', '100'); // Retrieve ALL matching showcase providers
-      query.append('scope', 'SHOWCASE_ONLY');
+      query.append('limit', '100'); // Retrieve all matching providers
+      query.append('scope', 'SHOWCASE_WITH_FALLBACK');
       query.append('seed', sessionSeed);
 
       const res = await fetch(`${API_BASE_URL}/isicepte/recommendations?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        const showcaseItems = Array.isArray(data.items) ? data.items : [];
-        setItems(showcaseItems);
-        setTotalCount(data.total || showcaseItems.length);
+        const mainItems = Array.isArray(data.items) ? data.items : [];
+        const scItems = Array.isArray(data.showcaseItems) ? data.showcaseItems : [];
+        const regItems = Array.isArray(data.regularItems) ? data.regularItems : [];
+
+        setItems(mainItems);
+        setShowcaseItems(scItems);
+        setRegularItems(regItems);
+        setTotalShowcase(data.totalShowcase ?? scItems.length);
+        setTotalRegular(data.totalRegular ?? regItems.length);
+        setTotalAll(data.totalAll ?? mainItems.length);
 
         // Record impression event
-        if (showcaseItems.length > 0) {
+        if (mainItems.length > 0) {
           fetch(`${API_BASE_URL}/isicepte/events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -194,12 +212,20 @@ export default function IsiCepteListingRecommendationWidget({
         }
       } else {
         setItems([]);
-        setTotalCount(0);
+        setShowcaseItems([]);
+        setRegularItems([]);
+        setTotalShowcase(0);
+        setTotalRegular(0);
+        setTotalAll(0);
       }
     } catch (err) {
       console.error('Recommendation fetch error:', err);
       setItems([]);
-      setTotalCount(0);
+      setShowcaseItems([]);
+      setRegularItems([]);
+      setTotalShowcase(0);
+      setTotalRegular(0);
+      setTotalAll(0);
     } finally {
       setLoading(false);
     }
@@ -240,7 +266,9 @@ export default function IsiCepteListingRecommendationWidget({
         city: provider.city,
       }),
     }).catch(() => {});
-    window.open(provider.isicepteProfileUrl, '_blank', 'noopener,noreferrer');
+    if (provider.isicepteProfileUrl) {
+      window.open(provider.isicepteProfileUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   // Turkish character insensitive search over 81 provinces
@@ -248,15 +276,23 @@ export default function IsiCepteListingRecommendationWidget({
     c.toLocaleLowerCase('tr-TR').includes(citySearch.toLocaleLowerCase('tr-TR'))
   );
 
+  // Tab filtered items for "Tümünü Gör" Modal (Rule 22)
+  const modalTabItems = useMemo(() => {
+    if (expandedActiveTab === 'SHOWCASE') return showcaseItems;
+    if (expandedActiveTab === 'REGULAR') return regularItems;
+    // ALL tab: combine showcase first, then regular
+    return [...showcaseItems, ...regularItems];
+  }, [expandedActiveTab, showcaseItems, regularItems]);
+
   return (
     <div
       className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans ${className}`}
     >
-      <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
+      <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></span>
 
-      {/* Widget Header with Real İşi Cepte Logo */}
-      <div className="flex items-start justify-between border-b border-white/10 pb-3 gap-2">
-        <div className="flex items-start gap-2 min-w-0 flex-1">
+      {/* Widget Header with Real İşi Cepte Logo (Matches Reference Image 1) */}
+      <div className="flex items-start justify-between border-b border-white/10 pb-3 gap-2 shrink-0">
+        <div className="flex items-start gap-2.5 min-w-0 flex-1">
           <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29] mt-0.5">
             <img
               src="/assets/images/isicepte-logo.jpeg"
@@ -266,29 +302,35 @@ export default function IsiCepteListingRecommendationWidget({
           </div>
 
           <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none">
                 İŞİ CEPTE ÖNERİYOR
               </span>
-              <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 rounded leading-none">
-                👑 Vitrin
-              </span>
+              {totalShowcase > 0 ? (
+                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5">
+                  👑 Vitrin
+                </span>
+              ) : totalRegular > 0 ? (
+                <span className="text-[9px] font-bold text-slate-300 bg-slate-800/80 border border-white/10 px-1.5 py-0.5 rounded leading-none">
+                  🔧 Uzman Servisler
+                </span>
+              ) : null}
             </div>
             <span className="text-[9.5px] text-slate-300 font-medium mt-1 leading-tight whitespace-normal break-words">
-              {vehicleBrand} markasına hizmet veren vitrin servisleri
+              {vehicleBrand} markasına hizmet veren {totalShowcase > 0 ? 'vitrin servisleri' : 'uzman servisler'}
             </span>
           </div>
         </div>
 
-        {/* Compact Location Selector Button */}
+        {/* Compact Location Selector Button (Matches Reference Image 1) */}
         <button
           type="button"
           onClick={() => setIsCitySelectorOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-orange-500/30 rounded-lg text-[10px] font-bold text-orange-300 transition cursor-pointer shrink-0"
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0f172a]/90 hover:bg-[#1e293b] border border-white/15 hover:border-orange-500/30 rounded-xl text-[10.5px] font-bold text-slate-200 hover:text-orange-300 transition cursor-pointer shrink-0 shadow-sm"
         >
-          <MapPin className="w-2.5 h-2.5 text-orange-400 shrink-0" />
+          <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
           <span className="truncate max-w-[75px]">{selectedCity || 'Şehir Seç'}</span>
-          <ChevronDown className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
         </button>
       </div>
 
@@ -296,17 +338,17 @@ export default function IsiCepteListingRecommendationWidget({
       <div className="flex-1 flex flex-col justify-between gap-2.5 min-h-0 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-400 font-mono animate-pulse my-auto">
-            Vitrin servisleri yükleniyor...
+            Servis önerileri yükleniyor...
           </div>
         ) : items.length === 0 ? (
-          /* Empty State */
+          /* Empty State (Rule 25 & 26: Only if Vitrin === 0 AND Regular === 0) */
           <div className="flex-1 flex flex-col items-center justify-center p-5 text-center space-y-3 bg-slate-950/60 rounded-xl border border-white/5 my-auto">
             <Building className="w-9 h-9 text-slate-600 mx-auto" />
             <h4 className="text-xs font-bold text-white leading-snug">
               Bu araç ve konum için henüz uygun servis bulunamadı.
             </h4>
             <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-              {vehicleBrand} markası için {selectedCity ? `${selectedCity} bölgesinde` : ''} aktif vitrin servisi eklendiğinde burada listelenecektir.
+              {vehicleBrand} markası için {selectedCity ? `${selectedCity} bölgesinde` : ''} servis eklendiğinde burada listelenecektir.
             </p>
             <button
               type="button"
@@ -317,87 +359,81 @@ export default function IsiCepteListingRecommendationWidget({
             </button>
           </div>
         ) : (
-          /* Scrollable Vertical List: Contains all matching Vitrin providers */
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 scrollbar-thin scrollbar-thumb-white/15 overscroll-contain">
+          /* Scrollable Vertical List of Compact Cards (Strictly Rules 11, 12, 38: NO service specialty chips on mini card) */
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-white/15 overscroll-contain">
             {items.map((shop) => (
               <div
                 key={shop.id}
-                className="p-3 rounded-xl bg-slate-900/80 border border-white/10 flex flex-col gap-2 hover:border-orange-500/30 transition group"
+                onClick={() => handleOpenDetail(shop)}
+                className="p-2.5 rounded-2xl bg-[#091124]/90 hover:bg-[#0f1b36] border border-white/10 hover:border-orange-500/40 transition flex items-center gap-3 cursor-pointer group shadow-sm"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-xs font-bold text-white truncate group-hover:text-orange-300 transition">
-                        {shop.businessName}
-                      </h4>
-                      <span className="text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                        👑 Vitrin Üyesi
-                      </span>
+                {/* Left Thumbnail Image */}
+                <div className="w-20 h-16 sm:w-24 sm:h-18 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 relative flex items-center justify-center">
+                  {shop.coverImageUrl || shop.avatarUrl ? (
+                    <img
+                      src={shop.coverImageUrl || shop.avatarUrl || ''}
+                      alt={shop.businessName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-950 flex flex-col items-center justify-center text-slate-600">
+                      <Wrench className="w-5 h-5 text-slate-500" />
                     </div>
-
-                    <div className="text-[10px] text-slate-400 mt-1 space-y-0.5 font-mono">
-                      <div>
-                        📍 {shop.city} {shop.district ? `/ ${shop.district}` : ''}
-                      </div>
-                      <div className="text-orange-400/90 font-medium font-sans">
-                        {vehicleBrand} markasına hizmet veriyor
-                      </div>
-                    </div>
-
-                    {shop.serviceCategories && shop.serviceCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {shop.serviceCategories.slice(0, 2).map((cat, idx) => (
-                          <span
-                            key={idx}
-                            className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[9px] font-medium"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {shop.rating > 0 && (
-                    <span className="text-[9.5px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20 shrink-0 flex items-center gap-0.5 font-mono">
-                      <Star className="w-2.5 h-2.5 fill-orange-400" /> {shop.rating.toFixed(1)}
-                    </span>
                   )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDetail(shop)}
-                    className="flex-1 py-1.5 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-[10px] font-bold text-center transition cursor-pointer"
-                  >
-                    Detay
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOutboundClick(shop)}
-                    className="flex-1 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-[10px] font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>İşiCepte&apos;de Aç</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </button>
+                {/* Middle Info Details */}
+                <div className="flex flex-col min-w-0 flex-1 gap-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <h4 className="text-xs font-bold text-white group-hover:text-orange-300 transition truncate">
+                      {shop.businessName}
+                    </h4>
+                    {shop.isShowcase && (
+                      <span className="text-[8.5px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0 leading-none">
+                        👑 Vitrin Üyesi
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono truncate">
+                    <MapPin className="w-2.5 h-2.5 text-orange-400/80 shrink-0" />
+                    <span className="truncate">
+                      {shop.city} {shop.district ? `/ ${shop.district}` : ''}
+                    </span>
+                  </div>
+
+                  {shop.rating > 0 ? (
+                    <div className="text-[10px] text-slate-300 flex items-center gap-1 font-mono">
+                      <Star className="w-2.5 h-2.5 fill-orange-400 text-orange-400 shrink-0" />
+                      <span className="font-bold text-white">{shop.rating.toFixed(1)}</span>
+                      {shop.reviewCount > 0 && (
+                        <span className="text-slate-400">· {shop.reviewCount} değerlendirme</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[9.5px] text-orange-400/90 font-medium">
+                      {vehicleBrand} uzmanı
+                    </div>
+                  )}
                 </div>
+
+                {/* Right Chevron Affordance */}
+                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-orange-400 transition ml-auto shrink-0" />
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* CTA Button: "TÜMÜNÜ GÖR" (Opens Central Overlay Modal) */}
+      {/* CTA Button: "TÜMÜNÜ GÖR" (Opens Central Overlay Modal - Matches Reference Image 1) */}
       {items.length > 0 && (
         <button
           type="button"
           onClick={() => setIsExpandedModalOpen(true)}
-          className="w-full py-2.5 bg-gradient-to-r from-orange-600/30 to-amber-600/30 hover:from-orange-600/40 hover:to-amber-600/40 border border-orange-500/40 rounded-xl text-xs font-bold text-orange-200 hover:text-white transition cursor-pointer flex items-center justify-center gap-1.5 mt-auto shadow-md"
+          className="w-full py-2.5 bg-[#0f172a]/90 hover:bg-[#1e293b] border border-white/10 hover:border-orange-500/40 rounded-xl text-xs font-bold text-orange-400 hover:text-orange-300 transition cursor-pointer flex items-center justify-center gap-1.5 mt-auto shadow-md"
         >
-          <span>Tümünü Gör ({totalCount} Vitrin Servisi)</span>
-          <span>➔</span>
+          <span>Tümünü Gör {totalAll > 0 ? `(${totalAll})` : ''}</span>
+          <ArrowRight className="w-3.5 h-3.5 text-orange-400" />
         </button>
       )}
 
@@ -463,27 +499,27 @@ export default function IsiCepteListingRecommendationWidget({
         </div>
       )}
 
-      {/* CENTRAL ALL SHOWCASE PROVIDERS MODAL (Tümünü Gör Modalı) */}
+      {/* CENTRAL ALL SHOWCASE + REGULAR PROVIDERS MODAL (Tümünü Gör Modalı - Rules 20, 21, 22, 23, 24) */}
       {isExpandedModalOpen && (
         <div
           onClick={() => setIsExpandedModalOpen(false)}
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl bg-[#0b101e] border border-white/15 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl max-h-[85vh] overflow-y-auto flex flex-col"
+            className="w-full max-w-2xl bg-[#081120] border border-sky-500/20 rounded-[28px] p-5 sm:p-7 space-y-5 shadow-2xl max-h-[88vh] overflow-y-auto flex flex-col"
           >
             {/* Modal Header */}
             <div className="flex justify-between items-start pb-4 border-b border-white/10 shrink-0">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-wider border border-orange-500/20">
-                  <ShieldCheck className="w-3 h-3" /> İŞİCEPTE ÖNERİYOR • VİTRİN ÜYELERİ
+                  <ShieldCheck className="w-3 h-3" /> İŞİCEPTE ÖNERİYOR
                 </div>
                 <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2 mt-1">
-                  <Wrench className="w-5 h-5 text-orange-400" /> {vehicleBrand} İçin Önerilen Vitrin Servisleri
+                  <Wrench className="w-5 h-5 text-orange-400" /> {vehicleBrand} İçin Önerilen Servisler
                 </h2>
                 <p className="text-xs text-slate-400">
-                  {selectedCity ? `📍 ${selectedCity} şehrindeki` : 'Tüm şehirlerdeki'} aktif vitrin üyeleri ({items.length} işletme)
+                  {selectedCity ? `📍 ${selectedCity} bölgesinde` : 'Tüm şehirlerdeki'} hizmet verebilecek {totalAll} usta ve servis
                 </p>
               </div>
 
@@ -507,203 +543,353 @@ export default function IsiCepteListingRecommendationWidget({
               </div>
             </div>
 
-            {/* Modal Content: Full List of Matching Vitrin Providers */}
-            <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-              {items.map((shop) => (
-                <div
-                  key={shop.id}
-                  className="p-4 bg-slate-900/80 rounded-2xl border border-white/10 hover:border-orange-500/30 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-white">{shop.businessName}</h3>
-                      <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded">
-                        👑 Vitrin Üyesi
-                      </span>
-                    </div>
+            {/* Filter Tabs: Tümü, Vitrin Üyeleri, Üyeler (Rule 22) */}
+            <div className="flex items-center gap-2 border-b border-white/10 pb-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setExpandedActiveTab('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  expandedActiveTab === 'ALL'
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                    : 'bg-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                Tümü ({totalAll})
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandedActiveTab('SHOWCASE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                  expandedActiveTab === 'SHOWCASE'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'bg-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                <span>👑 Vitrin Üyeleri</span>
+                <span>({totalShowcase})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandedActiveTab('REGULAR')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  expandedActiveTab === 'REGULAR'
+                    ? 'bg-slate-200 text-slate-950 shadow-md'
+                    : 'bg-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/10'
+                }`}
+              >
+                Üyeler ({totalRegular})
+              </button>
+            </div>
 
-                    <div className="text-xs text-slate-400">
-                      📍 {shop.city} {shop.district ? `/ ${shop.district}` : ''}
-                    </div>
-
-                    <div className="text-xs text-orange-400 font-medium">
-                      {vehicleBrand} markasına hizmet veriyor
-                    </div>
-
-                    {shop.serviceCategories && shop.serviceCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {shop.serviceCategories.map((cat, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 rounded-lg bg-slate-800 border border-white/5 text-slate-300 text-[10px] font-medium"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center sm:flex-col gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsExpandedModalOpen(false);
-                        handleOpenDetail(shop);
-                      }}
-                      className="flex-1 sm:w-36 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition text-center cursor-pointer shadow-md"
-                    >
-                      Profili Gör
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOutboundClick(shop)}
-                      className="flex-1 sm:w-36 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>İşiCepte&apos;de Aç</span>
-                    </button>
-                  </div>
+            {/* Modal Content: Full List of Matching Providers (Rule 23: Clean card without specialty tags) */}
+            <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
+              {modalTabItems.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 font-mono">
+                  Bu sekmede listelenecek işletme bulunamadı.
                 </div>
-              ))}
+              ) : (
+                modalTabItems.map((shop) => (
+                  <div
+                    key={shop.id}
+                    onClick={() => handleOpenDetail(shop)}
+                    className="p-3 bg-slate-900/80 rounded-2xl border border-white/10 hover:border-orange-500/40 transition flex items-center justify-between gap-3 cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Thumbnail */}
+                      <div className="w-16 h-14 sm:w-20 sm:h-16 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 relative flex items-center justify-center">
+                        {shop.coverImageUrl || shop.avatarUrl ? (
+                          <img
+                            src={shop.coverImageUrl || shop.avatarUrl || ''}
+                            alt={shop.businessName}
+                            className="w-full h-full object-cover group-hover:scale-105 transition"
+                          />
+                        ) : (
+                          <Wrench className="w-5 h-5 text-slate-500" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-white group-hover:text-orange-300 transition truncate">
+                            {shop.businessName}
+                          </h3>
+                          {shop.isShowcase ? (
+                            <span className="text-[9px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded leading-none">
+                              👑 Vitrin Üyesi
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-800 border border-white/10 px-1.5 py-0.5 rounded leading-none">
+                              Üye
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono truncate">
+                          <MapPin className="w-2.5 h-2.5 text-orange-400/80 shrink-0" />
+                          <span className="truncate">
+                            {shop.city} {shop.district ? `/ ${shop.district}` : ''}
+                          </span>
+                        </div>
+
+                        {shop.rating > 0 && (
+                          <div className="text-[10.5px] text-slate-300 flex items-center gap-1 font-mono">
+                            <Star className="w-3 h-3 fill-orange-400 text-orange-400 shrink-0" />
+                            <span className="font-bold text-white">{shop.rating.toFixed(1)}</span>
+                            {shop.reviewCount > 0 && (
+                              <span className="text-slate-400">· {shop.reviewCount} değerlendirme</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDetail(shop);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 border border-orange-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Detay</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* SINGLE PROVIDER DETAIL MODAL */}
+      {/* SINGLE PROVIDER DETAIL MODAL (Matches Reference Image 2 exactly) */}
       {detailModalProvider && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b101e] border border-white/15 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
-              <div>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400 text-[10px] font-black uppercase tracking-wider border border-orange-500/20">
-                  👑 İŞİCEPTE VİTRİN ÜYESİ
-                </span>
-                <h3 className="text-xl font-black text-white mt-1.5">
+        <div
+          onClick={() => setDetailModalProvider(null)}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#081120] border border-sky-500/20 rounded-[28px] max-w-2xl w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto flex flex-col"
+          >
+            {/* Modal Header (Matches Reference Image 2) */}
+            <div className="flex items-start justify-between border-b border-white/10 pb-3 shrink-0">
+              <div className="space-y-1">
+                {detailModalProvider.isShowcase ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-500/30">
+                    👑 VİTRİN ÜYESİ
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider border border-white/10">
+                    İŞİ CEPTE ÜYESİ
+                  </span>
+                )}
+                <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
                   {detailModalProvider.businessName}
                 </h3>
+                <div className="flex items-center gap-3 text-xs text-slate-400 font-mono mt-0.5 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                    {detailModalProvider.city} {detailModalProvider.district ? `/ ${detailModalProvider.district}` : ''}
+                  </span>
+                  {detailModalProvider.rating > 0 && (
+                    <span className="flex items-center gap-1 text-slate-300 font-bold">
+                      <Star className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />
+                      {detailModalProvider.rating.toFixed(1)}
+                      {detailModalProvider.reviewCount > 0 && (
+                        <span className="text-slate-400 font-normal font-mono">
+                          · {detailModalProvider.reviewCount} değerlendirme
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setDetailModalProvider(null)}
                 className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Cover Image */}
-            <div className="h-44 w-full rounded-2xl bg-slate-950 overflow-hidden relative flex items-center justify-center">
-              {detailModalProvider.coverImageUrl ? (
+            {/* Modal Cover Image Banner (Matches Reference Image 2) */}
+            <div className="h-44 sm:h-60 w-full rounded-2xl bg-slate-950 overflow-hidden relative flex items-center justify-center border border-white/10 shrink-0">
+              {detailModalProvider.coverImageUrl || detailModalProvider.avatarUrl ? (
                 <img
-                  src={detailModalProvider.coverImageUrl}
+                  src={detailModalProvider.coverImageUrl || detailModalProvider.avatarUrl || ''}
                   alt={detailModalProvider.businessName}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-950 flex flex-col items-center justify-center text-slate-500 gap-2">
-                  <Wrench className="w-8 h-8 text-slate-500" />
+                  <Wrench className="w-10 h-10 text-slate-500" />
                   <span className="text-xs font-medium text-slate-400">İşletme Görseli</span>
                 </div>
               )}
             </div>
 
-            {/* Details Section */}
-            <div className="space-y-4 text-xs text-slate-300">
-              {detailModalProvider.rating > 0 && (
-                <div className="p-3.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] text-slate-400 uppercase font-bold">
-                      Müşteri Değerlendirmesi
+            {/* Detail Section Cards (Matches Reference Image 2 Layout) */}
+            <div className="space-y-3 text-xs text-slate-300">
+              {/* 1. Row: Adres & Konum */}
+              <div className="p-3.5 rounded-2xl bg-[#0d1629] border border-white/5 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 shrink-0 mt-0.5">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      ADRES & KONUM
                     </div>
-                    <div className="text-sm font-bold text-white flex items-center gap-1 mt-0.5">
-                      <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
-                      <span>{detailModalProvider.rating.toFixed(1)} / 5.0</span>
+                    <div className="text-slate-200 text-xs sm:text-sm leading-snug">
+                      {detailModalProvider.address ||
+                        `${detailModalProvider.city} ${
+                          detailModalProvider.district ? `/ ${detailModalProvider.district}` : ''
+                        }`}
                     </div>
                   </div>
-                  {detailModalProvider.reviewCount > 0 && (
-                    <div className="text-right text-[11px] text-slate-400 font-mono">
-                      {detailModalProvider.reviewCount} gerçek değerlendirme
+                </div>
+
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    detailModalProvider.address || `${detailModalProvider.businessName} ${detailModalProvider.city}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Map className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Haritada Gör</span>
+                </a>
+              </div>
+
+              {/* 2. Row: Hizmet Verdiği Araç Markaları */}
+              <div className="p-3.5 rounded-2xl bg-[#0d1629] border border-white/5 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 shrink-0 mt-0.5">
+                  <Car className="w-4 h-4" />
+                </div>
+                <div className="space-y-2 min-w-0 flex-1">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                    HİZMET VERDİĞİ ARAÇ MARKALARI
+                  </div>
+                  {detailModalProvider.supportedBrands && detailModalProvider.supportedBrands.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {detailModalProvider.supportedBrands.map((b, i) => (
+                        <span
+                          key={i}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-white/10 text-slate-200 text-[11px] font-semibold"
+                        >
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 text-xs">Tüm binek ve ticari araçlar</span>
+                  )}
+
+                  {/* Rule 17: Bu Araçla Eşleşme Bilgisi */}
+                  {vehicleBrand && vehicleBrand !== 'Bu Araç' && (
+                    <div className="text-[11px] text-orange-400/95 font-medium pt-0.5">
+                      ✓ Bu işletme İşi Cepte profilinde {vehicleBrand} markasına hizmet verdiğini belirtmiştir.
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
-              <div className="space-y-1">
-                <div className="text-[10px] text-slate-400 uppercase font-bold">Adres & Konum</div>
-                <div className="text-slate-200">
-                  {detailModalProvider.address ||
-                    `${detailModalProvider.city} ${
-                      detailModalProvider.district ? `/ ${detailModalProvider.district}` : ''
-                    }`}
+              {/* 3. Row: Hizmet Uzmanlıkları (Rule 16: Canonical Set Only in Detail Modal) */}
+              <div className="p-3.5 rounded-2xl bg-[#0d1629] border border-white/5 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 shrink-0 mt-0.5">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <div className="space-y-2 min-w-0 flex-1">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                    HİZMET UZMANLIKLARI
+                  </div>
+                  {detailModalProvider.serviceCategories && detailModalProvider.serviceCategories.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {detailModalProvider.serviceCategories.map((c, i) => (
+                        <span
+                          key={i}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-white/10 text-slate-200 text-[11px] font-medium"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 text-xs">Genel Oto Servis Hizmetleri</span>
+                  )}
                 </div>
               </div>
 
-              {detailModalProvider.supportedBrands && detailModalProvider.supportedBrands.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">
-                    Hizmet Verilen Araç Markaları
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {detailModalProvider.supportedBrands.map((b, i) => (
-                      <span
-                        key={i}
-                        className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-semibold"
-                      >
-                        {b}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detailModalProvider.serviceCategories && detailModalProvider.serviceCategories.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">
-                    Hizmet Uzmanlıkları
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {detailModalProvider.serviceCategories.map((c, i) => (
-                      <span
-                        key={i}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 border border-white/5 text-slate-300 text-[11px] font-medium"
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              {/* 4. Row: İletişim Telefonu (If Available) */}
               {detailModalProvider.phone && (
-                <div className="space-y-1">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold">İletişim Telefonu</div>
-                  <div className="text-slate-200 font-mono font-bold flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-orange-400" />
-                    <span>{detailModalProvider.phone}</span>
+                <div className="p-3.5 rounded-2xl bg-[#0d1629] border border-white/5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                        İLETİŞİM TELEFONU
+                      </div>
+                      <div className="text-slate-100 font-mono font-bold text-xs sm:text-sm">
+                        {detailModalProvider.phone}
+                      </div>
+                    </div>
                   </div>
+
+                  <a
+                    href={`tel:${detailModalProvider.phone.replace(/\s+/g, '')}`}
+                    className="px-4 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Ara</span>
+                  </a>
                 </div>
               )}
+
+              {/* 5. Row: Kısa Açıklama */}
+              <div className="p-3.5 rounded-2xl bg-[#0d1629] border border-white/5 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                    KISA AÇIKLAMA
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    {vehicleBrand} başta olmak üzere binek ve ticari araçlarda uzmanlaşmış, deneyimli teknik kadrosuyla {detailModalProvider.city} bölgesinde hizmet veren yetkili/özel servistir. Şeffaf ekspertiz ve kaliteli işçilik prensibiyle çalışır.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="pt-2 flex items-center gap-3">
+            {/* Modal Bottom CTA Actions (Matches Reference Image 2) */}
+            <div className="pt-2 flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setDetailModalProvider(null)}
-                className="flex-1 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                className="py-3 px-6 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs sm:text-sm font-bold border border-white/10 transition cursor-pointer"
               >
                 Kapat
               </button>
               <button
                 type="button"
                 onClick={() => handleOutboundClick(detailModalProvider)}
-                className="flex-1 py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-orange-600/30"
+                className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm transition flex flex-col items-center justify-center cursor-pointer shadow-xl shadow-orange-500/20 active:scale-95 leading-tight"
               >
-                <ExternalLink className="w-4 h-4" />
-                <span>İşiCepte&apos;de Profili Aç</span>
+                <div className="flex items-center gap-1.5">
+                  <ExternalLink className="w-4 h-4" />
+                  <span>İşiCepte&apos;de Profili Aç</span>
+                </div>
+                <span className="text-[10px] text-orange-100/90 font-normal mt-0.5">
+                  Detaylı bilgiler, yorumlar ve randevu için
+                </span>
               </button>
             </div>
           </div>
@@ -712,4 +898,3 @@ export default function IsiCepteListingRecommendationWidget({
     </div>
   );
 }
-
