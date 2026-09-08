@@ -33,7 +33,7 @@ export class VehicleReportSemanticValidationService {
     const reportStr = JSON.stringify(report).toLowerCase();
     const vehicleCtx = contextJson?.vehicleIdentity || {};
 
-    // Rule 1: Engine code hallucination check
+    // Rule 1: Engine code context consistency check
     if (report.vehicleIdentity.engineCode && vehicleCtx.engineCode) {
       if (report.vehicleIdentity.engineCode.toLowerCase() !== vehicleCtx.engineCode.toLowerCase()) {
         return {
@@ -41,6 +41,33 @@ export class VehicleReportSemanticValidationService {
           reason: `Motor kodu bağlam dışı uyduruldu (${report.vehicleIdentity.engineCode} vs ${vehicleCtx.engineCode}).`,
           needsRepair: true,
         };
+      }
+    }
+
+    // Rule 1.1: No alternative codes listed as definitive identity in code fields
+    const transCode = (report.vehicleIdentity.transmissionCode || '').toLowerCase();
+    const engCode = (report.vehicleIdentity.engineCode || '').toLowerCase();
+    if (transCode.includes(' veya ') || transCode.includes(' ya da ') || engCode.includes(' veya ') || engCode.includes(' ya da ')) {
+      return {
+        isValid: false,
+        reason: 'Teknik kimlik alanlarında (transmissionCode / engineCode) birden fazla alternatif kod ("veya" ile) kesin gerçek gibi sunuldu. Doğrulanabilen tekil seviyede kalınmalıdır.',
+        needsRepair: true,
+      };
+    }
+
+    // Rule 1.2: Cross-stage research vs output consistency check
+    const researchIdentity = contextJson?.verifiedResearch?.vehicleIdentityResearch;
+    if (researchIdentity) {
+      if (researchIdentity.transmissionCode && report.vehicleIdentity.transmissionCode) {
+        const resTrans = String(researchIdentity.transmissionCode).trim().toLowerCase();
+        const repTrans = String(report.vehicleIdentity.transmissionCode).trim().toLowerCase();
+        if (resTrans !== 'unknown' && !repTrans.includes(resTrans) && !resTrans.includes(repTrans)) {
+          return {
+            isValid: false,
+            reason: `Şanzıman kodu Stage 1 araştırma bulgusu ile çelişiyor (${report.vehicleIdentity.transmissionCode} vs ${researchIdentity.transmissionCode}).`,
+            needsRepair: true,
+          };
+        }
       }
     }
 

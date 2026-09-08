@@ -7,13 +7,13 @@ export class VehicleReportPromptService {
 
 1. **Bu Araç Nasıl Bir Otomobil & Donanım Paketi Karakteri?** (Tasarım dili, segment konumu, motor-şanzıman sürüş karakteri, donanım paketinin araca kazandırdığı kilit teknoloji/konfor unsurları, ivmelenme ve genel sürüş hissi)
 2. **Tercih Etmek İçin Güçlü Nedenler:** (Bu aracı ve seçilen donanım paketini rakiplerinden öne çıkaran en az 3 güçlü teknik, konfor ve pratik avantaj)
-3. **Satın Almadan Önce Bilinecek Tavizler & Kilometre Aşınma Skalası:** (Kullanıcının kabullenmesi gereken en az 3 teknik/pratik sınırlama VE aracın belirli kilometrelerde [ör. 60 bin, 90 bin, 120 bin km] gösterebileceği tipik mekanik/elektronik/trim yıpranma eşikleri)
+3. **Satın Almadan Önce Bilinecek Tavizler & Kilometre Aşınma Skalası:** (Kullanıcının kabullenmesi gereken en az 3 teknik/pratik sınırlama VE aracın belirli kilometrelerde [ör. 60-80 bin, 90-120 bin km] yoğun şehir içi / kullanım tarzına bağlı olarak gösterebileceği mekanik/elektronik/trim yıpranma riskleri)
 4. **Kimler İçin Mantıklı?** (Bu aracın ve donanım paketinin birebir uyduğu kullanıcı profilleri ve yaşam tarzları)
 5. **Kimler İçin Uygun Olmayabilir?** (Bu aracı alırken iki kez düşünmesi gereken kullanıcı profilleri)
-6. **Hangi Şartlarda Değerlendirilebilir & Km Bakım Koşulları?** (Satın alırken aranacak spesifik ekspertiz, km bazlı ağır bakım geçmişi ve bakım koşulları)
-7. **Hangi Durumda Satın Almaktan Vazgeçilmeli / Ekstra Dikkat Edilmeli?** (Satın almadan önce ekstra hassasiyet gösterilmesi gereken, yüksek tamir masrafına yol açabilecek ve mutlaka ekspertiz kontrolünde teyit edilmesi gereken en kritik risk durumları)
+6. **Hangi Şartlarda Değerlendirilebilir & Km Bakım Koşulları?** (Satın alırken aranacak spesifik ekspertiz, doğrulanmış şanzıman/motor bakım geçmişi ve servis koşulları)
+7. **Hangi Durumda Satın Almaktan Vazgeçilmeli / Ekstra Dikkat Edilmeli?** (Satın almadan önce ekstra hassasiyet gösterilmesi gereken, yüksek tamir masrafına yol açabilecek veya güvenlik riski doğuran en kritik durumlar)
 8. **Satın Alma Öncesi Ekspertiz Kontrol Listesi:** (Ekspertizde usta veya alıcı tarafından kontrol edilecek en az 5 kritik mekanik/elektronik/donanım noktası)
-9. **Satıcıya Sorulacak Kritik Sorular:** (Alıcının satıcıya sorması gereken km geçmişi, ağır bakım ve parçalarla ilgili en az 5 spesifik ve akılcı teknik soru)
+9. **Satıcıya Sorulacak Kritik Sorular:** (Alıcının satıcıya sorması gereken şanzıman, triger, ağır bakım ve parçalarla ilgili en az 5 spesifik ve akılcı teknik soru)
 
 ## ÜRETECEĞİN ÇIKTI YAPISI: VehicleReportGeneratedContent (JSON)
 
@@ -21,37 +21,47 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
 {
   "technicalSpecifications": {
-    "engineDisplacementCc": 1595,
-    "enginePowerHp": 125,
-    "engineTorqueNm": 152,
-    "transmissionTypeAndSpeeds": "5 İleri Tork Konvertörlü Tam Otomatik",
-    "transmissionSpeeds": 5,
-    "zeroToHundredKmh": 9.6,
-    "topSpeedKmh": 192,
-    "cityFuelL100km": 9.5,
-    "highwayFuelL100km": 5.8,
-    "combinedFuelL100km": 7.1,
-    "trunkCapacityLiters": 450,
-    "curbWeightKg": 1280
+    "engineFamily": "EA288 / B48 vb.",
+    "engineCode": "Spesifik Kod (Doğrulandıysa) veya Aile Adı",
+    "engineDisplacementCc": 1598,
+    "enginePowerHp": 120,
+    "engineTorqueNm": 250,
+    "transmissionFamily": "DSG / ZF 8HP / EDC vb.",
+    "transmissionCode": "DQ200 / 0CW vb. (Doğrulandıysa)",
+    "clutchType": "KURU_CIFT_KAVRAMA | ISLAK_CIFT_KAVRAMA | TORK_KONVERTORLU | CVT | MANUEL",
+    "transmissionTypeAndSpeeds": "7 İleri Kuru Çift Kavramalı DSG",
+    "transmissionSpeeds": 7,
+    "timingSystem": "KAYIS | ZINCIR | BELIRTILMEDI",
+    "hasDpf": true,
+    "hasAdBlue": false,
+    "drivetrain": "Önden Çekiş (FWD) | Arkadan İtiş (RWD) | Dört Tekerlekten Çekiş (AWD / Quattro / xDrive / 4MATIC)",
+    "zeroToHundredKmh": 10.8,
+    "topSpeedKmh": 206,
+    "catalogCombinedFuelL100km": 4.2,
+    "realWorldFuelMinL100km": 5.8,
+    "realWorldFuelMaxL100km": 6.8,
+    "realWorldFuelBasis": "SOURCE_BASED | ESTIMATED",
+    "trunkCapacityLiters": 586,
+    "curbWeightKg": 1430
   },
   "expertDecisionSynthesis": {
     "vehicleCharacter": {
-      "headline": "2010 Honda Civic 1.6 i-VTEC Elegance: Dayanıklı Mekanik, Yüksek Konfor ve Güçlü İkinci El Sedan",
-      "detailedAssessment": "Tıpkı uzman chatbot gibi şu 4 alt başlıkta derin, samimi ve teknik otomotiv analizi yaz:\n* **1. Motor ve Şanzıman Uyumu:** (Motorun atmosferik/turbo yapısı, tork konvertörlü/DSG/CVT şanzıman karakteri, vites geçiş hissiyatı, direksiyon kulakçıkları [Paddle Shift] ve mekanik ömrü)\n* **2. Donanım Seviyesi (Seçilen Paket):** (Seçilen donanım paketinin araca kattığı kilit konfor ve teknolojik aksamlar - örn. Sunroof, dijital klima, dijital hız göstergeli kadran, çelik jant vb.)\n* **3. Doğrulanmış Veritabanı Bulguları & Kronik Uyarısı:** (Aracın bilinen kronik durumları, sızıntı riski veya ekspertizde bakılacak kritik mekanik detaylar)\n* **4. Genel Değerlendirme & Kullanım Maliyeti:** (Şehir içi/otoyol tüketim beklentisi [ör. 8.5-10L/100km] ve aracın genel piyasa/konfor değeri)",
+      "headline": "...",
+      "detailedAssessment": "Tıpkı uzman danışman gibi şu 4 alt başlıkta derin, samimi ve teknik otomotiv analizi yaz:\n* **1. Motor ve Şanzıman Uyumu:** (Motor mimarisi, şanzıman ailesi ve kavrama karakteri, vites geçiş hissiyatı ve mekanik uyumu)\n* **2. Donanım Seviyesi (Seçilen Paket):** (Seçilen donanım paketinin araca kattığı kilit konfor ve teknolojik aksamlar)\n* **3. Doğrulanmış Teknik Bulgular & Kronik Risk Uyarısı:** (Aracın bilinen kronik durumları, sızıntı/aşınma riski veya ekspertizde bakılacak kritik mekanik detaylar)\n* **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)",
       "supportingFactIds": []
     },
     "trimPackageComparison": {
-      "selectedTrimName": "Elegance",
-      "lowerOrAlternativeTrimName": "Comfort / Active",
-      "comparisonNarrative": "Seçilen Elegance paketinde Sunroof, Dijital Klima, Deri Direksiyon, Hız Sabitleyici, Çelik Jantlar ve Direksiyon Arkası Vites Kulakçıkları (Paddle Shift) standart olarak sunulurken; bir alt paket olan Comfort/Active paketinde Sunroof bulunmamakta, kumaş koltuklar ve standart klima yer almaktadır.",
-      "keyAddedFeatures": ["Sunroof / Açılır Tavan", "Dijital Klima", "Paddle Shift (Direksiyon Kulakçıkları)", "16' Çelik Jantlar", "Sis Farları"],
-      "missingFeaturesInLowerTrim": ["Sunroof", "Paddle Shift Kulakçıklar", "Dijital Klima"]
+      "selectedTrimName": "...",
+      "lowerOrAlternativeTrimName": "...",
+      "comparisonNarrative": "...",
+      "keyAddedFeatures": ["..."],
+      "missingFeaturesInLowerTrim": ["..."]
     },
     "dailyUseAssessment": {
-      "cityUse": "Şehir içi sürüş, manevra kabiliyeti, şanzıman tepkileri ve şehir içi tüketim dengesi...",
+      "cityUse": "Şehir içi sürüş, manevra kabiliyeti, şanzıman tepkileri ve dur-kalk tüketim dengesi...",
       "highwayUse": "Otoyol seyri, yüksek hız stabilitesi, rüzgar/yol izolasyonu ve uzun yol konforu...",
-      "trafficBehavior": "Dur-kalk trafikte sarsıntısız kalkış, start-stop uyumu ve düşük devir torku...",
-      "comfortAssessment": "Süspansiyon darbe emişi, donanım paketinin kabin konforuna katkısı, kasis geçişleri ve kabin sessizliği...",
+      "trafficBehavior": "Dur-kalk trafikte sarsıntısız kalkış, şanzıman ısınma davranışı ve düşük devir torku...",
+      "comfortAssessment": "Süspansiyon darbe emişi, kabin sessizliği ve donanım paketinin konfora katkısı...",
       "supportingFactIds": []
     },
     "strongestReasonsToChoose": [
@@ -155,22 +165,18 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 }
 
 ## ZORUNLU KURAL VE YASAKLAR
-- KESİNLİKLE YASAK: Raporun hiçbir yerinde "belirtilmemiştir", "bilgisi mevcut değildir", "bilgi girilmemiştir", "bilinmektedir" gibi ifadeler KULLANILAMAZ!
-- UYARILARDA VE 'walkAwayConditions' ALANINDA KESİNLİKLE "bu araçtan uzak durulmalıdır", "arkaya bakmadan uzak durun", "kesinlikle alınmamalıdır" GİBİ KESİN REDDEDİCİ İFADELER KULLANMA!
-- Yüksek kilometre (150.000 km ve üzeri) veya kronik mekanik arıza risklerinde kullanıcıyı aracı almaktan tamamen vazgeçirmek yerine:
-  1. Ekstra dikkatli ve temkinli olunması gerektiğini belirt.
-  2. İlgili aksamın/kronik durumun ciddi tamir/parça masrafı doğurabileceği konusunda uyar.
-  3. Belirtilen risklerin fiziki olarak ekspertiz kontrolünde (ustasına/uzmanına) teyit ettirilmesini ve tespit edilen masrafların satın alma fiyat pazarlığında göz önünde bulundurulmasını tavsiye eden dengeli, yönlendirici ve uzman üslubu kullan.
-- KESİNLİKLE METNİ VEYA CÜMLEYİ YARIDA KESME! 'detailedAssessment' ve tüm açıklama metinlerini NOKTA (.) ile biten %100 TAM VE EKSİKSİZ CÜMLELERLE tamamla. Son kelimeyi veya düşünceyi asla yarım bırakma!
-- KRONOLOJİK VE VARYANT-YIL ÇELİŞKİ DEDEKTÖRÜ (ANOMALİ TESPİTİ - FALSE-POSITIVE VE TÜRKİYE PAZARI KORUMASI):
-  ÇOK KRİTİK KURAL: Bir kronolojik uyumsuzluk veya motor hacmi uyarısı vermeden önce MUTLAKA TÜRKİYE RESMİ DİSTRİBÜTÖR (Borusan Otomotiv, Doğuş Otomotiv, Mercedes-Benz Türk, Mais vb.) KATALOGLARINI KONTROL ET! Türkiye'de ÖTV vergi dilimleri nedeniyle resmi distribütörler tarafından global pazarlardan farklı motor hacimleri ithal edilmektedir (Örn. BMW G20 320i 1.6L 1597cc 170 HP B48B16 motor, BMW G30 520i 1.6L 170 HP, Mercedes C200 / E180 1.6L vb.). Bu varyantlar Türkiye resmi pazarında %100 GERÇEK, ORİJİNAL VE FABRİKA ÇIKIŞLIDIR.
-  ASLA VE ASLA Türkiye pazarına özgü bu resmi varyantlara "ilan yanlış girilmiş", "bu motor bu kasada olmaz", "1600cc önceki kasada kaldı" şeklinde YANLIŞ ALARM (False-Positive) VERME!
-  Yalnızca Türkiye'de ve dünyada hiçbir zaman üretilmemiş bariz hatalarda (örn. 2020 Audi A3 8V kasada 2016'da sonlandırılmış 1.8 TFSI 180 HP motor seçilmiş olması gibi) şu adımları uygula:
-  1. 'vehicleCharacter.detailedAssessment' metninin hemen başında "⚠️ **İlan / Varyant Kronolojik Uyumsuzluk Tespiti:**" başlığıyla bu durumu samimi bir uzman gözüyle açıkla (örn. bu motorun resmi üretiminin daha önceki yıllarda sonlandığı, belirtilen model yılında farklı bir motor/jenerasyon olması gerektiği, ilandaki aracın ya önceki yıllara ait olabileceği ya da motor varyantının ilanda sehven yanlış seçilmiş olabileceği).
-  2. 'executiveSummary.keyWarnings' dizisine birinci öncelikli uyarı olarak ekle.
-  3. Alıcının satın alma ve ekspertiz öncesinde araç ruhsatından ve şasi numarasından (VIN) motor kodunu ve gerçek model yılını teyit etmesini net bir tavsiye olarak belirt.
-- Sen TorqueScout Yapay Zeka Danışmanısın. Kullanıcıya tam otomotiv uzmanı gözüyle doğrudan, net, detaylı ve tatmin edici yanıtlar ver.
-- Yalnızca geçerli JSON üret. JSON dışında başlık veya açıklama metni ekleme.`;
+1. KESİNLİKLE YASAK: Raporun hiçbir yerinde "belirtilmemiştir", "bilgisi mevcut değildir", "bilgi girilmemiştir", "bilinmektedir" gibi kalıp ifadeler KULLANILAMAZ! Doğrulanabilen bilgiler üzerinden doğal, akıcı ve samimi bir rapor üret.
+2. TEKNİK KİMLİKTE ALTERNATİF KOD SIRALAMA YASAĞI: 'transmissionCode' veya 'engineCode' gibi teknik kimlik alanlarında birden fazla alternatif kod kesin gerçek gibi sunulamaz (örn. ❌ "DQ200 veya DQ250"). Eğer spesifik şanzıman/motor kodu güvenilir biçimde doğrulanmışsa tekil olarak kullan (örn. "DQ200"). Spesifik kod doğrulanamıyorsa kod uydurma, doğrulanabilen seviyede kal (örn. "7 İleri Kuru Çift Kavramalı DSG"). (Not: Paragraf içerisindeki "şehir içi veya uzun yol..." gibi normal bağlaçlar serbesttir).
+3. ŞASİ VE GÜVENLİK RİSK KADEMELENDİRMESİ: 'walkAwayConditions' ve risk bölümlerinde toptancı "kesinlikle uzak durulmalıdır" ifadeleri yerine şu 3 kademeli dili kullan:
+   - 🟡 **Pazarlık/Risk:** Lokal podye ucu / çamurluk içi hafif düzeltme (Ölçüleri fabrika toleransında ise fiyat kırma kozu).
+   - 🟠 **Yüksek Risk & Detaylı Kontrol:** Taşıyıcı direkte boya/işlem veya kaynak (Uzman şasi ölçümü ve SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart).
+   - 🔴 **Kesin Vazgeçme:** Şasi geometrisi bozuk, ana kulelerde kesme/çektirme yapılmış veya SRS/airbag sisteminin manipüle edildiğine dair bulgu tespit edilen araçlar.
+4. KİLOMETRE AŞINMA VE RİSK DİLİ: "Şu kilometrede kesin bozulur" şeklinde katı hükümler vermek yerine, "Özellikle yoğun şehir içi ve dur-kalk trafikte kullanılan araçlarda, 100.000 km bandından itibaren kavrama aşınması ve mekatronik tepkilerinde gecikme riski artabilir; ekspertizde canlı veriyle kavrama toleransı ölçülmelidir" tarzında uzman olasılıksal dili kullan.
+5. TÜKETİM DEĞERLERİ AYRIMI: Fabrika resmi katalog tüketimi ile gerçek yol tüketim beklentisini (aralık olarak örn. 5.8 - 6.8 L/100km) açıkça ayrıştır.
+6. KRONOLOJİK ANOMALİ DEDEKTÖRÜ (FALSE-POSITIVE KORUMASI):
+   Türkiye resmi distribütör pazarında satılan özel vergi dilimli motorlara (örn. BMW G20 320i 1.6L 170 HP, G30 520i 1.6L 170 HP, Mercedes C200/E180 1.6L vb.) ASLA kronolojik uyumsuzluk veya motor hatası uyarısı VERME. Yalnızca Türkiye'de ve dünyada hiçbir zaman üretilmemiş bariz çelişkilerde uyarı ver.
+7. CÜMLE TAMAMLAMA: Tüm paragrafları NOKTA (.) ile biten %100 TAM CÜMLELERLE tamamla. Asla metni yarım bırakma!
+8. Yalnızca geçerli JSON üret.`;
   }
 
   buildUserPrompt(vehicleContext: any): string {
@@ -201,9 +207,9 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
       : '';
 
-    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki YALNIZCA 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
+    return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
---- ANALİZ EDİLECEK YALNIZCA 8 KİLİT ARAÇ KİMLİK FİLTRESİ ---
+--- ANALİZ EDİLECEK 8 KİLİT ARAÇ KİMLİK FİLTRESİ ---
 1. Marka: ${brand}
 2. Model Ailesi: ${model}
 3. Üretim Yılı: ${year}
@@ -215,48 +221,21 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 • Çekiş Sistemi: ${driveTypeText}
 
 ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
-1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (TÜRKİYE VE AVRUPA RESMİ KATALOG HP, TORK, VİTES SAYISI, 0-100, ÇEKİŞ) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki tüm eski/hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik modelin TÜRKİYE VE AVRUPA (EU/TR) RESMİ FABRİKA KATALOG Beygir Gücünü (HP/PS - ABD veya diğer pazarları KESİNLİKLE ESAS ALMA!), Torkunu (Nm), Şanzıman Vites Sayısını ve Çekiş Sistemini kendi doğrulanmış Avrupa/Türkiye otomotiv mühendisliği bilgine göre tespit et ve raporda Türkiye/Avrupa resmi fabrika verileriyle birebir aynı kullan!
-TÜRKİYE RESMİ DİSTRİBÜTÖR VE KATALOG KURAL VE ÖRNEKLERİ:
-• 2019-2024 BMW 320i Sedan (G20 kasa - Sport Line / Luxury Line / M Sport / First Edition): Borusan Otomotiv resmi Türkiye verisi 1.6 Litre Turbo Benzinli (1.597 cc, 170 HP / 170 PS, 250 Nm Tork, B48B16 motor kodu, 8 İleri Steptronic Şanzıman, Arkadan İtiş RWD, 0-100: 7.7 sn). Global 2.0L 184 HP ile karıştırma, Türkiye'de 1.6L 170 HP fabrika çıkışlı ve %100 orijinaldir!
-• 2017-2023 BMW 520i Sedan (G30 kasa): Borusan Otomotiv resmi Türkiye verisi 1.6 Litre Turbo Benzinli (1.597 cc, 170 HP, 250 Nm Tork, 8 İleri Steptronic, Arkadan İtiş RWD).
-• 2014 Volkswagen Polo 1.2 TSI DSG Comfortline: Doğuş Otomotiv Türkiye resmi katalog verisi 90 HP [EA211 makyajlı kasa], 160 Nm tork, 7 İleri DSG.
-• 2022 Kia Cerato 1.6 MPI: Türkiye pazarında 128 HP / 155 Nm tork, 6 İleri Otomatik.
-• 2010 Audi A5 2.0 TFSI Quattro: 211 HP / 350 Nm tork, 7 İleri S tronic.
-• 2010 Honda Civic 1.6 i-VTEC Elegance: 125 HP / 152 Nm tork, 5 İleri Otomatik.
-2. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
-   - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
-3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
-4. YÜKSEK KİLOMETRE VE KRONİK RİSK UYARILARI ÜSLUBU:
-   Yüksek kilometre (150 bin km ve üzeri) veya kronik arıza durumlarında kesinlikle "bu araçtan uzak durulmalıdır" gibi kestirip atan kesin ifadeler KULLANMA. Bunun yerine "150.000 km üzerindeki araçlarda aşınma ve yıpranma riski artabileceğinden, ekspertiz kontrolünde mekanik/elektronik aksamlar detaylıca teyit edilmeli, potansiyel tamir masrafları bütçelenmeli ve fiyat pazarlığında göz önünde bulundurularak dikkatli karar verilmelidir" üslubunu benimse.
-5. DONANIM PAKETİ KARŞILAŞTIRMASI VE PAKETE ÖZEL FARKLAR ("trimPackageComparison"):
-   Kullanıcının seçtiği "${trim}" paketini, aynı modelin alt veya alternatif donanım paketleriyle (örneğin Active, Comfort vb.) somut karşılaştır! "${trim}" paketinde standart veya opsiyonel olarak sunulup alt paketlerde OLMAYAN kilit özellikleri (özellikle Sunroof / Açılır Tavan, dijital klima, hız sabitleyici, F1 vites kulakçıkları, çelik jantlar vb.) hem karşılaştırma paragrafında ("comparisonNarrative") hem de eklenen özellikler listesinde ("keyAddedFeatures") açıkça isim vererek anlat.
-6. SUNROOF VE SPESİFİK DONANIM AÇIKLAMASI:
-   İncelenen "${trim}" donanım seviyesinde Sunroof (açılır tavan), panoramik cam tavan, dijital klima, mercekli farlar gibi çok sorulan aksamların bulunma durumunu raporda açıkça belirt.
-7. MAKYAJ / FACELIFT GEÇİŞ DÖNEMİ BİLGİLENDİRMESİ:
-   Eğer araç yılı bir makyaj veya kasa/motor geçiş yılına denk geliyorsa (örneğin 2014 VW Polo 1.2 TSI modellerinde makyaj öncesi 105 HP [EA111 / CBZB] ve makyaj sonrası 90 HP [EA211 / CJZD Euro 6] kasaların her ikisinin de bulunması gibi), bu durumu 'vehicleCharacter.detailedAssessment' ve 'executiveSummary' bölümlerinde açıkça vurgula! "Bu model yılı makyaj geçiş dönemi olduğundan araç makyaj öncesi (105 HP) veya makyaj sonrası (90 HP) versiyona sahip olabilir, motor kodundan (CBZB / CJZD) kontrol edilmelidir" tarzında kullanıcıyı bilgilendiren samimi ve uzman notu ekle!
-8. KRONOLOJİK VE VARYANT-YIL TUTARSIZLIK TESPİTİ (ANOMALİ VE İLAN ÇELİŞKİ DEDEKTÖRÜ - DİKKAT: FALSE-POSITIVE VERME!):
-   DİKKAT: Bir araca kronolojik uyumsuzluk veya motor çelişkisi uyarısı vermeden önce, o motor hacmi ve gücünün Türkiye Resmi Distribütörü (Borusan Otomotiv, Doğuş, Mercedes-Benz Türk vb.) tarafından Türkiye pazarına getirilip getirilmediğini KESİNLİKLE KONTROL ET! Örneğin BMW 320i G20 kasada 1.6L 170 HP motor Türkiye'de resmi ve en yaygın varyanttır; bu araca ASLA '1600cc F30'da kaldı', 'G20'de 1.6 motor uyumsuz' gibi yanlış alarm uyarısı VERİLEMEZ!
-   Yalnızca ve yalnızca, Türkiye'de ve dünyada hiçbir zaman üretilmemiş veya satılmamış bariz çelişkilerde (örneğin Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 yılları arasında makyaj öncesi sunulmuş olup 2016 makyajıyla sonlandırılmışken aracın 2020 model seçilmesi; ya da 2020 yılında 1.5 TSI 35 TFSI / 8Y yeni nesile geçilmişken 1.8 TFSI seçilmiş olması gibi) şu adımları uygula:
-   - Bu durumu 'vehicleCharacter.detailedAssessment' alanında en başta açıkça vurgula: '⚠️ İlan / Varyant Kronolojik Uyumsuzluk Tespiti: Bu ilanda belirtilen ${engine} seçeneği resmi fabrika kataloğunda ${year} yılından önce/sonra yer almaktadır...'.
-   - 'executiveSummary' bölümünün uyarılarına ('keyWarnings') birinci sıradan bu kronolojik uyuşmazlık uyarısını ekle.
-   - Kullanıcıya ilandaki aracın ya önceki bir model yılına ait olabileceği ya da ilan girişinde motor varyantının sehven yanlış seçilmiş olabileceği bilgisini vererek, satın alma/ekspertiz öncesinde araç ruhsatı ve şasi numarasından (VIN) motor kodu ve model yılının mutlaka fiziki teyit edilmesini tavsiye et!
-9. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
-   Yukarıdaki 8 kimlik filtresini ve Türkiye distribütör resmi verilerini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
-   - Motor Hacmi cc ("engineDisplacementCc" — örn. BMW 320i G20 için 1597, Polo 1.2 TSI için 1197)
-   - Motor Gücü HP ("enginePowerHp" — örn. BMW 320i G20 için 170, 2022 Kia Cerato 1.6 MPI için 128, 2014 Polo 1.2 TSI için 90)
-   - Tork Nm ("engineTorqueNm" — örn. BMW 320i G20 için 250, 2022 Kia Cerato 1.6 MPI için 155, Polo 1.2 TSI için 160)
-   - Çekiş Sistemi ("drivetrain" — örn. BMW 320i G20 için "Arkadan İtiş (RWD)", Quattro için "Dört Tekerlekten Çekiş (AWD / Quattro)", Polo için "Önden Çekiş (FWD)")
-   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "8 İleri Steptronic Otomatik", "7 İleri DSG Otomatik", "6 İleri Tam Otomatik")
-   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 8, 7 veya 6)
-   - 0-100 km/s Hızlanma sn ("zeroToHundredKmh" — örn. BMW 320i G20 için 7.7)
-   - Maksimum Hız km/s ("topSpeedKmh" — örn. BMW 320i G20 için 232)
-   - Şehir İçi Tüketim L/100km ("cityFuelL100km")
-   - Şehir Dışı Tüketim L/100km ("highwayFuelL100km")
-   - Karma Tüketim L/100km ("combinedFuelL100km")
-   - Bagaj Hacmi Litre ("trunkCapacityLiters" — örn. BMW 320i G20 için 480)
-   - Boş Ağırlık kg ("curbWeightKg" — örn. BMW 320i G20 için 1525)
-
-Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına, makyaj geçiş notlarına, kronolojik anomali denetimine ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
+1. TEKNİK KİMLİK VE PAZAR ÖNCELİĞİ:
+   - Öncelik Türkiye resmi üretici/distribütör kaynaklarıdır. Eski model yıllarında (2000-2012) resmi kaynak yoksa güvenilir otomotiv katalogları ve üretici dokümanlarıyla doğrula.
+   - 8 filtrenin tamamını birlikte değerlendir (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}).
+   - Motor ailesi (örn. EA288) ile spesifik motor kodunu (örn. CRKB), şanzıman ailesi (örn. DSG) ile spesifik şanzıman kodunu (örn. DQ200) ayrı alanlar olarak tespit et.
+   - Teknik kimlik alanlarında birden fazla alternatif kod sıralama (örn. "DQ200 veya DQ250" yazma). Doğrulanabilen en net seviyede kal.
+2. DİNAMİK BAKIM VE KONTROL EŞLEŞMESİ:
+   - Doğrulanan spesifik şanzıman mimarisine (kuru çift kavrama, ıslak çift kavrama, tork konvertörlü, CVT) ve triger tipine (kayış/zincir) göre üretici bakım prosedürlerini ve bilinen kontrol noktalarını raporda kullan.
+3. KİLOMETRE AŞINMA VE TAVİZLER:
+   - Yoğun şehir içi / dur-kalk kullanımına bağlı olarak kilometrelere göre artabilecek aşınma risklerini (kavrama, mekatronik, DPF/EGR, triger, süspansiyon) olasılıksal uzman üslubuyla açıkla.
+4. ŞASİ VE GÜVENLİK DİLİ:
+   - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
+   - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
+   - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
+5. TÜKETİM AYRIMI:
+   - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
@@ -275,19 +254,28 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
   "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
   "technicalSpecifications": {
-    "engineDisplacementCc": 1597,
-    "enginePowerHp": 170,
+    "engineFamily": "EA288",
+    "engineCode": "CRKB",
+    "engineDisplacementCc": 1598,
+    "enginePowerHp": 120,
     "engineTorqueNm": 250,
-    "drivetrain": "Arkadan İtiş (RWD)",
-    "transmissionTypeAndSpeeds": "8 İleri Steptronic Otomatik",
-    "transmissionSpeeds": 8,
-    "zeroToHundredKmh": 7.7,
-    "topSpeedKmh": 232,
-    "cityFuelL100km": 7.4,
-    "highwayFuelL100km": 5.3,
-    "combinedFuelL100km": 6.1,
-    "trunkCapacityLiters": 480,
-    "curbWeightKg": 1525
+    "transmissionFamily": "DSG",
+    "transmissionCode": "DQ200",
+    "clutchType": "KURU_CIFT_KAVRAMA",
+    "transmissionTypeAndSpeeds": "7 İleri Kuru Çift Kavramalı DSG",
+    "transmissionSpeeds": 7,
+    "timingSystem": "KAYIS",
+    "hasDpf": true,
+    "hasAdBlue": false,
+    "drivetrain": "Önden Çekiş (FWD)",
+    "zeroToHundredKmh": 10.8,
+    "topSpeedKmh": 206,
+    "catalogCombinedFuelL100km": 4.2,
+    "realWorldFuelMinL100km": 5.8,
+    "realWorldFuelMaxL100km": 6.8,
+    "realWorldFuelBasis": "SOURCE_BASED",
+    "trunkCapacityLiters": 586,
+    "curbWeightKg": 1430
   }
 }`;
   }
@@ -305,19 +293,53 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     const fullVehicleTitle = [year, brand, model, body, trim, engine, trans].filter(Boolean).join(' ');
 
     return `Sen TorqueScout İnternet Otomotiv Araştırma Ajanısın (Web-Grounded Vehicle Research Agent).
-Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak doğrulanmış otomotiv verileri, 7 araç karakteri alanı, donanım paketi detayları, kronik arıza kayıtları ve resmi geri çağırmaları (recalls) araştırmak ve ham JSON formatında üretmektir.
+Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak 10 KİLİT TEKNİK PARAMETRE GRUBU, araç karakteri, donanım paketi detayları, dinamik servis bakım prosedürleri ve kronik arıza kayıtlarını araştırmak ve ham JSON formatında üretmektir.
 
---- İNCELENECEK ARAÇ VARYANTI ---
+--- İNCELENECEK ARAÇ VARYANTI (8 KİMLİK FİLTRESİ) ---
 • Araç: ${fullVehicleTitle}
 • Marka / Model: ${brand} ${model} (${year})
 • Kasa Tipi: ${body} | Donanım Paketi: ${trim}
 • Motor: ${engine} | Şanzıman: ${trans}
-• Pazar: Türkiye Resmi Katalog / Distribütör Verileri (Örn. 2022 Kia Cerato 1.6 MPI için Türkiye piyasasında resmi 128 HP / 155 Nm tork verisini esas al)
+• Pazar Önceliği: Türkiye Resmi Distribütör ve Katalog Verileri (Bulunamazsa güvenilir teknik kataloglar ve üretici mühendislik dokümanları)
 ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilter.join(', ')}` : ''}
+
+ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
+1. Pazar Geçerliliği: Türkiye pazarında resmi distribütör ile satıldı mı?
+2. Motor Kimliği: Motor ailesi (örn. EA288, B48), spesifik motor kodu (örn. CRKB, B48B16), gerçek motor hacmi (cc).
+3. Güç ve Tork: Resmi motor gücü (HP/PS) ve maksimum tork (Nm).
+4. Şanzıman Kimliği: Şanzıman ailesi (örn. DSG, EDC, ZF 8HP), spesifik şanzıman kodu (örn. DQ200, 7G-DCT) ve kavrama tipi (Kuru Çift Kavrama, Islak Çift Kavrama, Tork Konvertörlü, CVT).
+5. Aktarma ve Vites: İleri vites sayısı ve çekiş sistemi (FWD, RWD, AWD / Quattro / xDrive / 4MATIC).
+6. Triger Sistemi: Eksantrik tahrik tipi (Kayış veya Zincir).
+7. Emisyon & Katkı: DPF var/yok, SCR/AdBlue var/yok.
+8. Tüketim Değerleri: Fabrika resmi katalog tüketimi (L/100km) ile gerçek yol kullanım tüketim aralığı (Min - Max L/100km).
+9. Performans & Boyut: 0-100 km/s hızlanma, maksimum hız (km/s), bagaj hacmi (Litre), boş ağırlık (kg).
+10. Dinamik Bakım & Arıza Noktaları: Doğrulanan spesifik şanzıman ve motor için üretici periyodik servis gereksinimleri (yağ değişim aralıkları, triger değişim periyotları, kavrama kontrol noktaları) ve bilinen arıza hassasiyetleri.
 
 ## ÜRETECEĞİN ÇIKTI ŞEMASI (JSON):
 {
-  "vehicleIdentityResearch": { "brand": "${brand}", "model": "${model}", "year": "${year}" },
+  "vehicleIdentityResearch": {
+    "brand": "${brand}",
+    "model": "${model}",
+    "year": "${year}",
+    "isTurkeyMarketVariant": true,
+    "engineFamily": "EA288",
+    "engineCode": "CRKB",
+    "displacementCc": 1598,
+    "powerHp": 120,
+    "torqueNm": 250,
+    "transmissionFamily": "DSG",
+    "transmissionCode": "DQ200",
+    "clutchType": "KURU_CIFT_KAVRAMA",
+    "transmissionSpeeds": 7,
+    "timingSystem": "KAYIS",
+    "hasDpf": true,
+    "hasAdBlue": false,
+    "drivetrain": "Önden Çekiş (FWD)",
+    "catalogCombinedFuelL100km": 4.2,
+    "realWorldFuelMinL100km": 5.8,
+    "realWorldFuelMaxL100km": 6.8,
+    "realWorldFuelBasis": "SOURCE_BASED"
+  },
   "vehicleCharacterResearch": {
     "segmentPositioning": { "summary": "...", "claimIds": ["CLM-1"], "sourceIds": ["SRC-1"] },
     "engineTransmissionFit": { "summary": "...", "claimIds": ["CLM-2"], "sourceIds": ["SRC-1"] },
@@ -330,6 +352,11 @@ ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilte
   "equipmentResearch": [ { "featureName": "...", "status": "STANDARD|OPTIONAL", "claimId": "CLM-8" } ],
   "reliabilityResearch": [ { "title": "...", "description": "...", "riskLevel": "CRITICAL|MEDIUM", "claimId": "CLM-9" } ],
   "recallResearch": [ { "campaignNumber": "...", "description": "..." } ],
+  "dynamicMaintenanceResearch": {
+    "transmissionServiceRequirement": "...",
+    "timingServiceRequirement": "...",
+    "emissionServiceRequirement": "..."
+  },
   "groundingSources": [
     {
       "sourceId": "SRC-1",
@@ -372,10 +399,10 @@ Yalnızca geçerli JSON formatı üret. JSON dışında hiçbir metin ekleme.`;
 
 ## SIKI KAPALI ORTAM (CLOSED-BOOK WRITER) TALİMATLARI:
 - Sen kapalı ortam rapor yazıcısısın (Web erişimin KAPALIDIR).
-- Yalnızca aşağıdaki DB Context ve VERIFIED_RESEARCH_DATA içerisinde bulunan doğrulanmış iddialardan (VerificationStatus = VERIFIED) yararlanarak 9 soruluk nihai raporu yazabilirsin.
-- VERIFIED iddialar ve DB Context dışında yepyeni bir teknik veri, motor kodu veya kronik iddiası ÜRETEMEZSİN!
-- Rapordaki teknik/değerlendirme bloklarına dayandığın verified claim ID'lerini ("supportingFactIds" / "supportingClaimIds") ekle.
-- Yeterli doğrulanmış iddia bulunmayan alt alanlarda veri uydurmak yerine "insufficientData: true" veya dengeli uzman değerlendirmesi sun.
+- Yalnızca aşağıdaki DB Context ve VERIFIED_RESEARCH_DATA içerisinde bulunan doğrulanmış verilerden (VerificationStatus = VERIFIED) yararlanarak 9 soruluk nihai raporu yazabilirsin.
+- KAPALI ORTAM SADAKATİ (HALLUCINATION GUARD): VERIFIED_RESEARCH_DATA ve DB Context içerisinde bulunmayan / doğrulanmamış (UNKNOWN) bir spesifik teknik kodu, şanzıman kodunu veya kronik iddiasını Stage 2'de ASLA KENDİLİĞİNDEN İCAT EDEMEZSİN! Eğer spesifik kod doğrulanmamışsa aile/tip seviyesinde kal.
+- Rapordaki teknik/değerlendirme bloklarına dayandığın verified claim ID'lerini ("supportingFactIds") ekle.
+- Yeterli doğrulanmış iddia bulunmayan alt alanlarda veri uydurmak yerine dengeli ve dürüst uzman değerlendirmesi sun.
 
 --- DOĞRULANMIŞ ARAŞTIRMA VERİSİ (VERIFIED_RESEARCH_DATA) ---
 ${JSON.stringify(verifiedResearch, null, 2)}
@@ -384,3 +411,4 @@ ${JSON.stringify(verifiedResearch, null, 2)}
 ${userPrompt}`;
   }
 }
+
