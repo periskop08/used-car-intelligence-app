@@ -929,7 +929,7 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
         expertDecisionSynthesis: {
           vehicleCharacter: {
             headline: 'Tesla Model 3',
-            detailedAssessment: 'Yüksek verimli elektrikli sedan.',
+            detailedAssessment: 'Yüksek verimli elektrikli sedan modelidir. Sessiz sürüş, anlık tork tepkisi ve gelişmiş multimedya sunmaktadır. Süspansiyon yapısı yol tutuş odaklıdır.',
             supportingFactIds: ['FACT-1'],
           },
           strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Verimlilik.', supportingFactIds: ['FACT-1'] }],
@@ -938,6 +938,15 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
           notSuitableFor: [{ profile: 'Pist', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
           purchaseConditions: [{ condition: 'Pil Sağlığı', reason: 'Durum', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
           walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Batarya Yıpranması ve SoH Düşüşü',
+            severity: 'ORTA',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Menzilde kısalma'],
+            inspectionInstructions: ['Yetkili serviste batarya sağlık testi yaptırın.'],
+            riskMeaning: 'Batarya kapasitesi zamanla düşebilir.',
+            supportingFactIds: ['FACT-1'],
+          },
           finalConditionalVerdict: {
             shortVerdict: 'Alınabilir.',
             detailedVerdict: 'Genel durumu temiz ise satın alınabilir.',
@@ -959,6 +968,194 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(result.report.performanceUsage.curbWeightKg).toBe(1760);
       expect(result.report.performanceUsage.topSpeedKmh).toBe(225);
       expect(result.report.performanceUsage.supportingFactIds).toContain('VEHICLE_DATABASE');
+    });
+  });
+
+  describe('Behavior 17: Deterministic Numeric Sanitizer & Final Validation Gate Protection', () => {
+    let providerService: any;
+    let mockOrchestrator: any;
+    let fallbackService: any;
+    let contradictionService: any;
+    let evidenceValidationService: any;
+
+    beforeEach(() => {
+      mockOrchestrator = {
+        generateListingAdvice: jest.fn(),
+      };
+      contradictionService = {
+        analyzeListingContradictions: jest.fn().mockReturnValue([]),
+        analyzeMileageAge: jest.fn().mockReturnValue({}),
+      };
+      fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(
+        scoringService,
+        contradictionService
+      );
+      evidenceValidationService = new (require('../research-evidence-validation.service').ResearchEvidenceValidationService)();
+
+      const { VehicleReportProviderService } = require('../vehicle-report-provider.service');
+      providerService = new VehicleReportProviderService(
+        promptService,
+        fallbackService,
+        evidenceValidationService,
+        validationService,
+        scoringService,
+        mockOrchestrator
+      );
+    });
+
+    it('should sanitize ungrounded SoH %85 claims deterministically when AI repair also fails, passing final validation', async () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v-tesla-3-2022',
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          bodyType: 'Sedan',
+          fuelType: 'Elektrik',
+          transmissionName: 'Tek Kademeli Redüktör',
+          timingSystem: 'NONE',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+        },
+      };
+
+      // 1. Initial AI response with unsupported %85 SoH claims
+      const initialWith85 = JSON.stringify({
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          oneSentenceSummary: 'Elektrikli sedan.',
+          strongestAdvantage: 'Verimlilik.',
+          biggestRisk: 'Batarya yıpranması.',
+          bestFor: ['Şehir içi'],
+          notIdealFor: ['Pist'],
+          keyWarnings: ['Batarya Sağlığı (SoH) Kontrolü: %85 ve üzeri SoH genellikle iyi kabul edilir.'],
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model 3',
+            detailedAssessment: 'Yüksek verimli elektrikli sedan modelidir. Sessiz sürüş, anlık tork tepkisi ve gelişmiş multimedya sunmaktadır. Süspansiyon yapısı yol tutuş odaklıdır.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Elektrikli verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'Sert süspansiyon.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Pist', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{
+            condition: 'Batarya Sağlığı (SoH) Kontrolü',
+            reason: '%85 ve üzeri SoH genellikle iyi kabul edilir. %85\'in altındaki değerler dikkatle değerlendirilmelidir.',
+            priority: 'ÖNEMLİ',
+            supportingFactIds: ['FACT-1'],
+          }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Batarya Yıpranması ve SoH Düşüşü',
+            severity: 'ORTA',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Menzilde kısalma'],
+            inspectionInstructions: ['Yetkili serviste batarya sağlık testi yaptırın.'],
+            riskMeaning: 'Batarya kapasitesi zamanla düşebilir.',
+            supportingFactIds: ['FACT-1'],
+          },
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Genel durumu temiz ise satın alma değerlendirilebilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      // 2. Repair AI ALSO returns %85 (fails to fix it)
+      mockOrchestrator.generateListingAdvice
+        .mockResolvedValueOnce({ answer: initialWith85, providerName: 'gemini-flash' })
+        .mockResolvedValueOnce({ answer: initialWith85, providerName: 'gemini-flash' });
+
+      const result = await providerService.generateReport('rep-tesla-soh-sanitize', vehicleContext);
+
+      expect(mockOrchestrator.generateListingAdvice).toHaveBeenCalledTimes(2);
+      expect(result.repairAttempted).toBe(true);
+
+      const finalJson = JSON.stringify(result.report);
+      // Final report must NOT contain ungrounded %85 or 85% thresholds
+      expect(finalJson).not.toContain('%85');
+      expect(finalJson).not.toContain('85%');
+      expect(finalJson).not.toContain('85 SoH');
+
+      // Check that purchase condition reason now has safe expert language
+      const sohReason = result.report.expertDecisionSynthesis.purchaseConditions[0].reason;
+      expect(sohReason).toContain('Batarya sağlık');
+      expect(sohReason).toContain('yetkili servis veya güvenilir bir uzman');
+    });
+
+    it('should NEVER return a dirty/invalid report as COMPLETED when an irrecoverable violation persists after repair & sanitize', async () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v-corolla-2021',
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2021,
+          bodyType: 'Sedan',
+          fuelType: 'Benzin',
+          engineCode: '1ZR-FAE',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+        },
+      };
+
+      // AI hallucinates multiple alternative transmission codes with "veya" that cannot be deterministically resolved
+      const unrecoverableAiResponse = JSON.stringify({
+        executiveSummary: {
+          title: 'Volkswagen Golf Özeti',
+          oneSentenceSummary: 'Hatchback araç.',
+          strongestAdvantage: 'Sürüş dinamikleri.',
+          biggestRisk: 'Mekanik risk.',
+          bestFor: ['Şehir içi'],
+          notIdealFor: ['Pist'],
+          keyWarnings: ['Bakım'],
+        },
+        technicalSpecifications: {
+          transmissionCode: 'DQ200 veya DQ250', // Violates Rule 1.1 single verified identity check!
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Volkswagen Golf',
+            detailedAssessment: 'Yüksek verimli ve dengeli C segmenti hatchback otomobilidir. Hassas direksiyon tepkileri ve rafine kabin yalıtımı sunmaktadır. Şehir içi ve otoyol kullanımı için uygundur.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'İzolasyon.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Pist', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{ condition: 'Bakım', reason: 'Durum', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Kavrama Aşınması',
+            severity: 'DÜŞÜK',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Titreme'],
+            inspectionInstructions: ['Yetkili serviste kavrama boşluğunu test ettirin.'],
+            riskMeaning: 'Mekanik risk.',
+            supportingFactIds: ['FACT-1'],
+          },
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Satın alınabilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      mockOrchestrator.generateListingAdvice
+        .mockResolvedValueOnce({ answer: unrecoverableAiResponse, providerName: 'gemini-flash' })
+        .mockResolvedValueOnce({ answer: unrecoverableAiResponse, providerName: 'gemini-flash' });
+
+      // Provider must throw BadRequestException and reject dirty payload instead of returning COMPLETED
+      await expect(providerService.generateReport('rep-golf-irrecoverable', vehicleContext)).rejects.toThrow(
+        'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
+      );
     });
   });
 });

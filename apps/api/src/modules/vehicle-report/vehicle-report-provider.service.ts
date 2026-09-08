@@ -153,11 +153,19 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
             }
           }
 
-          // If repair failed or validation is still invalid, apply safe sanitization/cleansing
+          // If repair failed or validation is still invalid, apply safe deterministic sanitization/cleansing
           if (!validation.isValid) {
-            this.logger.warn(`[STAGE 4 SANITIZATION] Validation remaining invalid (${validation.reason}). Applying safe risk sanitization...`);
+            this.logger.warn(`[STAGE 4 SANITIZATION] Validation remaining invalid (${validation.reason}). Applying safe deterministic sanitization...`);
             this.sanitizeIncompatibleReportFields(baseReport, validationContext);
+            // FINAL VALIDATION AFTER SANITIZATION
             validation = this.semanticValidationService.validate(baseReport, validationContext);
+            this.logger.log(`[STAGE 4 FINAL VALIDATION] Valid: ${validation.isValid}, Reason: ${validation.reason || 'None'}`);
+          }
+
+          // FINAL VALIDATION GATE: Never return a dirty/invalid report as COMPLETED!
+          if (!validation.isValid) {
+            this.logger.error(`[STAGE 4 GATE FAILED] Report could not be validated or sanitized (${validation.reason}). Rejecting dirty payload.`);
+            throw new BadRequestException('TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.');
           }
 
           // Recalculate scores strictly on final validated report & context with preserved evidence types
@@ -347,6 +355,9 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
   }
 
   private sanitizeIncompatibleReportFields(baseReport: ComprehensiveVehicleReport, contextJson: any): void {
+    // 1. Deterministlc numeric claim sanitization (SoH thresholds, wear km thresholds)
+    this.semanticValidationService.sanitizeEvidenceBoundNumericClaims(baseReport, contextJson);
+
     const synth = baseReport.expertDecisionSynthesis;
     if (synth?.primaryTechnicalRisk) {
       const risk = synth.primaryTechnicalRisk as any;
