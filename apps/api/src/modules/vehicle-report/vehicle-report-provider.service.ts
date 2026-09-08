@@ -232,25 +232,75 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
 
     if (contentObj.finalConditionalVerdict) baseReport.finalVerdict = contentObj.finalConditionalVerdict as any;
 
-    // 3. Preserve DB Technical Risks from Fallback Report if valid
+    // 3. Preserve Verified Research Risks
     const originalRisks = {
       primaryTechnicalRisk: baseReport.expertDecisionSynthesis?.primaryTechnicalRisk,
-      secondaryTechnicalRisks: baseReport.expertDecisionSynthesis?.secondaryTechnicalRisks,
+      secondaryTechnicalRisks: baseReport.expertDecisionSynthesis?.secondaryTechnicalRisks || [],
     };
 
     // 4. Map Expert Decision Synthesis
     if (contentObj.expertDecisionSynthesis) {
+      const existingSynth = baseReport.expertDecisionSynthesis || {} as any;
+      const newSynth = contentObj.expertDecisionSynthesis || {};
+
       baseReport.expertDecisionSynthesis = {
-        ...baseReport.expertDecisionSynthesis,
-        ...contentObj.expertDecisionSynthesis,
-        primaryTechnicalRisk: contentObj.expertDecisionSynthesis?.primaryTechnicalRisk || originalRisks.primaryTechnicalRisk,
-        secondaryTechnicalRisks: contentObj.expertDecisionSynthesis?.secondaryTechnicalRisks || originalRisks.secondaryTechnicalRisks,
+        ...existingSynth,
+        ...newSynth,
+        vehicleCharacter: newSynth.vehicleCharacter || existingSynth.vehicleCharacter,
+        strongestReasonsToChoose: (newSynth.strongestReasonsToChoose?.length ? newSynth.strongestReasonsToChoose : existingSynth.strongestReasonsToChoose) || [],
+        compromisesAndLimitations: (newSynth.compromisesAndLimitations?.length ? newSynth.compromisesAndLimitations : existingSynth.compromisesAndLimitations) || [],
+        suitableFor: (newSynth.suitableFor?.length ? newSynth.suitableFor : existingSynth.suitableFor) || [],
+        notSuitableFor: (newSynth.notSuitableFor?.length ? newSynth.notSuitableFor : existingSynth.notSuitableFor) || [],
+        purchaseConditions: (newSynth.purchaseConditions?.length ? newSynth.purchaseConditions : existingSynth.purchaseConditions) || [],
+        walkAwayConditions: (newSynth.walkAwayConditions?.length ? newSynth.walkAwayConditions : existingSynth.walkAwayConditions) || [],
+        primaryTechnicalRisk: newSynth.primaryTechnicalRisk || existingSynth.primaryTechnicalRisk || originalRisks.primaryTechnicalRisk,
+        secondaryTechnicalRisks: newSynth.secondaryTechnicalRisks || existingSynth.secondaryTechnicalRisks || originalRisks.secondaryTechnicalRisks,
       } as any;
+
       if (baseReport.expertDecisionSynthesis.vehicleCharacter) {
-        baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds = ['AI_RESEARCH_ENGINE'];
+        baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds = 
+          baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds?.length 
+            ? baseReport.expertDecisionSynthesis.vehicleCharacter.supportingFactIds 
+            : ['AI_RESEARCH_ENGINE'];
       }
-    } else {
-      // Flexible fallback mapper if AI returned pros/cons or sections
+      if (Array.isArray(baseReport.expertDecisionSynthesis.strongestReasonsToChoose)) {
+        baseReport.expertDecisionSynthesis.strongestReasonsToChoose = baseReport.expertDecisionSynthesis.strongestReasonsToChoose.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+      if (Array.isArray(baseReport.expertDecisionSynthesis.compromisesAndLimitations)) {
+        baseReport.expertDecisionSynthesis.compromisesAndLimitations = baseReport.expertDecisionSynthesis.compromisesAndLimitations.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+      if (Array.isArray(baseReport.expertDecisionSynthesis.suitableFor)) {
+        baseReport.expertDecisionSynthesis.suitableFor = baseReport.expertDecisionSynthesis.suitableFor.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+      if (Array.isArray(baseReport.expertDecisionSynthesis.notSuitableFor)) {
+        baseReport.expertDecisionSynthesis.notSuitableFor = baseReport.expertDecisionSynthesis.notSuitableFor.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+      if (Array.isArray(baseReport.expertDecisionSynthesis.purchaseConditions)) {
+        baseReport.expertDecisionSynthesis.purchaseConditions = baseReport.expertDecisionSynthesis.purchaseConditions.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+      if (Array.isArray(baseReport.expertDecisionSynthesis.walkAwayConditions)) {
+        baseReport.expertDecisionSynthesis.walkAwayConditions = baseReport.expertDecisionSynthesis.walkAwayConditions.map((item: any) => ({
+          ...item,
+          supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
+        }));
+      }
+    } else if (!baseReport.expertDecisionSynthesis || !baseReport.expertDecisionSynthesis.purchaseConditions?.length) {
+      // Flexible fallback mapper if AI returned pros/cons or sections and baseReport has no valid synthesis yet
       const vOverview = contentObj['Bu Araç Nasıl Bir Otomobil?'] 
         || contentObj.vehicleOverview 
         || contentObj.vehicleCharacter 
@@ -358,11 +408,25 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     // 1. Deterministlc numeric claim sanitization (SoH thresholds, wear km thresholds)
     this.semanticValidationService.sanitizeEvidenceBoundNumericClaims(baseReport, contextJson);
 
-    // 2. EV Architecture Sanitization: EV displacement must always be undefined
+    // 2. EV Architecture Sanitization: EV displacement must always be undefined, and remove ICE mechanical terms from EV checklists/questions
     const fuelType = ((baseReport.vehicleIdentity as any)?.fuelType || contextJson?.vehicleIdentity?.fuelType || '').toLowerCase();
     const isElectric = fuelType.includes('elektrik') || fuelType.includes('electric') || fuelType.includes('bev');
-    if (isElectric && baseReport.vehicleIdentity) {
-      baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+    if (isElectric) {
+      if (baseReport.vehicleIdentity) {
+        baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+      }
+      if (Array.isArray(baseReport.prePurchaseChecks)) {
+        baseReport.prePurchaseChecks = baseReport.prePurchaseChecks.filter(item => {
+          const text = ((item.title || '') + ' ' + (item.instruction || '') + ' ' + (item.targetComponent || '')).toLowerCase();
+          return !text.includes('egzoz emisyonu') && !text.includes('dpf filtresi') && !text.includes('buji değişimi') && !text.includes('yakıt deposu');
+        });
+      }
+      if (Array.isArray(baseReport.sellerQuestions)) {
+        baseReport.sellerQuestions = baseReport.sellerQuestions.filter(item => {
+          const text = ((item.questionText || '') + ' ' + (item.expectedAnswerHint || '')).toLowerCase();
+          return !text.includes('egzoz emisyonu') && !text.includes('dpf filtresi') && !text.includes('buji değişimi') && !text.includes('yakıt deposu');
+        });
+      }
     }
 
     const synth = baseReport.expertDecisionSynthesis;
