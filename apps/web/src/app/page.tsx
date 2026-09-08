@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import BuyerPackagesSection from "../components/BuyerPackagesSection";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
@@ -21,6 +21,16 @@ export default function Home() {
   const [variants, setVariants] = useState<any[]>([]);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
+
+  // Dynamic chunking: 1 row of up to 10 items (1*10), 2 rows when >10 (2*10), 3 rows when >20 (3*10)
+  const featuredRows = useMemo(() => {
+    const rows: any[][] = [];
+    const chunkSize = 10;
+    for (let i = 0; i < featuredListings.length; i += chunkSize) {
+      rows.push(featuredListings.slice(i, i + chunkSize));
+    }
+    return rows;
+  }, [featuredListings]);
 
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
@@ -70,7 +80,7 @@ export default function Home() {
   useEffect(() => {
     setLoadingListings(true);
     const queryParam = promoTab === 'vitrin' ? 'showcaseOnly=true' : 'urgentOnly=true';
-    fetch(`${API_URL}/listings?${queryParam}&limit=16`)
+    fetch(`${API_URL}/listings?${queryParam}&limit=30`)
       .then((res) => res.json())
       .then((data) => {
         const rawItems = data.items && Array.isArray(data.items) ? data.items : [];
@@ -897,72 +907,75 @@ export default function Home() {
         {loadingListings ? (
           <div className="py-16 text-center text-xs text-slate-400">İlanlar yükleniyor...</div>
         ) : featuredListings.length > 0 ? (
-          <div 
-            ref={scrollRef} 
-            className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-4 select-none scrollbar-none snap-x snap-mandatory mt-2"
-          >
-            {featuredListings.map((listing: any) => {
-              const coverImg = listing.media && listing.media[0] 
-                ? formatImageUrl(listing.media[0].url) 
-                : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-              return (
-                <a
-                  key={listing.id}
-                  href={`/listings/${listing.id}`}
-                  className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[230px] sm:w-[280px] lg:w-[205px] flex-shrink-0 snap-start"
-                >
-                  <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
-                    <img
-                      src={coverImg}
-                      alt={listing.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                      }}
-                    />
-                    <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
-                      {listing.isUrgent && (
-                        <UrgentListingBadge size="small" animated />
-                      )}
-                      {listing.isShowcaseFeedActive && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow border border-amber-300/40">
-                          ⭐ Vitrin
-                        </span>
-                      )}
-                      {listing.isAiReady && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">
-                          ✨ AI Analizli
-                        </span>
-                      )}
-                    </div>
-                  </div>
+          <div className="flex flex-col gap-4 mt-2">
+            {featuredRows.map((rowListings: any[], rowIndex: number) => (
+              <div 
+                key={`featured-row-${rowIndex}`}
+                className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-3 select-none scrollbar-none snap-x snap-mandatory"
+              >
+                {rowListings.map((listing: any) => {
+                  const coverImg = listing.media && listing.media[0] 
+                    ? formatImageUrl(listing.media[0].url) 
+                    : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                  return (
+                    <a
+                      key={listing.id}
+                      href={`/listings/${listing.id}`}
+                      className="group flex flex-col bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-2xl hover:shadow-orange-500/5 transition duration-300 w-[230px] sm:w-[280px] lg:w-[205px] flex-shrink-0 snap-start"
+                    >
+                      <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
+                        <img
+                          src={coverImg}
+                          alt={listing.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                          }}
+                        />
+                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
+                          {listing.isUrgent && (
+                            <UrgentListingBadge size="small" animated />
+                          )}
+                          {listing.isShowcaseFeedActive && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow border border-amber-300/40">
+                              ⭐ Vitrin
+                            </span>
+                          )}
+                          {listing.isAiReady && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">
+                              ✨ AI Analizli
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="p-3 flex flex-col justify-between flex-1 gap-2.5">
-                    <div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                        {listing.modelYear} • {listing.city}
-                      </span>
-                      <h3 className="font-bold text-slate-200 text-xs line-clamp-1 group-hover:text-orange-400 transition mt-0.5">
-                        {listing.title}
-                      </h3>
-                      <p className="text-slate-400 text-[10px] mt-0.5">
-                        {listing.kilometers.toLocaleString('tr-TR')} km
-                      </p>
-                    </div>
+                      <div className="p-3 flex flex-col justify-between flex-1 gap-2.5">
+                        <div>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                            {listing.modelYear} • {listing.city}
+                          </span>
+                          <h3 className="font-bold text-slate-200 text-xs line-clamp-1 group-hover:text-orange-400 transition mt-0.5">
+                            {listing.title}
+                          </h3>
+                          <p className="text-slate-400 text-[10px] mt-0.5">
+                            {listing.kilometers.toLocaleString('tr-TR')} km
+                          </p>
+                        </div>
 
-                    <div className="border-t border-white/5 pt-2 flex items-center justify-between">
-                      <span className="font-black text-slate-100 text-[13px]">
-                        {formatCurrency(listing.priceAmount, listing.currency)}
-                      </span>
-                      <span className="text-[9px] text-slate-500 font-mono">
-                        {listing.vehicleVariant?.brand.name}
-                      </span>
-                    </div>
-                  </div>
-
-                </a>
-              );
-            })}
+                        <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                          <span className="font-black text-slate-100 text-[13px]">
+                            {formatCurrency(listing.priceAmount, listing.currency)}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            {listing.vehicleVariant?.brand.name}
+                          </span>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="py-14 text-center rounded-2xl bg-slate-950/50 border border-white/5 space-y-2">
