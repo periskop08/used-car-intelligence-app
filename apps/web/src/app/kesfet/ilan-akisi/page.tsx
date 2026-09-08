@@ -1,138 +1,707 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
-import ListingCard from "../../../components/listings/ListingCard";
-import { Star } from "lucide-react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import Link from "next/link";
+import {
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
+  Share2,
+  Heart,
+  Settings,
+  Car,
+  MapPin,
+  User,
+  FileText,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  RefreshCw,
+  X,
+} from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://used-car-intelligence-app.onrender.com";
 
-function FeedContent() {
-  const [listings, setListings] = useState<any[]>([]);
+interface FeedSeller {
+  id: string;
+  displayName: string;
+  memberSince: string;
+  avatarUrl?: string | null;
+}
+
+interface FeedVehicle {
+  brand: string;
+  modelFamily: string;
+  modelName: string;
+  year: number;
+  fuelType: string;
+  transmissionType: string;
+  mileage: number;
+  bodyType?: string;
+  enginePower?: string;
+  engineCapacity?: string;
+  color?: string;
+}
+
+interface FeedItem {
+  id: string;
+  title: string;
+  price: number;
+  currency: string;
+  listingDate: string;
+  listingNo: string;
+  description?: string;
+  location: { city: string; district: string };
+  seller: FeedSeller;
+  vehicle: FeedVehicle;
+  photos: { id: string; url: string; order: number }[];
+  breadcrumb: string[];
+  isFavorite: boolean;
+  isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
+}
+
+const FUEL_LABELS: Record<string, string> = {
+  PETROL: "Benzin",
+  DIESEL: "Dizel",
+  LPG: "Benzin & LPG",
+  HYBRID: "Hibrit",
+  ELECTRIC: "Elektrik",
+  BENZIN: "Benzin",
+  DIZEL: "Dizel",
+  HIBRIT: "Hibrit",
+  ELEKTRIK: "Elektrik",
+};
+
+const TRANSMISSION_LABELS: Record<string, string> = {
+  AUTOMATIC: "Otomatik",
+  MANUAL: "Manuel",
+  SEMI_AUTOMATIC: "Yarı Otomatik",
+  OTOMATIK: "Otomatik",
+  MANUEL: "Manuel",
+  YARI_OTOMATIK: "Yarı Otomatik",
+};
+
+const formatFuel = (fuel?: string) => {
+  if (!fuel) return "-";
+  return FUEL_LABELS[fuel.toUpperCase()] || fuel;
+};
+
+const formatTransmission = (trans?: string) => {
+  if (!trans) return "-";
+  return TRANSMISSION_LABELS[trans.toUpperCase()] || trans;
+};
+
+function FeedCardDeck() {
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<"info" | "loc">("info");
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [isDescModalOpen, setIsDescModalOpen] = useState(false);
+  const [seed, setSeed] = useState("");
   const [token, setToken] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("accessToken");
     if (savedToken) setToken(savedToken);
+    const initialSeed = Math.random().toString(36).substring(2, 15);
+    setSeed(initialSeed);
+    loadFeed(initialSeed, true);
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
 
-    fetch(`${API_URL}/listings?showcaseOnly=true&page=${page}&limit=12&sort=newest`, { headers })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data.items)) {
-          setListings(data.items);
-          setTotal(data.total || data.items.length);
-        } else if (Array.isArray(data)) {
-          setListings(data);
-          setTotal(data.length);
-        } else {
-          setListings([]);
-          setTotal(0);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("İlan Akışı yüklenirken hata:", err);
-        setListings([]);
-        setLoading(false);
+  const loadFeed = async (activeSeed: string, replace: boolean) => {
+    if (replace) setLoading(true);
+    try {
+      const headers: Record<string, string> = {};
+      const savedToken = localStorage.getItem("accessToken");
+      if (savedToken) headers["Authorization"] = `Bearer ${savedToken}`;
+
+      const res = await fetch(`${API_BASE_URL}/listings/feed?limit=15&seed=${activeSeed}`, {
+        headers,
       });
-  }, [page, token]);
 
-  const handleFavoriteToggle = (listingId: string) => {
-    if (!token) {
+      if (!res.ok) {
+        throw new Error("Akış alınamadı");
+      }
+
+      const data = await res.json();
+      const rawList: FeedItem[] = data.items || [];
+
+      if (rawList.length === 0) {
+        // Fallback: Vitrin ilanlarını getir
+        const fallbackRes = await fetch(`${API_BASE_URL}/listings?showcaseOnly=true&limit=15`, {
+          headers,
+        });
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const fallbackItems = fallbackData.items || [];
+          const mappedFallback: FeedItem[] = fallbackItems.map((x: any) => ({
+            id: x.id,
+            title: x.title,
+            price: Number(x.priceAmount),
+            currency: x.currency || "TRY",
+            listingDate: new Date(x.publishedAt || x.createdAt).toLocaleDateString("tr-TR"),
+            listingNo: x.id.replace(/^TEST-SIMILAR-/, "SIM-").substring(0, 8).toUpperCase(),
+            description: x.description,
+            location: { city: x.city, district: x.district || "Merkez" },
+            seller: {
+              id: x.sellerId,
+              displayName: x.seller?.firstName ? `${x.seller.firstName} ${x.seller.lastName}` : "İlan Sahibi",
+              memberSince: "Temmuz 2026",
+            },
+            vehicle: {
+              brand: x.vehicleVariant?.brand?.name || x.customBrand || "Otomobil",
+              modelFamily: x.vehicleVariant?.model?.name || x.customModel || "",
+              modelName: x.vehicleVariant?.model?.name || x.customModel || "",
+              year: x.modelYear,
+              fuelType: x.fuelType,
+              transmissionType: x.transmission,
+              mileage: x.kilometers,
+            },
+            photos: x.media?.map((m: any, idx: number) => ({ id: m.id || String(idx), url: m.url, order: idx })) || [],
+            breadcrumb: ["Vasıta", "Otomobil", x.customBrand || x.vehicleVariant?.brand?.name || "Araç", x.customModel || x.vehicleVariant?.model?.name || ""].filter(Boolean),
+            isFavorite: !!x.isFavorited,
+            isUrgent: !!x.isUrgent,
+            isShowcaseFeedActive: !!x.isShowcaseFeedActive,
+          }));
+          setItems(mappedFallback);
+          return;
+        }
+      }
+
+      if (replace) {
+        setItems(rawList);
+        setCurrentIndex(0);
+        setActivePhotoIdx(0);
+        const favMap: Record<string, boolean> = {};
+        rawList.forEach((it) => {
+          favMap[it.id] = it.isFavorite;
+        });
+        setFavorites(favMap);
+      } else {
+        setItems((prev) => {
+          const ids = new Set(prev.map((p) => p.id));
+          const newOnes = rawList.filter((it) => !ids.has(it.id));
+          return [...prev, ...newOnes];
+        });
+      }
+    } catch (err) {
+      console.error("İlan Akışı yüklenirken hata:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < items.length - 1) {
+      setCurrentIndex((prev) => prev + 1);
+      setActivePhotoIdx(0);
+      setActiveTab("info");
+      // Sona yaklaştıysa daha fazla ilan yükle
+      if (currentIndex >= items.length - 3) {
+        loadFeed(seed, false);
+      }
+    } else {
+      // Başa dön veya yeni tohumla çek
+      const newSeed = Math.random().toString(36).substring(2, 15);
+      setSeed(newSeed);
+      loadFeed(newSeed, true);
+    }
+  }, [currentIndex, items.length, seed]);
+
+  const handlePrev = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1);
+      setActivePhotoIdx(0);
+      setActiveTab("info");
+    }
+  }, [currentIndex]);
+
+  // Klavye ok tuşları ile yukarı/aşağı geçiş
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "PageDown") {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        handlePrev();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNext, handlePrev]);
+
+  // Mouse wheel ile yukarı/aşağı akış
+  const handleWheel = (e: React.WheelEvent) => {
+    if (isScrollingRef.current) return;
+    if (Math.abs(e.deltaY) > 35) {
+      isScrollingRef.current = true;
+      if (e.deltaY > 0) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 500);
+    }
+  };
+
+  const handleFavoriteToggle = async (listingId: string) => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (!savedToken) {
       window.location.href = `/login?redirect=/kesfet/ilan-akisi`;
       return;
     }
 
-    fetch(`${API_URL}/listings/${listingId}/favorite`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setListings((prev) =>
-          prev.map((item) =>
-            item.id === listingId
-              ? {
-                  ...item,
-                  isFavorited: data.isFavorited,
-                  favoriteCount:
-                    data.favoriteCount !== undefined
-                      ? data.favoriteCount
-                      : data.isFavorited
-                      ? (item.favoriteCount || 0) + 1
-                      : Math.max(0, (item.favoriteCount || 0) - 1),
-                }
-              : item
-          )
-        );
-      })
-      .catch((err) => console.error("Error toggling favorite on feed page:", err));
+    const current = favorites[listingId] || false;
+    setFavorites((prev) => ({ ...prev, [listingId]: !current }));
+
+    try {
+      await fetch(`${API_BASE_URL}/listings/${listingId}/favorite`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${savedToken}` },
+      });
+      showToast(!current ? "❤️ Favorilere eklendi" : "Favorilerden kaldırıldı");
+    } catch {
+      setFavorites((prev) => ({ ...prev, [listingId]: current }));
+      showToast("Favori işlemi başarısız oldu");
+    }
   };
 
-  return (
-    <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-8 w-full">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/50 border border-amber-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
-        <div className="flex items-center gap-3">
-          <span className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-            <Star className="w-6 h-6" />
-          </span>
-          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">İlan Akışı (Vitrin)</h1>
-        </div>
-        <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-          Vitrin + Akış promosyonu ile öne çıkarılmış, yüksek görünürlüğe sahip özel araç ilanları.
-        </p>
-      </div>
+  const handleShare = (item: FeedItem) => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/listings/${item.id}` : "";
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      showToast("🔗 İlan bağlantısı kopyalandı!");
+    }
+  };
 
-      {/* Listing Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-64 rounded-2xl bg-slate-900/40 border border-white/5 animate-pulse" />
-          ))}
+  const currentItem = items[currentIndex];
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center space-y-4 text-center">
+        <div className="w-12 h-12 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+        <p className="text-sm font-bold text-slate-300">Vitrin & Akış İlanları Hazırlanıyor...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          <Sparkles className="w-10 h-10" />
         </div>
-      ) : listings.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-white/10 space-y-3">
-          <span className="text-4xl block">⭐</span>
-          <h3 className="text-base font-bold text-slate-200">Şu an aktif vitrin/akış ilanı bulunmamaktadır</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Yeni vitrin ilanları eklendiğinde bu alanda otomatik olarak listelenecektir.
-          </p>
-          <a
-            href="/listings"
-            className="inline-block px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold text-slate-200 transition mt-2"
-          >
-            Tüm İlanları İncele
-          </a>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {listings.map((item) => (
-            <ListingCard
-              key={item.id}
-              listing={item}
-              isFavorite={item.isFavorited}
-              onFavoriteToggle={(id) => handleFavoriteToggle(id)}
-            />
-          ))}
+        <h2 className="text-lg font-black text-white">Aktif Vitrin veya Acil İlan Bulunmuyor</h2>
+        <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+          Şu anda Vitrin + Akış ve Hızlı Satış paketi bulunan aktif ilan bulunmamaktadır.
+        </p>
+        <button
+          onClick={() => {
+            const newSeed = Math.random().toString(36).substring(2, 15);
+            setSeed(newSeed);
+            loadFeed(newSeed, true);
+          }}
+          className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition flex items-center gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span>Yeniden Dene</span>
+        </button>
+      </div>
+    );
+  }
+
+  const currentPhotoUrl =
+    currentItem.photos[activePhotoIdx]?.url ||
+    "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=800&q=80";
+
+  return (
+    <div
+      ref={containerRef}
+      onWheel={handleWheel}
+      className="relative min-h-[calc(100vh-80px)] py-4 sm:py-6 flex items-center justify-center px-3 sm:px-4 select-none"
+    >
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-20 z-[9999] px-4 py-2 rounded-xl bg-slate-900/95 border border-orange-500/40 text-xs font-bold text-white shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
+          {toastMessage}
         </div>
       )}
-    </main>
+
+      {/* Main Responsive Wrapper: Central Card + Right Desktop Controls */}
+      <div className="flex items-center justify-center gap-5 w-full max-w-4xl mx-auto">
+        {/* ========================================================================= */}
+        {/* THE VISUAL 1 CARD: Centered, Framed, Dark Glassmorphism, Web Balanced */}
+        {/* ========================================================================= */}
+        <div className="w-full max-w-[430px] sm:max-w-[450px] bg-[#0a1224] border border-white/10 rounded-[28px] p-4 sm:p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+          {/* 1. Header Bar */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-white/5">
+            {/* Left: Blue Gear Circle */}
+            <Link
+              href="/dashboard/listings"
+              className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 transition cursor-pointer"
+              title="İlan Yönetimi"
+            >
+              <Settings className="w-5 h-5" />
+            </Link>
+
+            {/* Center: Title */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">📦</span>
+              <span className="text-sm font-black text-white tracking-widest uppercase">
+                İlan Akışı
+              </span>
+            </div>
+
+            {/* Right: Share & Favorite */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleShare(currentItem)}
+                className="w-9 h-9 rounded-full bg-[#0c1527] hover:bg-[#15223e] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition shadow-sm cursor-pointer"
+                title="Paylaş"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFavoriteToggle(currentItem.id)}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition shadow-sm cursor-pointer ${
+                  favorites[currentItem.id]
+                    ? "bg-red-500/20 border-red-500/50 text-red-500"
+                    : "bg-[#0c1527] hover:bg-[#15223e] border-white/10 text-slate-300 hover:text-white"
+                }`}
+                title="Favorilere Ekle"
+              >
+                <Heart
+                  className={`w-4 h-4 ${favorites[currentItem.id] ? "fill-red-500" : ""}`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Photo Section with Badges */}
+          <div className="mt-3.5 relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-slate-950 border border-white/10 group flex items-center justify-center">
+            <img
+              src={currentPhotoUrl}
+              alt={currentItem.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+            />
+
+            {/* Top-Left Badges: Acil & Vitrin */}
+            <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2 flex-wrap">
+              {currentItem.isUrgent && (
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-600 text-white font-black text-[10px] uppercase tracking-wider shadow-lg border border-red-400/50 animate-pulse">
+                  <span>•</span>
+                  <span>🔥</span>
+                  <span>ACİL</span>
+                </div>
+              )}
+              {currentItem.isShowcaseFeedActive && (
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-lg border border-amber-300">
+                  <span>★</span>
+                  <span>VİTRİN</span>
+                </div>
+              )}
+            </div>
+
+            {/* Photo Counter */}
+            {currentItem.photos.length > 1 && (
+              <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-md border border-white/10">
+                {activePhotoIdx + 1} / {currentItem.photos.length}
+              </div>
+            )}
+
+            {/* Multi-Photo Navigation Arrows */}
+            {currentItem.photos.length > 1 && (
+              <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActivePhotoIdx((prev) => Math.max(0, prev - 1));
+                  }}
+                  className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActivePhotoIdx((prev) =>
+                      Math.min(currentItem.photos.length - 1, prev + 1)
+                    );
+                  }}
+                  className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Title & Seller Row */}
+          <div className="mt-3 space-y-1">
+            <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wide truncate">
+              {currentItem.title}
+            </h3>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+              <span className="truncate max-w-[60%]">
+                👤 {currentItem.seller.displayName} ({currentItem.seller.memberSince})
+              </span>
+              <span className="truncate max-w-[40%] text-right text-slate-300">
+                📍 {currentItem.location.city}, {currentItem.location.district || "Merkez"}
+              </span>
+            </div>
+          </div>
+
+          {/* 4. Breadcrumb Chip */}
+          <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-400 text-[10.5px] font-bold truncate">
+            {currentItem.breadcrumb && currentItem.breadcrumb.length > 0
+              ? currentItem.breadcrumb.join(" > ")
+              : `Vasıta > Otomobil > ${currentItem.vehicle.brand} > ${currentItem.vehicle.modelFamily}`}
+          </div>
+
+          {/* 5. Segmented Tabs (Özellikler & Konum) */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("info")}
+              className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === "info"
+                  ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-sm"
+                  : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>📋</span>
+              <span>Özellikler</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("loc")}
+              className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === "loc"
+                  ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-sm"
+                  : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>📍</span>
+              <span>Konum</span>
+            </button>
+          </div>
+
+          {/* 6. Tab Content Table */}
+          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 relative min-h-[96px] flex flex-col justify-center">
+            {/* Right Floating Scroll Guide Indicator Pill */}
+            <div
+              onClick={handleNext}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-[#0c162b] border border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-400 shadow-md cursor-pointer hover:bg-orange-500/20 transition"
+              title="Sonraki İlana Geç"
+            >
+              <ChevronUp className="w-2.5 h-2.5 text-slate-400" />
+              <ArrowUpDown className="w-3 h-3 text-orange-400" />
+              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+            </div>
+
+            {activeTab === "info" ? (
+              <div className="space-y-1.5 pr-7 text-xs">
+                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400 font-medium">Fiyat</span>
+                  <span className="font-black text-orange-400 text-sm">
+                    {currentItem.price.toLocaleString("tr-TR")} {currentItem.currency || "TL"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400 font-medium">İlan No</span>
+                  <span className="font-mono font-bold text-slate-200">
+                    {currentItem.listingNo}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400 font-medium">Yıl / KM</span>
+                  <span className="font-semibold text-slate-200">
+                    {currentItem.vehicle.year} • {currentItem.vehicle.mileage.toLocaleString("tr-TR")} km
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Yakıt / Vites</span>
+                  <span className="font-semibold text-slate-200 truncate max-w-[170px]">
+                    {formatFuel(currentItem.vehicle.fuelType)} • {formatTransmission(currentItem.vehicle.transmissionType)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 pr-7 text-xs">
+                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400 font-medium">Şehir</span>
+                  <span className="font-bold text-slate-200">{currentItem.location.city}</span>
+                </div>
+                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400 font-medium">İlçe</span>
+                  <span className="font-bold text-slate-200">
+                    {currentItem.location.district || "Merkez"}
+                  </span>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Link
+                    href={`/listings/${currentItem.id}`}
+                    className="text-blue-400 hover:text-blue-300 font-bold text-[11px] flex items-center gap-1"
+                  >
+                    <span>Haritada Göster ➔</span>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 7. Dedicated Description Card */}
+          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white flex items-center gap-1">
+                <span>📝</span>
+                <span>İlan Açıklaması</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsDescModalOpen(true)}
+                className="text-[11px] font-bold text-orange-400 hover:text-orange-300 transition cursor-pointer"
+              >
+                Tümünü Gör ➔
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 line-clamp-3 leading-relaxed">
+              {currentItem.description
+                ? currentItem.description.replace(/\n+/g, " ").trim()
+                : "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
+            </p>
+          </div>
+
+          {/* 8. Bottom Action Buttons */}
+          <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
+            <Link
+              href={`/listings/${currentItem.id}`}
+              className="py-2.5 px-3 rounded-xl bg-[#0e182e] hover:bg-[#162547] border border-white/15 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <FileText className="w-4 h-4 text-slate-300" />
+              <span>İlana Git</span>
+            </Link>
+            <Link
+              href={`/dashboard/messages?listingId=${currentItem.id}`}
+              className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/30"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Mesaj Gönder</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* DESKTOP SIDE CONTROLS: Vertical Scroll Buttons & Counter */}
+        {/* ========================================================================= */}
+        <div className="hidden md:flex flex-col items-center gap-3">
+          {/* Previous Button */}
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+            className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition shadow-xl cursor-pointer ${
+              currentIndex === 0
+                ? "bg-slate-900/40 border-white/5 text-slate-600 cursor-not-allowed"
+                : "bg-[#0a1224] hover:bg-[#142240] border-white/10 text-white hover:scale-105"
+            }`}
+            title="Önceki İlan (Yukarı Tuşu)"
+          >
+            <ChevronUp className="w-6 h-6" />
+          </button>
+
+          {/* Counter Badge */}
+          <div className="px-3 py-2 rounded-2xl bg-[#0a1224] border border-white/10 text-center shadow-lg space-y-0.5 min-w-[70px]">
+            <div className="text-[10px] uppercase font-bold text-slate-400">İlan</div>
+            <div className="text-sm font-black text-orange-400 leading-none">
+              {currentIndex + 1} <span className="text-slate-500 font-normal">/</span> {items.length}
+            </div>
+          </div>
+
+          {/* Next Button */}
+          <button
+            type="button"
+            onClick={handleNext}
+            className="w-12 h-12 rounded-2xl bg-[#0a1224] hover:bg-[#142240] border border-white/10 text-white hover:scale-105 flex items-center justify-center transition shadow-xl cursor-pointer"
+            title="Sonraki İlan (Aşağı Tuşu)"
+          >
+            <ChevronDown className="w-6 h-6" />
+          </button>
+
+          {/* Keyboard tip */}
+          <div className="text-[10px] text-slate-500 text-center font-medium max-w-[80px] leading-tight mt-2">
+            Klavye ↑ / ↓ veya Fare Tekerleği
+          </div>
+        </div>
+      </div>
+
+      {/* Full Description Modal Popup */}
+      {isDescModalOpen && (
+        <div
+          onClick={() => setIsDescModalOpen(false)}
+          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-[#0a1224] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h4 className="text-sm font-black text-white uppercase flex items-center gap-2">
+                <span>📝</span>
+                <span>İlan Açıklaması</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsDescModalOpen(false)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+              {currentItem.description ||
+                "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 export default function FeedPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#020617] flex items-center justify-center text-xs text-slate-400">Yükleniyor...</div>}>
-      <FeedContent />
-    </Suspense>
+    <main className="min-h-screen bg-[#030712] text-slate-100">
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#030712] flex items-center justify-center text-xs text-slate-400">
+            Yükleniyor...
+          </div>
+        }
+      >
+        <FeedCardDeck />
+      </Suspense>
+    </main>
   );
 }
