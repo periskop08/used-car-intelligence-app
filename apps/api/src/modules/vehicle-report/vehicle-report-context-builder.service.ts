@@ -144,16 +144,32 @@ export class VehicleReportContextBuilderService {
         summary: reportCache?.summary || null,
         riskScore: reportCache?.riskScore ?? null,
         buyabilityScore: reportCache?.buyabilityScore ?? null,
-        knownDatabaseProblems: variant.problems.map((p) => ({
-          id: p.id,
-          title: p.title,
-          description: p.description,
-          riskLevel: p.riskLevel,
-          symptoms: (p as any).symptoms || null,
-          checkRecommendation: (p as any).checkRecommendation || null,
-          category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
-          problemType: (p as any).problemType || ((p as any).sourceUrl ? 'VERIFIED_FAILURE' : 'REPORTED_COMPLAINT'),
-        })),
+        knownDatabaseProblems: variant.problems.map((p) => {
+          const rawType = String((p as any).problemType || '').toUpperCase();
+          const pType = (rawType === 'VERIFIED_FAILURE' || rawType === 'RECALL' || rawType === 'TSB')
+            ? 'VERIFIED_FAILURE'
+            : (rawType === 'OBSERVED_BEHAVIOR' ? 'OBSERVED_BEHAVIOR' : 'REPORTED_COMPLAINT');
+
+          let pTitle = p.title || 'Mekanik Gözlem';
+          if (pType === 'REPORTED_COMPLAINT') {
+            if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
+              pTitle = 'Otomatik Silecek Performansı Şikâyetleri';
+            } else if (pTitle.endsWith('Arızası')) {
+              pTitle = pTitle.replace(/Arızası$/, 'Şikâyetleri');
+            }
+          }
+
+          return {
+            id: p.id,
+            title: pTitle,
+            description: p.description,
+            riskLevel: p.riskLevel,
+            symptoms: (p as any).symptoms || null,
+            checkRecommendation: (p as any).checkRecommendation || null,
+            category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
+            problemType: pType,
+          };
+        }),
         inspectionChecklist: (variant.checklists || []).map((c) => ({
           id: c.id,
           category: c.category,
