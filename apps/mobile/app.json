@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "TorqueScout",
+    "slug": "torquescout",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.torquescout.mobile"
+    },
+    "android": {
+      "package": "com.torquescout.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar"
+    ]
+  }
+}
