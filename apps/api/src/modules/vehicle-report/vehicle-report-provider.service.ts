@@ -211,6 +211,8 @@ export class VehicleReportProviderService {
             if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
             if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
             if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+            if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+            if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
             if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
 
             baseReport.performanceUsage = {
@@ -220,9 +222,12 @@ export class VehicleReportProviderService {
               topSpeedKmh: specs.topSpeedKmh || baseReport.performanceUsage?.topSpeedKmh,
               cityFuelL100km: specs.cityFuelL100km || baseReport.performanceUsage?.cityFuelL100km,
               highwayFuelL100km: specs.highwayFuelL100km || baseReport.performanceUsage?.highwayFuelL100km,
-              combinedFuelL100km: specs.combinedFuelL100km || baseReport.performanceUsage?.combinedFuelL100km,
+              combinedFuelL100km: specs.catalogCombinedFuelL100km || specs.combinedFuelL100km || baseReport.performanceUsage?.combinedFuelL100km,
               trunkCapacityLiters: specs.trunkCapacityLiters || baseReport.performanceUsage?.trunkCapacityLiters,
               curbWeightKg: specs.curbWeightKg || baseReport.performanceUsage?.curbWeightKg,
+              rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
+                ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`
+                : baseReport.performanceUsage?.rangeFactorsNote,
               supportingFactIds: ['AI_VERIFIED_TECHNICAL_SPECS'],
             };
           }
