@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import QuotaBadge from "@/components/QuotaBadge";
 import VehicleReportShell from "../../vehicle-report/components/VehicleReportShell";
+import IsiCepteListingRecommendationWidget from "@/app/listings/components/IsiCepteListingRecommendationWidget";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -1071,6 +1072,12 @@ export default function VehicleDetail() {
               <span>Yanıtlar araç raporu verilerine göre hazırlanır.</span>
             </div>
           </div>
+
+          {/* İŞİ CEPTE ÖNERİYOR */}
+          <IsiCepteListingRecommendationWidget
+            vehicleBrand={vehicle?.brand || "Bu Araç"}
+            className="w-full"
+          />
         </div>
 
         </div>
