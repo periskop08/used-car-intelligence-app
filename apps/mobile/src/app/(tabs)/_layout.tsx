@@ -121,13 +121,20 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="isicepte"
+          options={{
+            headerShown: false,
+            tabBarLabel: 'İşi Cepte',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'build' : 'build-outline'} size={22} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="kesfet"
           options={{
             title: 'Keşfet',
-            tabBarLabel: 'Keşfet',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={22} color={color} />
-            ),
+            href: null,
           }}
         />
         <Tabs.Screen

@@ -17,6 +17,13 @@
       "expo-font",
       "expo-image",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "891b84e5-c90a-448d-be5a-6e87d7784d50"
+      }
+    },
+    "owner": "periskop007"
   }
 }
