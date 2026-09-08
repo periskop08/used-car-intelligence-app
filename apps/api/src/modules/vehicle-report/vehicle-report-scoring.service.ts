@@ -84,12 +84,11 @@ export class VehicleReportScoringService {
                 : `Doğrulanmış Kronik Gözlem: ${p.title || p.description || 'Periyodik Kontrol Noktası'}`,
             });
           } else {
-            const impactVal = isCritical ? 6 : 2;
-            accumulatedRisk += impactVal;
+            // Unverified/community feedback does not contribute numeric weight to technicalRiskScore calculation
             riskFactors.push({
               key: `COMMUNITY_FEEDBACK_${p.id || idx}`,
-              impact: impactVal,
-              explanation: `Kullanıcı Geri Bildirimi / Saha Gözlemi: ${p.title || p.description || 'Kullanıcı Bildirimi'}`,
+              impact: 0,
+              explanation: `Kullanıcı Geri Bildirimi / Saha Gözlemi (Doğrulanmamış): ${p.title || p.description || 'Kullanıcı Bildirimi'}`,
             });
           }
         });
