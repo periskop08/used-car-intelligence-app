@@ -405,7 +405,7 @@ export default function IsiCepteListingRecommendationWidget({
                   <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono truncate leading-tight">
                     <MapPin className="w-2.5 h-2.5 text-orange-400/80 shrink-0" />
                     <span className="truncate">
-                      {shop.city} {shop.district ? `/ ${shop.district}` : ''}
+                      {shop.district || shop.city}
                     </span>
                   </div>
 
