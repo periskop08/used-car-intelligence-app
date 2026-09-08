@@ -1453,6 +1453,22 @@ export default function MobileDashboard() {
             </View>
             <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
+
+          {/* 4. İşi Cepte Öneriyor */}
+          <TouchableOpacity
+            style={styles.kesfetCard}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(tabs)/isicepte')}
+          >
+            <View style={[styles.kesfetIconBox, styles.kesfetIconBoxEmerald]}>
+              <Ionicons name="shield-checkmark" size={20} color="#059669" />
+            </View>
+            <View style={styles.kesfetCardContent}>
+              <Text style={styles.kesfetCardText}>İşi Cepte</Text>
+              <Text style={styles.kesfetCardSubText}>Onaylı Ustalar</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* VİTRİN / ACİL PROMOTIONAL SECTION */}
@@ -2641,6 +2657,10 @@ const styles = StyleSheet.create({
   kesfetIconBoxCyan: {
     backgroundColor: '#f0f9ff',
     borderColor: '#bae6fd',
+  },
+  kesfetIconBoxEmerald: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
   },
   kesfetCardContent: {
     gap: 1.5,
