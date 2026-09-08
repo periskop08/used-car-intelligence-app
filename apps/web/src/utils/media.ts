@@ -27,6 +27,9 @@ export const formatImageUrl = (url?: string | null) => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith("guide-cards/")) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }

@@ -49,6 +49,9 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith('guide-cards/')) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }
@@ -65,20 +68,26 @@ const resolveVehicleImageUrl = (
   brand?: string,
   modelFamily?: string
 ): string => {
-  const formatted = formatCloudflareImageUrl(url);
-  if (formatted) return formatted;
+  if (url && !url.includes('test-similar')) {
+    const formatted = formatCloudflareImageUrl(url);
+    if (formatted) return formatted;
+  }
 
-  if (brand && modelFamily) {
-    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
-    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+  if (brand || modelFamily) {
+    const b = (brand || '').toLowerCase().trim();
+    const m = (modelFamily || '').toLowerCase().trim();
+    const fullKey = `${b} ${m}`.trim();
+    if (fullKey && CLOUDFLARE_VEHICLE_IMAGES[fullKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[fullKey]);
     }
-    const modelKey = modelFamily.toLowerCase().trim();
-    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    if (m && CLOUDFLARE_VEHICLE_IMAGES[m]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[m]);
+    }
+    if (b && CLOUDFLARE_VEHICLE_IMAGES[b]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[b]);
     }
   }
-  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+  return 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80';
 };
 
 interface Brand {
@@ -495,6 +504,35 @@ export default function MobileDashboard() {
     }
     return rows;
   }, [vitrinListings]);
+
+  // Auto-scroll loop for mobile Showcase / Vitrin horizontal slider rows
+  const vitrinScrollRefs = useRef<(ScrollView | null)[]>([]);
+  const vitrinScrollOffsets = useRef<number[]>([]);
+
+  useEffect(() => {
+    if (vitrinRows.length === 0) return;
+
+    const cardWidthWithGap = 165 + 12; // 165px card width + 12px gap
+    const interval = setInterval(() => {
+      vitrinRows.forEach((rowItems, rowIndex) => {
+        const scrollRef = vitrinScrollRefs.current[rowIndex];
+        if (!scrollRef || rowItems.length <= 1) return;
+
+        const currentOffset = vitrinScrollOffsets.current[rowIndex] || 0;
+        const maxOffset = (rowItems.length - 1) * cardWidthWithGap;
+        let nextOffset = currentOffset + cardWidthWithGap;
+
+        if (nextOffset > maxOffset) {
+          nextOffset = 0;
+        }
+
+        scrollRef.scrollTo({ x: nextOffset, animated: true });
+        vitrinScrollOffsets.current[rowIndex] = nextOffset;
+      });
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [vitrinRows]);
 
   // FULL 8-FILTER CASCADING VEHICLE QUERY STATE:
   // 1. Marka | 2. Model Ailesi | 3. Yıl | 4. Kasa Tipi | 5. Motor / Versiyon | 6. Yakıt | 7. Şanzıman | 8. Donanım
@@ -1570,6 +1608,13 @@ export default function MobileDashboard() {
               {vitrinRows.map((rowItems, rowIndex) => (
                 <ScrollView
                   key={`vitrin-row-${rowIndex}`}
+                  ref={(el) => {
+                    vitrinScrollRefs.current[rowIndex] = el;
+                  }}
+                  onScroll={(e) => {
+                    vitrinScrollOffsets.current[rowIndex] = e.nativeEvent.contentOffset.x;
+                  }}
+                  scrollEventThrottle={16}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.vitrinHorizontalScrollContent}

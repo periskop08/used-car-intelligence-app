@@ -3,9 +3,9 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ListingFilters from "../../components/listings/ListingFilters";
-import ListingCard from "../../components/listings/ListingCard";
 import UrgentListingBadge from "../../components/listings/UrgentListingBadge";
 import { formatCurrency } from "@/utils/formatters";
+import { formatImageUrl } from "@/utils/media";
 import {
   VEHICLE_COLORS,
   isApprovedVehicleColor,
@@ -175,7 +175,7 @@ function ListingsContent() {
   // Main Fetch function
   const fetchListings = () => {
     setLoading(true);
-    let query = `?page=${page}&limit=9&sort=${sort}`;
+    let query = `?page=${page}&limit=12&sort=${sort}`;
     if (selectedBrand) query += `&brandId=${selectedBrand}`;
     if (selectedModel) query += `&modelId=${selectedModel}`;
     if (selectedEngineId) query += `&engineId=${selectedEngineId}`;
@@ -1030,9 +1030,9 @@ function ListingsContent() {
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
               {listings.map((listing) => {
-                const cover = listing.media && listing.media[0] ? listing.media[0].url : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                 return (
                   <a
                     key={listing.id}
