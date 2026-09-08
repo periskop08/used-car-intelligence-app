@@ -374,29 +374,44 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
   });
 
   describe('Behavior 10: Evidence-Bound SoH & Component-Matched Numeric Guard', () => {
-    it('should REJECT report if it asserts %85 SoH / %85 altı pil sağlığı without Stage 1 verification', () => {
-      const teslaReportWithUngroundedSoh = {
-        reportId: 'rep-tesla-soh',
-        vehicleIdentity: {
-          brand: 'Tesla',
-          model: 'Model 3',
-          modelYear: 2022,
-          fuelType: 'Elektrik',
-        },
-        executiveSummary: {
-          title: 'Tesla Model 3 Özeti',
-          keyWarnings: ['Batarya sağlığı %85 altına düştüğünde menzilde belirgin düşüş gözlemlenebilir.'],
-        },
-      } as any;
+    const ungroundedSohVariations = [
+      '%85 ve üzeri SoH',
+      '%85\'in üzeri SoH',
+      '85% ve üzeri SoH',
+      'SoH %85',
+      'SoH 85%',
+      '%85\'in altı batarya sağlığı',
+      '%85 ve altı pil sağlığı',
+      'Batarya Sağlığı (SoH) Kontrolü ... %85 ve üzeri SoH idealdir.',
+      'pil sağlığı seviyesi %85',
+      'soh 85',
+    ];
 
-      const validation = validationService.validate(teslaReportWithUngroundedSoh, {
-        verifiedResearch: {
-          claims: [],
-        },
+    ungroundedSohVariations.forEach((phrase) => {
+      it(`should REJECT report for ungrounded variation: "${phrase}"`, () => {
+        const teslaReport = {
+          reportId: 'rep-tesla-soh-var',
+          vehicleIdentity: {
+            brand: 'Tesla',
+            model: 'Model 3',
+            modelYear: 2022,
+            fuelType: 'Elektrik',
+          },
+          executiveSummary: {
+            title: 'Tesla Model 3 Özeti',
+            keyWarnings: [`Bu araçta ${phrase} göz önünde bulundurulmalıdır.`],
+          },
+        } as any;
+
+        const validation = validationService.validate(teslaReport, {
+          verifiedResearch: {
+            claims: [],
+          },
+        });
+
+        expect(validation.isValid).toBe(false);
+        expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı) iddiası tespit edildi');
       });
-
-      expect(validation.isValid).toBe(false);
-      expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı) iddiası tespit edildi');
     });
 
     it('should ACCEPT report if %85 SoH was specifically verified in Stage 1 research data', () => {
