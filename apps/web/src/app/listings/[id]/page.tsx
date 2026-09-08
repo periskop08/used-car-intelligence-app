@@ -7,30 +7,17 @@ import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, 
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
+import SimilarListingsWidget from "../components/SimilarListingsWidget";
 import { formatCurrency } from "@/utils/formatters";
 import { VehicleBodyConditionMap } from "@/components/VehicleBodyConditionMap";
 
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-const mockSimilarListings = [
-  { id: 'sim-1', title: 'Audi A3 Sedan 35 TFSI Sport', year: 2020, km: '89.000', location: 'İstanbul / Kadıköy', price: '1.250.000 TL', imageUrl: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-2', title: 'BMW 320i Executive M Sport', year: 2019, km: '115.000', location: 'Ankara / Çankaya', price: '1.480.000 TL', imageUrl: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-3', title: 'Mercedes C200d AMG 9G-Tronic', year: 2018, km: '124.000', location: 'İzmir / Bornova', price: '1.390.000 TL', imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-4', title: 'Volkswagen Golf 1.5 TSI R-Line', year: 2021, km: '62.000', location: 'Bursa / Nilüfer', price: '1.180.000 TL', imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-5', title: 'Renault Megane 1.3 TCe Icon EDG', year: 2022, km: '45.000', location: 'Antalya / Muratpaşa', price: '985.000 TL', imageUrl: 'https://images.unsplash.com/photo-1541348263662-e082662d82da?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-6', title: 'Toyota Corolla 1.8 Hybrid Passion', year: 2020, km: '78.000', location: 'Kocaeli / İzmit', price: '1.090.000 TL', imageUrl: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-7', title: 'Honda Civic 1.5 VTEC Turbo Executive', year: 2019, km: '92.000', location: 'Adana / Seyhan', price: '1.140.000 TL', imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-8', title: 'Ford Focus 1.5 EcoBlue ST-Line', year: 2020, km: '84.000', location: 'Eskişehir / Tepebaşı', price: '1.030.000 TL', imageUrl: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400&auto=format&fit=crop&q=80' },
-  { id: 'sim-9', title: 'Peugeot 308 1.2 PureTech GT', year: 2021, km: '53.000', location: 'İstanbul / Maltepe', price: '1.120.000 TL', imageUrl: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&auto=format&fit=crop&q=80' },
-];
 
 import { formatImageUrl } from "@/utils/media";
 
 export default function ListingDetail() {
   const { id } = useParams();
   const router = useRouter();
-  const similarListingsRef = useRef<HTMLDivElement>(null);
 
   // Data states
   const [listing, setListing] = useState<any>(null);
@@ -782,64 +769,8 @@ export default function ListingDetail() {
             </div>
           </div>
 
-          {/* 2. KART: Benzer İlanlar (YouTube Sağ Panel Dikey Liste Mantığı) */}
-          <div className="glass p-4 rounded-2xl border border-white/5 flex flex-col gap-3 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
-                <span>🚗 Benzer İlanlar</span>
-              </h3>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => similarListingsRef.current?.scrollBy({ top: -140, behavior: 'smooth' })}
-                  className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
-                  title="Yukarı Kaydır"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => similarListingsRef.current?.scrollBy({ top: 140, behavior: 'smooth' })}
-                  className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition cursor-pointer"
-                  title="Aşağı Kaydır"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable vertical list (YouTube sidebar style) */}
-            <div
-              ref={similarListingsRef}
-              className="max-h-[770px] overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin scrollbar-thumb-white/10 overscroll-contain"
-            >
-              {mockSimilarListings.map((item) => (
-                <a
-                  key={item.id}
-                  href={`/listings/${id}`}
-                  className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-white/5 transition group"
-                >
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="w-16 h-12 rounded-lg object-cover border border-white/10 shrink-0 group-hover:scale-105 transition"
-                  />
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-[11px] font-extrabold text-slate-200 truncate group-hover:text-orange-400 transition">
-                      {item.title}
-                    </span>
-                    <span className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
-                      {item.year} • {item.km} km • {item.location}
-                    </span>
-                    <span className="text-[11px] font-black text-orange-400 mt-0.5">
-                      {item.price}
-                    </span>
-                  </div>
-                </a>
-              ))}
-          </div>
-
-          </div>
+          {/* 2. KART: Benzer İlanlar (Açılır/Kapanır, 5 İlan Görünür, 10 İlana Kadar Kaydırmalı, Tümünü Gör Modalı) */}
+          <SimilarListingsWidget listingId={listing.id} />
 
         </div>
       </div>

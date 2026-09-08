@@ -627,6 +627,46 @@ export class ListingController {
     };
   }
 
+  @Get('listings/:id/similar')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Benzer araç ilanlarını hiyerarşik filtreleme ve puanlama ile çek' })
+  async getSimilarListings(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const scored = await this.listingService.getSimilarListings(id, 50);
+    const items = scored.map(({ listing, score }) => {
+      const formattedMedia = listing.media ? this.formatMediaUrls(listing.media, req) : [];
+      const primaryPhoto = formattedMedia[0]?.url || null;
+      const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || '';
+      const modelName = listing.vehicleVariant?.model?.name || listing.customModel || '';
+      return {
+        id: listing.id,
+        title: listing.title,
+        brand: brandName,
+        model: modelName,
+        modelYear: listing.modelYear,
+        kilometers: listing.kilometers,
+        priceAmount: Number(listing.priceAmount),
+        currency: listing.currency,
+        city: listing.city,
+        district: listing.district,
+        fuelType: listing.fuelType,
+        transmission: listing.transmission,
+        bodyType: listing.bodyType,
+        enginePower: listing.enginePower || listing.vehicleVariant?.engine?.horsepower || null,
+        engineDisplacement: listing.engineDisplacement || listing.vehicleVariant?.engine?.displacement || null,
+        imageUrl: primaryPhoto,
+        similarityScore: score,
+      };
+    });
+
+    return {
+      total: items.length,
+      items,
+    };
+  }
+
   @Get('vehicle-reports/:variantId/related-listings')
   @ApiOperation({ summary: 'Araç varyantına göre ilgili aktif ilanları listele' })
   async getRelatedListings(

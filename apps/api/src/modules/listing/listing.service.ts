@@ -909,5 +909,143 @@ CRITICAL SAFETY RULES:
       nextSeed: activeSeed,
     };
   }
+
+  /**
+   * Benzer araç ilanlarını hiyerarşik filtreleme ve ağırlıklı puanlama ile getirir.
+   * Kriterler: İlan Fiyatı, Marka, Seri/Model, Yıl, Yakıt Tipi, Vites, KM, Kasa Tipi, Motor Gücü, Motor Hacmi
+   */
+  async getSimilarListings(id: string, limit = 50) {
+    const target = await this.prisma.vehicleListing.findUnique({
+      where: { id },
+      include: {
+        vehicleVariant: {
+          include: {
+            brand: true,
+            model: true,
+            engine: true,
+            transmission: true,
+          },
+        },
+      },
+    });
+
+    if (!target) {
+      throw new NotFoundException('İlan bulunamadı.');
+    }
+
+    const targetPrice = Number(target.priceAmount) || 0;
+    const targetBrand = (target.vehicleVariant?.brand?.name || target.customBrand || '').trim().toLowerCase();
+    const targetModel = (target.vehicleVariant?.model?.name || target.customModel || '').trim().toLowerCase();
+    const targetYear = target.modelYear;
+    const targetFuel = target.fuelType;
+    const targetTransmission = target.transmission;
+    const targetKm = target.kilometers;
+    const targetBodyType = target.bodyType;
+    const targetHp = target.enginePower || target.vehicleVariant?.engine?.horsepower || null;
+    const targetCc = target.engineDisplacement || target.vehicleVariant?.engine?.displacement || null;
+
+    // Aktif ilanları çek (mevcut ilan hariç)
+    const candidates = await this.prisma.vehicleListing.findMany({
+      where: {
+        id: { not: id },
+        status: ListingStatus.ACTIVE,
+      },
+      include: {
+        media: {
+          orderBy: { sortOrder: 'asc' },
+          take: 1,
+        },
+        vehicleVariant: {
+          include: {
+            brand: true,
+            model: true,
+            engine: true,
+          },
+        },
+      },
+      take: 200,
+    });
+
+    const scored = candidates.map((cand) => {
+      let score = 0;
+      const candPrice = Number(cand.priceAmount) || 0;
+      const candBrand = (cand.vehicleVariant?.brand?.name || cand.customBrand || '').trim().toLowerCase();
+      const candModel = (cand.vehicleVariant?.model?.name || cand.customModel || '').trim().toLowerCase();
+      const candHp = cand.enginePower || cand.vehicleVariant?.engine?.horsepower || null;
+      const candCc = cand.engineDisplacement || cand.vehicleVariant?.engine?.displacement || null;
+
+      // 1. Marka (Brand) Eşleşmesi
+      if (candBrand && targetBrand && candBrand === targetBrand) {
+        score += 35;
+      }
+
+      // 2. Model / Seri Eşleşmesi
+      if (candModel && targetModel && candModel === targetModel) {
+        score += 30;
+      }
+
+      // 3. İlan Fiyatı (Price) Yakınlığı
+      if (targetPrice > 0 && candPrice > 0) {
+        const diffRatio = Math.abs(candPrice - targetPrice) / targetPrice;
+        if (diffRatio <= 0.10) score += 25;
+        else if (diffRatio <= 0.20) score += 18;
+        else if (diffRatio <= 0.35) score += 10;
+        else if (diffRatio <= 0.50) score += 5;
+      }
+
+      // 4. Yıl (Year) Yakınlığı
+      const yearDiff = Math.abs(cand.modelYear - targetYear);
+      if (yearDiff === 0) score += 15;
+      else if (yearDiff === 1) score += 12;
+      else if (yearDiff <= 3) score += 8;
+      else if (yearDiff <= 5) score += 4;
+
+      // 5. Kasa Tipi (Body Type) Eşleşmesi
+      if (targetBodyType && cand.bodyType === targetBodyType) {
+        score += 15;
+      }
+
+      // 6. Yakıt Tipi (Fuel Type) Eşleşmesi
+      if (targetFuel && cand.fuelType === targetFuel) {
+        score += 10;
+      }
+
+      // 7. Vites (Transmission) Eşleşmesi
+      if (targetTransmission && cand.transmission === targetTransmission) {
+        score += 10;
+      }
+
+      // 8. KM Yakınlığı
+      if (targetKm !== null && cand.kilometers !== null) {
+        const kmDiffRatio = Math.abs(cand.kilometers - targetKm) / Math.max(targetKm, 20000);
+        if (kmDiffRatio <= 0.25) score += 10;
+        else if (kmDiffRatio <= 0.50) score += 6;
+        else if (kmDiffRatio <= 0.75) score += 3;
+      }
+
+      // 9. Motor Gücü (HP)
+      if (targetHp && candHp) {
+        const hpDiff = Math.abs(candHp - targetHp);
+        if (hpDiff <= 15) score += 10;
+        else if (hpDiff <= 35) score += 5;
+      }
+
+      // 10. Motor Hacmi (cc)
+      if (targetCc && candCc) {
+        const ccDiff = Math.abs(candCc - targetCc);
+        if (ccDiff <= 200) score += 10;
+        else if (ccDiff <= 400) score += 5;
+      }
+
+      return {
+        listing: cand,
+        score,
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, limit);
+  }
 }
 
