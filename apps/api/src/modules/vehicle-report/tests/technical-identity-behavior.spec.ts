@@ -865,7 +865,104 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(dsgFact?.confidence).toBe('HIGH');
     });
   });
+
+  describe('Behavior 16: DB-Grounded Technical Spec Integrity & AI Override Protection', () => {
+    it('should preserve DB acceleration0to100 (6.1) and prevent AI hallucination (5.6) from overriding it', async () => {
+      const mockOrchestrator = {
+        generateListingAdvice: jest.fn(),
+      };
+      const contradictionService = {
+        analyzeListingContradictions: jest.fn().mockReturnValue([]),
+        analyzeMileageAge: jest.fn().mockReturnValue({}),
+      };
+      const fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(
+        scoringService,
+        contradictionService
+      );
+      const evidenceValidationService = new (require('../research-evidence-validation.service').ResearchEvidenceValidationService)();
+      const { VehicleReportProviderService } = require('../vehicle-report-provider.service');
+      const providerService = new VehicleReportProviderService(
+        promptService,
+        fallbackService,
+        evidenceValidationService,
+        validationService,
+        scoringService,
+        mockOrchestrator
+      );
+
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v-tesla-2022',
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          bodyType: 'Sedan',
+          fuelType: 'Elektrik',
+        },
+        performanceSpecs: {
+          zeroToHundredKmh: 6.1, // DB-grounded acceleration
+          topSpeedKmh: 225,      // DB-grounded top speed
+          curbWeightKg: 1760,    // DB-grounded weight
+          trunkCapacityLiters: 561, // DB-grounded luggage
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+        },
+      };
+
+      // AI tries to hallucinate US / pre-LFP spec (5.6s, 1611kg)
+      const aiResponseWithHallucinatedSpecs = JSON.stringify({
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          oneSentenceSummary: 'Elektrikli sedan.',
+          strongestAdvantage: 'Hızlı şarj.',
+          bestFor: ['Şehir içi'],
+          notIdealFor: ['Pist'],
+          keyWarnings: ['Pil kontrolü'],
+        },
+        technicalSpecifications: {
+          zeroToHundredKmh: 5.6, // AI HALLUCINATION OVERRIDE ATTEMPT!
+          topSpeedKmh: 225,
+          curbWeightKg: 1611,    // AI HALLUCINATION OVERRIDE ATTEMPT!
+          trunkCapacityLiters: 561,
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model 3',
+            detailedAssessment: 'Yüksek verimli elektrikli sedan.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'Süspansiyon.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Pist', explanation: 'Kullanıcı.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{ condition: 'Pil Sağlığı', reason: 'Durum', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Genel durumu temiz ise satın alınabilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      mockOrchestrator.generateListingAdvice.mockResolvedValueOnce({
+        answer: aiResponseWithHallucinatedSpecs,
+        providerName: 'gemini-flash',
+      });
+
+      const result = await providerService.generateReport('rep-tesla-specs-test', vehicleContext);
+
+      // Final report must preserve DB-grounded 6.1s and 1760kg, not AI's 5.6s
+      expect(result.report.performanceUsage.zeroToHundredKmh).toBe(6.1);
+      expect(result.report.performanceUsage.curbWeightKg).toBe(1760);
+      expect(result.report.performanceUsage.topSpeedKmh).toBe(225);
+      expect(result.report.performanceUsage.supportingFactIds).toContain('VEHICLE_DATABASE');
+    });
+  });
 });
+
 
 
 

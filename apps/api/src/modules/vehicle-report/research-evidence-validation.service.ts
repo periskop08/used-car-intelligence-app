@@ -110,7 +110,7 @@ export class ResearchEvidenceValidationService {
         verificationStatus = 'REJECTED';
       } else if (claimType === 'DERIVED_CONCLUSION') {
         // Rule B: DERIVED_CONCLUSION requires verified parent claims
-        const parentVerifiedCount = derivedFromClaimIds.filter((parentId) => {
+        const parentVerifiedCount = derivedFromClaimIds.filter((parentId: string) => {
           const parent = rawClaims.find((rc) => rc.claimId === parentId);
           return parent && evaluateBaseClaimStatus(parent) === 'VERIFIED';
         }).length;

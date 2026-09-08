@@ -92,14 +92,14 @@ export class VehicleReportContextBuilderService {
     const transName = variant.transmission?.name || null;
     const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
     const driveType = specsJson.drivetrain || (variant as any).driveType || null;
-    const zeroToHundred = specsJson.zeroToHundredKmh || null;
-    const topSpeedVal = specsJson.topSpeed || null;
-    const weightVal = specsJson.weight || null;
-    const trunkVal = specsJson.luggageCapacity || null;
-    const fuelTankVal = specsJson.fuelTankCapacityLiters || specsJson.fuelTankLiters || null;
-    const cityFuelVal = specsJson.cityFuelConsumption || null;
-    const highwayFuelVal = specsJson.highwayFuelConsumption || null;
-    const combinedFuelVal = specsJson.averageFuelConsumption || null;
+    const zeroToHundred = specsJson.acceleration0to100 ?? specsJson.zeroToHundredKmh ?? null;
+    const topSpeedVal = specsJson.topSpeed ?? specsJson.topSpeedKmh ?? null;
+    const weightVal = specsJson.weight ?? specsJson.curbWeightKg ?? null;
+    const trunkVal = specsJson.luggageCapacity ?? specsJson.trunkCapacityLiters ?? null;
+    const fuelTankVal = specsJson.fuelTankCapacityLiters ?? specsJson.fuelTankLiters ?? null;
+    const cityFuelVal = specsJson.cityFuelConsumption ?? specsJson.cityFuelL100km ?? null;
+    const highwayFuelVal = specsJson.highwayFuelConsumption ?? specsJson.highwayFuelL100km ?? null;
+    const combinedFuelVal = specsJson.averageFuelConsumption ?? specsJson.combinedFuelL100km ?? null;
 
     const performanceData: Record<string, any> = {
       enginePowerHp: null,

@@ -320,20 +320,28 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
       if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
 
+      const currentPerf: any = baseReport.performanceUsage || {};
+      const hasDbPerformance = (
+        currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null ||
+        currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null ||
+        currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null ||
+        currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null
+      );
+
       baseReport.performanceUsage = {
-        powerHp: specs.enginePowerHp || baseReport.performanceUsage?.powerHp,
-        torqueNm: specs.engineTorqueNm || baseReport.performanceUsage?.torqueNm,
-        zeroToHundredKmh: specs.zeroToHundredKmh || baseReport.performanceUsage?.zeroToHundredKmh,
-        topSpeedKmh: specs.topSpeedKmh || baseReport.performanceUsage?.topSpeedKmh,
-        cityFuelL100km: specs.cityFuelL100km || baseReport.performanceUsage?.cityFuelL100km,
-        highwayFuelL100km: specs.highwayFuelL100km || baseReport.performanceUsage?.highwayFuelL100km,
-        combinedFuelL100km: specs.catalogCombinedFuelL100km || specs.combinedFuelL100km || baseReport.performanceUsage?.combinedFuelL100km,
-        trunkCapacityLiters: specs.trunkCapacityLiters || baseReport.performanceUsage?.trunkCapacityLiters,
-        curbWeightKg: specs.curbWeightKg || baseReport.performanceUsage?.curbWeightKg,
+        powerHp: currentPerf.powerHp || specs.enginePowerHp,
+        torqueNm: currentPerf.torqueNm || specs.engineTorqueNm,
+        zeroToHundredKmh: (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null) ? currentPerf.zeroToHundredKmh : specs.zeroToHundredKmh,
+        topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
+        cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
+        highwayFuelL100km: (currentPerf.highwayFuelL100km !== undefined && currentPerf.highwayFuelL100km !== null) ? currentPerf.highwayFuelL100km : specs.highwayFuelL100km,
+        combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null) ? currentPerf.combinedFuelL100km : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km),
+        trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
+        curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
         rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
           ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`
           : baseReport.performanceUsage?.rangeFactorsNote,
-        supportingFactIds: ['AI_VERIFIED_TECHNICAL_SPECS'],
+        supportingFactIds: hasDbPerformance ? ['VEHICLE_DATABASE'] : ['AI_VERIFIED_TECHNICAL_SPECS'],
       };
     }
   }
