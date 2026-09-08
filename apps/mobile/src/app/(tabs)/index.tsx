@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -486,6 +486,16 @@ export default function MobileDashboard() {
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
   const [loadingListings, setLoadingListings] = useState(false);
 
+  // Dynamic chunking: 1 row of up to 10 items (1*10), 2 rows when >10 (2*10), 3 rows when >20 (3*10)
+  const vitrinRows = useMemo(() => {
+    const rows: ShowcaseItem[][] = [];
+    const chunkSize = 10;
+    for (let i = 0; i < vitrinListings.length; i += chunkSize) {
+      rows.push(vitrinListings.slice(i, i + chunkSize));
+    }
+    return rows;
+  }, [vitrinListings]);
+
   // FULL 8-FILTER CASCADING VEHICLE QUERY STATE:
   // 1. Marka | 2. Model Ailesi | 3. Yıl | 4. Kasa Tipi | 5. Motor / Versiyon | 6. Yakıt | 7. Şanzıman | 8. Donanım
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -704,7 +714,7 @@ export default function MobileDashboard() {
     setLoadingListings(true);
     try {
       const queryParam = tab === 'vitrin' ? 'showcaseOnly=true' : 'urgentOnly=true';
-      const res = await fetch(`${API_URL}/listings?${queryParam}&limit=12`);
+      const res = await fetch(`${API_URL}/listings?${queryParam}&limit=30`);
       if (res.ok) {
         const data = await res.json();
         const apiItems = Array.isArray(data)
@@ -1556,61 +1566,71 @@ export default function MobileDashboard() {
           {loadingListings ? (
             <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 32 }} />
           ) : vitrinListings.length > 0 ? (
-            <View style={styles.vitrinGrid}>
-              {vitrinListings.map((item) => {
-                const isFav = !!favorites[item.id];
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.vitrinCard}
-                    activeOpacity={0.9}
-                    onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-                  >
-                    <View style={styles.vitrinImageContainer}>
-                      <ExpoImage
-                        source={{ uri: item.imageUrl }}
-                        style={styles.vitrinCarImage}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-
-                      {/* Floating Badges Overlay (Vitrin & Acil) */}
-                      <View style={styles.vitrinBadgesOverlay}>
-                        {item.isUrgent && <UrgentBadge size="small" />}
-                        {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                      </View>
-
+            <View style={styles.vitrinRowsWrapper}>
+              {vitrinRows.map((rowItems, rowIndex) => (
+                <ScrollView
+                  key={`vitrin-row-${rowIndex}`}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                  style={styles.vitrinRowScrollView}
+                >
+                  {rowItems.map((item) => {
+                    const isFav = !!favorites[item.id];
+                    return (
                       <TouchableOpacity
-                        style={styles.favCircleButton}
-                        onPress={() => toggleFavorite(item.id)}
+                        key={item.id}
+                        style={styles.vitrinCard}
+                        activeOpacity={0.9}
+                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
                       >
-                        <Ionicons
-                          name={isFav ? 'heart' : 'heart-outline'}
-                          size={17}
-                          color={isFav ? '#ef4444' : '#ffffff'}
-                        />
+                        <View style={styles.vitrinImageContainer}>
+                          <ExpoImage
+                            source={{ uri: item.imageUrl }}
+                            style={styles.vitrinCarImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+
+                          {/* Floating Badges Overlay (Vitrin & Acil) */}
+                          <View style={styles.vitrinBadgesOverlay}>
+                            {item.isUrgent && <UrgentBadge size="small" />}
+                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.favCircleButton}
+                            onPress={() => toggleFavorite(item.id)}
+                          >
+                            <Ionicons
+                              name={isFav ? 'heart' : 'heart-outline'}
+                              size={17}
+                              color={isFav ? '#ef4444' : '#ffffff'}
+                            />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.vitrinCardBody}>
+                          <Text style={styles.vitrinTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+
+                          <Text style={styles.vitrinSpecs}>
+                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                          </Text>
+
+                          <View style={styles.vitrinPriceRow}>
+                            <Text style={styles.vitrinPrice}>
+                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                            </Text>
+                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                          </View>
+                        </View>
                       </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.vitrinCardBody}>
-                      <Text style={styles.vitrinTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-
-                      <Text style={styles.vitrinSpecs}>
-                        {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                      </Text>
-
-                      <View style={styles.vitrinPriceRow}>
-                        <Text style={styles.vitrinPrice}>
-                          {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                        </Text>
-                        <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                    );
+                  })}
+                </ScrollView>
+              ))}
             </View>
           ) : (
             <View style={styles.emptyPromoBox}>
@@ -2756,14 +2776,19 @@ const styles = StyleSheet.create({
     gap: 4,
     zIndex: 10,
   },
-  vitrinGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 14,
+  vitrinRowsWrapper: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  vitrinRowScrollView: {
+    marginHorizontal: -16,
+  },
+  vitrinHorizontalScrollContent: {
+    paddingHorizontal: 16,
+    gap: 12,
   },
   vitrinCard: {
-    width: (windowWidth - 44) / 2,
+    width: 165,
     backgroundColor: '#ffffff',
     borderRadius: 16,
     borderWidth: 1,
