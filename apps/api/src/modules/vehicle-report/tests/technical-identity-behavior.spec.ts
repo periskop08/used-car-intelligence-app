@@ -14,6 +14,91 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
     scoringService = new VehicleReportScoringService();
   });
 
+  const createMockReport = (transCode: string): ComprehensiveVehicleReport => ({
+    reportId: 'rep-1',
+    mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+    status: 'COMPLETED',
+    variantId: 'var-1',
+    reportVersion: 'v5.1_GENUINE_SCORING_ARCH_GUARD',
+    schemaVersion: 2,
+    modeLabel: 'Araç Raporu',
+    generatedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    contextHash: 'hash',
+    vehicleContextHash: 'vhash',
+    vehicleIdentity: {
+      brand: 'Volkswagen',
+      model: 'Passat',
+      modelYear: 2018,
+      bodyType: 'Sedan',
+      fuelType: 'Dizel',
+      transmissionName: '7 İleri DSG',
+      transmissionCode: transCode,
+      variantMatchConfidence: 'KESİN',
+      supportingFactIds: ['FACT-1'],
+    },
+    executiveSummary: {
+      title: 'Özet',
+      oneSentenceSummary: '2018 Passat 1.6 TDI DSG konforlu ve ekonomik bir sedan.',
+      strongestAdvantage: 'Geniş kabin ve düşük yakıt tüketimi.',
+      biggestRisk: 'Kuru kavrama aşınması.',
+      bestFor: ['Aileler'],
+      notIdealFor: ['Performans arayanlar'],
+      firstCriticalCheck: 'DSG kavrama testi',
+      keyWarnings: ['Düzenli bakım geçmişi teyit edilmelidir.'],
+    },
+    expertDecisionSynthesis: {
+      vehicleCharacter: {
+        headline: 'Passat Karakteri',
+        detailedAssessment: 'Bu araç D segmentinde konfor odaklı bir sürüş sunmaktadır. Motor şanzıman uyumu dengelidir. Trim tıkırtısı ve süspansiyon darbe emişi başarılıdır. Şehir içi ve uzun yol sürüşünde dengelidir.',
+        supportingFactIds: ['FACT-1'],
+      },
+      trimPackageComparison: {
+        selectedTrimName: 'Highline',
+        lowerOrAlternativeTrimName: 'Comfortline',
+        comparisonNarrative: 'Highline pakette LED farlar ve dijital gösterge sunulmaktadır.',
+        keyAddedFeatures: ['LED Far', 'Dijital Gösterge'],
+        missingFeaturesInLowerTrim: ['LED Far'],
+      },
+      dailyUseAssessment: {
+        cityUse: 'Şehir içinde pratik manevra kabiliyeti.',
+        highwayUse: 'Otoyolda yüksek stabilite ve sessizlik.',
+        trafficBehavior: 'Dur-kalk trafikte dengeli kalkış.',
+        comfortAssessment: 'Süspansiyon darbe emişi yüksek.',
+        supportingFactIds: ['FACT-1'],
+      },
+      strongestReasonsToChoose: [
+        { title: 'Geniş Bagaj', explanation: '586 litrelik bagaj hacmi sunar.', supportingFactIds: ['FACT-1'] },
+        { title: 'Düşük Tüketim', explanation: 'Ekonomik dizel motor.', supportingFactIds: ['FACT-1'] },
+      ],
+      compromisesAndLimitations: [
+        { title: 'Taviz', explanation: 'Sert süspansiyon.', supportingFactIds: ['FACT-1'] },
+      ],
+      suitableFor: [{ profile: 'Aile', explanation: 'Geniş alan arayanlar.', supportingFactIds: ['FACT-1'] }],
+      notSuitableFor: [{ profile: 'Yarış', explanation: 'Sportif sürüş arayanlar.', supportingFactIds: ['FACT-1'] }],
+      purchaseConditions: [{ condition: 'Bakımlı', reason: 'Uzun ömür', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+      walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+      primaryTechnicalRisk: {
+        riskTitle: 'DSG Kavrama Aşınması',
+        severity: 'YÜKSEK',
+        likelihood: 'ORTA',
+        estimatedRepairCostMinTry: 20000,
+        estimatedRepairCostMaxTry: 45000,
+        symptoms: ['1-2 vites arası titreme'],
+        inspectionSteps: ['Canlı veriyle kavrama toleransı ölçülmeli'],
+        applicableKmBand: '80.000 - 120.000 km',
+        supportingFactIds: ['FACT-1'],
+      },
+      finalConditionalVerdict: {
+        title: 'Nihai Karar',
+        shortVerdict: 'Alınabilir.',
+        detailedVerdict: 'Ekspertiz kavrama kontrolü temiz çıkarsa gönül rahatlığıyla tercih edilebilir.',
+        confidence: 'HIGH',
+        supportingFactIds: ['FACT-1'],
+      },
+    },
+  } as any);
+
   describe('Behavior 1: Turkey Market Priority & Grounding Rules in Prompts', () => {
     it('should include priority for Turkey official distributor sources in user and research prompts', () => {
       const userPrompt = promptService.buildUserPrompt({
@@ -60,91 +145,6 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
   });
 
   describe('Behavior 2 & 3: Single Verified Identity & Rejection of Alternative Codes ("DQ200 veya DQ250")', () => {
-    const createMockReport = (transCode: string): ComprehensiveVehicleReport => ({
-      reportId: 'rep-1',
-      mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
-      status: 'COMPLETED',
-      variantId: 'var-1',
-      reportVersion: 'v5.1_GENUINE_SCORING_ARCH_GUARD',
-      schemaVersion: 2,
-      modeLabel: 'Araç Raporu',
-      generatedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      contextHash: 'hash',
-      vehicleContextHash: 'vhash',
-      vehicleIdentity: {
-        brand: 'Volkswagen',
-        model: 'Passat',
-        modelYear: 2018,
-        bodyType: 'Sedan',
-        fuelType: 'Dizel',
-        transmissionName: '7 İleri DSG',
-        transmissionCode: transCode,
-        variantMatchConfidence: 'KESİN',
-        supportingFactIds: ['FACT-1'],
-      },
-      executiveSummary: {
-        title: 'Özet',
-        oneSentenceSummary: '2018 Passat 1.6 TDI DSG konforlu ve ekonomik bir sedan.',
-        strongestAdvantage: 'Geniş kabin ve düşük yakıt tüketimi.',
-        biggestRisk: 'Kuru kavrama aşınması.',
-        bestFor: ['Aileler'],
-        notIdealFor: ['Performans arayanlar'],
-        firstCriticalCheck: 'DSG kavrama testi',
-        keyWarnings: ['Düzenli bakım geçmişi teyit edilmelidir.'],
-      },
-      expertDecisionSynthesis: {
-        vehicleCharacter: {
-          headline: 'Passat Karakteri',
-          detailedAssessment: 'Bu araç D segmentinde konfor odaklı bir sürüş sunmaktadır. Motor şanzıman uyumu dengelidir. Trim tıkırtısı ve süspansiyon darbe emişi başarılıdır. Şehir içi ve uzun yol sürüşünde dengelidir.',
-          supportingFactIds: ['FACT-1'],
-        },
-        trimPackageComparison: {
-          selectedTrimName: 'Highline',
-          lowerOrAlternativeTrimName: 'Comfortline',
-          comparisonNarrative: 'Highline pakette LED farlar ve dijital gösterge sunulmaktadır.',
-          keyAddedFeatures: ['LED Far', 'Dijital Gösterge'],
-          missingFeaturesInLowerTrim: ['LED Far'],
-        },
-        dailyUseAssessment: {
-          cityUse: 'Şehir içinde pratik manevra kabiliyeti.',
-          highwayUse: 'Otoyolda yüksek stabilite ve sessizlik.',
-          trafficBehavior: 'Dur-kalk trafikte dengeli kalkış.',
-          comfortAssessment: 'Süspansiyon darbe emişi yüksek.',
-          supportingFactIds: ['FACT-1'],
-        },
-        strongestReasonsToChoose: [
-          { title: 'Geniş Bagaj', explanation: '586 litrelik bagaj hacmi sunar.', supportingFactIds: ['FACT-1'] },
-          { title: 'Düşük Tüketim', explanation: 'Ekonomik dizel motor.', supportingFactIds: ['FACT-1'] },
-        ],
-        compromisesAndLimitations: [
-          { title: 'Taviz', explanation: 'Sert süspansiyon.', supportingFactIds: ['FACT-1'] },
-        ],
-        suitableFor: [{ profile: 'Aile', explanation: 'Geniş alan arayanlar.', supportingFactIds: ['FACT-1'] }],
-        notSuitableFor: [{ profile: 'Yarış', explanation: 'Sportif sürüş arayanlar.', supportingFactIds: ['FACT-1'] }],
-        purchaseConditions: [{ condition: 'Bakımlı', reason: 'Uzun ömür', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
-        walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
-        primaryTechnicalRisk: {
-          riskTitle: 'DSG Kavrama Aşınması',
-          severity: 'YÜKSEK',
-          likelihood: 'ORTA',
-          estimatedRepairCostMinTry: 20000,
-          estimatedRepairCostMaxTry: 45000,
-          symptoms: ['1-2 vites arası titreme'],
-          inspectionSteps: ['Canlı veriyle kavrama toleransı ölçülmeli'],
-          applicableKmBand: '80.000 - 120.000 km',
-          supportingFactIds: ['FACT-1'],
-        },
-        finalConditionalVerdict: {
-          title: 'Nihai Karar',
-          shortVerdict: 'Alınabilir.',
-          detailedVerdict: 'Ekspertiz kavrama kontrolü temiz çıkarsa gönül rahatlığıyla tercih edilebilir.',
-          confidence: 'HIGH',
-          supportingFactIds: ['FACT-1'],
-        },
-      },
-    } as any);
-
     it('should REJECT report when transmissionCode lists alternative options with "veya"', () => {
       const ambiguousReport = createMockReport('DQ200 veya DQ250');
       const validation = validationService.validate(ambiguousReport, {});
@@ -305,7 +305,7 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
 
       const validation = validationService.validate(hallucinatedReport, {});
       expect(validation.isValid).toBe(false);
-      expect(validation.reason).toContain('yapay/ezbere sayısal kilometre eşikleri');
+      expect(validation.reason).toContain('yapay/ezbere sayısal eşik iddiası');
     });
   });
 
@@ -372,5 +372,172 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(lowRiskScores.buyabilityScore.value!).toBeGreaterThan(highRiskScores.buyabilityScore.value!);
     });
   });
+
+  describe('Behavior 10: Evidence-Bound SoH & Component-Matched Numeric Guard', () => {
+    it('should REJECT report if it asserts %85 SoH / %85 altı pil sağlığı without Stage 1 verification', () => {
+      const teslaReportWithUngroundedSoh = {
+        reportId: 'rep-tesla-soh',
+        vehicleIdentity: {
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          fuelType: 'Elektrik',
+        },
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Batarya sağlığı %85 altına düştüğünde menzilde belirgin düşüş gözlemlenebilir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(teslaReportWithUngroundedSoh, {
+        verifiedResearch: {
+          claims: [],
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı) iddiası tespit edildi');
+    });
+
+    it('should ACCEPT report if %85 SoH was specifically verified in Stage 1 research data', () => {
+      const base = createMockReport('OTOMATIK');
+      const teslaReportWithVerifiedSoh: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-tesla-soh-ok',
+        vehicleIdentity: {
+          ...base.vehicleIdentity,
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          fuelType: 'Elektrik',
+        },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Batarya sağlığı %85 altına düştüğünde menzilde belirgin düşüş gözlemlenebilir.'],
+        },
+      };
+
+      const validation = validationService.validate(teslaReportWithVerifiedSoh, {
+        verifiedResearch: {
+          reliabilityResearch: [
+            { title: 'HV Batarya Değerlendirmesi', description: 'Kullanım sonrası %85 batarya kapasitesi ölçülmüştür.' },
+          ],
+        },
+      });
+
+      expect(validation.isValid).toBe(true);
+    });
+  });
+
+  describe('Behavior 11: Risk-Action Semantic Consistency Guard', () => {
+    it('should REJECT report if an electrical/wiper/screen risk is paired with underbody lift or oil leak inspection steps', () => {
+      const wiperRiskMismatchedReport = {
+        reportId: 'rep-wiper-mismatch',
+        vehicleIdentity: { brand: 'Renault', model: 'Clio', modelYear: 2019 },
+        executiveSummary: { title: 'Özet' },
+        expertDecisionSynthesis: {
+          primaryTechnicalRisk: {
+            title: 'Ön Silecek Motoru Röle Arızası',
+            inspectionInstructions: ['Aracı lifte kaldırıp alt karter muhafazası ve motor yağı kaçaklarını inceleyin.'],
+          },
+        },
+      } as any;
+
+      const validation = validationService.validate(wiperRiskMismatchedReport, {});
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('semantik uyumsuzluk tespit edildi');
+      expect(validation.reason).toContain('alt muhafaza/lift mekanik kontrolleri bağlanamaz');
+    });
+
+    it('should ACCEPT report when wiper risk is paired with relevant electrical/switch inspection steps', () => {
+      const base = createMockReport('MANUEL');
+      const wiperRiskMatchedReport: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-wiper-matched',
+        vehicleIdentity: {
+          ...base.vehicleIdentity,
+          brand: 'Renault',
+          model: 'Clio',
+          modelYear: 2019,
+        },
+        expertDecisionSynthesis: {
+          ...base.expertDecisionSynthesis!,
+          primaryTechnicalRisk: {
+            title: 'Ön Silecek Motoru Röle Arızası',
+            severity: 'ORTA',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Sileceklerin yavaşlaması'],
+            inspectionInstructions: ['Silecek kolunun kademeli hız geçişleri ve röle sesleri test edilmelidir.'],
+            riskMeaning: 'Mekanik yürüyen aksam riski oluşturmaz.',
+            supportingFactIds: ['FACT-1'],
+          } as any,
+        },
+      };
+
+      const validation = validationService.validate(wiperRiskMatchedReport, {});
+      expect(validation.isValid).toBe(true);
+    });
+  });
+
+  describe('Behavior 12: Evidence Type Preservation Guard', () => {
+    it('should REJECT report if subjective complaint is elevated to "kesin fabrika üretim hatasıdır" without verified TSB/recall', () => {
+      const ungroundedElevationReport = {
+        reportId: 'rep-elevated',
+        vehicleIdentity: { brand: 'Ford', model: 'Focus', modelYear: 2017 },
+        executiveSummary: {
+          title: 'Özet',
+          oneSentenceSummary: 'Bu durum üretici tarafından kabul edilmiş kronik arızadır.',
+        },
+      } as any;
+
+      const validation = validationService.validate(ungroundedElevationReport, {
+        verifiedResearch: { recallResearch: [] },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('Stage 1 TSB/bülten kanıtı olmadan');
+      expect(validation.reason).toContain('yükseltilemez');
+    });
+  });
+
+  describe('Behavior 13: Timing Architecture Guard (BELT vs CHAIN)', () => {
+    it('should REJECT report if timingSystem is KAYIS (Belt) but narrative mentions triger zinciri uzaması', () => {
+      const beltCarWithChainTerms = {
+        reportId: 'rep-belt-chain',
+        vehicleIdentity: { brand: 'Volkswagen', model: 'Passat', modelYear: 2018, timingSystem: 'KAYIS' },
+        executiveSummary: {
+          title: 'Özet',
+          keyWarnings: ['İlk soğuk çalıştırmada triger zinciri uzaması ve şakırtı kontrol edilmelidir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(beltCarWithChainTerms, {
+        vehicleIdentity: { timingSystem: 'KAYIS' },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('Araç triger sistemi KAYIŞ (BELT) olarak doğrulanmışken raporda triger zinciri');
+    });
+
+    it('should REJECT report if timingSystem is ZINCIR (Chain) but narrative mentions triger kayışı kopması', () => {
+      const chainCarWithBeltTerms = {
+        reportId: 'rep-chain-belt',
+        vehicleIdentity: { brand: 'BMW', model: '320i', modelYear: 2020, timingSystem: 'ZINCIR' },
+        executiveSummary: {
+          title: 'Özet',
+          keyWarnings: ['Periyodik bakımda triger kayışı kopması riskine karşı kayış değişimi teyit edilmelidir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(chainCarWithBeltTerms, {
+        vehicleIdentity: { timingSystem: 'ZINCIR' },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('Araç triger sistemi ZİNCİR (CHAIN) olarak doğrulanmışken raporda triger kayışı');
+    });
+  });
 });
+
 

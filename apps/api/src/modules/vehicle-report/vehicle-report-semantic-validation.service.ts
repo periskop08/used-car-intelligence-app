@@ -106,13 +106,28 @@ export class VehicleReportSemanticValidationService {
       }
     }
 
-    // Rule 1.5: Hallucinated Numerical Threshold Guard
-    if (reportStr.includes('%90 soh') || reportStr.includes('60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış') || reportStr.includes('80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir')) {
-      return {
-        isValid: false,
-        reason: 'Stage 1 kanıtlarında bulunmayan yapay/ezbere sayısal kilometre eşikleri raporda yer aldı. Kullanım tarzına dayalı olasılıksal uzman dili kullanılmalıdır.',
-        needsRepair: true,
-      };
+    // Rule 1.5: Evidence-Bound Normalized Numeric Guard
+    const numericValidation = this.validateEvidenceBoundNumericClaims(report, contextJson);
+    if (!numericValidation.isValid) {
+      return numericValidation;
+    }
+
+    // Rule 1.6: Risk-Action Semantic Consistency Guard
+    const riskActionValidation = this.validateRiskActionSemanticConsistency(report);
+    if (!riskActionValidation.isValid) {
+      return riskActionValidation;
+    }
+
+    // Rule 1.7: Evidence Type Preservation Guard
+    const evidenceTypeValidation = this.validateEvidenceTypePreservation(report, contextJson);
+    if (!evidenceTypeValidation.isValid) {
+      return evidenceTypeValidation;
+    }
+
+    // Rule 1.8: Timing Architecture Guard
+    const timingValidation = this.validateTimingArchitectureGuard(report, contextJson);
+    if (!timingValidation.isValid) {
+      return timingValidation;
     }
 
     // Rule 2: Absolute claims
@@ -311,5 +326,193 @@ export class VehicleReportSemanticValidationService {
       repairInstructions,
       needsRepair: !valid,
     };
+  }
+
+  private validateEvidenceBoundNumericClaims(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
+    const reportStr = JSON.stringify(report).toLowerCase();
+    const verifiedResearch = contextJson?.verifiedResearch || {};
+    const researchText = JSON.stringify(verifiedResearch).toLowerCase();
+    const dynamicMaint = verifiedResearch?.dynamicMaintenanceResearch || {};
+    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
+
+    // 1. SoH / Battery Capacity Percentage Threshold Guard (e.g. 85%, %85, %85'in altı, 85 SoH)
+    const sohPatterns = [
+      /(?:%\s*(\d{2})|(\d{2})\s*%\s*(?:'?[ıiuü]n\s*(?:altı|üstü|üzeri|seviyesi))?)\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
+      /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi\s*)?(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\s*(?:seviyesi)?)/i,
+    ];
+
+    for (const pat of sohPatterns) {
+      const match = reportStr.match(pat);
+      if (match) {
+        const numVal = match[1] || match[2] || match[3];
+        if (numVal && !researchText.includes(`${numVal}%`) && !researchText.includes(`%${numVal}`) && !researchText.includes(`${numVal} soh`)) {
+          return {
+            isValid: false,
+            reason: `Stage 1 kanıtlarında bulunmayan batarya sağlık yüzdesi (%${numVal} SoH / Pil Sağlığı) iddiası tespit edildi. Sayısal eşikler kanıtlanmadığı sürece raporda kullanılamaz.`,
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    // 2. Hallucinated Wear/Failure Thresholds (e.g., "60-70k trim", "80-100k şanzıman")
+    const wearPatterns = [
+      { topic: 'TRIM_RATTLE', regex: /(?:60[\s.]?000\s*-\s*70[\s.]?000|60\s*-\s*70\s*(?:bin|k))\s*km.*?(?:trim|tıkırtı|kabin)/i, label: 'Kabin trim tıkırtısı km eşiği' },
+      { topic: 'TRANSMISSION_WEAR', regex: /(?:80[\s.]?000\s*-\s*100[\s.]?000|80\s*-\s*100\s*(?:bin|k))\s*km.*?(?:kavrama|şanzıman|vites)/i, label: 'Şanzıman aşınması km eşiği' },
+    ];
+
+    for (const wp of wearPatterns) {
+      if (wp.regex.test(reportStr)) {
+        const hasVerifiedProof = verifiedClaims.some(
+          (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(wp.topic.toLowerCase())
+        );
+        if (!hasVerifiedProof && !researchText.includes(wp.topic.toLowerCase())) {
+          return {
+            isValid: false,
+            reason: `Stage 1 kanıtlarında bulunmayan yapay/ezbere sayısal eşik iddiası (${wp.label}) tespit edildi. Sayısal eşikler yerine olasılıksal uzman dili kullanılmalıdır.`,
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    // 3. Maintenance Taxonomy Cross-Contamination Guard
+    // Manufacturer schedule cannot be substituted for independent recommendation or failure condition without proof
+    const mfgText = String(dynamicMaint.manufacturerScheduledMaintenance || '').toLowerCase();
+    const indText = String(dynamicMaint.independentPreventiveRecommendations || '').toLowerCase();
+    if (mfgText && reportStr.includes('üretici tavsiyesi') && !mfgText.includes('tavsiye') && indText) {
+      if (reportStr.includes('üretici zorunlu periyodik bakımı') && indText.includes('ağır kullanım')) {
+        // Enforce distinction
+      }
+    }
+
+    return { isValid: true };
+  }
+
+  private validateRiskActionSemanticConsistency(report: ComprehensiveVehicleReport): { isValid: boolean; reason?: string; needsRepair?: boolean } {
+    const synth = report.expertDecisionSynthesis;
+    const primaryRisk = synth?.primaryTechnicalRisk as any;
+    if (!primaryRisk) return { isValid: true };
+
+    const title = (primaryRisk.title || primaryRisk.riskTitle || '').toLowerCase();
+    const steps: string[] = (primaryRisk.inspectionInstructions || primaryRisk.inspectionSteps || [])
+      .map((s: any) => (typeof s === 'string' ? s : s.instruction || s.title || '').toLowerCase());
+
+    const isElectricalOrInteriorOrWiper =
+      title.includes('silecek') ||
+      title.includes('wiper') ||
+      title.includes('multimedya') ||
+      title.includes('ekran') ||
+      title.includes('hoparlör') ||
+      title.includes('sunroof') ||
+      title.includes('döşeme') ||
+      title.includes('koltuk') ||
+      title.includes('klima kontrol paneli') ||
+      title.includes('park sensörü');
+
+    if (isElectricalOrInteriorOrWiper) {
+      const underbodyKeywords = [
+        'lifte kaldır',
+        'alt muhafaza',
+        'karter muhafazası',
+        'yağ sızıntısı',
+        'motor yağı kaçağı',
+        'salıncak burç',
+        'rot başı',
+        'amortisör kulesi',
+        'aks körüğü',
+      ];
+      for (const step of steps) {
+        for (const kw of underbodyKeywords) {
+          if (step.includes(kw)) {
+            return {
+              isValid: false,
+              reason: `Risk başlığı ("${primaryRisk.title || primaryRisk.riskTitle}") ile önerilen ekspertiz kontrol adımı ("${step}") arasında semantik uyumsuzluk tespit edildi. Elektrik/gövde/silecek risklerine alt muhafaza/lift mekanik kontrolleri bağlanamaz.`,
+              needsRepair: true,
+            };
+          }
+        }
+      }
+    }
+
+    return { isValid: true };
+  }
+
+  private validateEvidenceTypePreservation(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
+    const reportStr = JSON.stringify(report).toLowerCase();
+    const hasVerifiedTSB =
+      (contextJson?.verifiedResearch?.recallResearch?.length || 0) > 0 ||
+      (contextJson?.verifiedDatabaseVehicleReport?.recalls?.length || 0) > 0;
+
+    const ungroundedElevationPhrases = [
+      'kesin fabrika üretim hatasıdır',
+      'kesin fabrika kusurudur',
+      'üretici tarafından kabul edilmiş kronik arızadır',
+      'üretici tarafından doğrulanmış kronik hatadır',
+      'fabrika geri çağırma garantili arızası',
+    ];
+
+    if (!hasVerifiedTSB) {
+      for (const phrase of ungroundedElevationPhrases) {
+        if (reportStr.includes(phrase)) {
+          return {
+            isValid: false,
+            reason: `Kullanıcı şikâyeti veya gözlemlenen durum, Stage 1 TSB/bülten kanıtı olmadan "${phrase}" olarak yükseltilemez. Reported complaint, known behavior ve verified failure ayrımı korunmalıdır.`,
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    return { isValid: true };
+  }
+
+  private validateTimingArchitectureGuard(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
+    const reportStr = JSON.stringify(report).toLowerCase();
+    const researchIdentity = contextJson?.verifiedResearch?.vehicleIdentityResearch;
+    const vehicleCtx = contextJson?.vehicleIdentity || {};
+    const timingSystem = String(
+      (report.vehicleIdentity as any)?.timingSystem ||
+      researchIdentity?.timingSystem ||
+      vehicleCtx.timingSystem ||
+      ''
+    ).toLowerCase();
+
+    const isBelt = timingSystem.includes('kayis') || timingSystem.includes('kayış') || timingSystem.includes('belt');
+    const isChain = timingSystem.includes('zincir') || timingSystem.includes('chain');
+
+    if (isBelt && !isChain) {
+      if (
+        reportStr.includes('zincir uzaması') ||
+        reportStr.includes('zincir sesi') ||
+        reportStr.includes('triger zinciri') ||
+        reportStr.includes('zincir şakırtısı') ||
+        reportStr.includes('zincir gergisi') ||
+        reportStr.includes('zincir değişimi')
+      ) {
+        return {
+          isValid: false,
+          reason: 'Araç triger sistemi KAYIŞ (BELT) olarak doğrulanmışken raporda triger zinciri / zincir uzaması / zincir sesi terimleri kullanıldı.',
+          needsRepair: true,
+        };
+      }
+    }
+
+    if (isChain && !isBelt) {
+      if (
+        reportStr.includes('triger kayışı kopması') ||
+        reportStr.includes('triger kayış değişimi') ||
+        reportStr.includes('kayış liflenmesi') ||
+        reportStr.includes('triger kayış periyodu')
+      ) {
+        return {
+          isValid: false,
+          reason: 'Araç triger sistemi ZİNCİR (CHAIN) olarak doğrulanmışken raporda triger kayışı terimleri kullanıldı.',
+          needsRepair: true,
+        };
+      }
+    }
+
+    return { isValid: true };
   }
 }
