@@ -232,16 +232,26 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
      b) Uzman Önleyici Bakım Tavsiyesi (Dur-kalk trafikte erken kontrol vb.)
      c) Belirti ve Aşınma Bazlı Onarım (Kavrama kaçırma veya mekatronik basınç düşüşünde revizyon)
    - Kaynak açıkça desteklemiyorsa önleyici tavsiyeleri üretici zorunlu bakımı gibi sunma.
-3. SAYISAL EŞİK UYDURMA YASAĞI:
-   - Stage 1'de araç-spesifik güvenilir kaynakla kanıtlanmamış hiçbir bakım km/yıl aralığı, arıza kilometresi, aşınma skalası veya SoH yüzdesi (örn. "60-70k trim sesi", "80-120k şanzıman", "%90 SoH") ÜRETME!
-   - Kullanım tarzına ve dur-kalk trafiğe dayalı olasılıksal uzman dili kullan.
-4. ELEKTRİKLİ (EV) ARAÇ STANDARDI:
+3. SAYISAL EŞİK VE SOH KORUMASI (EVIDENCE-BOUND NUMERIC GUARD):
+   - Stage 1'de araç-spesifik güvenilir kaynakla doğrulanmamış hiçbir bakım km/yıl aralığı, arıza kilometresi, aşınma skalası veya SoH / pil sağlığı yüzdesi (örn. "85%", "%85'in altı", "60-70k trim sesi", "80-100k şanzıman") ÜRETME!
+   - Kaynakta sayı bulunması tek başına yeterli değildir; sayının aynı komponent ve aynı iddia bağlamında doğrulandığından emin ol.
+   - Üretici periyodik bakım aralıkları ile bağımsız önleyici tavsiye sayılarını birbirinin kanıtı olarak kullanma.
+4. RİSK - BELİRTİ - EKSPERTİZ TUTARLILIĞI (RISK-ACTION CONSISTENCY):
+   - Birincil risk başlığı ile belirtiler ve ekspertiz kontrol adımları doğrudan aynı mekanik/elektriksel probleme odaklanmalıdır.
+   - Silecek, multimedya ekranı veya kabin içi trim gibi elektriksel/gövde risklerine "lifte kaldırıp alt muhafaza / yağ kaçağı kontrolü" gibi alakasız şablon adımlar BAĞLANAMAZ.
+5. KANIT TÜRÜ KORUMASI (EVIDENCE TYPE PRESERVATION):
+   - Kullanıcı forum şikâyetlerini veya subjektif gözlemleri doğrudan "doğrulanmış fabrika komponent arızası" olarak yükseltme.
+   - Reported complaint (kullanıcı bildirimi), known behavior (çalışma karakteristiği) ve verified failure (doğrulanmış kronik parça arızası / bülten) ayrımını koru.
+6. TRİGER MİMARİSİ KORUMASI (TIMING ARCHITECTURE GUARD):
+   - Triger sistemi KAYIŞ (BELT) ise zincir mekanizması dili (zincir sesi, zincir uzaması, zincir şakırtısı) KULLANMA.
+   - Triger sistemi ZİNCİR (CHAIN) ise triger kayışı kopması/liflenmesi dili KULLANMA.
+7. ELEKTRİKLİ (EV) ARAÇ STANDARDI:
    - Elektrikli (EV/BEV) araçlarda motor hacmi ('engineDisplacementCc') KESİNLİKLE null veya undefined bırakılmalıdır ('0 cc' gibi yanıltıcı bir değer girilmez). Egzoz, buji, DPF ve yakıt deposu terimleri kullanılmaz.
-5. ŞASİ VE GÜVENLİK DİLİ:
+8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
    - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
-6. TÜKETİM AYRIMI:
+9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
