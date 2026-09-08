@@ -353,10 +353,10 @@ export class VehicleReportFallbackService {
         generation: vIdentity.generation,
         bodyType: vIdentity.bodyType || 'Sedan',
         modelYear: vIdentity.modelYear || new Date().getFullYear(),
-        engineDisplacementCc: vIdentity.engineDisplacementCc,
+        engineDisplacementCc: isElectric ? undefined : vIdentity.engineDisplacementCc,
         enginePowerHp: vIdentity.enginePowerHp,
         engineCode: vIdentity.engineCode,
-        engineType: vIdentity.engineType || 'Turbo Benzinli',
+        engineType: vIdentity.engineType || (isElectric ? 'Elektrik Motoru' : 'Turbo Benzinli'),
         enginePowerRpm: vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} HP @ 5500 d/dk` : undefined,
         engineTorqueRpm: perfSpecs.engineTorqueNm ? `${perfSpecs.engineTorqueNm} Nm @ 1750-4000 d/dk` : undefined,
         fuelType: fuel,
@@ -381,7 +381,7 @@ export class VehicleReportFallbackService {
       },
 
       engineTransmission: {
-        engineSummary: `${vIdentity.engineDisplacementCc || ''}cc ${fuel} motor (${hp})`,
+        engineSummary: isElectric ? `${fuel} motor (${hp})` : `${vIdentity.engineDisplacementCc || ''}cc ${fuel} motor (${hp})`,
         transmissionSummary: `${trans} şanzıman`,
         combinationAssessment: 'Günlük şehir içi sürüşe uygun, sarsıntısız şanzıman ve motor karakteri.',
         supportingFactIds,

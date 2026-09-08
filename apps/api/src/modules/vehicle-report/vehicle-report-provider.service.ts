@@ -358,6 +358,13 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     // 1. Deterministlc numeric claim sanitization (SoH thresholds, wear km thresholds)
     this.semanticValidationService.sanitizeEvidenceBoundNumericClaims(baseReport, contextJson);
 
+    // 2. EV Architecture Sanitization: EV displacement must always be undefined
+    const fuelType = ((baseReport.vehicleIdentity as any)?.fuelType || contextJson?.vehicleIdentity?.fuelType || '').toLowerCase();
+    const isElectric = fuelType.includes('elektrik') || fuelType.includes('electric') || fuelType.includes('bev');
+    if (isElectric && baseReport.vehicleIdentity) {
+      baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+    }
+
     const synth = baseReport.expertDecisionSynthesis;
     if (synth?.primaryTechnicalRisk) {
       const risk = synth.primaryTechnicalRisk as any;

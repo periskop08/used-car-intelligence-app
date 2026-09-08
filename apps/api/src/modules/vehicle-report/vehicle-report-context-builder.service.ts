@@ -76,7 +76,9 @@ export class VehicleReportContextBuilderService {
     // Build complete factory performance and technical specs (use actual specs if available, otherwise null to let AI rely on real vehicle knowledge)
     let engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || null;
     let engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || null;
-    const engineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+    const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
+    const rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+    const engineCc = isElectricVariant ? null : rawEngineCc;
 
     // Sanitize engine power & torque if DB contains clear mismatch (e.g. 2.0 TFSI / 2.0 Turbo with 110 HP / 143 Nm)
     const engineCodeLower = ((variant.engine?.code || '') + ' ' + (variant.engine?.description || '')).toLowerCase();
