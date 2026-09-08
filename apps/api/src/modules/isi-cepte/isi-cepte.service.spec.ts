@@ -505,4 +505,130 @@ describe('IsiCepteService — "İşiCepte Öneriyor" Public Discovery & Showcase
       })
     );
   });
+
+  it('TEST 17 (Acceptance 33): Subaru + Kocaeli (0 Vitrin + 4 Normal) with SHOWCASE_WITH_FALLBACK returns 4 normal fallback providers', async () => {
+    const kocaeliNormal4 = Array.from({ length: 4 }, (_, i) => ({
+      id: `kocaeli-normal-${i + 1}`,
+      isicepteProviderId: `IC-PROV-KOC-${i + 1}`,
+      businessName: `Kocaeli Normal Usta ${i + 1}`,
+      slug: `kocaeli-normal-usta-${i + 1}`,
+      city: 'Kocaeli',
+      supportedBrands: ['Subaru'],
+      serviceCategories: ['Motor/Mekanik'],
+      isAutomotive: true,
+      membershipStatus: 'ACTIVE',
+      torqueScoutOptIn: true,
+      isShowcaseActive: false,
+      showcaseExpiresAt: null,
+    }));
+
+    // In SHOWCASE_WITH_FALLBACK:
+    // Call 1: findMany showcase -> returns []
+    // Call 2: count baseWhere -> returns 4
+    // Call 3: findMany regular -> returns kocaeliNormal4
+    // Call 4: findMany for metadata -> returns mockActiveShowcaseProviders
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce([]) // 0 vitrin
+      .mockResolvedValueOnce(kocaeliNormal4) // regular fallback
+      .mockResolvedValueOnce(mockActiveShowcaseProviders); // filter metadata query
+    mockPrisma.isiCepteProvider.count.mockResolvedValueOnce(4);
+
+    const result = await service.getPublicRecommendations({
+      city: 'Kocaeli',
+      brand: 'Subaru',
+      scope: 'SHOWCASE_WITH_FALLBACK',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items.length).toBe(4);
+    expect(result.totalShowcase).toBe(0);
+    expect(result.totalRegular).toBe(4);
+    expect(result.totalAll).toBe(4);
+    expect(result.items.every((i) => i.isShowcase === false)).toBe(true);
+  });
+
+  it('TEST 18 (Acceptance 34): Later 1 provider buys Vitrin (1 Vitrin + 4 Normal) -> SHOWCASE_WITH_FALLBACK returns strictly 1 Vitrin provider', async () => {
+    const vitrin1 = [
+      {
+        id: 'kocaeli-vitrin-1',
+        isicepteProviderId: 'IC-PROV-KOC-V1',
+        businessName: 'Kocaeli Vitrin Usta 1',
+        slug: 'kocaeli-vitrin-usta-1',
+        city: 'Kocaeli',
+        supportedBrands: ['Subaru'],
+        serviceCategories: ['Motor/Mekanik'],
+        isAutomotive: true,
+        membershipStatus: 'ACTIVE',
+        torqueScoutOptIn: true,
+        isShowcaseActive: true,
+        showcaseExpiresAt: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000),
+      },
+    ];
+
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce(vitrin1) // 1 vitrin found
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+    mockPrisma.isiCepteProvider.count.mockResolvedValueOnce(5); // 1 vitrin + 4 normal
+
+    const result = await service.getPublicRecommendations({
+      city: 'Kocaeli',
+      brand: 'Subaru',
+      scope: 'SHOWCASE_WITH_FALLBACK',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items.length).toBe(1);
+    expect(result.totalShowcase).toBe(1);
+    expect(result.totalRegular).toBe(4);
+    expect(result.totalAll).toBe(5);
+    expect(result.items[0].isShowcase).toBe(true);
+  });
+
+  it('TEST 19 (Acceptance 37): Tümünü Gör (5 Vitrin + 7 Normal) with ALL_ELIGIBLE returns all 12 providers', async () => {
+    const vitrin5 = Array.from({ length: 5 }, (_, i) => ({
+      id: `v-${i + 1}`,
+      isicepteProviderId: `IC-V-${i + 1}`,
+      businessName: `Vitrin ${i + 1}`,
+      slug: `vitrin-${i + 1}`,
+      city: 'İstanbul',
+      supportedBrands: ['Subaru'],
+      serviceCategories: ['Motor/Mekanik'],
+      isAutomotive: true,
+      membershipStatus: 'ACTIVE',
+      torqueScoutOptIn: true,
+      isShowcaseActive: true,
+      showcaseExpiresAt: new Date(Date.now() + 100 * 24 * 60 * 60 * 1000),
+    }));
+    const normal7 = Array.from({ length: 7 }, (_, i) => ({
+      id: `n-${i + 1}`,
+      isicepteProviderId: `IC-N-${i + 1}`,
+      businessName: `Normal ${i + 1}`,
+      slug: `normal-${i + 1}`,
+      city: 'İstanbul',
+      supportedBrands: ['Subaru'],
+      serviceCategories: ['Motor/Mekanik'],
+      isAutomotive: true,
+      membershipStatus: 'ACTIVE',
+      torqueScoutOptIn: true,
+      isShowcaseActive: false,
+      showcaseExpiresAt: null,
+    }));
+
+    mockPrisma.isiCepteProvider.findMany
+      .mockResolvedValueOnce([...vitrin5, ...normal7])
+      .mockResolvedValueOnce(mockActiveShowcaseProviders);
+
+    const result = await service.getPublicRecommendations({
+      city: 'İstanbul',
+      brand: 'Subaru',
+      scope: 'ALL_ELIGIBLE',
+      limit: 50,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.items.length).toBe(12);
+    expect(result.totalShowcase).toBe(5);
+    expect(result.totalRegular).toBe(7);
+    expect(result.totalAll).toBe(12);
+  });
 });
