@@ -260,4 +260,61 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
       expect(result.reason).toContain('e-CVT / Hibrit planet dişli transaks mimarisine sahip araçta');
     });
   });
+
+  describe('Hybrid Power/Torque DB Value Preservation & Semantic Labeling', () => {
+    it('should preserve verified DB power value (120 HP) unchanged while applying hybrid semantic label', () => {
+      const contradictionService = new (require('../vehicle-report-contradiction.service').VehicleReportContradictionService)();
+      const fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(scoringService, contradictionService);
+      const dbVehicleContext = {
+        vehicleIdentity: {
+          variantId: 'toyota-corolla-hybrid-2020',
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: 120, // DB has 120 HP
+        },
+        performanceSpecs: {
+          engineTorqueNm: 142, // ICE-only torque in DB
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+          recalls: [],
+        },
+      };
+
+      const report = fallbackService.generateFallbackReport('rep-fallback-1', 'VEHICLE_QUERY', dbVehicleContext);
+
+      // Verified DB numeric values must survive unchanged
+      expect(report.vehicleIdentity.enginePowerHp).toBe(120);
+      expect(report.vehicleIdentity.enginePowerRpm).toBe('120 HP (Toplam Sistem Gücü)');
+      expect(report.vehicleIdentity.engineTorqueRpm).toBe('142 Nm (Benzinli Motor Torku)');
+
+      // Check provider merge protection: AI proposing 122 HP must not overwrite verified DB 120 HP
+      const providerService = new (require('../vehicle-report-provider.service').VehicleReportProviderService)(
+        null as any,
+        fallbackService,
+        validationService,
+        null as any,
+        scoringService,
+        null as any,
+        null as any
+      );
+
+      const aiContent = {
+        technicalSpecifications: {
+          enginePowerHp: 122, // AI hallucinating 122 instead of DB 120
+          engineTorqueNm: 142,
+        },
+      };
+
+      (providerService as any).mapGeneratedContentToReport(report, aiContent);
+
+      // Verified DB enginePowerHp must remain 120
+      expect(report.vehicleIdentity.enginePowerHp).toBe(120);
+    });
+  });
 });
+

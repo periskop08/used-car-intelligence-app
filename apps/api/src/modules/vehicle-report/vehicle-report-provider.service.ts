@@ -372,7 +372,9 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
         baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
       }
-      if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
+      if (specs.enginePowerHp && !baseReport.vehicleIdentity.enginePowerHp) {
+        baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
+      }
       if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
       if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
       if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
