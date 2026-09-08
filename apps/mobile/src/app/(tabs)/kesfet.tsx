@@ -22,6 +22,13 @@ export default function KesfetHub() {
       color: '#ea580c',
     },
     {
+      title: 'İşi Cepte Öneriyor',
+      description: 'Bölgenizdeki onaylı oto servisleri, yetkili ve özel mekanik ustaları, oto ekspertiz noktalarını keşfedin.',
+      icon: 'shield-checkmark',
+      route: '/(tabs)/isicepte',
+      color: '#ea580c',
+    },
+    {
       title: 'İlan Akışı',
       description: 'Aktif ilanları Reels / TikTok tarzı dikey bir akışta kaydırarak rastgele ve eğlenceli şekilde keşfedin.',
       icon: 'play-circle',

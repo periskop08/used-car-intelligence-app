@@ -19,6 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -1470,6 +1471,13 @@ export default function VehicleReportScreen() {
               ))}
             </CollapsibleLightSection>
           )}
+
+          {/* 7. İŞİ CEPTE ÖNERİYOR - Uzman Servis, Usta & Ekspertiz Tavsiyeleri */}
+          <IsiCepteRecommendationWidget
+            vehicleBrand={report.vehicleIdentity.brand}
+            title={`${report.vehicleIdentity.brand} İçin İşi Cepte Öneriyor`}
+            subtitle={`${report.vehicleIdentity.brand} ${report.vehicleIdentity.model} için onaylı yetkili/özel servisler ve ekspertiz noktaları`}
+          />
 
           {/* Bottom Disclaimer Banner */}
           <View style={styles.bottomBannerLight}>

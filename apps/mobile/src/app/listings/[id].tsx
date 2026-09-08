@@ -23,6 +23,7 @@ import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
 import ShowcaseBadge from '../../components/ShowcaseBadge';
 import VehicleConditionVisualizer from '../../components/VehicleConditionVisualizer';
+import IsiCepteRecommendationWidget from '../../components/IsiCepteRecommendationWidget';
 
 const { width, height } = Dimensions.get('window');
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -739,6 +740,14 @@ export default function ListingDetailScreen() {
               damageRecord={listing.damageRecord}
               tramerAmount={listing.tramerAmount}
               maintenanceHistory={listing.maintenanceHistory}
+            />
+
+            {/* İŞİ CEPTE ÖNERİYOR - Onaylı Oto Servis & Usta Tavsiye Kartı */}
+            <IsiCepteRecommendationWidget
+              vehicleBrand={brandName}
+              initialCity={listing.city}
+              title={`${brandName || 'Bu Araç'} İçin İşi Cepte Öneriyor`}
+              subtitle={`${brandName || 'Bu araç'} için ${listing.city ? `${listing.city} ve çevresindeki` : 'bölgenizdeki'} onaylı özel/yetkili servisler ve ustalar`}
             />
           </View>
         )}
