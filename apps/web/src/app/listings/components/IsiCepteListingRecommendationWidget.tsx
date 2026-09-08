@@ -297,48 +297,55 @@ export default function IsiCepteListingRecommendationWidget({
     >
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></span>
 
-      {/* Widget Header with Real İşi Cepte Logo (Matches Reference Image 1) */}
-      <div className="flex items-start justify-between border-b border-white/10 pb-3 gap-2 shrink-0">
-        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29] mt-0.5">
-            <img
-              src="/assets/images/isicepte-logo.jpeg"
-              alt="İşi Cepte Logo"
-              className="w-full h-full object-contain"
-            />
+      {/* Widget Header with Real İşi Cepte Logo & City Selector */}
+      <div className="flex flex-col gap-2 pb-2.5 border-b border-white/10 shrink-0">
+        {/* Row 1: Logo + Brand Heading on Left, City Pill on Right */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl overflow-hidden shrink-0 shadow-md border border-white/10 bg-[#161a29] p-0.5">
+              <img
+                src="/assets/images/isicepte-logo.jpeg"
+                alt="İşi Cepte Logo"
+                className="w-full h-full object-contain rounded-lg"
+              />
+            </div>
+            <div className="flex flex-col min-w-0 leading-tight">
+              <span className="text-[11px] sm:text-xs font-black text-orange-400 tracking-wide uppercase">
+                İŞİ CEPTE
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-300 tracking-wider uppercase">
+                ÖNERİYOR
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest leading-none">
-                İŞİ CEPTE ÖNERİYOR
-              </span>
-              {totalShowcase > 0 ? (
-                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5">
-                  👑 Vitrin
-                </span>
-              ) : totalRegular > 0 ? (
-                <span className="text-[9px] font-bold text-slate-300 bg-slate-800/80 border border-white/10 px-1.5 py-0.5 rounded leading-none">
-                  🔧 Uzman Servisler
-                </span>
-              ) : null}
-            </div>
-            <span className="text-[9.5px] text-slate-300 font-medium mt-1 leading-tight whitespace-normal break-words">
-              {vehicleBrand} markasına hizmet veren {totalShowcase > 0 ? 'vitrin servisleri' : 'uzman servisler'}
-            </span>
-          </div>
+          {/* Compact Location Selector Button */}
+          <button
+            type="button"
+            onClick={() => setIsCitySelectorOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0f172a]/95 hover:bg-[#1e293b] border border-white/15 hover:border-orange-500/40 rounded-xl text-[10.5px] font-bold text-slate-200 hover:text-orange-300 transition cursor-pointer shrink-0 shadow-sm"
+          >
+            <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
+            <span className="truncate max-w-[80px]">{selectedCity || 'Tüm İller'}</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+          </button>
         </div>
 
-        {/* Compact Location Selector Button (Matches Reference Image 1) */}
-        <button
-          type="button"
-          onClick={() => setIsCitySelectorOpen(true)}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0f172a]/90 hover:bg-[#1e293b] border border-white/15 hover:border-orange-500/30 rounded-xl text-[10.5px] font-bold text-slate-200 hover:text-orange-300 transition cursor-pointer shrink-0 shadow-sm"
-        >
-          <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
-          <span className="truncate max-w-[75px]">{selectedCity || 'Şehir Seç'}</span>
-          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-        </button>
+        {/* Row 2: Dedicated context bar for Badge + Subtitle (full width, spacious) */}
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/5 min-w-0">
+          {totalShowcase > 0 ? (
+            <span className="text-[9.5px] font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/35 px-1.5 py-0.5 rounded-md leading-none shrink-0 flex items-center gap-1">
+              👑 Vitrin
+            </span>
+          ) : totalRegular > 0 ? (
+            <span className="text-[9.5px] font-extrabold text-orange-300 bg-orange-500/15 border border-orange-500/30 px-1.5 py-0.5 rounded-md leading-none shrink-0 flex items-center gap-1">
+              🔧 Uzman Servisler
+            </span>
+          ) : null}
+          <span className="text-[10px] sm:text-[10.5px] text-slate-300 font-medium truncate leading-none">
+            {vehicleBrand} markasına hizmet veren {totalShowcase > 0 ? 'vitrin servisleri' : 'uzman servisler'}
+          </span>
+        </div>
       </div>
 
       {/* Main Body: Scrollable viewport */}
@@ -484,6 +491,23 @@ export default function IsiCepteListingRecommendationWidget({
               </div>
 
               <div className="flex-1 overflow-y-auto max-h-[50vh] pr-1 space-y-1 font-mono text-xs scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-slate-950">
+                <button
+                  type="button"
+                  onClick={() => handleCitySelect('')}
+                  className={`w-full text-left px-3 py-1.5 sm:py-2 rounded-xl transition flex items-center justify-between cursor-pointer text-[11px] sm:text-xs font-sans ${
+                    !selectedCity || selectedCity === 'Tüm Şehirler'
+                      ? 'bg-orange-500/20 text-orange-300 font-bold border border-orange-500/30'
+                      : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Tüm Şehirler (Türkiye Geneli)</span>
+                  </span>
+                  {(!selectedCity || selectedCity === 'Tüm Şehirler') && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-orange-400" />
+                  )}
+                </button>
                 {filteredCities.length === 0 ? (
                   <div className="p-4 text-center text-slate-500 text-xs">Aramayla eşleşen il bulunamadı.</div>
                 ) : (

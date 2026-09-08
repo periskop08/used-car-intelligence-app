@@ -209,34 +209,31 @@ export class IsiCepteService implements OnModuleInit {
         isShowcaseActive: true,
         showcaseExpiresAt: { gt: now },
       };
+      const regularWhere = {
+        ...baseWhere,
+        OR: [
+          { isShowcaseActive: false },
+          { showcaseExpiresAt: null },
+          { showcaseExpiresAt: { lte: now } },
+        ],
+      };
 
-      const [showcaseProviders, totalAllCount] = await Promise.all([
+      const [showcaseProviders, regularProviders] = await Promise.all([
         this.prisma.isiCepteProvider.findMany({ where: showcaseWhere }),
-        this.prisma.isiCepteProvider.count({ where: baseWhere }),
+        this.prisma.isiCepteProvider.findMany({ where: regularWhere }),
       ]);
 
       totalShowcase = showcaseProviders.length;
-      totalAll = totalAllCount;
-      totalRegular = Math.max(0, totalAll - totalShowcase);
+      totalRegular = regularProviders.length;
+      totalAll = totalShowcase + totalRegular;
       rotatedShowcase = this.applyDeterministicFairRotation(showcaseProviders, seedString);
+      rotatedRegular = this.applyDeterministicFairRotation(regularProviders, `${seedString}-reg`);
 
       if (totalShowcase > 0) {
         total = totalShowcase;
         itemsToPaginate = rotatedShowcase;
       } else {
-        const regularWhere = {
-          ...baseWhere,
-          OR: [
-            { isShowcaseActive: false },
-            { showcaseExpiresAt: null },
-            { showcaseExpiresAt: { lte: now } },
-          ],
-        };
-        const regularProviders = await this.prisma.isiCepteProvider.findMany({
-          where: regularWhere,
-        });
-        total = regularProviders.length;
-        rotatedRegular = this.applyDeterministicFairRotation(regularProviders, `${seedString}-reg`);
+        total = totalRegular;
         itemsToPaginate = rotatedRegular;
       }
     } else {
