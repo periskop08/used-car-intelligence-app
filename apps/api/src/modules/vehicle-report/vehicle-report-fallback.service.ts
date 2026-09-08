@@ -74,13 +74,25 @@ export class VehicleReportFallbackService {
       },
     ];
 
-    if (problems.length > 0) {
+    const verifiedProblems = problems.filter((p: any) => (p.problemType === 'VERIFIED_FAILURE' || p.problemType === 'CHRONIC' || !p.problemType));
+    const communityComplaints = problems.filter((p: any) => (p.problemType === 'REPORTED_COMPLAINT' || p.problemType === 'OBSERVED_BEHAVIOR'));
+
+    if (verifiedProblems.length > 0) {
       supportingFacts.push({
         factKey: 'KNOWN_PROBLEMS_COUNT',
         label: 'Onaylı Kronik Sorun Kaydı',
-        value: problems.length,
+        value: verifiedProblems.length,
         source: 'VEHICLE_DATABASE',
         confidence: 'HIGH',
+      });
+    }
+    if (communityComplaints.length > 0) {
+      supportingFacts.push({
+        factKey: 'COMMUNITY_COMPLAINTS_COUNT',
+        label: 'Kullanıcı Geri Bildirim Gözlemi',
+        value: communityComplaints.length,
+        source: 'SYSTEM_DERIVED',
+        confidence: 'MEDIUM',
       });
     }
 
@@ -92,16 +104,45 @@ export class VehicleReportFallbackService {
 
     if (problems.length > 0) {
       const topProb = problems[0];
+      const titleLower = (topProb.title || '').toLowerCase();
+      const descLower = (topProb.description || '').toLowerCase();
+      const isElectricalOrInteriorOrWiper =
+        titleLower.includes('silecek') ||
+        titleLower.includes('wiper') ||
+        titleLower.includes('multimedya') ||
+        titleLower.includes('ekran') ||
+        titleLower.includes('hoparlör') ||
+        titleLower.includes('sunroof') ||
+        titleLower.includes('döşeme') ||
+        titleLower.includes('koltuk') ||
+        titleLower.includes('park sensörü') ||
+        descLower.includes('silecek');
+
+      const symptoms = isElectricalOrInteriorOrWiper
+        ? ['İlgili donanım ve elektrik aksamında işlev kaybı veya geç tepki', 'Gösterge panelinde veya ekranda uyarı']
+        : (topProb.symptoms || ['Sürüş sırasında anormal ses veya titreşim', 'Sıvı seviyelerinde düşüş']);
+
+      const inspectionInstructions = isElectricalOrInteriorOrWiper
+        ? [
+            'Ekspertizde ilgili donanım ve gövde elektronik kontrol ünitesini test ettirin.',
+            'Silecek kolu, motor kademeleri ve ilgili sigorta/röle kutusunu kontrol ettirin.',
+          ]
+        : (topProb.checkRecommendation ? [topProb.checkRecommendation] : [
+            'Ekspertizde aracı liftte kaldırıp alt muhafazayı ve sızıntı bölgesini inceletin.',
+            'Bilgisayarlı arıza arama cihazı (OBD-II) ile hata kodlarını taratın.',
+          ]);
+
+      const isVerified = topProb.problemType === 'VERIFIED_FAILURE' || topProb.problemType === 'CHRONIC' || !topProb.problemType;
+
       primaryRisk = {
         title: topProb.title || 'Mekanik Aşınma Riski',
         severity: (topProb.riskLevel || 'MEDIUM') as any,
-        explanation: topProb.description || 'Veritabanında kayıtlı aksam aşınma hassasiyeti.',
-        symptoms: ['Sürüş sırasında anormal ses veya titreşim', 'Sıvı seviyelerinde düşüş'],
-        inspectionInstructions: [
-          'Ekspertizde aracı liftte kaldırıp alt muhafazayı ve sızıntı bölgesini inceletin.',
-          'Bilgisayarlı arıza arama cihazı (OBD-II) ile hata kodlarını taratın.',
-        ],
-        riskMeaning: 'Bu kayıt tek başına araçtan vazgeçme nedeni değildir; ancak fiziki kontrolde masraf tespiti için önceliklidir.',
+        explanation: topProb.description || 'Kayıtlı teknik aksam gözlemi.',
+        symptoms,
+        inspectionInstructions,
+        riskMeaning: isVerified
+          ? 'Doğrulanmış bu kayıt ekspertiz kontrolünde öncelikli fiziki kontrol noktasıdır.'
+          : 'Kullanıcı geri bildirimi niteliğindedir; ekspertizde fonksiyonel kontrolü önerilir.',
         supportingFactIds: [`FACT_PROB_${topProb.id || '1'}`],
       };
 

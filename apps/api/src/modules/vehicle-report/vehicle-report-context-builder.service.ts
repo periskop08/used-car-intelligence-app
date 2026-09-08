@@ -152,7 +152,7 @@ export class VehicleReportContextBuilderService {
           symptoms: (p as any).symptoms || null,
           checkRecommendation: (p as any).checkRecommendation || null,
           category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
-          problemType: (p as any).problemType || 'CHRONIC',
+          problemType: (p as any).problemType || ((p as any).sourceUrl ? 'VERIFIED_FAILURE' : 'REPORTED_COMPLAINT'),
         })),
         inspectionChecklist: (variant.checklists || []).map((c) => ({
           id: c.id,
