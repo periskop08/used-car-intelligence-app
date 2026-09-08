@@ -64,6 +64,46 @@ export function getTransmissionTr(name: string): string {
   return 'Otomatik';
 }
 
+export function getTransmissionWhereClause(targetTrans?: string): any {
+  if (!targetTrans) return {};
+  const lower = targetTrans.toLowerCase().trim();
+  if (lower.includes('manuel') || lower.includes('düz') || lower.includes('manual')) {
+    return {
+      transmission: {
+        OR: [
+          { name: { contains: 'manuel', mode: 'insensitive' } },
+          { name: { contains: 'düz', mode: 'insensitive' } },
+          { name: { contains: 'manual', mode: 'insensitive' } },
+        ],
+      },
+    };
+  }
+  if (lower.includes('yarı') || lower.includes('semi')) {
+    return {
+      transmission: {
+        OR: [
+          { name: { contains: 'dsg', mode: 'insensitive' } },
+          { name: { contains: 'edc', mode: 'insensitive' } },
+          { name: { contains: 'powershift', mode: 'insensitive' } },
+          { name: { contains: 'dct', mode: 'insensitive' } },
+          { name: { contains: 'çift kavrama', mode: 'insensitive' } },
+          { name: { contains: 'yarı otomatik', mode: 'insensitive' } },
+        ],
+      },
+    };
+  }
+  // Otomatik / Automatic
+  return {
+    transmission: {
+      NOT: [
+        { name: { contains: 'manuel', mode: 'insensitive' } },
+        { name: { contains: 'düz', mode: 'insensitive' } },
+        { name: { contains: 'manual', mode: 'insensitive' } },
+      ],
+    },
+  };
+}
+
 import { VariantTechnicalFactsService } from './variant-technical-facts.service';
 
 @ApiTags('Vehicle Filters')
@@ -451,6 +491,8 @@ export class VehicleFiltersController {
       engineFilterClause = { engine: { code: { in: rawCodes } } };
     }
 
+    const transFilterClause = getTransmissionWhereClause(targetTrans);
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -460,6 +502,7 @@ export class VehicleFiltersController {
         year: Number(year),
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+        ...transFilterClause,
       },
       select: {
         id: true,
