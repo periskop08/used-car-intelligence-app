@@ -21,6 +21,15 @@ export interface NarrativeQualityResult {
   needsRepair: boolean;
 }
 
+export interface NormalizedNumericClaim {
+  subject: 'BATTERY_SOH' | 'BATTERY_CAPACITY' | 'WEAR_KM';
+  value: number;
+  unit: 'PERCENT' | 'KWH' | 'KM';
+  comparator: 'ABOVE' | 'BELOW' | 'AT_LEAST' | 'AT_MOST' | 'NONE';
+  claimType: 'HEALTH_THRESHOLD' | 'TECHNICAL_SPEC' | 'USAGE_STATISTIC' | 'WEAR_THRESHOLD';
+  rawSpan: string;
+}
+
 @Injectable()
 export class VehicleReportSemanticValidationService {
   private readonly logger = new Logger(VehicleReportSemanticValidationService.name);
@@ -328,57 +337,207 @@ export class VehicleReportSemanticValidationService {
     };
   }
 
-  private static readonly SOH_PATTERNS = [
-    /(?:%\s*(\d{2})|(\d{2})\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
-    /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\b)/i,
-  ];
-
   private static readonly WEAR_PATTERNS = [
     { topic: 'TRIM_RATTLE', regex: /(?:60[\s.]?000\s*-\s*70[\s.]?000|60\s*-\s*70\s*(?:bin|k))\s*km.*?(?:trim|tıkırtı|kabin)/i, label: 'Kabin trim tıkırtısı km eşiği' },
     { topic: 'TRANSMISSION_WEAR', regex: /(?:80[\s.]?000\s*-\s*100[\s.]?000|80\s*-\s*100\s*(?:bin|k))\s*km.*?(?:kavrama|şanzıman|vites)/i, label: 'Şanzıman aşınması km eşiği' },
   ];
 
+  public static extractNormalizedClaims(text: string): NormalizedNumericClaim[] {
+    if (!text || typeof text !== 'string') return [];
+    const claims: NormalizedNumericClaim[] = [];
+
+    const fullTextLower = text.toLowerCase();
+    const fullTextHasSoh = fullTextLower.includes('soh') || 
+                           fullTextLower.includes('batarya sağlığı') || 
+                           fullTextLower.includes('pil sağlığı') || 
+                           fullTextLower.includes('batarya sağlık') ||
+                           fullTextLower.includes('pil sağlık');
+
+    // Split text into clauses/sentences by punctuation and newlines
+    const segments = text.split(/(?<=[.!?\n;])\s+/);
+
+    for (const segment of segments) {
+      const lower = segment.toLowerCase();
+
+      // 1. Check for Battery / SoH keywords
+      const hasSohKeyword = fullTextHasSoh ||
+                            lower.includes('soh') || 
+                            lower.includes('batarya sağlığı') || 
+                            lower.includes('pil sağlığı') || 
+                            lower.includes('batarya sağlık') ||
+                            lower.includes('pil sağlık');
+      
+      const hasBatteryCapacityKeyword = fullTextLower.includes('batarya kapasite') || fullTextLower.includes('pil kapasite');
+
+      // 2. Check for kWh technical specs (e.g. 60 kWh batarya kapasitesi)
+      const kwhMatch = lower.match(/(\d{2,3}(?:\.\d+)?)\s*kwh/i);
+      if (kwhMatch && (hasBatteryCapacityKeyword || lower.includes('batarya') || lower.includes('pil'))) {
+        claims.push({
+          subject: 'BATTERY_CAPACITY',
+          value: parseFloat(kwhMatch[1]),
+          unit: 'KWH',
+          comparator: 'NONE',
+          claimType: 'TECHNICAL_SPEC',
+          rawSpan: segment.trim(),
+        });
+      }
+
+      // 3. Check for percentage numeric values (%75, 75%, %85, 85%, 85 SoH, SoH 85)
+      const percentMatches = Array.from(lower.matchAll(/(?:%\s*(\d{1,3})|(\d{1,3})\s*%|(\d{2,3})\s*soh|soh\s*(\d{2,3}))/gi));
+
+      for (const m of percentMatches) {
+        const rawValStr = m[1] || m[2] || m[3] || m[4];
+        const val = parseInt(rawValStr, 10);
+        if (isNaN(val) || val < 1 || val > 100) continue;
+
+        const matchIndex = m.index || 0;
+        const surroundingText = lower.substring(Math.max(0, matchIndex - 60), Math.min(lower.length, matchIndex + 60));
+
+        // False-Positive Guard: Charging statistics (e.g. %80 oranında DC hızlı şarj)
+        const isChargingStatistic = surroundingText.includes('şarj') || 
+                                    surroundingText.includes('dc') || 
+                                    surroundingText.includes('ac') ||
+                                    lower.includes('hızlı şarj') ||
+                                    lower.includes('şarj oranı') ||
+                                    lower.includes('şarj kullanım');
+
+        if (isChargingStatistic && !surroundingText.includes('soh') && !surroundingText.includes('sağlık')) {
+          claims.push({
+            subject: 'BATTERY_CAPACITY',
+            value: val,
+            unit: 'PERCENT',
+            comparator: 'NONE',
+            claimType: 'USAGE_STATISTIC',
+            rawSpan: segment.trim(),
+          });
+          continue;
+        }
+
+        // Comparator detection
+        let comparator: 'ABOVE' | 'BELOW' | 'AT_LEAST' | 'AT_MOST' | 'NONE' = 'NONE';
+        if (
+          surroundingText.includes('üzeri') || 
+          surroundingText.includes('üzerinde') || 
+          surroundingText.includes('üstü') || 
+          surroundingText.includes('üstünde') ||
+          surroundingText.includes('yukarısı') ||
+          surroundingText.includes('fazlası') ||
+          surroundingText.includes('ve üzeri')
+        ) {
+          comparator = 'ABOVE';
+        } else if (
+          surroundingText.includes('altı') || 
+          surroundingText.includes('altında') || 
+          surroundingText.includes('altındaki') ||
+          surroundingText.includes('aşağısı') ||
+          surroundingText.includes('düşük') ||
+          surroundingText.includes('ve altı')
+        ) {
+          comparator = 'BELOW';
+        } else if (surroundingText.includes('en az') || surroundingText.includes('minimum')) {
+          comparator = 'AT_LEAST';
+        } else if (surroundingText.includes('en fazla') || surroundingText.includes('maksimum') || surroundingText.includes('en çok')) {
+          comparator = 'AT_MOST';
+        }
+
+        const isDegradationOrHealth = hasSohKeyword || 
+                                      surroundingText.includes('sağlık') || 
+                                      surroundingText.includes('soh') ||
+                                      (hasBatteryCapacityKeyword && (comparator !== 'NONE' || surroundingText.includes('düş') || surroundingText.includes('kayb')));
+
+        if (isDegradationOrHealth && !isChargingStatistic) {
+          claims.push({
+            subject: 'BATTERY_SOH',
+            value: val,
+            unit: 'PERCENT',
+            comparator,
+            claimType: 'HEALTH_THRESHOLD',
+            rawSpan: segment.trim(),
+          });
+        }
+      }
+
+      // 4. Wear threshold patterns
+      for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
+        if (wp.regex.test(segment)) {
+          claims.push({
+            subject: 'WEAR_KM',
+            value: wp.topic === 'TRIM_RATTLE' ? 60000 : 80000,
+            unit: 'KM',
+            comparator: 'ABOVE',
+            claimType: 'WEAR_THRESHOLD',
+            rawSpan: segment.trim(),
+          });
+        }
+      }
+    }
+
+    return claims;
+  }
+
+  public static isClaimVerifiedInResearch(claim: NormalizedNumericClaim, verifiedResearch: any): boolean {
+    if (!verifiedResearch) return false;
+    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
+    const researchStr = JSON.stringify(verifiedResearch).toLowerCase();
+
+    if (claim.subject === 'BATTERY_SOH' && claim.claimType === 'HEALTH_THRESHOLD') {
+      // Must match subject (SoH / battery health) + value + unit in verified evidence
+      const hasMatchingVerifiedClaim = verifiedClaims.some((c: any) => {
+        if (c.verificationStatus !== 'VERIFIED') return false;
+        const text = String(c.claimText || '').toLowerCase();
+        const hasSohContext = text.includes('soh') || text.includes('batarya') || text.includes('pil sağlığı') || text.includes('sağlık');
+        const hasVal = text.includes(`%${claim.value}`) || text.includes(`${claim.value}%`) || text.includes(`${claim.value} soh`) || text.includes(`soh ${claim.value}`);
+        return hasSohContext && hasVal;
+      });
+
+      if (hasMatchingVerifiedClaim) return true;
+
+      // Research text deep match: value must be co-located with battery health/soh
+      const hasDeepMatch = (researchStr.includes(`%${claim.value}`) || researchStr.includes(`${claim.value}%`) || researchStr.includes(`soh ${claim.value}`) || researchStr.includes(`${claim.value} soh`)) &&
+                           (researchStr.includes('soh') || researchStr.includes('batarya sağlığı') || researchStr.includes('pil sağlığı'));
+      return hasDeepMatch;
+    }
+
+    if (claim.subject === 'WEAR_KM' && claim.claimType === 'WEAR_THRESHOLD') {
+      const topic = claim.value === 60000 ? 'trim' : 'şanzıman';
+      const hasVerifiedProof = verifiedClaims.some(
+        (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(topic)
+      );
+      return hasVerifiedProof || researchStr.includes(topic);
+    }
+
+    return true;
+  }
+
   public sanitizeEvidenceBoundNumericClaims(report: ComprehensiveVehicleReport, contextJson: any): void {
     const verifiedResearch = contextJson?.verifiedResearch || {};
-    const researchText = JSON.stringify(verifiedResearch).toLowerCase();
-    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
 
     const sanitizeString = (text: string): string => {
       if (!text || typeof text !== 'string') return text;
+      
+      const claims = VehicleReportSemanticValidationService.extractNormalizedClaims(text);
       let cleaned = text;
 
-      // 1. SoH / Battery percentage threshold sanitization
-      for (const pat of VehicleReportSemanticValidationService.SOH_PATTERNS) {
-        if (pat.test(cleaned)) {
-          const match = cleaned.match(pat);
-          const numVal = match ? (match[1] || match[2] || match[3]) : null;
-          if (numVal && !researchText.includes(`${numVal}%`) && !researchText.includes(`%${numVal}`) && !researchText.includes(`${numVal} soh`)) {
-            cleaned = cleaned.replace(
-              /(?:%\s*\d{2}|\d{2}\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)[^.!?\n]*(?:[.!?\n]|$)/gi,
-              'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir. '
-            ).replace(
-              /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*\d{2}|\d{2}\s*%|\d{2}\b)[^.!?\n]*(?:[.!?\n]|$)/gi,
-              'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir. '
-            ).replace(
-              /(?:%\s*\d{2}|\d{2}\s*%)\s*(?:'?[ıiuü]n)?\s*(?:altı|altındaki|üstü|üstündeki|üzeri|üzerindeki)\s*değerler[^.!?\n]*(?:[.!?\n]|$)/gi,
-              'Batarya sağlık raporundaki değerler araç yaşı, kullanım geçmişi ve üretici verileriyle birlikte değerlendirilmelidir. '
-            );
+      for (const claim of claims) {
+        if (!VehicleReportSemanticValidationService.isClaimVerifiedInResearch(claim, verifiedResearch)) {
+          if (claim.subject === 'BATTERY_SOH' && claim.claimType === 'HEALTH_THRESHOLD') {
+            if (claim.rawSpan && cleaned.includes(claim.rawSpan)) {
+              cleaned = cleaned.replace(claim.rawSpan, 'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir.');
+            } else {
+              cleaned = 'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir.';
+            }
+          } else if (claim.subject === 'WEAR_KM' && claim.claimType === 'WEAR_THRESHOLD') {
+            for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
+              if (wp.regex.test(cleaned)) {
+                cleaned = cleaned.replace(wp.regex, 'kullanım ve yol şartlarına bağlı olarak periyodik ekspertizde kontrol edilmelidir');
+              }
+            }
           }
         }
       }
 
-      // 2. Wear threshold sanitization
-      for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
-        if (wp.regex.test(cleaned)) {
-          const hasVerifiedProof = verifiedClaims.some(
-            (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(wp.topic.toLowerCase())
-          );
-          if (!hasVerifiedProof && !researchText.includes(wp.topic.toLowerCase())) {
-            cleaned = cleaned.replace(wp.regex, 'kullanım ve yol şartlarına bağlı olarak periyodik ekspertizde kontrol edilmelidir');
-          }
-        }
-      }
-
+      // Deduplicate repeated identical sentences
+      cleaned = cleaned.replace(/(Batarya sağlık durumu \(SoH\) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir\.\s*)+/g, '$1');
       return cleaned.replace(/\s{2,}/g, ' ').trim();
     };
 
@@ -407,49 +566,55 @@ export class VehicleReportSemanticValidationService {
   }
 
   private validateEvidenceBoundNumericClaims(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
-    const reportStr = JSON.stringify(report).toLowerCase();
     const verifiedResearch = contextJson?.verifiedResearch || {};
-    const researchText = JSON.stringify(verifiedResearch).toLowerCase();
     const dynamicMaint = verifiedResearch?.dynamicMaintenanceResearch || {};
-    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
 
-    // 1. SoH / Battery Capacity Percentage Threshold Guard (e.g. 85%, %85, %85 ve üzeri, %85'in altı, 85 SoH, SoH %85)
-    for (const pat of VehicleReportSemanticValidationService.SOH_PATTERNS) {
-      const match = reportStr.match(pat);
-      if (match) {
-        const numVal = match[1] || match[2] || match[3];
-        if (numVal && !researchText.includes(`${numVal}%`) && !researchText.includes(`%${numVal}`) && !researchText.includes(`${numVal} soh`)) {
+    const allClaims: NormalizedNumericClaim[] = [];
+    const walkAndExtract = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        if (typeof obj[key] === 'string') {
+          allClaims.push(...VehicleReportSemanticValidationService.extractNormalizedClaims(obj[key]));
+        } else if (Array.isArray(obj[key])) {
+          for (const item of obj[key]) {
+            if (typeof item === 'string') {
+              allClaims.push(...VehicleReportSemanticValidationService.extractNormalizedClaims(item));
+            } else if (item && typeof item === 'object') {
+              walkAndExtract(item);
+            }
+          }
+        } else if (typeof obj[key] === 'object') {
+          walkAndExtract(obj[key]);
+        }
+      }
+    };
+    walkAndExtract(report);
+
+    for (const claim of allClaims) {
+      if (!VehicleReportSemanticValidationService.isClaimVerifiedInResearch(claim, verifiedResearch)) {
+        if (claim.subject === 'BATTERY_SOH' && claim.claimType === 'HEALTH_THRESHOLD') {
           return {
             isValid: false,
-            reason: `Stage 1 kanıtlarında bulunmayan batarya sağlık yüzdesi (%${numVal} SoH / Pil Sağlığı) iddiası tespit edildi. Sayısal eşikler kanıtlanmadığı sürece raporda kullanılamaz.`,
+            reason: `Stage 1 kanıtlarında bulunmayan batarya sağlık yüzdesi (%${claim.value} SoH / Pil Sağlığı) iddiası tespit edildi. Sayısal eşikler kanıtlanmadığı sürece raporda kullanılamaz.`,
+            needsRepair: true,
+          };
+        }
+        if (claim.subject === 'WEAR_KM' && claim.claimType === 'WEAR_THRESHOLD') {
+          return {
+            isValid: false,
+            reason: `Stage 1 kanıtlarında bulunmayan yapay/ezbere sayısal eşik iddiası (${claim.value} km) tespit edildi. Sayısal eşikler yerine olasılıksal uzman dili kullanılmalıdır.`,
             needsRepair: true,
           };
         }
       }
     }
 
-    // 2. Hallucinated Wear/Failure Thresholds (e.g., "60-70k trim", "80-100k şanzıman")
-    for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
-      if (wp.regex.test(reportStr)) {
-        const hasVerifiedProof = verifiedClaims.some(
-          (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(wp.topic.toLowerCase())
-        );
-        if (!hasVerifiedProof && !researchText.includes(wp.topic.toLowerCase())) {
-          return {
-            isValid: false,
-            reason: `Stage 1 kanıtlarında bulunmayan yapay/ezbere sayısal eşik iddiası (${wp.label}) tespit edildi. Sayısal eşikler yerine olasılıksal uzman dili kullanılmalıdır.`,
-            needsRepair: true,
-          };
-        }
-      }
-    }
-
-    // 3. Maintenance Taxonomy Cross-Contamination Guard
-    // Manufacturer schedule cannot be substituted for independent recommendation or failure condition without proof
+    // Maintenance Taxonomy Cross-Contamination Guard
     const mfgText = String(dynamicMaint.manufacturerScheduledMaintenance || '').toLowerCase();
     const indText = String(dynamicMaint.independentPreventiveRecommendations || '').toLowerCase();
-    if (mfgText && reportStr.includes('üretici tavsiyesi') && !mfgText.includes('tavsiye') && indText) {
-      if (reportStr.includes('üretici zorunlu periyodik bakımı') && indText.includes('ağır kullanım')) {
+    const reportStrLower = JSON.stringify(report).toLowerCase();
+    if (mfgText && reportStrLower.includes('üretici tavsiyesi') && !mfgText.includes('tavsiye') && indText) {
+      if (reportStrLower.includes('üretici zorunlu periyodik bakımı') && indText.includes('ağır kullanım')) {
         // Enforce distinction
       }
     }
