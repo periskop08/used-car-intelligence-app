@@ -293,7 +293,7 @@ export default function IsiCepteListingRecommendationWidget({
 
   return (
     <div
-      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans ${className}`}
+      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans h-[590px] max-h-[590px] ${className}`}
     >
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></span>
 
@@ -373,8 +373,8 @@ export default function IsiCepteListingRecommendationWidget({
             </button>
           </div>
         ) : (
-          /* Scrollable Vertical List of Compact Cards (Strictly Rules 11, 12, 38: Responsive for both narrow and wide columns) */
-          <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-white/15 overscroll-contain">
+          /* Scrollable Vertical List of Compact Cards (Strictly 5 visible cards, rest scrollable inside box) */
+          <div className="flex-1 min-h-0 max-h-[415px] overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-white/20 hover:scrollbar-thumb-orange-500/50 scrollbar-track-transparent overscroll-contain">
             {items.map((shop) => (
               <div
                 key={shop.id}
