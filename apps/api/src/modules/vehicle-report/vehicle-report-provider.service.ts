@@ -208,7 +208,14 @@ export class VehicleReportProviderService {
           // 5. Map AI-derived verified technical specifications
           if (contentObj.technicalSpecifications) {
             const specs = contentObj.technicalSpecifications;
-            if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
+            const fuelTypeLower = (baseReport.vehicleIdentity.fuelType || '').toLowerCase();
+            const isEv = fuelTypeLower.includes('elektrik') || fuelTypeLower.includes('electric') || fuelTypeLower.includes('bev');
+
+            if (isEv) {
+              baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+            } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
+              baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
+            }
             if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
             if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
             if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;

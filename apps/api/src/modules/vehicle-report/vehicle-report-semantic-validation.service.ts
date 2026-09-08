@@ -71,6 +71,50 @@ export class VehicleReportSemanticValidationService {
       }
     }
 
+    // Rule 1.3: EV vs ICE Architecture Guard
+    const fuelType = (report.vehicleIdentity.fuelType || vehicleCtx.fuelType || '').toLowerCase();
+    const isElectric = fuelType.includes('elektrik') || fuelType.includes('electric') || fuelType.includes('bev');
+    if (isElectric) {
+      if (report.vehicleIdentity.engineDisplacementCc && report.vehicleIdentity.engineDisplacementCc > 0) {
+        return {
+          isValid: false,
+          reason: `Elektrikli (EV) araçta içten yanmalı motor hacmi (engineDisplacementCc: ${report.vehicleIdentity.engineDisplacementCc} cc) tanımlandı. EV araçlarda motor hacmi null/undefined olmalıdır.`,
+          needsRepair: true,
+        };
+      }
+      if (reportStr.includes('egzoz emisyonu') || reportStr.includes('dpf filtresi') || reportStr.includes('buji değişimi') || reportStr.includes('yakıt deposu')) {
+        return {
+          isValid: false,
+          reason: 'Elektrikli (EV) araç analizinde içten yanmalı motor terimleri (egzoz/DPF/buji/yakıt deposu) tespit edildi.',
+          needsRepair: true,
+        };
+      }
+    }
+
+    // Rule 1.4: Transmission Architecture Semantic Compatibility Guard
+    const transName = (report.vehicleIdentity.transmissionName || vehicleCtx.transmissionName || '').toLowerCase();
+    const transArch = String(researchIdentity?.transmissionFamily || researchIdentity?.clutchType || transName).toLowerCase();
+    const isTorqueConverterOrCVTOrManual = transArch.includes('tork_konvertorlu') || transArch.includes('tork konvertörlü') || transArch.includes('tam otomatik') || transArch.includes('eat8') || transArch.includes('zf 8hp') || transArch.includes('cvt') || transArch.includes('multitronic') || transArch.includes('manuel');
+    const hasDctTerminology = reportStr.includes('kuru çift kavrama') || reportStr.includes('kuru kavrama balata') || reportStr.includes('mekatronik basınç tüpü') || reportStr.includes('dsg kavrama titremesi');
+    if (isTorqueConverterOrCVTOrManual && !transArch.includes('dsg') && !transArch.includes('edc') && !transArch.includes('dct')) {
+      if (hasDctTerminology) {
+        return {
+          isValid: false,
+          reason: `Şanzıman mimarisi (${transName}) ile raporda kullanılan çift kavrama / DSG mekatronik dili çelişiyor. Tork konvertörlü, CVT veya Manuel araçlarda DSG kavrama/mekatronik arızası iddia edilemez.`,
+          needsRepair: true,
+        };
+      }
+    }
+
+    // Rule 1.5: Hallucinated Numerical Threshold Guard
+    if (reportStr.includes('%90 soh') || reportStr.includes('60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış') || reportStr.includes('80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir')) {
+      return {
+        isValid: false,
+        reason: 'Stage 1 kanıtlarında bulunmayan yapay/ezbere sayısal kilometre eşikleri raporda yer aldı. Kullanım tarzına dayalı olasılıksal uzman dili kullanılmalıdır.',
+        needsRepair: true,
+      };
+    }
+
     // Rule 2: Absolute claims
     if (reportStr.includes('araç kesinlikle kazasızdır') || reportStr.includes('kesinlikle orijinaldir')) {
       return {

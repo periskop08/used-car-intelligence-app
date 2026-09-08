@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportMode } from '@prisma/client';
 
-export const CURRENT_REPORT_VERSION = 'v5.0_DYNAMIC_IDENTITY_GROUNDED';
+export const CURRENT_REPORT_VERSION = 'v5.1_GENUINE_SCORING_ARCH_GUARD';
 
 @Injectable()
 export class VehicleReportCacheService {

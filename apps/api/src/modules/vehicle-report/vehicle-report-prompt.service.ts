@@ -220,21 +220,28 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}
 
-ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
-1. TEKNİK KİMLİK VE PAZAR ÖNCELİĞİ:
-   - Öncelik Türkiye resmi üretici/distribütör kaynaklarıdır. Eski model yıllarında (2000-2012) resmi kaynak yoksa güvenilir otomotiv katalogları ve üretici dokümanlarıyla doğrula.
-   - 8 filtrenin tamamını birlikte değerlendir (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}).
+--- ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ ---
+1. TİCARİ İSİM VE TÜRKİYE VARYANT ÇÖZÜMLEME:
+   - Motor filtresi 320i, 520i, C200, E180, 1.6 TDI gibi ticari bir isimse global varsayılanı (örn. global 2.0L motor) ESAS ALMA!
+   - Yıl + Kasa + Yakıt + Şanzıman + Donanım + Pazar=TR parametrelerini birlikte değerlendirerek Türkiye varyantını çöz. Türkiye resmi distribütör verileri (Borusan, Doğuş, Mercedes-Benz Türk vb.) global pazar verilerine göre mutlak önceliğe sahiptir.
    - Motor ailesi (örn. EA288) ile spesifik motor kodunu (örn. CRKB), şanzıman ailesi (örn. DSG) ile spesifik şanzıman kodunu (örn. DQ200) ayrı alanlar olarak tespit et.
    - Teknik kimlik alanlarında birden fazla alternatif kod sıralama (örn. "DQ200 veya DQ250" yazma). Doğrulanabilen en net seviyede kal.
-2. DİNAMİK BAKIM VE KONTROL EŞLEŞMESİ:
-   - Doğrulanan spesifik şanzıman mimarisine (kuru çift kavrama, ıslak çift kavrama, tork konvertörlü, CVT) ve triger tipine (kayış/zincir) göre üretici bakım prosedürlerini ve bilinen kontrol noktalarını raporda kullan.
-3. KİLOMETRE AŞINMA VE TAVİZLER:
-   - Yoğun şehir içi / dur-kalk kullanımına bağlı olarak kilometrelere göre artabilecek aşınma risklerini (kavrama, mekatronik, DPF/EGR, triger, süspansiyon) olasılıksal uzman üslubuyla açıkla.
-4. ŞASİ VE GÜVENLİK DİLİ:
+2. 3 SEVİYELİ BAKIM TAKSONOMİSİ VE BİLGİ TÜRÜ AYRIMI:
+   - Aşağıdaki 3 bakım türünü birbirine karıştırmadan ve dönüştürmeden kullan:
+     a) Üretici Resmi Periyodik Bakım Takvimi (Triger km/yıl aralığı, periyodik yağ/filtre)
+     b) Uzman Önleyici Bakım Tavsiyesi (Dur-kalk trafikte erken kontrol vb.)
+     c) Belirti ve Aşınma Bazlı Onarım (Kavrama kaçırma veya mekatronik basınç düşüşünde revizyon)
+   - Kaynak açıkça desteklemiyorsa önleyici tavsiyeleri üretici zorunlu bakımı gibi sunma.
+3. SAYISAL EŞİK UYDURMA YASAĞI:
+   - Stage 1'de araç-spesifik güvenilir kaynakla kanıtlanmamış hiçbir bakım km/yıl aralığı, arıza kilometresi, aşınma skalası veya SoH yüzdesi (örn. "60-70k trim sesi", "80-120k şanzıman", "%90 SoH") ÜRETME!
+   - Kullanım tarzına ve dur-kalk trafiğe dayalı olasılıksal uzman dili kullan.
+4. ELEKTRİKLİ (EV) ARAÇ STANDARDI:
+   - Elektrikli (EV/BEV) araçlarda motor hacmi ('engineDisplacementCc') KESİNLİKLE null veya undefined bırakılmalıdır ('0 cc' gibi yanıltıcı bir değer girilmez). Egzoz, buji, DPF ve yakıt deposu terimleri kullanılmaz.
+5. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
    - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
-5. TÜKETİM AYRIMI:
+6. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
@@ -254,6 +261,8 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
   "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
   "technicalSpecifications": {
+    "generation": "B8 / G20 / W205 vb.",
+    "faceliftStatus": "Makyajlı Kasa | Makyaj Öncesi | Tek Kasa",
     "engineFamily": "EA288",
     "engineCode": "CRKB",
     "engineDisplacementCc": 1598,
@@ -293,27 +302,30 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     const fullVehicleTitle = [year, brand, model, body, trim, engine, trans].filter(Boolean).join(' ');
 
     return `Sen TorqueScout İnternet Otomotiv Araştırma Ajanısın (Web-Grounded Vehicle Research Agent).
-Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak 10 KİLİT TEKNİK PARAMETRE GRUBU, araç karakteri, donanım paketi detayları, dinamik servis bakım prosedürleri ve kronik arıza kayıtlarını araştırmak ve ham JSON formatında üretmektir.
+Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak 10 KİLİT TEKNİK PARAMETRE GRUBU, nesil/makyaj kimliği, donanım paketi detayları, 3 seviyeli servis bakım taksonomisi ve kronik arıza kayıtlarını araştırmak ve ham JSON formatında üretmektir.
 
 --- İNCELENECEK ARAÇ VARYANTI (8 KİMLİK FİLTRESİ) ---
 • Araç: ${fullVehicleTitle}
 • Marka / Model: ${brand} ${model} (${year})
 • Kasa Tipi: ${body} | Donanım Paketi: ${trim}
 • Motor: ${engine} | Şanzıman: ${trans}
-• Pazar Önceliği: Türkiye Resmi Distribütör ve Katalog Verileri (Bulunamazsa güvenilir teknik kataloglar ve üretici mühendislik dokümanları)
+• Pazar Önceliği: Türkiye Resmi Distribütör ve Katalog Verileri (Ticari isimlerde TR resmi motor varyantı önceliklidir; bulunamazsa güvenilir teknik kataloglar ve üretici mühendislik dokümanları)
 ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilter.join(', ')}` : ''}
 
 ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
-1. Pazar Geçerliliği: Türkiye pazarında resmi distribütör ile satıldı mı?
-2. Motor Kimliği: Motor ailesi (örn. EA288, B48), spesifik motor kodu (örn. CRKB, B48B16), gerçek motor hacmi (cc).
+1. Pazar ve Nesil Geçerliliği: Türkiye pazarında resmi distribütör ile satıldı mı? Kasa nesil kodu (örn. G20, B8, W205) ve makyaj/facelift durumu nedir?
+2. Motor Kimliği: Motor ailesi (örn. EA288, B48), spesifik motor kodu (örn. CRKB, B48B16), gerçek motor hacmi (cc - Elektrikli araçta null/undefined).
 3. Güç ve Tork: Resmi motor gücü (HP/PS) ve maksimum tork (Nm).
-4. Şanzıman Kimliği: Şanzıman ailesi (örn. DSG, EDC, ZF 8HP), spesifik şanzıman kodu (örn. DQ200, 7G-DCT) ve kavrama tipi (Kuru Çift Kavrama, Islak Çift Kavrama, Tork Konvertörlü, CVT).
+4. Şanzıman Kimliği: Şanzıman ailesi (örn. DSG, EDC, ZF 8HP), spesifik şanzıman kodu (örn. DQ200, 7G-DCT) ve kavrama tipi (Kuru Çift Kavrama, Islak Çift Kavrama, Tork Konvertörlü, CVT, Manuel).
 5. Aktarma ve Vites: İleri vites sayısı ve çekiş sistemi (FWD, RWD, AWD / Quattro / xDrive / 4MATIC).
 6. Triger Sistemi: Eksantrik tahrik tipi (Kayış veya Zincir).
 7. Emisyon & Katkı: DPF var/yok, SCR/AdBlue var/yok.
 8. Tüketim Değerleri: Fabrika resmi katalog tüketimi (L/100km) ile gerçek yol kullanım tüketim aralığı (Min - Max L/100km).
 9. Performans & Boyut: 0-100 km/s hızlanma, maksimum hız (km/s), bagaj hacmi (Litre), boş ağırlık (kg).
-10. Dinamik Bakım & Arıza Noktaları: Doğrulanan spesifik şanzıman ve motor için üretici periyodik servis gereksinimleri (yağ değişim aralıkları, triger değişim periyotları, kavrama kontrol noktaları) ve bilinen arıza hassasiyetleri.
+10. 3 Seviyeli Bakım Taksonomisi:
+    a) manufacturerScheduledMaintenance: Üretici resmi periyodik bakım takvimi gereksinimleri (triger değişim periyodu, üretici resmi sıvı aralıkları)
+    b) independentPreventiveRecommendations: Bağımsız uzman/servis önleyici tavsiyeleri (ağır kullanım şartları)
+    c) conditionBasedRepairs: Belirti ve aşınmaya dayalı onarım/revizyon ihtiyaçları
 
 ## ÜRETECEĞİN ÇIKTI ŞEMASI (JSON):
 {
@@ -321,6 +333,8 @@ ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
     "brand": "${brand}",
     "model": "${model}",
     "year": "${year}",
+    "generation": "B8",
+    "faceliftStatus": "Makyaj Öncesi",
     "isTurkeyMarketVariant": true,
     "engineFamily": "EA288",
     "engineCode": "CRKB",
@@ -351,11 +365,11 @@ ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
   },
   "equipmentResearch": [ { "featureName": "...", "status": "STANDARD|OPTIONAL", "claimId": "CLM-8" } ],
   "reliabilityResearch": [ { "title": "...", "description": "...", "riskLevel": "CRITICAL|MEDIUM", "claimId": "CLM-9" } ],
-  "recallResearch": [ { "campaignNumber": "...", "description": "..." } ],
+  "recallResearch": [ { "campaignNumber": "...", "description": "...", "status": "OPEN|COMPLETED" } ],
   "dynamicMaintenanceResearch": {
-    "transmissionServiceRequirement": "...",
-    "timingServiceRequirement": "...",
-    "emissionServiceRequirement": "..."
+    "manufacturerScheduledMaintenance": "...",
+    "independentPreventiveRecommendations": "...",
+    "conditionBasedRepairs": "..."
   },
   "groundingSources": [
     {
