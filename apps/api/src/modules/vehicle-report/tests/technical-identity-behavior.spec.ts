@@ -760,7 +760,98 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(steps.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Behavior 15: Evidence Type & Source Mapping Verification (REPORTED_COMPLAINT vs VERIFIED_FAILURE)', () => {
+    let fallbackService: any;
+    let contradictionService: any;
+
+    beforeEach(() => {
+      contradictionService = {
+        analyzeListingContradictions: jest.fn().mockReturnValue([]),
+        analyzeMileageAge: jest.fn().mockReturnValue({}),
+      };
+      fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(
+        scoringService,
+        contradictionService
+      );
+    });
+
+    it('should map REPORTED_COMPLAINT to evidence-bound title and "Kullanıcı Geri Bildirimi / Bildirilen Şikâyet" source', () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v-tesla',
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          bodyType: 'Sedan',
+          fuelType: 'Elektrik',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [
+            {
+              id: 'p-wiper',
+              title: 'Silecek Motoru Arızası',
+              description: 'Otomatik modda sileceklerin yavaşlaması bildirilmiştir.',
+              problemType: 'REPORTED_COMPLAINT',
+              riskLevel: 'MEDIUM',
+            }
+          ]
+        }
+      };
+
+      const report = fallbackService.generateFallbackReport('rep-tesla-test', 'TORQUE_SCOUT_VEHICLE_REPORT', vehicleContext);
+
+      // 1. Check primaryTechnicalRisk title is evidence-bound (not absolute failure)
+      expect(report.expertDecisionSynthesis.primaryTechnicalRisk.title).toBe('Otomatik Silecek Performansı Şikâyetleri');
+      expect(report.expertDecisionSynthesis.primaryTechnicalRisk.title).not.toBe('Silecek Motoru Arızası');
+      expect(report.expertDecisionSynthesis.primaryTechnicalRisk.riskMeaning).toContain('Kullanıcı geri bildirimi niteliğindedir');
+
+      // 2. Check supportingFact registered for this problem is NOT marked as VEHICLE_DATABASE HIGH confidence
+      const wiperFact = report.dataQuality.supportingFacts.find(f => f.factKey === 'FACT_PROB_p-wiper');
+      expect(wiperFact).toBeDefined();
+      expect(wiperFact?.label).toBe('Kullanıcı Geri Bildirimi / Bildirilen Şikâyet');
+      expect(wiperFact?.source).toBe('SYSTEM_DERIVED');
+      expect(wiperFact?.confidence).toBe('MEDIUM');
+    });
+
+    it('should ONLY mark VERIFIED_FAILURE as "Doğrulanmış Teknik Veri" with HIGH confidence and VEHICLE_DATABASE source', () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v-passat',
+          brand: 'Volkswagen',
+          model: 'Passat',
+          modelYear: 2018,
+          bodyType: 'Sedan',
+          fuelType: 'Dizel',
+          transmissionName: '7 İleri DSG',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [
+            {
+              id: 'p-dq200',
+              title: 'DSG (DQ200) Mekatronik Basınç Tüpü Arızası',
+              description: 'Basınç tüpü dişli yuvasında çatlama.',
+              problemType: 'VERIFIED_FAILURE',
+              riskLevel: 'CRITICAL',
+            }
+          ]
+        }
+      };
+
+      const report = fallbackService.generateFallbackReport('rep-passat-test', 'TORQUE_SCOUT_VEHICLE_REPORT', vehicleContext);
+
+      expect(report.expertDecisionSynthesis.primaryTechnicalRisk.title).toBe('DSG (DQ200) Mekatronik Basınç Tüpü Arızası');
+      expect(report.expertDecisionSynthesis.primaryTechnicalRisk.riskMeaning).toContain('Doğrulanmış bu kayıt');
+
+      const dsgFact = report.dataQuality.supportingFacts.find(f => f.factKey === 'FACT_PROB_p-dq200');
+      expect(dsgFact).toBeDefined();
+      expect(dsgFact?.label).toBe('Doğrulanmış Teknik Veri');
+      expect(dsgFact?.source).toBe('VEHICLE_DATABASE');
+      expect(dsgFact?.confidence).toBe('HIGH');
+    });
+  });
 });
+
 
 
 

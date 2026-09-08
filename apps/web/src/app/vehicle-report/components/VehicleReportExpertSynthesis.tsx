@@ -50,17 +50,37 @@ export default function VehicleReportExpertSynthesis({
   const renderSourceBadge = (factIds?: string[]) => {
     if (!factIds || factIds.length === 0) return null;
     const firstFact = factMap.get(factIds[0]);
-    let label = "Kaynak: Doğrulanmış Teknik Veri";
-    let colorClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+
+    let label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
+    let colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
     if (firstFact) {
       if (firstFact.source === "SELLER_DECLARATION") {
         label = "Kaynak: Satıcı Beyanı — Doğrulanmamış";
         colorClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      } else {
-        label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
-        colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      } else if (
+        firstFact.label?.includes("Kullanıcı Geri Bildirimi") || 
+        firstFact.label?.includes("Şikâyet") || 
+        firstFact.factKey === "COMMUNITY_COMPLAINTS_COUNT"
+      ) {
+        label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
+        colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
+      } else if (
+        firstFact.label?.includes("Gözlemlenen") || 
+        firstFact.label?.includes("Davranış")
+      ) {
+        label = "Kaynak: Gözlemlenen Saha / Karakteristik Davranış";
+        colorClass = "bg-sky-500/10 text-sky-400 border-sky-500/20";
+      } else if (firstFact.source === "VEHICLE_DATABASE" && firstFact.confidence === "HIGH") {
+        label = "Kaynak: Doğrulanmış Teknik Veri";
+        colorClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
       }
+    } else if (factIds.some(id => id.includes("COMPLAINT") || id.includes("COMMUNITY"))) {
+      label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
+      colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
+    } else if (factIds.some(id => id.startsWith("FACT_PROB_"))) {
+      label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
+      colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
     } else if (factIds.includes("AI_RESEARCH_ENGINE") || factIds.includes("AI_VERIFIED_TECHNICAL_SPECS")) {
       label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
       colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";

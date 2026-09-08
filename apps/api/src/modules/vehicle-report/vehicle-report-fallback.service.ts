@@ -74,14 +74,14 @@ export class VehicleReportFallbackService {
       },
     ];
 
-    const verifiedProblems = problems.filter((p: any) => (p.problemType === 'VERIFIED_FAILURE' || p.problemType === 'CHRONIC' || !p.problemType));
-    const communityComplaints = problems.filter((p: any) => (p.problemType === 'REPORTED_COMPLAINT' || p.problemType === 'OBSERVED_BEHAVIOR'));
+    const verifiedProblems = problems.filter((p: any) => p.problemType === 'VERIFIED_FAILURE');
+    const communityComplaints = problems.filter((p: any) => p.problemType === 'REPORTED_COMPLAINT' || p.problemType === 'USER_COMPLAINT' || p.problemType === 'OBSERVED_BEHAVIOR' || !p.problemType);
 
     if (verifiedProblems.length > 0) {
       supportingFacts.push({
         factKey: 'KNOWN_PROBLEMS_COUNT',
-        label: 'Onaylı Kronik Sorun Kaydı',
-        value: verifiedProblems.length,
+        label: 'Doğrulanmış Teknik Veri',
+        value: `${verifiedProblems.length} adet onaylı kronik sorun`,
         source: 'VEHICLE_DATABASE',
         confidence: 'HIGH',
       });
@@ -89,12 +89,40 @@ export class VehicleReportFallbackService {
     if (communityComplaints.length > 0) {
       supportingFacts.push({
         factKey: 'COMMUNITY_COMPLAINTS_COUNT',
-        label: 'Kullanıcı Geri Bildirim Gözlemi',
-        value: communityComplaints.length,
+        label: 'Kullanıcı Geri Bildirimi / Bildirilen Şikâyet',
+        value: `${communityComplaints.length} adet saha bildirimi`,
         source: 'SYSTEM_DERIVED',
         confidence: 'MEDIUM',
       });
     }
+
+    // Register individual problem fact keys so frontend source badges match precisely
+    problems.forEach((p: any) => {
+      const isVerified = p.problemType === 'VERIFIED_FAILURE';
+      const isObserved = p.problemType === 'OBSERVED_BEHAVIOR';
+      const factKey = `FACT_PROB_${p.id}`;
+
+      let pTitle = p.title || 'Mekanik Gözlem';
+      if (!isVerified) {
+        if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
+          pTitle = 'Otomatik Silecek Performansı Şikâyetleri';
+        } else if (pTitle.endsWith('Arızası')) {
+          pTitle = pTitle.replace(/Arızası$/, 'Şikâyetleri');
+        }
+      }
+
+      supportingFacts.push({
+        factKey,
+        label: isVerified
+          ? 'Doğrulanmış Teknik Veri'
+          : isObserved
+          ? 'Gözlemlenen Saha / Karakteristik Davranış'
+          : 'Kullanıcı Geri Bildirimi / Bildirilen Şikâyet',
+        value: pTitle,
+        source: isVerified ? 'VEHICLE_DATABASE' : 'SYSTEM_DERIVED',
+        confidence: isVerified ? 'HIGH' : 'MEDIUM',
+      });
+    });
 
     const supportingFactIds = supportingFacts.map((f) => f.factKey);
 
@@ -104,7 +132,20 @@ export class VehicleReportFallbackService {
 
     if (problems.length > 0) {
       const topProb = problems[0];
-      const titleLower = (topProb.title || '').toLowerCase();
+      const isVerified = topProb.problemType === 'VERIFIED_FAILURE';
+      const isObserved = topProb.problemType === 'OBSERVED_BEHAVIOR';
+      const isComplaint = !isVerified && !isObserved;
+
+      let riskTitle = topProb.title || 'Teknik Aksam Gözlemi';
+      if (isComplaint) {
+        if (riskTitle.toLowerCase().includes('silecek motoru arızası') || (riskTitle.toLowerCase().includes('silecek') && riskTitle.toLowerCase().includes('arızası'))) {
+          riskTitle = 'Otomatik Silecek Performansı Şikâyetleri';
+        } else if (riskTitle.endsWith('Arızası')) {
+          riskTitle = riskTitle.replace(/Arızası$/, 'Şikâyetleri');
+        }
+      }
+
+      const titleLower = riskTitle.toLowerCase();
       const descLower = (topProb.description || '').toLowerCase();
       const isElectricalOrInteriorOrWiper =
         titleLower.includes('silecek') ||
@@ -125,35 +166,46 @@ export class VehicleReportFallbackService {
       const inspectionInstructions = isElectricalOrInteriorOrWiper
         ? [
             'Ekspertizde ilgili donanım ve gövde elektronik kontrol ünitesini test ettirin.',
-            'Silecek kolu, motor kademeleri ve ilgili sigorta/röle kutusunu kontrol ettirin.',
+            'Silecek kolu kademelerini, su püskürtme memelerini ve ilgili sigorta/röle kutusunu kontrol ettirin.',
           ]
         : (topProb.checkRecommendation ? [topProb.checkRecommendation] : [
             'Ekspertizde aracı liftte kaldırıp alt muhafazayı ve sızıntı bölgesini inceletin.',
             'Bilgisayarlı arıza arama cihazı (OBD-II) ile hata kodlarını taratın.',
           ]);
 
-      const isVerified = topProb.problemType === 'VERIFIED_FAILURE' || topProb.problemType === 'CHRONIC' || !topProb.problemType;
-
       primaryRisk = {
-        title: topProb.title || 'Mekanik Aşınma Riski',
+        title: riskTitle,
         severity: (topProb.riskLevel || 'MEDIUM') as any,
         explanation: topProb.description || 'Kayıtlı teknik aksam gözlemi.',
         symptoms,
         inspectionInstructions,
         riskMeaning: isVerified
           ? 'Doğrulanmış bu kayıt ekspertiz kontrolünde öncelikli fiziki kontrol noktasıdır.'
+          : isObserved
+          ? 'Gözlemlenen karakteristik bir durum olup ekspertizde olağan çalışma durumu teyit edilmelidir.'
           : 'Kullanıcı geri bildirimi niteliğindedir; ekspertizde fonksiyonel kontrolü önerilir.',
         supportingFactIds: [`FACT_PROB_${topProb.id || '1'}`],
       };
 
       for (let i = 1; i < problems.length; i++) {
+        const p = problems[i];
+        const pVerified = p.problemType === 'VERIFIED_FAILURE';
+        let pTitle = p.title || 'İkincil Gözlem';
+        if (!pVerified) {
+          if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
+            pTitle = 'Otomatik Silecek Performansı Şikâyetleri';
+          } else if (pTitle.endsWith('Arızası')) {
+            pTitle = pTitle.replace(/Arızası$/, 'Şikâyetleri');
+          }
+        }
+
         secondaryRisks.push({
-          title: problems[i].title,
-          severity: (problems[i].riskLevel || 'LOW') as any,
-          explanation: problems[i].description || 'Takip edilmesi gereken teknik aksam uyarısı.',
+          title: pTitle,
+          severity: (p.riskLevel || 'LOW') as any,
+          explanation: p.description || 'Takip edilmesi gereken teknik aksam uyarısı.',
           symptoms: ['Periyodik bakım aralığında kontrol gereksinimi'],
           inspectionInstructions: ['Periyodik servis kayıtlarını inceletin.'],
-          supportingFactIds: [`FACT_PROB_${problems[i].id}`],
+          supportingFactIds: [`FACT_PROB_${p.id}`],
         });
       }
     }
