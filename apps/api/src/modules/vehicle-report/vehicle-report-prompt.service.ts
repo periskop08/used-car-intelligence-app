@@ -178,7 +178,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 7. CÜMLE TAMAMLAMA: Tüm paragrafları NOKTA (.) ile biten %100 TAM CÜMLELERLE tamamla. Asla metni yarım bırakma!
 8. Yalnızca geçerli JSON üret.
 9. HİBRİT VE e-CVT MİMARİSİ VE GÜÇ/TORK ETİKETLEME KORUMASI:
-   - Hibrit araçlarda motor gücü (örn. 122 HP) "Toplam Hibrit Sistem Gücü" olarak, tork (örn. 142 Nm) ise "Benzinli Motor Torku" olarak sunulmalıdır. Hibrit araçlarda elektrik motoru torku (örn. 163 Nm) ile benzinli motor torku doğrudan toplanarak uydurma kombine tork ÜRETİLEMEZ veya 142 Nm "toplam tork" olarak sunulamaz.
+   - Hibrit araçlarda doğrulanmış DB / kaynak sayısal güç ve tork değerlerini ASLA kendiliğinden dönüştürme veya yeniden yazma (örn. DB'de 120 HP ise 120 HP olarak koru, 122 HP'ye çevirme; kaynak birim ve değerleri sessizce dönüştürme). Yalnızca doğrulanmış değere semantik etiket ekle: "[Doğrulanmış Güç] HP (Toplam Hibrit Sistem Gücü)".
+   - Doğrulanmış içten yanmalı motor torkunu "[Doğrulanmış Tork] Nm (Benzinli Motor Torku)" olarak etiketle. Doğrulanmış elektrik motoru torku güvenilir kaynakta varsa ayrı belirt; güvenilir kanıtta yoksa tork uydurma ve ASLA benzinli ile elektrik torkunu toplayarak kombine hibrit tork hesaplama.
    - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.`;
   }
 
@@ -257,7 +258,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 10. HİBRİT VE e-CVT AKTARMA MİMARİSİ:
-    - Araç Hibrit veya e-CVT ise: Motor gücü Toplam Hibrit Sistem Gücü olarak, Tork Benzinli Motor Torku olarak sunulmalıdır. Asla benzinli ve elektrik torkunu toplayıp kombine tork uydurma.
+    - Araç Hibrit veya e-CVT ise: Doğrulanmış DB güç/tork sayısal değerlerini aynen koru, dönüştürme (örn. DB'de 120 HP ise 120 HP olarak koru). Yalnızca Motor gücüne "(Toplam Hibrit Sistem Gücü)", varsa doğrulanmış benzinli torka "(Benzinli Motor Torku)" etiketini ekle. Asla kombine hibrit tork hesaplama veya kanıtta olmayan tork uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
