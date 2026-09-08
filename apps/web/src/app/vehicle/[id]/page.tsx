@@ -593,8 +593,8 @@ export default function VehicleDetail() {
       {/* SOL GOOGLE ADS REKLAM KOLONU (1280px ve üzeri ekranlarda temiz boşluk olarak kalır) */}
       <div className="hidden xl:block w-[160px] min-[1600px]:w-[200px] min-[1920px]:w-[280px] shrink-0 sticky top-16 h-[600px]" />
 
-      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1060px Ortalanmış Kompakt) */}
-      <div className="w-full max-w-[1060px] flex flex-col gap-4 shrink-0">
+      {/* MERKEZ ANA İÇERİK KONTEYNERİ (1220px Ortalanmış Geniş) */}
+      <div className="w-full max-w-[1220px] flex flex-col gap-4 shrink-0">
         
         {/* Title Header & Favorite Action */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
@@ -654,10 +654,10 @@ export default function VehicleDetail() {
           </a>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
         
         {/* Specs, Problems & Reviews Column */}
-        <div className="lg:col-span-2 flex flex-col gap-8">
+        <div className="lg:col-span-7 flex flex-col gap-8">
           
           {/* AI Report Card (TorqueScout Vehicle Report Shell) */}
           {structuredReport ? (
@@ -850,15 +850,15 @@ export default function VehicleDetail() {
         </div>
 
         {/* AI Report & Custom AI Chat Column */}
-        <div className="flex flex-col gap-6">
+        <div className="lg:col-span-5 flex flex-col gap-6">
 
           {/* AI Chat Box (Custom Question Box - Reference Design) */}
-          <div className="relative overflow-hidden rounded-[26px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-6 sm:p-8 md:p-10 shadow-2xl flex flex-col">
+          <div className="relative overflow-hidden rounded-[24px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-4 sm:p-5 lg:p-6 shadow-2xl flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
               {/* Status indicator */}
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-2.5 w-2.5">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_10px_#34d399]"></span>
                 </span>
@@ -870,7 +870,7 @@ export default function VehicleDetail() {
               </div>
 
               {/* Entitlement Badge */}
-              <div className="rounded-2xl border border-teal-500/35 bg-[#08222c]/80 px-4 py-2 flex flex-col items-center justify-center text-center select-none shadow-sm min-w-[100px]">
+              <div className="rounded-2xl border border-teal-500/35 bg-[#08222c]/80 px-3.5 py-1.5 flex flex-col items-center justify-center text-center select-none shadow-sm shrink-0 min-w-[92px]">
                 <span className="text-teal-300 font-bold text-xs sm:text-[13px] leading-tight">
                   {chatQuota.isUnlimited ? "Sınırsız" : `${chatQuota.remaining}`}
                 </span>
@@ -881,17 +881,17 @@ export default function VehicleDetail() {
             </div>
 
             {/* Subtle Divider */}
-            <div className="border-t border-sky-500/15 w-full my-6 sm:my-8" />
+            <div className="border-t border-sky-500/15 w-full my-4 sm:my-5" />
 
             {/* Center Title or Message History */}
             {chatMessages.length === 0 ? (
               <div className="flex flex-col">
-                <h3 className="text-center text-lg sm:text-xl md:text-2xl font-bold text-slate-100 mb-6 sm:mb-8 tracking-tight">
+                <h3 className="text-center text-base sm:text-lg font-bold text-slate-100 mb-4 sm:mb-5 tracking-tight">
                   Bu araç hakkında ne öğrenmek istersiniz?
                 </h3>
 
                 {/* 2x2 Suggestion Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-4 sm:mb-5">
                   {[
                     "Şanzıman uzun vadede üzer mi?",
                     "Bu motorun kronik sorunu var mı?",
@@ -903,20 +903,20 @@ export default function VehicleDetail() {
                       type="button"
                       disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
                       onClick={() => handleSendChat(undefined, q)}
-                      className="group relative flex items-center justify-between p-4 sm:p-5 rounded-2xl bg-[#0c182e]/80 hover:bg-[#112444] border border-sky-500/15 hover:border-sky-400/40 transition-all duration-200 cursor-pointer text-left shadow-sm hover:shadow-md hover:shadow-sky-950/40 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="group relative flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-[#0c182e]/80 hover:bg-[#112444] border border-sky-500/15 hover:border-sky-400/40 transition-all duration-200 cursor-pointer text-left shadow-sm hover:shadow-md hover:shadow-sky-950/40 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center shrink-0">
-                        <svg className="w-4 h-4 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <div className="w-7 h-7 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                           <circle cx="9" cy="10" r="0.8" fill="currentColor"/>
                           <circle cx="12" cy="10" r="0.8" fill="currentColor"/>
                           <circle cx="15" cy="10" r="0.8" fill="currentColor"/>
                         </svg>
                       </div>
-                      <span className="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-white px-3 flex-1 leading-snug">
+                      <span className="text-[11px] sm:text-xs font-medium text-slate-200 group-hover:text-white px-2 flex-1 leading-snug">
                         {q}
                       </span>
-                      <svg className="w-4 h-4 text-slate-500 group-hover:text-slate-300 shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="9 18 15 12 9 6"/>
                       </svg>
                     </button>
@@ -926,11 +926,11 @@ export default function VehicleDetail() {
             ) : (
               <div className="flex flex-col mb-4">
                 {/* Messages Listing */}
-                <div className="max-h-96 overflow-y-auto flex flex-col gap-4 py-2 pr-1 custom-scrollbar">
+                <div className="max-h-96 overflow-y-auto flex flex-col gap-3 py-2 pr-1 custom-scrollbar">
                   {chatMessages.map((msg, idx) => (
                     <div
                       key={idx}
-                      className={`flex gap-2.5 max-w-[85%] ${
+                      className={`flex gap-2.5 max-w-[88%] ${
                         msg.sender === "user" ? "self-end flex-row-reverse" : "self-start"
                       }`}
                     >
@@ -944,7 +944,7 @@ export default function VehicleDetail() {
                         {msg.sender === "user" ? "Siz" : "TS"}
                       </div>
                       <div
-                        className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap shadow-md ${
+                        className={`p-3 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap shadow-md ${
                           msg.sender === "user"
                             ? "bg-gradient-to-br from-orange-600/20 to-orange-700/5 border border-orange-500/25 text-slate-100 rounded-tr-none"
                             : "bg-[#071326] border border-sky-500/20 text-slate-200 rounded-tl-none"
@@ -959,11 +959,11 @@ export default function VehicleDetail() {
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse font-bold">
                         TS
                       </div>
-                      <div className="p-3.5 rounded-2xl text-xs bg-[#071326] border border-sky-500/20 text-slate-400 rounded-tl-none flex items-center gap-1.5 shadow-md">
+                      <div className="p-3 rounded-2xl text-xs bg-[#071326] border border-sky-500/20 text-slate-400 rounded-tl-none flex items-center gap-1.5 shadow-md">
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
                         <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
-                        <span className="text-[11px] text-slate-500 ml-1.5 font-medium">Analiz ediliyor...</span>
+                        <span className="text-[11px] text-slate-500 ml-1 font-medium">Analiz ediliyor...</span>
                       </div>
                     </div>
                   )}
@@ -971,8 +971,8 @@ export default function VehicleDetail() {
                 </div>
 
                 {/* Suggested Questions compact chips after conversation begins */}
-                <div className="flex flex-wrap items-center gap-2 pt-3 mt-2 border-t border-white/5">
-                  <span className="text-[11px] text-slate-400 mr-1">Önerilen sorular:</span>
+                <div className="flex flex-wrap items-center gap-1.5 pt-2.5 mt-2 border-t border-white/5">
+                  <span className="text-[10px] text-slate-400 mr-1">Önerilen sorular:</span>
                   {[
                     "Şanzıman uzun vadede üzer mi?",
                     "Bu motorun kronik sorunu var mı?",
@@ -984,9 +984,9 @@ export default function VehicleDetail() {
                       type="button"
                       disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
                       onClick={() => handleSendChat(undefined, q)}
-                      className="text-xs px-3 py-1.5 rounded-xl bg-[#0c182e] hover:bg-[#102242] border border-sky-500/20 text-slate-300 hover:text-white transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                      className="text-[11px] px-2.5 py-1 rounded-xl bg-[#0c182e] hover:bg-[#102242] border border-sky-500/20 text-slate-300 hover:text-white transition flex items-center gap-1 active:scale-95 disabled:opacity-50"
                     >
-                      <span className="text-orange-400 text-[10px]">●</span>
+                      <span className="text-orange-400 text-[9px]">●</span>
                       <span>{q}</span>
                     </button>
                   ))}
@@ -996,11 +996,11 @@ export default function VehicleDetail() {
 
             {/* Quota Exhausted Warning */}
             {!chatQuota.loading && !chatQuota.isUnlimited && chatQuota.remaining <= 0 && (
-              <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-200">
-                <span>Mesaj hakkınız tükendi. Daha fazla soru sormak için paket satın alabilir veya aboneliğinizi yükseltebilirsiniz.</span>
+              <div className="mb-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-amber-200">
+                <span>Mesaj hakkınız tükendi. Lütfen ek paket satın alın.</span>
                 <a
                   href="/pricing"
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition whitespace-nowrap text-xs"
+                  className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition whitespace-nowrap text-xs"
                 >
                   Paketleri İncele
                 </a>
@@ -1009,7 +1009,7 @@ export default function VehicleDetail() {
 
             {/* Error Message */}
             {chatError && (
-              <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-2xl font-medium flex items-center justify-between">
+              <div className="mb-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2.5 rounded-2xl font-medium flex items-center justify-between">
                 <span>⚠️ {chatError}</span>
                 <button
                   type="button"
@@ -1022,9 +1022,9 @@ export default function VehicleDetail() {
             )}
 
             {/* Input Form */}
-            <form onSubmit={handleSendChat} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1 flex items-center bg-[#060e1d]/90 border border-slate-700/60 focus-within:border-sky-500/50 rounded-2xl px-4 py-3 sm:py-3.5 transition shadow-inner">
-                <svg className="w-4 h-4 text-slate-400 mr-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <form onSubmit={handleSendChat} className="flex flex-row items-center gap-2.5">
+              <div className="relative flex-1 flex items-center bg-[#060e1d]/90 border border-slate-700/60 focus-within:border-sky-500/50 rounded-2xl px-3.5 py-2.5 sm:py-3 transition shadow-inner min-w-0">
+                <svg className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   <circle cx="9" cy="10" r="0.8" fill="currentColor"/>
                   <circle cx="12" cy="10" r="0.8" fill="currentColor"/>
@@ -1036,23 +1036,23 @@ export default function VehicleDetail() {
                   disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
                   onChange={e => setChatQuestion(e.target.value)}
                   placeholder="Bu araç hakkında sorunuzu yazın..."
-                  className="flex-1 bg-transparent border-0 outline-none text-slate-100 text-xs sm:text-sm placeholder:text-slate-500 disabled:opacity-50"
+                  className="flex-1 bg-transparent border-0 outline-none text-slate-100 text-xs sm:text-sm placeholder:text-slate-500 disabled:opacity-50 min-w-0"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0) || !chatQuestion.trim()}
-                className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold px-7 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 text-sm tracking-wide"
+                className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold px-5 sm:px-6 py-2.5 sm:py-3 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 text-xs sm:text-sm tracking-wide"
               >
                 {sendingChat ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                     <span>Soruluyor...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4 text-white rotate-45" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-3.5 h-3.5 text-white rotate-45" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
                     <span>Sor</span>
@@ -1062,7 +1062,7 @@ export default function VehicleDetail() {
             </form>
 
             {/* Helper Text */}
-            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-400 mt-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 mt-2">
               <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="16" x2="12" y2="12"/>
