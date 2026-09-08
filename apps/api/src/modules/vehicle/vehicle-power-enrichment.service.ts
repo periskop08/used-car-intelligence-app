@@ -1,12 +1,19 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from '../research/providers/web-search.provider';
+import OpenAI from 'openai';
 import {
   PowerVerificationStatus,
   PowerSourceMarket,
   PowerMarketResolution,
 } from '@prisma/client';
-import { convertPowerUnits, ConvertedPower } from '@used-car-intelligence/shared';
+import {
+  convertPowerUnits,
+  ConvertedPower,
+  classifySourceTier,
+  TechnicalSourceTier,
+} from '@used-car-intelligence/shared';
+import { verifyVehicleApplicationMatch, isModelMentionedInText } from './variant-technical-facts.service';
 
 export interface PowerEnrichmentReport {
   totalTested: number;
@@ -63,10 +70,12 @@ export class VehiclePowerEnrichmentService {
 
   public readonly metrics = {
     externalWebSearchCalls: 0,
+    externalLLMCalls: 0,
   };
 
   resetMetrics(): void {
     this.metrics.externalWebSearchCalls = 0;
+    this.metrics.externalLLMCalls = 0;
   }
 
   constructor(
@@ -92,7 +101,7 @@ export class VehiclePowerEnrichmentService {
    * Retrieves existing side-car Power Enrichment record for a variant.
    */
   async getEnrichmentByVariantId(vehicleVariantId: string) {
-    return this.prisma.vehiclePowerEnrichment.findUnique({
+    const enrichment = await this.prisma.vehiclePowerEnrichment.findUnique({
       where: { vehicleVariantId },
       include: {
         evidences: {
@@ -100,6 +109,34 @@ export class VehiclePowerEnrichmentService {
         },
       },
     });
+
+    if (!enrichment) return null;
+
+    // Pure read authenticity gate (Section 4, 7, 11):
+    // If enrichment is marked VERIFIED, verify that it has trusted provider origin in metadata
+    if (enrichment.verificationStatus === PowerVerificationStatus.VERIFIED) {
+      const hasTrusted =
+        enrichment.evidences &&
+        enrichment.evidences.length > 0 &&
+        enrichment.evidences.some((ev: any) => {
+          const meta = ev.metadata as any;
+          return (
+            meta &&
+            (meta.provider === 'serper' || meta.provider === 'gemini_grounding' || meta.provider === 'direct_fetch') &&
+            meta.applicationMatch !== false
+          );
+        });
+
+      if (!hasTrusted) {
+        return {
+          ...enrichment,
+          verificationStatus: PowerVerificationStatus.MISSING,
+          confidenceScore: 0.0,
+        };
+      }
+    }
+
+    return enrichment;
   }
 
   /**
@@ -132,7 +169,21 @@ export class VehiclePowerEnrichmentService {
     });
 
     if (existing && existing.verificationStatus === PowerVerificationStatus.VERIFIED) {
-      return existing;
+      const hasTrusted =
+        existing.evidences &&
+        existing.evidences.length > 0 &&
+        existing.evidences.some((e: any) => {
+          const meta = e.metadata as any;
+          return (
+            meta &&
+            (meta.provider === 'serper' || meta.provider === 'gemini_grounding' || meta.provider === 'direct_fetch') &&
+            meta.applicationMatch !== false
+          );
+        });
+
+      if (hasTrusted) {
+        return existing;
+      }
     }
 
     const brandName = (variant.brand?.name || '').trim();
@@ -156,6 +207,7 @@ export class VehiclePowerEnrichmentService {
     };
 
     const identityFingerprint = `${brandName}:${modelName}:${year}:${engineCode}:${fuelType}`.toLowerCase().replace(/\s+/g, '_');
+    const identityText = [brandName, modelName, trimName, year, engineCode, fuelType, bodyType].filter(Boolean).join(' ');
 
     // Mark as RESEARCHING
     await this.prisma.vehiclePowerEnrichment.upsert({
@@ -184,11 +236,51 @@ export class VehiclePowerEnrichmentService {
 
       this.metrics.externalWebSearchCalls++;
       const trSearchResults = await this.webSearchProvider.search(trQuery, 'tr', 'tr');
-      const trEvidences = this.extractPowerEvidences(trSearchResults, PowerSourceMarket.TURKEY);
+
+      const trSourceMap = new Map<string, any>();
+      (trSearchResults || []).slice(0, 8).forEach((res, idx) => {
+        const sId = `S${idx + 1}`;
+        trSourceMap.set(sId, { ...res, sourceId: sId, resolvedUrl: res.resolvedUrl || res.url });
+      });
+
+      const trEvidences = this.extractPowerEvidences(Array.from(trSourceMap.values()), PowerSourceMarket.TURKEY, variant);
+
+      // AI validation & structured extraction with exact vehicle application gate
+      const aiExtraction = await this.extractPowerViaAi(identityText, trSourceMap, PowerSourceMarket.TURKEY, brandName, variant);
+
+      if (aiExtraction?.applicationIncompatible) {
+        this.logger.warn(`[EXACT_APPLICATION_GATE] Vehicle application "${identityText}" unproven or incompatible (${aiExtraction.reason || ''}). Failing closed.`);
+        await this.prisma.vehiclePowerEvidence.deleteMany({
+          where: { enrichment: { vehicleVariantId } },
+        });
+        return await this.prisma.vehiclePowerEnrichment.update({
+          where: { vehicleVariantId },
+          data: {
+            powerKw: null,
+            powerPs: null,
+            powerHp: null,
+            sourceReportedValue: null,
+            sourceReportedUnit: null,
+            verificationStatus: PowerVerificationStatus.MISSING,
+            confidenceScore: 0.0,
+            verifiedAt: new Date(),
+          },
+          include: { evidences: true },
+        });
+      }
+
+      if (aiExtraction?.powerEvidence) {
+        trEvidences.push(aiExtraction.powerEvidence as any);
+      }
 
       if (trEvidences.length > 0) {
         const verifiedResult = this.evaluateEvidences(trEvidences, PowerSourceMarket.TURKEY, PowerMarketResolution.TR_PRIMARY);
-        return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, trEvidences);
+        if (
+          verifiedResult.status === PowerVerificationStatus.VERIFIED ||
+          (verifiedResult.status === PowerVerificationStatus.CONFLICT && verifiedResult.candidatePowers && verifiedResult.candidatePowers.length > 1)
+        ) {
+          return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, trEvidences);
+        }
       }
 
       // ----------------------------------------------------
@@ -199,19 +291,65 @@ export class VehiclePowerEnrichmentService {
 
       this.metrics.externalWebSearchCalls++;
       const euSearchResults = await this.webSearchProvider.search(euQuery, 'en', 'eu');
-      const euEvidences = this.extractPowerEvidences(euSearchResults, PowerSourceMarket.EUROPE);
+
+      const euSourceMap = new Map<string, any>();
+      (euSearchResults || []).slice(0, 8).forEach((res, idx) => {
+        const sId = `S${idx + 1}`;
+        euSourceMap.set(sId, { ...res, sourceId: sId, resolvedUrl: res.resolvedUrl || res.url });
+      });
+
+      const euEvidences = this.extractPowerEvidences(Array.from(euSourceMap.values()), PowerSourceMarket.EUROPE, variant);
+      const aiExtractionEu = await this.extractPowerViaAi(identityText, euSourceMap, PowerSourceMarket.EUROPE, brandName, variant);
+
+      if (aiExtractionEu?.applicationIncompatible) {
+        this.logger.warn(`[EXACT_APPLICATION_GATE] Vehicle application "${identityText}" unproven or incompatible (${aiExtractionEu.reason || ''}). Failing closed.`);
+        await this.prisma.vehiclePowerEvidence.deleteMany({
+          where: { enrichment: { vehicleVariantId } },
+        });
+        return await this.prisma.vehiclePowerEnrichment.update({
+          where: { vehicleVariantId },
+          data: {
+            powerKw: null,
+            powerPs: null,
+            powerHp: null,
+            sourceReportedValue: null,
+            sourceReportedUnit: null,
+            verificationStatus: PowerVerificationStatus.MISSING,
+            confidenceScore: 0.0,
+            verifiedAt: new Date(),
+          },
+          include: { evidences: true },
+        });
+      }
+
+      if (aiExtractionEu?.powerEvidence) {
+        euEvidences.push(aiExtractionEu.powerEvidence as any);
+      }
 
       if (euEvidences.length > 0) {
         const verifiedResult = this.evaluateEvidences(euEvidences, PowerSourceMarket.EUROPE, PowerMarketResolution.EU_FALLBACK);
-        return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, euEvidences);
+        if (
+          verifiedResult.status === PowerVerificationStatus.VERIFIED ||
+          (verifiedResult.status === PowerVerificationStatus.CONFLICT && verifiedResult.candidatePowers && verifiedResult.candidatePowers.length > 1)
+        ) {
+          return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, euEvidences);
+        }
       }
 
       // ----------------------------------------------------
       // PHASE 3: NO VALID TR OR EU SOURCE -> MISSING (NO DEFAULT HP!)
       // ----------------------------------------------------
+      await this.prisma.vehiclePowerEvidence.deleteMany({
+        where: { enrichment: { vehicleVariantId } },
+      });
       return await this.prisma.vehiclePowerEnrichment.update({
         where: { vehicleVariantId },
         data: {
+          powerKw: null,
+          powerPs: null,
+          powerHp: null,
+          sourceReportedValue: null,
+          sourceReportedUnit: null,
           verificationStatus: PowerVerificationStatus.MISSING,
           confidenceScore: 0.0,
           verifiedAt: new Date(),
@@ -238,6 +376,7 @@ export class VehiclePowerEnrichmentService {
   private extractPowerEvidences(
     results: any[],
     market: PowerSourceMarket,
+    targetVariant?: any,
   ): Array<{
     sourceUrl: string;
     sourceDomain: string;
@@ -246,35 +385,77 @@ export class VehiclePowerEnrichmentService {
     reportedUnit: string;
     title: string;
     evidenceExcerpt: string;
+    sourceTier: TechnicalSourceTier;
+    sourceKind: string;
+    provider?: string;
+    providerCitationUri?: string | null;
+    providerResultId?: string | null;
+    contentHash?: string | null;
+    retrievedAt?: string;
+    providerSnippet?: string | null;
+    retrievedPageExcerpt?: string | null;
+    identityMatch?: boolean;
+    applicationMatch?: boolean;
   }> {
-    const evidences: Array<{
-      sourceUrl: string;
-      sourceDomain: string;
-      sourceMarket: PowerSourceMarket;
-      reportedValue: number;
-      reportedUnit: string;
-      title: string;
-      evidenceExcerpt: string;
-    }> = [];
+    const evidences: any[] = [];
+
+    const targetModel = (targetVariant?.model?.name || '').toLowerCase().trim();
+    const targetBrand = (targetVariant?.brand?.name || targetVariant?.model?.brand?.name || '').toLowerCase().trim();
+    const targetEngine = (targetVariant?.engine?.code || '').toLowerCase().trim();
 
     for (const res of results) {
-      const url = String(res.url || '');
+      const url = String(res.resolvedUrl || res.url || '');
       const lowerUrl = url.toLowerCase();
 
-      // Reject non-European / non-Turkish market domains strictly
-      if (NON_EU_FORBIDDEN_DOMAINS.some((domain) => lowerUrl.includes(domain))) {
+      let domain = res.domain || '';
+      try {
+        domain = new URL(url).hostname.toLowerCase();
+      } catch {
+        domain = lowerUrl;
+      }
+
+      // Generic 5-Tier Source Classification (Section 9)
+      const sourceClassification = classifySourceTier(url, targetBrand);
+      const sourceTier = sourceClassification.tier;
+      const sourceKind = sourceClassification.tierLabel;
+
+      // Reject non-European / non-Turkish market domains strictly UNLESS it is an official Tier 1 OEM Manufacturer domain
+      const isOem = sourceTier === TechnicalSourceTier.TIER_1_MANUFACTURER;
+      const isForbiddenDomain = !isOem && NON_EU_FORBIDDEN_DOMAINS.some((forbidden) => {
+        if (forbidden.startsWith('.')) {
+          return domain.endsWith(forbidden) || domain.includes(forbidden + '.');
+        }
+        return domain.includes(forbidden) || lowerUrl.includes(forbidden);
+      });
+
+      if (isForbiddenDomain) {
         this.logger.warn(`[REJECTED_MARKET] Discarding non-European source: ${url}`);
         continue;
       }
 
-      let domain = '';
-      try {
-        domain = new URL(url).hostname;
-      } catch {
-        domain = url;
+      // Application-scoped target identity matching:
+      // Discard snippets that explicitly discuss a foreign model while omitting the target model
+      const titleLower = String(res.title || '').toLowerCase();
+      const snippetLower = String(res.snippet || '').toLowerCase();
+      const fullTextLower = `${titleLower} ${snippetLower}`;
+
+      if (targetModel && targetBrand && fullTextLower.includes(targetBrand)) {
+        if (!isModelMentionedInText(fullTextLower, targetModel, targetEngine)) {
+          this.logger.log(`[FOREIGN_MODEL_DISCARD] Discarding snippet not mentioning target model "${targetModel}": "${res.title}"`);
+          continue;
+        }
       }
 
-      const text = `${res.title || ''} ${res.snippet || ''}`;
+      const text = `${res.title || ''} ${res.providerSnippet || ''} ${res.retrievedPageExcerpt || ''} ${res.snippet || ''}`;
+
+      // Enforce independent vehicle application match (Section 8 & 9)
+      if (targetVariant) {
+        const appMatch = verifyVehicleApplicationMatch(targetVariant, text, url);
+        if (!appMatch.match) {
+          this.logger.log(`[APPLICATION_MISMATCH_DISCARD] Discarding source not matching target variant: "${url}" (${appMatch.reason})`);
+          continue;
+        }
+      }
 
       // Regex for explicit HP / PS / kW / BG values (e.g., 128 HP, 150 PS, 95 BG, 81 kW)
       const matches = text.matchAll(/\b(\d{2,3})\s*(hp|bg|ps|bhp|kw)\b/gi);
@@ -284,6 +465,14 @@ export class VehiclePowerEnrichmentService {
         const unitRaw = match[2].toUpperCase();
 
         if (val >= 40 && val <= 1000) {
+          // Physical passenger vehicle plausibility gate:
+          // A stock 1.0L - 1.6L passenger engine cannot produce 230+ HP (that belongs to high-performance 2.0L+ trims like VZ on the same page)
+          const engineDisplacement = targetVariant?.engine?.displacement;
+          const isSmallEngine = engineDisplacement && engineDisplacement <= 1600;
+          if (isSmallEngine && val > 225) {
+            continue; // Discard alien trim mentions like 300 HP or 325 HP
+          }
+
           const unit = unitRaw === 'BG' ? 'PS' : unitRaw;
           evidences.push({
             sourceUrl: url,
@@ -293,6 +482,17 @@ export class VehiclePowerEnrichmentService {
             reportedUnit: unit,
             title: res.title || '',
             evidenceExcerpt: match[0],
+            sourceTier,
+            sourceKind,
+            provider: res.provider || 'direct_fetch',
+            providerCitationUri: res.providerCitationUri || null,
+            providerResultId: res.providerResultId || null,
+            contentHash: res.contentHash || null,
+            retrievedAt: res.retrievedAt || new Date().toISOString(),
+            providerSnippet: res.providerSnippet || null,
+            retrievedPageExcerpt: res.retrievedPageExcerpt || null,
+            identityMatch: true,
+            applicationMatch: true,
           });
         }
       }
@@ -303,9 +503,16 @@ export class VehiclePowerEnrichmentService {
 
   /**
    * Evaluates collected evidences for consensus or conflict.
+   * Enforces Section 9: Forum evidence cannot be the primary authority making a field VERIFIED.
    */
   private evaluateEvidences(
-    evidences: Array<{ reportedValue: number; reportedUnit: string; sourceMarket: PowerSourceMarket }>,
+    evidences: Array<{
+      reportedValue: number;
+      reportedUnit: string;
+      sourceMarket: PowerSourceMarket;
+      sourceTier?: TechnicalSourceTier;
+      sourceKind?: string;
+    }>,
     market: PowerSourceMarket,
     resolution: PowerMarketResolution,
   ): {
@@ -314,6 +521,7 @@ export class VehiclePowerEnrichmentService {
     confidence: number;
     market: PowerSourceMarket;
     resolution: PowerMarketResolution;
+    candidatePowers?: number[];
   } {
     if (evidences.length === 0) {
       return {
@@ -328,48 +536,101 @@ export class VehiclePowerEnrichmentService {
     const convertedList = evidences.map((e) => ({
       ...e,
       converted: convertPowerUnits(e.reportedValue, e.reportedUnit),
+      tier: e.sourceTier ?? TechnicalSourceTier.TIER_4_SECONDARY_MEDIA,
     }));
 
-    const uniqueHpValues = Array.from(new Set(convertedList.map((c) => c.converted.powerHp)));
+    // Filter out forum-only sources from primary verification authority (Section 9)
+    const nonForumEvidences = convertedList.filter(
+      (c) => c.tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM,
+    );
 
-    // Check for major conflict (e.g., difference > 15 HP across valid sources)
-    const minHp = Math.min(...uniqueHpValues);
-    const maxHp = Math.max(...uniqueHpValues);
-
-    if (maxHp - minHp > 15 && uniqueHpValues.length > 1) {
-      this.logger.warn(`[CONFLICT] Incompatible power values found: ${uniqueHpValues.join(', ')} HP`);
+    if (nonForumEvidences.length === 0) {
+      this.logger.warn(`[FORUM_ONLY_EVIDENCE] Only Tier 5 community forum sources found. Cannot grant VERIFIED status.`);
       return {
-        status: PowerVerificationStatus.CONFLICT,
-        confidence: 0.3,
+        status: PowerVerificationStatus.MISSING,
+        confidence: 0.2,
         market,
         resolution,
       };
     }
 
-    // Consensus power (use most frequent HP value)
-    const hpCounts = new Map<number, number>();
-    for (const item of convertedList) {
-      const hp = item.converted.powerHp;
-      hpCounts.set(hp, (hpCounts.get(hp) || 0) + 1);
+    // Determine consensus using authoritative published sources (Tiers 1-4)
+    const consensusList = nonForumEvidences;
+
+    // Cluster power values within a tolerance window of ±4 HP (handling 150 PS = 148 HP)
+    interface PowerCluster {
+      representativeHp: number;
+      minHp: number;
+      maxHp: number;
+      count: number;
+      items: typeof consensusList;
     }
 
-    let topHp = uniqueHpValues[0];
-    let maxCount = 0;
-    for (const [hp, count] of hpCounts.entries()) {
-      if (count > maxCount) {
-        maxCount = count;
-        topHp = hp;
+    const clusters: PowerCluster[] = [];
+    for (const item of consensusList) {
+      const hp = item.converted.powerHp;
+      const existingCluster = clusters.find((c) => Math.abs(c.representativeHp - hp) <= 4);
+      if (existingCluster) {
+        existingCluster.count++;
+        existingCluster.items.push(item);
+        existingCluster.minHp = Math.min(existingCluster.minHp, hp);
+        existingCluster.maxHp = Math.max(existingCluster.maxHp, hp);
+      } else {
+        clusters.push({
+          representativeHp: hp,
+          minHp: hp,
+          maxHp: hp,
+          count: 1,
+          items: [item],
+        });
       }
     }
 
-    const topItem = convertedList.find((c) => c.converted.powerHp === topHp)!;
+    // Sort clusters by evidence count descending
+    clusters.sort((a, b) => b.count - a.count);
+    const topCluster = clusters[0];
+
+    // Identify candidate factory powers (distinct clusters separated by > 10 HP with support)
+    const validCandidateClusters = clusters.filter(
+      (c) => c.count >= 2 || (c === topCluster && c.count >= 1),
+    );
+    const candidatePowers = validCandidateClusters
+      .map((c) => c.representativeHp)
+      .sort((a, b) => a - b);
+
+    // Genuine conflict check:
+    // Conflict only occurs if there is a competing cluster with significant support (>= 2 authoritative sources and >= 40% of top cluster count)
+    // that differs by > 15 HP.
+    const runnerUp = clusters[1];
+    if (
+      runnerUp &&
+      runnerUp.count >= 2 &&
+      runnerUp.count >= topCluster.count * 0.4 &&
+      Math.abs(topCluster.representativeHp - runnerUp.representativeHp) > 15
+    ) {
+      this.logger.warn(
+        `[CONFLICT] Incompatible competing power clusters found across authoritative sources: ${topCluster.representativeHp} HP (${topCluster.count} sources) vs ${runnerUp.representativeHp} HP (${runnerUp.count} sources)`
+      );
+      const conflictCandidates = [topCluster.representativeHp, runnerUp.representativeHp].sort((a, b) => a - b);
+      return {
+        status: PowerVerificationStatus.CONFLICT,
+        confidence: 0.3,
+        market,
+        resolution,
+        candidatePowers: conflictCandidates,
+      };
+    }
+
+    // Top cluster is verified consensus!
+    const topItem = topCluster.items.sort((a, b) => (a.tier || 4) - (b.tier || 4))[0];
 
     return {
       status: PowerVerificationStatus.VERIFIED,
       power: topItem.converted,
-      confidence: Math.min(1.0, 0.7 + maxCount * 0.1),
+      confidence: Math.min(1.0, 0.7 + topCluster.count * 0.1),
       market,
       resolution,
+      candidatePowers: candidatePowers.length > 1 ? candidatePowers : undefined,
     };
   }
 
@@ -381,7 +642,16 @@ export class VehiclePowerEnrichmentService {
     evalResult: ReturnType<typeof this.evaluateEvidences>,
     evidences: any[],
   ) {
-    const { status, power, confidence, market, resolution } = evalResult;
+    const { status, power, confidence, market, resolution, candidatePowers } = evalResult;
+
+    const existingEnrich = await this.prisma.vehiclePowerEnrichment.findUnique({
+      where: { vehicleVariantId },
+      select: { identitySnapshot: true },
+    });
+    const snapshot = (existingEnrich?.identitySnapshot as Record<string, any>) || {};
+    if (candidatePowers && candidatePowers.length > 1) {
+      snapshot.candidatePowers = candidatePowers;
+    }
 
     const enrichment = await this.prisma.vehiclePowerEnrichment.update({
       where: { vehicleVariantId },
@@ -395,28 +665,47 @@ export class VehiclePowerEnrichmentService {
         powerHp: power?.powerHp ?? null,
         sourceReportedValue: power?.sourceReportedValue ?? null,
         sourceReportedUnit: power?.sourceReportedUnit ?? null,
+        identitySnapshot: Object.keys(snapshot).length > 0 ? snapshot : undefined,
         verifiedAt: new Date(),
       },
     });
 
-    // Create Evidence records (additive)
+    // Create Evidence records (additive) with sourceKind, sourceMarket, and immutable metadata
     if (evidences.length > 0) {
       await this.prisma.vehiclePowerEvidence.createMany({
         data: evidences.map((ev) => ({
           enrichmentId: enrichment.id,
           sourceUrl: ev.sourceUrl,
           sourceDomain: ev.sourceDomain,
-          sourceKind: 'WEB_RESEARCH',
+          sourceKind: ev.sourceKind || 'WEB_RESEARCH',
           sourceMarket: ev.sourceMarket,
           reportedValue: ev.reportedValue,
           reportedUnit: ev.reportedUnit,
           title: ev.title,
           evidenceExcerpt: ev.evidenceExcerpt,
+          retrievedAt: ev.retrievedAt ? new Date(ev.retrievedAt) : new Date(),
+          metadata: {
+            provider: ev.provider || 'direct_fetch',
+            providerResultId: ev.providerResultId || null,
+            providerCitationUri: ev.providerCitationUri || null,
+            resolvedUrl: ev.sourceUrl,
+            contentHash: ev.contentHash || null,
+            sourceTier: ev.sourceTier || null,
+            identityMatch: ev.identityMatch !== false,
+            applicationMatch: ev.applicationMatch !== false,
+            providerSnippet: ev.providerSnippet || null,
+            retrievedPageExcerpt: ev.retrievedPageExcerpt || null,
+            parserSummary: ev.parserSummary || null,
+          },
         })),
       });
     }
 
-    return this.getEnrichmentByVariantId(vehicleVariantId);
+    const finalRecord: any = await this.getEnrichmentByVariantId(vehicleVariantId);
+    if (finalRecord && candidatePowers && candidatePowers.length > 1) {
+      finalRecord.candidatePowers = candidatePowers;
+    }
+    return finalRecord;
   }
 
   /**
@@ -507,5 +796,188 @@ export class VehiclePowerEnrichmentService {
       },
       results: reportResults,
     };
+  }
+
+  private async extractPowerViaAi(
+    vehicleIdentity: string,
+    sourceMap: Map<string, any>,
+    market: PowerSourceMarket,
+    brandName: string,
+    targetVariant: any,
+  ): Promise<{
+    power?: { value: number; unit: 'KW' | 'PS' | 'HP' };
+    powerEvidence?: {
+      sourceUrl: string;
+      sourceDomain: string;
+      sourceMarket: PowerSourceMarket;
+      reportedValue: number;
+      reportedUnit: string;
+      title: string;
+      evidenceExcerpt: string;
+      sourceTier: TechnicalSourceTier;
+      sourceKind: string;
+      provider?: string;
+      providerCitationUri?: string | null;
+      providerResultId?: string | null;
+      contentHash?: string | null;
+      retrievedAt?: string;
+      providerSnippet?: string | null;
+      retrievedPageExcerpt?: string | null;
+      parserSummary?: string | null;
+      identityMatch?: boolean;
+      applicationMatch?: boolean;
+    };
+    sourceUrl?: string;
+    evidence?: string;
+    applicationIncompatible?: boolean;
+    reason?: string;
+  } | null> {
+    this.metrics.externalLLMCalls++;
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+
+    // AI is provided only request-local identifiers [S1], [S2] and content.
+    // AI is NEVER given URLs or allowed to return URLs.
+    const evidenceText = Array.from(sourceMap.entries())
+      .map(([sId, src]) => {
+        const textContent = src.providerSnippet || src.retrievedPageExcerpt || src.snippet || '';
+        return `[${sId}]\nTitle: ${src.title}\nDomain: ${src.domain}\nContent: ${textContent}`;
+      })
+      .join('\n\n');
+
+    const systemPrompt = `You are an expert automotive technical power specification extractor.
+Given evidence snippets from authoritative automotive sources for target vehicle: "${vehicleIdentity}", extract the exact factory engine power (in kW, PS/bg, or HP).
+
+CRITICAL CONSTRAINTS:
+1. You MUST reference an existing source identifier ([S1], [S2], etc.). You are STRICTLY FORBIDDEN from inventing or outputting URLs.
+2. The numeric power value MUST be explicitly stated in the source content for that [sourceId].
+3. Extract source-side vehicle details (model, badge, market) so application code can independently verify application match.
+4. If vehicle model/engine was NOT manufactured or is implausible, return {"applicationCompatible": false, "reason": "TAXONOMY_MISMATCH"}.
+5. Return strict JSON matching:
+{
+  "applicationCompatible": true,
+  "sourceId": "S1",
+  "power": {
+    "value": number,
+    "unit": "KW" | "PS" | "HP"
+  },
+  "parserSummary": "Summary describing power and vehicle application",
+  "sourceVehicleDetails": {
+    "model": "model name in source",
+    "badge": "badge/trim in source",
+    "market": "market in source"
+  }
+}`;
+
+    let parsed: any = null;
+
+    if (openaiKey) {
+      try {
+        const openai = new OpenAI({ apiKey: openaiKey, timeout: 8000 });
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `EVIDENCE:\n${evidenceText}` },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const content = response.choices[0]?.message?.content;
+        if (content) parsed = JSON.parse(content);
+      } catch (err: any) {
+        this.logger.warn(`OpenAI power extraction failed: ${err.message}`);
+      }
+    }
+
+    if (!parsed && geminiKey) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(8000),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nEVIDENCE:\n${evidenceText}` }] }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) parsed = JSON.parse(text);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Gemini power extraction failed: ${err.message}`);
+      }
+    }
+
+    if (!parsed) return null;
+
+    if (parsed.applicationCompatible === false || parsed.reason?.includes('TAXONOMY')) {
+      return { applicationIncompatible: true, reason: 'VARIANT_IDENTITY_REQUIRES_SEPARATE_TAXONOMY_REVIEW' };
+    }
+
+    // Resolve sourceId to immutable RetrievedSource
+    const sourceId = String(parsed.sourceId || '').trim();
+    const retrievedSource = sourceMap.get(sourceId);
+    if (!retrievedSource) {
+      this.logger.warn(`[SOURCE_FABRICATION_PREVENTED] AI returned unsupplied sourceId "${sourceId}". Rejected.`);
+      return null;
+    }
+
+    if (parsed.power?.value && parsed.power?.unit) {
+      const val = Number(parsed.power.value);
+      const rawUnit = String(parsed.power.unit).toUpperCase();
+      const unit = rawUnit === 'BG' ? 'PS' : (rawUnit as 'KW' | 'PS' | 'HP');
+
+      if (val < 40 || val > 1200) return null;
+
+      // Verify value exists in retrieved authentic text (valueAbsentFromRetrievedEvidenceCanVerifyFact = FALSE)
+      const authenticText = `${retrievedSource.providerSnippet || ''} ${retrievedSource.retrievedPageExcerpt || ''} ${retrievedSource.retrievedPageText || ''} ${retrievedSource.title || ''}`;
+      const hasValueInText = authenticText.includes(String(Math.round(val)));
+      if (!hasValueInText) {
+        this.logger.warn(`[AUTHENTICITY_REJECT] Extracted power ${val} ${unit} not physically present in source ${retrievedSource.resolvedUrl}`);
+        return null;
+      }
+
+      // Verify vehicle application match deterministically
+      const appMatchResult = verifyVehicleApplicationMatch(targetVariant, authenticText, retrievedSource.resolvedUrl);
+      if (!appMatchResult.match) {
+        this.logger.warn(`[APPLICATION_MISMATCH_REJECT] Extracted power source ${retrievedSource.resolvedUrl} does not match target application: ${appMatchResult.reason}`);
+        return null;
+      }
+
+      const sourceClassification = classifySourceTier(retrievedSource.resolvedUrl, brandName);
+
+      return {
+        power: { value: val, unit },
+        sourceUrl: retrievedSource.resolvedUrl,
+        evidence: retrievedSource.providerSnippet || retrievedSource.retrievedPageExcerpt || `${val} ${unit}`,
+        powerEvidence: {
+          sourceUrl: retrievedSource.resolvedUrl,
+          sourceDomain: retrievedSource.domain,
+          sourceMarket: market,
+          reportedValue: val,
+          reportedUnit: unit,
+          title: retrievedSource.title || `${vehicleIdentity} Specifications`,
+          evidenceExcerpt: retrievedSource.providerSnippet || retrievedSource.retrievedPageExcerpt || `${val} ${unit}`,
+          sourceTier: sourceClassification.tier,
+          sourceKind: sourceClassification.tierLabel,
+          provider: retrievedSource.provider,
+          providerCitationUri: retrievedSource.providerCitationUri,
+          providerResultId: retrievedSource.providerResultId,
+          contentHash: retrievedSource.contentHash,
+          retrievedAt: retrievedSource.retrievedAt,
+          providerSnippet: retrievedSource.providerSnippet,
+          retrievedPageExcerpt: retrievedSource.retrievedPageExcerpt,
+          parserSummary: parsed.parserSummary,
+          identityMatch: true,
+          applicationMatch: true,
+        },
+      };
+    }
+
+    return null;
   }
 }

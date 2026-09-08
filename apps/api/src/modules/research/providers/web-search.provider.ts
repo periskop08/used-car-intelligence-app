@@ -1,15 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SearchProvider, SearchResult } from './search-provider.interface';
+import { SearchProvider, SearchResult, RetrievedSource } from './search-provider.interface';
 import { SourceKind } from '@used-car-intelligence/shared';
-import OpenAI from 'openai';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class WebSearchProvider implements SearchProvider {
   private readonly logger = new Logger(WebSearchProvider.name);
 
+  // Authenticity contract invariants:
+  // An LLM is NEVER a search provider. Synthetic search fallback is permanently disabled.
+  public readonly llmCanSimulateWebSearchResults = false;
+  public readonly syntheticSearchFallbackExists = false;
+
   async search(query: string, languageCode: string, countryCode: string): Promise<SearchResult[]> {
-    const isProduction = process.env.NODE_ENV === 'production';
     const serperKey = process.env.SERPER_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
 
     // 1. Try Serper.dev Google Search API first if key is present
     if (serperKey) {
@@ -35,96 +40,201 @@ export class WebSearchProvider implements SearchProvider {
         const data: any = await response.json();
         const organic = Array.isArray(data.organic) ? data.organic : [];
 
-        return organic.slice(0, 5).map((item: any) => {
+        return organic.slice(0, 5).map((item: any, idx: number) => {
           const itemUrl = item.link || '';
           const sourceKind = this.determineSourceKind(itemUrl);
+          let domain = '';
+          try { domain = new URL(itemUrl).hostname.toLowerCase(); } catch {}
+          const snippetText = item.snippet || '';
+          const contentHash = crypto.createHash('sha256').update(snippetText).digest('hex');
 
           return {
             url: itemUrl,
+            resolvedUrl: itemUrl,
+            domain,
             title: item.title || '',
-            snippet: item.snippet || '',
+            snippet: snippetText,
+            providerSnippet: snippetText,
+            retrievedPageExcerpt: null,
+            retrievedPageText: null,
+            provider: 'serper' as const,
+            providerResultId: `serper_${idx}`,
+            contentHash,
+            retrievedAt: new Date().toISOString(),
             sourceKind,
             reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
           };
         });
       } catch (error: any) {
-        this.logger.error(`Error performing Serper.dev Live Search: ${error.message}. Falling back to AI Search Grounding...`);
+        this.logger.error(`Error performing Serper.dev Live Search: ${error.message}. Falling back to authentic Gemini Search Grounding...`);
       }
     }
 
-    // 2. Fallback: OpenAI Search Grounding or Gemini Fallback
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-
-    if (!isProduction && !openaiKey && !geminiApiKey) {
-      this.logger.log(`Mocking search results for query: "${query}" in development/test environment.`);
-      return this.generateMockResults(query);
+    // 2. Real Gemini Google Search Grounding with Direct Destination Page Fetch
+    if (geminiApiKey) {
+      this.logger.log(`Using Gemini Real Google Search Grounding for query: "${query}"`);
+      try {
+        const groundingResults = await this.executeGeminiSearchGrounding(query, geminiApiKey);
+        if (groundingResults.length > 0) {
+          return groundingResults;
+        }
+      } catch (err: any) {
+        this.logger.error(`Gemini Real Search Grounding failed: ${err.message}`);
+      }
     }
 
-    if (!openaiKey && !geminiApiKey) {
-      this.logger.error('Both OPENAI_API_KEY and GEMINI_API_KEY are missing.');
-      throw new Error('Search credentials are missing.');
+    // 3. FAIL CLOSED: When all real retrieval providers fail or are missing,
+    // NEVER invent, simulate, or fabricate synthetic results.
+    this.logger.warn(`No real search provider available or all attempts failed for query: "${query}". Failing closed with empty results.`);
+    return [];
+  }
+
+  /**
+   * Executes genuine Google Search Grounding via Gemini API,
+   * resolves redirect URIs to real target URLs, and fetches authentic destination page text.
+   */
+  private async executeGeminiSearchGrounding(query: string, apiKey: string): Promise<SearchResult[]> {
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    let data: any = null;
+
+    for (const modelName of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(10000),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: query }] }],
+            tools: [{ google_search: {} }],
+          }),
+        });
+
+        if (res.ok) {
+          data = await res.json();
+          break;
+        }
+      } catch (e: any) {
+        this.logger.warn(`Gemini grounding attempt with ${modelName} failed: ${e.message}`);
+      }
     }
 
-    const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
+    if (!data) return [];
 
-    this.logger.log(`Using AI-Powered Search Grounding for query: "${query}"`);
-    try {
-      const systemPrompt = `You are a web search engine retriever. Generate the top 5 highly realistic, accurate search results that would appear on the web (including forums like GolfMK7, Reddit, complaint sites like Şikayetvar, official recall sites, or manufacturer manuals) for the search query: "${query}".
-Return a JSON object containing a "results" array, where each object strictly matches this schema:
-{
-  "url": "a realistic URL from a real website relevant to the search query",
-  "title": "the title of the page",
-  "snippet": "a realistic text snippet of what is discussed on that page regarding the query"
-}
-Ensure the output is strict JSON. Do not include markdown code block formatting (like \`\`\`json).`;
+    const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return [];
+    }
 
-      let text = '{"results": []}';
-      if (openai) {
+    const results: SearchResult[] = [];
+
+    // Process up to 5 unique authentic grounding references
+    for (let i = 0; i < Math.min(chunks.length, 6); i++) {
+      const chunk = chunks[i];
+      const citationUri = chunk.web?.uri;
+      const title = chunk.web?.title || '';
+      if (!citationUri) continue;
+
+      try {
+        // Resolve Google grounding redirect URI to real target URL
+        let resolvedUrl = citationUri;
         try {
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'user', content: systemPrompt },
-            ],
-            temperature: 0.3,
-            response_format: { type: 'json_object' },
+          const headRes = await fetch(citationUri, {
+            method: 'HEAD',
+            redirect: 'manual',
+            signal: AbortSignal.timeout(4000),
+          });
+          const loc = headRes.headers.get('location');
+          if (loc && loc.startsWith('http')) {
+            resolvedUrl = loc;
+          }
+        } catch {
+          // If HEAD fails, keep citationUri or try a GET with manual redirect
+        }
+
+        let domain = title;
+        try {
+          domain = new URL(resolvedUrl).hostname.toLowerCase();
+        } catch {}
+
+        // Fetch destination page directly to extract genuine page text
+        let retrievedPageText: string | null = null;
+        let retrievedPageExcerpt: string | null = null;
+        let contentHash = '';
+
+        try {
+          const pageRes = await fetch(resolvedUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            redirect: 'follow',
+            signal: AbortSignal.timeout(5000),
           });
 
-          text = response.choices[0].message.content || '{"results": []}';
-          this.logger.log(`AI Search Grounding Raw Response: ${text}`);
-        } catch (err: any) {
-          if (geminiApiKey) {
-            this.logger.error(`OpenAI Search Grounding failed: ${err.message}. Trying Gemini fallback...`);
-            text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
-          } else {
-            throw err;
+          if (pageRes.url && pageRes.url.startsWith('http')) {
+            resolvedUrl = pageRes.url;
+            try { domain = new URL(resolvedUrl).hostname.toLowerCase(); } catch {}
           }
+
+          if (pageRes.ok) {
+            const rawHtml = await pageRes.text();
+            // Clean HTML tags and scripts to extract authentic visible text
+            const cleanedText = this.extractVisibleText(rawHtml);
+            if (cleanedText.length > 30) {
+              retrievedPageText = cleanedText.slice(0, 20000);
+              retrievedPageExcerpt = cleanedText.slice(0, 1500);
+              contentHash = crypto.createHash('sha256').update(retrievedPageText).digest('hex');
+            }
+          }
+        } catch {
+          // Page fetch may fail for 403 / timeouts, still retain resolved URL with title
         }
-      } else {
-        text = await this.callGeminiSearch(systemPrompt, geminiApiKey);
-      }
 
-      const cleanedText = this.cleanJsonString(text);
-      const parsed = JSON.parse(cleanedText);
-      const resultsArray = Array.isArray(parsed.results) ? parsed.results : [];
+        if (!contentHash) {
+          contentHash = crypto.createHash('sha256').update(resolvedUrl).digest('hex');
+        }
 
-      return resultsArray.map((item: any) => {
-        const itemUrl = item.url || '';
-        const sourceKind = this.determineSourceKind(itemUrl);
+        const sourceKind = this.determineSourceKind(resolvedUrl);
 
-        return {
-          url: itemUrl,
-          title: item.title || '',
-          snippet: item.snippet || '',
+        results.push({
+          url: resolvedUrl,
+          resolvedUrl,
+          domain,
+          title,
+          // Authentic raw text: either page excerpt or title.
+          // NEVER use Gemini's generated response prose as retrieved text.
+          snippet: retrievedPageExcerpt || title,
+          providerSnippet: null, // No raw Serper snippet, discovered via grounding
+          retrievedPageExcerpt,
+          retrievedPageText,
+          provider: 'gemini_grounding' as const,
+          providerResultId: `gemini_chunk_${i}`,
+          providerCitationUri: citationUri,
+          contentHash,
+          retrievedAt: new Date().toISOString(),
           sourceKind,
           reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
-        };
-      });
-    } catch (error: any) {
-      this.logger.error(`Error performing AI Search Grounding: ${error.message}`);
-      throw error;
+        });
+      } catch (err: any) {
+        this.logger.warn(`Error resolving grounding chunk ${i}: ${err.message}`);
+      }
     }
+
+    return results;
+  }
+
+  private extractVisibleText(html: string): string {
+    return html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private determineSourceKind(url: string): SourceKind {
@@ -135,7 +245,7 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       return SourceKind.COMPLAINT_PLATFORM;
     } else if (itemUrl.includes('recall') || itemUrl.includes('nhtsa') || itemUrl.includes('gov')) {
       return SourceKind.OFFICIAL_RECALL;
-    } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service')) {
+    } else if (itemUrl.includes('manual') || itemUrl.includes('manufacturer') || itemUrl.includes('service') || itemUrl.includes('audi') || itemUrl.includes('subaru') || itemUrl.includes('volkswagen')) {
       return SourceKind.MANUFACTURER;
     } else if (itemUrl.includes('blog') || itemUrl.includes('review')) {
       return SourceKind.BLOG_REVIEW;
@@ -143,32 +253,6 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       return SourceKind.VIDEO_REVIEW;
     }
     return SourceKind.UNKNOWN;
-  }
-
-  private generateMockResults(query: string): SearchResult[] {
-    return [
-      {
-        url: 'https://official-recalls.gov/campaign/123',
-        title: 'Official Recall Campaign for variant',
-        snippet: 'Safety recall regarding fuel leak issue in engine compartment.',
-        sourceKind: SourceKind.MOCK,
-        reliabilityScore: 0,
-      },
-      {
-        url: 'https://carforum.com/threads/engine-stalling-issue',
-        title: 'Engine stalling and electrical issues',
-        snippet: 'Many users reporting sudden engine stalling at traffic lights.',
-        sourceKind: SourceKind.MOCK,
-        reliabilityScore: 0,
-      },
-      {
-        url: 'https://manufacturer-service.com/manuals',
-        title: 'Manufacturer Service Bulletin',
-        snippet: 'Recommended check on transmission valve body during 60k service.',
-        sourceKind: SourceKind.MOCK,
-        reliabilityScore: 0,
-      }
-    ];
   }
 
   private getReliabilityScoreForKind(kind: SourceKind): number {
@@ -183,76 +267,5 @@ Ensure the output is strict JSON. Do not include markdown code block formatting 
       case SourceKind.VIDEO_REVIEW: return 0.3;
       default: return 0.2;
     }
-  }
-
-  private cleanJsonString(str: string): string {
-    let cleaned = str.trim();
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-    }
-
-    let inString = false;
-    let escaped = '';
-    for (let i = 0; i < cleaned.length; i++) {
-      const char = cleaned[i];
-      if (char === '"' && (i === 0 || cleaned[i - 1] !== '\\')) {
-        inString = !inString;
-        escaped += char;
-      } else if (inString && char === '\n') {
-        escaped += '\\n';
-      } else if (inString && char === '\r') {
-        escaped += '\\r';
-      } else if (inString && char === '\t') {
-        escaped += '\\t';
-      } else {
-        escaped += char;
-      }
-    }
-    return escaped;
-  }
-
-  private async callGeminiSearch(prompt: string, apiKey: string): Promise<string> {
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
-    let lastError: Error | null = null;
-
-    for (const modelName of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: prompt }
-                ]
-              }
-            ],
-            generationConfig: {
-              responseMimeType: "application/json"
-            }
-          })
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Gemini model ${modelName} returned status ${response.status}: ${errText}`);
-        }
-
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || '{"results": []}';
-      } catch (err: any) {
-        lastError = err;
-        this.logger.warn(`Gemini model ${modelName} failed inside callGeminiSearch: ${err.message}. Trying next model...`);
-      }
-    }
-
-    throw lastError || new Error('All Gemini models failed inside callGeminiSearch');
   }
 }

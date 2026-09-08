@@ -201,6 +201,8 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'year', required: true })
   @ApiQuery({ name: 'bodyType', required: false })
   @ApiQuery({ name: 'body_type', required: false })
+  @ApiQuery({ name: 'fuelType', required: false })
+  @ApiQuery({ name: 'fuel_type', required: false })
   async getEngines(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
@@ -208,9 +210,13 @@ export class VehicleFiltersController {
     @Query('model') model?: string,
     @Query('bodyType') bodyType?: string,
     @Query('body_type') bodyTypeLegacy?: string,
+    @Query('fuelType') fuelType?: string,
+    @Query('fuel_type') fuelTypeLegacy?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
+    const targetFuel = fuelType || fuelTypeLegacy;
+    const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
@@ -220,16 +226,30 @@ export class VehicleFiltersController {
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+        ...(fuelEnums && fuelEnums.length > 0 ? { fuelType: { in: fuelEnums as any } } : {}),
         year: Number(year),
       },
       select: { id: true, engine: { select: { code: true } } },
     });
 
+    const NON_ENGINE_TOKENS = new Set([
+      'TOURING', 'GRAN TURISMO', 'COMPACT', 'GRAN COUPE', '5.0 JAHRE EDITION',
+      'COUPE', 'CABRIO', 'ROADSTER', 'AVANT', 'SPORTBACK', 'ESTATE',
+      'STANDART', 'EXECUTIVE', 'LOFT', 'SUITE', 'SIGNATURE', 'TECHNO',
+      'XCLUSIVE', 'E XTRA', 'E XTREME', 'LS', 'LT', 'LA PRIMA', 'MY FIESTA',
+      'ES', 'ECO', 'SS', 'HALO', 'LODGE', 'POLARSTAR', 'VISION', 'BOYUT',
+      'EMOTION', 'GRAND PRIX', 'TERRA', 'SOL', 'LINEAR', 'VECTOR', 'PORTFOLIO',
+      'M EXCELLENCE', 'REFLEX', 'SPIRIT', 'SPORT PLUS', 'TERRA SPORTY',
+      'TORNADO', 'TORNADO CRAWLER', 'MACAN', 'MACAN TURBO', 'MAGNUM',
+      'OBSIDIYEN', 'POWER SENSE PLUS', 'R SPORT PLUS', 'SINGLE ULTIMATE',
+      'TWIN ULTIMATE', 'RECHARGE PRO', 'RECHARGE ULTIMATE', 'STORM'
+    ]);
+
     const enginesSet = new Set(
       variants
         .map(v => {
           const rawCode = v.engine?.code;
-          if (!rawCode) return null;
+          if (!rawCode || NON_ENGINE_TOKENS.has(rawCode.trim().toUpperCase())) return null;
           return this.canonicalDisplayService.getProjectedEngineCode(v.id, rawCode);
         })
         .filter(Boolean) as string[],

@@ -90,6 +90,54 @@ const mapToTransmissionEnum = (tr: string): string => {
   return "AUTOMATIC";
 };
 
+const inferDrivetrain = (brand?: string, model?: string, engine?: string, trim?: string): "FWD" | "RWD" | "AWD" => {
+  const fullContext = `${brand || ""} ${model || ""} ${engine || ""} ${trim || ""}`.toLowerCase();
+
+  // 1. Explicit AWD / 4WD
+  if (/xdrive|4matic|quattro|4motion|allgrip|awd|4x4|4wd|4-motion|e-four|syncro|symmetrical/i.test(fullContext)) {
+    return "AWD";
+  }
+
+  const brandNorm = (brand || "").toLowerCase().trim();
+  const modelNorm = (model || "").toLowerCase().trim();
+
+  // 2. BMW Architecture
+  if (brandNorm === "bmw") {
+    // UKL / FAAR front-wheel-drive platforms (1 Serisi F40+, 2 Serisi Active Tourer/Gran Tourer/Gran Coupe, X1/X2 sDrive)
+    const isFwdBmw = /1 serisi|active tourer|gran tourer|gran coupe/i.test(modelNorm);
+    if (isFwdBmw) return "FWD";
+    // Classic BMW longitudinal RWD architecture (3 Serisi, 4 Serisi, 5 Serisi, 6 Serisi, 7 Serisi, 8 Serisi, Z4, etc.)
+    return "RWD";
+  }
+
+  // 3. Mercedes-Benz Architecture
+  if (brandNorm.includes("mercedes")) {
+    // MFA transverse FWD platforms (A Serisi, B Serisi, CLA, GLA, GLB)
+    const isFwdBenz = /a serisi|b serisi|cla|gla|glb/i.test(modelNorm);
+    if (isFwdBenz) return "FWD";
+    // C Serisi, E Serisi, S Serisi, CLS, SL, etc.
+    return "RWD";
+  }
+
+  // 4. Alfa Romeo
+  if (brandNorm.includes("alfa") && /giulia|4c/i.test(modelNorm)) {
+    return "RWD";
+  }
+
+  // 5. Ford Mustang
+  if (brandNorm === "ford" && /mustang/i.test(modelNorm)) {
+    return "RWD";
+  }
+
+  // 6. Porsche
+  if (brandNorm === "porsche") {
+    if (/cayenne|macan/i.test(modelNorm)) return "AWD";
+    return "RWD";
+  }
+
+  return "FWD";
+};
+
 export default function CreateListing() {
   const router = useRouter();
 
@@ -143,7 +191,10 @@ export default function CreateListing() {
   const [displacementVerified, setDisplacementVerified] = useState(false);
   const [powerVerified, setPowerVerified] = useState(false);
   const [techSpecsConflict, setTechSpecsConflict] = useState(false);
+  const [candidatePowers, setCandidatePowers] = useState<number[]>([]);
+  const [selectedCandidateHp, setSelectedCandidateHp] = useState<number | null>(null);
   const activeVariantEnrichmentRef = useRef<string>("");
+  const lastPrefetchedVariantIdRef = useRef<string>("");
 
   // Custom details fallback if variant doesn't exist
   const [useCustomVariant, setUseCustomVariant] = useState(false);
@@ -232,6 +283,12 @@ export default function CreateListing() {
       .then((data) => setPromotionPricingDetails(data))
       .catch(() => null);
   }, []);
+
+  const clearSelectedVariant = () => {
+    setSelectedVariant("");
+    activeVariantEnrichmentRef.current = "";
+    lastPrefetchedVariantIdRef.current = "";
+  };
 
   // Cascade Handlers for 8 Canonical Dimensions
   const handleBrandChange = async (brand: string) => {
@@ -438,7 +495,11 @@ export default function CreateListing() {
         setFuelType(mapToFuelTypeEnum(currentFuel));
         setTransmission(mapToTransmissionEnum(currentTrans));
 
-        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP)
+        // Intelligently auto-populate verified drivetrain based on vehicle architecture
+        const initialDrivetrain = inferDrivetrain(selectedBrand, currentModel, currentEngine, trim);
+        setDrivetrain(initialDrivetrain);
+
+        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP + Drivetrain)
         resolveTechnicalSpecs(res.variantId);
       } else {
         setSelectedVariant("");
@@ -453,8 +514,12 @@ export default function CreateListing() {
     }
   };
 
-  const resolveTechnicalSpecs = async (variantId: string) => {
+  const resolveTechnicalSpecs = async (variantId: string, forceRetry: boolean = false) => {
     if (!variantId) return;
+    if (!forceRetry && lastPrefetchedVariantIdRef.current === variantId) {
+      return;
+    }
+    lastPrefetchedVariantIdRef.current = variantId;
     activeVariantEnrichmentRef.current = variantId;
     setLoadingTechSpecs(true);
     setTechSpecsConflict(false);
@@ -466,6 +531,13 @@ export default function CreateListing() {
       if (activeVariantEnrichmentRef.current !== variantId) {
         return;
       }
+
+      if (specs?.drivetrain) {
+        setDrivetrain(specs.drivetrain);
+      }
+
+      const initialCandidates = specs?.candidatePowers && specs.candidatePowers.length > 1 ? specs.candidatePowers : [];
+      setCandidatePowers(initialCandidates);
 
       // Check initial field-level status from Consistency Gate
       const initDispStatus = specs?.engineDisplacement?.status || (specs?.engineDisplacement?.verified ? "VERIFIED" : "MISSING");
@@ -483,6 +555,9 @@ export default function CreateListing() {
       if (initPwrStatus === "VERIFIED" && specs?.enginePower?.valueHp) {
         setEnginePower(String(specs.enginePower.valueHp));
         setPowerVerified(true);
+      } else if (initialCandidates.length > 1 && selectedCandidateHp && initialCandidates.includes(selectedCandidateHp)) {
+        setEnginePower(String(selectedCandidateHp));
+        setPowerVerified(true);
       } else {
         setEnginePower("");
         setPowerVerified(false);
@@ -490,11 +565,12 @@ export default function CreateListing() {
 
       // 2. If displacement or power is MISSING or CONFLICT, trigger controlled authenticated enrichment
       const needsDisplacement = initDispStatus !== "VERIFIED";
-      const needsPower = initPwrStatus !== "VERIFIED";
+      const needsPower = initPwrStatus !== "VERIFIED" && initialCandidates.length <= 1;
 
-      if ((needsDisplacement || needsPower) && token) {
+      const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("accessToken") : "") || "";
+      if ((needsDisplacement || needsPower) && authToken) {
         // Enforce 15s bounded timeout on client enrichment request to eliminate infinite spinner
-        const enrichmentPromise = vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, token);
+        const enrichmentPromise = vehicleTaxonomyApi.enrichTechnicalSpecs(variantId, authToken);
         const timeoutPromise = new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error("TECHNICAL_ENRICHMENT_TIMEOUT")), 15000)
         );
@@ -511,11 +587,18 @@ export default function CreateListing() {
         return;
       }
 
+      if (specs?.drivetrain) {
+        setDrivetrain(specs.drivetrain);
+      }
+
+      const finalCandidates = specs?.candidatePowers && specs.candidatePowers.length > 1 ? specs.candidatePowers : initialCandidates;
+      setCandidatePowers(finalCandidates);
+
       const finalDispStatus = specs?.engineDisplacement?.status || (specs?.engineDisplacement?.verified ? "VERIFIED" : "MISSING");
       const finalPwrStatus = specs?.enginePower?.status || (specs?.enginePower?.verified ? "VERIFIED" : "MISSING");
 
       const isDispVerified = finalDispStatus === "VERIFIED" && typeof specs?.engineDisplacement?.valueCc === "number";
-      const isPwrVerified = finalPwrStatus === "VERIFIED" && typeof specs?.enginePower?.valueHp === "number";
+      let isPwrVerified = finalPwrStatus === "VERIFIED" && typeof specs?.enginePower?.valueHp === "number";
 
       if (isDispVerified && specs?.engineDisplacement?.valueCc) {
         setEngineDisplacement(String(specs.engineDisplacement.valueCc));
@@ -528,6 +611,10 @@ export default function CreateListing() {
       if (isPwrVerified && specs?.enginePower?.valueHp) {
         setEnginePower(String(specs.enginePower.valueHp));
         setPowerVerified(true);
+      } else if (finalCandidates.length > 1 && selectedCandidateHp && finalCandidates.includes(selectedCandidateHp)) {
+        setEnginePower(String(selectedCandidateHp));
+        setPowerVerified(true);
+        isPwrVerified = true;
       } else {
         setEnginePower("");
         setPowerVerified(false);
@@ -535,7 +622,7 @@ export default function CreateListing() {
 
       const allVerified = isDispVerified && isPwrVerified;
       setTechSpecsVerified(allVerified);
-      setTechSpecsConflict(finalDispStatus === "CONFLICT" || finalPwrStatus === "CONFLICT");
+      setTechSpecsConflict((finalDispStatus === "CONFLICT" || finalPwrStatus === "CONFLICT") && finalCandidates.length <= 1);
     } catch (err) {
       console.error("Technical specs resolution error:", err);
       if (activeVariantEnrichmentRef.current === variantId) {
@@ -1426,6 +1513,14 @@ export default function CreateListing() {
                       <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded animate-pulse">
                         Doğrulanıyor... ⏳
                       </span>
+                    ) : candidatePowers.length > 1 && powerVerified && enginePower ? (
+                      <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                        ✓ Fabrika Seçimi ({enginePower} HP)
+                      </span>
+                    ) : candidatePowers.length > 1 && !powerVerified ? (
+                      <span className="text-[9px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse">
+                        ⚡ Seçim Bekleniyor
+                      </span>
                     ) : powerVerified && enginePower ? (
                       <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
                         ✓ Katalogdan
@@ -1442,20 +1537,62 @@ export default function CreateListing() {
                   value={powerVerified ? enginePower : ""}
                   onChange={(e) => setEnginePower(e.target.value)}
                   readOnly={!useCustomVariant && !!selectedVariant && powerVerified}
-                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : "Doğrulanamadı") : "Örn: 150"}
+                  placeholder={!useCustomVariant && selectedVariant && !powerVerified ? (loadingTechSpecs ? "Doğrulanıyor..." : candidatePowers.length > 1 ? "Aşağıdan seçiniz" : "Doğrulanamadı") : "Örn: 150"}
                   className={`border rounded-xl px-4 py-3 text-sm outline-none transition ${
                     !useCustomVariant && selectedVariant && powerVerified
                       ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold cursor-default"
+                      : candidatePowers.length > 1 && !powerVerified
+                      ? "bg-slate-900/80 border-amber-500/40 text-amber-200"
                       : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
                   }`}
                 />
+                {candidatePowers.length > 1 && (
+                  <div className="flex flex-col gap-1 p-2 rounded-xl bg-orange-500/10 border border-orange-500/25">
+                    <span className="text-[9px] font-bold text-orange-300">
+                      ⚡ Fabrika Güç Seçenekleri (Ruhsatınıza göre seçin):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {candidatePowers.map((hp) => (
+                        <button
+                          key={hp}
+                          type="button"
+                          onClick={() => {
+                            setEnginePower(String(hp));
+                            setSelectedCandidateHp(hp);
+                            setPowerVerified(true);
+                            setTechSpecsConflict(false);
+                          }}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer border flex items-center gap-1 ${
+                            enginePower === String(hp)
+                              ? "bg-orange-500 text-white border-orange-400 shadow-sm"
+                              : "bg-slate-900/90 hover:bg-slate-800 text-orange-200 border-orange-500/30 hover:border-orange-400"
+                          }`}
+                        >
+                          <span>{hp} HP</span>
+                          {enginePower === String(hp) && <span>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Çekiş</label>
+                  {!useCustomVariant && selectedVariant && (
+                    <span className="text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                      ✓ Katalogdan
+                    </span>
+                  )}
+                </div>
                 <select
                   value={drivetrain}
                   onChange={(e) => setDrivetrain(e.target.value)}
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-slate-200 outline-none focus:border-orange-500"
+                  className={`border rounded-xl px-4 py-3 text-xs outline-none transition ${
+                    !useCustomVariant && selectedVariant
+                      ? "bg-slate-900/60 border-emerald-500/30 text-emerald-300 font-semibold"
+                      : "bg-slate-900 border-white/10 text-slate-200 focus:border-orange-500"
+                  }`}
                 >
                   <option value="FWD">Önden Çekiş</option>
                   <option value="RWD">Arkadan İtiş</option>
@@ -1534,6 +1671,15 @@ export default function CreateListing() {
                   <span>⏳</span>
                   <span>Motor teknik bilgileri doğrulanıyor...</span>
                 </p>
+              ) : candidatePowers.length > 1 && !powerVerified ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-amber-200">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <span className="text-base">⚡</span>
+                    <span>
+                      Bu motor için fabrika çıkışı birden fazla güç seçeneği ({candidatePowers.join(", ")} HP) bulunmaktadır. Lütfen ruhsatınızdaki beygir gücünü yukarıdaki seçeneklerden tıklayınız.
+                    </span>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300">
                   <div className="flex items-center gap-2 text-xs font-medium">
@@ -1546,7 +1692,7 @@ export default function CreateListing() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => resolveTechnicalSpecs(selectedVariant)}
+                    onClick={() => resolveTechnicalSpecs(selectedVariant, true)}
                     className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-semibold rounded-xl border border-rose-500/30 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                   >
                     <span>🔄</span>
