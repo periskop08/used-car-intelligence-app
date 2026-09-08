@@ -106,12 +106,22 @@ export default function IsiCepteRecommendationWidget({
     Linking.openURL(`tel:${cleanPhone}`);
   };
 
-  const handleWhatsApp = (phone?: string | null) => {
-    if (!phone) return;
-    let cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('0')) cleanPhone = '90' + cleanPhone.substring(1);
-    if (!cleanPhone.startsWith('90')) cleanPhone = '90' + cleanPhone;
-    Linking.openURL(`https://wa.me/${cleanPhone}?text=Merhaba,%20TorqueScout%20üzerinden%20ulaşıyorum.`);
+  const handleOpenIsiCepte = async (provider: IsiCepteProviderItem) => {
+    const webUrl =
+      provider.isicepteProfileUrl ||
+      (provider.slug ? `https://isicepte.com/usta/${provider.slug}` : 'https://isicepte.com');
+    const appDeepLink = `isicepte://usta/${provider.slug || provider.id}`;
+
+    try {
+      const supported = await Linking.canOpenURL(appDeepLink);
+      if (supported) {
+        await Linking.openURL(appDeepLink);
+      } else {
+        await Linking.openURL(webUrl);
+      }
+    } catch (e) {
+      Linking.openURL(webUrl);
+    }
   };
 
   const filteredCities = TURKEY_81_PROVINCES.filter((c) =>
@@ -239,7 +249,7 @@ export default function IsiCepteRecommendationWidget({
                 ))}
               </View>
 
-              {/* Action Buttons (Call / WhatsApp) */}
+              {/* Action Buttons (Call / İşi Cepte'de Aç) */}
               <View style={styles.cardActionsRow}>
                 {provider.phone ? (
                   <TouchableOpacity
@@ -247,20 +257,21 @@ export default function IsiCepteRecommendationWidget({
                     onPress={() => handleCall(provider.phone)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="call" size={14} color="#ffffff" />
+                    <Ionicons name="call" size={13} color="#ffffff" />
                     <Text style={styles.actionBtnCallText}>Ara</Text>
                   </TouchableOpacity>
                 ) : null}
 
-                {provider.phone ? (
-                  <TouchableOpacity
-                    style={styles.actionBtnWa}
-                    onPress={() => handleWhatsApp(provider.phone)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="logo-whatsapp" size={14} color="#16a34a" />
-                  </TouchableOpacity>
-                ) : null}
+                <TouchableOpacity
+                  style={styles.actionBtnIsiCepte}
+                  onPress={() => handleOpenIsiCepte(provider)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="open-outline" size={13} color="#0284c7" />
+                  <Text style={styles.actionBtnIsiCepteText} numberOfLines={1}>
+                    İşi Cepte'de Aç
+                  </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.actionBtnDetail}
@@ -487,16 +498,14 @@ export default function IsiCepteRecommendationWidget({
                     </TouchableOpacity>
                   ) : null}
 
-                  {selectedProvider.phone ? (
-                    <TouchableOpacity
-                      style={styles.detailWaBtn}
-                      onPress={() => handleWhatsApp(selectedProvider.phone)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="logo-whatsapp" size={18} color="#ffffff" />
-                      <Text style={styles.detailWaBtnText}>WhatsApp</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <TouchableOpacity
+                    style={styles.detailIsiCepteBtn}
+                    onPress={() => handleOpenIsiCepte(selectedProvider)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="open-outline" size={18} color="#ffffff" />
+                    <Text style={styles.detailIsiCepteBtnText}>İşi Cepte'de Aç</Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
@@ -744,19 +753,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  actionBtnWa: {
-    width: 32,
-    height: 30,
-    backgroundColor: '#dcfce7',
-    borderRadius: 8,
+  actionBtnIsiCepte: {
+    flex: 1.4,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#f0f9ff',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: '#bae6fd',
+  },
+  actionBtnIsiCepteText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#0284c7',
   },
   actionBtnDetail: {
-    width: 30,
-    height: 30,
+    width: 28,
+    height: 28,
     backgroundColor: '#f1f5f9',
     borderRadius: 8,
     alignItems: 'center',
@@ -1010,17 +1027,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  detailWaBtn: {
+  detailIsiCepteBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0284c7',
     paddingVertical: 12,
     borderRadius: 12,
   },
-  detailWaBtnText: {
+  detailIsiCepteBtnText: {
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',

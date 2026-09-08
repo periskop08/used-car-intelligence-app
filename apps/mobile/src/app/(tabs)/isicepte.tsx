@@ -136,12 +136,22 @@ export default function IsiCepteOneriyorScreen() {
     Linking.openURL(`tel:${cleanPhone}`);
   };
 
-  const handleWhatsApp = (phone?: string | null) => {
-    if (!phone) return;
-    let cleanPhone = phone.replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('0')) cleanPhone = '90' + cleanPhone.substring(1);
-    if (!cleanPhone.startsWith('90')) cleanPhone = '90' + cleanPhone;
-    Linking.openURL(`https://wa.me/${cleanPhone}?text=Merhaba,%20TorqueScout%20İşi%20Cepte%20Öneriyor%20üzerinden%20ulaşıyorum.`);
+  const handleOpenIsiCepte = async (provider: IsiCepteProviderItem) => {
+    const webUrl =
+      provider.isicepteProfileUrl ||
+      (provider.slug ? `https://isicepte.com/usta/${provider.slug}` : 'https://isicepte.com');
+    const appDeepLink = `isicepte://usta/${provider.slug || provider.id}`;
+
+    try {
+      const supported = await Linking.canOpenURL(appDeepLink);
+      if (supported) {
+        await Linking.openURL(appDeepLink);
+      } else {
+        await Linking.openURL(webUrl);
+      }
+    } catch (e) {
+      Linking.openURL(webUrl);
+    }
   };
 
   // Client search filter for business names
@@ -440,16 +450,14 @@ export default function IsiCepteOneriyorScreen() {
                   </TouchableOpacity>
                 ) : null}
 
-                {item.phone ? (
-                  <TouchableOpacity
-                    style={styles.cardWaBtn}
-                    onPress={() => handleWhatsApp(item.phone)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="logo-whatsapp" size={16} color="#16a34a" />
-                    <Text style={styles.cardWaBtnText}>WhatsApp</Text>
-                  </TouchableOpacity>
-                ) : null}
+                <TouchableOpacity
+                  style={styles.cardIsiCepteBtn}
+                  onPress={() => handleOpenIsiCepte(item)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="open-outline" size={15} color="#0284c7" />
+                  <Text style={styles.cardIsiCepteBtnText}>İşi Cepte'de Aç</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.cardDetailBtn}
@@ -652,16 +660,14 @@ export default function IsiCepteOneriyorScreen() {
                     </TouchableOpacity>
                   ) : null}
 
-                  {selectedProvider.phone ? (
-                    <TouchableOpacity
-                      style={styles.detailWaBtn}
-                      onPress={() => handleWhatsApp(selectedProvider.phone)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="logo-whatsapp" size={18} color="#ffffff" />
-                      <Text style={styles.detailWaBtnText}>WhatsApp</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <TouchableOpacity
+                    style={styles.detailIsiCepteBtn}
+                    onPress={() => handleOpenIsiCepte(selectedProvider)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="open-outline" size={18} color="#ffffff" />
+                    <Text style={styles.detailIsiCepteBtnText}>İşi Cepte'de Aç</Text>
+                  </TouchableOpacity>
                 </View>
               </ScrollView>
             )}
@@ -1029,22 +1035,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  cardWaBtn: {
-    flex: 1,
+  cardIsiCepteBtn: {
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#f0f9ff',
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: '#bae6fd',
     paddingVertical: 8,
     borderRadius: 10,
   },
-  cardWaBtnText: {
-    fontSize: 12,
+  cardIsiCepteBtnText: {
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#15803d',
+    color: '#0284c7',
   },
   cardDetailBtn: {
     width: 36,
@@ -1339,17 +1345,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  detailWaBtn: {
+  detailIsiCepteBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0284c7',
     paddingVertical: 12,
     borderRadius: 12,
   },
-  detailWaBtnText: {
+  detailIsiCepteBtnText: {
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',

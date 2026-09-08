@@ -1464,7 +1464,7 @@ export default function MobileDashboard() {
               <Ionicons name="shield-checkmark" size={20} color="#059669" />
             </View>
             <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>İşi Cepte</Text>
+              <Text style={styles.kesfetCardText}>İşi Cepte Öneriyor</Text>
               <Text style={styles.kesfetCardSubText}>Onaylı Ustalar</Text>
             </View>
             <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
