@@ -432,16 +432,16 @@ export default function ListingFeedScreen() {
 
           <View style={styles.row}>
             <TouchableOpacity onPress={() => handleShare(item)} style={styles.darkCircularBtn}>
-              <Ionicons name="share-social-outline" size={18} color="#cbd5e1" />
+              <Ionicons name="share-social-outline" size={19} color="#0f172a" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleFavoriteToggle(item.id, item)}
               style={[
                 styles.darkCircularBtn,
-                isFav && { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderColor: 'rgba(239, 68, 68, 0.5)' },
+                isFav && { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
               ]}
             >
-              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#cbd5e1'} />
+              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={19} color={isFav ? '#ef4444' : '#0f172a'} />
             </TouchableOpacity>
           </View>
         </View>
@@ -520,12 +520,18 @@ export default function ListingFeedScreen() {
                 {item.title.toUpperCase()}
               </Text>
               <View style={styles.infoLine}>
-                <Text style={styles.infoSubText}>
-                  👤 {item.seller.displayName} ({item.seller.memberSince})
-                </Text>
-                <Text style={styles.infoSubText}>
-                  📍 {item.location.city}, {item.location.district || 'Merkez'}
-                </Text>
+                <View style={styles.metaItem}>
+                  <Ionicons name="person" size={13} color="#64748b" style={{ marginRight: 4 }} />
+                  <Text style={styles.infoSubText} numberOfLines={1}>
+                    {item.seller.displayName} ({item.seller.memberSince})
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Ionicons name="location-sharp" size={13} color="#ef4444" style={{ marginRight: 2 }} />
+                  <Text style={styles.infoSubText} numberOfLines={1}>
+                    {item.location.city}, {item.location.district || 'Merkez'}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -558,7 +564,7 @@ export default function ListingFeedScreen() {
               {/* Right Floating Vertical Swipe Guide Indicator inside the table */}
               <View style={styles.scrollGuidePill} pointerEvents="none">
                 <Ionicons name="chevron-up" size={10} color="#64748b" />
-                <Ionicons name="swap-vertical" size={12} color="#f97316" />
+                <Ionicons name="swap-vertical" size={12} color="#ea580c" />
                 <Ionicons name="chevron-down" size={10} color="#64748b" />
               </View>
 
@@ -605,7 +611,7 @@ export default function ListingFeedScreen() {
               )}
             </View>
 
-            {/* 6. Dedicated Açıklamalar Kartı (with finger spacing) */}
+            {/* 6. Dedicated Açıklamalar Kartı */}
             <View style={styles.descriptionCard}>
               <View style={styles.descriptionCardHeader}>
                 <Text style={styles.descriptionCardTitle}>📝 İlan Açıklaması</Text>
@@ -627,7 +633,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnOutline}
                 activeOpacity={0.8}
               >
-                <Ionicons name="document-text-outline" size={16} color="#f8fafc" style={{ marginRight: 6 }} />
+                <Ionicons name="document-text-outline" size={17} color="#0f172a" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextOutline}>İlana Git</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -635,7 +641,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnSolid}
                 activeOpacity={0.85}
               >
-                <Ionicons name="chatbubbles-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                <Ionicons name="chatbubble-ellipses-outline" size={17} color="#ffffff" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextSolid}>Mesaj Gönder</Text>
               </TouchableOpacity>
             </View>
@@ -647,7 +653,7 @@ export default function ListingFeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#030712" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f0f4f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#ea580c" />
@@ -707,23 +713,23 @@ export default function ListingFeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#f0f4f9',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#030712',
+    backgroundColor: '#f0f4f9',
   },
   loadingText: {
     marginTop: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 13,
     fontWeight: '600',
   },
   errorText: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -751,18 +757,18 @@ const styles = StyleSheet.create({
   },
   feedWrapper: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#f0f4f9',
   },
   feedList: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: '#f0f4f9',
   },
   cardContainer: {
     width: windowWidth,
-    backgroundColor: '#030712',
-    paddingHorizontal: 10,
-    paddingTop: 4,
-    paddingBottom: 8,
+    backgroundColor: '#f0f4f9',
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
     justifyContent: 'space-between',
   },
   topActions: {
@@ -770,7 +776,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingBottom: 4,
+    paddingBottom: 6,
   },
   gearCircle: {
     width: 38,
@@ -789,21 +795,21 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#0c1527',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.06,
     shadowRadius: 3,
     elevation: 2,
   },
   feedTitle: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#0f172a',
     letterSpacing: 1.2,
   },
   row: {
@@ -812,44 +818,44 @@ const styles = StyleSheet.create({
   },
   cardFrame: {
     flex: 1,
-    backgroundColor: '#0a1224',
+    backgroundColor: '#ffffff',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
     padding: 12,
     justifyContent: 'space-between',
     position: 'relative',
-    shadowColor: '#000000',
+    shadowColor: '#64748b',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 3,
   },
   cardContentTop: {
-    gap: 8,
+    gap: 7,
   },
   cardContentBottom: {
-    gap: 8,
+    gap: 6,
   },
   scrollGuidePill: {
     position: 'absolute',
     right: 8,
     top: '50%',
     transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.4)',
-    borderRadius: 10,
-    paddingHorizontal: 4,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 3.5,
     paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
     zIndex: 30,
   },
   photoContainer: {
@@ -857,9 +863,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: '#050a14',
+    backgroundColor: '#f1f5f9',
     position: 'relative',
   },
   photoImage: {
@@ -877,18 +881,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   urgentPillBadge: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 9,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3.5,
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    shadowColor: '#dc2626',
+    shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -907,27 +909,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   showcasePillBadge: {
-    backgroundColor: '#d97706',
-    paddingHorizontal: 9,
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3.5,
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-    shadowColor: '#d97706',
+    shadowColor: '#f59e0b',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 3,
   },
   showcaseStar: {
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 10,
+    fontWeight: 'bold',
   },
   showcasePillText: {
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 10.5,
     fontWeight: '900',
     letterSpacing: 0.6,
@@ -936,17 +937,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 8,
     right: 8,
-    backgroundColor: 'rgba(3, 7, 18, 0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   photoCountText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: '#ffffff',
   },
   carouselBtns: {
     position: 'absolute',
@@ -961,20 +960,18 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(3, 7, 18, 0.75)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailsContainer: {
-    marginTop: 6,
+    marginTop: 4,
     gap: 2,
   },
   titleText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#0f172a',
     letterSpacing: 0.2,
   },
   infoLine: {
@@ -983,27 +980,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   infoSubText: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
     fontWeight: '600',
   },
   breadcrumbContainer: {
-    marginTop: 5,
+    marginTop: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.25)',
+    borderColor: '#dbeafe',
     borderRadius: 8,
   },
   breadcrumbText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#60a5fa',
+    color: '#2563eb',
   },
   tabBar: {
-    marginTop: 6,
+    marginTop: 4,
     flexDirection: 'row',
     gap: 8,
   },
@@ -1011,29 +1012,31 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    borderColor: '#f97316',
+    backgroundColor: '#ffffff',
+    borderColor: '#ea580c',
+    borderWidth: 1.5,
   },
   tabButtonText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#94a3b8',
+    fontWeight: '700',
+    color: '#64748b',
   },
   tabButtonTextActive: {
-    color: '#f97316',
+    color: '#ea580c',
+    fontWeight: '800',
   },
   tabContentContainer: {
-    marginTop: 6,
+    marginTop: 4,
     height: 94,
-    backgroundColor: '#060d1b',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: '#e2e8f0',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1049,32 +1052,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    borderBottomColor: '#f1f5f9',
     paddingVertical: 1.5,
   },
   infoLabel: {
     fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
+    color: '#64748b',
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: 11,
-    color: '#f1f5f9',
+    color: '#0f172a',
     fontWeight: '700',
   },
   infoValuePrice: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '900',
-    color: '#f97316',
+    color: '#ea580c',
   },
   descriptionCard: {
-    backgroundColor: '#060d1b',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginTop: 8,
+    marginTop: 4,
     gap: 4,
   },
   descriptionCardHeader: {
@@ -1085,16 +1088,16 @@ const styles = StyleSheet.create({
   descriptionCardTitle: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#0f172a',
   },
   descriptionDetailLink: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#f97316',
+    color: '#ea580c',
   },
   descriptionCardBody: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#475569',
     lineHeight: 16,
   },
   locBox: {
@@ -1109,7 +1112,7 @@ const styles = StyleSheet.create({
   locLinkText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#60a5fa',
+    color: '#2563eb',
   },
   ctaContainer: {
     flexDirection: 'row',
@@ -1118,11 +1121,11 @@ const styles = StyleSheet.create({
   },
   ctaBtnOutline: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#0e182e',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1130,11 +1133,11 @@ const styles = StyleSheet.create({
   ctaTextOutline: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#0f172a',
   },
   ctaBtnSolid: {
-    flex: 1,
-    paddingVertical: 11,
+    flex: 1.2,
+    paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#ea580c',
     flexDirection: 'row',
