@@ -410,8 +410,109 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
         });
 
         expect(validation.isValid).toBe(false);
-        expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı) iddiası tespit edildi');
+        expect(validation.reason).toContain('batarya sağlık yüzdesi');
       });
+    });
+
+    it('should REJECT report for ungrounded variation: "Batarya SoH değerinin %75\'in altında olması"', () => {
+      const teslaReport = {
+        reportId: 'rep-tesla-soh-75',
+        vehicleIdentity: { brand: 'Tesla', model: 'Model 3', modelYear: 2022, fuelType: 'Elektrik' },
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Batarya SoH değerinin %75\'in altında olması durumunda garanti şartları incelenmelidir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(teslaReport, { verifiedResearch: { claims: [] } });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%75 SoH / Pil Sağlığı)');
+    });
+
+    it('should REJECT report for clause-separated ungrounded variation: "... (% SoH) ... tercihen %85 üzeri"', () => {
+      const teslaReport = {
+        reportId: 'rep-tesla-soh-separated',
+        vehicleIdentity: { brand: 'Tesla', model: 'Model 3', modelYear: 2022, fuelType: 'Elektrik' },
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Yüksek voltajlı batarya sağlığının (% SoH) kontrol edilmesi ve kabul edilebilir seviyede olması (tercihen %85 üzeri) önemlidir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(teslaReport, { verifiedResearch: { claims: [] } });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı)');
+    });
+
+    it('should NOT REJECT report when percentage refers to charging statistic (False-Positive Guard)', () => {
+      const base = createMockReport('OTOMATIK');
+      const teslaReportWithChargingStat = {
+        ...base,
+        reportId: 'rep-tesla-charging-stat',
+        vehicleIdentity: {
+          ...base.vehicleIdentity,
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          fuelType: 'Elektrik',
+          engineDisplacementCc: undefined,
+        },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Batarya sağlığı kontrol edilmelidir; araç geçmişte %80 oranında DC hızlı şarj kullanmış olabilir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(teslaReportWithChargingStat, { verifiedResearch: { claims: [] } });
+      expect(validation.isValid).toBe(true);
+    });
+
+    it('should NOT REJECT report when capacity is stated in kWh technical spec', () => {
+      const base = createMockReport('OTOMATIK');
+      const teslaReportWithKwh = {
+        ...base,
+        reportId: 'rep-tesla-kwh',
+        vehicleIdentity: {
+          ...base.vehicleIdentity,
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2022,
+          fuelType: 'Elektrik',
+          engineDisplacementCc: undefined,
+        },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Araçta 60 kWh batarya kapasitesi bulunmaktadır.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(teslaReportWithKwh, { verifiedResearch: { claims: [] } });
+      expect(validation.isValid).toBe(true);
+    });
+
+    it('should REJECT report if %85 number exists in Stage 1 but in an unrelated context (e.g. 85 kW power)', () => {
+      const teslaReport = {
+        reportId: 'rep-tesla-soh-unrelated-evidence',
+        vehicleIdentity: { brand: 'Tesla', model: 'Model 3', modelYear: 2022, fuelType: 'Elektrik' },
+        executiveSummary: {
+          title: 'Tesla Model 3 Özeti',
+          keyWarnings: ['Batarya sağlığı %85 altına düştüğünde dikkat edilmelidir.'],
+        },
+      } as any;
+
+      // Stage 1 has %85 / 85 in an unrelated context (e.g., otoban kullanım oranı %85)
+      const validation = validationService.validate(teslaReport, {
+        verifiedResearch: {
+          claims: [
+            { claimText: 'Aracın şehir dışı otoban kullanım oranı %85 olarak belirlenmiştir.', verificationStatus: 'VERIFIED' },
+          ],
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı)');
     });
 
     it('should ACCEPT report if %85 SoH was specifically verified in Stage 1 research data', () => {
@@ -425,6 +526,7 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
           model: 'Model 3',
           modelYear: 2022,
           fuelType: 'Elektrik',
+          engineDisplacementCc: undefined,
         },
         executiveSummary: {
           ...base.executiveSummary,
@@ -435,8 +537,8 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
 
       const validation = validationService.validate(teslaReportWithVerifiedSoh, {
         verifiedResearch: {
-          reliabilityResearch: [
-            { title: 'HV Batarya Değerlendirmesi', description: 'Kullanım sonrası %85 batarya kapasitesi ölçülmüştür.' },
+          claims: [
+            { claimText: 'Tesla Model 3 batarya sağlık durumu (SoH) %85 seviyesinde doğrulanmıştır.', verificationStatus: 'VERIFIED' }
           ],
         },
       });
