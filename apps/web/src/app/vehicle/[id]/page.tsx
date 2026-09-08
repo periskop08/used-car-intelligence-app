@@ -851,7 +851,7 @@ export default function VehicleDetail() {
         </div>
 
         {/* AI Report & Custom AI Chat Column */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-5 flex flex-col gap-6 self-start">
 
           {/* AI Chat Box (Custom Question Box - Reference Design) */}
           <div className="relative overflow-hidden rounded-[24px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-4 sm:p-5 lg:p-6 shadow-2xl flex flex-col">
@@ -1076,7 +1076,7 @@ export default function VehicleDetail() {
           {/* İŞİ CEPTE ÖNERİYOR */}
           <IsiCepteListingRecommendationWidget
             vehicleBrand={vehicle?.brand || "Bu Araç"}
-            className="w-full"
+            className="w-full h-[590px] max-h-[590px]"
           />
         </div>
 

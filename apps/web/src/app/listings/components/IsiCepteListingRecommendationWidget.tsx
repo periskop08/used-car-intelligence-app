@@ -250,7 +250,7 @@ export default function IsiCepteListingRecommendationWidget({
 
   return (
     <div
-      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans h-full flex-1 ${className}`}
+      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans ${className}`}
     >
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl"></span>
 
@@ -292,8 +292,8 @@ export default function IsiCepteListingRecommendationWidget({
         </button>
       </div>
 
-      {/* Main Body: Fixed-height scrollable viewport showing approx 5 compact cards */}
-      <div className="flex-1 flex flex-col justify-between gap-2.5 min-h-[200px]">
+      {/* Main Body: Scrollable viewport */}
+      <div className="flex-1 flex flex-col justify-between gap-2.5 min-h-0 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-400 font-mono animate-pulse my-auto">
             Vitrin servisleri yükleniyor...
@@ -318,7 +318,7 @@ export default function IsiCepteListingRecommendationWidget({
           </div>
         ) : (
           /* Scrollable Vertical List: Contains all matching Vitrin providers */
-          <div className="max-h-[380px] overflow-y-auto pr-1 space-y-2.5 scrollbar-thin scrollbar-thumb-white/15 overscroll-contain">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 scrollbar-thin scrollbar-thumb-white/15 overscroll-contain">
             {items.map((shop) => (
               <div
                 key={shop.id}
