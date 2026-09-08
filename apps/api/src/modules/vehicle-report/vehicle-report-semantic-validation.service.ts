@@ -328,6 +328,84 @@ export class VehicleReportSemanticValidationService {
     };
   }
 
+  private static readonly SOH_PATTERNS = [
+    /(?:%\s*(\d{2})|(\d{2})\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
+    /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\b)/i,
+  ];
+
+  private static readonly WEAR_PATTERNS = [
+    { topic: 'TRIM_RATTLE', regex: /(?:60[\s.]?000\s*-\s*70[\s.]?000|60\s*-\s*70\s*(?:bin|k))\s*km.*?(?:trim|tıkırtı|kabin)/i, label: 'Kabin trim tıkırtısı km eşiği' },
+    { topic: 'TRANSMISSION_WEAR', regex: /(?:80[\s.]?000\s*-\s*100[\s.]?000|80\s*-\s*100\s*(?:bin|k))\s*km.*?(?:kavrama|şanzıman|vites)/i, label: 'Şanzıman aşınması km eşiği' },
+  ];
+
+  public sanitizeEvidenceBoundNumericClaims(report: ComprehensiveVehicleReport, contextJson: any): void {
+    const verifiedResearch = contextJson?.verifiedResearch || {};
+    const researchText = JSON.stringify(verifiedResearch).toLowerCase();
+    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
+
+    const sanitizeString = (text: string): string => {
+      if (!text || typeof text !== 'string') return text;
+      let cleaned = text;
+
+      // 1. SoH / Battery percentage threshold sanitization
+      for (const pat of VehicleReportSemanticValidationService.SOH_PATTERNS) {
+        if (pat.test(cleaned)) {
+          const match = cleaned.match(pat);
+          const numVal = match ? (match[1] || match[2] || match[3]) : null;
+          if (numVal && !researchText.includes(`${numVal}%`) && !researchText.includes(`%${numVal}`) && !researchText.includes(`${numVal} soh`)) {
+            cleaned = cleaned.replace(
+              /(?:%\s*\d{2}|\d{2}\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)[^.!?\n]*(?:[.!?\n]|$)/gi,
+              'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir. '
+            ).replace(
+              /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*\d{2}|\d{2}\s*%|\d{2}\b)[^.!?\n]*(?:[.!?\n]|$)/gi,
+              'Batarya sağlık durumu (SoH) yetkili servis veya güvenilir bir uzman tarafından ölçülmeli ve araç özelinde değerlendirilmelidir. '
+            ).replace(
+              /(?:%\s*\d{2}|\d{2}\s*%)\s*(?:'?[ıiuü]n)?\s*(?:altı|altındaki|üstü|üstündeki|üzeri|üzerindeki)\s*değerler[^.!?\n]*(?:[.!?\n]|$)/gi,
+              'Batarya sağlık raporundaki değerler araç yaşı, kullanım geçmişi ve üretici verileriyle birlikte değerlendirilmelidir. '
+            );
+          }
+        }
+      }
+
+      // 2. Wear threshold sanitization
+      for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
+        if (wp.regex.test(cleaned)) {
+          const hasVerifiedProof = verifiedClaims.some(
+            (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(wp.topic.toLowerCase())
+          );
+          if (!hasVerifiedProof && !researchText.includes(wp.topic.toLowerCase())) {
+            cleaned = cleaned.replace(wp.regex, 'kullanım ve yol şartlarına bağlı olarak periyodik ekspertizde kontrol edilmelidir');
+          }
+        }
+      }
+
+      return cleaned.replace(/\s{2,}/g, ' ').trim();
+    };
+
+    const walkAndSanitize = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        if (typeof obj[key] === 'string') {
+          obj[key] = sanitizeString(obj[key]);
+        } else if (Array.isArray(obj[key])) {
+          obj[key] = obj[key].map((item: any) => {
+            if (typeof item === 'string') {
+              return sanitizeString(item);
+            } else if (item && typeof item === 'object') {
+              walkAndSanitize(item);
+              return item;
+            }
+            return item;
+          });
+        } else if (typeof obj[key] === 'object') {
+          walkAndSanitize(obj[key]);
+        }
+      }
+    };
+
+    walkAndSanitize(report);
+  }
+
   private validateEvidenceBoundNumericClaims(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
     const reportStr = JSON.stringify(report).toLowerCase();
     const verifiedResearch = contextJson?.verifiedResearch || {};
@@ -336,12 +414,7 @@ export class VehicleReportSemanticValidationService {
     const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
 
     // 1. SoH / Battery Capacity Percentage Threshold Guard (e.g. 85%, %85, %85 ve üzeri, %85'in altı, 85 SoH, SoH %85)
-    const sohPatterns = [
-      /(?:%\s*(\d{2})|(\d{2})\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
-      /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\b)/i,
-    ];
-
-    for (const pat of sohPatterns) {
+    for (const pat of VehicleReportSemanticValidationService.SOH_PATTERNS) {
       const match = reportStr.match(pat);
       if (match) {
         const numVal = match[1] || match[2] || match[3];
@@ -356,12 +429,7 @@ export class VehicleReportSemanticValidationService {
     }
 
     // 2. Hallucinated Wear/Failure Thresholds (e.g., "60-70k trim", "80-100k şanzıman")
-    const wearPatterns = [
-      { topic: 'TRIM_RATTLE', regex: /(?:60[\s.]?000\s*-\s*70[\s.]?000|60\s*-\s*70\s*(?:bin|k))\s*km.*?(?:trim|tıkırtı|kabin)/i, label: 'Kabin trim tıkırtısı km eşiği' },
-      { topic: 'TRANSMISSION_WEAR', regex: /(?:80[\s.]?000\s*-\s*100[\s.]?000|80\s*-\s*100\s*(?:bin|k))\s*km.*?(?:kavrama|şanzıman|vites)/i, label: 'Şanzıman aşınması km eşiği' },
-    ];
-
-    for (const wp of wearPatterns) {
+    for (const wp of VehicleReportSemanticValidationService.WEAR_PATTERNS) {
       if (wp.regex.test(reportStr)) {
         const hasVerifiedProof = verifiedClaims.some(
           (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(wp.topic.toLowerCase())
