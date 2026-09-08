@@ -211,6 +211,7 @@ export class VehicleReportProviderService {
             if (specs.engineDisplacementCc) baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
             if (specs.enginePowerHp) baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
             if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+            if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
 
             baseReport.performanceUsage = {
               powerHp: specs.enginePowerHp || baseReport.performanceUsage?.powerHp,

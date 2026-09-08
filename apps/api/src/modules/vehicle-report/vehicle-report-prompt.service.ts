@@ -162,8 +162,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
   2. İlgili aksamın/kronik durumun ciddi tamir/parça masrafı doğurabileceği konusunda uyar.
   3. Belirtilen risklerin fiziki olarak ekspertiz kontrolünde (ustasına/uzmanına) teyit ettirilmesini ve tespit edilen masrafların satın alma fiyat pazarlığında göz önünde bulundurulmasını tavsiye eden dengeli, yönlendirici ve uzman üslubu kullan.
 - KESİNLİKLE METNİ VEYA CÜMLEYİ YARIDA KESME! 'detailedAssessment' ve tüm açıklama metinlerini NOKTA (.) ile biten %100 TAM VE EKSİKSİZ CÜMLELERLE tamamla. Son kelimeyi veya düşünceyi asla yarım bırakma!
-- KRONOLOJİK VE VARYANT-YIL ÇELİŞKİ DEDEKTÖRÜ (ANOMALİ TESPİTİ):
-  Eğer incelenen araçta belirtilen Model Yılı ile seçilen Motor varyantı, Kasa jenerasyonu veya Donanım paketi resmi fabrika üretim yılları/takvimi açısından uyuşmuyorsa (örneğin motorun üretimi belirtilen model yılından önce bitmişse veya o yıl yeni nesle / farklı motor koduna geçilmişse [örn. Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 makyaj öncesi dönemde sunulmuşken aracın 2020 girilmiş olması gibi]):
+- KRONOLOJİK VE VARYANT-YIL ÇELİŞKİ DEDEKTÖRÜ (ANOMALİ TESPİTİ - FALSE-POSITIVE VE TÜRKİYE PAZARI KORUMASI):
+  ÇOK KRİTİK KURAL: Bir kronolojik uyumsuzluk veya motor hacmi uyarısı vermeden önce MUTLAKA TÜRKİYE RESMİ DİSTRİBÜTÖR (Borusan Otomotiv, Doğuş Otomotiv, Mercedes-Benz Türk, Mais vb.) KATALOGLARINI KONTROL ET! Türkiye'de ÖTV vergi dilimleri nedeniyle resmi distribütörler tarafından global pazarlardan farklı motor hacimleri ithal edilmektedir (Örn. BMW G20 320i 1.6L 1597cc 170 HP B48B16 motor, BMW G30 520i 1.6L 170 HP, Mercedes C200 / E180 1.6L vb.). Bu varyantlar Türkiye resmi pazarında %100 GERÇEK, ORİJİNAL VE FABRİKA ÇIKIŞLIDIR.
+  ASLA VE ASLA Türkiye pazarına özgü bu resmi varyantlara "ilan yanlış girilmiş", "bu motor bu kasada olmaz", "1600cc önceki kasada kaldı" şeklinde YANLIŞ ALARM (False-Positive) VERME!
+  Yalnızca Türkiye'de ve dünyada hiçbir zaman üretilmemiş bariz hatalarda (örn. 2020 Audi A3 8V kasada 2016'da sonlandırılmış 1.8 TFSI 180 HP motor seçilmiş olması gibi) şu adımları uygula:
   1. 'vehicleCharacter.detailedAssessment' metninin hemen başında "⚠️ **İlan / Varyant Kronolojik Uyumsuzluk Tespiti:**" başlığıyla bu durumu samimi bir uzman gözüyle açıkla (örn. bu motorun resmi üretiminin daha önceki yıllarda sonlandığı, belirtilen model yılında farklı bir motor/jenerasyon olması gerektiği, ilandaki aracın ya önceki yıllara ait olabileceği ya da motor varyantının ilanda sehven yanlış seçilmiş olabileceği).
   2. 'executiveSummary.keyWarnings' dizisine birinci öncelikli uyarı olarak ekle.
   3. Alıcının satın alma ve ekspertiz öncesinde araç ruhsatından ve şasi numarasından (VIN) motor kodunu ve gerçek model yılını teyit etmesini net bir tavsiye olarak belirt.
@@ -213,7 +215,14 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 • Çekiş Sistemi: ${driveTypeText}
 
 ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ:
-1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (TÜRKİYE VE AVRUPA RESMİ KATALOG HP, TORK, VİTES SAYISI, 0-100) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki tüm eski/hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik modelin TÜRKİYE VE AVRUPA (EU/TR) RESMİ FABRİKA KATALOG Beygir Gücünü (HP/PS - ABD veya diğer pazarları KESİNLİKLE ESAS ALMA! Örneğin 2014 Volkswagen Polo 1.2 TSI DSG Comfortline modeli için Türkiye resmi distribütör pazarında en yaygın ve standart satılan resmi 90 HP [EA211 makyajlı kasa] katalog verisini; 2022 Kia Cerato 1.6 MPI için Türkiye pazarında 128 HP / 155 Nm tork verisini; 2010 Audi A5 2.0 TFSI Quattro için 211 HP; 2010 Civic 1.6 i-VTEC için 125 HP), Torkunu (Nm), Şanzıman Vites Sayısını (örn. Cerato için 6 İleri Otomatik; Polo 1.2 TSI DSG için 7 İleri DSG) kendi doğrulanmış Avrupa/Türkiye otomotiv mühendisliği bilgine göre tespit et ve raporda Türkiye/Avrupa resmi fabrika verileriyle birebir aynı kullan!
+1. SIFIR VERİTABANI BAĞIMLILIĞI — TEKNİK VERİLERİ (TÜRKİYE VE AVRUPA RESMİ KATALOG HP, TORK, VİTES SAYISI, 0-100, ÇEKİŞ) SEN TESPİT ET VE YAZ: Sana veritabanından hiçbir sayısal HP (beygir gücü), Nm (tork) veya vites sayısı verisi VERİLMEMİŞTİR (Veritabanındaki tüm eski/hatalı verileri tamamen göz ardı et!). Yalnızca yukarıdaki 8 kimlik filtresine dayanarak (${year} ${brand} ${model} ${trim} ${engine} ${fuel} ${trans}); bu spesifik modelin TÜRKİYE VE AVRUPA (EU/TR) RESMİ FABRİKA KATALOG Beygir Gücünü (HP/PS - ABD veya diğer pazarları KESİNLİKLE ESAS ALMA!), Torkunu (Nm), Şanzıman Vites Sayısını ve Çekiş Sistemini kendi doğrulanmış Avrupa/Türkiye otomotiv mühendisliği bilgine göre tespit et ve raporda Türkiye/Avrupa resmi fabrika verileriyle birebir aynı kullan!
+TÜRKİYE RESMİ DİSTRİBÜTÖR VE KATALOG KURAL VE ÖRNEKLERİ:
+• 2019-2024 BMW 320i Sedan (G20 kasa - Sport Line / Luxury Line / M Sport / First Edition): Borusan Otomotiv resmi Türkiye verisi 1.6 Litre Turbo Benzinli (1.597 cc, 170 HP / 170 PS, 250 Nm Tork, B48B16 motor kodu, 8 İleri Steptronic Şanzıman, Arkadan İtiş RWD, 0-100: 7.7 sn). Global 2.0L 184 HP ile karıştırma, Türkiye'de 1.6L 170 HP fabrika çıkışlı ve %100 orijinaldir!
+• 2017-2023 BMW 520i Sedan (G30 kasa): Borusan Otomotiv resmi Türkiye verisi 1.6 Litre Turbo Benzinli (1.597 cc, 170 HP, 250 Nm Tork, 8 İleri Steptronic, Arkadan İtiş RWD).
+• 2014 Volkswagen Polo 1.2 TSI DSG Comfortline: Doğuş Otomotiv Türkiye resmi katalog verisi 90 HP [EA211 makyajlı kasa], 160 Nm tork, 7 İleri DSG.
+• 2022 Kia Cerato 1.6 MPI: Türkiye pazarında 128 HP / 155 Nm tork, 6 İleri Otomatik.
+• 2010 Audi A5 2.0 TFSI Quattro: 211 HP / 350 Nm tork, 7 İleri S tronic.
+• 2010 Honda Civic 1.6 i-VTEC Elegance: 125 HP / 152 Nm tork, 5 İleri Otomatik.
 2. Bu araca özel KİLOMETREYE GÖRE AŞINMA VE ARIZA SKALASINI raporda (özellikle Tavizler ve Değerlendirme bölümlerinde) detaylandır!
    - Örneğin: "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış görülebilir", "80.000 - 100.000 km arasında şanzıman kavrama geçişleri hissettirebilir / mekatronik kontrol edilmelidir", "120.000 km sonrasında devirdaim/termostat sızıntıları ve ağır bakım zamanı gelir" gibi somut kilometre eşiklerini kıdemli otomotiv bilginle açıklayarak kullanıcıyı bilgilendir.
 3. Kullanıcının seçtiği "${trim}" donanım paketinin sunduğu kilit konfor ve güvenlik donanımlarını "Tercih Etmek İçin Güçlü Nedenler" bölümünde anlat.
@@ -225,25 +234,27 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    İncelenen "${trim}" donanım seviyesinde Sunroof (açılır tavan), panoramik cam tavan, dijital klima, mercekli farlar gibi çok sorulan aksamların bulunma durumunu raporda açıkça belirt.
 7. MAKYAJ / FACELIFT GEÇİŞ DÖNEMİ BİLGİLENDİRMESİ:
    Eğer araç yılı bir makyaj veya kasa/motor geçiş yılına denk geliyorsa (örneğin 2014 VW Polo 1.2 TSI modellerinde makyaj öncesi 105 HP [EA111 / CBZB] ve makyaj sonrası 90 HP [EA211 / CJZD Euro 6] kasaların her ikisinin de bulunması gibi), bu durumu 'vehicleCharacter.detailedAssessment' ve 'executiveSummary' bölümlerinde açıkça vurgula! "Bu model yılı makyaj geçiş dönemi olduğundan araç makyaj öncesi (105 HP) veya makyaj sonrası (90 HP) versiyona sahip olabilir, motor kodundan (CBZB / CJZD) kontrol edilmelidir" tarzında kullanıcıyı bilgilendiren samimi ve uzman notu ekle!
-8. KRONOLOJİK VE VARYANT-YIL TUTARSIZLIK TESPİTİ (ANOMALİ VE İLAN ÇELİŞKİ DEDEKTÖRÜ):
-   Eğer kullanıcının/ilanın girdiği Üretim Yılı (${year}) ile seçilen Motor (${engine}) / Kasa Tipi (${body}) / Donanım (${trim}) arasında resmi fabrika üretim ve pazar yılları açısından bariz bir kronolojik tutarsızlık / uyumsuzluk varsa (örneğin Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 yılları arasında makyaj öncesi sunulmuş olup 2016 makyajıyla sonlandırılmışken aracın 2020 model seçilmesi; ya da 2020 yılında 1.5 TSI 35 TFSI / 8Y yeni nesile geçilmişken 1.8 TFSI seçilmiş olması gibi):
+8. KRONOLOJİK VE VARYANT-YIL TUTARSIZLIK TESPİTİ (ANOMALİ VE İLAN ÇELİŞKİ DEDEKTÖRÜ - DİKKAT: FALSE-POSITIVE VERME!):
+   DİKKAT: Bir araca kronolojik uyumsuzluk veya motor çelişkisi uyarısı vermeden önce, o motor hacmi ve gücünün Türkiye Resmi Distribütörü (Borusan Otomotiv, Doğuş, Mercedes-Benz Türk vb.) tarafından Türkiye pazarına getirilip getirilmediğini KESİNLİKLE KONTROL ET! Örneğin BMW 320i G20 kasada 1.6L 170 HP motor Türkiye'de resmi ve en yaygın varyanttır; bu araca ASLA '1600cc F30'da kaldı', 'G20'de 1.6 motor uyumsuz' gibi yanlış alarm uyarısı VERİLEMEZ!
+   Yalnızca ve yalnızca, Türkiye'de ve dünyada hiçbir zaman üretilmemiş veya satılmamış bariz çelişkilerde (örneğin Audi A3 8V kasada 1.8 TFSI 180 HP motor 2012-2016 yılları arasında makyaj öncesi sunulmuş olup 2016 makyajıyla sonlandırılmışken aracın 2020 model seçilmesi; ya da 2020 yılında 1.5 TSI 35 TFSI / 8Y yeni nesile geçilmişken 1.8 TFSI seçilmiş olması gibi) şu adımları uygula:
    - Bu durumu 'vehicleCharacter.detailedAssessment' alanında en başta açıkça vurgula: '⚠️ İlan / Varyant Kronolojik Uyumsuzluk Tespiti: Bu ilanda belirtilen ${engine} seçeneği resmi fabrika kataloğunda ${year} yılından önce/sonra yer almaktadır...'.
    - 'executiveSummary' bölümünün uyarılarına ('keyWarnings') birinci sıradan bu kronolojik uyuşmazlık uyarısını ekle.
    - Kullanıcıya ilandaki aracın ya önceki bir model yılına ait olabileceği ya da ilan girişinde motor varyantının sehven yanlış seçilmiş olabileceği bilgisini vererek, satın alma/ekspertiz öncesinde araç ruhsatı ve şasi numarasından (VIN) motor kodu ve model yılının mutlaka fiziki teyit edilmesini tavsiye et!
 9. TAM KAPSAMLI TEKNİK SPESİFİKASYON ÇIKTISI ("technicalSpecifications"):
-   Yukarıdaki 8 kimlik filtresini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
-   - Motor Hacmi cc ("engineDisplacementCc")
-   - Motor Gücü HP ("enginePowerHp" — örn. 2022 Kia Cerato 1.6 MPI için 128, 2014 Polo 1.2 TSI için 90)
-   - Tork Nm ("engineTorqueNm" — örn. 2022 Kia Cerato 1.6 MPI için 155, Polo 1.2 TSI için 160)
-   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "6 İleri Tam Otomatik", "7 İleri DSG Otomatik")
-   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 7 veya 6)
-   - 0-100 km/s Hızlanma sn ("zeroToHundredKmh")
-   - Maksimum Hız km/s ("topSpeedKmh")
+   Yukarıdaki 8 kimlik filtresini ve Türkiye distribütör resmi verilerini esas alarak, aracın GERÇEK fabrika teknik verilerini "technicalSpecifications" JSON nesnesi içine eksiksiz doldur:
+   - Motor Hacmi cc ("engineDisplacementCc" — örn. BMW 320i G20 için 1597, Polo 1.2 TSI için 1197)
+   - Motor Gücü HP ("enginePowerHp" — örn. BMW 320i G20 için 170, 2022 Kia Cerato 1.6 MPI için 128, 2014 Polo 1.2 TSI için 90)
+   - Tork Nm ("engineTorqueNm" — örn. BMW 320i G20 için 250, 2022 Kia Cerato 1.6 MPI için 155, Polo 1.2 TSI için 160)
+   - Çekiş Sistemi ("drivetrain" — örn. BMW 320i G20 için "Arkadan İtiş (RWD)", Quattro için "Dört Tekerlekten Çekiş (AWD / Quattro)", Polo için "Önden Çekiş (FWD)")
+   - Vites Tipi ve Sayısı Metni ("transmissionTypeAndSpeeds" — örn. "8 İleri Steptronic Otomatik", "7 İleri DSG Otomatik", "6 İleri Tam Otomatik")
+   - Vites Sayısı Sayı ("transmissionSpeeds" — KESİNLİKLE GERÇEK VİTES SAYISI, örn. 8, 7 veya 6)
+   - 0-100 km/s Hızlanma sn ("zeroToHundredKmh" — örn. BMW 320i G20 için 7.7)
+   - Maksimum Hız km/s ("topSpeedKmh" — örn. BMW 320i G20 için 232)
    - Şehir İçi Tüketim L/100km ("cityFuelL100km")
    - Şehir Dışı Tüketim L/100km ("highwayFuelL100km")
    - Karma Tüketim L/100km ("combinedFuelL100km")
-   - Bagaj Hacmi Litre ("trunkCapacityLiters")
-   - Boş Ağırlık kg ("curbWeightKg")
+   - Bagaj Hacmi Litre ("trunkCapacityLiters" — örn. BMW 320i G20 için 480)
+   - Boş Ağırlık kg ("curbWeightKg" — örn. BMW 320i G20 için 1525)
 
 Yukarıdaki 8 filtreye, donanım paketine, kilometre aşınma skalasına, makyaj geçiş notlarına, kronolojik anomali denetimine ve teknik spesifikasyonlara özel 9 otomotiv sorusunu yanıtlayarak zengin, samimi ve mühendislik seviyesinde bir VehicleReportGeneratedContent JSON çıktısı oluştur.
 
@@ -264,17 +275,19 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
   "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
   "technicalSpecifications": {
-    "enginePowerHp": 128,
-    "engineTorqueNm": 155,
-    "transmissionTypeAndSpeeds": "6 İleri Tam Otomatik",
-    "transmissionSpeeds": 6,
-    "zeroToHundredKmh": 10.8,
-    "topSpeedKmh": 192,
-    "cityFuelL100km": 8.0,
-    "highwayFuelL100km": 5.7,
+    "engineDisplacementCc": 1597,
+    "enginePowerHp": 170,
+    "engineTorqueNm": 250,
+    "drivetrain": "Arkadan İtiş (RWD)",
+    "transmissionTypeAndSpeeds": "8 İleri Steptronic Otomatik",
+    "transmissionSpeeds": 8,
+    "zeroToHundredKmh": 7.7,
+    "topSpeedKmh": 232,
+    "cityFuelL100km": 7.4,
+    "highwayFuelL100km": 5.3,
     "combinedFuelL100km": 6.1,
-    "trunkCapacityLiters": 450,
-    "curbWeightKg": 1350
+    "trunkCapacityLiters": 480,
+    "curbWeightKg": 1525
   }
 }`;
   }

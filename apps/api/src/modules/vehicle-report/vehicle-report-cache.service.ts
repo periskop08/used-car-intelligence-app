@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportMode } from '@prisma/client';
 
-export const CURRENT_REPORT_VERSION = 'v4.5_CHRONO_ANOMALY_DETECTOR';
+export const CURRENT_REPORT_VERSION = 'v4.6_TURKEY_MARKET_AWARE';
 
 @Injectable()
 export class VehicleReportCacheService {
