@@ -18,11 +18,13 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import UrgentListingBadge from '@/components/listings/UrgentListingBadge';
+
 interface SimilarListingItem {
   id: string;
   title: string;
-  brand: string;
-  model: string;
+  brand?: string;
+  model?: string;
   modelYear: number;
   kilometers: number;
   priceAmount: number;
@@ -36,6 +38,9 @@ interface SimilarListingItem {
   engineDisplacement?: number | null;
   imageUrl?: string | null;
   similarityScore?: number;
+  isUrgent?: boolean;
+  isShowcaseFeedActive?: boolean;
+  isFeatured?: boolean;
 }
 
 interface SimilarListingsWidgetProps {
@@ -198,7 +203,6 @@ export default function SimilarListingsWidget({
                   href={`/listings/${item.id}`}
                   className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0a1122]/90 hover:bg-[#101b33] border border-white/5 hover:border-orange-500/40 transition group shadow-sm select-none"
                 >
-                  {/* Sol Küçük Görsel */}
                   <div className="w-16 h-14 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0 relative flex items-center justify-center">
                     {item.imageUrl ? (
                       <img
@@ -211,13 +215,24 @@ export default function SimilarListingsWidget({
                         <Car className="w-5 h-5 text-slate-500" />
                       </div>
                     )}
+                    {item.isUrgent && (
+                      <div className="absolute top-0.5 left-0.5 z-10 scale-[0.7] origin-top-left">
+                        <UrgentListingBadge size="small" animated />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Sağ İlan Özeti */}
                   <div className="flex flex-col min-w-0 flex-1 justify-center">
-                    <h4 className="text-[11.5px] font-bold text-slate-200 truncate group-hover:text-orange-400 transition leading-snug">
-                      {item.title}
-                    </h4>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h4 className="text-[11.5px] font-bold text-slate-200 truncate group-hover:text-orange-400 transition leading-snug">
+                        {item.title}
+                      </h4>
+                      {item.isShowcaseFeedActive && (
+                        <span className="shrink-0 px-1 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[7.5px] uppercase tracking-wider shadow border border-amber-300">
+                          ⭐ Vitrin
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
                       {item.modelYear} • {item.kilometers.toLocaleString('tr-TR')} km •{' '}
                       {item.district || item.city}
@@ -231,7 +246,6 @@ export default function SimilarListingsWidget({
             </div>
           )}
 
-          {/* 3. En Altta: Tüm Benzer İlanları Gör Butonu */}
           {totalCount > 0 && (
             <button
               type="button"
@@ -245,7 +259,6 @@ export default function SimilarListingsWidget({
         </div>
       )}
 
-      {/* 4. TÜM BENZER İLANLAR MODAL POPUP (Rendered via Portal into body) */}
       {mounted &&
         isModalOpen &&
         createPortal(
@@ -257,42 +270,41 @@ export default function SimilarListingsWidget({
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-4xl bg-[#081120] border border-orange-500/30 rounded-[28px] p-5 sm:p-7 space-y-5 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col my-auto"
             >
-              {/* Modal Başlık */}
-              <div className="flex items-start justify-between pb-3 border-b border-white/10 shrink-0 gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="p-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
-                      <Sparkles className="w-5 h-5" />
-                    </span>
-                    <h2 className="text-base sm:text-lg font-black text-white">
-                      Eşleşen Benzer İlanlar ({totalCount})
-                    </h2>
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                    <Car className="w-5 h-5" />
                   </div>
-                  <p className="text-[11.5px] text-slate-400">
-                    İlan Fiyatı, Marka, Model, Yıl, Yakıt, Vites, KM ve Kasa Tipi kriterlerine göre
-                    en uyumlu alternatif ilanlar listelenmiştir.
-                  </p>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      Tüm Benzer Araç İlanları
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                        {totalCount} Sonuç
+                      </span>
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                      Fiyat, marka, model, yıl, yakıt, vites ve motor hacmi kriterlerine göre sıralandı.
+                    </p>
+                  </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition cursor-pointer shrink-0"
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Modal İçerik: Kaydırılabilir Grid / Kartlar */}
-              <div className="flex-1 overflow-y-auto pr-1.5 space-y-3 custom-scrollbar">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {items.map((car, idx) => (
                     <Link
                       key={car.id}
                       href={`/listings/${car.id}`}
-                      className="p-3.5 rounded-2xl bg-[#0c162b] hover:bg-[#12203d] border border-white/10 hover:border-orange-500/40 transition flex gap-3.5 group cursor-pointer shadow-md"
+                      className="p-3.5 rounded-2xl bg-[#0c162b] hover:bg-[#12203d] border border-white/10 hover:border-orange-500/40 transition flex gap-3.5 group cursor-pointer shadow-md relative"
                     >
-                      {/* Sol Görsel */}
                       <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 relative flex items-center justify-center">
                         {car.imageUrl ? (
                           <img
@@ -308,9 +320,20 @@ export default function SimilarListingsWidget({
                         <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-bold">
                           #{idx + 1}
                         </span>
+                        {car.isUrgent && (
+                          <div className="absolute top-1.5 right-1.5 z-10 scale-90 origin-top-right">
+                            <UrgentListingBadge size="small" animated />
+                          </div>
+                        )}
+                        {car.isShowcaseFeedActive && (
+                          <div className="absolute bottom-1.5 left-1.5 z-10">
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[8.5px] uppercase tracking-wider shadow-lg border border-amber-300">
+                              ⭐ Vitrin + Akış
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Sağ Detaylar */}
                       <div className="flex flex-col min-w-0 flex-1 justify-between py-0.5">
                         <div className="space-y-1">
                           <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition truncate leading-snug">

@@ -658,6 +658,9 @@ export class ListingController {
         engineDisplacement: listing.engineDisplacement || listing.vehicleVariant?.engine?.displacement || null,
         imageUrl: primaryPhoto,
         similarityScore: score,
+        isUrgent: !!listing.isUrgent,
+        isShowcaseFeedActive: !!listing.isShowcaseFeedActive,
+        isFeatured: !!listing.isFeatured,
       };
     });
 

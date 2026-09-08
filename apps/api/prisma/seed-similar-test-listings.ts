@@ -1,4 +1,15 @@
-import { PrismaClient, ListingStatus, FuelType, TransmissionType, BodyType } from '@prisma/client';
+import {
+  PrismaClient,
+  ListingStatus,
+  FuelType,
+  TransmissionType,
+  BodyType,
+  ListingPromotionType,
+  ListingPromotionProductSku,
+  ListingPromotionSource,
+  PromotionLifecycleStatus,
+  PromotionPaymentStatus,
+} from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -324,12 +335,119 @@ async function main() {
     console.log(`[${item.num}/15] ${item.title} (${item.city}) eklendi.`);
   }
 
+  // Promosyon Paketlerini Tanımla (1-8: Vitrin + Akış, 9-15: Sadece Acil)
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  for (let i = 1; i <= 8; i++) {
+    const id = `TEST-SIMILAR-${String(i).padStart(2, '0')}`;
+    const listing = await prisma.vehicleListing.findUnique({ where: { id } });
+    if (!listing) continue;
+
+    await prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        isFeatured: true,
+        isShowcaseFeedActive: true,
+        showcaseFeedSince: now,
+        showcaseFeedExpiresAt: expiresAt,
+        showcaseRequested: true,
+        expiresAt: expiresAt,
+      },
+    });
+
+    await prisma.listingPromotionEntitlement.deleteMany({ where: { listingId: id } });
+    await prisma.listingPromotionPurchase.deleteMany({ where: { listingId: id } });
+
+    const purchase = await prisma.listingPromotionPurchase.create({
+      data: {
+        userId: listing.sellerId,
+        listingId: id,
+        source: ListingPromotionSource.ADMIN_GRANT,
+        promotionType: ListingPromotionType.SHOWCASE_FEED,
+        productSku: ListingPromotionProductSku.SHOWCASE_FEED,
+        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+        paymentStatus: PromotionPaymentStatus.NOT_REQUIRED,
+        grantedByAdminId: listing.sellerId,
+        adminGrantReason: 'Vitrin ve akış paketi testi',
+        priceAmount: 499.0,
+        currency: 'TRY',
+        activatedAt: now,
+        expiresAt: expiresAt,
+        purchasedAt: now,
+      },
+    });
+
+    await prisma.listingPromotionEntitlement.create({
+      data: {
+        purchaseId: purchase.id,
+        listingId: id,
+        promotionType: ListingPromotionType.SHOWCASE_FEED,
+        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+        activatedAt: now,
+        expiresAt: expiresAt,
+      },
+    });
+  }
+
+  for (let i = 9; i <= 15; i++) {
+    const id = `TEST-SIMILAR-${String(i).padStart(2, '0')}`;
+    const listing = await prisma.vehicleListing.findUnique({ where: { id } });
+    if (!listing) continue;
+
+    await prisma.vehicleListing.update({
+      where: { id },
+      data: {
+        isUrgent: true,
+        urgentSince: now,
+        urgentExpiresAt: expiresAt,
+        urgentRequested: true,
+        expiresAt: expiresAt,
+      },
+    });
+
+    await prisma.listingPromotionEntitlement.deleteMany({ where: { listingId: id } });
+    await prisma.listingPromotionPurchase.deleteMany({ where: { listingId: id } });
+
+    const purchase = await prisma.listingPromotionPurchase.create({
+      data: {
+        userId: listing.sellerId,
+        listingId: id,
+        source: ListingPromotionSource.ADMIN_GRANT,
+        promotionType: ListingPromotionType.URGENT_LISTING,
+        productSku: ListingPromotionProductSku.URGENT_LISTING,
+        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+        paymentStatus: PromotionPaymentStatus.NOT_REQUIRED,
+        grantedByAdminId: listing.sellerId,
+        adminGrantReason: 'Acil ilan paketi testi',
+        priceAmount: 299.0,
+        currency: 'TRY',
+        activatedAt: now,
+        expiresAt: expiresAt,
+        purchasedAt: now,
+      },
+    });
+
+    await prisma.listingPromotionEntitlement.create({
+      data: {
+        purchaseId: purchase.id,
+        listingId: id,
+        promotionType: ListingPromotionType.URGENT_LISTING,
+        lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+        activatedAt: now,
+        expiresAt: expiresAt,
+      },
+    });
+  }
+
   const count = await prisma.vehicleListing.count({
     where: { id: { startsWith: 'TEST-SIMILAR-' } },
   });
 
   console.log('----------------------------------------------------');
   console.log(`Tamamlandı! Eklenen benzer test ilanı sayısı: ${count}`);
+  console.log('- 8 adet Vitrin + Akış (TEST-SIMILAR-01 .. TEST-SIMILAR-08)');
+  console.log('- 7 adet Sadece Acil (TEST-SIMILAR-09 .. TEST-SIMILAR-15)');
   console.log('----------------------------------------------------');
 }
 
