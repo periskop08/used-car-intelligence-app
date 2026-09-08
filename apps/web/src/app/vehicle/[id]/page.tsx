@@ -654,8 +654,11 @@ export default function VehicleDetail() {
           </a>
         </div>
       ) : (
-        <div className="flex flex-col gap-8 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
+        {/* Specs, Problems & Reviews Column */}
+        <div className="lg:col-span-2 flex flex-col gap-8">
+          
           {/* AI Report Card (TorqueScout Vehicle Report Shell) */}
           {structuredReport ? (
             <VehicleReportShell 
@@ -718,8 +721,139 @@ export default function VehicleDetail() {
             </div>
           )}
 
-          {/* AI Chat Box (Custom Question Box - Reference Design - FULL WIDTH) */}
-          <div className="w-full relative overflow-hidden rounded-[26px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-6 sm:p-8 md:p-10 shadow-2xl flex flex-col">
+
+
+          {/* User Reviews List */}
+          <div className="glass p-6 rounded-2xl flex flex-col gap-4">
+            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({vehicle.reviews.length})</h2>
+            {vehicle.reviews.length > 0 ? (
+              <div className="flex flex-col gap-4 mt-2">
+                {vehicle.reviews.map((rev: any) => (
+                  <div key={rev.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-200 text-xs">{rev.email}</span>
+                      <span className="text-xs text-slate-500 font-medium">Süre: {rev.usageDuration} Ay • {rev.isOwner ? 'Sahibi' : 'Kullanıcısı'}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed italic">"{rev.comment}"</p>
+                    {rev.rating && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-400">
+                        <span>Dayanıklılık: {rev.rating.reliability}/5⭐</span>
+                        <span>Yakıt: {rev.rating.fuelConsumption}/5⭐</span>
+                        <span>Konfor: {rev.rating.comfort}/5⭐</span>
+                        <span>Parça Maliyeti: {rev.rating.partCost}/5⭐</span>
+                        <span>Bakım: {rev.rating.maintenanceCost}/5⭐</span>
+                        <span>Satış Kolaylığı: {rev.rating.resaleEase}/5⭐</span>
+                        <span className="font-bold text-slate-300">Genel Skor: {rev.rating.overall}/5⭐</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Henüz yorum yapılmamış.</p>
+            )}
+
+            {/* Write a Review form */}
+            <div className="mt-6 border-t border-white/5 pt-6">
+              <h3 className="text-sm font-bold text-slate-200 mb-4">✍️ Araç Hakkında Yorum Yaz (Günde 1 Sınır)</h3>
+              
+              {reviewError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mb-4">
+                  ⚠️ {reviewError}
+                </div>
+              )}
+              {reviewSuccess && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs p-3 rounded-xl font-semibold mb-4">
+                  🎉 {reviewSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Yorumunuz (En az 20, en fazla 1000 karakter)</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    placeholder="Aracın konforu, yakıt tüketimi, kullanıcı deneyimleri hakkındaki görüşlerinizi yazın..."
+                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Kullanım Süresi (Ay)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={usageDuration}
+                      onChange={e => setUsageDuration(Number(e.target.value))}
+                      className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-6">
+                    <input
+                      type="checkbox"
+                      id="isOwner"
+                      checked={isOwner}
+                      onChange={e => setIsOwner(e.target.checked)}
+                      className="rounded"
+                    />
+                    <label htmlFor="isOwner" className="text-xs font-semibold text-slate-300">Araç Sahibiyim</label>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-6">
+                    <input
+                      type="checkbox"
+                      id="recommend"
+                      checked={recommend}
+                      onChange={e => setRecommend(e.target.checked)}
+                      className="rounded"
+                    />
+                    <label htmlFor="recommend" className="text-xs font-semibold text-slate-300">Tavsiye Ediyorum</label>
+                  </div>
+                </div>
+
+                {/* Star Ratings Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                  {Object.keys(ratings).map((key) => (
+                    <div key={key} className="flex flex-col gap-1">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">{key === 'reliability' ? 'Güvenilirlik' : key === 'fuelConsumption' ? 'Yakıt' : key === 'comfort' ? 'Konfor' : key === 'partCost' ? 'Parça' : key === 'maintenanceCost' ? 'Bakım' : key === 'resaleEase' ? 'Satış' : 'Genel'}</span>
+                      <select
+                        value={ratings[key as keyof typeof ratings]}
+                        onChange={e => setRatings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                        className="bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-slate-200 outline-none"
+                      >
+                        <option value="5">5 ⭐ (Mükemmel)</option>
+                        <option value="4">4 ⭐ (İyi)</option>
+                        <option value="3">3 ⭐ (Orta)</option>
+                        <option value="2">2 ⭐ (Kötü)</option>
+                        <option value="1">1 ⭐ (Kritik)</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs mt-2 transition"
+                >
+                  {submittingReview ? "Yorum Gönderiliyor..." : "Yorumu Gönder"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Report & Custom AI Chat Column */}
+        <div className="flex flex-col gap-6">
+
+          {/* AI Chat Box (Custom Question Box - Reference Design) */}
+          <div className="relative overflow-hidden rounded-[26px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-6 sm:p-8 md:p-10 shadow-2xl flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between gap-4">
               {/* Status indicator */}
@@ -908,7 +1042,7 @@ export default function VehicleDetail() {
 
               <button
                 type="submit"
-                disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
+                disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0) || !chatQuestion.trim()}
                 className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold px-7 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 text-sm tracking-wide"
               >
                 {sendingChat ? (
@@ -937,131 +1071,7 @@ export default function VehicleDetail() {
               <span>Yanıtlar araç raporu verilerine göre hazırlanır.</span>
             </div>
           </div>
-
-          {/* User Reviews List */}
-          <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({vehicle.reviews.length})</h2>
-            {vehicle.reviews.length > 0 ? (
-              <div className="flex flex-col gap-4 mt-2">
-                {vehicle.reviews.map((rev: any) => (
-                  <div key={rev.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200 text-xs">{rev.email}</span>
-                      <span className="text-xs text-slate-500 font-medium">Süre: {rev.usageDuration} Ay • {rev.isOwner ? 'Sahibi' : 'Kullanıcısı'}</span>
-                    </div>
-                    <p className="text-xs text-slate-300 leading-relaxed italic">"{rev.comment}"</p>
-                    {rev.rating && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-400">
-                        <span>Dayanıklılık: {rev.rating.reliability}/5⭐</span>
-                        <span>Yakıt: {rev.rating.fuelConsumption}/5⭐</span>
-                        <span>Konfor: {rev.rating.comfort}/5⭐</span>
-                        <span>Parça Maliyeti: {rev.rating.partCost}/5⭐</span>
-                        <span>Bakım: {rev.rating.maintenanceCost}/5⭐</span>
-                        <span>Satış Kolaylığı: {rev.rating.resaleEase}/5⭐</span>
-                        <span className="font-bold text-slate-300">Genel Skor: {rev.rating.overall}/5⭐</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">Henüz yorum yapılmamış.</p>
-            )}
-
-            {/* Write a Review form */}
-            <div className="mt-6 border-t border-white/5 pt-6">
-              <h3 className="text-sm font-bold text-slate-200 mb-4">✍️ Araç Hakkında Yorum Yaz (Günde 1 Sınır)</h3>
-              
-              {reviewError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mb-4">
-                  ⚠️ {reviewError}
-                </div>
-              )}
-              {reviewSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs p-3 rounded-xl font-semibold mb-4">
-                  🎉 {reviewSuccess}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Yorumunuz (En az 20, en fazla 1000 karakter)</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    placeholder="Aracın konforu, yakıt tüketimi, kullanıcı deneyimleri hakkındaki görüşlerinizi yazın..."
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Kullanım Süresi (Ay)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={usageDuration}
-                      onChange={e => setUsageDuration(Number(e.target.value))}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-6">
-                    <input
-                      type="checkbox"
-                      id="isOwner"
-                      checked={isOwner}
-                      onChange={e => setIsOwner(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="isOwner" className="text-xs font-semibold text-slate-300">Araç Sahibiyim</label>
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-6">
-                    <input
-                      type="checkbox"
-                      id="recommend"
-                      checked={recommend}
-                      onChange={e => setRecommend(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="recommend" className="text-xs font-semibold text-slate-300">Tavsiye Ediyorum</label>
-                  </div>
-                </div>
-
-                {/* Star Ratings Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                  {Object.keys(ratings).map((key) => (
-                    <div key={key} className="flex flex-col gap-1">
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold">{key === 'reliability' ? 'Güvenilirlik' : key === 'fuelConsumption' ? 'Yakıt' : key === 'comfort' ? 'Konfor' : key === 'partCost' ? 'Parça' : key === 'maintenanceCost' ? 'Bakım' : key === 'resaleEase' ? 'Satış' : 'Genel'}</span>
-                      <select
-                        value={ratings[key as keyof typeof ratings]}
-                        onChange={e => setRatings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                        className="bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-slate-200 outline-none"
-                      >
-                        <option value="5">5 ⭐ (Mükemmel)</option>
-                        <option value="4">4 ⭐ (İyi)</option>
-                        <option value="3">3 ⭐ (Orta)</option>
-                        <option value="2">2 ⭐ (Kötü)</option>
-                        <option value="1">1 ⭐ (Kritik)</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submittingReview}
-                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs mt-2 transition"
-                >
-                  {submittingReview ? "Yorum Gönderiliyor..." : "Yorumu Gönder"}
-                </button>
-              </form>
-            </div>
-          </div>
+        </div>
 
         </div>
       )}
