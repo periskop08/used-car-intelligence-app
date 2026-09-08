@@ -335,10 +335,10 @@ export class VehicleReportSemanticValidationService {
     const dynamicMaint = verifiedResearch?.dynamicMaintenanceResearch || {};
     const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
 
-    // 1. SoH / Battery Capacity Percentage Threshold Guard (e.g. 85%, %85, %85'in altı, 85 SoH)
+    // 1. SoH / Battery Capacity Percentage Threshold Guard (e.g. 85%, %85, %85 ve üzeri, %85'in altı, 85 SoH, SoH %85)
     const sohPatterns = [
-      /(?:%\s*(\d{2})|(\d{2})\s*%\s*(?:'?[ıiuü]n\s*(?:altı|üstü|üzeri|seviyesi))?)\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
-      /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi\s*)?(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\s*(?:seviyesi)?)/i,
+      /(?:%\s*(\d{2})|(\d{2})\s*%)\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri|seviyesi|değerleri|oranı))?\s*(?:soh|pil sağlığı|batarya sağlığı|kapasite)/i,
+      /(?:soh|pil sağlığı|batarya sağlığı|kapasite)\s*(?:seviyesi|oranı|değeri)?\s*(?:(?:ve|veya|'?[ıiuü]n)?\s*(?:altı|üstü|üzeri))?\s*(?:%\s*(\d{2})|(\d{2})\s*%|(\d{2})\b)/i,
     ];
 
     for (const pat of sohPatterns) {
