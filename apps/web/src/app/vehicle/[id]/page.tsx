@@ -92,8 +92,47 @@ export default function VehicleDetail() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sendingChat, setSendingChat] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatQuota, setChatQuota] = useState<{
+    isUnlimited: boolean;
+    remaining: number;
+    totalLimit: number;
+    loading: boolean;
+  }>({
+    isUnlimited: false,
+    remaining: 3,
+    totalLimit: 3,
+    loading: true,
+  });
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchChatQuota = async () => {
+    try {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") || localStorage.getItem("token")) : null;
+      const res = await fetch(`${API_URL}/subscriptions/summary`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const right = data?.rights?.aiChat;
+        const isUnlimited = Boolean(data?.isUnlimited || right?.isUnlimited);
+        setChatQuota({
+          isUnlimited,
+          remaining: right?.remaining ?? 3,
+          totalLimit: right?.totalLimit ?? 3,
+          loading: false,
+        });
+      }
+    } catch {
+      setChatQuota(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    fetchChatQuota();
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -404,23 +443,28 @@ export default function VehicleDetail() {
   };
 
   // Custom AI Chat Question
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatQuestion.trim()) return;
+  const handleSendChat = (e?: React.FormEvent, customQuestion?: string) => {
+    if (e) e.preventDefault();
+    const questionToSend = (customQuestion || chatQuestion).trim();
+    if (!questionToSend || sendingChat) return;
 
-    const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
     if (!token) {
       router.push("/login");
       return;
     }
 
-    const questionText = chatQuestion;
+    if (!chatQuota.isUnlimited && chatQuota.remaining <= 0) {
+      setChatError("Mesaj hakkınız tükendi. Lütfen ek paket satın alın.");
+      return;
+    }
+
     setChatQuestion("");
     setSendingChat(true);
     setChatError("");
 
     // Append user message immediately
-    setChatMessages(prev => [...prev, { sender: "user", text: questionText }]);
+    setChatMessages(prev => [...prev, { sender: "user", text: questionToSend }]);
 
     fetch(`${API_URL}/reports/chat`, {
       method: "POST",
@@ -428,7 +472,7 @@ export default function VehicleDetail() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify({ variantId, question: questionText }),
+      body: JSON.stringify({ variantId, question: questionToSend }),
     })
       .then(res => {
         if (!res.ok) {
@@ -441,6 +485,7 @@ export default function VehicleDetail() {
       .then(data => {
         setChatMessages(prev => [...prev, { sender: "ai", text: data.response }]);
         setSendingChat(false);
+        fetchChatQuota();
       })
       .catch(err => {
         setChatError(err.message);
@@ -807,95 +852,224 @@ export default function VehicleDetail() {
         {/* AI Report & Custom AI Chat Column */}
         <div className="flex flex-col gap-6">
 
-          {/* AI Chat Box (Custom Question Box) */}
-          <div className="glass p-6 rounded-3xl flex flex-col gap-4 shadow-2xl border border-white/5 bg-slate-900/40">
-            {/* AI Chat Quota Badge */}
-            <QuotaBadge feature="aiChat" showDetails={false} />
+          {/* AI Chat Box (Custom Question Box - Reference Design) */}
+          <div className="relative overflow-hidden rounded-[26px] border border-sky-500/25 bg-[#081225]/95 backdrop-blur-xl p-6 sm:p-8 md:p-10 shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4">
+              {/* Status indicator */}
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_10px_#34d399]"></span>
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-emerald-300/95 tracking-wide select-none">
+                  {Boolean(structuredReport || aiReport || vehicle?.aiReport)
+                    ? "Çevrimiçi • Rapor verilerine hakim"
+                    : "Çevrimiçi • Araç verilerine hazır"}
+                </span>
+              </div>
 
-            <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-              <span className="text-xl">💬</span>
-              <div className="flex flex-col">
-                <h2 className="text-sm font-bold text-slate-200">TorqueScout Yapay Zeka Danışmanı</h2>
-                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Çevrimiçi • Rapor Verilerine Hakim
+              {/* Entitlement Badge */}
+              <div className="rounded-2xl border border-teal-500/35 bg-[#08222c]/80 px-4 py-2 flex flex-col items-center justify-center text-center select-none shadow-sm min-w-[100px]">
+                <span className="text-teal-300 font-bold text-xs sm:text-[13px] leading-tight">
+                  {chatQuota.isUnlimited ? "Sınırsız" : `${chatQuota.remaining}`}
+                </span>
+                <span className="text-teal-400/90 font-medium text-[10px] sm:text-[11px] leading-tight mt-0.5">
+                  {chatQuota.isUnlimited ? "Mesaj Hakkı" : "Mesaj Kaldı"}
                 </span>
               </div>
             </div>
-            
-            {/* Messages Listing */}
-            <div className="max-h-80 overflow-y-auto flex flex-col gap-4 py-2 pr-1 custom-scrollbar">
-              {chatMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-                  <span className="text-3xl">🤖</span>
-                  <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                    Merhaba! Ben TorqueScout AI. Bu araçta sık karşılaşılan durumlar, muayene checklisti veya satın alma uygunluğu hakkında bana dilediğiniz soruyu sorabilirsiniz.
-                  </p>
-                  <span className="text-[10px] text-slate-500 italic">Örn: "Şanzımanı uzun vadede üzer mi?", "Motor performansı nasıldır?"</span>
-                </div>
-              ) : (
-                chatMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex gap-2.5 max-w-[85%] ${
-                      msg.sender === 'user' ? 'self-end flex-row-reverse' : 'self-start'
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 select-none ${
-                      msg.sender === 'user' ? 'bg-orange-600/20 text-orange-400 border border-orange-500/30' : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                    }`}>
-                      {msg.sender === 'user' ? '🧑‍💻' : '🤖'}
-                    </div>
-                    {/* Bubble */}
-                    <div className={`p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
-                      msg.sender === 'user'
-                        ? 'bg-gradient-to-br from-orange-600/20 to-orange-700/5 border border-orange-500/20 text-slate-200 rounded-tr-none'
-                        : 'bg-slate-900 border border-white/5 text-slate-300 rounded-tl-none'
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                ))
-              )}
-              {sendingChat && (
-                <div className="flex gap-2.5 self-start">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-blue-600/20 text-blue-400 border border-blue-500/30 animate-pulse select-none">
-                    🤖
-                  </div>
-                  <div className="p-3 rounded-2xl text-xs bg-slate-900 border border-white/5 text-slate-500 rounded-tl-none flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce delay-75"></span>
-                    <span className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce delay-150"></span>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
 
+            {/* Subtle Divider */}
+            <div className="border-t border-sky-500/15 w-full my-6 sm:my-8" />
+
+            {/* Center Title or Message History */}
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col">
+                <h3 className="text-center text-lg sm:text-xl md:text-2xl font-bold text-slate-100 mb-6 sm:mb-8 tracking-tight">
+                  Bu araç hakkında ne öğrenmek istersiniz?
+                </h3>
+
+                {/* 2x2 Suggestion Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+                  {[
+                    "Şanzıman uzun vadede üzer mi?",
+                    "Bu motorun kronik sorunu var mı?",
+                    "Yakıt tüketimi gerçek kullanımda nasıl?",
+                    "Satın almadan önce neye baktırmalıyım?",
+                  ].map((q, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
+                      onClick={() => handleSendChat(undefined, q)}
+                      className="group relative flex items-center justify-between p-4 sm:p-5 rounded-2xl bg-[#0c182e]/80 hover:bg-[#112444] border border-sky-500/15 hover:border-sky-400/40 transition-all duration-200 cursor-pointer text-left shadow-sm hover:shadow-md hover:shadow-sky-950/40 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/25 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          <circle cx="9" cy="10" r="0.8" fill="currentColor"/>
+                          <circle cx="12" cy="10" r="0.8" fill="currentColor"/>
+                          <circle cx="15" cy="10" r="0.8" fill="currentColor"/>
+                        </svg>
+                      </div>
+                      <span className="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-white px-3 flex-1 leading-snug">
+                        {q}
+                      </span>
+                      <svg className="w-4 h-4 text-slate-500 group-hover:text-slate-300 shrink-0 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col mb-4">
+                {/* Messages Listing */}
+                <div className="max-h-96 overflow-y-auto flex flex-col gap-4 py-2 pr-1 custom-scrollbar">
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex gap-2.5 max-w-[85%] ${
+                        msg.sender === "user" ? "self-end flex-row-reverse" : "self-start"
+                      }`}
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 select-none font-bold ${
+                          msg.sender === "user"
+                            ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                            : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                        }`}
+                      >
+                        {msg.sender === "user" ? "Siz" : "TS"}
+                      </div>
+                      <div
+                        className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap shadow-md ${
+                          msg.sender === "user"
+                            ? "bg-gradient-to-br from-orange-600/20 to-orange-700/5 border border-orange-500/25 text-slate-100 rounded-tr-none"
+                            : "bg-[#071326] border border-sky-500/20 text-slate-200 rounded-tl-none"
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {sendingChat && (
+                    <div className="flex gap-2.5 self-start">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-sky-500/20 text-sky-400 border border-sky-500/30 animate-pulse font-bold">
+                        TS
+                      </div>
+                      <div className="p-3.5 rounded-2xl text-xs bg-[#071326] border border-sky-500/20 text-slate-400 rounded-tl-none flex items-center gap-1.5 shadow-md">
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                        <span className="text-[11px] text-slate-500 ml-1.5 font-medium">Analiz ediliyor...</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Suggested Questions compact chips after conversation begins */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 mt-2 border-t border-white/5">
+                  <span className="text-[11px] text-slate-400 mr-1">Önerilen sorular:</span>
+                  {[
+                    "Şanzıman uzun vadede üzer mi?",
+                    "Bu motorun kronik sorunu var mı?",
+                    "Yakıt tüketimi gerçek kullanımda nasıl?",
+                    "Satın almadan önce neye baktırmalıyım?",
+                  ].map((q, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
+                      onClick={() => handleSendChat(undefined, q)}
+                      className="text-xs px-3 py-1.5 rounded-xl bg-[#0c182e] hover:bg-[#102242] border border-sky-500/20 text-slate-300 hover:text-white transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                    >
+                      <span className="text-orange-400 text-[10px]">●</span>
+                      <span>{q}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quota Exhausted Warning */}
+            {!chatQuota.loading && !chatQuota.isUnlimited && chatQuota.remaining <= 0 && (
+              <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-200">
+                <span>Mesaj hakkınız tükendi. Daha fazla soru sormak için paket satın alabilir veya aboneliğinizi yükseltebilirsiniz.</span>
+                <a
+                  href="/pricing"
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition whitespace-nowrap text-xs"
+                >
+                  Paketleri İncele
+                </a>
+              </div>
+            )}
+
+            {/* Error Message */}
             {chatError && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2.5 rounded-xl font-semibold">
-                ⚠️ {chatError}
+              <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-2xl font-medium flex items-center justify-between">
+                <span>⚠️ {chatError}</span>
+                <button
+                  type="button"
+                  onClick={() => setChatError("")}
+                  className="text-red-400 hover:text-red-300 text-xs underline ml-2"
+                >
+                  Kapat
+                </button>
               </div>
             )}
 
             {/* Input Form */}
-            <form onSubmit={handleSendChat} className="flex gap-2 border-t border-white/5 pt-3">
-              <input
-                type="text"
-                required
-                value={chatQuestion}
-                onChange={e => setChatQuestion(e.target.value)}
-                placeholder="Bu araca dair aklınıza takılan soruyu yazın..."
-                className="flex-1 bg-slate-950/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none placeholder:text-slate-500 focus:border-orange-500/50 transition"
-              />
+            <form onSubmit={handleSendChat} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative flex-1 flex items-center bg-[#060e1d]/90 border border-slate-700/60 focus-within:border-sky-500/50 rounded-2xl px-4 py-3 sm:py-3.5 transition shadow-inner">
+                <svg className="w-4 h-4 text-slate-400 mr-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <circle cx="9" cy="10" r="0.8" fill="currentColor"/>
+                  <circle cx="12" cy="10" r="0.8" fill="currentColor"/>
+                  <circle cx="15" cy="10" r="0.8" fill="currentColor"/>
+                </svg>
+                <input
+                  type="text"
+                  value={chatQuestion}
+                  disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0)}
+                  onChange={e => setChatQuestion(e.target.value)}
+                  placeholder="Bu araç hakkında sorunuzu yazın..."
+                  className="flex-1 bg-transparent border-0 outline-none text-slate-100 text-xs sm:text-sm placeholder:text-slate-500 disabled:opacity-50"
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={sendingChat || !chatQuestion.trim()}
-                className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition"
+                disabled={sendingChat || (!chatQuota.isUnlimited && chatQuota.remaining <= 0) || !chatQuestion.trim()}
+                className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold px-7 py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0 text-sm tracking-wide"
               >
-                Sor
+                {sendingChat ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Soruluyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 text-white rotate-45" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                    <span>Sor</span>
+                  </>
+                )}
               </button>
             </form>
+
+            {/* Helper Text */}
+            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-400 mt-2.5">
+              <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>Yanıtlar araç raporu verilerine göre hazırlanır.</span>
+            </div>
           </div>
         </div>
 
