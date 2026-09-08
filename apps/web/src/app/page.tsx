@@ -74,7 +74,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Fetch Vitrin / Acil promotional listings when promoTab changes
   useEffect(() => {
@@ -95,13 +95,13 @@ export default function Home() {
       });
   }, [promoTab]);
 
-  // Auto-scroll loop for Featured Listings slider
+  // Auto-scroll loop for all Featured Listings slider rows
   useEffect(() => {
-    if (featuredListings.length === 0) return;
+    if (featuredListings.length === 0 || featuredRows.length === 0) return;
 
     const interval = setInterval(() => {
-      if (scrollRef.current) {
-        const container = scrollRef.current;
+      rowRefs.current.forEach((container) => {
+        if (!container) return;
         const card = container.querySelector('a');
         if (!card) return;
 
@@ -120,11 +120,11 @@ export default function Home() {
           left: newScrollLeft,
           behavior: "smooth",
         });
-      }
+      });
     }, 3500); // Scroll every 3.5 seconds
 
     return () => clearInterval(interval);
-  }, [featuredListings]);
+  }, [featuredListings, featuredRows]);
 
   // Fetch Brands on Load
   useEffect(() => {
@@ -911,6 +911,7 @@ export default function Home() {
             {featuredRows.map((rowListings: any[], rowIndex: number) => (
               <div 
                 key={`featured-row-${rowIndex}`}
+                ref={(el) => { rowRefs.current[rowIndex] = el; }}
                 className="flex items-stretch justify-start gap-4 overflow-x-auto scroll-smooth pb-3 select-none scrollbar-none snap-x snap-mandatory"
               >
                 {rowListings.map((listing: any) => {

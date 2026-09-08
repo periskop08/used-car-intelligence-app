@@ -49,6 +49,9 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith('guide-cards/')) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }
@@ -65,20 +68,26 @@ const resolveVehicleImageUrl = (
   brand?: string,
   modelFamily?: string
 ): string => {
-  const formatted = formatCloudflareImageUrl(url);
-  if (formatted) return formatted;
+  if (url && !url.includes('test-similar')) {
+    const formatted = formatCloudflareImageUrl(url);
+    if (formatted) return formatted;
+  }
 
-  if (brand && modelFamily) {
-    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
-    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+  if (brand || modelFamily) {
+    const b = (brand || '').toLowerCase().trim();
+    const m = (modelFamily || '').toLowerCase().trim();
+    const fullKey = `${b} ${m}`.trim();
+    if (fullKey && CLOUDFLARE_VEHICLE_IMAGES[fullKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[fullKey]);
     }
-    const modelKey = modelFamily.toLowerCase().trim();
-    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    if (m && CLOUDFLARE_VEHICLE_IMAGES[m]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[m]);
+    }
+    if (b && CLOUDFLARE_VEHICLE_IMAGES[b]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[b]);
     }
   }
-  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+  return 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80';
 };
 
 interface Brand {
@@ -486,16 +495,6 @@ export default function MobileDashboard() {
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
   const [loadingListings, setLoadingListings] = useState(false);
 
-  // Dynamic chunking: 1 row of up to 10 items (1*10), 2 rows when >10 (2*10), 3 rows when >20 (3*10)
-  const vitrinRows = useMemo(() => {
-    const rows: ShowcaseItem[][] = [];
-    const chunkSize = 10;
-    for (let i = 0; i < vitrinListings.length; i += chunkSize) {
-      rows.push(vitrinListings.slice(i, i + chunkSize));
-    }
-    return rows;
-  }, [vitrinListings]);
-
   // FULL 8-FILTER CASCADING VEHICLE QUERY STATE:
   // 1. Marka | 2. Model Ailesi | 3. Yıl | 4. Kasa Tipi | 5. Motor / Versiyon | 6. Yakıt | 7. Şanzıman | 8. Donanım
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -720,25 +719,25 @@ export default function MobileDashboard() {
         const apiItems = Array.isArray(data)
           ? data
           : Array.isArray(data?.items)
-          ? data.items
-          : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.data?.items)
-          ? data.data.items
-          : Array.isArray(data?.listings)
-          ? data.listings
-          : [];
+            ? data.items
+            : Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(data?.data?.items)
+                ? data.data.items
+                : Array.isArray(data?.listings)
+                  ? data.listings
+                  : [];
 
         if (apiItems.length > 0) {
           const formatted: ShowcaseItem[] = apiItems.map((item: any, idx: number) => {
             const brandStr = item.vehicleVariant?.brand?.name || item.customBrand || '';
             const modelStr = item.vehicleVariant?.model?.name || item.customModel || '';
             const computedTitle = item.title || `${brandStr} ${modelStr}`.trim() || 'Araç İlanı';
-            
+
             const priceVal = Number(item.priceAmount || item.price || 0);
             const yearVal = Number(item.modelYear || item.year || item.vehicleVariant?.year || 2020);
             const kmVal = Number(item.kilometers || item.mileage || 0);
-            
+
             const firstImage =
               item.media?.[0]?.url ||
               item.media?.[0]?.mediaUrl ||
@@ -1566,851 +1565,843 @@ export default function MobileDashboard() {
           {loadingListings ? (
             <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 32 }} />
           ) : vitrinListings.length > 0 ? (
-            <View style={styles.vitrinRowsWrapper}>
-              {vitrinRows.map((rowItems, rowIndex) => (
-                <ScrollView
-                  key={`vitrin-row-${rowIndex}`}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
-                  style={styles.vitrinRowScrollView}
-                >
-                  {rowItems.map((item) => {
-                    const isFav = !!favorites[item.id];
-                    return (
+            <View style={styles.vitrinGrid}>
+              {vitrinListings.map((item) => {
+                const isFav = !!favorites[item.id];
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.vitrinCard}
+                    activeOpacity={0.9}
+                    onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                  >
+                    <View style={styles.vitrinImageContainer}>
+                      <ExpoImage
+                        source={{ uri: item.imageUrl }}
+                        style={styles.vitrinCarImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+
+                      {/* Floating Badges Overlay (Vitrin & Acil) */}
+                      <View style={styles.vitrinBadgesOverlay}>
+                        {item.isUrgent && <UrgentBadge size="small" />}
+                        {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                      </View>
+
                       <TouchableOpacity
-                        key={item.id}
-                        style={styles.vitrinCard}
-                        activeOpacity={0.9}
-                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
+                        style={styles.favCircleButton}
+                        onPress={() => toggleFavorite(item.id)}
                       >
-                        <View style={styles.vitrinImageContainer}>
-                          <ExpoImage
-                            source={{ uri: item.imageUrl }}
-                            style={styles.vitrinCarImage}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                          />
-
-                          {/* Floating Badges Overlay (Vitrin & Acil) */}
-                          <View style={styles.vitrinBadgesOverlay}>
-                            {item.isUrgent && <UrgentBadge size="small" />}
-                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                          </View>
-
-                          <TouchableOpacity
-                            style={styles.favCircleButton}
-                            onPress={() => toggleFavorite(item.id)}
-                          >
-                            <Ionicons
-                              name={isFav ? 'heart' : 'heart-outline'}
-                              size={17}
-                              color={isFav ? '#ef4444' : '#ffffff'}
-                            />
-                          </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.vitrinCardBody}>
-                          <Text style={styles.vitrinTitle} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-
-                          <Text style={styles.vitrinSpecs}>
-                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                          </Text>
-
-                          <View style={styles.vitrinPriceRow}>
-                            <Text style={styles.vitrinPrice}>
-                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                            </Text>
-                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                          </View>
-                        </View>
+                        <Ionicons
+                          name={isFav ? 'heart' : 'heart-outline'}
+                          size={17}
+                          color={isFav ? '#ef4444' : '#ffffff'}
+                        />
                       </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                    </View>
+
+                    <View style={styles.vitrinCardBody}>
+                      <Text style={styles.vitrinTitle} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+
+                      <Text style={styles.vitrinSpecs}>
+                        {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                      </Text>
+
+                      <View style={styles.vitrinPriceRow}>
+                        <Text style={styles.vitrinPrice}>
+                          {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                        </Text>
+                        <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ))}
+        </View>
+        ) : (
+        <View style={styles.emptyPromoBox}>
+          <Ionicons
+            name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
+            size={34}
+            color="#94a3b8"
+          />
+          <Text style={styles.emptyPromoTitle}>
+            {promoTab === 'vitrin'
+              ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
+              : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
+          </Text>
+          <Text style={styles.emptyPromoSub}>
+            Tüm satılık araçları incelemek için İlan Akışı'na göz atabilirsiniz.
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyPromoBtn}
+            onPress={() => router.push('/ilan-akisi')}
+          >
+            <Text style={styles.emptyPromoBtnText}>İlan Akışına Git ➔</Text>
+          </TouchableOpacity>
+        </View>
+          )}
+      </View>
+    </ScrollView>
+
+      {/* SINGLE UNIFIED MODAL MATCHING REFERENCE UI */ }
+  <Modal visible={queryModalVisible} animationType="slide">
+    <SafeAreaView style={styles.fullModalContainer}>
+      {modalView === 'form' ? (
+        /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
+        <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
+          {/* Header with Back Arrow & Centered Title */}
+          <View style={styles.refHeaderRow}>
+            <TouchableOpacity style={styles.refBackButton} onPress={() => setQueryModalVisible(false)}>
+              <Ionicons name="chevron-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* TorkScout Brand Header */}
+          <View style={styles.brandHeroSection}>
+            <View style={styles.brandHeroLogoRow}>
+              <View style={styles.logoIconLines}>
+                <View style={[styles.logoLine, { width: 14, backgroundColor: '#0284c7' }]} />
+                <View style={[styles.logoLine, { width: 18, backgroundColor: '#0284c7' }]} />
+                <View style={[styles.logoLine, { width: 10, backgroundColor: '#0284c7' }]} />
+              </View>
+              <Text style={styles.brandHeroLogoMain}>Tork<Text style={styles.brandHeroLogoSub}>Scout</Text></Text>
+            </View>
+            <Text style={styles.brandHeroSubtitle}>
+              Aracını seç, teknik özelliklerini, yaygın sorunlarını ve satın alma öncesi kritik detaylarını öğren.
+            </Text>
+          </View>
+
+          {/* Araç Bilgileri Card with 8 Rows */}
+          <View style={styles.vehicleInfoCard}>
+            <View style={styles.vehicleInfoCardHeader}>
+              <View style={styles.vehicleInfoIconCircle}>
+                <Ionicons name="search" size={18} color="#0284c7" />
+              </View>
+              <Text style={styles.vehicleInfoCardTitle}>Araç Bilgileri</Text>
+            </View>
+
+            {/* 1. Marka */}
+            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('brand')}>
+              <Text style={styles.filterRowLabel}>Marka</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedBrand ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedBrand ? selectedBrand.name : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 2. Model Ailesi */}
+            <TouchableOpacity
+              style={[styles.filterRowItem, !selectedBrand && styles.filterRowItemDisabled]}
+              onPress={() => selectedBrand && openStepView('model')}
+              disabled={!selectedBrand}
+            >
+              <Text style={styles.filterRowLabel}>Model Ailesi</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedModel ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedModel ? selectedModel.name : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 3. Yıl */}
+            <TouchableOpacity
+              style={[styles.filterRowItem, !selectedModel && styles.filterRowItemDisabled]}
+              onPress={() => selectedModel && openStepView('year')}
+              disabled={!selectedModel}
+            >
+              <Text style={styles.filterRowLabel}>Yıl</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedYear ? selectedYear : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 4. Kasa Tipi */}
+            <TouchableOpacity
+              style={[styles.filterRowItem, !selectedYear && styles.filterRowItemDisabled]}
+              onPress={() => selectedYear && openStepView('bodyType')}
+              disabled={!selectedYear}
+            >
+              <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 5. Motor / Versiyon */}
+            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('engine')}>
+              <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedEngine ? selectedEngine : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 6. Yakıt */}
+            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('fuelType')}>
+              <Text style={styles.filterRowLabel}>Yakıt</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 7. Şanzıman */}
+            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('transmission')}>
+              <Text style={styles.filterRowLabel}>Şanzıman</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 8. Donanım */}
+            <TouchableOpacity
+              style={[styles.filterRowItem, { borderBottomWidth: 0 }]}
+              onPress={() => openStepView('trim')}
+            >
+              <Text style={styles.filterRowLabel}>Donanım</Text>
+              <View style={styles.filterRowRight}>
+                <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                  {selectedTrim ? selectedTrim : 'Seçilmedi'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Orange Action Button */}
+          <TouchableOpacity
+            style={[styles.refOrangeSubmitButton, (!selectedBrand || !selectedModel) && styles.refOrangeSubmitButtonDisabled]}
+            onPress={handleStartReport}
+          >
+            <Text style={styles.refOrangeSubmitButtonText}>Sorgulamaya Başla</Text>
+            <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        /* STEP SELECTION VIEW MATCHING REFERENCE UI */
+        <View style={styles.refModalContent}>
+          {/* Header with Back Arrow & Centered Title */}
+          <View style={styles.refHeaderRow}>
+            <TouchableOpacity style={styles.refBackButton} onPress={handleStepBack}>
+              <Ionicons name="chevron-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+
+            <Text style={styles.refHeaderTitle}>{getStepTitle()}</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* Progress Indicator: Step Badge (e.g. 8/8) & Segmented Bar */}
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{getStepNumber()} / 8</Text>
+            <View style={styles.progressBarTrack}>
+              {Array.from({ length: 8 }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.progressBarSegment,
+                    i < getStepNumber() && styles.progressBarSegmentActive,
+                  ]}
+                />
               ))}
             </View>
-          ) : (
-            <View style={styles.emptyPromoBox}>
-              <Ionicons
-                name={promoTab === 'vitrin' ? 'star-outline' : 'flame-outline'}
-                size={34}
-                color="#94a3b8"
-              />
-              <Text style={styles.emptyPromoTitle}>
-                {promoTab === 'vitrin'
-                  ? 'Şu anda vitrinde aktif araç ilanı bulunmuyor.'
-                  : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
-              </Text>
-              <Text style={styles.emptyPromoSub}>
-                Tüm satılık araçları incelemek için İlan Akışı'na göz atabilirsiniz.
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyPromoBtn}
-                onPress={() => router.push('/ilan-akisi')}
-              >
-                <Text style={styles.emptyPromoBtnText}>İlan Akışına Git ➔</Text>
-              </TouchableOpacity>
+          </View>
+
+          <Text style={styles.refSubtitle}>{getStepSubtitle()}</Text>
+
+          {/* Selected Brand Summary Card for Step 2 (Model Selection) */}
+          {selectedBrand && activeStep === 'model' && (
+            <View style={styles.selectedBrandBadgeCard}>
+              <View style={styles.selectedBrandBadgeLeft}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={24} color="#0f172a" />
+                )}
+                <Text style={styles.selectedBrandBadgeName}>{selectedBrand.name}</Text>
+              </View>
+              <Ionicons name="checkmark" size={20} color="#ea580c" />
             </View>
           )}
-        </View>
-      </ScrollView>
 
-      {/* SINGLE UNIFIED MODAL MATCHING REFERENCE UI */}
-      <Modal visible={queryModalVisible} animationType="slide">
-        <SafeAreaView style={styles.fullModalContainer}>
-          {modalView === 'form' ? (
-            /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
-            <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
-              {/* Header with Back Arrow & Centered Title */}
-              <View style={styles.refHeaderRow}>
-                <TouchableOpacity style={styles.refBackButton} onPress={() => setQueryModalVisible(false)}>
-                  <Ionicons name="chevron-back" size={24} color="#0f172a" />
-                </TouchableOpacity>
-                <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
-                <View style={{ width: 24 }} />
+          {/* Selected Summary Card for Step 3 (Year Selection) */}
+          {selectedBrand && selectedModel && activeStep === 'year' && (
+            <View style={styles.selectedSummaryBadgeCard}>
+              <View style={styles.selectedSummaryBadgeItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={22} color="#0f172a" />
+                )}
+                <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
+                <Ionicons name="checkmark" size={16} color="#ea580c" />
               </View>
 
-              {/* TorkScout Brand Header */}
-              <View style={styles.brandHeroSection}>
-                <View style={styles.brandHeroLogoRow}>
-                  <View style={styles.logoIconLines}>
-                    <View style={[styles.logoLine, { width: 14, backgroundColor: '#0284c7' }]} />
-                    <View style={[styles.logoLine, { width: 18, backgroundColor: '#0284c7' }]} />
-                    <View style={[styles.logoLine, { width: 10, backgroundColor: '#0284c7' }]} />
-                  </View>
-                  <Text style={styles.brandHeroLogoMain}>Tork<Text style={styles.brandHeroLogoSub}>Scout</Text></Text>
-                </View>
-                <Text style={styles.brandHeroSubtitle}>
-                  Aracını seç, teknik özelliklerini, yaygın sorunlarını ve satın alma öncesi kritik detaylarını öğren.
-                </Text>
+              <View style={styles.selectedSummaryDivider} />
+
+              <View style={styles.selectedSummaryBadgeItem}>
+                <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
+                <Ionicons name="checkmark" size={16} color="#ea580c" />
+              </View>
+            </View>
+          )}
+
+          {/* Selected Summary Card for Step 4 (Body Type Selection) */}
+          {selectedBrand && selectedModel && selectedYear && activeStep === 'bodyType' && (
+            <View style={styles.selectedSummaryBadgeCard}>
+              <View style={styles.selectedSummaryBadgeItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={20} color="#0f172a" />
+                )}
+                <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
+                <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
 
-              {/* Araç Bilgileri Card with 8 Rows */}
-              <View style={styles.vehicleInfoCard}>
-                <View style={styles.vehicleInfoCardHeader}>
-                  <View style={styles.vehicleInfoIconCircle}>
-                    <Ionicons name="search" size={18} color="#0284c7" />
-                  </View>
-                  <Text style={styles.vehicleInfoCardTitle}>Araç Bilgileri</Text>
-                </View>
+              <View style={styles.selectedSummaryDivider} />
 
-                {/* 1. Marka */}
-                <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('brand')}>
-                  <Text style={styles.filterRowLabel}>Marka</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedBrand ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedBrand ? selectedBrand.name : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 2. Model Ailesi */}
-                <TouchableOpacity
-                  style={[styles.filterRowItem, !selectedBrand && styles.filterRowItemDisabled]}
-                  onPress={() => selectedBrand && openStepView('model')}
-                  disabled={!selectedBrand}
-                >
-                  <Text style={styles.filterRowLabel}>Model Ailesi</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedModel ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedModel ? selectedModel.name : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 3. Yıl */}
-                <TouchableOpacity
-                  style={[styles.filterRowItem, !selectedModel && styles.filterRowItemDisabled]}
-                  onPress={() => selectedModel && openStepView('year')}
-                  disabled={!selectedModel}
-                >
-                  <Text style={styles.filterRowLabel}>Yıl</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedYear ? selectedYear : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 4. Kasa Tipi */}
-                <TouchableOpacity
-                  style={[styles.filterRowItem, !selectedYear && styles.filterRowItemDisabled]}
-                  onPress={() => selectedYear && openStepView('bodyType')}
-                  disabled={!selectedYear}
-                >
-                  <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 5. Motor / Versiyon */}
-                <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('engine')}>
-                  <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedEngine ? selectedEngine : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 6. Yakıt */}
-                <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('fuelType')}>
-                  <Text style={styles.filterRowLabel}>Yakıt</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 7. Şanzıman */}
-                <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('transmission')}>
-                  <Text style={styles.filterRowLabel}>Şanzıman</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
-
-                {/* 8. Donanım */}
-                <TouchableOpacity
-                  style={[styles.filterRowItem, { borderBottomWidth: 0 }]}
-                  onPress={() => openStepView('trim')}
-                >
-                  <Text style={styles.filterRowLabel}>Donanım</Text>
-                  <View style={styles.filterRowRight}>
-                    <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                      {selectedTrim ? selectedTrim : 'Seçilmedi'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                  </View>
-                </TouchableOpacity>
+              <View style={styles.selectedSummaryBadgeItem}>
+                <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
+                <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
 
-              {/* Bottom Orange Action Button */}
-              <TouchableOpacity
-                style={[styles.refOrangeSubmitButton, (!selectedBrand || !selectedModel) && styles.refOrangeSubmitButtonDisabled]}
-                onPress={handleStartReport}
-              >
-                <Text style={styles.refOrangeSubmitButtonText}>Sorgulamaya Başla</Text>
-                <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
-            </ScrollView>
-          ) : (
-            /* STEP SELECTION VIEW MATCHING REFERENCE UI */
-            <View style={styles.refModalContent}>
-              {/* Header with Back Arrow & Centered Title */}
-              <View style={styles.refHeaderRow}>
-                <TouchableOpacity style={styles.refBackButton} onPress={handleStepBack}>
-                  <Ionicons name="chevron-back" size={24} color="#0f172a" />
-                </TouchableOpacity>
+              <View style={styles.selectedSummaryDivider} />
 
-                <Text style={styles.refHeaderTitle}>{getStepTitle()}</Text>
-                <View style={{ width: 24 }} />
+              <View style={styles.selectedSummaryBadgeItem}>
+                <Text style={styles.selectedSummaryText}>{selectedYear}</Text>
+                <Ionicons name="checkmark" size={15} color="#ea580c" />
               </View>
+            </View>
+          )}
 
-              {/* Progress Indicator: Step Badge (e.g. 8/8) & Segmented Bar */}
-              <View style={styles.progressRow}>
-                <Text style={styles.progressText}>{getStepNumber()} / 8</Text>
-                <View style={styles.progressBarTrack}>
-                  {Array.from({ length: 8 }, (_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.progressBarSegment,
-                        i < getStepNumber() && styles.progressBarSegmentActive,
-                      ]}
-                    />
-                  ))}
+          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 5 (Motor / Versiyon Seç) MATCHING REFERENCE IMAGE */}
+          {selectedBrand && selectedModel && selectedYear && activeStep === 'engine' && (
+            <View style={styles.breadCrumbSummaryCard}>
+              <View style={styles.breadCrumbItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={20} color="#0f172a" />
+                )}
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
                 </View>
               </View>
 
-              <Text style={styles.refSubtitle}>{getStepSubtitle()}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
 
-              {/* Selected Brand Summary Card for Step 2 (Model Selection) */}
-              {selectedBrand && activeStep === 'model' && (
-                <View style={styles.selectedBrandBadgeCard}>
-                  <View style={styles.selectedBrandBadgeLeft}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedBrandBadgeLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={24} color="#0f172a" />
-                    )}
-                    <Text style={styles.selectedBrandBadgeName}>{selectedBrand.name}</Text>
-                  </View>
-                  <Ionicons name="checkmark" size={20} color="#ea580c" />
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="car-outline" size={22} color="#0f172a" />
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                  <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
                 </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="color-fill-outline" size={20} color="#0f172a" />
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+                  <Text style={styles.breadCrumbSubText}>Yakıt</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 6 (Yakıt Türü Seç) MATCHING REFERENCE SCREENSHOT */}
+          {selectedBrand && selectedModel && selectedYear && activeStep === 'fuelType' && (
+            <View style={styles.breadCrumbSummaryCard}>
+              <View style={styles.breadCrumbItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={20} color="#0f172a" />
+                )}
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+                  <Text style={styles.breadCrumbSubText}>Motor</Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="car-outline" size={22} color="#0f172a" />
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+                  <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 7 (Şanzıman Tipi Seç) MATCHING REFERENCE SCREENSHOT */}
+          {selectedBrand && selectedModel && selectedYear && activeStep === 'transmission' && (
+            <View style={styles.breadCrumbSummaryCard}>
+              <View style={styles.breadCrumbItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={20} color="#0f172a" />
+                )}
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
+                <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="car-outline" size={16} color="#0f172a" />
+                <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 8 (Donanım Paketi Seç) MATCHING REFERENCE SCREENSHOT */}
+          {selectedBrand && selectedModel && selectedYear && activeStep === 'trim' && (
+            <View style={styles.breadCrumbSummaryCard}>
+              <View style={styles.breadCrumbItem}>
+                {BRAND_LOGOS[selectedBrand.name] ? (
+                  <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
+                ) : (
+                  <Ionicons name="car-sport" size={20} color="#0f172a" />
+                )}
+                <View style={{ gap: 1 }}>
+                  <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
+                  <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
+                  <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="color-fill-outline" size={14} color="#0f172a" />
+                <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <AutomaticGearIcon color="#0f172a" />
+                <Text style={styles.breadCrumbMainText}>{selectedTransmission || 'Otomatik'}</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
+
+              <View style={styles.breadCrumbItem}>
+                <Ionicons name="car-outline" size={14} color="#0f172a" />
+                <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Search Bar matching reference UI (Hidden for Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
+          {activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
+            <View style={styles.refSearchBox}>
+              <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.refSearchInput}
+                placeholder={getSearchPlaceholder()}
+                placeholderTextColor="#94a3b8"
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+            </View>
+          )}
+
+          {/* Scrollable Content Container */}
+          <View style={styles.stepBodyWithJumper}>
+            <ScrollView contentContainerStyle={styles.stepScrollInner} showsVerticalScrollIndicator={false}>
+              {activeStep === 'brand' && !searchText && (
+                <>
+                  {/* Popüler Markalar Horizontal Row */}
+                  <Text style={styles.sectionHeaderLabel}>Popüler Markalar</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.popularRowContent}
+                  >
+                    {(getPopularBrands().length > 0
+                      ? getPopularBrands()
+                      : [
+                        { id: 'pop-1', name: 'Volkswagen' },
+                        { id: 'pop-2', name: 'BMW' },
+                        { id: 'pop-3', name: 'Mercedes-Benz' },
+                        { id: 'pop-4', name: 'Renault' },
+                        { id: 'pop-5', name: 'Audi' },
+                      ]
+                    ).map((pBrand) => {
+                      const logoUri = BRAND_LOGOS[pBrand.name];
+                      return (
+                        <TouchableOpacity
+                          key={pBrand.id || pBrand.name}
+                          style={styles.popularBrandCard}
+                          activeOpacity={0.8}
+                          onPress={() => selectOption(pBrand)}
+                        >
+                          <View style={styles.popularLogoContainer}>
+                            {logoUri ? (
+                              <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
+                            ) : (
+                              <Ionicons name="car-sport" size={26} color="#0f172a" />
+                            )}
+                          </View>
+                          <Text style={styles.popularBrandTitle} numberOfLines={1}>
+                            {pBrand.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
               )}
 
-              {/* Selected Summary Card for Step 3 (Year Selection) */}
-              {selectedBrand && selectedModel && activeStep === 'year' && (
-                <View style={styles.selectedSummaryBadgeCard}>
-                  <View style={styles.selectedSummaryBadgeItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={22} color="#0f172a" />
-                    )}
-                    <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
-                    <Ionicons name="checkmark" size={16} color="#ea580c" />
-                  </View>
-
-                  <View style={styles.selectedSummaryDivider} />
-
-                  <View style={styles.selectedSummaryBadgeItem}>
-                    <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
-                    <Ionicons name="checkmark" size={16} color="#ea580c" />
-                  </View>
-                </View>
-              )}
-
-              {/* Selected Summary Card for Step 4 (Body Type Selection) */}
-              {selectedBrand && selectedModel && selectedYear && activeStep === 'bodyType' && (
-                <View style={styles.selectedSummaryBadgeCard}>
-                  <View style={styles.selectedSummaryBadgeItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.selectedSummaryLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={20} color="#0f172a" />
-                    )}
-                    <Text style={styles.selectedSummaryText}>{selectedBrand.name}</Text>
-                    <Ionicons name="checkmark" size={15} color="#ea580c" />
-                  </View>
-
-                  <View style={styles.selectedSummaryDivider} />
-
-                  <View style={styles.selectedSummaryBadgeItem}>
-                    <Text style={styles.selectedSummaryText}>{selectedModel.name}</Text>
-                    <Ionicons name="checkmark" size={15} color="#ea580c" />
-                  </View>
-
-                  <View style={styles.selectedSummaryDivider} />
-
-                  <View style={styles.selectedSummaryBadgeItem}>
-                    <Text style={styles.selectedSummaryText}>{selectedYear}</Text>
-                    <Ionicons name="checkmark" size={15} color="#ea580c" />
-                  </View>
-                </View>
-              )}
-
-              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 5 (Motor / Versiyon Seç) MATCHING REFERENCE IMAGE */}
-              {selectedBrand && selectedModel && selectedYear && activeStep === 'engine' && (
-                <View style={styles.breadCrumbSummaryCard}>
-                  <View style={styles.breadCrumbItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={20} color="#0f172a" />
-                    )}
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                      <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                      <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="car-outline" size={22} color="#0f172a" />
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
-                      <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="color-fill-outline" size={20} color="#0f172a" />
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
-                      <Text style={styles.breadCrumbSubText}>Yakıt</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 6 (Yakıt Türü Seç) MATCHING REFERENCE SCREENSHOT */}
-              {selectedBrand && selectedModel && selectedYear && activeStep === 'fuelType' && (
-                <View style={styles.breadCrumbSummaryCard}>
-                  <View style={styles.breadCrumbItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={20} color="#0f172a" />
-                    )}
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                      <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                      <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
-                      <Text style={styles.breadCrumbSubText}>Motor</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="car-outline" size={22} color="#0f172a" />
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
-                      <Text style={styles.breadCrumbSubText}>Kasa Tipi</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 7 (Şanzıman Tipi Seç) MATCHING REFERENCE SCREENSHOT */}
-              {selectedBrand && selectedModel && selectedYear && activeStep === 'transmission' && (
-                <View style={styles.breadCrumbSummaryCard}>
-                  <View style={styles.breadCrumbItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={20} color="#0f172a" />
-                    )}
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                      <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                      <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="color-fill-outline" size={16} color="#0f172a" />
-                    <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={15} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="car-outline" size={16} color="#0f172a" />
-                    <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
-                  </View>
-                </View>
-              )}
-
-              {/* MULTI-SPEC BREADCRUMB SUMMARY CARD FOR STEP 8 (Donanım Paketi Seç) MATCHING REFERENCE SCREENSHOT */}
-              {selectedBrand && selectedModel && selectedYear && activeStep === 'trim' && (
-                <View style={styles.breadCrumbSummaryCard}>
-                  <View style={styles.breadCrumbItem}>
-                    {BRAND_LOGOS[selectedBrand.name] ? (
-                      <Image source={{ uri: BRAND_LOGOS[selectedBrand.name] }} style={styles.breadCrumbLogo} resizeMode="contain" />
-                    ) : (
-                      <Ionicons name="car-sport" size={20} color="#0f172a" />
-                    )}
-                    <View style={{ gap: 1 }}>
-                      <Text style={styles.breadCrumbSubText}>{selectedBrand.name}</Text>
-                      <Text style={styles.breadCrumbMainText}>{selectedModel.name}</Text>
-                      <Text style={styles.breadCrumbSubText}>{selectedYear}</Text>
-                    </View>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Text style={styles.breadCrumbMainText}>{selectedEngine || '320i'}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="color-fill-outline" size={14} color="#0f172a" />
-                    <Text style={styles.breadCrumbMainText}>{selectedFuelType || 'Benzin'}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <AutomaticGearIcon color="#0f172a" />
-                    <Text style={styles.breadCrumbMainText}>{selectedTransmission || 'Otomatik'}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
-
-                  <View style={styles.breadCrumbItem}>
-                    <Ionicons name="car-outline" size={14} color="#0f172a" />
-                    <Text style={styles.breadCrumbMainText}>{selectedBodyType || 'Sedan'}</Text>
-                  </View>
-                </View>
-              )}
-
-              {/* Search Bar matching reference UI (Hidden for Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
-              {activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
-                <View style={styles.refSearchBox}>
-                  <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
-                  <TextInput
-                    style={styles.refSearchInput}
-                    placeholder={getSearchPlaceholder()}
-                    placeholderTextColor="#94a3b8"
-                    value={searchText}
-                    onChangeText={setSearchText}
-                  />
-                </View>
-              )}
-
-              {/* Scrollable Content Container */}
-              <View style={styles.stepBodyWithJumper}>
-                <ScrollView contentContainerStyle={styles.stepScrollInner} showsVerticalScrollIndicator={false}>
-                  {activeStep === 'brand' && !searchText && (
-                    <>
-                      {/* Popüler Markalar Horizontal Row */}
-                      <Text style={styles.sectionHeaderLabel}>Popüler Markalar</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.popularRowContent}
-                      >
-                        {(getPopularBrands().length > 0
-                          ? getPopularBrands()
-                          : [
-                              { id: 'pop-1', name: 'Volkswagen' },
-                              { id: 'pop-2', name: 'BMW' },
-                              { id: 'pop-3', name: 'Mercedes-Benz' },
-                              { id: 'pop-4', name: 'Renault' },
-                              { id: 'pop-5', name: 'Audi' },
-                            ]
-                        ).map((pBrand) => {
-                          const logoUri = BRAND_LOGOS[pBrand.name];
-                          return (
-                            <TouchableOpacity
-                              key={pBrand.id || pBrand.name}
-                              style={styles.popularBrandCard}
-                              activeOpacity={0.8}
-                              onPress={() => selectOption(pBrand)}
-                            >
-                              <View style={styles.popularLogoContainer}>
-                                {logoUri ? (
-                                  <Image source={{ uri: logoUri }} style={styles.popularLogoImage} resizeMode="contain" />
-                                ) : (
-                                  <Ionicons name="car-sport" size={26} color="#0f172a" />
-                                )}
-                              </View>
-                              <Text style={styles.popularBrandTitle} numberOfLines={1}>
-                                {pBrand.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    </>
-                  )}
-
-                  {/* Options Section Header */}
-                  {activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
-                    <Text style={styles.sectionHeaderLabel}>
-                      {activeStep === 'brand'
-                        ? 'Tüm Markalar'
-                        : activeStep === 'model'
-                        ? 'Model Aileleri'
-                        : activeStep === 'year'
+              {/* Options Section Header */}
+              {activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
+                <Text style={styles.sectionHeaderLabel}>
+                  {activeStep === 'brand'
+                    ? 'Tüm Markalar'
+                    : activeStep === 'model'
+                      ? 'Model Aileleri'
+                      : activeStep === 'year'
                         ? 'Yıl Seçenekleri'
                         : activeStep === 'bodyType'
-                        ? 'Kasa Tipi Seçenekleri'
-                        : activeStep === 'transmission'
-                        ? 'Şanzıman tipini seçin.'
-                        : 'Seçenekler'}
-                    </Text>
-                  )}
+                          ? 'Kasa Tipi Seçenekleri'
+                          : activeStep === 'transmission'
+                            ? 'Şanzıman tipini seçin.'
+                            : 'Seçenekler'}
+                </Text>
+              )}
 
-                  {loadingOptions ? (
-                    <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 40 }} />
-                  ) : activeStep === 'brand' ? (
-                    getGroupedBrands().map((group) => (
-                      <View key={group.key} style={styles.brandGroupBlock}>
-                        <Text style={styles.brandGroupLetter}>{group.key}</Text>
-                        <View style={styles.brandGroupCard}>
-                          {group.data.map((item, idx) => {
-                            const logoUri = BRAND_LOGOS[item.name];
-                            return (
-                              <TouchableOpacity
-                                key={item.id || item.name}
-                                style={[
-                                  styles.brandRowItem,
-                                  idx < group.data.length - 1 && styles.brandRowBorderBottom,
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={() => selectOption(item)}
-                              >
-                                <View style={styles.brandRowLeft}>
-                                  <View style={styles.brandLogoBox}>
-                                    {logoUri ? (
-                                      <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
-                                    ) : (
-                                      <Ionicons name="car-outline" size={20} color="#0f172a" />
-                                    )}
-                                  </View>
-                                  <Text style={styles.brandRowName}>{item.name}</Text>
-                                </View>
-
-                                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    ))
-                  ) : activeStep === 'year' ? (
-                    /* 3-COLUMN GRID FOR YEAR SELECTION */
-                    <View style={styles.yearGridContainer}>
-                      {getStepData().map((yearVal, idx) => {
-                        const isSelected = selectedYear === String(yearVal);
-                        return (
-                          <TouchableOpacity
-                            key={String(yearVal) || idx}
-                            style={[styles.yearGridCard, isSelected && styles.yearGridCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(yearVal)}
-                          >
-                            <Text style={[styles.yearGridCardText, isSelected && styles.yearGridCardTextSelected]}>
-                              {String(yearVal)}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : activeStep === 'bodyType' ? (
-                    /* 2-COLUMN GRID FOR BODY TYPE SELECTION WITH HIGH-END AUTOMOTIVE ILLUSTRATIONS */
-                    <View style={styles.bodyTypeGridContainer}>
-                      {getStepData().map((bodyTypeVal, idx) => {
-                        const isSelected = selectedBodyType === String(bodyTypeVal);
-                        return (
-                          <TouchableOpacity
-                            key={String(bodyTypeVal) || idx}
-                            style={[styles.bodyTypeGridCard, isSelected && styles.bodyTypeGridCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(bodyTypeVal)}
-                          >
-                            <View style={styles.bodyTypeIconBox}>
-                              {renderBodyTypeImage(String(bodyTypeVal))}
-                            </View>
-                            <Text style={[styles.bodyTypeGridCardText, isSelected && styles.bodyTypeGridCardTextSelected]}>
-                              {String(bodyTypeVal)}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : activeStep === 'engine' ? (
-                    /* CLEAN MOTOR / VERSION SELECTION LIST SHOWING MOTOR CODES ONLY */
-                    <View style={styles.engineListContainer}>
-                      {getStepData().map((engineItem, idx) => {
-                        const engineLabel = typeof engineItem === 'string' ? engineItem : engineItem.name || engineItem.label || String(engineItem);
-                        const isSelected = selectedEngine === engineLabel;
-
-                        return (
-                          <TouchableOpacity
-                            key={engineLabel || idx}
-                            style={[styles.engineOptionCard, isSelected && styles.engineOptionCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(engineItem)}
-                          >
-                            <View style={styles.engineOptionCardLeft}>
-                              <Text style={styles.engineOptionTitle}>{engineLabel}</Text>
-                            </View>
-
-                            <View style={styles.engineOptionCardRight}>
-                              {isSelected ? (
-                                <View style={styles.engineOptionCheckedBox}>
-                                  <Ionicons name="checkmark-circle" size={22} color="#ea580c" />
-                                  <Ionicons name="chevron-forward" size={18} color="#ea580c" />
-                                </View>
-                              ) : (
-                                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Bottom Info Banner */}
-                      <View style={styles.engineInfoBanner}>
-                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                        <Text style={styles.engineInfoBannerText}>
-                          Listelenen motor / versiyonlar seçilen araç kombinasyonuna uygundur.
-                        </Text>
-                      </View>
-                    </View>
-                  ) : activeStep === 'fuelType' ? (
-                    /* DYNAMIC FUEL TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
-                    <View style={styles.fuelListContainer}>
-                      {getStepData().map((fuelVal, idx) => {
-                        const fuelLabel = typeof fuelVal === 'string' ? fuelVal : fuelVal.name || fuelVal.label || String(fuelVal);
-                        const isSelected = selectedFuelType === fuelLabel;
-
-                        return (
-                          <TouchableOpacity
-                            key={fuelLabel || idx}
-                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(fuelVal)}
-                          >
-                            <View style={styles.fuelOptionCardLeft}>
-                              {renderFuelTypeIcon(fuelLabel)}
-                              <Text style={styles.fuelOptionTitle}>{fuelLabel}</Text>
-                            </View>
-
-                            <View style={styles.fuelOptionCardRight}>
-                              {isSelected ? (
-                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                              ) : (
-                                <View style={styles.fuelOptionUncheckedCircle} />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Bottom Info Banner */}
-                      <View style={styles.engineInfoBanner}>
-                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                        <Text style={styles.engineInfoBannerText}>
-                          Seçtiğiniz yakıt türüne göre ilgili donanımlar ve teknik veriler gösterilecektir.
-                        </Text>
-                      </View>
-                    </View>
-                  ) : activeStep === 'transmission' ? (
-                    /* TRANSMISSION TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
-                    <View style={styles.fuelListContainer}>
-                      {getStepData().map((transVal, idx) => {
-                        const transLabel = typeof transVal === 'string' ? transVal : transVal.name || transVal.label || String(transVal);
-                        const isSelected = selectedTransmission === transLabel;
-
-                        return (
-                          <TouchableOpacity
-                            key={transLabel || idx}
-                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(transVal)}
-                          >
-                            <View style={styles.fuelOptionCardLeft}>
-                              {renderTransmissionIcon(transLabel, isSelected)}
-                              <Text style={styles.fuelOptionTitle}>{transLabel}</Text>
-                            </View>
-
-                            <View style={styles.fuelOptionCardRight}>
-                              {isSelected ? (
-                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                              ) : (
-                                <View style={styles.fuelOptionUncheckedCircle} />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : activeStep === 'trim' ? (
-                    /* TRIM PACKAGE SELECTION LIST MATCHING USER DIRECTIVE (STEP 8) */
-                    <View style={styles.fuelListContainer}>
-                      {getStepData().map((trimVal, idx) => {
-                        const trimLabel = typeof trimVal === 'string' ? trimVal : trimVal.name || trimVal.label || String(trimVal);
-                        const isSelected = selectedTrim === trimLabel;
-
-                        return (
-                          <TouchableOpacity
-                            key={trimLabel || idx}
-                            style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
-                            activeOpacity={0.8}
-                            onPress={() => selectOption(trimVal)}
-                          >
-                            <View style={styles.fuelOptionCardLeft}>
-                              {renderTrimBadge(trimLabel)}
-                              <Text style={styles.fuelOptionTitle}>{trimLabel}</Text>
-                            </View>
-
-                            <View style={styles.fuelOptionCardRight}>
-                              {isSelected ? (
-                                <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
-                              ) : (
-                                <View style={styles.fuelOptionUncheckedCircle} />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Bottom Info Banner */}
-                      <View style={styles.engineInfoBanner}>
-                        <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
-                        <Text style={styles.engineInfoBannerText}>
-                          Donanım paketleri, aracınızın konfor, tasarım ve teknoloji özelliklerini belirler.
-                        </Text>
-                      </View>
-                    </View>
-                  ) : (
+              {loadingOptions ? (
+                <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 40 }} />
+              ) : activeStep === 'brand' ? (
+                getGroupedBrands().map((group) => (
+                  <View key={group.key} style={styles.brandGroupBlock}>
+                    <Text style={styles.brandGroupLetter}>{group.key}</Text>
                     <View style={styles.brandGroupCard}>
-                      {getStepData().map((item, idx, arr) => {
-                        const label = typeof item === 'string' ? item : item.name || item.label || item.value || String(item);
-                        const itemKey = typeof item === 'string' ? item : item.id || item.value || `${label}-${idx}`;
+                      {group.data.map((item, idx) => {
+                        const logoUri = BRAND_LOGOS[item.name];
                         return (
                           <TouchableOpacity
-                            key={itemKey}
+                            key={item.id || item.name}
                             style={[
                               styles.brandRowItem,
-                              idx < arr.length - 1 && styles.brandRowBorderBottom,
+                              idx < group.data.length - 1 && styles.brandRowBorderBottom,
                             ]}
                             activeOpacity={0.7}
                             onPress={() => selectOption(item)}
                           >
-                            <Text style={styles.brandRowName}>{label}</Text>
+                            <View style={styles.brandRowLeft}>
+                              <View style={styles.brandLogoBox}>
+                                {logoUri ? (
+                                  <Image source={{ uri: logoUri }} style={styles.brandRowLogoImage} resizeMode="contain" />
+                                ) : (
+                                  <Ionicons name="car-outline" size={20} color="#0f172a" />
+                                )}
+                              </View>
+                              <Text style={styles.brandRowName}>{item.name}</Text>
+                            </View>
+
                             <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-                  )}
-                </ScrollView>
-
-                {/* Right Alphabet Quick Jumper Bar */}
-                {activeStep === 'brand' && (
-                  <View style={styles.alphabetJumperColumn}>
-                    {ALPHABET_INDEX.map((char) => (
-                      <TouchableOpacity key={char} style={styles.alphabetJumperTouch}>
-                        <Text style={[styles.alphabetJumperChar, char === 'A' && styles.alphabetJumperCharActive]}>
-                          {char}
+                  </View>
+                ))
+              ) : activeStep === 'year' ? (
+                /* 3-COLUMN GRID FOR YEAR SELECTION */
+                <View style={styles.yearGridContainer}>
+                  {getStepData().map((yearVal, idx) => {
+                    const isSelected = selectedYear === String(yearVal);
+                    return (
+                      <TouchableOpacity
+                        key={String(yearVal) || idx}
+                        style={[styles.yearGridCard, isSelected && styles.yearGridCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(yearVal)}
+                      >
+                        <Text style={[styles.yearGridCardText, isSelected && styles.yearGridCardTextSelected]}>
+                          {String(yearVal)}
                         </Text>
                       </TouchableOpacity>
-                    ))}
+                    );
+                  })}
+                </View>
+              ) : activeStep === 'bodyType' ? (
+                /* 2-COLUMN GRID FOR BODY TYPE SELECTION WITH HIGH-END AUTOMOTIVE ILLUSTRATIONS */
+                <View style={styles.bodyTypeGridContainer}>
+                  {getStepData().map((bodyTypeVal, idx) => {
+                    const isSelected = selectedBodyType === String(bodyTypeVal);
+                    return (
+                      <TouchableOpacity
+                        key={String(bodyTypeVal) || idx}
+                        style={[styles.bodyTypeGridCard, isSelected && styles.bodyTypeGridCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(bodyTypeVal)}
+                      >
+                        <View style={styles.bodyTypeIconBox}>
+                          {renderBodyTypeImage(String(bodyTypeVal))}
+                        </View>
+                        <Text style={[styles.bodyTypeGridCardText, isSelected && styles.bodyTypeGridCardTextSelected]}>
+                          {String(bodyTypeVal)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : activeStep === 'engine' ? (
+                /* CLEAN MOTOR / VERSION SELECTION LIST SHOWING MOTOR CODES ONLY */
+                <View style={styles.engineListContainer}>
+                  {getStepData().map((engineItem, idx) => {
+                    const engineLabel = typeof engineItem === 'string' ? engineItem : engineItem.name || engineItem.label || String(engineItem);
+                    const isSelected = selectedEngine === engineLabel;
+
+                    return (
+                      <TouchableOpacity
+                        key={engineLabel || idx}
+                        style={[styles.engineOptionCard, isSelected && styles.engineOptionCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(engineItem)}
+                      >
+                        <View style={styles.engineOptionCardLeft}>
+                          <Text style={styles.engineOptionTitle}>{engineLabel}</Text>
+                        </View>
+
+                        <View style={styles.engineOptionCardRight}>
+                          {isSelected ? (
+                            <View style={styles.engineOptionCheckedBox}>
+                              <Ionicons name="checkmark-circle" size={22} color="#ea580c" />
+                              <Ionicons name="chevron-forward" size={18} color="#ea580c" />
+                            </View>
+                          ) : (
+                            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Bottom Info Banner */}
+                  <View style={styles.engineInfoBanner}>
+                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                    <Text style={styles.engineInfoBannerText}>
+                      Listelenen motor / versiyonlar seçilen araç kombinasyonuna uygundur.
+                    </Text>
                   </View>
-                )}
+                </View>
+              ) : activeStep === 'fuelType' ? (
+                /* DYNAMIC FUEL TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
+                <View style={styles.fuelListContainer}>
+                  {getStepData().map((fuelVal, idx) => {
+                    const fuelLabel = typeof fuelVal === 'string' ? fuelVal : fuelVal.name || fuelVal.label || String(fuelVal);
+                    const isSelected = selectedFuelType === fuelLabel;
+
+                    return (
+                      <TouchableOpacity
+                        key={fuelLabel || idx}
+                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(fuelVal)}
+                      >
+                        <View style={styles.fuelOptionCardLeft}>
+                          {renderFuelTypeIcon(fuelLabel)}
+                          <Text style={styles.fuelOptionTitle}>{fuelLabel}</Text>
+                        </View>
+
+                        <View style={styles.fuelOptionCardRight}>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                          ) : (
+                            <View style={styles.fuelOptionUncheckedCircle} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Bottom Info Banner */}
+                  <View style={styles.engineInfoBanner}>
+                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                    <Text style={styles.engineInfoBannerText}>
+                      Seçtiğiniz yakıt türüne göre ilgili donanımlar ve teknik veriler gösterilecektir.
+                    </Text>
+                  </View>
+                </View>
+              ) : activeStep === 'transmission' ? (
+                /* TRANSMISSION TYPE SELECTION LIST MATCHING REFERENCE SCREENSHOT */
+                <View style={styles.fuelListContainer}>
+                  {getStepData().map((transVal, idx) => {
+                    const transLabel = typeof transVal === 'string' ? transVal : transVal.name || transVal.label || String(transVal);
+                    const isSelected = selectedTransmission === transLabel;
+
+                    return (
+                      <TouchableOpacity
+                        key={transLabel || idx}
+                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(transVal)}
+                      >
+                        <View style={styles.fuelOptionCardLeft}>
+                          {renderTransmissionIcon(transLabel, isSelected)}
+                          <Text style={styles.fuelOptionTitle}>{transLabel}</Text>
+                        </View>
+
+                        <View style={styles.fuelOptionCardRight}>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                          ) : (
+                            <View style={styles.fuelOptionUncheckedCircle} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : activeStep === 'trim' ? (
+                /* TRIM PACKAGE SELECTION LIST MATCHING USER DIRECTIVE (STEP 8) */
+                <View style={styles.fuelListContainer}>
+                  {getStepData().map((trimVal, idx) => {
+                    const trimLabel = typeof trimVal === 'string' ? trimVal : trimVal.name || trimVal.label || String(trimVal);
+                    const isSelected = selectedTrim === trimLabel;
+
+                    return (
+                      <TouchableOpacity
+                        key={trimLabel || idx}
+                        style={[styles.fuelOptionCard, isSelected && styles.fuelOptionCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => selectOption(trimVal)}
+                      >
+                        <View style={styles.fuelOptionCardLeft}>
+                          {renderTrimBadge(trimLabel)}
+                          <Text style={styles.fuelOptionTitle}>{trimLabel}</Text>
+                        </View>
+
+                        <View style={styles.fuelOptionCardRight}>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                          ) : (
+                            <View style={styles.fuelOptionUncheckedCircle} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Bottom Info Banner */}
+                  <View style={styles.engineInfoBanner}>
+                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                    <Text style={styles.engineInfoBannerText}>
+                      Donanım paketleri, aracınızın konfor, tasarım ve teknoloji özelliklerini belirler.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.brandGroupCard}>
+                  {getStepData().map((item, idx, arr) => {
+                    const label = typeof item === 'string' ? item : item.name || item.label || item.value || String(item);
+                    const itemKey = typeof item === 'string' ? item : item.id || item.value || `${label}-${idx}`;
+                    return (
+                      <TouchableOpacity
+                        key={itemKey}
+                        style={[
+                          styles.brandRowItem,
+                          idx < arr.length - 1 && styles.brandRowBorderBottom,
+                        ]}
+                        activeOpacity={0.7}
+                        onPress={() => selectOption(item)}
+                      >
+                        <Text style={styles.brandRowName}>{label}</Text>
+                        <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Right Alphabet Quick Jumper Bar */}
+            {activeStep === 'brand' && (
+              <View style={styles.alphabetJumperColumn}>
+                {ALPHABET_INDEX.map((char) => (
+                  <TouchableOpacity key={char} style={styles.alphabetJumperTouch}>
+                    <Text style={[styles.alphabetJumperChar, char === 'A' && styles.alphabetJumperCharActive]}>
+                      {char}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </View>
-          )}
-        </SafeAreaView>
-      </Modal>
+            )}
+          </View>
+        </View>
+      )}
     </SafeAreaView>
+  </Modal>
+    </SafeAreaView >
   );
 }
 

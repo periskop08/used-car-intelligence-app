@@ -129,6 +129,9 @@ const formatCloudflareImageUrl = (url?: string | null): string => {
     }
 
     if (storageKey) {
+      if (storageKey.startsWith('guide-cards/')) {
+        return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
+      }
       return `${API_URL}/listings/media-proxy/${storageKey}`;
     }
   }
@@ -145,20 +148,26 @@ const resolveVehicleImageUrl = (
   brand?: string,
   modelFamily?: string
 ): string => {
-  const formatted = formatCloudflareImageUrl(url);
-  if (formatted) return formatted;
+  if (url && !url.includes('test-similar')) {
+    const formatted = formatCloudflareImageUrl(url);
+    if (formatted) return formatted;
+  }
 
-  if (brand && modelFamily) {
-    const key = `${brand.toLowerCase().trim()} ${modelFamily.toLowerCase().trim()}`;
-    if (CLOUDFLARE_VEHICLE_IMAGES[key]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[key]);
+  if (brand || modelFamily) {
+    const b = (brand || '').toLowerCase().trim();
+    const m = (modelFamily || '').toLowerCase().trim();
+    const fullKey = `${b} ${m}`.trim();
+    if (fullKey && CLOUDFLARE_VEHICLE_IMAGES[fullKey]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[fullKey]);
     }
-    const modelKey = modelFamily.toLowerCase().trim();
-    if (CLOUDFLARE_VEHICLE_IMAGES[modelKey]) {
-      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[modelKey]);
+    if (m && CLOUDFLARE_VEHICLE_IMAGES[m]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[m]);
+    }
+    if (b && CLOUDFLARE_VEHICLE_IMAGES[b]) {
+      return formatCloudflareImageUrl(CLOUDFLARE_VEHICLE_IMAGES[b]);
     }
   }
-  return 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop&q=80';
+  return 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=800&auto=format&fit=crop&q=80';
 };
 
 interface ListingMedia {
