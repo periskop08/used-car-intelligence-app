@@ -171,12 +171,15 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - 🟡 **Pazarlık/Risk:** Lokal podye ucu / çamurluk içi hafif düzeltme (Ölçüleri fabrika toleransında ise fiyat kırma kozu).
    - 🟠 **Yüksek Risk & Detaylı Kontrol:** Taşıyıcı direkte boya/işlem veya kaynak (Uzman şasi ölçümü ve SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart).
    - 🔴 **Kesin Vazgeçme:** Şasi geometrisi bozuk, ana kulelerde kesme/çektirme yapılmış veya SRS/airbag sisteminin manipüle edildiğine dair bulgu tespit edilen araçlar.
-4. KİLOMETRE AŞINMA VE RİSK DİLİ: "Şu kilometrede kesin bozulur" şeklinde katı hükümler vermek yerine, "Özellikle yoğun şehir içi ve dur-kalk trafikte kullanılan araçlarda, 100.000 km bandından itibaren kavrama aşınması ve mekatronik tepkilerinde gecikme riski artabilir; ekspertizde canlı veriyle kavrama toleransı ölçülmelidir" tarzında uzman olasılıksal dili kullan.
+4. KİLOMETRE AŞINMA VE RİSK DİLİ: "Şu kilometrede kesin bozulur" şeklinde katı hükümler vermek yerine, örneğin çift kavramalı araçlarda "Özellikle yoğun şehir içi ve dur-kalk trafikte kullanılan araçlarda, 100.000 km bandından itibaren kavrama aşınması ve mekatronik tepkilerinde gecikme riski artabilir; ekspertizde canlı veriyle kavrama toleransı ölçülmelidir" tarzında, aracın gerçek şanzıman mimarisine uygun uzman olasılıksal dili kullan.
 5. TÜKETİM DEĞERLERİ AYRIMI: Fabrika resmi katalog tüketimi ile gerçek yol tüketim beklentisini (aralık olarak örn. 5.8 - 6.8 L/100km) açıkça ayrıştır.
 6. KRONOLOJİK ANOMALİ DEDEKTÖRÜ (FALSE-POSITIVE KORUMASI):
    Türkiye resmi distribütör pazarında satılan özel vergi dilimli motorlara (örn. BMW G20 320i 1.6L 170 HP, G30 520i 1.6L 170 HP, Mercedes C200/E180 1.6L vb.) ASLA kronolojik uyumsuzluk veya motor hatası uyarısı VERME. Yalnızca Türkiye'de ve dünyada hiçbir zaman üretilmemiş bariz çelişkilerde uyarı ver.
 7. CÜMLE TAMAMLAMA: Tüm paragrafları NOKTA (.) ile biten %100 TAM CÜMLELERLE tamamla. Asla metni yarım bırakma!
-8. Yalnızca geçerli JSON üret.`;
+8. Yalnızca geçerli JSON üret.
+9. HİBRİT VE e-CVT MİMARİSİ VE GÜÇ/TORK ETİKETLEME KORUMASI:
+   - Hibrit araçlarda motor gücü (örn. 122 HP) "Toplam Hibrit Sistem Gücü" olarak, tork (örn. 142 Nm) ise "Benzinli Motor Torku" olarak sunulmalıdır. Hibrit araçlarda elektrik motoru torku (örn. 163 Nm) ile benzinli motor torku doğrudan toplanarak uydurma kombine tork ÜRETİLEMEZ veya 142 Nm "toplam tork" olarak sunulamaz.
+   - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.`;
   }
 
   buildUserPrompt(vehicleContext: any): string {
@@ -253,6 +256,9 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
+10. HİBRİT VE e-CVT AKTARMA MİMARİSİ:
+    - Araç Hibrit veya e-CVT ise: Motor gücü Toplam Hibrit Sistem Gücü olarak, Tork Benzinli Motor Torku olarak sunulmalıdır. Asla benzinli ve elektrik torkunu toplayıp kombine tork uydurma.
+    - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {

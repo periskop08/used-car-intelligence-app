@@ -212,6 +212,9 @@ export class VehicleReportFallbackService {
 
     const torque = rawTorque ? `${rawTorque} Nm` : null;
     const isElectric = (fuel || '').toUpperCase().includes('ELECTR') || (fuel || '').toUpperCase().includes('ELEKTRİK');
+    const isHybrid = (fuel || '').toUpperCase().includes('HIBRIT') || (fuel || '').toUpperCase().includes('HYBRID');
+    const isEcvt = (trans || '').toLowerCase().includes('e-cvt') || (trans || '').toLowerCase().includes('ecvt');
+    const isEcvtOrHybrid = isHybrid || isEcvt;
     const rawCc = (vIdentity.engineDisplacementCc || perfSpecs.engineDisplacementCc);
     const cc = (!isElectric && rawCc && rawCc > 0) ? `${rawCc} cc` : null;
     const accel = perfSpecs.zeroToHundredKmh ? `${perfSpecs.zeroToHundredKmh} sn` : null;
@@ -222,7 +225,9 @@ export class VehicleReportFallbackService {
     // Motor: [EngineCode] ([HP] HP / [Torque] Nm)
     // Şanzıman: [TransName] ([TransType])
     // Yakıt: [FuelType] (Ort. [Fuel] lt/100km)
-    const formattedEngineLabel = `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim();
+    const formattedEngineLabel = isHybrid
+      ? `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp} Toplam Sistem Gücü${torque ? ' / ' + torque + ' Benzinli Motor Torku' : ''})`.trim()
+      : `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim();
     const formattedTransLabel = `${trans}${vIdentity.transmissionCode ? ' (' + vIdentity.transmissionCode + ')' : ''}`;
     const formattedFuelLabel = `${fuel}${avgFuel ? ' (' + avgFuel + ')' : ''}`;
 
@@ -230,7 +235,7 @@ export class VehicleReportFallbackService {
     const expertDecisionSynthesis: ExpertDecisionSynthesis = {
       vehicleCharacter: {
         headline: `${carTitle} — Teknik Karakter ve Fabrika Sentezi`,
-        detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} şanzıman kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Doğrulanmış veritabanı kayıtlarına göre periyodik bakımları düzenli yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
+        detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} aktarma kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Doğrulanmış veritabanı kayıtlarına göre periyodik bakımları düzenli yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
         supportingFactIds,
       },
       trimPackageComparison: {
@@ -243,7 +248,9 @@ export class VehicleReportFallbackService {
       dailyUseAssessment: {
         cityUse: `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
         highwayUse: `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,
-        trafficBehavior: `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`,
+        trafficBehavior: isEcvtOrHybrid
+          ? `Dur-kalk kullanımında hibrit batarya şarj durumu ve elektrik-benzin motor geçiş pürüzsüzlüğü kontrol edilmelidir.`
+          : `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`,
         comfortAssessment: `Sınıfı standartlarında günlük kullanım pratikliği ve kabin ergonomisi vadeder.`,
         supportingFactIds,
       },
@@ -290,12 +297,12 @@ export class VehicleReportFallbackService {
       purchaseConditions: [
         {
           condition: 'Periyodik Bakım Belgelerinin Doğrulanması',
-          reason: 'Motor ve şanzıman ömrünün düzenli yağ değişimleriyle korunduğunu teyit etmek.',
+          reason: 'Motor ve şanzıman ömrünün düzenli bakım kayıtlarıyla korunduğunu teyit etmek.',
           priority: 'CRITICAL',
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
         {
-          condition: 'Ekspertizde Şanzıman ve Sıvı Kaçak Kontrolü',
+          condition: isEcvtOrHybrid ? 'Hibrit Sistem ve Sıvı Kaçak Kontrolü' : 'Ekspertizde Şanzıman ve Sıvı Kaçak Kontrolü',
           reason: 'Liftte fiziki alt muhafaza incelemesi yapılarak aktif sızıntı bulunmadığını görmek.',
           priority: 'IMPORTANT',
           supportingFactIds: ['ENGINE_POWER'],
@@ -303,8 +310,12 @@ export class VehicleReportFallbackService {
       ],
       walkAwayConditions: [
         {
-          condition: 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
-          reason: 'Yüksek tamir ve revizyon masrafları doğurabileceğinden, satın alım öncesinde ekspertiz kontrolünde mekatronik ve kavrama sağlığı detaylıca teyit edilmelidir.',
+          condition: isEcvtOrHybrid
+            ? 'Hibrit Transaks / İnvertör Sisteminde Anormal Uğultu veya Güç Kesintisi'
+            : 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
+          reason: isEcvtOrHybrid
+            ? 'Hibrit planet dişli transaks ve elektrik motoru (MG1/MG2) onarım maliyetlerini engellemek için ekspertizde hibrit sistem diagnostik testi yapılmalıdır.'
+            : 'Yüksek tamir ve revizyon masrafları doğurabileceğinden, satın alım öncesinde ekspertiz kontrolünde mekatronik ve kavrama sağlığı detaylıca teyit edilmelidir.',
           priority: 'CRITICAL',
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
@@ -317,7 +328,7 @@ export class VehicleReportFallbackService {
       ],
       finalConditionalVerdict: {
         shortVerdict: 'Belirli kontrollerin sağlanması şartıyla değerlendirilebilir.',
-        detailedVerdict: `${carTitle}, periyodik bakımları belgelenmiş, şanzıman geçişleri pürüzsüz ve lifte kaldırıldığında aktif sıvı kaçağı görülmeyen durumlarda satın alma yönünde değerlendirilebilir.`,
+        detailedVerdict: `${carTitle}, periyodik bakımları belgelenmiş, ${isEcvtOrHybrid ? 'hibrit sistem ve güç aktarımı sorunsuz' : 'şanzıman geçişleri pürüzsüz'} ve lifte kaldırıldığında aktif sıvı kaçağı görülmeyen durumlarda satın alma yönünde değerlendirilebilir.`,
         confidence: 'HIGH',
         supportingFactIds,
       },
@@ -357,8 +368,12 @@ export class VehicleReportFallbackService {
         enginePowerHp: vIdentity.enginePowerHp,
         engineCode: vIdentity.engineCode,
         engineType: vIdentity.engineType || (isElectric ? 'Elektrik Motoru' : 'Turbo Benzinli'),
-        enginePowerRpm: vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} HP @ 5500 d/dk` : undefined,
-        engineTorqueRpm: perfSpecs.engineTorqueNm ? `${perfSpecs.engineTorqueNm} Nm @ 1750-4000 d/dk` : undefined,
+        enginePowerRpm: vIdentity.enginePowerHp
+          ? (isEcvtOrHybrid ? `${vIdentity.enginePowerHp} HP (Toplam Sistem Gücü)` : `${vIdentity.enginePowerHp} HP @ 5500 d/dk`)
+          : undefined,
+        engineTorqueRpm: perfSpecs.engineTorqueNm
+          ? (isEcvtOrHybrid ? `${perfSpecs.engineTorqueNm} Nm (Benzinli Motor Torku)` : `${perfSpecs.engineTorqueNm} Nm @ 1750-4000 d/dk`)
+          : undefined,
         fuelType: fuel,
         transmissionName: trans,
         drivetrain: vIdentity.drivetrain || 'Önden Çekiş (FWD)',

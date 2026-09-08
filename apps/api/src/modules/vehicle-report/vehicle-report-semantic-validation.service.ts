@@ -104,8 +104,25 @@ export class VehicleReportSemanticValidationService {
     const transName = (report.vehicleIdentity.transmissionName || vehicleCtx.transmissionName || '').toLowerCase();
     const transArch = String(researchIdentity?.transmissionFamily || researchIdentity?.clutchType || transName).toLowerCase();
     const isTorqueConverterOrCVTOrManual = transArch.includes('tork_konvertorlu') || transArch.includes('tork konvertörlü') || transArch.includes('tam otomatik') || transArch.includes('eat8') || transArch.includes('zf 8hp') || transArch.includes('cvt') || transArch.includes('multitronic') || transArch.includes('manuel');
-    const hasDctTerminology = reportStr.includes('kuru çift kavrama') || reportStr.includes('kuru kavrama balata') || reportStr.includes('mekatronik basınç tüpü') || reportStr.includes('dsg kavrama titremesi');
-    if (isTorqueConverterOrCVTOrManual && !transArch.includes('dsg') && !transArch.includes('edc') && !transArch.includes('dct')) {
+    const isEcvtOrToyotaHybrid = transArch.includes('e-cvt') || transArch.includes('ecvt') || transName.includes('e-cvt') || ((fuelType.includes('hibrit') || fuelType.includes('hybrid')) && (transArch.includes('cvt') || transName.includes('otomatik')));
+
+    if (isEcvtOrToyotaHybrid) {
+      const hasEcvtViolations = reportStr.includes('vites geçişlerinde vuruntu') ||
+                                reportStr.includes('vites vuruntusu') ||
+                                reportStr.includes('vites kaçırma') ||
+                                reportStr.includes('kavrama aşınması') ||
+                                reportStr.includes('mekatronik arızası') ||
+                                reportStr.includes('mekatronik basınç') ||
+                                reportStr.includes('kuru kavrama');
+      if (hasEcvtViolations) {
+        return {
+          isValid: false,
+          reason: `e-CVT / Hibrit planet dişli transaks mimarisine sahip araçta (${transName}) kademeli vites geçişi veya çift kavrama / mekatronik terimleri kullanıldı. e-CVT araçlarda kademeli vites dişlileri ve klasik kavrama/mekatronik bulunmaz.`,
+          needsRepair: true,
+        };
+      }
+    } else if (isTorqueConverterOrCVTOrManual && !transArch.includes('dsg') && !transArch.includes('edc') && !transArch.includes('dct')) {
+      const hasDctTerminology = reportStr.includes('kuru çift kavrama') || reportStr.includes('kuru kavrama balata') || reportStr.includes('mekatronik basınç tüpü') || reportStr.includes('dsg kavrama titremesi');
       if (hasDctTerminology) {
         return {
           isValid: false,
