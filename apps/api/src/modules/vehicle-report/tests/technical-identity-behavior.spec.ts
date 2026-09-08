@@ -1,14 +1,17 @@
 import { VehicleReportPromptService } from '../vehicle-report-prompt.service';
 import { VehicleReportSemanticValidationService } from '../vehicle-report-semantic-validation.service';
+import { VehicleReportScoringService } from '../vehicle-report-scoring.service';
 import { ComprehensiveVehicleReport } from '@used-car-intelligence/shared';
 
 describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
   let promptService: VehicleReportPromptService;
   let validationService: VehicleReportSemanticValidationService;
+  let scoringService: VehicleReportScoringService;
 
   beforeEach(() => {
     promptService = new VehicleReportPromptService();
     validationService = new VehicleReportSemanticValidationService();
+    scoringService = new VehicleReportScoringService();
   });
 
   describe('Behavior 1: Turkey Market Priority & Grounding Rules in Prompts', () => {
@@ -26,7 +29,7 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
         },
       });
 
-      expect(userPrompt).toContain('Öncelik Türkiye resmi üretici/distribütör kaynaklarıdır');
+      expect(userPrompt).toContain('Türkiye resmi distribütör verileri');
       expect(userPrompt).toContain('Motor ailesi');
       expect(userPrompt).toContain('spesifik motor kodunu');
       expect(userPrompt).toContain('şanzıman ailesi');
@@ -47,12 +50,12 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
         },
       });
 
-      expect(researchPrompt).toContain('10 KİLİT TEKNİK PARAMETRE GRUBU');
-      expect(researchPrompt).toContain('Pazar Geçerliliği');
+      expect(researchPrompt).toContain('10 TEKNİK PARAMETRE GRUBU');
+      expect(researchPrompt).toContain('Pazar ve Nesil Geçerliliği');
       expect(researchPrompt).toContain('Motor Kimliği');
       expect(researchPrompt).toContain('Şanzıman Kimliği');
       expect(researchPrompt).toContain('Triger Sistemi');
-      expect(researchPrompt).toContain('Dinamik Bakım & Arıza Noktaları');
+      expect(researchPrompt).toContain('3 Seviyeli Bakım Taksonomisi');
     });
   });
 
@@ -62,7 +65,7 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
       status: 'COMPLETED',
       variantId: 'var-1',
-      reportVersion: 'v5.0_DYNAMIC_IDENTITY_GROUNDED',
+      reportVersion: 'v5.1_GENUINE_SCORING_ARCH_GUARD',
       schemaVersion: 2,
       modeLabel: 'Araç Raporu',
       generatedAt: new Date().toISOString(),
@@ -207,4 +210,167 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(closedWriterPrompt).toContain('Stage 2\'de ASLA KENDİLİĞİNDEN İCAT EDEMEZSİN');
     });
   });
+
+  describe('Behavior 6: EV Architecture Guard (Displacement null & No ICE terminology)', () => {
+    it('should REJECT report if EV has non-null displacement cc', () => {
+      const evReportWithCc = {
+        reportId: 'rep-ev-1',
+        vehicleIdentity: {
+          brand: 'Tesla',
+          model: 'Model Y',
+          modelYear: 2023,
+          fuelType: 'Elektrik',
+          engineDisplacementCc: 1598, // Invalid for EV
+        },
+        executiveSummary: { title: 'Tesla Model Y Özeti' },
+      } as any;
+
+      const validation = validationService.validate(evReportWithCc, {
+        vehicleIdentity: { fuelType: 'Elektrik' },
+      });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('Elektrikli (EV) araçta içten yanmalı motor hacmi');
+    });
+
+    it('should REJECT report if EV text mentions ICE-specific components (DPF, buji, egzoz)', () => {
+      const evReportWithIceTerms = {
+        reportId: 'rep-ev-2',
+        vehicleIdentity: {
+          brand: 'Tesla',
+          model: 'Model Y',
+          modelYear: 2023,
+          fuelType: 'Elektrik',
+        },
+        executiveSummary: {
+          title: 'Tesla Özeti',
+          keyWarnings: ['Egzoz emisyonu ve buji değişimi periyodik olarak kontrol edilmelidir.'],
+        },
+      } as any;
+
+      const validation = validationService.validate(evReportWithIceTerms, {
+        vehicleIdentity: { fuelType: 'Elektrik' },
+      });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('içten yanmalı motor terimleri');
+    });
+  });
+
+  describe('Behavior 7: Transmission Semantic Guard (No DCT/DSG Mechatronics on Torque Converter/CVT/Manual)', () => {
+    it('should REJECT report if Torque Converter/CVT vehicle claims dry DCT mechatronics pressure tube failure', () => {
+      const eat8ReportWithDctTerms = {
+        reportId: 'rep-eat8-1',
+        vehicleIdentity: {
+          brand: 'Peugeot',
+          model: '3008',
+          modelYear: 2021,
+          fuelType: 'Dizel',
+          transmissionName: 'EAT8 (Tam Otomatik)',
+        },
+        executiveSummary: {
+          title: 'Peugeot 3008 Özeti',
+          biggestRisk: 'Mekatronik basınç tüpü gevşemesi ve kuru kavrama balata aşınması riski mevcuttur.',
+        },
+      } as any;
+
+      const validation = validationService.validate(eat8ReportWithDctTerms, {
+        vehicleIdentity: { transmissionName: 'EAT8 Tam Otomatik' },
+        verifiedResearch: {
+          vehicleIdentityResearch: {
+            transmissionFamily: 'Tork Konvertörlü Otomatik (EAT8 / Aisin)',
+          },
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('Şanzıman mimarisi');
+      expect(validation.reason).toContain('DSG kavrama/mekatronik');
+    });
+  });
+
+  describe('Behavior 8: Rejection of Hallucinated Numerical Maintenance Thresholds', () => {
+    it('should REJECT report if it asserts fabricated numerical wear thresholds like "60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış"', () => {
+      const hallucinatedReport = {
+        reportId: 'rep-hallucinated-1',
+        vehicleIdentity: {
+          brand: 'Honda',
+          model: 'Civic',
+          modelYear: 2020,
+          fuelType: 'Benzin',
+        },
+        executiveSummary: {
+          title: 'Civic Özeti',
+          oneSentenceSummary: '60.000 - 70.000 km sonrasında kabin trim tıkırtılarında artış gözlemlenebilir.',
+        },
+      } as any;
+
+      const validation = validationService.validate(hallucinatedReport, {});
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('yapay/ezbere sayısal kilometre eşikleri');
+    });
+  });
+
+  describe('Behavior 9: Evidence-Grounded Scoring Behavior (No Arbitrary 77/20 Defaults)', () => {
+    it('should return null scores and LOW confidence with human-readable Turkish missing inputs when evidence is insufficient', () => {
+      const emptyContext = {
+        vehicleIdentity: {
+          brand: 'Bilinmeyen',
+          model: 'Araç',
+        },
+      };
+
+      const result = scoringService.calculateScores(emptyContext);
+
+      expect(result.technicalRiskScore.value).toBeNull();
+      expect(result.technicalRiskScore.confidence).toBe('LOW');
+      expect(result.buyabilityScore.value).toBeNull();
+      expect(result.dataConfidenceScore.value).toBeLessThan(50);
+      expect(result.technicalRiskScore.missingInputs).toBeDefined();
+      expect(result.technicalRiskScore.missingInputs?.some(i => i.includes('Doğrulanmış'))).toBe(true);
+    });
+
+    it('should produce dynamic, differentiated scores based on verified known database problems', () => {
+      const lowRiskVehicleContext = {
+        vehicleIdentity: {
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2022,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+          recalls: [],
+        },
+      };
+
+      const highRiskVehicleContext = {
+        vehicleIdentity: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYear: 2012,
+          fuelType: 'Benzin',
+          transmissionName: '7 İleri DSG',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [
+            { id: 'p1', title: 'Mekatronik Basınç Tüpü Patlaması', riskLevel: 'CRITICAL' },
+            { id: 'p2', title: 'Kuru Kavrama Aşınması', riskLevel: 'HIGH' },
+            { id: 'p3', title: 'Zincir Uzaması', riskLevel: 'HIGH' },
+          ],
+          recalls: [
+            { id: 'r1', title: 'Şanzıman Yazılım ve Akümülatör Geri Çağırma', status: 'OPEN' },
+          ],
+        },
+      };
+
+      const lowRiskScores = scoringService.calculateScores(lowRiskVehicleContext);
+      const highRiskScores = scoringService.calculateScores(highRiskVehicleContext);
+
+      expect(lowRiskScores.technicalRiskScore.value).not.toBeNull();
+      expect(highRiskScores.technicalRiskScore.value).not.toBeNull();
+      expect(highRiskScores.technicalRiskScore.value!).toBeGreaterThan(lowRiskScores.technicalRiskScore.value!);
+      expect(lowRiskScores.buyabilityScore.value!).toBeGreaterThan(highRiskScores.buyabilityScore.value!);
+    });
+  });
 });
+
