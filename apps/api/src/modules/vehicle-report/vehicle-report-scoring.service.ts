@@ -70,16 +70,28 @@ export class VehicleReportScoringService {
 
       if (hasDbProblems) {
         problems.forEach((p: any, idx: number) => {
+          const isVerifiedFailure = p.problemType === 'VERIFIED_FAILURE' || p.problemType === 'CHRONIC' || !p.problemType;
           const isCritical = p.riskLevel === 'CRITICAL' || p.severity === 'YÜKSEK' || p.riskLevel === 'HIGH';
-          const impactVal = isCritical ? 25 : 12;
-          accumulatedRisk += impactVal;
-          riskFactors.push({
-            key: `VERIFIED_PROBLEM_${p.id || idx}`,
-            impact: impactVal,
-            explanation: isCritical
-              ? `Doğrulanmış Kritik Kronik Risk: ${p.title || p.description || 'Mekanik Aşınma Riski'}`
-              : `Doğrulanmış Kronik Gözlem: ${p.title || p.description || 'Periyodik Kontrol Noktası'}`,
-          });
+
+          if (isVerifiedFailure) {
+            const impactVal = isCritical ? 25 : 12;
+            accumulatedRisk += impactVal;
+            riskFactors.push({
+              key: `VERIFIED_PROBLEM_${p.id || idx}`,
+              impact: impactVal,
+              explanation: isCritical
+                ? `Doğrulanmış Kritik Kronik Risk: ${p.title || p.description || 'Mekanik Aşınma Riski'}`
+                : `Doğrulanmış Kronik Gözlem: ${p.title || p.description || 'Periyodik Kontrol Noktası'}`,
+            });
+          } else {
+            const impactVal = isCritical ? 6 : 2;
+            accumulatedRisk += impactVal;
+            riskFactors.push({
+              key: `COMMUNITY_FEEDBACK_${p.id || idx}`,
+              impact: impactVal,
+              explanation: `Kullanıcı Geri Bildirimi / Saha Gözlemi: ${p.title || p.description || 'Kullanıcı Bildirimi'}`,
+            });
+          }
         });
       }
 

@@ -538,6 +538,229 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       expect(validation.reason).toContain('Araç triger sistemi ZİNCİR (CHAIN) olarak doğrulanmışken raporda triger kayışı');
     });
   });
+
+  describe('Behavior 14: End-to-End VehicleReportProviderService Production Pipeline (Live Validation, Repair & Revalidate)', () => {
+    let providerService: any;
+    let mockOrchestrator: any;
+    let fallbackService: any;
+    let contradictionService: any;
+    let evidenceValidationService: any;
+
+    beforeEach(() => {
+      mockOrchestrator = {
+        generateListingAdvice: jest.fn(),
+      };
+      contradictionService = {
+        analyzeListingContradictions: jest.fn().mockReturnValue([]),
+        analyzeMileageAge: jest.fn().mockReturnValue({}),
+      };
+      fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(
+        scoringService,
+        contradictionService
+      );
+      evidenceValidationService = new (require('../research-evidence-validation.service').ResearchEvidenceValidationService)();
+      
+      const { VehicleReportProviderService } = require('../vehicle-report-provider.service');
+      providerService = new VehicleReportProviderService(
+        promptService,
+        fallbackService,
+        evidenceValidationService,
+        validationService,
+        scoringService,
+        mockOrchestrator
+      );
+    });
+
+    it('should trigger AI repair and re-validate when initial AI output has semantic contradiction', async () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v1',
+          brand: 'Tesla',
+          model: 'Model Y',
+          modelYear: 2023,
+          bodyType: 'SUV',
+          fuelType: 'Elektrik',
+          transmissionName: 'Tek Kademeli Redüktör',
+          timingSystem: 'NONE',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [
+            { id: 'p1', title: 'Ön Silecek Motoru Arızası', problemType: 'REPORTED_COMPLAINT' }
+          ]
+        }
+      };
+
+      // 1. Initial AI response contains semantic mismatch (wiper with lift inspection step)
+      const invalidAiResponse = JSON.stringify({
+        executiveSummary: {
+          title: 'Tesla Model Y Özeti',
+          oneSentenceSummary: 'Elektrikli SUV.',
+          strongestAdvantage: 'Geniş iç hacim.',
+          biggestRisk: 'Silecek arızası.',
+          bestFor: ['Aileler'],
+          notIdealFor: ['Offroad'],
+          keyWarnings: ['Silecek kontrol edilmeli.'],
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model Y',
+            detailedAssessment: 'Yüksek menzilli ve geniş hacimli elektrikli SUV aracıdır. Sessiz sürüş ve yüksek verimlilik sunmaktadır. Süspansiyon yapısı ve trim izolasyonu dengelidir.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Elektrikli verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'Büyük jantlar.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Şehir içi ve uzun yol.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Offroad', explanation: 'Alçak zemin.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{ condition: 'Pil Sağlığı', reason: 'Uzun ömür', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Silecek Motoru Arızası',
+            severity: 'DÜŞÜK',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Sileceklerin yavaşlaması'],
+            inspectionInstructions: ['Aracı lifte kaldırıp alt muhafaza ve karter sızıntısını inceleyin.'], // CONTRADICTION!
+            riskMeaning: 'Mekanik yürüyen aksam riski oluşturmaz.',
+            supportingFactIds: ['FACT-1'],
+          },
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Genel durumu temiz ise satın alma değerlendirilebilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      // 2. Repaired AI response fixes the inspection step
+      const repairedAiResponse = JSON.stringify({
+        executiveSummary: {
+          title: 'Tesla Model Y Özeti',
+          oneSentenceSummary: 'Elektrikli SUV.',
+          strongestAdvantage: 'Geniş iç hacim.',
+          biggestRisk: 'Silecek arızası.',
+          bestFor: ['Aileler'],
+          notIdealFor: ['Offroad'],
+          keyWarnings: ['Silecek kontrol edilmeli.'],
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model Y',
+            detailedAssessment: 'Yüksek menzilli ve geniş hacimli elektrikli SUV aracıdır. Sessiz sürüş ve yüksek verimlilik sunmaktadır. Süspansiyon yapısı ve trim izolasyonu dengelidir.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Elektrikli verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'Büyük jantlar.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Şehir içi ve uzun yol.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Offroad', explanation: 'Alçak zemin.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{ condition: 'Pil Sağlığı', reason: 'Uzun ömür', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Silecek Motoru Arızası',
+            severity: 'DÜŞÜK',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Sileceklerin yavaşlaması'],
+            inspectionInstructions: ['Silecek kolu kademelerini ve su püskürtme memesini test ettirin.'], // REPAIRED!
+            riskMeaning: 'Mekanik yürüyen aksam riski oluşturmaz.',
+            supportingFactIds: ['FACT-1'],
+          },
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Genel durumu temiz ise satın alma değerlendirilebilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      mockOrchestrator.generateListingAdvice
+        .mockResolvedValueOnce({ answer: invalidAiResponse, providerName: 'gemini-flash' })
+        .mockResolvedValueOnce({ answer: repairedAiResponse, providerName: 'gemini-flash' });
+
+      const result = await providerService.generateReport('rep-tesla-live', vehicleContext);
+
+      expect(mockOrchestrator.generateListingAdvice).toHaveBeenCalledTimes(2);
+      expect(result.repairAttempted).toBe(true);
+      expect(result.report.expertDecisionSynthesis.primaryTechnicalRisk.inspectionInstructions[0]).toContain('Silecek kolu');
+      expect(result.report.expertDecisionSynthesis.primaryTechnicalRisk.inspectionInstructions[0]).not.toContain('lifte kaldır');
+      // Verify scoring was executed on final data and REPORTED_COMPLAINT gave modest risk
+      expect(result.report.scoring.technicalRiskScore.value).toBeLessThan(15);
+    });
+
+    it('should sanitize incompatible risk steps when repair fails so invalid underbody checks never reach the client', async () => {
+      const vehicleContext = {
+        vehicleIdentity: {
+          variantId: 'v1',
+          brand: 'Tesla',
+          model: 'Model Y',
+          modelYear: 2023,
+          bodyType: 'SUV',
+          fuelType: 'Elektrik',
+          transmissionName: 'Tek Kademeli Redüktör',
+          timingSystem: 'NONE',
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [
+            { id: 'p1', title: 'Silecek Motoru Arızası', problemType: 'REPORTED_COMPLAINT' }
+          ]
+        }
+      };
+
+      const invalidAiResponse = JSON.stringify({
+        executiveSummary: {
+          title: 'Tesla Model Y Özeti',
+          oneSentenceSummary: 'Elektrikli SUV.',
+          strongestAdvantage: 'Geniş iç hacim.',
+          biggestRisk: 'Silecek arızası.',
+          bestFor: ['Aileler'],
+          notIdealFor: ['Offroad'],
+          keyWarnings: ['Silecek kontrol edilmeli.'],
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model Y',
+            detailedAssessment: 'Yüksek menzilli ve geniş hacimli elektrikli SUV aracıdır. Sessiz sürüş ve yüksek verimlilik sunmaktadır. Süspansiyon yapısı ve trim izolasyonu dengelidir.',
+            supportingFactIds: ['FACT-1'],
+          },
+          strongestReasonsToChoose: [{ title: 'Düşük Tüketim', explanation: 'Elektrikli verimlilik.', supportingFactIds: ['FACT-1'] }],
+          compromisesAndLimitations: [{ title: 'Sert Sürüş', explanation: 'Büyük jantlar.', supportingFactIds: ['FACT-1'] }],
+          suitableFor: [{ profile: 'Aile', explanation: 'Şehir içi ve uzun yol.', supportingFactIds: ['FACT-1'] }],
+          notSuitableFor: [{ profile: 'Offroad', explanation: 'Alçak zemin.', supportingFactIds: ['FACT-1'] }],
+          purchaseConditions: [{ condition: 'Pil Sağlığı', reason: 'Uzun ömür', priority: 'ÖNEMLİ', supportingFactIds: ['FACT-1'] }],
+          walkAwayConditions: [{ condition: 'Ağır Hasar', reason: 'Güvenlik', priority: 'KRİTİK', supportingFactIds: ['FACT-1'] }],
+          primaryTechnicalRisk: {
+            title: 'Silecek Motoru Arızası',
+            severity: 'DÜŞÜK',
+            likelihood: 'DÜŞÜK',
+            symptoms: ['Sileceklerin yavaşlaması'],
+            inspectionInstructions: ['Aracı lifte kaldırıp alt karter muhafazası yağ kaçaklarını inceleyin.'], // INCOMPATIBLE
+            riskMeaning: 'Mekanik yürüyen aksam riski oluşturmaz.',
+            supportingFactIds: ['FACT-1'],
+          },
+          finalConditionalVerdict: {
+            shortVerdict: 'Alınabilir.',
+            detailedVerdict: 'Genel durumu temiz ise satın alma değerlendirilebilir.',
+            confidence: 'HIGH',
+            supportingFactIds: ['FACT-1'],
+          },
+        },
+      });
+
+      // AI repair returns identical invalid response (repair failed)
+      mockOrchestrator.generateListingAdvice
+        .mockResolvedValueOnce({ answer: invalidAiResponse, providerName: 'gemini-flash' })
+        .mockResolvedValueOnce({ answer: invalidAiResponse, providerName: 'gemini-flash' });
+
+      const result = await providerService.generateReport('rep-tesla-live-sanitized', vehicleContext);
+
+      expect(mockOrchestrator.generateListingAdvice).toHaveBeenCalledTimes(2);
+      expect(result.repairAttempted).toBe(true);
+      // Sanitizer should have removed the lift/underbody inspection step
+      const steps = result.report.expertDecisionSynthesis.primaryTechnicalRisk.inspectionInstructions;
+      expect(steps.some((s: string) => s.includes('lifte kaldır') || s.includes('alt karter'))).toBe(false);
+      expect(steps.length).toBeGreaterThan(0);
+    });
+  });
 });
+
 
 
