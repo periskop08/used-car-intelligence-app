@@ -3,19 +3,15 @@
 import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import {
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ChevronDown,
   ArrowUpDown,
   Share2,
   Heart,
-  Settings,
-  Car,
-  MapPin,
-  User,
   FileText,
   MessageSquare,
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
   RefreshCw,
   X,
@@ -23,6 +19,10 @@ import {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-intelligence-app.onrender.com";
+
+const STORAGE_KEY_ITEMS = "torquescout_feed_items";
+const STORAGE_KEY_INDEX = "torquescout_feed_index";
+const STORAGE_KEY_SEED = "torquescout_feed_seed";
 
 interface FeedSeller {
   id: string;
@@ -103,19 +103,58 @@ function FeedCardDeck() {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [isDescModalOpen, setIsDescModalOpen] = useState(false);
   const [seed, setSeed] = useState("");
-  const [token, setToken] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  const loadingMoreRef = useRef(false);
 
+  // Mount logic: Check sessionStorage first to restore state on back navigation
   useEffect(() => {
-    const savedToken = localStorage.getItem("accessToken");
-    if (savedToken) setToken(savedToken);
+    try {
+      const cachedItems = sessionStorage.getItem(STORAGE_KEY_ITEMS);
+      const cachedIndex = sessionStorage.getItem(STORAGE_KEY_INDEX);
+      const cachedSeed = sessionStorage.getItem(STORAGE_KEY_SEED);
+
+      if (cachedItems) {
+        const parsed = JSON.parse(cachedItems);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setItems(parsed);
+          const parsedIdx = cachedIndex ? parseInt(cachedIndex, 10) : 0;
+          setCurrentIndex(isNaN(parsedIdx) ? 0 : Math.max(0, Math.min(parsedIdx, parsed.length - 1)));
+          if (cachedSeed) setSeed(cachedSeed);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse cached feed:", e);
+    }
+
     const initialSeed = Math.random().toString(36).substring(2, 15);
     setSeed(initialSeed);
+    try {
+      sessionStorage.setItem(STORAGE_KEY_SEED, initialSeed);
+    } catch (_) {}
     loadFeed(initialSeed, true);
   }, []);
+
+  // Persist currentIndex in sessionStorage on every step
+  useEffect(() => {
+    if (items.length > 0) {
+      try {
+        sessionStorage.setItem(STORAGE_KEY_INDEX, String(currentIndex));
+      } catch (_) {}
+    }
+  }, [currentIndex, items.length]);
+
+  // Persist items in sessionStorage whenever new items are fetched
+  useEffect(() => {
+    if (items.length > 0) {
+      try {
+        sessionStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
+      } catch (_) {}
+    }
+  }, [items]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -123,13 +162,16 @@ function FeedCardDeck() {
   };
 
   const loadFeed = async (activeSeed: string, replace: boolean) => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     if (replace) setLoading(true);
+
     try {
       const headers: Record<string, string> = {};
       const savedToken = localStorage.getItem("accessToken");
       if (savedToken) headers["Authorization"] = `Bearer ${savedToken}`;
 
-      const res = await fetch(`${API_BASE_URL}/listings/feed?limit=15&seed=${activeSeed}`, {
+      const res = await fetch(`${API_BASE_URL}/listings/feed?limit=20&seed=${activeSeed}`, {
         headers,
       });
 
@@ -140,9 +182,9 @@ function FeedCardDeck() {
       const data = await res.json();
       const rawList: FeedItem[] = data.items || [];
 
-      if (rawList.length === 0) {
-        // Fallback: Vitrin ilanlarını getir
-        const fallbackRes = await fetch(`${API_BASE_URL}/listings?showcaseOnly=true&limit=15`, {
+      if (rawList.length === 0 && replace) {
+        // Fallback: Vitrin ve Acil ilanlarını getir
+        const fallbackRes = await fetch(`${API_BASE_URL}/listings?showcaseOnly=true&limit=20`, {
           headers,
         });
         if (fallbackRes.ok) {
@@ -172,7 +214,12 @@ function FeedCardDeck() {
               mileage: x.kilometers,
             },
             photos: x.media?.map((m: any, idx: number) => ({ id: m.id || String(idx), url: m.url, order: idx })) || [],
-            breadcrumb: ["Vasıta", "Otomobil", x.customBrand || x.vehicleVariant?.brand?.name || "Araç", x.customModel || x.vehicleVariant?.model?.name || ""].filter(Boolean),
+            breadcrumb: [
+              "Vasıta",
+              "Otomobil",
+              x.customBrand || x.vehicleVariant?.brand?.name || "Araç",
+              x.customModel || x.vehicleVariant?.model?.name || "",
+            ].filter(Boolean),
             isFavorite: !!x.isFavorited,
             isUrgent: !!x.isUrgent,
             isShowcaseFeedActive: !!x.isShowcaseFeedActive,
@@ -202,41 +249,46 @@ function FeedCardDeck() {
       console.error("İlan Akışı yüklenirken hata:", err);
     } finally {
       setLoading(false);
+      loadingMoreRef.current = false;
     }
   };
 
+  // Sonraki İlan (Functional state update ile yarış koşullarını ve atlamaları engeller)
   const handleNext = useCallback(() => {
-    if (currentIndex < items.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setActivePhotoIdx(0);
-      setActiveTab("info");
-      // Sona yaklaştıysa daha fazla ilan yükle
-      if (currentIndex >= items.length - 3) {
-        loadFeed(seed, false);
+    setCurrentIndex((prev) => {
+      const next = prev + 1;
+      if (next < items.length) {
+        setActivePhotoIdx(0);
+        setActiveTab("info");
+        // Sona 3 ilan kala arka planda yeni ilanlar ekle
+        if (next >= items.length - 3) {
+          loadFeed(seed, false);
+        }
+        return next;
       }
-    } else {
-      // Başa dön veya yeni tohumla çek
-      const newSeed = Math.random().toString(36).substring(2, 15);
-      setSeed(newSeed);
-      loadFeed(newSeed, true);
-    }
-  }, [currentIndex, items.length, seed]);
+      return prev;
+    });
+  }, [items.length, seed]);
 
+  // Önceki İlan (Kullanıcı geri bastığında her zaman tam olarak az önce geçtiği doğru kartı gösterir)
   const handlePrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-      setActivePhotoIdx(0);
-      setActiveTab("info");
-    }
-  }, [currentIndex]);
+    setCurrentIndex((prev) => {
+      if (prev > 0) {
+        setActivePhotoIdx(0);
+        setActiveTab("info");
+        return prev - 1;
+      }
+      return 0;
+    });
+  }, []);
 
-  // Klavye ok tuşları ile yukarı/aşağı geçiş
+  // Klavye ok tuşları ile önceki / sonraki geçiş
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown" || e.key === "PageDown") {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") {
         e.preventDefault();
         handleNext();
-      } else if (e.key === "ArrowUp" || e.key === "PageUp") {
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
         e.preventDefault();
         handlePrev();
       }
@@ -245,10 +297,10 @@ function FeedCardDeck() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNext, handlePrev]);
 
-  // Mouse wheel ile yukarı/aşağı akış
+  // Mouse wheel ile yukarı/aşağı geçiş (debounce ile)
   const handleWheel = (e: React.WheelEvent) => {
     if (isScrollingRef.current) return;
-    if (Math.abs(e.deltaY) > 35) {
+    if (Math.abs(e.deltaY) > 30) {
       isScrollingRef.current = true;
       if (e.deltaY > 0) {
         handleNext();
@@ -257,7 +309,7 @@ function FeedCardDeck() {
       }
       setTimeout(() => {
         isScrollingRef.current = false;
-      }, 500);
+      }, 450);
     }
   };
 
@@ -302,7 +354,7 @@ function FeedCardDeck() {
     );
   }
 
-  if (items.length === 0) {
+  if (!currentItem || items.length === 0) {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
@@ -316,9 +368,14 @@ function FeedCardDeck() {
           onClick={() => {
             const newSeed = Math.random().toString(36).substring(2, 15);
             setSeed(newSeed);
+            try {
+              sessionStorage.setItem(STORAGE_KEY_SEED, newSeed);
+              sessionStorage.removeItem(STORAGE_KEY_ITEMS);
+              sessionStorage.removeItem(STORAGE_KEY_INDEX);
+            } catch (_) {}
             loadFeed(newSeed, true);
           }}
-          className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition flex items-center gap-2"
+          className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />
           <span>Yeniden Dene</span>
@@ -333,7 +390,6 @@ function FeedCardDeck() {
 
   return (
     <div
-      ref={containerRef}
       onWheel={handleWheel}
       className="relative min-h-[calc(100vh-80px)] py-4 sm:py-6 flex items-center justify-center px-3 sm:px-4 select-none"
     >
@@ -344,27 +400,39 @@ function FeedCardDeck() {
         </div>
       )}
 
-      {/* Main Responsive Wrapper: Central Card + Right Desktop Controls */}
-      <div className="flex items-center justify-center gap-5 w-full max-w-4xl mx-auto">
+      {/* Main Responsive Wrapper: Left (Önceki İlan) - Central Card - Right (Sonraki İlan) */}
+      <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8 w-full max-w-5xl mx-auto">
         {/* ========================================================================= */}
-        {/* THE VISUAL 1 CARD: Centered, Framed, Dark Glassmorphism, Web Balanced */}
+        {/* SOL YÖN OKU: ÖNCEKİ İLAN (KARTIN SOLUNDA VE ALTINDA METİN) */}
+        {/* ========================================================================= */}
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center transition-all shadow-xl cursor-pointer ${
+              currentIndex === 0
+                ? "bg-slate-900/40 border-white/5 text-slate-600 cursor-not-allowed opacity-30"
+                : "bg-[#0a1224] hover:bg-[#142240] border-white/10 text-white hover:border-orange-500/50 hover:scale-110 active:scale-95 shadow-orange-500/5"
+            }`}
+            title="Önceki İlan (Sol / Yukarı Tuşu)"
+          >
+            <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
+          </button>
+          <span className="text-[11px] sm:text-xs font-bold text-slate-400 select-none tracking-tight">
+            Önceki İlan
+          </span>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* MERKEZ: İLAN KARTI (GÖRSEL 1 YAPISI, SOL ÜSTTE AYARLAR YOK) */}
         {/* ========================================================================= */}
         <div className="w-full max-w-[430px] sm:max-w-[450px] bg-[#0a1224] border border-white/10 rounded-[28px] p-4 sm:p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
-          {/* 1. Header Bar */}
-          <div className="flex items-center justify-between pb-3.5 border-b border-white/5">
-            {/* Left: Blue Gear Circle */}
-            <Link
-              href="/dashboard/listings"
-              className="w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 transition cursor-pointer"
-              title="İlan Yönetimi"
-            >
-              <Settings className="w-5 h-5" />
-            </Link>
-
-            {/* Center: Title */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-base">📦</span>
-              <span className="text-sm font-black text-white tracking-widest uppercase">
+          {/* 1. Header Bar: Ayarlar butonu kaldırıldı, Başlık solda/ortada, Paylaş & Kalp sağda */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="text-base sm:text-lg">📦</span>
+              <span className="text-xs sm:text-sm font-black text-white tracking-widest uppercase">
                 İlan Akışı
               </span>
             </div>
@@ -597,14 +665,14 @@ function FeedCardDeck() {
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
             <Link
               href={`/listings/${currentItem.id}`}
-              className="py-2.5 px-3 rounded-xl bg-[#0e182e] hover:bg-[#162547] border border-white/15 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+              className="py-2.5 px-3 rounded-xl bg-[#0e182e] hover:bg-[#162547] border border-white/15 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
               <FileText className="w-4 h-4 text-slate-300" />
               <span>İlana Git</span>
             </Link>
             <Link
               href={`/dashboard/messages?listingId=${currentItem.id}`}
-              className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/30"
+              className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/30 cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" />
               <span>Mesaj Gönder</span>
@@ -613,46 +681,20 @@ function FeedCardDeck() {
         </div>
 
         {/* ========================================================================= */}
-        {/* DESKTOP SIDE CONTROLS: Vertical Scroll Buttons & Counter */}
+        {/* SAĞ YÖN OKU: SONRAKİ İLAN (KARTIN SAĞINDA VE ALTINDA METİN) */}
         {/* ========================================================================= */}
-        <div className="hidden md:flex flex-col items-center gap-3">
-          {/* Previous Button */}
-          <button
-            type="button"
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            className={`w-12 h-12 rounded-2xl border flex items-center justify-center transition shadow-xl cursor-pointer ${
-              currentIndex === 0
-                ? "bg-slate-900/40 border-white/5 text-slate-600 cursor-not-allowed"
-                : "bg-[#0a1224] hover:bg-[#142240] border-white/10 text-white hover:scale-105"
-            }`}
-            title="Önceki İlan (Yukarı Tuşu)"
-          >
-            <ChevronUp className="w-6 h-6" />
-          </button>
-
-          {/* Counter Badge */}
-          <div className="px-3 py-2 rounded-2xl bg-[#0a1224] border border-white/10 text-center shadow-lg space-y-0.5 min-w-[70px]">
-            <div className="text-[10px] uppercase font-bold text-slate-400">İlan</div>
-            <div className="text-sm font-black text-orange-400 leading-none">
-              {currentIndex + 1} <span className="text-slate-500 font-normal">/</span> {items.length}
-            </div>
-          </div>
-
-          {/* Next Button */}
+        <div className="flex flex-col items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleNext}
-            className="w-12 h-12 rounded-2xl bg-[#0a1224] hover:bg-[#142240] border border-white/10 text-white hover:scale-105 flex items-center justify-center transition shadow-xl cursor-pointer"
-            title="Sonraki İlan (Aşağı Tuşu)"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0a1224] hover:bg-[#142240] border border-white/10 text-white hover:border-orange-500/50 hover:scale-110 active:scale-95 flex items-center justify-center transition-all shadow-xl cursor-pointer shadow-orange-500/5"
+            title="Sonraki İlan (Sağ / Aşağı Tuşu)"
           >
-            <ChevronDown className="w-6 h-6" />
+            <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
           </button>
-
-          {/* Keyboard tip */}
-          <div className="text-[10px] text-slate-500 text-center font-medium max-w-[80px] leading-tight mt-2">
-            Klavye ↑ / ↓ veya Fare Tekerleği
-          </div>
+          <span className="text-[11px] sm:text-xs font-bold text-slate-400 select-none tracking-tight">
+            Sonraki İlan
+          </span>
         </div>
       </div>
 
@@ -674,7 +716,7 @@ function FeedCardDeck() {
               <button
                 type="button"
                 onClick={() => setIsDescModalOpen(false)}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
