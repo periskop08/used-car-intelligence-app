@@ -172,7 +172,7 @@ export class VehicleReportSemanticValidationService {
     }
 
     // Rule 5: 100-Point Narrative Quality Scoring
-    const qualityResult = this.validateReportNarrativeQuality(report);
+    const qualityResult = this.validateReportNarrativeQuality(report, contextJson);
     if (!qualityResult.valid) {
       return {
         isValid: false,
@@ -185,7 +185,7 @@ export class VehicleReportSemanticValidationService {
     return { isValid: true, qualityResult };
   }
 
-  validateReportNarrativeQuality(report: ComprehensiveVehicleReport): NarrativeQualityResult {
+  validateReportNarrativeQuality(report: ComprehensiveVehicleReport, context?: any): NarrativeQualityResult {
     const errors: string[] = [];
     const warnings: string[] = [];
     const repairInstructions: string[] = [];
@@ -240,11 +240,57 @@ export class VehicleReportSemanticValidationService {
       decisionCoverage -= 5;
     }
 
-    // 4. Risk Depth (0-15)
-    if (!synth || !synth.primaryTechnicalRisk || !synth.primaryTechnicalRisk.symptoms || synth.primaryTechnicalRisk.symptoms.length === 0) {
-      riskDepth = 0;
-      errors.push('Ana teknik risk belirtileri ve kontrol adımları eksik.');
-      repairInstructions.push('En öncelikli teknik riskin belirtilerini ve ekspertiz kontrol adımlarını açıklayın.');
+    // 4. Risk Depth (0-15) - Trusted Upstream Evidence Boundary
+    const hasExplicitZeroEvidence = Boolean(
+      context &&
+      Array.isArray(context.problems) && context.problems.length === 0 &&
+      Array.isArray(context?.verifiedDatabaseVehicleReport?.knownDatabaseProblems) && context.verifiedDatabaseVehicleReport.knownDatabaseProblems.length === 0 &&
+      (!context?.verifiedResearch?.chronicFaults || context.verifiedResearch.chronicFaults.length === 0)
+    );
+
+    const verifiedDbProblems = (context?.verifiedDatabaseVehicleReport?.knownDatabaseProblems || context?.problems || [])
+      .filter((p: any) => {
+        if (p.problemType || p.status) {
+          const rawType = String(p.problemType || p.type || '').toUpperCase();
+          return rawType === 'VERIFIED_FAILURE' || rawType === 'RECALL' || rawType === 'TSB' || p.status === 'APPROVED';
+        }
+        return Boolean(p.id && (p.title || p.riskLevel));
+      });
+    const verifiedResearchFaults = (context?.verifiedResearch?.chronicFaults || [])
+      .filter((f: any) => f.verified !== false && f.title);
+
+    const hasVerifiedEvidenceRisk = (verifiedDbProblems.length > 0 || verifiedResearchFaults.length > 0);
+
+    const primaryRisk = synth?.primaryTechnicalRisk;
+    const isExplicitNoRisk = !primaryRisk || (primaryRisk as any).state === 'NO_VERIFIED_PRIMARY_RISK';
+
+    if (hasVerifiedEvidenceRisk) {
+      // Case A: Trusted verified chronic risk exists -> primaryTechnicalRisk is required with symptoms and inspection instructions
+      if (!primaryRisk || isExplicitNoRisk || !primaryRisk.symptoms || primaryRisk.symptoms.length === 0) {
+        riskDepth = 0;
+        errors.push('Doğrulanmış teknik risk kaydı bulunmasına rağmen raporda ana teknik risk belirtileri ve kontrol adımları eksik.');
+        repairInstructions.push('Doğrulanmış arıza kayıtlarına dayalı öncelikli teknik riskin belirtilerini ve kontrol adımlarını ekleyin.');
+      }
+    } else if (hasExplicitZeroEvidence) {
+      // Case B: Evidence explicitly confirms zero verified chronic risk
+      if (primaryRisk && !isExplicitNoRisk) {
+        // Fabricated generic risk detected when evidence confirms no verified risk
+        riskDepth = 0;
+        errors.push('Doğrulanmış teknik risk bulunmamasına rağmen mesnetsiz/jenerik ana teknik risk eklendi.');
+        repairInstructions.push('Doğrulanmış kronik risk bulunmadığı durumda mesnetsiz risk üretmeyin.');
+      } else {
+        // Correct absence of verified primary risk -> full score, no penalty
+        riskDepth = 15;
+      }
+    } else {
+      // Case C: Unspecified context / standalone test
+      if (!primaryRisk || isExplicitNoRisk) {
+        riskDepth = 15;
+      } else if (!primaryRisk.symptoms || primaryRisk.symptoms.length === 0) {
+        riskDepth = 0;
+        errors.push('Ana teknik risk belirtileri ve kontrol adımları eksik.');
+        repairInstructions.push('Teknik riskin belirtilerini ve kontrol adımlarını ekleyin.');
+      }
     }
 
     // 5. Suitability Depth (0-10)
