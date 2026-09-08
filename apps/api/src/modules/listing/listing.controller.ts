@@ -440,11 +440,13 @@ export class ListingController {
         fuelConsumption: specs?.fuelConsumptionAvg ? `${specs.fuelConsumptionAvg} lt/100km` : null,
       };
 
+      const brandName = variant?.brand?.name || item.customBrand || '';
+      const modelName = variant?.model?.name || item.customModel || '';
       const breadcrumb = [
         'Vasıta',
         'Otomobil',
-        variant?.brand?.name || '',
-        variant?.model?.name || '',
+        brandName,
+        modelName,
       ].filter(Boolean);
 
       const feedNow = new Date();
@@ -454,8 +456,8 @@ export class ListingController {
       const hasShowcaseEnt = (item as any).promotionEntitlements?.some(
         (e: any) => e.promotionType === ListingPromotionType.SHOWCASE_FEED && new Date(e.expiresAt) > feedNow
       );
-      const isUrgent = !!((item as any).status === ListingStatus.ACTIVE && (!(item as any).expiresAt || new Date((item as any).expiresAt) > feedNow) && hasUrgentEnt);
-      const isShowcaseFeedActive = !!((item as any).status === ListingStatus.ACTIVE && (!(item as any).expiresAt || new Date((item as any).expiresAt) > feedNow) && hasShowcaseEnt);
+      const isUrgent = !!((item as any).isUrgent || hasUrgentEnt);
+      const isShowcaseFeedActive = !!((item as any).isShowcaseFeedActive || hasShowcaseEnt);
 
       return {
         id: item.id,
@@ -464,7 +466,7 @@ export class ListingController {
         price: parseFloat(item.priceAmount.toString()),
         currency: item.currency,
         listingDate: new Date(item.publishedAt || item.createdAt).toLocaleDateString('tr-TR'),
-        listingNo: item.id.substring(0, 8).toUpperCase(),
+        listingNo: item.id.replace(/^TEST-SIMILAR-/, 'SIM-').substring(0, 8).toUpperCase(),
         location,
         seller,
         vehicle,

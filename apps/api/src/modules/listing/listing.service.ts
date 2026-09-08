@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto';
-import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier, PromotionLifecycleStatus } from '@prisma/client';
+import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier, PromotionLifecycleStatus, ListingPromotionType } from '@prisma/client';
 import { R2Service } from './r2.service';
 import { isValidCityAndDistrict, isApprovedVehicleColor, normalizeVehicleColor, sanitizeBodyPartArrays, VEHICLE_COLORS } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
@@ -753,11 +753,27 @@ CRITICAL SAFETY RULES:
   async getListingFeed(limit: number, excludeIds?: string[], seed?: string) {
     const activeSeed = seed || Math.random().toString(36).substring(2, 15);
     
-    // 1. Fetch Candidate Pool
+    // 1. Fetch Candidate Pool (Sadece Vitrin + Akış ve Hızlı Satış / Acil paketli ilanlar)
+    const now = new Date();
     const candidates = await this.prisma.vehicleListing.findMany({
       where: {
         status: ListingStatus.ACTIVE,
-        expiresAt: { gt: new Date() },
+        expiresAt: { gt: now },
+        OR: [
+          { isShowcaseFeedActive: true },
+          { isUrgent: true },
+          {
+            promotionEntitlements: {
+              some: {
+                lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
+                expiresAt: { gt: now },
+                promotionType: {
+                  in: [ListingPromotionType.SHOWCASE_FEED, ListingPromotionType.URGENT_LISTING],
+                },
+              },
+            },
+          },
+        ],
         media: {
           some: {
             moderationStatus: MediaModerationStatus.APPROVED,
@@ -791,7 +807,7 @@ CRITICAL SAFETY RULES:
         promotionEntitlements: {
           where: {
             lifecycleStatus: PromotionLifecycleStatus.ACTIVE,
-            expiresAt: { gt: new Date() },
+            expiresAt: { gt: now },
           },
           select: {
             promotionType: true,
@@ -804,10 +820,9 @@ CRITICAL SAFETY RULES:
     // 2. Validate mandatory fields
     const validCandidates = candidates.filter((c) => {
       if (!c.media || c.media.length === 0) return false;
-      const variant = c.vehicleVariant;
-      if (!variant) return false;
-      if (!variant.brand || !variant.brand.name) return false;
-      if (!variant.model || !variant.model.name) return false;
+      const brand = c.vehicleVariant?.brand?.name || c.customBrand;
+      const model = c.vehicleVariant?.model?.name || c.customModel;
+      if (!brand || !model) return false;
       if (
         !c.id ||
         !c.title ||
@@ -819,8 +834,7 @@ CRITICAL SAFETY RULES:
         c.kilometers === undefined ||
         c.kilometers === null ||
         !c.bodyType ||
-        !c.city ||
-        !c.district
+        !c.city
       ) {
         return false;
       }
@@ -841,7 +855,7 @@ CRITICAL SAFETY RULES:
     const scoredCandidates = validCandidates.map((item) => {
       let score = prng(); // Random Weight [0, 1]
       
-      if (item.isFeatured) {
+      if (item.isFeatured || item.isShowcaseFeedActive) {
         score += 1.5; // Featured Boost
       }
 
@@ -880,10 +894,10 @@ CRITICAL SAFETY RULES:
         if (recentSellers.length >= 2) continue;
 
         // Aynı marka üst üste gelmesin
-        if (prev1 && item.vehicleVariant && prev1.vehicleVariant) {
-          const itemBrandId = item.vehicleVariant.brandId;
-          const prevBrandId = prev1.vehicleVariant.brandId;
-          if (itemBrandId === prevBrandId && pool.length > 1) {
+        if (prev1) {
+          const itemBrand = (item.vehicleVariant?.brand?.name || item.customBrand || '').toLowerCase();
+          const prevBrand = (prev1.vehicleVariant?.brand?.name || prev1.customBrand || '').toLowerCase();
+          if (itemBrand && prevBrand && itemBrand === prevBrand && pool.length > 1) {
             continue;
           }
         }

@@ -411,35 +411,34 @@ export default function ListingFeedScreen() {
       <View style={[styles.cardContainer, { height: feedHeight }]}>
         {/* Top Header Actions */}
         <View style={styles.topActions}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.circularBtn}>
-            <Ionicons name="arrow-back" size={18} color="#0f172a" />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.gearCircle}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="settings-sharp" size={20} color="#ffffff" />
           </TouchableOpacity>
-          <Text style={styles.feedTitle}>🎞️ İLAN AKIŞI</Text>
+
+          <Text style={styles.feedTitle}>📦 İLAN AKIŞI</Text>
+
           <View style={styles.row}>
-            <TouchableOpacity onPress={() => handleShare(item)} style={styles.circularBtn}>
-              <Ionicons name="share-social-outline" size={18} color="#0f172a" />
+            <TouchableOpacity onPress={() => handleShare(item)} style={styles.darkCircularBtn}>
+              <Ionicons name="share-social-outline" size={18} color="#cbd5e1" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleFavoriteToggle(item.id, item)}
               style={[
-                styles.circularBtn,
-                isFav && { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
+                styles.darkCircularBtn,
+                isFav && { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderColor: 'rgba(239, 68, 68, 0.5)' },
               ]}
             >
-              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#0f172a'} />
+              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#cbd5e1'} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* DISTINCT FRAMED CARD CONTAINER */}
         <View style={styles.cardFrame}>
-          {/* Right Floating Vertical Swipe Guide Indicator on the card frame */}
-          <View style={styles.scrollGuidePill} pointerEvents="none">
-            <Ionicons name="chevron-up" size={10} color="#94a3b8" />
-            <Ionicons name="swap-vertical" size={12} color="#ea580c" />
-            <Ionicons name="chevron-down" size={10} color="#94a3b8" />
-          </View>
-
           {/* TOP SECTION: Photo, Title, Breadcrumb, Tabs, Table */}
           <View style={styles.cardContentTop}>
             {/* 1. Photo Carousel */}
@@ -450,11 +449,23 @@ export default function ListingFeedScreen() {
                 contentFit="cover"
                 cachePolicy="memory-disk"
               />
-              {/* Promotional Badges: Urgent & Showcase */}
+
+              {/* Promotional Badges: Urgent & Showcase (Pills as in screenshot) */}
               {(item.isUrgent || item.isShowcaseFeedActive) && (
                 <View style={styles.promoBadgesWrap}>
-                  {item.isUrgent && <UrgentBadge size="small" />}
-                  {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                  {item.isUrgent && (
+                    <View style={styles.urgentPillBadge}>
+                      <Text style={styles.urgentDot}>•</Text>
+                      <Text style={styles.urgentFire}>🔥</Text>
+                      <Text style={styles.urgentPillText}>ACİL</Text>
+                    </View>
+                  )}
+                  {item.isShowcaseFeedActive && (
+                    <View style={styles.showcasePillBadge}>
+                      <Text style={styles.showcaseStar}>★</Text>
+                      <Text style={styles.showcasePillText}>VİTRİN</Text>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -512,7 +523,9 @@ export default function ListingFeedScreen() {
             {/* 3. Breadcrumb */}
             <View style={styles.breadcrumbContainer}>
               <Text style={styles.breadcrumbText} numberOfLines={1}>
-                {item.breadcrumb.join(' > ')}
+                {item.breadcrumb && item.breadcrumb.length > 0
+                  ? item.breadcrumb.join(' > ')
+                  : `Vasıta > Otomobil > ${item.vehicle.brand} > ${item.vehicle.modelFamily}`}
               </Text>
             </View>
 
@@ -533,12 +546,19 @@ export default function ListingFeedScreen() {
 
             {/* 5. Tab Content Box (Özellikler or Konum) */}
             <View style={styles.tabContentContainer}>
+              {/* Right Floating Vertical Swipe Guide Indicator inside the table */}
+              <View style={styles.scrollGuidePill} pointerEvents="none">
+                <Ionicons name="chevron-up" size={10} color="#64748b" />
+                <Ionicons name="swap-vertical" size={12} color="#f97316" />
+                <Ionicons name="chevron-down" size={10} color="#64748b" />
+              </View>
+
               {activeTab === 'info' ? (
                 <View style={styles.scrollInfo}>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Fiyat</Text>
                     <Text style={styles.infoValuePrice}>
-                      {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency}
+                      {(item.price ?? 0).toLocaleString('tr-TR')} {item.currency || 'TL'}
                     </Text>
                   </View>
                   <View style={styles.infoRow}>
@@ -598,7 +618,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnOutline}
                 activeOpacity={0.8}
               >
-                <Ionicons name="document-text-outline" size={15} color="#0f172a" style={{ marginRight: 5 }} />
+                <Ionicons name="document-text-outline" size={16} color="#f8fafc" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextOutline}>İlana Git</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -606,7 +626,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnSolid}
                 activeOpacity={0.85}
               >
-                <Ionicons name="chatbubbles-outline" size={15} color="#ffffff" style={{ marginRight: 5 }} />
+                <Ionicons name="chatbubbles-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextSolid}>Mesaj Gönder</Text>
               </TouchableOpacity>
             </View>
@@ -618,7 +638,7 @@ export default function ListingFeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f1f5f9" />
+      <StatusBar barStyle="light-content" backgroundColor="#030712" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#ea580c" />
@@ -637,9 +657,9 @@ export default function ListingFeedScreen() {
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.centered}>
-          <Ionicons name="film-outline" size={48} color="#94a3b8" />
-          <Text style={styles.errorText}>Gösterilecek aktif ilan bulunmuyor.</Text>
-          <Text style={styles.subText}>Yeni ilanlar yayınlandığında burada listelenecektir.</Text>
+          <Ionicons name="film-outline" size={48} color="#64748b" />
+          <Text style={styles.errorText}>Gösterilecek vitrin ve acil ilan bulunmuyor.</Text>
+          <Text style={styles.subText}>Yeni vitrin ve acil paketli ilanlar yayınlandığında burada listelenecektir.</Text>
         </View>
       ) : (
         <View
@@ -678,23 +698,23 @@ export default function ListingFeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#030712',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#030712',
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748b',
+    color: '#94a3b8',
     fontSize: 13,
     fontWeight: '600',
   },
   errorText: {
-    color: '#0f172a',
+    color: '#f8fafc',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -706,6 +726,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
+    maxWidth: 280,
   },
   retryBtn: {
     backgroundColor: '#ea580c',
@@ -715,24 +736,24 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   retryText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: 'bold',
   },
   feedWrapper: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#030712',
   },
   feedList: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#030712',
   },
   cardContainer: {
     width: windowWidth,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#030712',
     paddingHorizontal: 10,
-    paddingTop: 2,
-    paddingBottom: 6,
+    paddingTop: 4,
+    paddingBottom: 8,
     justifyContent: 'space-between',
   },
   topActions: {
@@ -740,27 +761,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingBottom: 2,
+    paddingBottom: 4,
   },
-  circularBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#ffffff',
+  gearCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  darkCircularBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0c1527',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 1,
+    elevation: 2,
   },
   feedTitle: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#ffffff',
     letterSpacing: 1.2,
   },
   row: {
@@ -769,18 +803,18 @@ const styles = StyleSheet.create({
   },
   cardFrame: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    padding: 10,
+    backgroundColor: '#0a1224',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 12,
     justifyContent: 'space-between',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
     position: 'relative',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   cardContentTop: {
     gap: 8,
@@ -791,32 +825,32 @@ const styles = StyleSheet.create({
   scrollGuidePill: {
     position: 'absolute',
     right: 8,
-    top: '40%',
+    top: '50%',
     transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: 'rgba(249, 115, 22, 0.4)',
+    borderRadius: 10,
     paddingHorizontal: 4,
-    paddingVertical: 6,
+    paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
     zIndex: 30,
   },
   photoContainer: {
     width: '100%',
-    height: 160,
-    borderRadius: 12,
+    height: 180,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#050a14',
     position: 'relative',
   },
   photoImage: {
@@ -826,26 +860,84 @@ const styles = StyleSheet.create({
   },
   promoBadgesWrap: {
     position: 'absolute',
-    top: 6,
-    left: 6,
+    top: 8,
+    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     zIndex: 10,
+  },
+  urgentPillBadge: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3.5,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  urgentDot: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  urgentFire: {
+    fontSize: 11,
+  },
+  urgentPillText: {
+    color: '#ffffff',
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  showcasePillBadge: {
+    backgroundColor: '#d97706',
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3.5,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    shadowColor: '#d97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  showcaseStar: {
+    color: '#ffffff',
+    fontSize: 10,
+  },
+  showcasePillText: {
+    color: '#ffffff',
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   photoCountBadge: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(3, 7, 18, 0.85)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   photoCountText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#f8fafc',
   },
   carouselBtns: {
     position: 'absolute',
@@ -854,35 +946,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 6,
-    marginTop: -13,
+    marginTop: -14,
   },
   carouselArrow: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(3, 7, 18, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  noPhoto: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
-  },
-  noPhotoText: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
   },
   detailsContainer: {
-    marginTop: 8,
-    gap: 3,
+    marginTop: 6,
+    gap: 2,
   },
   titleText: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#ffffff',
     letterSpacing: 0.2,
   },
   infoLine: {
@@ -892,95 +975,97 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   infoSubText: {
-    fontSize: 10.5,
-    color: '#64748b',
+    fontSize: 11,
+    color: '#94a3b8',
     fontWeight: '600',
   },
   breadcrumbContainer: {
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#eff6ff',
+    marginTop: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderWidth: 1,
-    borderColor: '#dbeafe',
-    borderRadius: 6,
+    borderColor: 'rgba(59, 130, 246, 0.25)',
+    borderRadius: 8,
   },
   breadcrumbText: {
-    fontSize: 9.5,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#2563eb',
+    color: '#60a5fa',
   },
   tabBar: {
-    marginTop: 8,
+    marginTop: 6,
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 5,
-    borderRadius: 6,
-    backgroundColor: '#f8fafc',
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: '#fff7ed',
-    borderColor: '#ea580c',
+    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+    borderColor: '#f97316',
   },
   tabButtonText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#64748b',
+    color: '#94a3b8',
   },
   tabButtonTextActive: {
-    color: '#ea580c',
+    color: '#f97316',
   },
   tabContentContainer: {
     marginTop: 6,
-    height: 84,
-    backgroundColor: '#f8fafc',
+    height: 94,
+    backgroundColor: '#060d1b',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     justifyContent: 'center',
+    position: 'relative',
   },
   scrollInfo: {
     flex: 1,
     justifyContent: 'space-evenly',
+    paddingRight: 28,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
     paddingVertical: 1.5,
   },
   infoLabel: {
-    fontSize: 10.5,
-    color: '#64748b',
+    fontSize: 11,
+    color: '#94a3b8',
     fontWeight: '600',
   },
   infoValue: {
-    fontSize: 10.5,
-    color: '#0f172a',
+    fontSize: 11,
+    color: '#f1f5f9',
     fontWeight: '700',
   },
   infoValuePrice: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '900',
-    color: '#ea580c',
+    color: '#f97316',
   },
   descriptionCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#060d1b',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    marginTop: 18,
+    marginTop: 8,
     gap: 4,
   },
   descriptionCardHeader: {
@@ -989,79 +1074,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   descriptionCardTitle: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#f8fafc',
   },
   descriptionDetailLink: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#ea580c',
+    color: '#f97316',
   },
   descriptionCardBody: {
-    fontSize: 10.5,
-    color: '#475569',
-    lineHeight: 15,
+    fontSize: 11,
+    color: '#94a3b8',
+    lineHeight: 16,
   },
   locBox: {
     flex: 1,
     justifyContent: 'space-evenly',
+    paddingRight: 28,
   },
   detailLink: {
     alignSelf: 'flex-end',
     marginTop: 2,
   },
-  locTitle: {
-    fontSize: 10.5,
-    fontWeight: 'bold',
-    color: '#0f172a',
-  },
-  locText: {
-    fontSize: 10.5,
-    color: '#475569',
-  },
   locLinkText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: '800',
-    color: '#2563eb',
+    color: '#60a5fa',
   },
   ctaContainer: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 2,
+    gap: 10,
+    marginTop: 4,
   },
   ctaBtnOutline: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#f8fafc',
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: '#0e182e',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   ctaTextOutline: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#f8fafc',
   },
   ctaBtnSolid: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 11,
+    borderRadius: 12,
     backgroundColor: '#ea580c',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#ea580c',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 3,
   },
   ctaTextSolid: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '900',
     color: '#ffffff',
   },
