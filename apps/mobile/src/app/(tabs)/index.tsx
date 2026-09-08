@@ -495,6 +495,45 @@ export default function MobileDashboard() {
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
   const [loadingListings, setLoadingListings] = useState(false);
 
+  // Dynamic chunking: 1 row of up to 10 items (1*10), 2 rows when >10 (2*10), 3 rows when >20 (3*10)
+  const vitrinRows = useMemo(() => {
+    const rows: ShowcaseItem[][] = [];
+    const chunkSize = 10;
+    for (let i = 0; i < vitrinListings.length; i += chunkSize) {
+      rows.push(vitrinListings.slice(i, i + chunkSize));
+    }
+    return rows;
+  }, [vitrinListings]);
+
+  // Auto-scroll loop for mobile Showcase / Vitrin horizontal slider rows
+  const vitrinScrollRefs = useRef<(ScrollView | null)[]>([]);
+  const vitrinScrollOffsets = useRef<number[]>([]);
+
+  useEffect(() => {
+    if (vitrinRows.length === 0) return;
+
+    const cardWidthWithGap = 165 + 12; // 165px card width + 12px gap
+    const interval = setInterval(() => {
+      vitrinRows.forEach((rowItems, rowIndex) => {
+        const scrollRef = vitrinScrollRefs.current[rowIndex];
+        if (!scrollRef || rowItems.length <= 1) return;
+
+        const currentOffset = vitrinScrollOffsets.current[rowIndex] || 0;
+        const maxOffset = (rowItems.length - 1) * cardWidthWithGap;
+        let nextOffset = currentOffset + cardWidthWithGap;
+
+        if (nextOffset > maxOffset) {
+          nextOffset = 0;
+        }
+
+        scrollRef.scrollTo({ x: nextOffset, animated: true });
+        vitrinScrollOffsets.current[rowIndex] = nextOffset;
+      });
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [vitrinRows]);
+
   // FULL 8-FILTER CASCADING VEHICLE QUERY STATE:
   // 1. Marka | 2. Model Ailesi | 3. Yıl | 4. Kasa Tipi | 5. Motor / Versiyon | 6. Yakıt | 7. Şanzıman | 8. Donanım
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -1565,64 +1604,79 @@ export default function MobileDashboard() {
           {loadingListings ? (
             <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 32 }} />
           ) : vitrinListings.length > 0 ? (
-            <View style={styles.vitrinGrid}>
-              {vitrinListings.map((item) => {
-                const isFav = !!favorites[item.id];
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.vitrinCard}
-                    activeOpacity={0.9}
-                    onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
-                  >
-                    <View style={styles.vitrinImageContainer}>
-                      <ExpoImage
-                        source={{ uri: item.imageUrl }}
-                        style={styles.vitrinCarImage}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-
-                      {/* Floating Badges Overlay (Vitrin & Acil) */}
-                      <View style={styles.vitrinBadgesOverlay}>
-                        {item.isUrgent && <UrgentBadge size="small" />}
-                        {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
-                      </View>
-
+            <View style={styles.vitrinRowsWrapper}>
+              {vitrinRows.map((rowItems, rowIndex) => (
+                <ScrollView
+                  key={`vitrin-row-${rowIndex}`}
+                  ref={(el) => {
+                    vitrinScrollRefs.current[rowIndex] = el;
+                  }}
+                  onScroll={(e) => {
+                    vitrinScrollOffsets.current[rowIndex] = e.nativeEvent.contentOffset.x;
+                  }}
+                  scrollEventThrottle={16}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.vitrinHorizontalScrollContent}
+                  style={styles.vitrinRowScrollView}
+                >
+                  {rowItems.map((item) => {
+                    const isFav = !!favorites[item.id];
+                    return (
                       <TouchableOpacity
-                        style={styles.favCircleButton}
-                        onPress={() => toggleFavorite(item.id)}
+                        key={item.id}
+                        style={styles.vitrinCard}
+                        activeOpacity={0.9}
+                        onPress={() => router.push({ pathname: '/listings/[id]', params: { id: item.id } })}
                       >
-                        <Ionicons
-                          name={isFav ? 'heart' : 'heart-outline'}
-                          size={17}
-                          color={isFav ? '#ef4444' : '#ffffff'}
-                        />
+                        <View style={styles.vitrinImageContainer}>
+                          <ExpoImage
+                            source={{ uri: item.imageUrl }}
+                            style={styles.vitrinCarImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+
+                          {/* Floating Badges Overlay (Vitrin & Acil) */}
+                          <View style={styles.vitrinBadgesOverlay}>
+                            {item.isUrgent && <UrgentBadge size="small" />}
+                            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.favCircleButton}
+                            onPress={() => toggleFavorite(item.id)}
+                          >
+                            <Ionicons
+                              name={isFav ? 'heart' : 'heart-outline'}
+                              size={17}
+                              color={isFav ? '#ef4444' : '#ffffff'}
+                            />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.vitrinCardBody}>
+                          <Text style={styles.vitrinTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+
+                          <Text style={styles.vitrinSpecs}>
+                            {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
+                          </Text>
+
+                          <View style={styles.vitrinPriceRow}>
+                            <Text style={styles.vitrinPrice}>
+                              {(item.price ?? 0).toLocaleString('tr-TR')} ₺
+                            </Text>
+                            <Text style={styles.vitrinCityBadge}>{item.city}</Text>
+                          </View>
+                        </View>
                       </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.vitrinCardBody}>
-                      <Text style={styles.vitrinTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-
-                      <Text style={styles.vitrinSpecs}>
-                        {item.year} • {(item.mileage ?? 0).toLocaleString('tr-TR')} km
-                      </Text>
-
-                      <View style={styles.vitrinPriceRow}>
-                        <Text style={styles.vitrinPrice}>
-                          {(item.price ?? 0).toLocaleString('tr-TR')} ₺
-                        </Text>
-                        <Text style={styles.vitrinCityBadge}>{item.city}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          ))}
-        </View>
+                    );
+                  })}
+                </ScrollView>
+              ))}
+            </View>
         ) : (
         <View style={styles.emptyPromoBox}>
           <Ionicons
