@@ -374,7 +374,7 @@ export default function IsiCepteListingRecommendationWidget({
           </div>
         ) : (
           /* Scrollable Vertical List of Compact Cards (Strictly 5 visible cards, rest scrollable inside box) */
-          <div className="flex-1 min-h-0 max-h-[415px] overflow-y-auto pr-1 space-y-2 scrollbar-thin scrollbar-thumb-white/20 hover:scrollbar-thumb-orange-500/50 scrollbar-track-transparent overscroll-contain">
+          <div className="flex-1 min-h-0 max-h-[415px] overflow-y-auto pr-1 space-y-2 custom-scrollbar overscroll-contain">
             {items.map((shop) => (
               <div
                 key={shop.id}
@@ -396,18 +396,11 @@ export default function IsiCepteListingRecommendationWidget({
                   )}
                 </div>
 
-                {/* Middle Info Details (Cram-proof Typography) */}
+                {/* Middle Info Details (Full Width Service Name) */}
                 <div className="flex flex-col min-w-0 flex-1 gap-0.5 justify-center">
-                  <div className="flex items-center justify-between gap-1">
-                    <h4 className="text-xs font-bold text-white group-hover:text-orange-300 transition truncate leading-snug">
-                      {shop.businessName}
-                    </h4>
-                    {shop.isShowcase && (
-                      <span className="text-[8px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 rounded shrink-0 leading-none">
-                        👑 Vitrin
-                      </span>
-                    )}
-                  </div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-orange-300 transition truncate leading-snug">
+                    {shop.businessName}
+                  </h4>
 
                   <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono truncate leading-tight">
                     <MapPin className="w-2.5 h-2.5 text-orange-400/80 shrink-0" />
