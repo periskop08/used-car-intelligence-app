@@ -285,7 +285,7 @@ export class VehicleReportFallbackService {
           supportingFactIds: ['ENGINE_POWER'],
         },
       ],
-      primaryTechnicalRisk: primaryRisk,
+      primaryTechnicalRisk: primaryRisk || null,
       secondaryTechnicalRisks: secondaryRisks,
       purchaseConditions: [
         {

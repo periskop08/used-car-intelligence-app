@@ -488,6 +488,21 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         });
       }
     }
+
+    // 4. Primary Technical Risk Grounding Sanitization
+    const hasExplicitZeroEvidence = Boolean(
+      contextJson &&
+      Array.isArray(contextJson.problems) && contextJson.problems.length === 0 &&
+      Array.isArray(contextJson?.verifiedDatabaseVehicleReport?.knownDatabaseProblems) && contextJson.verifiedDatabaseVehicleReport.knownDatabaseProblems.length === 0 &&
+      (!contextJson?.verifiedResearch?.chronicFaults || contextJson.verifiedResearch.chronicFaults.length === 0)
+    );
+
+    if (hasExplicitZeroEvidence && baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
+      const risk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk as any;
+      if (risk && risk.state !== 'NO_VERIFIED_PRIMARY_RISK') {
+        baseReport.expertDecisionSynthesis.primaryTechnicalRisk = null as any;
+      }
+    }
   }
 
   private repairJson(jsonStr: string): string {
