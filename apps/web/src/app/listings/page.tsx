@@ -36,6 +36,7 @@ function ListingsContent() {
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedEngineId, setSelectedEngineId] = useState("");
+  const [selectedTrimId, setSelectedTrimId] = useState("");
   const [vehicleVariantId, setVehicleVariantId] = useState("");
   const [minYear, setMinYear] = useState("");
   const [maxYear, setMaxYear] = useState("");
@@ -111,10 +112,14 @@ function ListingsContent() {
     const brand = searchParams.get("brandId");
     const model = searchParams.get("modelId");
     const engineVal = searchParams.get("engineId");
+    const trimVal = searchParams.get("trimId");
     const variantId = searchParams.get("vehicleVariantId");
     const bodyVal = searchParams.get("bodyType");
     const fuelVal = searchParams.get("fuelType");
     const transVal = searchParams.get("transmission");
+    const yearVal = searchParams.get("year");
+    const minYearVal = searchParams.get("minYear") || yearVal;
+    const maxYearVal = searchParams.get("maxYear") || yearVal;
     const minP = searchParams.get("minPrice");
     const maxP = searchParams.get("maxPrice");
     const aiReady = searchParams.get("isAiReady") === "true";
@@ -132,7 +137,10 @@ function ListingsContent() {
     if (brand) setSelectedBrand(brand);
     if (model) setSelectedModel(model);
     if (engineVal) setSelectedEngineId(engineVal);
+    if (trimVal) setSelectedTrimId(trimVal);
     if (variantId) setVehicleVariantId(variantId);
+    if (minYearVal) setMinYear(minYearVal);
+    if (maxYearVal) setMaxYear(maxYearVal);
     if (bodyVal) setBodyTypes(bodyVal.split(","));
     if (fuelVal) setFuelTypes(fuelVal.split(","));
     if (transVal) setTransmissions(transVal.split(","));
@@ -179,6 +187,7 @@ function ListingsContent() {
     if (selectedBrand) query += `&brandId=${selectedBrand}`;
     if (selectedModel) query += `&modelId=${selectedModel}`;
     if (selectedEngineId) query += `&engineId=${selectedEngineId}`;
+    if (selectedTrimId) query += `&trimId=${selectedTrimId}`;
     if (vehicleVariantId) query += `&vehicleVariantId=${vehicleVariantId}`;
     if (minYear) query += `&minYear=${minYear}`;
     if (maxYear) query += `&maxYear=${maxYear}`;
@@ -276,6 +285,7 @@ function ListingsContent() {
     if (selectedBrand) params.set("brandId", selectedBrand);
     if (selectedModel) params.set("modelId", selectedModel);
     if (selectedEngineId) params.set("engineId", selectedEngineId);
+    if (selectedTrimId) params.set("trimId", selectedTrimId);
     if (vehicleVariantId) params.set("vehicleVariantId", vehicleVariantId);
     if (minYear) params.set("minYear", minYear);
     if (maxYear) params.set("maxYear", maxYear);
@@ -312,6 +322,9 @@ function ListingsContent() {
   const handleClearFilters = () => {
     setSelectedBrand("");
     setSelectedModel("");
+    setSelectedEngineId("");
+    setSelectedTrimId("");
+    setVehicleVariantId("");
     setMinYear("");
     setMaxYear("");
     setMinPrice("");

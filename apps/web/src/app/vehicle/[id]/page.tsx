@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import QuotaBadge from "@/components/QuotaBadge";
 import VehicleReportShell from "../../vehicle-report/components/VehicleReportShell";
 import IsiCepteListingRecommendationWidget from "@/app/listings/components/IsiCepteListingRecommendationWidget";
+import VehicleExactListingsWidget from "@/app/listings/components/VehicleExactListingsWidget";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -160,6 +161,15 @@ export default function VehicleDetail() {
   // Fetch variant detail & favorites on load
   const fetchVehicleDetails = (id: string) => {
     if (!id) return;
+
+    try {
+      const cachedVeh = sessionStorage.getItem(`ts_veh_${id}`);
+      if (cachedVeh) {
+        setVehicle(JSON.parse(cachedVeh));
+        setLoading(false);
+      }
+    } catch {}
+
     const token = localStorage.getItem("accessToken");
     const headers: any = {};
     if (token) {
@@ -173,6 +183,9 @@ export default function VehicleDetail() {
       })
       .then(data => {
         setVehicle(data);
+        try {
+          sessionStorage.setItem(`ts_veh_${id}`, JSON.stringify(data));
+        } catch {}
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -195,10 +208,6 @@ export default function VehicleDetail() {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
-    }
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      setCountdown(30);
     }
   }, []);
 
@@ -245,6 +254,19 @@ export default function VehicleDetail() {
   const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
 
+    if (!force) {
+      try {
+        const cachedRep = sessionStorage.getItem(`ts_rep_${variantId}`);
+        if (cachedRep) {
+          const parsedCached = JSON.parse(cachedRep);
+          if (parsedCached) {
+            setStructuredReport(parsedCached);
+            setCountdown(null);
+          }
+        }
+      } catch {}
+    }
+
     setLoadingStructuredReport(true);
 
     try {
@@ -264,6 +286,9 @@ export default function VehicleDetail() {
             (data.reportData?.status || data.status) !== "SAFE_FALLBACK"
           ) {
             setStructuredReport(parsed);
+            try {
+              sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsed));
+            } catch {}
             setLoadingStructuredReport(false);
             setCountdown(null);
             setReportError("");
@@ -296,6 +321,9 @@ export default function VehicleDetail() {
             const parsedDetail = extractReportData(detailData);
             if (parsedDetail) {
               setStructuredReport(parsedDetail);
+              try {
+                sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsedDetail));
+              } catch {}
               setCountdown(null);
               setLoadingStructuredReport(false);
               setReportError("");
@@ -319,7 +347,14 @@ export default function VehicleDetail() {
   useEffect(() => {
     if (variantId) {
       fetchVehicleDetails(variantId);
-      setCountdown(30);
+      try {
+        const cachedRep = typeof window !== 'undefined' ? sessionStorage.getItem(`ts_rep_${variantId}`) : null;
+        if (!cachedRep) {
+          setCountdown(30);
+        }
+      } catch {
+        setCountdown(30);
+      }
       fetchStructuredReport(false);
     }
   }, [variantId]);
@@ -1077,6 +1112,12 @@ export default function VehicleDetail() {
           <IsiCepteListingRecommendationWidget
             vehicleBrand={vehicle?.brand || "Bu Araç"}
             className="w-full h-[590px] max-h-[590px]"
+          />
+
+          {/* BU ARACIN İLANLARI */}
+          <VehicleExactListingsWidget
+            variantId={variantId}
+            className="w-full"
           />
         </div>
 
