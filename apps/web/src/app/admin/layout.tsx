@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { UnifiedAdminSidebar } from './components/UnifiedAdminSidebar';
+import { API_URL } from '@/utils/apiConfig';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,24 +19,64 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed.role !== 'ADMIN' && parsed.role !== 'SUPER_ADMIN' && parsed.role !== 'MODERATOR') {
+    // Verify token validity against backend to prevent stale 401 states
+    fetch(`${API_URL}/users/me`, {
+      headers: { Authorization: `Bearer ${savedToken}` },
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          // Token is expired or revoked
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('token');
+          router.push('/login?redirect=' + encodeURIComponent(pathname) + '&expired=1');
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
+      .then((freshUser) => {
+        if (!freshUser) {
+          // Fallback to cached user if offline or network glitch
+          const savedUser = localStorage.getItem('user');
+          if (savedUser) {
+            try {
+              const parsed = JSON.parse(savedUser);
+              if (parsed.role !== 'ADMIN' && parsed.role !== 'SUPER_ADMIN' && parsed.role !== 'MODERATOR') {
+                setErrorMsg('Bu alana erişim yetkiniz bulunmamaktadır. Yalnızca yetkili yönetici hesapları girebilir.');
+                setLoading(false);
+              } else {
+                setIsAdmin(true);
+                setLoading(false);
+              }
+            } catch {
+              setErrorMsg('Oturum bilgisi doğrulanamadı.');
+              setLoading(false);
+            }
+          }
+          return;
+        }
+
+        localStorage.setItem('user', JSON.stringify(freshUser));
+        if (freshUser.role !== 'ADMIN' && freshUser.role !== 'SUPER_ADMIN' && freshUser.role !== 'MODERATOR') {
           setErrorMsg('Bu alana erişim yetkiniz bulunmamaktadır. Yalnızca yetkili yönetici hesapları girebilir.');
           setLoading(false);
         } else {
           setIsAdmin(true);
           setLoading(false);
         }
-      } catch (e) {
-        setErrorMsg('Oturum bilgisi doğrulanamadı.');
+      })
+      .catch(() => {
+        // Network fallback
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            if (parsed.role === 'ADMIN' || parsed.role === 'SUPER_ADMIN' || parsed.role === 'MODERATOR') {
+              setIsAdmin(true);
+            }
+          } catch {}
+        }
         setLoading(false);
-      }
-    } else {
-      router.push('/login?redirect=' + encodeURIComponent(pathname));
-    }
+      });
   }, [pathname, router]);
 
   if (loading) {

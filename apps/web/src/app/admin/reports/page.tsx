@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ReportHeader } from './components/ReportHeader';
 import { ReportSidebar } from './components/ReportSidebar';
 import { ReportKpiCard } from './components/ReportKpiCard';
@@ -20,6 +21,9 @@ export default function ReportsOverviewPage() {
 
     fetchReportApi(`/admin/reports/overview?${query}`)
       .then((res) => {
+        if (res.status === 401) {
+          throw new Error('401: Oturum süreniz dolmuş veya geçersiz. Lütfen tekrar giriş yapın.');
+        }
         if (!res.ok) throw new Error(`Yönetici raporları yüklenemedi (HTTP ${res.status})`);
         return res.json();
       })
@@ -62,8 +66,22 @@ export default function ReportsOverviewPage() {
           )}
 
           {error && (
-            <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 font-bold text-xs">
-              {error}
+            <div className="p-4 sm:p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-rose-300 font-semibold">
+              <div className="flex items-center gap-2.5">
+                <span>{error}</span>
+              </div>
+              {error.includes('401') && (
+                <Link
+                  href="/login?redirect=/admin/reports&expired=1"
+                  onClick={() => {
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('token');
+                  }}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold transition text-center shrink-0 shadow-lg shadow-rose-600/20"
+                >
+                  Yeniden Giriş Yap
+                </Link>
+              )}
             </div>
           )}
 
