@@ -366,14 +366,11 @@ export class VehicleReportFallbackService {
         modelYear: vIdentity.modelYear || new Date().getFullYear(),
         engineDisplacementCc: isElectric ? undefined : vIdentity.engineDisplacementCc,
         enginePowerHp: vIdentity.enginePowerHp,
+        powerUnit: vIdentity.powerUnit || 'HP',
         engineCode: vIdentity.engineCode,
         engineType: vIdentity.engineType || (isElectric ? 'Elektrik Motoru' : 'Turbo Benzinli'),
-        enginePowerRpm: vIdentity.enginePowerHp
-          ? (isEcvtOrHybrid ? `${vIdentity.enginePowerHp} HP (Toplam Sistem Gücü)` : `${vIdentity.enginePowerHp} HP @ 5500 d/dk`)
-          : undefined,
-        engineTorqueRpm: perfSpecs.engineTorqueNm
-          ? (isEcvtOrHybrid ? `${perfSpecs.engineTorqueNm} Nm (Benzinli Motor Torku)` : `${perfSpecs.engineTorqueNm} Nm @ 1750-4000 d/dk`)
-          : undefined,
+        enginePowerRpm: vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} HP @ 5500 d/dk` : undefined,
+        engineTorqueRpm: perfSpecs.engineTorqueNm ? `${perfSpecs.engineTorqueNm} Nm @ 1750-4000 d/dk` : undefined,
         fuelType: fuel,
         transmissionName: trans,
         drivetrain: vIdentity.drivetrain || 'Önden Çekiş (FWD)',
