@@ -16,6 +16,7 @@ import {
   RefreshCw,
   X,
   ShieldCheck,
+  Settings,
 } from "lucide-react";
 import {
   VehicleBodyConditionMap,
@@ -29,9 +30,9 @@ import {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
 
-const STORAGE_KEY_ITEMS = "torquescout_feed_items_v3";
-const STORAGE_KEY_INDEX = "torquescout_feed_index_v3";
-const STORAGE_KEY_SEED = "torquescout_feed_seed_v3";
+const STORAGE_KEY_ITEMS = "torquescout_feed_items_v4";
+const STORAGE_KEY_INDEX = "torquescout_feed_index_v4";
+const STORAGE_KEY_SEED = "torquescout_feed_seed_v4";
 
 interface FeedSeller {
   id: string;
@@ -455,7 +456,7 @@ function FeedCardDeck() {
   return (
     <div
       onWheel={handleWheel}
-      className="relative min-h-[calc(100vh-80px)] py-4 sm:py-6 flex items-center justify-center px-3 sm:px-4 select-none"
+      className="relative min-h-[calc(100vh-80px)] py-3 sm:py-6 flex flex-col items-center justify-center px-2 sm:px-4 select-none bg-[#f0f4f9] md:bg-transparent"
     >
       {/* Toast Alert */}
       {toastMessage && (
@@ -467,9 +468,9 @@ function FeedCardDeck() {
       {/* Main Responsive Wrapper: Left (Önceki İlan) - Central Card - Right (Sonraki İlan) */}
       <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-8 w-full max-w-5xl mx-auto">
         {/* ========================================================================= */}
-        {/* SOL YÖN OKU: ÖNCEKİ İLAN (KARTIN SOLUNDA VE ALTINDA METİN) */}
+        {/* SOL YÖN OKU: ÖNCEKİ İLAN (KARTIN SOLUNDA - Desktop Only) */}
         {/* ========================================================================= */}
-        <div className="flex flex-col items-center gap-2 shrink-0">
+        <div className="hidden md:flex flex-col items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handlePrev}
@@ -489,14 +490,17 @@ function FeedCardDeck() {
         </div>
 
         {/* ========================================================================= */}
-        {/* MERKEZ: İLAN KARTI (GÖRSEL 1 YAPISI, SOL ÜSTTE AYARLAR YOK) */}
+        {/* MERKEZ: İLAN KARTI (GÖRSEL 1 YAPISI, MOBİLDE AÇIK TEMA, SOL ÜSTTE MAVİ AYARLAR) */}
         {/* ========================================================================= */}
-        <div className="w-full max-w-[430px] sm:max-w-[450px] bg-[#0a1224] border border-white/10 rounded-[28px] p-4 sm:p-5 shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
-          {/* 1. Header Bar: Ayarlar butonu kaldırıldı, Başlık solda/ortada, Paylaş & Kalp sağda */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/5">
+        <div className="w-full max-w-[430px] sm:max-w-[450px] bg-white md:bg-[#0a1224] border border-slate-200/90 md:border-white/10 rounded-[26px] sm:rounded-[28px] p-3.5 sm:p-5 shadow-xl md:shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+          {/* 1. Header Bar: Mobilde Mavi Ayarlar Butonu, Başlık solda/ortada, Paylaş & Kalp sağda */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 md:border-white/5">
             <div className="flex items-center gap-2">
-              <span className="text-base sm:text-lg">📦</span>
-              <span className="text-xs sm:text-sm font-black text-white tracking-widest uppercase">
+              <div className="w-9 h-9 rounded-full bg-[#2563eb] text-white flex items-center justify-center shadow-md shadow-blue-500/30 shrink-0 md:hidden">
+                <Settings className="w-4 h-4" />
+              </div>
+              <span className="text-base sm:text-lg hidden md:inline">📦</span>
+              <span className="text-xs sm:text-sm font-black text-slate-900 md:text-white tracking-widest uppercase">
                 İlan Akışı
               </span>
             </div>
@@ -506,7 +510,7 @@ function FeedCardDeck() {
               <button
                 type="button"
                 onClick={() => handleShare(currentItem)}
-                className="w-9 h-9 rounded-full bg-[#0c1527] hover:bg-[#15223e] border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition shadow-sm cursor-pointer"
+                className="w-9 h-9 rounded-full bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border border-slate-200 md:border-white/10 flex items-center justify-center text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white transition shadow-sm cursor-pointer"
                 title="Paylaş"
               >
                 <Share2 className="w-4 h-4" />
@@ -516,8 +520,8 @@ function FeedCardDeck() {
                 onClick={() => handleFavoriteToggle(currentItem.id)}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition shadow-sm cursor-pointer ${
                   favorites[currentItem.id]
-                    ? "bg-red-500/20 border-red-500/50 text-red-500"
-                    : "bg-[#0c1527] hover:bg-[#15223e] border-white/10 text-slate-300 hover:text-white"
+                    ? "bg-red-50 md:bg-red-500/20 border-red-300 md:border-red-500/50 text-red-500"
+                    : "bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border-slate-200 md:border-white/10 text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white"
                 }`}
                 title="Favorilere Ekle"
               >
@@ -529,7 +533,7 @@ function FeedCardDeck() {
           </div>
 
           {/* 2. Photo Section with Badges */}
-          <div className="mt-3.5 relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-slate-950 border border-white/10 group flex items-center justify-center">
+          <div className="mt-3.5 relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-slate-100 md:bg-slate-950 border border-slate-200 md:border-white/10 group flex items-center justify-center">
             <img
               src={currentPhotoUrl}
               alt={currentItem.title}
@@ -546,7 +550,7 @@ function FeedCardDeck() {
                 </div>
               )}
               {currentItem.isShowcaseFeedActive && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-lg border border-amber-300">
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-lg border border-amber-300">
                   <span>★</span>
                   <span>VİTRİN</span>
                 </div>
@@ -591,21 +595,21 @@ function FeedCardDeck() {
 
           {/* 3. Title & Seller Row */}
           <div className="mt-3 space-y-1">
-            <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wide truncate">
+            <h3 className="text-sm sm:text-base font-black text-slate-900 md:text-white uppercase tracking-wide truncate">
               {currentItem.title}
             </h3>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 md:text-slate-400 font-medium">
               <span className="truncate max-w-[60%]">
                 👤 {currentItem.seller.displayName} ({currentItem.seller.memberSince})
               </span>
-              <span className="truncate max-w-[40%] text-right text-slate-300">
+              <span className="truncate max-w-[40%] text-right text-slate-600 md:text-slate-300">
                 📍 {currentItem.location.city}, {currentItem.location.district || "Merkez"}
               </span>
             </div>
           </div>
 
           {/* 4. Breadcrumb Chip */}
-          <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-400 text-[10.5px] font-bold truncate">
+          <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-[#eff6ff] md:bg-blue-500/10 border border-[#dbeafe] md:border-blue-500/25 text-[#2563eb] md:text-blue-400 text-[10.5px] font-bold truncate">
             {currentItem.breadcrumb && currentItem.breadcrumb.length > 0
               ? currentItem.breadcrumb.join(" > ")
               : `Vasıta > Otomobil > ${currentItem.vehicle.brand} > ${currentItem.vehicle.modelFamily}`}
@@ -618,8 +622,8 @@ function FeedCardDeck() {
               onClick={() => setActiveTab("info")}
               className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === "info"
-                  ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-sm"
-                  : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white"
+                  ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
+                  : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
               }`}
             >
               <span>📋</span>
@@ -630,8 +634,8 @@ function FeedCardDeck() {
               onClick={() => setActiveTab("expertise")}
               className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === "expertise"
-                  ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-sm"
-                  : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white"
+                  ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
+                  : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
               }`}
             >
               <span>🛡️</span>
@@ -640,41 +644,41 @@ function FeedCardDeck() {
           </div>
 
           {/* 6. Tab Content Table (Sabit Boyutlandırılmış / Kart Fiziki Yapısını Değiştirmez) */}
-          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 relative h-[116px] min-h-[116px] flex flex-col justify-center overflow-hidden">
+          <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 relative h-[116px] min-h-[116px] flex flex-col justify-center overflow-hidden">
             {/* Right Floating Scroll Guide Indicator Pill */}
             <div
               onClick={handleNext}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-[#0c162b] border border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-400 shadow-md cursor-pointer hover:bg-orange-500/20 transition z-20"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-white md:bg-[#0c162b] border border-slate-300 md:border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-600 md:text-orange-400 shadow-md cursor-pointer hover:bg-orange-50 md:hover:bg-orange-500/20 transition z-20"
               title="Sonraki İlana Geç"
             >
               <ChevronUp className="w-2.5 h-2.5 text-slate-400" />
-              <ArrowUpDown className="w-3 h-3 text-orange-400" />
+              <ArrowUpDown className="w-3 h-3 text-orange-500" />
               <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
             </div>
 
             {activeTab === "info" ? (
               <div className="space-y-1.5 pr-7 text-xs">
-                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
-                  <span className="text-slate-400 font-medium">Fiyat</span>
-                  <span className="font-black text-orange-400 text-sm">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                  <span className="text-slate-500 md:text-slate-400 font-medium">Fiyat</span>
+                  <span className="font-black text-orange-600 md:text-orange-400 text-sm">
                     {currentItem.price.toLocaleString("tr-TR")} {currentItem.currency || "TL"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
-                  <span className="text-slate-400 font-medium">İlan No</span>
-                  <span className="font-mono font-bold text-slate-200">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                  <span className="text-slate-500 md:text-slate-400 font-medium">İlan No</span>
+                  <span className="font-mono font-bold text-slate-900 md:text-slate-200">
                     {currentItem.listingNo}
                   </span>
                 </div>
-                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
-                  <span className="text-slate-400 font-medium">Yıl / KM</span>
-                  <span className="font-semibold text-slate-200">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                  <span className="text-slate-500 md:text-slate-400 font-medium">Yıl / KM</span>
+                  <span className="font-semibold text-slate-900 md:text-slate-200">
                     {currentItem.vehicle.year} • {currentItem.vehicle.mileage.toLocaleString("tr-TR")} km
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Yakıt / Vites</span>
-                  <span className="font-semibold text-slate-200 truncate max-w-[170px]">
+                  <span className="text-slate-500 md:text-slate-400 font-medium">Yakıt / Vites</span>
+                  <span className="font-semibold text-slate-900 md:text-slate-200 truncate max-w-[170px]">
                     {formatFuel(currentItem.vehicle.fuelType)} • {formatTransmission(currentItem.vehicle.transmissionType)}
                   </span>
                 </div>
@@ -684,7 +688,7 @@ function FeedCardDeck() {
                 {/* Sol: Ölçeklendirilmiş SVG Araç Şeması (Tıklanınca Tam Ekran Açar) */}
                 <div
                   onClick={() => setIsExpertiseModalOpen(true)}
-                  className="w-[50px] h-[92px] shrink-0 bg-slate-950/70 rounded-xl border border-white/10 p-1 flex items-center justify-center cursor-pointer hover:border-orange-500/50 hover:bg-slate-900/80 transition group"
+                  className="w-[50px] h-[92px] shrink-0 bg-slate-50 md:bg-slate-950/70 rounded-xl border border-slate-200 md:border-white/10 p-1 flex items-center justify-center cursor-pointer hover:border-orange-500/50 hover:bg-slate-100 md:hover:bg-slate-900/80 transition group"
                   title="Detaylı Ekspertiz Şemasını Büyüt"
                 >
                   <CompactVehicleBodySvg
@@ -707,17 +711,17 @@ function FeedCardDeck() {
                     if (!hasDamages) {
                       return (
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-emerald-400 font-black text-xs">
+                          <div className="flex items-center gap-1.5 text-emerald-600 md:text-emerald-400 font-black text-xs">
                             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                             <span>Hatasız & Orijinal</span>
                           </div>
-                          <p className="text-[10.5px] text-slate-400 leading-tight">
+                          <p className="text-[10.5px] text-slate-500 md:text-slate-400 leading-tight">
                             Boya ve değişen parça bulunmamaktadır.
                           </p>
                           <button
                             type="button"
                             onClick={() => setIsExpertiseModalOpen(true)}
-                            className="text-[10px] text-emerald-400 hover:text-emerald-300 font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                            className="text-[10px] text-emerald-600 md:text-emerald-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
                           >
                             <span>Detaylı Şemayı Aç ➔</span>
                           </button>
@@ -728,15 +732,15 @@ function FeedCardDeck() {
                     return (
                       <div className="space-y-0.5">
                         {localList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-orange-400 font-bold truncate">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 shadow-sm" />
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-amber-600 md:text-orange-400 font-bold truncate">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 shadow-sm" />
                             <span className="truncate">
                               Lokal ({localList.length}): {localList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
                             </span>
                           </div>
                         )}
                         {paintedList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-blue-400 font-bold truncate">
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-blue-600 md:text-blue-400 font-bold truncate">
                             <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 shadow-sm" />
                             <span className="truncate">
                               Boyalı ({paintedList.length}): {paintedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
@@ -744,7 +748,7 @@ function FeedCardDeck() {
                           </div>
                         )}
                         {changedList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-red-400 font-bold truncate">
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-red-600 md:text-red-400 font-bold truncate">
                             <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 shadow-sm" />
                             <span className="truncate">
                               Değişen ({changedList.length}): {changedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
@@ -754,7 +758,7 @@ function FeedCardDeck() {
                         <button
                           type="button"
                           onClick={() => setIsExpertiseModalOpen(true)}
-                          className="text-[10px] text-orange-400 hover:text-orange-300 font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                          className="text-[10px] text-orange-600 md:text-orange-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
                         >
                           <span>Detaylı Şemayı Gör ➔</span>
                         </button>
@@ -767,21 +771,21 @@ function FeedCardDeck() {
           </div>
 
           {/* 7. Dedicated Description Card */}
-          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 space-y-1">
+          <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white flex items-center gap-1">
+              <span className="text-xs font-bold text-slate-900 md:text-white flex items-center gap-1">
                 <span>📝</span>
                 <span>İlan Açıklaması</span>
               </span>
               <button
                 type="button"
                 onClick={() => setIsDescModalOpen(true)}
-                className="text-[11px] font-bold text-orange-400 hover:text-orange-300 transition cursor-pointer"
+                className="text-[11px] font-bold text-orange-600 md:text-orange-400 hover:underline transition cursor-pointer"
               >
                 Tümünü Gör ➔
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 line-clamp-3 leading-relaxed">
+            <p className="text-[11px] text-slate-600 md:text-slate-400 line-clamp-3 leading-relaxed">
               {currentItem.description
                 ? currentItem.description.replace(/\n+/g, " ").trim()
                 : "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
@@ -792,9 +796,9 @@ function FeedCardDeck() {
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
             <Link
               href={`/listings/${currentItem.id}`}
-              className="py-2.5 px-3 rounded-xl bg-[#0e182e] hover:bg-[#162547] border border-white/15 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              className="py-2.5 px-3 rounded-xl bg-white md:bg-[#0e182e] hover:bg-slate-50 md:hover:bg-[#162547] border-2 border-slate-200 md:border-white/15 text-slate-900 md:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <FileText className="w-4 h-4 text-slate-300" />
+              <FileText className="w-4 h-4 text-slate-600 md:text-slate-300" />
               <span>İlana Git</span>
             </Link>
             <Link
@@ -807,10 +811,8 @@ function FeedCardDeck() {
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* SAĞ YÖN OKU: SONRAKİ İLAN (KARTIN SAĞINDA VE ALTINDA METİN) */}
-        {/* ========================================================================= */}
-        <div className="flex flex-col items-center gap-2 shrink-0">
+        {/* SAĞ YÖN OKU: SONRAKİ İLAN (Desktop Only) */}
+        <div className="hidden md:flex flex-col items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleNext}
@@ -825,6 +827,31 @@ function FeedCardDeck() {
         </div>
       </div>
 
+      {/* MOBİL ALT NAVİGASYON: Önceki ve Sonraki İlan Butonları (< md) */}
+      <div className="flex md:hidden items-center justify-between gap-3 w-full max-w-[430px] mt-3 px-1">
+        <button
+          type="button"
+          onClick={handlePrev}
+          disabled={currentIndex === 0}
+          className={`flex-1 py-2.5 px-3 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition shadow-sm cursor-pointer ${
+            currentIndex === 0
+              ? "bg-slate-200 text-slate-400 border-slate-200 cursor-not-allowed opacity-50"
+              : "bg-white text-slate-800 border-slate-300 hover:bg-slate-50 active:scale-95"
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span>Önceki İlan</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleNext}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 active:scale-95 flex items-center justify-center gap-1.5 font-bold text-xs transition shadow-sm cursor-pointer"
+        >
+          <span>Sonraki İlan</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Full Description Modal Popup */}
       {isDescModalOpen && (
         <div
@@ -833,22 +860,22 @@ function FeedCardDeck() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg bg-[#0a1224] border border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl"
+            className="w-full max-w-lg bg-white md:bg-[#0a1224] border border-slate-200 md:border-white/10 rounded-3xl p-6 space-y-4 shadow-2xl"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h4 className="text-sm font-black text-white uppercase flex items-center gap-2">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 md:border-white/10">
+              <h4 className="text-sm font-black text-slate-900 md:text-white uppercase flex items-center gap-2">
                 <span>📝</span>
                 <span>İlan Açıklaması</span>
               </h4>
               <button
                 type="button"
                 onClick={() => setIsDescModalOpen(false)}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 md:bg-white/5 hover:bg-slate-200 md:hover:bg-white/10 text-slate-600 md:text-slate-400 hover:text-slate-900 md:hover:text-white transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-xs text-slate-300 leading-relaxed whitespace-pre-line">
+            <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-xs text-slate-700 md:text-slate-300 leading-relaxed whitespace-pre-line">
               {currentItem.description ||
                 "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
             </div>
@@ -864,16 +891,16 @@ function FeedCardDeck() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl bg-[#0a1224] border border-white/10 rounded-3xl p-5 sm:p-7 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
+            className="w-full max-w-2xl bg-white md:bg-[#0a1224] border border-slate-200 md:border-white/10 rounded-3xl p-5 sm:p-7 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 md:border-white/10">
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">🛡️</span>
                 <div>
-                  <h4 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
+                  <h4 className="text-sm sm:text-base font-black text-slate-900 md:text-white uppercase tracking-wider">
                     Ekspertiz ve Boya/Değişen Durumu
                   </h4>
-                  <p className="text-xs text-slate-400 font-medium">
+                  <p className="text-xs text-slate-500 md:text-slate-400 font-medium">
                     {currentItem.title}
                   </p>
                 </div>
@@ -881,7 +908,7 @@ function FeedCardDeck() {
               <button
                 type="button"
                 onClick={() => setIsExpertiseModalOpen(false)}
-                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-100 md:bg-white/5 hover:bg-slate-200 md:hover:bg-white/10 text-slate-600 md:text-slate-400 hover:text-slate-900 md:hover:text-white transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -913,10 +940,10 @@ function FeedCardDeck() {
 
 export default function FeedPage() {
   return (
-    <main className="min-h-screen bg-[#030712] text-slate-100">
+    <main className="min-h-screen bg-[#f0f4f9] md:bg-[#030712] text-slate-900 md:text-slate-100">
       <Suspense
         fallback={
-          <div className="min-h-screen bg-[#030712] flex items-center justify-center text-xs text-slate-400">
+          <div className="min-h-screen bg-[#f0f4f9] md:bg-[#030712] flex items-center justify-center text-xs text-slate-500 md:text-slate-400">
             Yükleniyor...
           </div>
         }

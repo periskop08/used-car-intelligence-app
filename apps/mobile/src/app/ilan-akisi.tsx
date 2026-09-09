@@ -12,6 +12,7 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
 import ShowcaseBadge from '../components/ShowcaseBadge';
-import { PART_LABELS } from '../components/VehicleConditionVisualizer';
+import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -207,6 +208,7 @@ export default function ListingFeedScreen() {
   const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'expertise'>>({});
   const [activePhotoIndices, setActivePhotoIndices] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [selectedExpertiseItem, setSelectedExpertiseItem] = useState<ListingFeedItem | null>(null);
 
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const loadingMoreRef = useRef(false);
@@ -627,74 +629,92 @@ export default function ListingFeedScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.scrollInfo}>
-                  {(() => {
-                    const localList = item.localPaintedParts || [];
-                    const paintedList = item.paintedParts || [];
-                    const changedList = item.changedParts || [];
-                    const hasIssues = localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+                <View style={styles.expertiseContainer}>
+                  {/* Left: Interactive Compact Vehicle Body SVG */}
+                  <TouchableOpacity
+                    onPress={() => setSelectedExpertiseItem(item)}
+                    style={styles.compactSvgBox}
+                    activeOpacity={0.8}
+                  >
+                    <CompactMobileVehicleBodySvg
+                      localPaintedParts={item.localPaintedParts}
+                      paintedParts={item.paintedParts}
+                      changedParts={item.changedParts}
+                      width={38}
+                      height={76}
+                    />
+                  </TouchableOpacity>
 
-                    if (!hasIssues) {
-                      return (
-                        <View style={{ justifyContent: 'center', height: '100%', gap: 3 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Ionicons name="shield-checkmark" size={14} color="#10b981" />
-                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#10b981' }}>
-                              Hatasız & Orijinal
+                  {/* Right: Damage Status Breakdown */}
+                  <View style={styles.expertiseInfoBox}>
+                    {(() => {
+                      const localList = item.localPaintedParts || [];
+                      const paintedList = item.paintedParts || [];
+                      const changedList = item.changedParts || [];
+                      const hasIssues = localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+
+                      if (!hasIssues) {
+                        return (
+                          <View style={{ justifyContent: 'center', height: '100%', gap: 2 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="shield-checkmark" size={13} color="#10b981" />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#10b981' }}>
+                                Hatasız & Orijinal
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 9.5, color: '#64748b' }} numberOfLines={1}>
+                              Boya veya değişen parçası yoktur.
                             </Text>
+                            <TouchableOpacity
+                              onPress={() => setSelectedExpertiseItem(item)}
+                              style={{ alignSelf: 'flex-start', marginTop: 2 }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
+                                Detaylı Şemayı Gör ➔
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                          <Text style={{ fontSize: 10, color: '#64748b' }}>
-                            Boya veya değişen parçası bulunmamaktadır.
-                          </Text>
+                        );
+                      }
+
+                      return (
+                        <View style={{ justifyContent: 'space-evenly', height: '100%' }}>
+                          {localList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#d97706' }]}>Lokal ({localList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#b45309' }]} numberOfLines={1}>
+                                {localList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
+                          {paintedList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#2563eb' }]}>Boyalı ({paintedList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#1d4ed8' }]} numberOfLines={1}>
+                                {paintedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
+                          {changedList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#dc2626' }]}>Değişen ({changedList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#b91c1c' }]} numberOfLines={1}>
+                                {changedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
                           <TouchableOpacity
-                            onPress={() => router.push(`/listings/${item.id}` as any)}
-                            style={{ alignSelf: 'flex-start', marginTop: 2 }}
+                            onPress={() => setSelectedExpertiseItem(item)}
+                            style={{ alignSelf: 'flex-end', marginTop: 1 }}
                           >
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
-                              Detaylı Raporu Gör ➔
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#ea580c' }}>
+                              Detaylı Şemayı Gör ➔
                             </Text>
                           </TouchableOpacity>
                         </View>
                       );
-                    }
-
-                    return (
-                      <View style={{ justifyContent: 'space-evenly', height: '100%' }}>
-                        {localList.length > 0 && (
-                          <View style={styles.infoRow}>
-                            <Text style={[styles.infoLabel, { color: '#f59e0b' }]}>Lokal Boya</Text>
-                            <Text style={[styles.infoValue, { color: '#f59e0b', maxWidth: 160 }]} numberOfLines={1}>
-                              {localList.map((p) => PART_LABELS[p] || p).join(', ')}
-                            </Text>
-                          </View>
-                        )}
-                        {paintedList.length > 0 && (
-                          <View style={styles.infoRow}>
-                            <Text style={[styles.infoLabel, { color: '#3b82f6' }]}>Boyalı</Text>
-                            <Text style={[styles.infoValue, { color: '#3b82f6', maxWidth: 160 }]} numberOfLines={1}>
-                              {paintedList.map((p) => PART_LABELS[p] || p).join(', ')}
-                            </Text>
-                          </View>
-                        )}
-                        {changedList.length > 0 && (
-                          <View style={styles.infoRow}>
-                            <Text style={[styles.infoLabel, { color: '#ef4444' }]}>Değişen</Text>
-                            <Text style={[styles.infoValue, { color: '#ef4444', maxWidth: 160 }]} numberOfLines={1}>
-                              {changedList.map((p) => PART_LABELS[p] || p).join(', ')}
-                            </Text>
-                          </View>
-                        )}
-                        <TouchableOpacity
-                          onPress={() => router.push(`/listings/${item.id}` as any)}
-                          style={{ alignSelf: 'flex-end', marginTop: 1 }}
-                        >
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
-                            Detaylı Şemayı Gör ➔
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })()}
+                    })()}
+                  </View>
                 </View>
               )}
             </View>
@@ -793,6 +813,52 @@ export default function ListingFeedScreen() {
             style={styles.feedList}
           />
         </View>
+      )}
+
+      {/* Full Expertise / Condition Modal */}
+      {selectedExpertiseItem && (
+        <Modal
+          visible={!!selectedExpertiseItem}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedExpertiseItem(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="shield-checkmark" size={20} color="#ea580c" />
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    Ekspertiz ve Boya/Değişen Durumu
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedExpertiseItem(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: windowHeight * 0.72 }} showsVerticalScrollIndicator={false}>
+                <VehicleConditionVisualizer
+                  paintedParts={selectedExpertiseItem.paintedParts}
+                  changedParts={selectedExpertiseItem.changedParts}
+                  localPaintedParts={selectedExpertiseItem.localPaintedParts}
+                  damageRecord={selectedExpertiseItem.damageRecord || undefined}
+                  tramerAmount={selectedExpertiseItem.tramerAmount || 0}
+                />
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setSelectedExpertiseItem(null)}
+                style={styles.modalDoneBtn}
+              >
+                <Text style={styles.modalDoneText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );
@@ -1241,5 +1307,93 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '900',
     color: '#ffffff',
+  },
+  expertiseContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 28,
+    gap: 8,
+  },
+  compactSvgBox: {
+    width: 44,
+    height: 82,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  expertiseInfoBox: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'space-evenly',
+  },
+  infoRowCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingVertical: 1,
+  },
+  infoLabelCompact: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoValCompact: {
+    fontSize: 10,
+    fontWeight: '700',
+    maxWidth: 140,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#0f172a',
+    maxWidth: 260,
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalDoneBtn: {
+    backgroundColor: '#ea580c',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalDoneText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
