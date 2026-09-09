@@ -8,7 +8,7 @@ import {
   Car,
   ArrowRight,
 } from 'lucide-react';
-import UrgentListingBadge from '@/components/listings/UrgentListingBadge';
+import CompactListingCard from '@/components/listings/CompactListingCard';
 
 export interface VehicleExactListingItem {
   id: string;
@@ -174,50 +174,7 @@ export default function VehicleExactListingsWidget({
               </div>
             ) : (
               items.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/listings/${item.listingNo || item.id}`}
-                  className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0a1122]/90 hover:bg-[#101b33] border border-white/5 hover:border-orange-500/40 transition group shadow-sm select-none shrink-0"
-                >
-                  <div className="w-16 h-14 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0 relative flex items-center justify-center">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-slate-950 flex items-center justify-center text-slate-600">
-                        <Car className="w-5 h-5 text-slate-500" />
-                      </div>
-                    )}
-                    {item.isUrgent && (
-                      <div className="absolute top-0.5 left-0.5 z-10 scale-[0.7] origin-top-left">
-                        <UrgentListingBadge size="small" animated />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col min-w-0 flex-1 justify-center">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <h4 className="text-[11.5px] font-bold text-slate-200 truncate group-hover:text-orange-400 transition leading-snug">
-                        {item.title}
-                      </h4>
-                      {item.isShowcaseFeedActive && (
-                        <span className="shrink-0 px-1 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[7.5px] uppercase tracking-wider shadow border border-amber-300">
-                          ⭐ Vitrin
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
-                      {item.modelYear} • {(item.kilometers ?? 0).toLocaleString('tr-TR')} km •{' '}
-                      {item.district ? `${item.city || ''} / ${item.district}` : (item.city || '')}
-                    </div>
-                    <div className="text-xs font-black text-orange-400 mt-0.5 leading-none">
-                      {formatPrice(item.priceAmount || 0)}
-                    </div>
-                  </div>
-                </Link>
+                <CompactListingCard key={item.id} listing={item} />
               ))
             )}
           </div>
