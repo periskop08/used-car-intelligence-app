@@ -9,6 +9,7 @@ import { VehicleReportProviderService } from './vehicle-report-provider.service'
 import { CreateVehicleReportDto } from './vehicle-report.dto';
 import { VehicleReportMode, AiQuotaFeature, VehicleReportStatus, VehicleReportJobStatus } from '@prisma/client';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
+import { normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -399,6 +400,25 @@ export class VehicleReportService implements OnModuleInit {
     }
   }
 
+  private ensureSafeReportPayload(report: any): any {
+    if (!report || !report.reportData) return report;
+    try {
+      const norm = normalizeVehicleReportPayload(report.reportData);
+      if (norm.warnings && norm.warnings.length > 0) {
+        this.logger.warn(
+          `[READ-TIME NORMALIZER] Fixed ${norm.warnings.length} shape deviation(s) in report ${report.id || 'unknown'}: ${JSON.stringify(norm.warnings)}`
+        );
+      }
+      return {
+        ...report,
+        reportData: norm.data,
+      };
+    } catch (err: any) {
+      this.logger.error(`[READ-TIME NORMALIZER ERROR] Failed to normalize report payload: ${err.message}`);
+      return report;
+    }
+  }
+
   async getReportById(userId: string, reportId: string) {
     try {
       const report = await this.prisma.generatedVehicleReport.findUnique({
@@ -409,7 +429,7 @@ export class VehicleReportService implements OnModuleInit {
         throw new NotFoundException(`Rapor bulunamadı: ${reportId}`);
       }
 
-      return report;
+      return this.ensureSafeReportPayload(report);
     } catch (e: any) {
       this.logger.error(`getReportById error: ${e.message}`);
       throw new NotFoundException(e.message || 'Rapor bulunamadı.');
@@ -419,13 +439,14 @@ export class VehicleReportService implements OnModuleInit {
   async getCurrentVariantReport(userId: string, variantId: string) {
     try {
       const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId);
-      return await this.cacheService.getCachedReport(
+      const cached = await this.cacheService.getCachedReport(
         userId,
         'TORQUE_SCOUT_VEHICLE_REPORT',
         vRes.vehicleContextHash,
         CURRENT_REPORT_VERSION,
         variantId,
       );
+      return this.ensureSafeReportPayload(cached);
     } catch (e: any) {
       return null;
     }
@@ -441,7 +462,7 @@ export class VehicleReportService implements OnModuleInit {
         .update(`${vRes.vehicleContextHash}_${lRes.listingContextHash}`)
         .digest('hex');
 
-      return await this.cacheService.getCachedReport(
+      const cached = await this.cacheService.getCachedReport(
         userId,
         'LISTING_REPORT',
         fullHash,
@@ -449,6 +470,7 @@ export class VehicleReportService implements OnModuleInit {
         lRes.variantId,
         listingId,
       );
+      return this.ensureSafeReportPayload(cached);
     } catch (e: any) {
       return null;
     }

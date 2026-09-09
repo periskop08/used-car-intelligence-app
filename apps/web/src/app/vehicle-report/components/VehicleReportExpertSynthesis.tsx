@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ExpertDecisionSynthesis, ReportSupportingFact } from "@used-car-intelligence/shared";
+import { ExpertDecisionSynthesis, ReportSupportingFact, safeString } from "@used-car-intelligence/shared";
 import { 
   Sparkles, 
   CheckCircle2, 
@@ -276,7 +276,7 @@ export default function VehicleReportExpertSynthesis({
                     <span className="font-bold text-rose-300 block">⚠️ Belirtileri ve Semptomları:</span>
                     <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
                       {toArray(synthesis.primaryTechnicalRisk.symptoms).map((s, idx) => (
-                        <li key={idx}>{s}</li>
+                        <li key={idx}>{safeString(s)}</li>
                       ))}
                     </ul>
                   </div>
@@ -287,7 +287,7 @@ export default function VehicleReportExpertSynthesis({
                     <span className="font-bold text-emerald-300 block">🔍 Ekspertiz Kontrol Adımları:</span>
                     <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
                       {toArray(synthesis.primaryTechnicalRisk.inspectionInstructions).map((inst, idx) => (
-                        <li key={idx}>{inst}</li>
+                        <li key={idx}>{safeString(inst)}</li>
                       ))}
                     </ul>
                   </div>

@@ -4,7 +4,7 @@ import { VehicleReportFallbackService } from './vehicle-report-fallback.service'
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
 import { VehicleReportSemanticValidationService } from './vehicle-report-semantic-validation.service';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
-import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData } from '@used-car-intelligence/shared';
+import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
 @Injectable()
@@ -172,10 +172,19 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
           baseReport.scoring = this.scoringService.calculateScores(validationContext);
           baseReport.status = 'COMPLETED';
 
+          // Fail-Safe Item Shape Validation & Normalization before saving to DB
+          const norm = normalizeVehicleReportPayload(baseReport);
+          if (norm.warnings && norm.warnings.length > 0) {
+            this.logger.warn(
+              `[WRITE-TIME NORMALIZER] Sanitized ${norm.warnings.length} shape deviation(s) before DB commit: ${JSON.stringify(norm.warnings)}`
+            );
+          }
+          const finalReport = norm.data;
+
           this.logger.log(`[DELEGATOR] Report updated successfully with AI content from ${orchestratorResult.providerName}`);
 
           return {
-            report: baseReport,
+            report: finalReport,
             provider: orchestratorResult.providerName,
             modelName: 'Vehicle Intelligence Orchestrator',
             qualityScore: validation.qualityResult?.score || 95,

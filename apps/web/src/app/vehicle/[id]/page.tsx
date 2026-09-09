@@ -6,6 +6,7 @@ import QuotaBadge from "@/components/QuotaBadge";
 import VehicleReportShell from "../../vehicle-report/components/VehicleReportShell";
 import IsiCepteListingRecommendationWidget from "@/app/listings/components/IsiCepteListingRecommendationWidget";
 import VehicleExactListingsWidget from "@/app/listings/components/VehicleExactListingsWidget";
+import SafeSection from "@/components/SafeSection";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -704,193 +705,197 @@ export default function VehicleDetail() {
         <div className="lg:col-span-7 flex flex-col gap-8">
           
           {/* AI Report Card (TorqueScout Vehicle Report Shell) */}
-          {structuredReport ? (
-            <VehicleReportShell 
-              report={structuredReport} 
-              onRefresh={() => fetchStructuredReport(true)} 
-              isRefreshing={loadingStructuredReport} 
-            />
-          ) : (
-            <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-5 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
-              
-              <div className="relative flex items-center justify-center my-2">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
-                <div className="absolute text-lg font-black text-orange-500">
-                  {countdown !== null ? countdown : "..."}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 max-w-md">
-                <h3 className="text-sm font-bold text-slate-200 animate-pulse">
-                  TorqueScout AI Uzman Raporu Hazırlanıyor...
-                </h3>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Aracın motor-şanzıman kombinasyonu, kronik arıza veritabanı kayıtları ve geri çağırma listeleri taranıyor. Lütfen bekleyin...
-                </p>
-              </div>
-
-              {/* Road and Driving Car Animation */}
-              <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
-                <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
-                  <div 
-                    className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}%` }}
-                  ></div>
-                </div>
-                <div 
-                  className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
-                  style={{ 
-                    left: `calc(${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}% - 14px)`,
-                    transform: 'scaleX(-1)'
-                  }}
-                >
-                  🚗
-                </div>
-              </div>
-
-              {reportError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold mt-3 flex flex-col items-center gap-3 max-w-md mx-auto">
-                  <div className="flex items-center gap-2 text-center">
-                    <span>⚠️ {reportError}</span>
+          <SafeSection title="Araç Ekspertiz Raporu">
+            {structuredReport ? (
+              <VehicleReportShell 
+                report={structuredReport} 
+                onRefresh={() => fetchStructuredReport(true)} 
+                isRefreshing={loadingStructuredReport} 
+              />
+            ) : (
+              <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
+                
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
+                  <div className="absolute text-lg font-black text-orange-500">
+                    {countdown !== null ? countdown : "..."}
                   </div>
-                  <a
-                    href="/dashboard/support/feedback?category=VEHICLE_QUERY_AI_REPORT"
-                    className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 active:scale-95"
-                  >
-                    <span>💬 Geri Bildirim Gönder</span>
-                  </a>
                 </div>
-              )}
-            </div>
-          )}
+
+                <div className="flex flex-col gap-2 max-w-md">
+                  <h3 className="text-sm font-bold text-slate-200 animate-pulse">
+                    TorqueScout AI Uzman Raporu Hazırlanıyor...
+                  </h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Aracın motor-şanzıman kombinasyonu, kronik arıza veritabanı kayıtları ve geri çağırma listeleri taranıyor. Lütfen bekleyin...
+                  </p>
+                </div>
+
+                {/* Road and Driving Car Animation */}
+                <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
+                  <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}%` }}
+                    ></div>
+                  </div>
+                  <div 
+                    className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
+                    style={{ 
+                      left: `calc(${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}% - 14px)`,
+                      transform: 'scaleX(-1)'
+                    }}
+                  >
+                    🚗
+                  </div>
+                </div>
+
+                {reportError && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold mt-3 flex flex-col items-center gap-3 max-w-md mx-auto">
+                    <div className="flex items-center gap-2 text-center">
+                      <span>⚠️ {reportError}</span>
+                    </div>
+                    <a
+                      href="/dashboard/support/feedback?category=VEHICLE_QUERY_AI_REPORT"
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                    >
+                      <span>💬 Geri Bildirim Gönder</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </SafeSection>
 
 
 
           {/* User Reviews List */}
-          <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({Array.isArray(vehicle.reviews) ? vehicle.reviews.length : 0})</h2>
-            {Array.isArray(vehicle.reviews) && vehicle.reviews.length > 0 ? (
-              <div className="flex flex-col gap-4 mt-2">
-                {vehicle.reviews.map((rev: any) => (
-                  <div key={rev.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200 text-xs">{rev.email}</span>
-                      <span className="text-xs text-slate-500 font-medium">Süre: {rev.usageDuration} Ay • {rev.isOwner ? 'Sahibi' : 'Kullanıcısı'}</span>
-                    </div>
-                    <p className="text-xs text-slate-300 leading-relaxed italic">"{rev.comment}"</p>
-                    {rev.rating && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-400">
-                        <span>Dayanıklılık: {rev.rating.reliability}/5⭐</span>
-                        <span>Yakıt: {rev.rating.fuelConsumption}/5⭐</span>
-                        <span>Konfor: {rev.rating.comfort}/5⭐</span>
-                        <span>Parça Maliyeti: {rev.rating.partCost}/5⭐</span>
-                        <span>Bakım: {rev.rating.maintenanceCost}/5⭐</span>
-                        <span>Satış Kolaylığı: {rev.rating.resaleEase}/5⭐</span>
-                        <span className="font-bold text-slate-300">Genel Skor: {rev.rating.overall}/5⭐</span>
+          <SafeSection title="Kullanıcı Yorumları">
+            <div className="glass p-6 rounded-2xl flex flex-col gap-4">
+              <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({Array.isArray(vehicle.reviews) ? vehicle.reviews.length : 0})</h2>
+              {Array.isArray(vehicle.reviews) && vehicle.reviews.length > 0 ? (
+                <div className="flex flex-col gap-4 mt-2">
+                  {vehicle.reviews.map((rev: any) => (
+                    <div key={rev.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-200 text-xs">{rev.email}</span>
+                        <span className="text-xs text-slate-500 font-medium">Süre: {rev.usageDuration} Ay • {rev.isOwner ? 'Sahibi' : 'Kullanıcısı'}</span>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">Henüz yorum yapılmamış.</p>
-            )}
-
-            {/* Write a Review form */}
-            <div className="mt-6 border-t border-white/5 pt-6">
-              <h3 className="text-sm font-bold text-slate-200 mb-4">✍️ Araç Hakkında Yorum Yaz (Günde 1 Sınır)</h3>
-              
-              {reviewError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mb-4">
-                  ⚠️ {reviewError}
-                </div>
-              )}
-              {reviewSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs p-3 rounded-xl font-semibold mb-4">
-                  🎉 {reviewSuccess}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Yorumunuz (En az 20, en fazla 1000 karakter)</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    placeholder="Aracın konforu, yakıt tüketimi, kullanıcı deneyimleri hakkındaki görüşlerinizi yazın..."
-                    className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Kullanım Süresi (Ay)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={usageDuration}
-                      onChange={e => setUsageDuration(Number(e.target.value))}
-                      className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-6">
-                    <input
-                      type="checkbox"
-                      id="isOwner"
-                      checked={isOwner}
-                      onChange={e => setIsOwner(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="isOwner" className="text-xs font-semibold text-slate-300">Araç Sahibiyim</label>
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-6">
-                    <input
-                      type="checkbox"
-                      id="recommend"
-                      checked={recommend}
-                      onChange={e => setRecommend(e.target.checked)}
-                      className="rounded"
-                    />
-                    <label htmlFor="recommend" className="text-xs font-semibold text-slate-300">Tavsiye Ediyorum</label>
-                  </div>
-                </div>
-
-                {/* Star Ratings Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-                  {Object.keys(ratings).map((key) => (
-                    <div key={key} className="flex flex-col gap-1">
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold">{key === 'reliability' ? 'Güvenilirlik' : key === 'fuelConsumption' ? 'Yakıt' : key === 'comfort' ? 'Konfor' : key === 'partCost' ? 'Parça' : key === 'maintenanceCost' ? 'Bakım' : key === 'resaleEase' ? 'Satış' : 'Genel'}</span>
-                      <select
-                        value={ratings[key as keyof typeof ratings]}
-                        onChange={e => setRatings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                        className="bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-slate-200 outline-none"
-                      >
-                        <option value="5">5 ⭐ (Mükemmel)</option>
-                        <option value="4">4 ⭐ (İyi)</option>
-                        <option value="3">3 ⭐ (Orta)</option>
-                        <option value="2">2 ⭐ (Kötü)</option>
-                        <option value="1">1 ⭐ (Kritik)</option>
-                      </select>
+                      <p className="text-xs text-slate-300 leading-relaxed italic">"{rev.comment}"</p>
+                      {rev.rating && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-slate-400">
+                          <span>Dayanıklılık: {rev.rating.reliability}/5⭐</span>
+                          <span>Yakıt: {rev.rating.fuelConsumption}/5⭐</span>
+                          <span>Konfor: {rev.rating.comfort}/5⭐</span>
+                          <span>Parça Maliyeti: {rev.rating.partCost}/5⭐</span>
+                          <span>Bakım: {rev.rating.maintenanceCost}/5⭐</span>
+                          <span>Satış Kolaylığı: {rev.rating.resaleEase}/5⭐</span>
+                          <span className="font-bold text-slate-300">Genel Skor: {rev.rating.overall}/5⭐</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-slate-500">Henüz yorum yapılmamış.</p>
+              )}
 
-                <button
-                  type="submit"
-                  disabled={submittingReview}
-                  className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs mt-2 transition"
-                >
-                  {submittingReview ? "Yorum Gönderiliyor..." : "Yorumu Gönder"}
-                </button>
-              </form>
+              {/* Write a Review form */}
+              <div className="mt-6 border-t border-white/5 pt-6">
+                <h3 className="text-sm font-bold text-slate-200 mb-4">✍️ Araç Hakkında Yorum Yaz (Günde 1 Sınır)</h3>
+                
+                {reviewError && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl font-semibold mb-4">
+                    ⚠️ {reviewError}
+                  </div>
+                )}
+                {reviewSuccess && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs p-3 rounded-xl font-semibold mb-4">
+                    🎉 {reviewSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmitReview} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Yorumunuz (En az 20, en fazla 1000 karakter)</label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      placeholder="Aracın konforu, yakıt tüketimi, kullanıcı deneyimleri hakkındaki görüşlerinizi yazın..."
+                      className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none focus:border-orange-500 transition resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase">Kullanım Süresi (Ay)</label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={usageDuration}
+                        onChange={e => setUsageDuration(Number(e.target.value))}
+                        className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-6">
+                      <input
+                        type="checkbox"
+                        id="isOwner"
+                        checked={isOwner}
+                        onChange={e => setIsOwner(e.target.checked)}
+                        className="rounded"
+                      />
+                      <label htmlFor="isOwner" className="text-xs font-semibold text-slate-300">Araç Sahibiyim</label>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-6">
+                      <input
+                        type="checkbox"
+                        id="recommend"
+                        checked={recommend}
+                        onChange={e => setRecommend(e.target.checked)}
+                        className="rounded"
+                      />
+                      <label htmlFor="recommend" className="text-xs font-semibold text-slate-300">Tavsiye Ediyorum</label>
+                    </div>
+                  </div>
+
+                  {/* Star Ratings Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                    {Object.keys(ratings).map((key) => (
+                      <div key={key} className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">{key === 'reliability' ? 'Güvenilirlik' : key === 'fuelConsumption' ? 'Yakıt' : key === 'comfort' ? 'Konfor' : key === 'partCost' ? 'Parça' : key === 'maintenanceCost' ? 'Bakım' : key === 'resaleEase' ? 'Satış' : 'Genel'}</span>
+                        <select
+                          value={ratings[key as keyof typeof ratings]}
+                          onChange={e => setRatings(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                          className="bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-slate-200 outline-none"
+                        >
+                          <option value="5">5 ⭐ (Mükemmel)</option>
+                          <option value="4">4 ⭐ (İyi)</option>
+                          <option value="3">3 ⭐ (Orta)</option>
+                          <option value="2">2 ⭐ (Kötü)</option>
+                          <option value="1">1 ⭐ (Kritik)</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingReview}
+                    className="bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs mt-2 transition"
+                  >
+                    {submittingReview ? "Yorum Gönderiliyor..." : "Yorumu Gönder"}
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
+          </SafeSection>
         </div>
 
         {/* AI Report & Custom AI Chat Column */}
@@ -1117,16 +1122,20 @@ export default function VehicleDetail() {
           </div>
 
           {/* İŞİ CEPTE ÖNERİYOR */}
-          <IsiCepteListingRecommendationWidget
-            vehicleBrand={vehicle?.brand || "Bu Araç"}
-            className="w-full h-[590px] max-h-[590px]"
-          />
+          <SafeSection title="İş Cepte Önerileri">
+            <IsiCepteListingRecommendationWidget
+              vehicleBrand={vehicle?.brand || "Bu Araç"}
+              className="w-full h-[590px] max-h-[590px]"
+            />
+          </SafeSection>
 
           {/* BU ARACIN İLANLARI */}
-          <VehicleExactListingsWidget
-            variantId={variantId}
-            className="w-full"
-          />
+          <SafeSection title="Bu Aracın İlanları">
+            <VehicleExactListingsWidget
+              variantId={variantId}
+              className="w-full"
+            />
+          </SafeSection>
         </div>
 
         </div>

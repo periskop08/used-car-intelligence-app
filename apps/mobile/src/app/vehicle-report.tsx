@@ -19,6 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -248,28 +249,36 @@ function formatFuelTypeTr(fuel?: string): string {
 }
 
 function parseConditionItems(rawList: any): ConditionItem[] {
-  if (!Array.isArray(rawList)) return [];
-  return rawList
+  if (!rawList) return [];
+  const list = Array.isArray(rawList) ? rawList : [rawList];
+  return list
     .map((item: any) => {
       if (typeof item === 'string') {
-        return { title: item };
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { title: trimmed } : null;
       }
       if (typeof item === 'object' && item !== null) {
-        const title = item.title || item.conditionText || item.condition || item.text || item.heading || item.name || '';
-        const text = item.conditionText && item.title && item.conditionText !== item.title ? item.conditionText : item.description || item.detail;
-        return { title: title || String(item), text: text !== title ? text : undefined };
+        const title = item.condition || item.title || item.conditionText || item.text || item.heading || item.name || '';
+        const text = item.reason || item.explanation || (item.conditionText && item.title && item.conditionText !== item.title ? item.conditionText : item.description || item.detail);
+        const sTitle = typeof title === 'string' ? title.trim() : '';
+        const sText = typeof text === 'string' ? text.trim() : undefined;
+        if (sTitle && sTitle !== '[object Object]') {
+          return { title: sTitle, text: sText && sText !== sTitle ? sText : undefined };
+        }
       }
-      return { title: String(item) };
+      return null;
     })
-    .filter((x) => Boolean(x.title));
+    .filter((x): x is ConditionItem => Boolean(x && x.title));
 }
 
 function parseSuitabilityItems(rawList: any): SuitabilityItem[] {
-  if (!Array.isArray(rawList)) return [];
-  return rawList
+  if (!rawList) return [];
+  const list = Array.isArray(rawList) ? rawList : [rawList];
+  return list
     .map((item: any) => {
       if (typeof item === 'string') {
-        return { group: item };
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { group: trimmed } : null;
       }
       if (typeof item === 'object' && item !== null) {
         const group =
@@ -286,15 +295,22 @@ function parseSuitabilityItems(rawList: any): SuitabilityItem[] {
           item.description ||
           item.detail ||
           '';
-        return { group, rationale };
+        const sGroup = typeof group === 'string' ? group.trim() : '';
+        const sRationale = typeof rationale === 'string' ? rationale.trim() : undefined;
+        if (sGroup && sGroup !== '[object Object]') {
+          return { group: sGroup, rationale: sRationale };
+        }
       }
-      return { group: String(item) };
+      return null;
     })
-    .filter((x) => Boolean(x.group) && x.group !== '[object Object]');
+    .filter((x): x is SuitabilityItem => Boolean(x && x.group));
 }
 
 function normalizeReport(data: any): ComprehensiveReport {
-  const rep = data?.reportData || data?.report || data || {};
+  const rawPayload = data?.reportData || data?.report || data || {};
+  const normResult = normalizeVehicleReportPayload(rawPayload);
+  const rep = normResult.data || {};
+
   const identity = rep.vehicleIdentity || {};
   const scoring = rep.scoring || {
     buyabilityScore: { value: 73 },
@@ -1337,10 +1353,10 @@ export default function VehicleReportScreen() {
           )}
 
           {/* 4. SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-          {Boolean(report.prePurchaseChecks && report.prePurchaseChecks.length > 0) && (
+          {Array.isArray(report.prePurchaseChecks) && report.prePurchaseChecks.length > 0 && (
             <CollapsibleLightSection
               title="Satın Alma Öncesi Ekspertiz Kontrol Listesi"
-              badgeText={`${report.prePurchaseChecks!.length} Adım`}
+              badgeText={`${report.prePurchaseChecks.length} Adım`}
               iconName="clipboard-outline"
               iconColor="#7c3aed"
               iconBgColor="#f5f3ff"
@@ -1348,7 +1364,7 @@ export default function VehicleReportScreen() {
               titleColor="#6d28d9"
               defaultOpen={true}
             >
-              {report.prePurchaseChecks!.map((chk, idx) => (
+              {(report.prePurchaseChecks || []).map((chk, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.8}
@@ -1428,10 +1444,10 @@ export default function VehicleReportScreen() {
           </CollapsibleLightSection>
 
           {/* 6. SATICIYA SORULACAK KRİTİK SORULAR */}
-          {Boolean(report.sellerQuestions && report.sellerQuestions.length > 0) && (
+          {Array.isArray(report.sellerQuestions) && report.sellerQuestions.length > 0 && (
             <CollapsibleLightSection
               title="Satıcıya Sorulacak Kritik Sorular"
-              badgeText={`${report.sellerQuestions!.length} Soru`}
+              badgeText={`${report.sellerQuestions.length} Soru`}
               iconName="help-circle-outline"
               iconColor="#6d28d9"
               iconBgColor="#f5f3ff"
@@ -1439,7 +1455,7 @@ export default function VehicleReportScreen() {
               titleColor="#6d28d9"
               defaultOpen={true}
             >
-              {report.sellerQuestions!.map((q, idx) => (
+              {(report.sellerQuestions || []).map((q, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.8}
