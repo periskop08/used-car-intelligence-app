@@ -3,11 +3,25 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 
+export interface SafeSectionTelemetryPayload {
+  level: 'WARN_CRASH_ISOLATED';
+  componentName: string;
+  route: string;
+  entityId?: string;
+  errorMessage: string;
+  errorDigest?: string;
+  timestamp: string;
+}
+
 interface SafeSectionProps {
   title?: string;
+  componentName?: string;
+  entityId?: string;
+  route?: string;
   fallback?: ReactNode;
   children: ReactNode;
   className?: string;
+  onTelemetry?: (payload: SafeSectionTelemetryPayload) => void;
 }
 
 interface SafeSectionState {
@@ -15,6 +29,11 @@ interface SafeSectionState {
   errorMessage: string;
 }
 
+/**
+ * Real React Error Boundary for isolated dynamic fragile widgets.
+ * Catches JavaScript render exceptions in wrapped tree without letting the entire page crash.
+ * Emits non-sensitive telemetry on catch so errors are never silently masked.
+ */
 export default class SafeSection extends Component<SafeSectionProps, SafeSectionState> {
   constructor(props: SafeSectionProps) {
     super(props);
@@ -29,11 +48,34 @@ export default class SafeSection extends Component<SafeSectionProps, SafeSection
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(
-      `[SAFE_SECTION_CATCH] Section: "${this.props.title || "Adsız Bölüm"}"`,
-      error,
-      errorInfo
+    const componentName = this.props.componentName || this.props.title || "SafeSectionWidget";
+    const route = typeof window !== 'undefined' ? window.location.pathname : (this.props.route || 'unknown');
+    const entityId = this.props.entityId;
+
+    const telemetry: SafeSectionTelemetryPayload = {
+      level: 'WARN_CRASH_ISOLATED',
+      componentName,
+      route,
+      entityId,
+      errorMessage: error?.message || "Unknown error",
+      errorDigest: (error as any)?.digest,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Log structured telemetry for observability (no sensitive user data)
+    console.warn(
+      `[TORQUE_SCOUT_WIDGET_TELEMETRY] Widget "${componentName}" caught render error at ${route}:`,
+      JSON.stringify(telemetry),
+      errorInfo?.componentStack?.slice(0, 300)
     );
+
+    if (this.props.onTelemetry) {
+      try {
+        this.props.onTelemetry(telemetry);
+      } catch (e) {
+        // Never let telemetry callback failure crash the boundary
+      }
+    }
   }
 
   handleRetry = () => {

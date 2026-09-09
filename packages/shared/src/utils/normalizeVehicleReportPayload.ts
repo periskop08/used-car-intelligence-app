@@ -1,24 +1,86 @@
 /**
  * Fail-Safe Report Shape Normalizer
- * Enforces strict shape validation and type coercion without corrupted "[object Object]" strings.
+ * Enforces strict shape validation, field-specific string extraction, and zero fabricated content.
  * Usable across API, Web, and Mobile.
+ *
+ * CORE RULE:
+ * FAIL-SAFE != FAKE DATA.
+ * Normalizer repairs shapes, it NEVER invents new semantic content, claims, or priorities.
  */
 
+export type NormalizationClassification = 'LOSSLESS' | 'LOSSY' | 'REJECTED' | 'UNRECOVERABLE';
+
 export interface NormalizationTelemetryWarning {
+  classification: NormalizationClassification;
   field: string;
   expected: string;
   receivedType: string;
   actionTaken: string;
+  details?: string;
+}
+
+export interface NormalizationMetrics {
+  safelyNormalizedCount: number;
+  losslessNormalizedCount: number;
+  lossyNormalizedCount: number;
+  rejectedItemCount: number;
+  unrecoverableFieldCount: number;
 }
 
 export interface NormalizationResult<T> {
   data: T;
   warnings: NormalizationTelemetryWarning[];
+  metrics: NormalizationMetrics;
+}
+
+// Field-Specific Whitelists for String Extraction from Objects
+export const WHITELISTS = {
+  symptoms: ['symptom', 'text', 'description'],
+  inspectionInstructions: ['instruction', 'text', 'description'],
+  reasonsToChoose: ['reason', 'title', 'description'],
+  compromisesAndLimitations: ['limitation', 'title', 'description', 'text'],
+  suitableFor: ['profile', 'target', 'title'],
+  notSuitableFor: ['profile', 'target', 'title'],
+  purchaseConditions: ['condition', 'text', 'description'],
+  walkAwayConditions: ['condition', 'text', 'description'],
+  prePurchaseChecks: ['instruction', 'check', 'title', 'description'],
+  sellerQuestions: ['questionText', 'question', 'text'],
+  factIds: ['factId', 'id', 'key'],
+} as const;
+
+/**
+ * Safely extracts a string from an unknown value using a FIELD-SPECIFIC whitelist.
+ * NEVER produces "[object Object]".
+ */
+export function extractFieldString(
+  val: any,
+  whitelistKeys: readonly string[],
+  fallback = ''
+): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    return trimmed === '[object Object]' ? fallback : trimmed;
+  }
+  if (typeof val === 'number' || typeof val === 'boolean') {
+    return String(val);
+  }
+  if (typeof val === 'object' && !Array.isArray(val)) {
+    for (const key of whitelistKeys) {
+      if (typeof val[key] === 'string') {
+        const trimmed = val[key].trim();
+        if (trimmed && trimmed !== '[object Object]') {
+          return trimmed;
+        }
+      }
+    }
+    return fallback;
+  }
+  return fallback;
 }
 
 /**
- * Safely extracts a meaningful string from an unknown value.
- * Never produces "[object Object]".
+ * Generic safeString for simple primitive text display. Never produces "[object Object]".
  */
 export function safeString(val: any, fallback = ''): string {
   if (val === null || val === undefined) return fallback;
@@ -29,24 +91,16 @@ export function safeString(val: any, fallback = ''): string {
   if (typeof val === 'number' || typeof val === 'boolean') {
     return String(val);
   }
-  if (typeof val === 'object') {
-    // Check known string property names instead of coercing object directly
-    for (const key of ['title', 'name', 'text', 'symptom', 'instruction', 'description', 'condition', 'reason', 'profile', 'headline', 'value']) {
-      if (typeof val[key] === 'string' && val[key].trim() && val[key].trim() !== '[object Object]') {
-        return val[key].trim();
-      }
-    }
-    return fallback;
-  }
   return fallback;
 }
 
 /**
- * Safely normalizes an unknown value to a string array (string[]).
+ * Safely normalizes an unknown value to a string array (string[]) using field-specific extraction.
  */
 export function normalizeStringArray(
   raw: any,
   fieldName: string,
+  whitelistKeys: readonly string[],
   warnings?: NormalizationTelemetryWarning[],
 ): string[] {
   if (!raw) return [];
@@ -55,31 +109,49 @@ export function normalizeStringArray(
   if (Array.isArray(raw)) {
     const result: string[] = [];
     for (const item of raw) {
-      const str = safeString(item);
-      if (str) {
-        result.push(str);
-      } else if (typeof item === 'object' && warnings) {
-        warnings.push({
-          field: fieldName,
-          expected: 'string[]',
-          receivedType: 'object (unextractable)',
-          actionTaken: 'dropped unextractable item',
-        });
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed && trimmed !== '[object Object]') {
+          result.push(trimmed);
+        }
+      } else if (typeof item === 'object' && item !== null) {
+        const extracted = extractFieldString(item, whitelistKeys);
+        if (extracted) {
+          result.push(extracted);
+          if (warnings) {
+            warnings.push({
+              classification: 'LOSSY',
+              field: fieldName,
+              expected: 'string[]',
+              receivedType: 'object in array',
+              actionTaken: `extracted '${extracted}' via whitelist [${whitelistKeys.join(', ')}]`,
+            });
+          }
+        } else if (warnings) {
+          warnings.push({
+            classification: 'REJECTED',
+            field: fieldName,
+            expected: 'string[]',
+            receivedType: 'unextractable object',
+            actionTaken: 'dropped unextractable object item',
+          });
+        }
       }
     }
     return result;
   }
 
-  // If single string
+  // If single string: Lossless wrapping
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
     if (trimmed && trimmed !== '[object Object]') {
       if (warnings) {
         warnings.push({
+          classification: 'LOSSLESS',
           field: fieldName,
           expected: 'string[]',
           receivedType: 'string',
-          actionTaken: 'wrapped single string in array',
+          actionTaken: 'wrapped single string in array without information loss',
         });
       }
       return [trimmed];
@@ -88,25 +160,27 @@ export function normalizeStringArray(
   }
 
   // If single object
-  if (typeof raw === 'object') {
-    const extracted = safeString(raw);
+  if (typeof raw === 'object' && raw !== null) {
+    const extracted = extractFieldString(raw, whitelistKeys);
     if (extracted) {
       if (warnings) {
         warnings.push({
+          classification: 'LOSSY',
           field: fieldName,
           expected: 'string[]',
           receivedType: 'object',
-          actionTaken: 'extracted string property from object and wrapped in array',
+          actionTaken: `extracted '${extracted}' from single object via whitelist`,
         });
       }
       return [extracted];
     }
     if (warnings) {
       warnings.push({
+        classification: 'REJECTED',
         field: fieldName,
         expected: 'string[]',
         receivedType: 'object',
-        actionTaken: 'coerced to empty array (no string property found)',
+        actionTaken: 'rejected object item (no matching whitelist property found)',
       });
     }
     return [];
@@ -116,177 +190,25 @@ export function normalizeStringArray(
 }
 
 /**
- * Safely normalizes Title / Explanation objects (e.g. strongestReasonsToChoose, compromisesAndLimitations).
- */
-export function normalizeTitleExplanationArray(
-  raw: any,
-  fieldName: string,
-  defaultTitle: string,
-  warnings?: NormalizationTelemetryWarning[],
-): Array<{ title: string; explanation: string; supportingFactIds: string[] }> {
-  if (!raw) return [];
-
-  const items = Array.isArray(raw) ? raw : [raw];
-  const result: Array<{ title: string; explanation: string; supportingFactIds: string[] }> = [];
-
-  for (const item of items) {
-    if (!item) continue;
-
-    if (typeof item === 'string') {
-      const trimmed = item.trim();
-      if (trimmed && trimmed !== '[object Object]') {
-        result.push({
-          title: trimmed,
-          explanation: '',
-          supportingFactIds: ['AI_RESEARCH_ENGINE'],
-        });
-        if (warnings) {
-          warnings.push({
-            field: fieldName,
-            expected: 'object[]',
-            receivedType: 'string',
-            actionTaken: 'converted string to { title, explanation: "" }',
-          });
-        }
-      }
-      continue;
-    }
-
-    if (typeof item === 'object') {
-      const title = safeString(item.title || item.name || item.heading || item.reason || item.limitation || defaultTitle);
-      const explanation = safeString(item.explanation || item.description || item.detail || item.text || '');
-      const factIds = normalizeStringArray(item.supportingFactIds, `${fieldName}.supportingFactIds`);
-
-      result.push({
-        title: title || defaultTitle,
-        explanation,
-        supportingFactIds: factIds.length > 0 ? factIds : ['AI_RESEARCH_ENGINE'],
-      });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Safely normalizes Profile / Explanation objects (e.g. suitableFor, notSuitableFor).
- */
-export function normalizeProfileArray(
-  raw: any,
-  fieldName: string,
-  defaultProfile: string,
-  warnings?: NormalizationTelemetryWarning[],
-): Array<{ profile: string; explanation: string; supportingFactIds: string[] }> {
-  if (!raw) return [];
-
-  const items = Array.isArray(raw) ? raw : [raw];
-  const result: Array<{ profile: string; explanation: string; supportingFactIds: string[] }> = [];
-
-  for (const item of items) {
-    if (!item) continue;
-
-    if (typeof item === 'string') {
-      const trimmed = item.trim();
-      if (trimmed && trimmed !== '[object Object]') {
-        result.push({
-          profile: trimmed,
-          explanation: '',
-          supportingFactIds: ['AI_RESEARCH_ENGINE'],
-        });
-        if (warnings) {
-          warnings.push({
-            field: fieldName,
-            expected: 'object[]',
-            receivedType: 'string',
-            actionTaken: 'converted string to { profile, explanation: "" }',
-          });
-        }
-      }
-      continue;
-    }
-
-    if (typeof item === 'object') {
-      const profile = safeString(item.profile || item.target || item.title || item.name || defaultProfile);
-      const explanation = safeString(item.explanation || item.description || item.reason || item.detail || '');
-      const factIds = normalizeStringArray(item.supportingFactIds, `${fieldName}.supportingFactIds`);
-
-      result.push({
-        profile: profile || defaultProfile,
-        explanation,
-        supportingFactIds: factIds.length > 0 ? factIds : ['AI_RESEARCH_ENGINE'],
-      });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Safely normalizes Conditions (e.g. purchaseConditions, walkAwayConditions).
- */
-export function normalizeConditionArray(
-  raw: any,
-  fieldName: string,
-  defaultPriority: 'ÖNEMLİ' | 'KRİTİK',
-  warnings?: NormalizationTelemetryWarning[],
-): Array<{ condition: string; reason: string; priority: string; supportingFactIds: string[] }> {
-  if (!raw) return [];
-
-  const items = Array.isArray(raw) ? raw : [raw];
-  const result: Array<{ condition: string; reason: string; priority: string; supportingFactIds: string[] }> = [];
-
-  for (const item of items) {
-    if (!item) continue;
-
-    if (typeof item === 'string') {
-      const trimmed = item.trim();
-      if (trimmed && trimmed !== '[object Object]') {
-        result.push({
-          condition: trimmed,
-          reason: '',
-          priority: defaultPriority,
-          supportingFactIds: ['AI_RESEARCH_ENGINE'],
-        });
-        if (warnings) {
-          warnings.push({
-            field: fieldName,
-            expected: 'object[]',
-            receivedType: 'string',
-            actionTaken: 'converted string to { condition, reason: "" }',
-          });
-        }
-      }
-      continue;
-    }
-
-    if (typeof item === 'object') {
-      const condition = safeString(item.condition || item.title || item.name || 'Kontrol Şartı');
-      const reason = safeString(item.reason || item.explanation || item.description || '');
-      const priority = safeString(item.priority || defaultPriority);
-      const factIds = normalizeStringArray(item.supportingFactIds, `${fieldName}.supportingFactIds`);
-
-      result.push({
-        condition,
-        reason,
-        priority: priority.toUpperCase().includes('KRİTİK') || priority.toUpperCase().includes('CRITICAL') ? 'KRİTİK' : defaultPriority,
-        supportingFactIds: factIds.length > 0 ? factIds : ['AI_RESEARCH_ENGINE'],
-      });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Deep, fail-safe normalizer for the full ComprehensiveVehicleReport.
- * Guarantees every array field is an actual array with validated item shapes.
+ * Deep, fail-safe normalizer for ComprehensiveVehicleReport.
+ * Guarantees schema-safe payload WITHOUT inventing fake priorities, fake reasons, or fake claims.
  */
 export function normalizeVehicleReportPayload(
   rawReport: any,
 ): NormalizationResult<any> {
   const warnings: NormalizationTelemetryWarning[] = [];
   if (!rawReport || typeof rawReport !== 'object') {
-    return { data: rawReport, warnings };
+    return {
+      data: rawReport,
+      warnings,
+      metrics: {
+        safelyNormalizedCount: 0,
+        losslessNormalizedCount: 0,
+        lossyNormalizedCount: 0,
+        rejectedItemCount: 0,
+        unrecoverableFieldCount: 0,
+      },
+    };
   }
 
   const report = { ...rawReport };
@@ -297,7 +219,13 @@ export function normalizeVehicleReportPayload(
       buyabilityScore: { value: null },
       technicalRiskScore: { value: null },
     };
-    warnings.push({ field: 'scoring', expected: 'object', receivedType: typeof report.scoring, actionTaken: 'initialized fallback scoring object' });
+    warnings.push({
+      classification: 'UNRECOVERABLE',
+      field: 'scoring',
+      expected: 'object',
+      receivedType: typeof report.scoring,
+      actionTaken: 'initialized safe empty scoring object with null values',
+    });
   } else {
     report.scoring = {
       ...report.scoring,
@@ -310,31 +238,51 @@ export function normalizeVehicleReportPayload(
     };
   }
 
-  // 2. PrePurchaseChecks Guard
+  // 2. PrePurchaseChecks Guard (NO dummy priority, NO fake provenance fact IDs)
   if (report.prePurchaseChecks !== undefined) {
     const rawChecks = Array.isArray(report.prePurchaseChecks) ? report.prePurchaseChecks : [report.prePurchaseChecks];
     const checksResult: any[] = [];
     rawChecks.forEach((c: any, i: number) => {
       if (!c) return;
       if (typeof c === 'string') {
-        checksResult.push({
-          checkId: `c_${i + 1}`,
-          category: 'MEKANİK',
-          title: safeString(c),
-          instruction: safeString(c),
-          priority: 'ÖNEMLİ',
-          supportingFactIds: ['AI_RESEARCH_ENGINE'],
-        });
+        const text = c.trim();
+        if (text && text !== '[object Object]') {
+          checksResult.push({
+            checkId: `c_${i + 1}`,
+            title: text,
+          });
+          warnings.push({
+            classification: 'LOSSLESS',
+            field: `prePurchaseChecks[${i}]`,
+            expected: 'object',
+            receivedType: 'string',
+            actionTaken: 'preserved string as title without inventing fake priority or reason',
+          });
+        }
       } else if (typeof c === 'object') {
-        checksResult.push({
-          checkId: safeString(c.checkId || `c_${i + 1}`),
-          category: safeString(c.category || 'MEKANİK'),
-          title: safeString(c.title || c.check || `Kontrol #${i + 1}`),
-          instruction: safeString(c.instruction || c.description || c.title || ''),
-          priority: safeString(c.priority || 'ÖNEMLİ'),
-          targetComponent: safeString(c.targetComponent) || undefined,
-          supportingFactIds: normalizeStringArray(c.supportingFactIds, `prePurchaseChecks[${i}].supportingFactIds`),
-        });
+        const title = extractFieldString(c, WHITELISTS.prePurchaseChecks);
+        if (title) {
+          const item: Record<string, any> = {
+            checkId: safeString(c.checkId) || `c_${i + 1}`,
+            title,
+          };
+          if (c.category) item.category = safeString(c.category);
+          if (c.instruction) item.instruction = safeString(c.instruction);
+          if (c.priority) item.priority = safeString(c.priority);
+          if (c.targetComponent) item.targetComponent = safeString(c.targetComponent);
+          if (Array.isArray(c.supportingFactIds) && c.supportingFactIds.length > 0) {
+            item.supportingFactIds = normalizeStringArray(c.supportingFactIds, `prePurchaseChecks[${i}].supportingFactIds`, WHITELISTS.factIds);
+          }
+          checksResult.push(item);
+        } else {
+          warnings.push({
+            classification: 'REJECTED',
+            field: `prePurchaseChecks[${i}]`,
+            expected: 'object with check/title/instruction',
+            receivedType: 'empty/malformed object',
+            actionTaken: 'rejected item due to missing extractable check content',
+          });
+        }
       }
     });
     report.prePurchaseChecks = checksResult;
@@ -342,28 +290,50 @@ export function normalizeVehicleReportPayload(
     report.prePurchaseChecks = [];
   }
 
-  // 3. SellerQuestions Guard
+  // 3. SellerQuestions Guard (NO fake answers, NO fake provenance fact IDs)
   if (report.sellerQuestions !== undefined) {
     const rawQs = Array.isArray(report.sellerQuestions) ? report.sellerQuestions : [report.sellerQuestions];
     const qsResult: any[] = [];
     rawQs.forEach((q: any, i: number) => {
       if (!q) return;
       if (typeof q === 'string') {
-        qsResult.push({
-          questionId: `q_${i + 1}`,
-          category: 'MEKANİK',
-          questionText: safeString(q),
-          supportingFactIds: ['AI_RESEARCH_ENGINE'],
-        });
+        const text = q.trim();
+        if (text && text !== '[object Object]') {
+          qsResult.push({
+            questionId: `q_${i + 1}`,
+            questionText: text,
+          });
+          warnings.push({
+            classification: 'LOSSLESS',
+            field: `sellerQuestions[${i}]`,
+            expected: 'object',
+            receivedType: 'string',
+            actionTaken: 'preserved string as questionText without inventing fake metadata',
+          });
+        }
       } else if (typeof q === 'object') {
-        qsResult.push({
-          questionId: safeString(q.questionId || `q_${i + 1}`),
-          category: safeString(q.category || 'MEKANİK'),
-          questionText: safeString(q.questionText || q.question || 'Detaylı satıcı sorusu'),
-          expectedAnswerHint: safeString(q.expectedAnswerHint || q.hint) || undefined,
-          redFlagAnswerHint: safeString(q.redFlagAnswerHint) || undefined,
-          supportingFactIds: normalizeStringArray(q.supportingFactIds, `sellerQuestions[${i}].supportingFactIds`),
-        });
+        const questionText = extractFieldString(q, WHITELISTS.sellerQuestions);
+        if (questionText) {
+          const item: Record<string, any> = {
+            questionId: safeString(q.questionId) || `q_${i + 1}`,
+            questionText,
+          };
+          if (q.category) item.category = safeString(q.category);
+          if (q.expectedAnswerHint) item.expectedAnswerHint = safeString(q.expectedAnswerHint);
+          if (q.redFlagAnswerHint) item.redFlagAnswerHint = safeString(q.redFlagAnswerHint);
+          if (Array.isArray(q.supportingFactIds) && q.supportingFactIds.length > 0) {
+            item.supportingFactIds = normalizeStringArray(q.supportingFactIds, `sellerQuestions[${i}].supportingFactIds`, WHITELISTS.factIds);
+          }
+          qsResult.push(item);
+        } else {
+          warnings.push({
+            classification: 'REJECTED',
+            field: `sellerQuestions[${i}]`,
+            expected: 'object with question text',
+            receivedType: 'empty/malformed object',
+            actionTaken: 'rejected question due to missing extractable text',
+          });
+        }
       }
     });
     report.sellerQuestions = qsResult;
@@ -378,11 +348,14 @@ export function normalizeVehicleReportPayload(
     // Primary Technical Risk
     if (synth.primaryTechnicalRisk && typeof synth.primaryTechnicalRisk === 'object') {
       const ptr = { ...synth.primaryTechnicalRisk };
-      ptr.title = safeString(ptr.title || 'Teknik Risk');
-      ptr.explanation = safeString(ptr.explanation || '');
-      ptr.symptoms = normalizeStringArray(ptr.symptoms, 'primaryTechnicalRisk.symptoms', warnings);
-      ptr.inspectionInstructions = normalizeStringArray(ptr.inspectionInstructions, 'primaryTechnicalRisk.inspectionInstructions', warnings);
-      ptr.supportingFactIds = normalizeStringArray(ptr.supportingFactIds, 'primaryTechnicalRisk.supportingFactIds');
+      ptr.title = safeString(ptr.title || ptr.riskTitle);
+      if (ptr.explanation !== undefined) ptr.explanation = safeString(ptr.explanation);
+      if (ptr.riskMeaning !== undefined) ptr.riskMeaning = safeString(ptr.riskMeaning);
+      ptr.symptoms = normalizeStringArray(ptr.symptoms, 'primaryTechnicalRisk.symptoms', WHITELISTS.symptoms, warnings);
+      ptr.inspectionInstructions = normalizeStringArray(ptr.inspectionInstructions, 'primaryTechnicalRisk.inspectionInstructions', WHITELISTS.inspectionInstructions, warnings);
+      if (Array.isArray(ptr.supportingFactIds)) {
+        ptr.supportingFactIds = normalizeStringArray(ptr.supportingFactIds, 'primaryTechnicalRisk.supportingFactIds', WHITELISTS.factIds);
+      }
       synth.primaryTechnicalRisk = ptr;
     }
 
@@ -390,22 +363,42 @@ export function normalizeVehicleReportPayload(
     if (synth.secondaryTechnicalRisks !== undefined) {
       const rawSec = Array.isArray(synth.secondaryTechnicalRisks) ? synth.secondaryTechnicalRisks : [synth.secondaryTechnicalRisks];
       const secResult: any[] = [];
-      rawSec.forEach((item: any) => {
+      rawSec.forEach((item: any, i: number) => {
         if (!item) return;
         if (typeof item === 'string') {
-          secResult.push({
-            title: safeString(item),
-            explanation: '',
-            symptoms: [],
-            inspectionInstructions: [],
-          });
+          const trimmed = item.trim();
+          if (trimmed && trimmed !== '[object Object]') {
+            secResult.push({
+              title: trimmed,
+              symptoms: [],
+              inspectionInstructions: [],
+            });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `secondaryTechnicalRisks[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as title',
+            });
+          }
         } else if (typeof item === 'object') {
-          secResult.push({
-            title: safeString(item.title || 'İkincil Risk'),
-            explanation: safeString(item.explanation || item.description || ''),
-            symptoms: normalizeStringArray(item.symptoms, 'secondaryTechnicalRisks.symptoms'),
-            inspectionInstructions: normalizeStringArray(item.inspectionInstructions, 'secondaryTechnicalRisks.inspectionInstructions'),
-          });
+          const title = safeString(item.title || item.riskTitle);
+          if (title) {
+            secResult.push({
+              title,
+              explanation: safeString(item.explanation),
+              symptoms: normalizeStringArray(item.symptoms, `secondaryTechnicalRisks[${i}].symptoms`, WHITELISTS.symptoms),
+              inspectionInstructions: normalizeStringArray(item.inspectionInstructions, `secondaryTechnicalRisks[${i}].inspectionInstructions`, WHITELISTS.inspectionInstructions),
+            });
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `secondaryTechnicalRisks[${i}]`,
+              expected: 'object with title',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected secondary risk due to missing title',
+            });
+          }
         }
       });
       synth.secondaryTechnicalRisks = secResult;
@@ -413,53 +406,253 @@ export function normalizeVehicleReportPayload(
       synth.secondaryTechnicalRisks = [];
     }
 
-    // Strongest Reasons To Choose
-    synth.strongestReasonsToChoose = normalizeTitleExplanationArray(
-      synth.strongestReasonsToChoose,
-      'strongestReasonsToChoose',
-      'Güçlü Neden',
-      warnings,
-    );
+    // Strongest Reasons To Choose (NO dummy title, NO fake provenance)
+    if (synth.strongestReasonsToChoose !== undefined) {
+      const rawItems = Array.isArray(synth.strongestReasonsToChoose) ? synth.strongestReasonsToChoose : [synth.strongestReasonsToChoose];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ title: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `strongestReasonsToChoose[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as title without inventing fake explanation',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const title = extractFieldString(item, WHITELISTS.reasonsToChoose);
+          if (title) {
+            const entry: Record<string, any> = { title };
+            if (item.explanation) entry.explanation = safeString(item.explanation);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `strongestReasonsToChoose[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `strongestReasonsToChoose[${i}]`,
+              expected: 'object with reason/title',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected reason item due to missing title',
+            });
+          }
+        }
+      });
+      synth.strongestReasonsToChoose = res;
+    }
 
-    // Compromises and Limitations
-    synth.compromisesAndLimitations = normalizeTitleExplanationArray(
-      synth.compromisesAndLimitations,
-      'compromisesAndLimitations',
-      'Taviz & Sınırlama',
-      warnings,
-    );
+    // Compromises and Limitations (NO dummy title, NO fake provenance)
+    if (synth.compromisesAndLimitations !== undefined) {
+      const rawItems = Array.isArray(synth.compromisesAndLimitations) ? synth.compromisesAndLimitations : [synth.compromisesAndLimitations];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ title: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `compromisesAndLimitations[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as title without inventing fake explanation',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const title = extractFieldString(item, WHITELISTS.compromisesAndLimitations);
+          if (title) {
+            const entry: Record<string, any> = { title };
+            if (item.explanation) entry.explanation = safeString(item.explanation);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `compromisesAndLimitations[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `compromisesAndLimitations[${i}]`,
+              expected: 'object with limitation/title',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected compromise item due to missing title',
+            });
+          }
+        }
+      });
+      synth.compromisesAndLimitations = res;
+    }
 
     // Suitable For
-    synth.suitableFor = normalizeProfileArray(
-      synth.suitableFor,
-      'suitableFor',
-      'Uygun Kullanıcı Profili',
-      warnings,
-    );
+    if (synth.suitableFor !== undefined) {
+      const rawItems = Array.isArray(synth.suitableFor) ? synth.suitableFor : [synth.suitableFor];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ profile: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `suitableFor[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as profile without inventing fake explanation',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const profile = extractFieldString(item, WHITELISTS.suitableFor);
+          if (profile) {
+            const entry: Record<string, any> = { profile };
+            if (item.explanation) entry.explanation = safeString(item.explanation);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `suitableFor[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `suitableFor[${i}]`,
+              expected: 'object with profile',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected profile item due to missing profile text',
+            });
+          }
+        }
+      });
+      synth.suitableFor = res;
+    }
 
     // Not Suitable For
-    synth.notSuitableFor = normalizeProfileArray(
-      synth.notSuitableFor,
-      'notSuitableFor',
-      'Uygun Olmayabilecek Profil',
-      warnings,
-    );
+    if (synth.notSuitableFor !== undefined) {
+      const rawItems = Array.isArray(synth.notSuitableFor) ? synth.notSuitableFor : [synth.notSuitableFor];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ profile: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `notSuitableFor[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as profile without inventing fake explanation',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const profile = extractFieldString(item, WHITELISTS.notSuitableFor);
+          if (profile) {
+            const entry: Record<string, any> = { profile };
+            if (item.explanation) entry.explanation = safeString(item.explanation);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `notSuitableFor[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `notSuitableFor[${i}]`,
+              expected: 'object with profile',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected notSuitableFor item due to missing profile text',
+            });
+          }
+        }
+      });
+      synth.notSuitableFor = res;
+    }
 
-    // Purchase Conditions
-    synth.purchaseConditions = normalizeConditionArray(
-      synth.purchaseConditions,
-      'purchaseConditions',
-      'ÖNEMLİ',
-      warnings,
-    );
+    // Purchase Conditions (NO fake priority = 'ÖNEMLİ')
+    if (synth.purchaseConditions !== undefined) {
+      const rawItems = Array.isArray(synth.purchaseConditions) ? synth.purchaseConditions : [synth.purchaseConditions];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ condition: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `purchaseConditions[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as condition without inventing fake priority or reason',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const condition = extractFieldString(item, WHITELISTS.purchaseConditions);
+          if (condition) {
+            const entry: Record<string, any> = { condition };
+            if (item.reason) entry.reason = safeString(item.reason);
+            if (item.priority) entry.priority = safeString(item.priority);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `purchaseConditions[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `purchaseConditions[${i}]`,
+              expected: 'object with condition',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected purchase condition due to missing condition text',
+            });
+          }
+        }
+      });
+      synth.purchaseConditions = res;
+    }
 
-    // Walk Away Conditions
-    synth.walkAwayConditions = normalizeConditionArray(
-      synth.walkAwayConditions,
-      'walkAwayConditions',
-      'KRİTİK',
-      warnings,
-    );
+    // Walk Away Conditions (NO fake priority = 'KRİTİK')
+    if (synth.walkAwayConditions !== undefined) {
+      const rawItems = Array.isArray(synth.walkAwayConditions) ? synth.walkAwayConditions : [synth.walkAwayConditions];
+      const res: any[] = [];
+      rawItems.forEach((item: any, i: number) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (text && text !== '[object Object]') {
+            res.push({ condition: text });
+            warnings.push({
+              classification: 'LOSSLESS',
+              field: `walkAwayConditions[${i}]`,
+              expected: 'object',
+              receivedType: 'string',
+              actionTaken: 'preserved string as condition without inventing fake priority or reason',
+            });
+          }
+        } else if (typeof item === 'object') {
+          const condition = extractFieldString(item, WHITELISTS.walkAwayConditions);
+          if (condition) {
+            const entry: Record<string, any> = { condition };
+            if (item.reason) entry.reason = safeString(item.reason);
+            if (item.priority) entry.priority = safeString(item.priority);
+            if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
+              entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `walkAwayConditions[${i}].supportingFactIds`, WHITELISTS.factIds);
+            }
+            res.push(entry);
+          } else {
+            warnings.push({
+              classification: 'REJECTED',
+              field: `walkAwayConditions[${i}]`,
+              expected: 'object with condition',
+              receivedType: 'malformed object',
+              actionTaken: 'rejected walk away condition due to missing condition text',
+            });
+          }
+        }
+      });
+      synth.walkAwayConditions = res;
+    }
 
     report.expertDecisionSynthesis = synth;
   }
@@ -467,14 +660,40 @@ export function normalizeVehicleReportPayload(
   // 5. Common Problems Guard
   if (report.commonProblems !== undefined && !Array.isArray(report.commonProblems)) {
     report.commonProblems = typeof report.commonProblems === 'object' && report.commonProblems !== null ? [report.commonProblems] : [];
-    warnings.push({ field: 'commonProblems', expected: 'array', receivedType: typeof rawReport.commonProblems, actionTaken: 'wrapped or defaulted to array' });
+    warnings.push({
+      classification: 'LOSSLESS',
+      field: 'commonProblems',
+      expected: 'array',
+      receivedType: typeof rawReport.commonProblems,
+      actionTaken: 'wrapped single item into array',
+    });
   }
 
   // 6. Recalls Guard
   if (report.recalls !== undefined && !Array.isArray(report.recalls)) {
     report.recalls = typeof report.recalls === 'object' && report.recalls !== null ? [report.recalls] : [];
-    warnings.push({ field: 'recalls', expected: 'array', receivedType: typeof rawReport.recalls, actionTaken: 'wrapped or defaulted to array' });
+    warnings.push({
+      classification: 'LOSSLESS',
+      field: 'recalls',
+      expected: 'array',
+      receivedType: typeof rawReport.recalls,
+      actionTaken: 'wrapped single item into array',
+    });
   }
 
-  return { data: report, warnings };
+  // Metrics computation
+  const losslessCount = warnings.filter(w => w.classification === 'LOSSLESS').length;
+  const lossyCount = warnings.filter(w => w.classification === 'LOSSY').length;
+  const rejectedCount = warnings.filter(w => w.classification === 'REJECTED').length;
+  const unrecoverableCount = warnings.filter(w => w.classification === 'UNRECOVERABLE').length;
+
+  const metrics: NormalizationMetrics = {
+    safelyNormalizedCount: warnings.length > 0 ? 1 : 0,
+    losslessNormalizedCount: losslessCount,
+    lossyNormalizedCount: lossyCount,
+    rejectedItemCount: rejectedCount,
+    unrecoverableFieldCount: unrecoverableCount,
+  };
+
+  return { data: report, warnings, metrics };
 }

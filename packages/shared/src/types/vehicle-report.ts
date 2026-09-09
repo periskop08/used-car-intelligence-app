@@ -168,21 +168,21 @@ export interface UsageScenarioResult {
 
 export interface PrePurchaseCheckItem {
   checkId: string;
-  category: 'MEKANİK' | 'KAPORTA' | 'ELEKTRONİK' | 'BELGE' | 'SÜRÜŞ' | 'İLAN_ÇELİŞKİSİ';
+  category?: 'MEKANİK' | 'KAPORTA' | 'ELEKTRONİK' | 'BELGE' | 'SÜRÜŞ' | 'İLAN_ÇELİŞKİSİ' | string;
   title: string;
-  instruction: string;
-  priority: 'NORMAL' | 'ÖNEMLİ' | 'KRİTİK';
+  instruction?: string;
+  priority?: 'NORMAL' | 'ÖNEMLİ' | 'KRİTİK' | string;
   targetComponent?: string;
-  supportingFactIds: string[];
+  supportingFactIds?: string[];
 }
 
 export interface SellerQuestionItem {
   questionId: string;
-  category: 'BAKIM' | 'HASAR' | 'KULLANIM' | 'BELGE' | 'ÇELİŞKİ';
+  category?: 'BAKIM' | 'HASAR' | 'KULLANIM' | 'BELGE' | 'ÇELİŞKİ' | string;
   questionText: string;
   expectedAnswerHint?: string;
   redFlagAnswerHint?: string;
-  supportingFactIds: string[];
+  supportingFactIds?: string[];
 }
 
 export interface ListingContradiction {
@@ -261,21 +261,21 @@ export interface ReportDataQualitySection {
 // Expert Decision Synthesis Types
 export interface ExpertSynthesisItem {
   title: string;
-  explanation: string;
-  supportingFactIds: string[];
+  explanation?: string;
+  supportingFactIds?: string[];
 }
 
 export interface UserProfileAssessment {
   profile: string;
-  explanation: string;
-  supportingFactIds: string[];
+  explanation?: string;
+  supportingFactIds?: string[];
 }
 
 export interface PurchaseCondition {
   condition: string;
-  reason: string;
-  priority: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
-  supportingFactIds: string[];
+  reason?: string;
+  priority?: 'NORMAL' | 'IMPORTANT' | 'CRITICAL' | string;
+  supportingFactIds?: string[];
 }
 
 export interface UnavailableClaimItem {
