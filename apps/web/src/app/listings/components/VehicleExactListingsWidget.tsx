@@ -47,7 +47,7 @@ interface VehicleExactListingsWidgetProps {
 }
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://used-car-intelligence-app.onrender.com';
+  process.env.NEXT_PUBLIC_API_URL || 'https://used-car-api-hzmu.onrender.com';
 
 export default function VehicleExactListingsWidget({
   variantId,
@@ -210,11 +210,11 @@ export default function VehicleExactListingsWidget({
                       )}
                     </div>
                     <div className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
-                      {item.modelYear} • {item.kilometers.toLocaleString('tr-TR')} km •{' '}
-                      {item.district ? `${item.city} / ${item.district}` : item.city}
+                      {item.modelYear} • {(item.kilometers ?? 0).toLocaleString('tr-TR')} km •{' '}
+                      {item.district ? `${item.city || ''} / ${item.district}` : (item.city || '')}
                     </div>
                     <div className="text-xs font-black text-orange-400 mt-0.5 leading-none">
-                      {formatPrice(item.priceAmount)}
+                      {formatPrice(item.priceAmount || 0)}
                     </div>
                   </div>
                 </Link>

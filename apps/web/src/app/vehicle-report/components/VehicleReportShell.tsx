@@ -106,28 +106,28 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       {/* 2 Score Indicator Grid (Buyability & Technical Risk) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Buyability Score */}
-        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring.buyabilityScore.value)}`}>
+        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring?.buyabilityScore?.value ?? null)}`}>
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider opacity-90 mb-1">
             <span>Satın Alınabilirlik Skoru</span>
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div className="text-3xl font-black my-2">
-            {report.scoring.buyabilityScore.value !== null ? `${report.scoring.buyabilityScore.value} / 100` : "Veri Yetersiz"}
+            {report.scoring?.buyabilityScore?.value !== undefined && report.scoring?.buyabilityScore?.value !== null ? `${report.scoring.buyabilityScore.value} / 100` : "Veri Yetersiz"}
           </div>
           <span className="text-xs opacity-80 font-medium">Genel Değerlendirme & Satın Alma Uygunluğu</span>
         </div>
 
         {/* Technical Risk Score */}
-        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring.technicalRiskScore.value, true)}`}>
+        <div className={`p-5 rounded-2xl border flex flex-col justify-between shadow-lg ${getScoreColor(report.scoring?.technicalRiskScore?.value ?? null, true)}`}>
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider opacity-90 mb-1">
             <span>Teknik Risk Skoru</span>
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="text-3xl font-black my-2">
-            {report.scoring.technicalRiskScore.value !== null ? `${report.scoring.technicalRiskScore.value} / 100` : "Veri Yetersiz"}
+            {report.scoring?.technicalRiskScore?.value !== undefined && report.scoring?.technicalRiskScore?.value !== null ? `${report.scoring.technicalRiskScore.value} / 100` : "Veri Yetersiz"}
           </div>
           <span className="text-xs font-semibold opacity-90">
-            {report.scoring.technicalRiskScore.value !== null && report.scoring.technicalRiskScore.value > 60 
+            {report.scoring?.technicalRiskScore?.value !== undefined && report.scoring?.technicalRiskScore?.value !== null && report.scoring.technicalRiskScore.value > 60 
               ? "⚠️ Yüksek Risk Seviyesi" 
               : "Dengeli Risk Seviyesi"}
           </span>
@@ -176,7 +176,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       )}
 
       {/* SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-      {report.prePurchaseChecks && report.prePurchaseChecks.length > 0 && (
+      {Array.isArray(report.prePurchaseChecks) && report.prePurchaseChecks.length > 0 && (
         <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center gap-2 border-b border-white/10 pb-3">
             <ShieldCheck className="w-5 h-5 text-orange-400" />
@@ -245,7 +245,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       </div>
 
       {/* SATICIYA SORULACAK KRİTİK SORULAR */}
-      {report.sellerQuestions && report.sellerQuestions.length > 0 && (
+      {Array.isArray(report.sellerQuestions) && report.sellerQuestions.length > 0 && (
         <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center gap-2 border-b border-white/10 pb-3">
             <HelpCircle className="w-5 h-5 text-purple-400" />
@@ -302,7 +302,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             </div>
           )}
 
-          {report.listingAnalysis.damageAssessment && report.listingAnalysis.damageAssessment.length > 0 && (
+          {Array.isArray(report.listingAnalysis.damageAssessment) && report.listingAnalysis.damageAssessment.length > 0 && (
             <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
               <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
               <ul className="list-disc list-inside space-y-1 text-slate-300">

@@ -38,6 +38,16 @@ interface VehicleReportExpertSynthesisProps {
   supportingFacts?: ReportSupportingFact[];
 }
 
+const toArray = <T,>(val: T[] | T | null | undefined): T[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    const trimmed = (val as string).trim();
+    return trimmed ? [trimmed as unknown as T] : [];
+  }
+  return [val];
+};
+
 export default function VehicleReportExpertSynthesis({
   synthesis,
   supportingFacts = [],
@@ -155,7 +165,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-3">
-            {synthesis.strongestReasonsToChoose?.map((item, idx) => (
+            {toArray(synthesis.strongestReasonsToChoose).map((item, idx) => (
               <div key={idx} className="p-3.5 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-xs font-bold text-emerald-300">{item.title}</h4>
@@ -175,7 +185,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-3">
-            {synthesis.compromisesAndLimitations?.map((item, idx) => (
+            {toArray(synthesis.compromisesAndLimitations).map((item, idx) => (
               <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-xs font-bold text-amber-300">{item.title}</h4>
@@ -198,7 +208,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-2.5">
-            {synthesis.suitableFor?.map((prof, idx) => (
+            {toArray(synthesis.suitableFor).map((prof, idx) => (
               <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-200">{prof.profile}</span>
@@ -218,7 +228,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-2.5">
-            {synthesis.notSuitableFor?.map((prof, idx) => (
+            {toArray(synthesis.notSuitableFor).map((prof, idx) => (
               <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-200">{prof.profile}</span>
@@ -232,7 +242,7 @@ export default function VehicleReportExpertSynthesis({
       </div>
 
       {/* 4. TEKNİK RİSK ANALİZİ (Öncelikli Risk + İkincil Riskler) */}
-      {(synthesis.primaryTechnicalRisk || (synthesis.secondaryTechnicalRisks && synthesis.secondaryTechnicalRisks.length > 0)) && (
+      {(synthesis.primaryTechnicalRisk || (toArray(synthesis.secondaryTechnicalRisks).length > 0)) && (
         <div className="bg-[#090d1a] border border-rose-500/30 p-6 rounded-2xl space-y-4 shadow-xl">
           <div className="flex items-center justify-between border-b border-rose-500/20 pb-3">
             <h3 className="text-sm font-black text-rose-400 uppercase tracking-wider flex items-center gap-2">
@@ -261,22 +271,22 @@ export default function VehicleReportExpertSynthesis({
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
-                {synthesis.primaryTechnicalRisk.symptoms?.length > 0 && (
+                {toArray(synthesis.primaryTechnicalRisk.symptoms).length > 0 && (
                   <div className="space-y-1">
                     <span className="font-bold text-rose-300 block">⚠️ Belirtileri ve Semptomları:</span>
                     <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
-                      {synthesis.primaryTechnicalRisk.symptoms.map((s, idx) => (
+                      {toArray(synthesis.primaryTechnicalRisk.symptoms).map((s, idx) => (
                         <li key={idx}>{s}</li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                {synthesis.primaryTechnicalRisk.inspectionInstructions?.length > 0 && (
+                {toArray(synthesis.primaryTechnicalRisk.inspectionInstructions).length > 0 && (
                   <div className="space-y-1">
                     <span className="font-bold text-emerald-300 block">🔍 Ekspertiz Kontrol Adımları:</span>
                     <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
-                      {synthesis.primaryTechnicalRisk.inspectionInstructions.map((inst, idx) => (
+                      {toArray(synthesis.primaryTechnicalRisk.inspectionInstructions).map((inst, idx) => (
                         <li key={idx}>{inst}</li>
                       ))}
                     </ul>
@@ -287,11 +297,11 @@ export default function VehicleReportExpertSynthesis({
           )}
 
           {/* Secondary Risks */}
-          {synthesis.secondaryTechnicalRisks && synthesis.secondaryTechnicalRisks.length > 0 && (
+          {toArray(synthesis.secondaryTechnicalRisks).length > 0 && (
             <div className="space-y-2 pt-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Diğer Dikkat Edilmesi Gereken Riskler</span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {synthesis.secondaryTechnicalRisks.map((sec, idx) => (
+                {toArray(synthesis.secondaryTechnicalRisks).map((sec, idx) => (
                   <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
                     <span className="text-xs font-bold text-slate-200 block">{sec.title}</span>
                     <p className="text-xs text-slate-400">{sec.explanation}</p>
@@ -313,7 +323,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-2.5">
-            {synthesis.purchaseConditions?.map((cond, idx) => (
+            {toArray(synthesis.purchaseConditions).map((cond, idx) => (
               <div key={idx} className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
@@ -338,7 +348,7 @@ export default function VehicleReportExpertSynthesis({
           </h3>
 
           <div className="space-y-2.5">
-            {synthesis.walkAwayConditions?.map((cond, idx) => (
+            {toArray(synthesis.walkAwayConditions).map((cond, idx) => (
               <div key={idx} className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-xl space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">

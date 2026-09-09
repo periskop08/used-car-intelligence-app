@@ -162,15 +162,17 @@ export default function VehicleDetail() {
   const fetchVehicleDetails = (id: string) => {
     if (!id) return;
 
-    try {
-      const cachedVeh = sessionStorage.getItem(`ts_veh_${id}`);
-      if (cachedVeh) {
-        setVehicle(JSON.parse(cachedVeh));
-        setLoading(false);
-      }
-    } catch {}
+    if (typeof window !== "undefined") {
+      try {
+        const cachedVeh = sessionStorage.getItem(`ts_veh_${id}`);
+        if (cachedVeh) {
+          setVehicle(JSON.parse(cachedVeh));
+          setLoading(false);
+        }
+      } catch {}
+    }
 
-    const token = localStorage.getItem("accessToken");
+    const token = typeof window !== "undefined" ? (localStorage.getItem("accessToken") || localStorage.getItem("token")) : null;
     const headers: any = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -183,9 +185,11 @@ export default function VehicleDetail() {
       })
       .then(data => {
         setVehicle(data);
-        try {
-          sessionStorage.setItem(`ts_veh_${id}`, JSON.stringify(data));
-        } catch {}
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(`ts_veh_${id}`, JSON.stringify(data));
+          } catch {}
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -254,7 +258,7 @@ export default function VehicleDetail() {
   const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
 
-    if (!force) {
+    if (!force && typeof window !== "undefined") {
       try {
         const cachedRep = sessionStorage.getItem(`ts_rep_${variantId}`);
         if (cachedRep) {
@@ -286,9 +290,11 @@ export default function VehicleDetail() {
             (data.reportData?.status || data.status) !== "SAFE_FALLBACK"
           ) {
             setStructuredReport(parsed);
-            try {
-              sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsed));
-            } catch {}
+            if (typeof window !== "undefined") {
+              try {
+                sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsed));
+              } catch {}
+            }
             setLoadingStructuredReport(false);
             setCountdown(null);
             setReportError("");
@@ -321,9 +327,11 @@ export default function VehicleDetail() {
             const parsedDetail = extractReportData(detailData);
             if (parsedDetail) {
               setStructuredReport(parsedDetail);
-              try {
-                sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsedDetail));
-              } catch {}
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsedDetail));
+                } catch {}
+              }
               setCountdown(null);
               setLoadingStructuredReport(false);
               setReportError("");
@@ -636,13 +644,13 @@ export default function VehicleDetail() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/10 pb-2.5">
           <div>
             <span className="text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-              {vehicle.country} Spesifikasyonları
+              {typeof vehicle.country === 'object' ? vehicle.country?.name : (vehicle.country || 'Türkiye')} Spesifikasyonları
             </span>
             <h1 className="text-lg md:text-xl font-black tracking-tight text-white mt-1">
-              {vehicle.brand} {vehicle.model} ({vehicle.year})
+              {typeof vehicle.brand === 'object' ? vehicle.brand?.name : vehicle.brand} {typeof vehicle.model === 'object' ? vehicle.model?.name : vehicle.model} ({vehicle.year})
             </h1>
             <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-              {vehicle.generation} • {vehicle.bodyType} • {vehicle.engine} • {vehicle.transmission} • {vehicle.trim}
+              {typeof vehicle.generation === 'object' ? vehicle.generation?.name : (vehicle.generation || '')} • {typeof vehicle.bodyType === 'object' ? vehicle.bodyType?.name : (vehicle.bodyType || '')} • {typeof vehicle.engine === 'object' ? (vehicle.engine?.code || vehicle.engine?.name || '') : (vehicle.engine || '')} • {typeof vehicle.transmission === 'object' ? vehicle.transmission?.name : (vehicle.transmission || '')} • {typeof vehicle.trim === 'object' ? vehicle.trim?.name : (vehicle.trim || '')}
             </p>
           </div>
 
@@ -761,8 +769,8 @@ export default function VehicleDetail() {
 
           {/* User Reviews List */}
           <div className="glass p-6 rounded-2xl flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({vehicle.reviews.length})</h2>
-            {vehicle.reviews.length > 0 ? (
+            <h2 className="text-lg font-bold text-slate-200 border-b border-white/5 pb-2">💬 Kullanıcı Yorumları ({Array.isArray(vehicle.reviews) ? vehicle.reviews.length : 0})</h2>
+            {Array.isArray(vehicle.reviews) && vehicle.reviews.length > 0 ? (
               <div className="flex flex-col gap-4 mt-2">
                 {vehicle.reviews.map((rev: any) => (
                   <div key={rev.id} className="bg-slate-950/20 border border-white/5 p-4 rounded-xl flex flex-col gap-2">
