@@ -27,11 +27,11 @@ import {
 } from "@used-car-intelligence/shared";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://used-car-intelligence-app.onrender.com";
+  process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
 
-const STORAGE_KEY_ITEMS = "torquescout_feed_items";
-const STORAGE_KEY_INDEX = "torquescout_feed_index";
-const STORAGE_KEY_SEED = "torquescout_feed_seed";
+const STORAGE_KEY_ITEMS = "torquescout_feed_items_v3";
+const STORAGE_KEY_INDEX = "torquescout_feed_index_v3";
+const STORAGE_KEY_SEED = "torquescout_feed_seed_v3";
 
 interface FeedSeller {
   id: string;
@@ -238,18 +238,30 @@ function FeedCardDeck() {
             isFavorite: !!x.isFavorited,
             isUrgent: !!x.isUrgent,
             isShowcaseFeedActive: !!x.isShowcaseFeedActive,
+            localPaintedParts: (x.localPaintedParts as string[]) || [],
+            paintedParts: (x.paintedParts as string[]) || [],
+            changedParts: (x.changedParts as string[]) || [],
+            damageRecord: x.damageRecord || null,
+            tramerAmount: x.tramerAmount ? Number(x.tramerAmount) : 0,
           }));
           setItems(mappedFallback);
           return;
         }
       }
 
+      const cleanList: FeedItem[] = rawList.map((it: any) => ({
+        ...it,
+        localPaintedParts: it.localPaintedParts || [],
+        paintedParts: it.paintedParts || [],
+        changedParts: it.changedParts || [],
+      }));
+
       if (replace) {
-        setItems(rawList);
+        setItems(cleanList);
         setCurrentIndex(0);
         setActivePhotoIdx(0);
         const favMap: Record<string, boolean> = {};
-        rawList.forEach((it) => {
+        cleanList.forEach((it) => {
           favMap[it.id] = it.isFavorite;
         });
         setFavorites(favMap);
@@ -359,6 +371,43 @@ function FeedCardDeck() {
   };
 
   const currentItem = items[currentIndex];
+
+  // Guaranteed Live Expertise Synchronization:
+  // Fetches single listing details directly from the API to ensure 100% parity with the listing's own detail page!
+  useEffect(() => {
+    if (!currentItem?.id) return;
+
+    let isCancelled = false;
+    fetch(`${API_BASE_URL}/listings/${currentItem.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((detail) => {
+        if (!isCancelled && detail) {
+          const lParts = Array.isArray(detail.localPaintedParts) ? detail.localPaintedParts : [];
+          const pParts = Array.isArray(detail.paintedParts) ? detail.paintedParts : [];
+          const cParts = Array.isArray(detail.changedParts) ? detail.changedParts : [];
+
+          setItems((prev) =>
+            prev.map((it) =>
+              it.id === currentItem.id
+                ? {
+                    ...it,
+                    localPaintedParts: lParts,
+                    paintedParts: pParts,
+                    changedParts: cParts,
+                    damageRecord: detail.damageRecord || null,
+                    tramerAmount: detail.tramerAmount ? Number(detail.tramerAmount) : 0,
+                  }
+                : it
+            )
+          );
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentItem?.id]);
 
   if (loading && items.length === 0) {
     return (

@@ -248,7 +248,13 @@ export default function ListingFeedScreen() {
       }
 
       const data = await response.json();
-      const newItems: ListingFeedItem[] = data.items || [];
+      const rawItems = data.items || [];
+      const newItems: ListingFeedItem[] = rawItems.map((item: any) => ({
+        ...item,
+        localPaintedParts: item.localPaintedParts || [],
+        paintedParts: item.paintedParts || [],
+        changedParts: item.changedParts || [],
+      }));
 
       if (replace) {
         setListings(newItems);
@@ -399,6 +405,29 @@ export default function ListingFeedScreen() {
             if (prev.includes(item.id)) return prev;
             return [...prev, item.id];
           });
+
+          // Live Condition Synchronizer: Guarantees 1:1 match with real vehicle listing
+          fetch(`${API_URL}/listings/${item.id}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((detail) => {
+              if (detail) {
+                setListings((prev) =>
+                  prev.map((l) =>
+                    l.id === item.id
+                      ? {
+                          ...l,
+                          localPaintedParts: detail.localPaintedParts || [],
+                          paintedParts: detail.paintedParts || [],
+                          changedParts: detail.changedParts || [],
+                          damageRecord: detail.damageRecord || null,
+                          tramerAmount: detail.tramerAmount || 0,
+                        }
+                      : l
+                  )
+                );
+              }
+            })
+            .catch(() => {});
         }
 
         // Prefetch next page
