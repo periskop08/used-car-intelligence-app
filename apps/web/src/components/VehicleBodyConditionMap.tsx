@@ -487,3 +487,153 @@ export function VehicleBodyConditionMap({
     </div>
   );
 }
+
+export function CompactVehicleBodySvg({
+  localPaintedParts = [],
+  paintedParts = [],
+  changedParts = [],
+  className = "",
+}: {
+  localPaintedParts?: string[] | null;
+  paintedParts?: string[] | null;
+  changedParts?: string[] | null;
+  className?: string;
+}) {
+  const statusMap = resolveBodyPartStatusMap({
+    localPaintedParts: localPaintedParts || [],
+    paintedParts: paintedParts || [],
+    changedParts: changedParts || [],
+  });
+
+  const getPartColor = (part: VehicleBodyPart) => {
+    const status = statusMap[part];
+    if (status === BodyPartStatus.REPLACED) {
+      return { fill: "rgba(239, 68, 68, 0.65)", stroke: "#f87171" };
+    }
+    if (status === BodyPartStatus.PAINTED) {
+      return { fill: "rgba(59, 130, 246, 0.65)", stroke: "#60a5fa" };
+    }
+    if (status === BodyPartStatus.LOCAL_PAINTED) {
+      return { fill: "rgba(249, 115, 22, 0.65)", stroke: "#fb923c" };
+    }
+    return { fill: "#0f172a", stroke: "#334155" };
+  };
+
+  return (
+    <svg viewBox="0 0 200 370" className={`drop-shadow-md select-none ${className}`}>
+      {/* Ghost Outline */}
+      <path
+        d="M 50 35 C 50 25, 150 25, 150 35 C 165 60, 168 110, 162 180 C 168 250, 165 300, 152 350 C 150 360, 50 360, 48 350 C 35 300, 32 250, 38 180 C 32 110, 35 60, 50 35 Z"
+        fill="#080f1d"
+        stroke="#1e293b"
+        strokeWidth="1.5"
+      />
+      {/* Wheels */}
+      <rect x="23" y="60" width="14" height="32" rx="4" fill="#1e293b" />
+      <rect x="163" y="60" width="14" height="32" rx="4" fill="#1e293b" />
+      <rect x="23" y="280" width="14" height="32" rx="4" fill="#1e293b" />
+      <rect x="163" y="280" width="14" height="32" rx="4" fill="#1e293b" />
+
+      {/* 1. FRONT BUMPER */}
+      <path
+        d="M 50 35 Q 100 20 150 35 L 142 45 Q 100 35 58 45 Z"
+        fill={getPartColor("FRONT_BUMPER").fill}
+        stroke={getPartColor("FRONT_BUMPER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 2. HOOD */}
+      <path
+        d="M 58 45 Q 100 35 142 45 L 135 110 L 65 110 Z"
+        fill={getPartColor("HOOD").fill}
+        stroke={getPartColor("HOOD").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 3. LEFT FRONT FENDER */}
+      <path
+        d="M 50 35 L 58 45 L 65 110 L 38 110 C 34 85 36 55 50 35 Z"
+        fill={getPartColor("LEFT_FRONT_FENDER").fill}
+        stroke={getPartColor("LEFT_FRONT_FENDER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 4. RIGHT FRONT FENDER */}
+      <path
+        d="M 150 35 C 164 55 166 85 162 110 L 135 110 L 142 45 Z"
+        fill={getPartColor("RIGHT_FRONT_FENDER").fill}
+        stroke={getPartColor("RIGHT_FRONT_FENDER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 5. LEFT FRONT DOOR */}
+      <path
+        d="M 38 110 L 65 110 L 65 180 L 38 180 Z"
+        fill={getPartColor("LEFT_FRONT_DOOR").fill}
+        stroke={getPartColor("LEFT_FRONT_DOOR").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 6. RIGHT FRONT DOOR */}
+      <path
+        d="M 135 110 L 162 110 L 162 180 L 135 180 Z"
+        fill={getPartColor("RIGHT_FRONT_DOOR").fill}
+        stroke={getPartColor("RIGHT_FRONT_DOOR").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 7. ROOF */}
+      <rect
+        x="65"
+        y="110"
+        width="70"
+        height="140"
+        rx="8"
+        fill={getPartColor("ROOF").fill}
+        stroke={getPartColor("ROOF").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 8. LEFT REAR DOOR */}
+      <path
+        d="M 38 180 L 65 180 L 65 250 L 38 250 Z"
+        fill={getPartColor("LEFT_REAR_DOOR").fill}
+        stroke={getPartColor("LEFT_REAR_DOOR").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 9. RIGHT REAR DOOR */}
+      <path
+        d="M 135 180 L 162 180 L 162 250 L 135 250 Z"
+        fill={getPartColor("RIGHT_REAR_DOOR").fill}
+        stroke={getPartColor("RIGHT_REAR_DOOR").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 10. LEFT REAR FENDER */}
+      <path
+        d="M 38 250 L 65 250 L 60 330 L 53 340 C 36 320 34 280 38 250 Z"
+        fill={getPartColor("LEFT_REAR_FENDER").fill}
+        stroke={getPartColor("LEFT_REAR_FENDER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 11. TRUNK */}
+      <path
+        d="M 65 250 L 135 250 L 140 330 Q 100 340 60 330 Z"
+        fill={getPartColor("TRUNK").fill}
+        stroke={getPartColor("TRUNK").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 12. RIGHT REAR FENDER */}
+      <path
+        d="M 135 250 L 162 250 C 166 280 164 320 147 340 L 140 330 Z"
+        fill={getPartColor("RIGHT_REAR_FENDER").fill}
+        stroke={getPartColor("RIGHT_REAR_FENDER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* 13. REAR BUMPER */}
+      <path
+        d="M 53 340 Q 100 350 147 340 L 152 350 Q 100 365 48 350 Z"
+        fill={getPartColor("REAR_BUMPER").fill}
+        stroke={getPartColor("REAR_BUMPER").stroke}
+        strokeWidth="1.5"
+      />
+      {/* Headlights & Taillights */}
+      <ellipse cx="61" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(-10 61 41)" opacity="0.9" />
+      <ellipse cx="139" cy="41" rx="5" ry="2.5" fill="#fef08a" transform="rotate(10 139 41)" opacity="0.9" />
+      <rect x="52" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" />
+      <rect x="138" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity="0.9" />
+    </svg>
+  );
+}

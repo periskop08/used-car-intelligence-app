@@ -477,6 +477,11 @@ export class ListingController {
         isUrgent,
         isShowcaseFeedActive,
         detailUrl: `/listings/${item.id}`,
+        localPaintedParts: (item.localPaintedParts as string[]) || [],
+        paintedParts: (item.paintedParts as string[]) || [],
+        changedParts: (item.changedParts as string[]) || [],
+        damageRecord: item.damageRecord || null,
+        tramerAmount: item.tramerAmount ? Number(item.tramerAmount) : 0,
       };
     });
 

@@ -15,7 +15,16 @@ import {
   Sparkles,
   RefreshCw,
   X,
+  ShieldCheck,
 } from "lucide-react";
+import {
+  VehicleBodyConditionMap,
+  CompactVehicleBodySvg,
+} from "@/components/VehicleBodyConditionMap";
+import {
+  BODY_PART_LABELS,
+  VehicleBodyPart,
+} from "@used-car-intelligence/shared";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-intelligence-app.onrender.com";
@@ -61,6 +70,11 @@ interface FeedItem {
   isFavorite: boolean;
   isUrgent?: boolean;
   isShowcaseFeedActive?: boolean;
+  localPaintedParts?: string[];
+  paintedParts?: string[];
+  changedParts?: string[];
+  damageRecord?: string | null;
+  tramerAmount?: number;
 }
 
 const FUEL_LABELS: Record<string, string> = {
@@ -98,10 +112,11 @@ function FeedCardDeck() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "loc">("info");
+  const [activeTab, setActiveTab] = useState<"info" | "expertise">("info");
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [isDescModalOpen, setIsDescModalOpen] = useState(false);
+  const [isExpertiseModalOpen, setIsExpertiseModalOpen] = useState(false);
   const [seed, setSeed] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -547,7 +562,7 @@ function FeedCardDeck() {
               : `Vasıta > Otomobil > ${currentItem.vehicle.brand} > ${currentItem.vehicle.modelFamily}`}
           </div>
 
-          {/* 5. Segmented Tabs (Özellikler & Konum) */}
+          {/* 5. Segmented Tabs (Özellikler & Ekspertiz Durumu) */}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -563,24 +578,24 @@ function FeedCardDeck() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("loc")}
+              onClick={() => setActiveTab("expertise")}
               className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === "loc"
+                activeTab === "expertise"
                   ? "bg-orange-500/10 border-orange-500 text-orange-400 shadow-sm"
                   : "bg-white/[0.02] border-white/10 text-slate-400 hover:text-white"
               }`}
             >
-              <span>📍</span>
-              <span>Konum</span>
+              <span>🛡️</span>
+              <span>Ekspertiz Durumu</span>
             </button>
           </div>
 
-          {/* 6. Tab Content Table */}
-          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 relative min-h-[96px] flex flex-col justify-center">
+          {/* 6. Tab Content Table (Sabit Boyutlandırılmış / Kart Fiziki Yapısını Değiştirmez) */}
+          <div className="mt-2.5 p-3 rounded-2xl bg-[#060d1b] border border-white/5 relative h-[116px] min-h-[116px] flex flex-col justify-center overflow-hidden">
             {/* Right Floating Scroll Guide Indicator Pill */}
             <div
               onClick={handleNext}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-[#0c162b] border border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-400 shadow-md cursor-pointer hover:bg-orange-500/20 transition"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-[#0c162b] border border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-400 shadow-md cursor-pointer hover:bg-orange-500/20 transition z-20"
               title="Sonraki İlana Geç"
             >
               <ChevronUp className="w-2.5 h-2.5 text-slate-400" />
@@ -616,24 +631,87 @@ function FeedCardDeck() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-2 pr-7 text-xs">
-                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
-                  <span className="text-slate-400 font-medium">Şehir</span>
-                  <span className="font-bold text-slate-200">{currentItem.location.city}</span>
+              <div className="flex items-center gap-3 pr-7 h-full">
+                {/* Sol: Ölçeklendirilmiş SVG Araç Şeması (Tıklanınca Tam Ekran Açar) */}
+                <div
+                  onClick={() => setIsExpertiseModalOpen(true)}
+                  className="w-[50px] h-[92px] shrink-0 bg-slate-950/70 rounded-xl border border-white/10 p-1 flex items-center justify-center cursor-pointer hover:border-orange-500/50 hover:bg-slate-900/80 transition group"
+                  title="Detaylı Ekspertiz Şemasını Büyüt"
+                >
+                  <CompactVehicleBodySvg
+                    localPaintedParts={currentItem.localPaintedParts}
+                    paintedParts={currentItem.paintedParts}
+                    changedParts={currentItem.changedParts}
+                    className="w-full h-full group-hover:scale-105 transition"
+                  />
                 </div>
-                <div className="flex items-center justify-between pb-1 border-b border-white/[0.04]">
-                  <span className="text-slate-400 font-medium">İlçe</span>
-                  <span className="font-bold text-slate-200">
-                    {currentItem.location.district || "Merkez"}
-                  </span>
-                </div>
-                <div className="flex justify-end pt-1">
-                  <Link
-                    href={`/listings/${currentItem.id}`}
-                    className="text-blue-400 hover:text-blue-300 font-bold text-[11px] flex items-center gap-1"
-                  >
-                    <span>Haritada Göster ➔</span>
-                  </Link>
+
+                {/* Sağ: Ekspertiz Özeti ve Buton */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1 text-xs">
+                  {(() => {
+                    const localList = currentItem.localPaintedParts || [];
+                    const paintedList = currentItem.paintedParts || [];
+                    const changedList = currentItem.changedParts || [];
+                    const hasDamages =
+                      localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+
+                    if (!hasDamages) {
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-emerald-400 font-black text-xs">
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                            <span>Hatasız & Orijinal</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-400 leading-tight">
+                            Boya ve değişen parça bulunmamaktadır.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsExpertiseModalOpen(true)}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                          >
+                            <span>Detaylı Şemayı Aç ➔</span>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-0.5">
+                        {localList.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-orange-400 font-bold truncate">
+                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0 shadow-sm" />
+                            <span className="truncate">
+                              Lokal ({localList.length}): {localList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        {paintedList.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-blue-400 font-bold truncate">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 shadow-sm" />
+                            <span className="truncate">
+                              Boyalı ({paintedList.length}): {paintedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        {changedList.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-[10.5px] text-red-400 font-bold truncate">
+                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 shadow-sm" />
+                            <span className="truncate">
+                              Değişen ({changedList.length}): {changedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsExpertiseModalOpen(true)}
+                          className="text-[10px] text-orange-400 hover:text-orange-300 font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                        >
+                          <span>Detaylı Şemayı Gör ➔</span>
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -724,6 +802,58 @@ function FeedCardDeck() {
             <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-xs text-slate-300 leading-relaxed whitespace-pre-line">
               {currentItem.description ||
                 "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Expertise / Vehicle Condition Modal (Görsel 1 ile Birebir Aynı Şema) */}
+      {isExpertiseModalOpen && (
+        <div
+          onClick={() => setIsExpertiseModalOpen(false)}
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl bg-[#0a1224] border border-white/10 rounded-3xl p-5 sm:p-7 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🛡️</span>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
+                    Ekspertiz ve Boya/Değişen Durumu
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium">
+                    {currentItem.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExpertiseModalOpen(false)}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <VehicleBodyConditionMap
+              mode="readOnly"
+              localPaintedParts={currentItem.localPaintedParts || []}
+              paintedParts={currentItem.paintedParts || []}
+              changedParts={currentItem.changedParts || []}
+              showTitle={true}
+            />
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsExpertiseModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition shadow-md cursor-pointer"
+              >
+                Kapat
+              </button>
             </div>
           </div>
         </div>

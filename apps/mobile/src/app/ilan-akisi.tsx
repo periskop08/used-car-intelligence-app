@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
 import ShowcaseBadge from '../components/ShowcaseBadge';
+import { PART_LABELS } from '../components/VehicleConditionVisualizer';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -185,6 +186,11 @@ interface ListingFeedItem {
   isUrgent?: boolean;
   isShowcaseFeedActive?: boolean;
   detailUrl: string;
+  localPaintedParts?: string[];
+  paintedParts?: string[];
+  changedParts?: string[];
+  damageRecord?: string | null;
+  tramerAmount?: number;
 }
 
 export default function ListingFeedScreen() {
@@ -198,7 +204,7 @@ export default function ListingFeedScreen() {
   const [seed, setSeed] = useState<string>('');
 
   // States per listing id
-  const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'desc' | 'loc'>>({});
+  const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'expertise'>>({});
   const [activePhotoIndices, setActivePhotoIndices] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
@@ -246,7 +252,7 @@ export default function ListingFeedScreen() {
 
       if (replace) {
         setListings(newItems);
-        const tabs: Record<string, 'info' | 'desc' | 'loc'> = {};
+        const tabs: Record<string, 'info' | 'expertise'> = {};
         const photos: Record<string, number> = {};
         const favs: Record<string, boolean> = {};
 
@@ -544,22 +550,22 @@ export default function ListingFeedScreen() {
               </Text>
             </View>
 
-            {/* 4. Tab Bar (Özellikler & Konum) */}
+            {/* 4. Tab Bar (Özellikler & Ekspertiz Durumu) */}
             <View style={styles.tabBar}>
-              {(['info', 'loc'] as const).map((tab) => (
+              {(['info', 'expertise'] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab}
                   style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
                   onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
                 >
                   <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
-                    {tab === 'info' ? '📋 Özellikler' : '📍 Konum'}
+                    {tab === 'info' ? '📋 Özellikler' : '🛡️ Ekspertiz Durumu'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* 5. Tab Content Box (Özellikler or Konum) */}
+            {/* 5. Tab Content Box (Özellikler or Ekspertiz Durumu) */}
             <View style={styles.tabContentContainer}>
               {/* Right Floating Vertical Swipe Guide Indicator inside the table */}
               <View style={styles.scrollGuidePill} pointerEvents="none">
@@ -592,21 +598,74 @@ export default function ListingFeedScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.locBox}>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Şehir</Text>
-                    <Text style={styles.infoValue}>{item.location.city}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>İlçe / Mahalle</Text>
-                    <Text style={styles.infoValue}>{item.location.district || 'Merkez'}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/listings/${item.id}` as any)}
-                    style={styles.detailLink}
-                  >
-                    <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
-                  </TouchableOpacity>
+                <View style={styles.scrollInfo}>
+                  {(() => {
+                    const localList = item.localPaintedParts || [];
+                    const paintedList = item.paintedParts || [];
+                    const changedList = item.changedParts || [];
+                    const hasIssues = localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+
+                    if (!hasIssues) {
+                      return (
+                        <View style={{ justifyContent: 'center', height: '100%', gap: 3 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="shield-checkmark" size={14} color="#10b981" />
+                            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#10b981' }}>
+                              Hatasız & Orijinal
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 10, color: '#64748b' }}>
+                            Boya veya değişen parçası bulunmamaktadır.
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => router.push(`/listings/${item.id}` as any)}
+                            style={{ alignSelf: 'flex-start', marginTop: 2 }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
+                              Detaylı Raporu Gör ➔
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    }
+
+                    return (
+                      <View style={{ justifyContent: 'space-evenly', height: '100%' }}>
+                        {localList.length > 0 && (
+                          <View style={styles.infoRow}>
+                            <Text style={[styles.infoLabel, { color: '#f59e0b' }]}>Lokal Boya</Text>
+                            <Text style={[styles.infoValue, { color: '#f59e0b', maxWidth: 160 }]} numberOfLines={1}>
+                              {localList.map((p) => PART_LABELS[p] || p).join(', ')}
+                            </Text>
+                          </View>
+                        )}
+                        {paintedList.length > 0 && (
+                          <View style={styles.infoRow}>
+                            <Text style={[styles.infoLabel, { color: '#3b82f6' }]}>Boyalı</Text>
+                            <Text style={[styles.infoValue, { color: '#3b82f6', maxWidth: 160 }]} numberOfLines={1}>
+                              {paintedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                            </Text>
+                          </View>
+                        )}
+                        {changedList.length > 0 && (
+                          <View style={styles.infoRow}>
+                            <Text style={[styles.infoLabel, { color: '#ef4444' }]}>Değişen</Text>
+                            <Text style={[styles.infoValue, { color: '#ef4444', maxWidth: 160 }]} numberOfLines={1}>
+                              {changedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                            </Text>
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          onPress={() => router.push(`/listings/${item.id}` as any)}
+                          style={{ alignSelf: 'flex-end', marginTop: 1 }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
+                            Detaylı Şemayı Gör ➔
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })()}
                 </View>
               )}
             </View>
