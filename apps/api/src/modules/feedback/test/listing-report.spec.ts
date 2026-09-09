@@ -87,9 +87,10 @@ describe('Listing Report & Moderation System (İlanı Bildir)', () => {
     it('should ignore client-passed metadata and strictly derive source, subjectCategory, and snapshots from DB', async () => {
       const mockListing = {
         id: 'list-derived-001',
+        listingNo: 'TSIN-2301-000001',
         title: 'Mercedes C200d AMG',
         sellerId: 'seller-true-id',
-        seller: { id: 'seller-true-id', createdAt: new Date('2023-01-10'), username: 'benz_master' },
+        seller: { id: 'seller-true-id', createdAt: new Date('2023-01-10'), customerNo: 'TSU-2301-000001', username: 'benz_master' },
       };
 
       mockPrismaService.vehicleListing.findUnique.mockResolvedValue(mockListing);
@@ -104,9 +105,9 @@ describe('Listing Report & Moderation System (İlanı Bildir)', () => {
       expect(res.source).toBe(FeedbackSource.LISTING_REPORT);
       expect(res.subjectCategory).toBe(FeedbackCategory.LISTINGS);
       expect(res.listingOwnerId).toBe('seller-true-id');
-      expect(res.listingNoSnapshot).toBe('LIST-DER');
+      expect(res.listingNoSnapshot).toBe('TSIN-2301-000001');
       expect(res.listingTitleSnapshot).toBe('Mercedes C200d AMG');
-      expect(res.listingOwnerReferenceSnapshot).toBe('TS-2301-SELLER');
+      expect(res.listingOwnerReferenceSnapshot).toBe('TSU-2301-000001');
     });
   });
 

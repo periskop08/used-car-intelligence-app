@@ -1030,6 +1030,7 @@ enum ListingPackageType {
 
 model VehicleListing {
   id                 String             @id @default(uuid())
+  listingNo          String?            @unique
   sellerId           String
   seller             User               @relation(fields: [sellerId], references: [id])
   
@@ -3174,6 +3175,12 @@ model AdminUserMessage {
 }
 
 model CustomerNoCounter {
+  period    String   @id // YYMM format, e.g. "2608"
+  counter   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model ListingNoCounter {
   period    String   @id // YYMM format, e.g. "2608"
   counter   Int      @default(0)
   updatedAt DateTime @updatedAt

@@ -466,7 +466,7 @@ export class ListingController {
         price: parseFloat(item.priceAmount.toString()),
         currency: item.currency,
         listingDate: new Date(item.publishedAt || item.createdAt).toLocaleDateString('tr-TR'),
-        listingNo: item.id.replace(/^TEST-SIMILAR-/, 'SIM-').substring(0, 8).toUpperCase(),
+        listingNo: item.listingNo || item.id,
         location,
         seller,
         vehicle,
@@ -476,7 +476,7 @@ export class ListingController {
         isFavorite: favoritedIds.has(item.id),
         isUrgent,
         isShowcaseFeedActive,
-        detailUrl: `/listings/${item.id}`,
+        detailUrl: `/listings/${item.listingNo || item.id}`,
         localPaintedParts: (item.localPaintedParts as string[]) || [],
         paintedParts: (item.paintedParts as string[]) || [],
         changedParts: (item.changedParts as string[]) || [],
@@ -500,12 +500,18 @@ export class ListingController {
     @Req() req: Request,
     @GetUser() user?: UserPayload,
   ) {
-    const listing = await this.listingService['prisma'].vehicleListing.findUnique({
-      where: { id },
+    const listing = await this.listingService['prisma'].vehicleListing.findFirst({
+      where: {
+        OR: [
+          { listingNo: id },
+          { id: id },
+        ],
+      },
       include: {
         seller: {
           select: {
             id: true,
+            customerNo: true,
             firstName: true,
             lastName: true,
             phone: true,

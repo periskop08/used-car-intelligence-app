@@ -52,7 +52,7 @@ export class ReportExportService {
       // Dummy generation simulation or UTF-8 CSV build
       const rows = [
         ['Müşteri No', 'Ad Soyad', 'Paket', 'Tarih'],
-        ['TS-2608-000123', 'Mehmet Efe Güven', 'YETKIN', new Date().toISOString()],
+        ['TSU-2608-000123', 'Mehmet Efe Güven', 'YETKIN', new Date().toISOString()],
       ];
 
       let fileContent = '';

@@ -187,7 +187,7 @@ export function AdminListingInspectionModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-orange-400">
-                  {l?.publicListingNo || listingId?.slice(0, 10)}
+                  {l?.listingNo || l?.publicListingNo || listingId}
                 </span>
                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-mono ${statusResolution.badgeClass}`}>
                   {statusResolution.label}
@@ -202,7 +202,7 @@ export function AdminListingInspectionModal({
           <div className="flex items-center gap-2 shrink-0">
             {listingId && (
               <a
-                href={`/listings/${listingId}`}
+                href={`/listings/${l?.listingNo || listingId}`}
                 target="_blank"
                 rel="noreferrer"
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/10 rounded-xl text-xs font-bold transition cursor-pointer"

@@ -149,7 +149,7 @@ describe('VehicleGuideComment System (SİSTEM B - Bağımsız)', () => {
             firstName: 'Ahmet',
             lastName: 'Yılmaz',
             username: 'ahmety',
-            customerNo: 'TS-2607-000001',
+            customerNo: 'TSU-2607-000001',
           },
         },
       ]);

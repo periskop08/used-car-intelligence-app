@@ -168,7 +168,7 @@ export class FeedbackService {
       where: { id: listingId },
       include: {
         seller: {
-          select: { id: true, createdAt: true, username: true, email: true },
+          select: { id: true, createdAt: true, username: true, email: true, customerNo: true },
         },
       },
     });
@@ -210,9 +210,11 @@ export class FeedbackService {
 
     // Generate pseudonymous seller customer reference snapshot
     const seller = listing.seller;
-    const sellerCustomerNo = seller
-      ? `TS-${seller.createdAt.getFullYear().toString().slice(-2)}${(seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}-${seller.id.substring(0, 6)}`.toUpperCase()
-      : 'TS-UNKNOWN';
+    const sellerCustomerNo = seller?.customerNo
+      ? seller.customerNo
+      : seller
+      ? `TSU-${seller.createdAt.getFullYear().toString().slice(-2)}${(seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}-000001`
+      : 'TSU-UNKNOWN';
 
     const ticketNo = this.generateTicketNo('RPT');
     const initialTimeline: AuditTimelineEntry[] = [
@@ -233,7 +235,7 @@ export class FeedbackService {
           subjectCategory: FeedbackCategory.LISTINGS,
           listingId: listing.id,
           listingOwnerId: listing.sellerId,
-          listingNoSnapshot: listing.id.substring(0, 8).toUpperCase(),
+          listingNoSnapshot: listing.listingNo || listing.id,
           listingTitleSnapshot: listing.title,
           listingOwnerReferenceSnapshot: sellerCustomerNo,
           message: sanitizedMessage,
@@ -324,6 +326,7 @@ export class FeedbackService {
             lastName: true,
             profilePhotoUrl: true,
             subscriptionTier: true,
+            customerNo: true,
             createdAt: true,
           },
         },
@@ -338,12 +341,14 @@ export class FeedbackService {
         listing: {
           select: {
             id: true,
+            listingNo: true,
             title: true,
             status: true,
             sellerId: true,
             seller: {
               select: {
                 id: true,
+                customerNo: true,
                 email: true,
                 username: true,
                 firstName: true,
@@ -367,8 +372,7 @@ export class FeedbackService {
 
         if (user) {
           const yearMonth = `${user.createdAt.getFullYear().toString().slice(-2)}${(user.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-          const shortId = user.id.slice(0, 6).toUpperCase();
-          const customerNo = `TS-${yearMonth}-${shortId}`;
+          const customerNo = user.customerNo || `TSU-${yearMonth}-000001`;
 
           const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
           formattedName = fullName || user.username || user.email.split('@')[0];
@@ -379,8 +383,7 @@ export class FeedbackService {
         if (fb.listing?.seller) {
           const seller = fb.listing.seller;
           const yearMonth = `${seller.createdAt.getFullYear().toString().slice(-2)}${(seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-          const shortId = seller.id.slice(0, 6).toUpperCase();
-          const sellerCustomerNo = `TS-${yearMonth}-${shortId}`;
+          const sellerCustomerNo = seller.customerNo || `TSU-${yearMonth}-000001`;
           const fullName = `${seller.firstName || ''} ${seller.lastName || ''}`.trim();
 
           listingOwnerInfo = {
@@ -392,7 +395,7 @@ export class FeedbackService {
         } else if (fb.listingOwnerId) {
           listingOwnerInfo = {
             id: fb.listingOwnerId,
-            customerNo: fb.listingOwnerReferenceSnapshot || 'TS-UNKNOWN',
+            customerNo: fb.listingOwnerReferenceSnapshot || 'TSU-UNKNOWN',
             displayName: 'İlan Sahibi',
           };
         }

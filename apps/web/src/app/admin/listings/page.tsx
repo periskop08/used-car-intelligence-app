@@ -314,7 +314,7 @@ function AdminListingsContent() {
 
                       {/* İLAN NO */}
                       <td className="p-4 font-mono">
-                        <span className="font-bold text-orange-400 block hover:underline cursor-pointer">{listingId.slice(0, 10)}</span>
+                        <span className="font-bold text-orange-400 block hover:underline cursor-pointer">{item.listingNo || listingId}</span>
                         <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
                           <Camera className="w-3 h-3 text-slate-400" />
                           <span>{item.media?.length || 0}</span>
@@ -344,7 +344,7 @@ function AdminListingsContent() {
                               <span className="font-bold text-white group-hover:text-orange-400 block font-sans">
                                 {seller.firstName && seller.lastName ? `${seller.firstName} ${seller.lastName}` : seller.email}
                               </span>
-                              <span className="text-[10px] text-slate-500 block">{seller.customerNo || 'TS-Müşteri'}</span>
+                              <span className="text-[10px] text-slate-500 block">{seller.customerNo || 'TSU-Müşteri'}</span>
                             </div>
                           </button>
                         ) : (

@@ -284,7 +284,7 @@ export function ClubPostDrawer({
                   {post.authorFormatted || post.author?.name || post.author?.username || 'Yönetici'}
                 </span>
                 <span className="text-slate-400 text-[11px] font-mono">
-                  Müşteri No: {post.author?.customerNo || 'TS-ADMIN'}
+                  Müşteri No: {post.author?.customerNo || 'TSU-ADMIN'}
                 </span>
               </div>
               {onOpenUserDrawer && post.author?.id && (
@@ -334,7 +334,7 @@ export function ClubPostDrawer({
                               {comment.authorFormatted || comment.author?.username || 'Kullanıcı'}
                             </span>
                             <span className="text-[10px] text-slate-400 font-mono">
-                              ({comment.author?.customerNo || 'TS-MEMBER'})
+                              ({comment.author?.customerNo || 'TSU-MEMBER'})
                             </span>
                             {comment.badge && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">

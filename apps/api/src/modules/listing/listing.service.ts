@@ -207,6 +207,21 @@ export class ListingService {
     }
   }
 
+  async generateListingNo(createdAt: Date = new Date()): Promise<string> {
+    const yy = String(createdAt.getFullYear()).slice(-2);
+    const mm = String(createdAt.getMonth() + 1).padStart(2, '0');
+    const period = `${yy}${mm}`;
+
+    const updatedCounter = await this.prisma.listingNoCounter.upsert({
+      where: { period },
+      update: { counter: { increment: 1 } },
+      create: { period, counter: 1 },
+    });
+
+    const seqStr = String(updatedCounter.counter).padStart(6, '0');
+    return `TSIN-${period}-${seqStr}`;
+  }
+
   // Create Listing DRAFT
   async createListing(userId: string, dto: CreateListingDto) {
     // If creating directly with ACTIVE/PENDING_REVIEW status, check quota first
@@ -234,8 +249,11 @@ export class ListingService {
       changedParts: dto.changedParts,
     });
 
+    const listingNo = await this.generateListingNo(new Date());
+
     return this.prisma.vehicleListing.create({
       data: {
+        listingNo,
         sellerId: userId,
         vehicleVariantId: dto.vehicleVariantId || null,
         title: dto.title,

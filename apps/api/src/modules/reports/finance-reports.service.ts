@@ -90,7 +90,7 @@ export class FinanceReportsService {
       },
       include: {
         plan: true,
-        user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, subscriptionTier: true, createdAt: true } },
+        user: { select: { id: true, email: true, firstName: true, lastName: true, role: true, subscriptionTier: true, customerNo: true, createdAt: true } },
       },
     });
 
@@ -149,8 +149,7 @@ export class FinanceReportsService {
       }
 
       const yearMonth = `${s.createdAt.getFullYear().toString().slice(-2)}${(s.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-      const shortId = s.id.slice(0, 6).toUpperCase();
-      const customerNo = `TS-${yearMonth}-${shortId}`;
+      const customerNo = s.user.customerNo || `TSU-${yearMonth}-000001`;
       const name = `${s.user.firstName || ''} ${s.user.lastName || ''}`.trim() || s.user.email.split('@')[0];
 
       return {
@@ -414,14 +413,14 @@ export class FinanceReportsService {
     const adminGrantedBuyerPackagesList = adminBuyerGrantPurchases.map((p) => {
       const u = p.user;
       const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
-      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
+      const customerNo = u?.customerNo || `TSU-${yearMonth}-000001`;
       const audit = adminBuyerGrantAudits.find((a) => a.entityId === p.id);
       const metadata = audit ? (audit.metadata as any) || {} : {};
 
       return {
         id: p.id,
         userId: p.userId,
-        customerNo: `TS-${yearMonth}-${shortId}`,
+        customerNo,
         userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : 'Müşteri',
         userEmail: u?.email || '—',
         packageCode: p.packageCode,
@@ -482,7 +481,7 @@ export class FinanceReportsService {
     const buyerItems = paidBuyerPurchases.map((p) => {
       const u = p.user;
       const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
-      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'BUYER';
+      const customerNo = u?.customerNo || `TSU-${yearMonth}-000001`;
       return {
         id: p.id,
         transactionNo: `TX-BUYER-${p.id.substring(0, 8).toUpperCase()}`,
@@ -491,7 +490,7 @@ export class FinanceReportsService {
         userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : 'Müşteri',
         userEmail: u?.email || '—',
         userPhone: u?.phone || '—',
-        customerNo: `TS-${yearMonth}-${shortId}`,
+        customerNo,
         productName: p.packageCode === 'ALICI_MINI' ? 'Alıcı Mini Ek Hak Paketi' : p.packageCode === 'ALICI_MAX' ? 'Alıcı Max Ek Hak Paketi' : 'Alıcı Plus Ek Hak Paketi',
         productCode: p.packageCode,
         productType: 'BUYER_PACKAGE',
@@ -520,7 +519,7 @@ export class FinanceReportsService {
     const promoItems = realPaidPromotions.map((p) => {
       const u = p.user;
       const yearMonth = u ? `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}` : '2408';
-      const shortId = u ? u.id.slice(0, 6).toUpperCase() : 'PROMO';
+      const customerNo = u?.customerNo || `TSU-${yearMonth}-000001`;
       const isUrgent = p.promotionType === 'URGENT_LISTING' || p.productSku === 'URGENT_LISTING';
       const netPaid = this.getNetPromotionRevenue(p as any);
       const isRefunded = (p.paymentStatus as any) === 'REFUNDED' || p.refundedAt !== null;
@@ -534,7 +533,7 @@ export class FinanceReportsService {
         userName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || p.buyerReferenceSnapshot || 'Müşteri' : p.buyerReferenceSnapshot || 'Müşteri',
         userEmail: u?.email || '—',
         userPhone: u?.phone || '—',
-        customerNo: `TS-${yearMonth}-${shortId}`,
+        customerNo,
         productName: isUrgent ? 'Acil İlan Paketi' : 'Vitrin + Keşfet Paketi',
         productCode: p.productSku,
         productType: isUrgent ? 'PROMOTION_URGENT' : 'PROMOTION_SHOWCASE',
@@ -696,9 +695,9 @@ export class FinanceReportsService {
     });
 
     const formatCustomerNo = (u: any) => {
+      if (u.customerNo) return u.customerNo;
       const yearMonth = `${u.createdAt.getFullYear().toString().slice(-2)}${(u.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-      const shortId = u.id.slice(0, 6).toUpperCase();
-      return `TS-${yearMonth}-${shortId}`;
+      return `TSU-${yearMonth}-000001`;
     };
 
     // Format Real Paid Subscribers List

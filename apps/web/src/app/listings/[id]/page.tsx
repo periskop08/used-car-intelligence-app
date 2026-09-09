@@ -55,6 +55,9 @@ export default function ListingDetail() {
       })
       .then((data) => {
         setListing(data);
+        if (data.listingNo && id !== data.listingNo && typeof window !== 'undefined') {
+          window.history.replaceState(null, '', `/listings/${data.listingNo}`);
+        }
         setIsSellerFavorited(data.isSellerFavorited || false);
         if (data.media && data.media.length > 0) {
           setActivePhoto(data.media[0].url);
@@ -384,7 +387,7 @@ export default function ListingDetail() {
               {/* İlan No */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">İlan No</span>
-                <span className="font-black text-red-400 font-mono text-right">{listing.listingNo || listing.id.slice(0, 8).toUpperCase()}</span>
+                <span className="font-black text-red-400 font-mono text-right">{listing.listingNo}</span>
               </div>
 
               {/* İlan Tarihi */}
@@ -666,7 +669,7 @@ export default function ListingDetail() {
           {/* İlanı Bildir Link */}
           <div className="flex justify-end pr-1">
             <Link
-              href={`/dashboard/support/feedback?listingId=${listing.id}`}
+              href={`/dashboard/support/feedback?listingId=${listing.listingNo || listing.id}`}
               className="text-xs font-semibold text-slate-400 hover:text-orange-400 transition flex items-center gap-1.5 cursor-pointer py-0.5 group"
             >
               <span className="text-slate-500 group-hover:text-orange-400 transition">⚑</span>
@@ -777,7 +780,7 @@ export default function ListingDetail() {
 
       {/* 4. ALT DİKDÖRTGEN BÖLÜM: TorqueScout İlan Zekası (Araç Raporu + Chatbot Danışmanı) */}
       <div className="max-w-7xl mx-auto px-4 pb-8">
-        <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.publicListingNo} />
+        <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.listingNo || listing.publicListingNo} />
       </div>
 
       {/* Send Message Modal Popup */}

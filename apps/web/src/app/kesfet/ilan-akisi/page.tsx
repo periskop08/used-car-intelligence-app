@@ -212,7 +212,7 @@ function FeedCardDeck() {
             price: Number(x.priceAmount),
             currency: x.currency || "TRY",
             listingDate: new Date(x.publishedAt || x.createdAt).toLocaleDateString("tr-TR"),
-            listingNo: x.id.replace(/^TEST-SIMILAR-/, "SIM-").substring(0, 8).toUpperCase(),
+            listingNo: x.listingNo || x.id,
             description: x.description,
             location: { city: x.city, district: x.district || "Merkez" },
             seller: {
@@ -364,7 +364,7 @@ function FeedCardDeck() {
   };
 
   const handleShare = (item: FeedItem) => {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/listings/${item.id}` : "";
+    const url = typeof window !== "undefined" ? `${window.location.origin}/listings/${item.listingNo || item.id}` : "";
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
       showToast("🔗 İlan bağlantısı kopyalandı!");
@@ -795,7 +795,7 @@ function FeedCardDeck() {
           {/* 8. Bottom Action Buttons */}
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
             <Link
-              href={`/listings/${currentItem.id}`}
+              href={`/listings/${currentItem.listingNo || currentItem.id}`}
               className="py-2.5 px-3 rounded-xl bg-white md:bg-[#0e182e] hover:bg-slate-50 md:hover:bg-[#162547] border-2 border-slate-200 md:border-white/15 text-slate-900 md:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
               <FileText className="w-4 h-4 text-slate-600 md:text-slate-300" />
