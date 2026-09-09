@@ -45,8 +45,16 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   };
 
   // Detailed Specifications & Calculations (Pulls 100% directly from AI technical specifications)
-  const hpValue = report.performanceUsage?.powerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp || report.vehicleIdentity?.enginePowerHp;
-  const torqueValue = report.performanceUsage?.torqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.engineTorqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
+  const isHybrid = formatFuelTypeTr(report.vehicleIdentity?.fuelType) === 'Hibrit' || (report.vehicleIdentity?.transmissionName || '').toLowerCase().includes('e-cvt');
+  const rawHp = report.performanceUsage?.powerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp || report.vehicleIdentity?.enginePowerHp;
+  const powerUnit = (report.performanceUsage as any)?.powerUnit || (report.vehicleIdentity as any)?.powerUnit || ((report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerUnit) || 'HP';
+  const numericHp = typeof rawHp === 'number' ? rawHp : (typeof rawHp === 'string' ? parseInt(rawHp.replace(/\D/g, ''), 10) : null);
+  const powerLabel = numericHp ? `${numericHp} ${powerUnit}${isHybrid ? ' (Toplam Hibrit Sistem Gücü)' : ''}` : null;
+
+  const rawTorque = report.performanceUsage?.torqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.engineTorqueNm || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.torqueNm || (report.vehicleIdentity as any)?.engineTorqueNm;
+  const torqueUnit = (report.performanceUsage as any)?.torqueUnit || (report.vehicleIdentity as any)?.torqueUnit || 'Nm';
+  const numericTorque = typeof rawTorque === 'number' ? rawTorque : (typeof rawTorque === 'string' ? parseInt(rawTorque.replace(/\D/g, ''), 10) : null);
+
   const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
   const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh;
   const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
@@ -75,7 +83,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
             {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} ` : ""}
-            {hpValue ? `(${hpValue} HP${torqueValue ? ` / ${torqueValue} Nm` : ""}) ` : ""}• 
+            {powerLabel ? `(${powerLabel}${numericTorque ? ` / ${numericTorque} ${torqueUnit}` : ""}) ` : ""}• 
             {report.vehicleIdentity.transmissionName} • {formatFuelTypeTr(report.vehicleIdentity.fuelType)}
             {combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : ""}
           </p>
@@ -211,7 +219,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
           <div className="bg-slate-950/60 border border-orange-500/30 p-3 rounded-xl flex flex-col justify-center shadow-md">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
-            <span className="font-extrabold text-orange-400 text-sm mt-0.5">{hpValue ? `${hpValue} HP` : "—"}</span>
+            <span className="font-extrabold text-orange-400 text-sm mt-0.5">{powerLabel || "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>

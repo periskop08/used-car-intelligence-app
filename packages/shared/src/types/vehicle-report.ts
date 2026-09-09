@@ -68,6 +68,7 @@ export interface VehicleIdentitySection {
   modelYear: number;
   engineDisplacementCc?: number;
   enginePowerHp?: number;
+  powerUnit?: string;
   engineCode?: string;
   engineType?: string;
   enginePowerRpm?: string;
@@ -99,7 +100,9 @@ export interface EngineTransmissionSection {
 
 export interface PerformanceUsageSection {
   powerHp?: number;
+  powerUnit?: string;
   torqueNm?: number;
+  torqueUnit?: string;
   powerRpm?: string;
   torqueRpm?: string;
   zeroToHundredKmh?: number;

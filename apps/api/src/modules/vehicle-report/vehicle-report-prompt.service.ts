@@ -25,7 +25,9 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "engineCode": "Spesifik Kod (Doğrulandıysa) veya Aile Adı",
     "engineDisplacementCc": 1598,
     "enginePowerHp": 120,
+    "powerUnit": "HP | PS | kW",
     "engineTorqueNm": 250,
+    "torqueUnit": "Nm",
     "transmissionFamily": "DSG / ZF 8HP / EDC vb.",
     "transmissionCode": "DQ200 / 0CW vb. (Doğrulandıysa)",
     "clutchType": "KURU_CIFT_KAVRAMA | ISLAK_CIFT_KAVRAMA | TORK_KONVERTORLU | CVT | MANUEL",
@@ -177,9 +179,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    Türkiye resmi distribütör pazarında satılan özel vergi dilimli motorlara (örn. BMW G20 320i 1.6L 170 HP, G30 520i 1.6L 170 HP, Mercedes C200/E180 1.6L vb.) ASLA kronolojik uyumsuzluk veya motor hatası uyarısı VERME. Yalnızca Türkiye'de ve dünyada hiçbir zaman üretilmemiş bariz çelişkilerde uyarı ver.
 7. CÜMLE TAMAMLAMA: Tüm paragrafları NOKTA (.) ile biten %100 TAM CÜMLELERLE tamamla. Asla metni yarım bırakma!
 8. Yalnızca geçerli JSON üret.
-9. HİBRİT VE e-CVT MİMARİSİ VE GÜÇ/TORK ETİKETLEME KORUMASI:
-   - Hibrit araçlarda doğrulanmış DB / kaynak sayısal güç ve tork değerlerini ASLA kendiliğinden dönüştürme veya yeniden yazma (örn. DB'de 120 HP ise 120 HP olarak koru, 122 HP'ye çevirme; kaynak birim ve değerleri sessizce dönüştürme). Yalnızca doğrulanmış değere semantik etiket ekle: "[Doğrulanmış Güç] HP (Toplam Hibrit Sistem Gücü)".
-   - Doğrulanmış içten yanmalı motor torkunu "[Doğrulanmış Tork] Nm (Benzinli Motor Torku)" olarak etiketle. Doğrulanmış elektrik motoru torku güvenilir kaynakta varsa ayrı belirt; güvenilir kanıtta yoksa tork uydurma ve ASLA benzinli ile elektrik torkunu toplayarak kombine hibrit tork hesaplama.
+9. HİBRİT VE e-CVT MİMARİSİ VE GÜÇ/TORK KORUMASI:
+   - 'technicalSpecifications' JSON alanlarındaki 'enginePowerHp', 'engineTorqueNm' vb. sayısal alanlara KESİNLİKLE metin/semantik etiket GÖMÜLEMEZ. Bu alanlar her zaman saf sayı (Number) olmalıdır. Güç birimi 'powerUnit' ('HP' | 'PS' | 'kW') alanında saklanır.
+   - Doğrulanmış güç değerini ve birimini kaynakta geçtiği orijinal haliyle koru (örn. kaynak 122 PS ise 'enginePowerHp': 122 ve 'powerUnit': 'PS'; kaynak 90 kW ise 'enginePowerHp': 90 ve 'powerUnit': 'kW'; DB'de 120 HP ise 120 ve 'powerUnit': 'HP'). Sessizce birim dönüştürme yapma.
+   - Doğrulanmış içten yanmalı motor torkunu kaynakta geçtiği sayısal haliyle koru. Doğrulanmış elektrik motoru torku güvenilir kaynakta varsa ayrı belirt; güvenilir kanıtta yoksa tork uydurma ve ASLA benzinli ile elektrik torkunu toplayarak kombine hibrit tork hesaplama.
    - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.`;
   }
 
@@ -258,7 +261,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 10. HİBRİT VE e-CVT AKTARMA MİMARİSİ:
-    - Araç Hibrit veya e-CVT ise: Doğrulanmış DB güç/tork sayısal değerlerini aynen koru, dönüştürme (örn. DB'de 120 HP ise 120 HP olarak koru). Yalnızca Motor gücüne "(Toplam Hibrit Sistem Gücü)", varsa doğrulanmış benzinli torka "(Benzinli Motor Torku)" etiketini ekle. Asla kombine hibrit tork hesaplama veya kanıtta olmayan tork uydurma.
+    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) gir. Güç birimini 'powerUnit' ('HP' | 'PS' | 'kW') alanında belirt.
+    - Doğrulanmış DB/kaynak güç ve tork sayısal değerlerini ve birimlerini aynen koru. Asla kombine hibrit tork hesaplama veya kanıtta olmayan tork uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
@@ -284,7 +288,9 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     "engineCode": "CRKB",
     "engineDisplacementCc": 1598,
     "enginePowerHp": 120,
+    "powerUnit": "HP",
     "engineTorqueNm": 250,
+    "torqueUnit": "Nm",
     "transmissionFamily": "DSG",
     "transmissionCode": "DQ200",
     "clutchType": "KURU_CIFT_KAVRAMA",

@@ -262,7 +262,7 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
   });
 
   describe('Hybrid Power/Torque DB Value Preservation & Semantic Labeling', () => {
-    it('should preserve verified DB power value (120 HP) unchanged while applying hybrid semantic label', () => {
+    it('should preserve verified DB power value (120 HP) unchanged when DB power is explicitly set', () => {
       const contradictionService = new (require('../vehicle-report-contradiction.service').VehicleReportContradictionService)();
       const fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(scoringService, contradictionService);
       const dbVehicleContext = {
@@ -275,6 +275,7 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
           transmissionName: 'e-CVT',
           engineCode: '1.8 Hybrid',
           enginePowerHp: 120, // DB has 120 HP
+          powerUnit: 'HP',
         },
         performanceSpecs: {
           engineTorqueNm: 142, // ICE-only torque in DB
@@ -285,27 +286,27 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
         },
       };
 
-      const report = fallbackService.generateFallbackReport('rep-fallback-1', 'VEHICLE_QUERY', dbVehicleContext);
+      const report = fallbackService.generateFallbackReport('rep-fallback-1', 'VEHICLE_REPORT', dbVehicleContext);
 
       // Verified DB numeric values must survive unchanged
       expect(report.vehicleIdentity.enginePowerHp).toBe(120);
-      expect(report.vehicleIdentity.enginePowerRpm).toBe('120 HP (Toplam Sistem Gücü)');
-      expect(report.vehicleIdentity.engineTorqueRpm).toBe('142 Nm (Benzinli Motor Torku)');
+      expect(report.vehicleIdentity.powerUnit).toBe('HP');
+      expect(typeof report.vehicleIdentity.enginePowerHp).toBe('number');
 
       // Check provider merge protection: AI proposing 122 HP must not overwrite verified DB 120 HP
       const providerService = new (require('../vehicle-report-provider.service').VehicleReportProviderService)(
         null as any,
         fallbackService,
+        null as any,
         validationService,
-        null as any,
         scoringService,
-        null as any,
         null as any
       );
 
       const aiContent = {
         technicalSpecifications: {
-          enginePowerHp: 122, // AI hallucinating 122 instead of DB 120
+          enginePowerHp: 122,
+          powerUnit: 'HP',
           engineTorqueNm: 142,
         },
       };
@@ -314,6 +315,80 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
 
       // Verified DB enginePowerHp must remain 120
       expect(report.vehicleIdentity.enginePowerHp).toBe(120);
+      expect(typeof report.vehicleIdentity.enginePowerHp).toBe('number');
+    });
+
+    it('should maintain numeric purity, preserve original unit (PS/kW), and forbid embedded semantic labels when DB power is null (Corolla Production Parity)', () => {
+      const contradictionService = new (require('../vehicle-report-contradiction.service').VehicleReportContradictionService)();
+      const fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(scoringService, contradictionService);
+
+      // Actual production context: DB power is null (letting Stage 1 research provide verified factory spec)
+      const productionCorollaContext = {
+        vehicleIdentity: {
+          variantId: 'c7767942-0fb8-4efd-956d-1077a33d68c9',
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: null, // Production DB has null
+        },
+        performanceSpecs: {
+          enginePowerHp: null,
+          engineTorqueNm: null,
+        },
+        verifiedDatabaseVehicleReport: {
+          knownDatabaseProblems: [],
+          recalls: [],
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-corolla-live', 'VEHICLE_REPORT', productionCorollaContext);
+
+      const providerService = new (require('../vehicle-report-provider.service').VehicleReportProviderService)(
+        null as any,
+        fallbackService,
+        null as any,
+        validationService,
+        scoringService,
+        null as any
+      );
+
+      // Stage 1 / Stage 2 outputs verified factory specification: 122 PS
+      const aiGeneratedContent = {
+        technicalSpecifications: {
+          enginePowerHp: 122,
+          powerUnit: 'PS',
+          engineTorqueNm: 142,
+        },
+      };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, aiGeneratedContent);
+      (providerService as any).sanitizeIncompatibleReportFields(baseReport, productionCorollaContext);
+
+      // 1. Numeric fields must remain pure numbers
+      expect(typeof baseReport.vehicleIdentity.enginePowerHp).toBe('number');
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(122);
+      expect(typeof baseReport.performanceUsage?.powerHp).toBe('number');
+      expect(baseReport.performanceUsage?.powerHp).toBe(122);
+
+      // 2. Original unit must be preserved
+      expect(baseReport.vehicleIdentity.powerUnit).toBe('PS');
+      expect(baseReport.performanceUsage?.powerUnit).toBe('PS');
+
+      // 3. No semantic labels embedded inside numeric fields
+      expect(String(baseReport.vehicleIdentity.enginePowerHp)).not.toContain('Toplam Hibrit');
+      expect(String(baseReport.performanceUsage?.powerHp)).not.toContain('Toplam Hibrit');
+
+      // 4. Frontend rendering parity verification: value + unit + semanticLabel
+      const isHybrid = baseReport.vehicleIdentity.fuelType.toLowerCase().includes('hibrit');
+      const powerUnit = baseReport.performanceUsage?.powerUnit || baseReport.vehicleIdentity.powerUnit || 'HP';
+      const powerSemanticLabel = isHybrid ? ' (Toplam Hibrit Sistem Gücü)' : '';
+      const formattedHeader = `${baseReport.performanceUsage?.powerHp} ${powerUnit}${powerSemanticLabel}`;
+
+      expect(formattedHeader).toBe('122 PS (Toplam Hibrit Sistem Gücü)');
+      expect(formattedHeader).not.toContain('122 (Toplam Hibrit Sistem Gücü) HP');
     });
   });
 });

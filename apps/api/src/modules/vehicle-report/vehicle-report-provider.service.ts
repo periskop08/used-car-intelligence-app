@@ -373,7 +373,13 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
       }
       if (specs.enginePowerHp && !baseReport.vehicleIdentity.enginePowerHp) {
-        baseReport.vehicleIdentity.enginePowerHp = specs.enginePowerHp;
+        const numericHp = typeof specs.enginePowerHp === 'number'
+          ? specs.enginePowerHp
+          : parseInt(String(specs.enginePowerHp).replace(/\D/g, ''), 10) || undefined;
+        baseReport.vehicleIdentity.enginePowerHp = numericHp;
+      }
+      if (specs.powerUnit) {
+        (baseReport.vehicleIdentity as any).powerUnit = specs.powerUnit;
       }
       if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
       if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
@@ -388,9 +394,15 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null
       );
 
+      const numericPerfHp = typeof specs.enginePowerHp === 'number'
+        ? specs.enginePowerHp
+        : (typeof currentPerf.powerHp === 'number' ? currentPerf.powerHp : parseInt(String(specs.enginePowerHp || currentPerf.powerHp || '').replace(/\D/g, ''), 10) || undefined);
+
       baseReport.performanceUsage = {
-        powerHp: currentPerf.powerHp || specs.enginePowerHp,
+        powerHp: (currentPerf.powerHp !== undefined && currentPerf.powerHp !== null) ? currentPerf.powerHp : numericPerfHp,
+        powerUnit: specs.powerUnit || (currentPerf as any).powerUnit || 'HP',
         torqueNm: currentPerf.torqueNm || specs.engineTorqueNm,
+        torqueUnit: specs.torqueUnit || (currentPerf as any).torqueUnit || 'Nm',
         zeroToHundredKmh: (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null) ? currentPerf.zeroToHundredKmh : specs.zeroToHundredKmh,
         topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
         cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
