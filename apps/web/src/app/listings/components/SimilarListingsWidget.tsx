@@ -196,9 +196,9 @@ export default function SimilarListingsWidget({
             </div>
           ) : (
             /* Görünürde Tam 5 benzer ilan sınırı (max-h-[385px]), 10 ilana kadar iç kaydırma */
-            <div className="max-h-[385px] overflow-y-auto pr-1 flex flex-col gap-2.5 custom-scrollbar overscroll-contain">
+            <div className="max-h-[385px] overflow-y-auto pr-1 flex flex-col gap-2 custom-scrollbar overscroll-contain">
               {miniListings.map((item) => (
-                <CompactListingCard key={item.id} listing={item} />
+                <CompactListingCard key={item.id} listing={item} variant="sidebar" />
               ))}
             </div>
           )}

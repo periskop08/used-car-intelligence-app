@@ -500,7 +500,10 @@ export class ListingController {
 
   @Get('listings/by-vehicle/:variantId')
   @ApiOperation({ summary: 'Araç raporu için birebir eşleşen aktif ilanları getir' })
-  async getExactListingsByVehicle(@Param('variantId') variantId: string) {
+  async getExactListingsByVehicle(
+    @Param('variantId') variantId: string,
+    @Req() req: Request,
+  ) {
     const prisma = this.listingService['prisma'];
     const variant = await prisma.vehicleVariant.findUnique({
       where: { id: variantId },
@@ -576,7 +579,8 @@ export class ListingController {
     });
 
     const mappedItems = items.map((item: any) => {
-      const primaryMedia = item.media?.[0]?.url || null;
+      const formattedMedia = item.media ? this.formatMediaUrls(item.media, req) : [];
+      const primaryMedia = formattedMedia?.[0]?.url || item.media?.[0]?.url || null;
       const promoSummary = this.promotionQueryService
         ? this.promotionQueryService.resolveEffectivePromotions(item, now)
         : null;
