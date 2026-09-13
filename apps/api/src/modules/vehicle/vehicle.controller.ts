@@ -37,6 +37,27 @@ export class VehicleController {
     return this.vehicleService.getModels(brandId);
   }
 
+  @Get('engines')
+  @ApiOperation({ summary: 'Modele Ait Motor Seçeneklerini Al' })
+  @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })
+  getEngines(@Query('modelId') modelId: string) {
+    if (!modelId) {
+      throw new BadRequestException('modelId query parametresi gereklidir.');
+    }
+    return this.vehicleService.getEngines(modelId);
+  }
+
+  @Get('trims')
+  @ApiOperation({ summary: 'Modele ve İsteğe Bağlı Motora Ait Donanım Paketlerini Al' })
+  @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })
+  @ApiQuery({ name: 'engineId', required: false, description: 'Motor UUIDsi' })
+  getTrims(@Query('modelId') modelId: string, @Query('engineId') engineId?: string) {
+    if (!modelId) {
+      throw new BadRequestException('modelId query parametresi gereklidir.');
+    }
+    return this.vehicleService.getTrims(modelId, engineId);
+  }
+
   @Get('variants')
   @ApiOperation({ summary: 'Modele Ait Varyantları Al' })
   @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })

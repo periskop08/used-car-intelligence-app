@@ -56,6 +56,98 @@ export class VehicleService {
     });
   }
 
+  async getEngines(modelId: string) {
+    const variants = await this.prisma.vehicleVariant.findMany({
+      where: { modelId, status: ApprovalStatus.APPROVED },
+      select: {
+        engine: {
+          select: {
+            id: true,
+            code: true,
+            displacement: true,
+            horsepower: true,
+            torque: true,
+            fuelType: true,
+            hasTurbo: true,
+            isHybrid: true,
+            isElectric: true,
+          },
+        },
+      },
+      distinct: ['engineId'],
+    });
+
+    const engines = variants
+      .map((v) => v.engine)
+      .filter((e): e is NonNullable<typeof e> => !!e);
+
+    return engines
+      .map((e) => {
+        const parts: string[] = [];
+        if (e.displacement) parts.push(`${e.displacement} cc`);
+        if (e.horsepower) parts.push(`${e.horsepower} HP`);
+        if (e.fuelType) {
+          const fuelMap: Record<string, string> = {
+            PETROL: 'Benzin',
+            DIESEL: 'Dizel',
+            HYBRID: 'Hibrit',
+            ELECTRIC: 'Elektrik',
+            LPG: 'LPG',
+          };
+          parts.push(fuelMap[e.fuelType] || e.fuelType);
+        }
+        const details = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+        return {
+          ...e,
+          displayName: `${e.code}${details}`,
+        };
+      })
+      .sort((a, b) => (a.displacement || 0) - (b.displacement || 0) || (a.horsepower || 0) - (b.horsepower || 0));
+  }
+
+  async getTrims(modelId: string, engineId?: string) {
+    let where: any = { modelId, status: ApprovalStatus.APPROVED };
+    if (engineId) {
+      where.engineId = engineId;
+    }
+
+    let variants = await this.prisma.vehicleVariant.findMany({
+      where,
+      select: {
+        trim: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+      },
+      distinct: ['trimId'],
+    });
+
+    if (variants.length === 0 && engineId) {
+      variants = await this.prisma.vehicleVariant.findMany({
+        where: { modelId, status: ApprovalStatus.APPROVED },
+        select: {
+          trim: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+        },
+        distinct: ['trimId'],
+      });
+    }
+
+    const trims = variants
+      .map((v) => v.trim)
+      .filter((t): t is NonNullable<typeof t> => !!t);
+
+    return trims.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  }
+
   async getVariants(modelId: string) {
     const list = await this.prisma.vehicleVariant.findMany({
       where: { modelId, status: ApprovalStatus.APPROVED },
