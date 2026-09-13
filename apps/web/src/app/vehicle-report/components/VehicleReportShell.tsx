@@ -147,8 +147,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           };
 
           const stateCfg = getStateConfig(decisionScore.state);
-          const topAdvantages = (report.expertDecisionSynthesis?.strongestReasonsToChoose || []).slice(0, 3);
-          const topRisks = (report.expertDecisionSynthesis?.compromisesAndLimitations || []).slice(0, 3);
+          const hasConditionData = decisionScore.scope === 'VEHICLE' && decisionScore.conditionRiskUsed !== null && decisionScore.conditionRiskUsed !== undefined;
 
           const hasUnverifiedComplaints = Boolean(
             (report.commonProblems && report.commonProblems.length > 0) ||
@@ -158,7 +157,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
 
           return (
             <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 shadow-xl space-y-5">
-              {/* Header Row: Score + State + Confidence */}
+              {/* Header Row: Score + State + Scope + Confidence */}
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/10">
                 <div className="flex items-center gap-4">
                   <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center ${stateCfg.color}`}>
@@ -179,7 +178,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                     <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">
                       {isInsufficient
                         ? "Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz."
-                        : (decisionScore.explanation?.modelRisk || "Doğrulanmış teknik kronik riskler, araç kondisyonu ve piyasa fiyat dengesi baz alınarak hesaplandı.")}
+                        : (decisionScore.explanation?.modelRisk || "Doğrulanmış teknik kronik riskler baz alınarak hesaplandı.")}
                     </p>
                     {isInsufficient && hasUnverifiedComplaints && (
                       <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
@@ -209,8 +208,8 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 </div>
               </div>
 
-              {/* 3-Pillar Risk & Price Breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {/* Risk Breakdown */}
+              <div className={`grid grid-cols-1 ${hasConditionData ? 'sm:grid-cols-2' : ''} gap-3 text-xs`}>
                 <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Model Teknik Riski</span>
                   <span className="text-sm font-bold text-slate-200 mt-0.5 block">
@@ -221,67 +220,18 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                   </span>
                 </div>
 
-                <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Araç Kondisyon Etkisi</span>
-                  <span className="text-sm font-bold text-slate-200 mt-0.5 block">
-                    {decisionScore.conditionRiskUsed !== null 
-                      ? `-${decisionScore.conditionRiskUsed} Puan Risk` 
-                      : 'Genel Varyant (İlan Yok)'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 block mt-0.5 truncate">
-                    {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı'}
-                  </span>
-                </div>
-
-                <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Piyasa Fiyat Dengesi</span>
-                  <span className={`text-sm font-bold mt-0.5 block ${
-                    (decisionScore.priceModifierUsed ?? 0) > 0 ? 'text-emerald-400' : (decisionScore.priceModifierUsed ?? 0) < 0 ? 'text-rose-400' : 'text-slate-200'
-                  }`}>
-                    {(decisionScore.priceModifierUsed ?? 0) > 0 ? `+${decisionScore.priceModifierUsed} Avantaj` : (decisionScore.priceModifierUsed ?? 0) < 0 ? `${decisionScore.priceModifierUsed} Ceza` : 'Piyasa Fiyatında (0)'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 block mt-0.5 truncate">
-                    {decisionScore.explanation?.price || 'Fiyat-performans çarpanı'}
-                  </span>
-                </div>
+                {hasConditionData && (
+                  <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Araç Kondisyon Etkisi</span>
+                    <span className="text-sm font-bold text-slate-200 mt-0.5 block">
+                      {`-${decisionScore.conditionRiskUsed} Puan Risk`}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5 truncate">
+                      {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı'}
+                    </span>
+                  </div>
+                )}
               </div>
-
-              {/* Top 3 Advantages & Risks Grid */}
-              {(topAdvantages.length > 0 || topRisks.length > 0) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  {topAdvantages.length > 0 && (
-                    <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-xl p-4 space-y-2">
-                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
-                        ✨ En Önemli Avantajlar
-                      </span>
-                      <ul className="space-y-1.5 text-xs text-slate-200">
-                        {topAdvantages.map((adv, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="text-emerald-400 font-bold shrink-0">✓</span>
-                            <span><strong>{adv.title}:</strong> {adv.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {topRisks.length > 0 && (
-                    <div className="bg-rose-950/20 border border-rose-500/20 rounded-xl p-4 space-y-2">
-                      <span className="text-xs font-bold text-rose-400 uppercase tracking-wider block">
-                        ⚠️ En Önemli Riskler & Feragatler
-                      </span>
-                      <ul className="space-y-1.5 text-xs text-slate-200">
-                        {topRisks.map((rsk, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="text-rose-400 font-bold shrink-0">✕</span>
-                            <span><strong>{rsk.title}:</strong> {rsk.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           );
         }
