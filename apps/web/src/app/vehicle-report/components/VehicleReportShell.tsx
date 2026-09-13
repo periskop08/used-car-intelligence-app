@@ -178,7 +178,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                     <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">
                       {isInsufficient
                         ? "Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz."
-                        : (decisionScore.explanation?.modelRisk || "Doğrulanmış teknik kronik riskler baz alınarak hesaplandı.")}
+                        : (decisionScore.explanation?.confidence || "Model değerlendirmesi bağımsız bülten ve katalog verilerine dayanmaktadır.")}
                     </p>
                     {isInsufficient && hasUnverifiedComplaints && (
                       <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
@@ -215,9 +215,9 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                   <span className="text-sm font-bold text-slate-200 mt-0.5 block">
                     {decisionScore.modelDecisionRisk !== null ? `-${decisionScore.modelDecisionRisk} Puan Risk` : 'Belirlenemedi'}
                   </span>
-                  <span className="text-[11px] text-slate-400 block mt-0.5 truncate">
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                     {decisionScore.explanation?.modelRisk || 'Kronik mekanik yükü'}
-                  </span>
+                  </p>
                 </div>
 
                 {hasConditionData && (
@@ -226,9 +226,9 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                     <span className="text-sm font-bold text-slate-200 mt-0.5 block">
                       {`-${decisionScore.conditionRiskUsed} Puan Risk`}
                     </span>
-                    <span className="text-[11px] text-slate-400 block mt-0.5 truncate">
+                    <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                       {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı'}
-                    </span>
+                    </p>
                   </div>
                 )}
               </div>
