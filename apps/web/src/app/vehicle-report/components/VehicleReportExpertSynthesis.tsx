@@ -261,27 +261,45 @@ export default function VehicleReportExpertSynthesis({
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
-                {synthesis.primaryTechnicalRisk.symptoms?.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="font-bold text-rose-300 block">⚠️ Belirtileri ve Semptomları:</span>
-                    <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
-                      {synthesis.primaryTechnicalRisk.symptoms.map((s, idx) => (
-                        <li key={idx}>{s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {(() => {
+                  const rawSymptoms = synthesis.primaryTechnicalRisk.symptoms;
+                  const symptomsList = Array.isArray(rawSymptoms)
+                    ? rawSymptoms
+                    : typeof rawSymptoms === 'string' && (rawSymptoms as string).trim().length > 0
+                      ? [(rawSymptoms as string).trim()]
+                      : [];
+                  if (symptomsList.length === 0) return null;
+                  return (
+                    <div className="space-y-1">
+                      <span className="font-bold text-rose-300 block">⚠️ Belirtileri ve Semptomları:</span>
+                      <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
+                        {symptomsList.map((s, idx) => (
+                          <li key={idx}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
 
-                {synthesis.primaryTechnicalRisk.inspectionInstructions?.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="font-bold text-emerald-300 block">🔍 Ekspertiz Kontrol Adımları:</span>
-                    <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
-                      {synthesis.primaryTechnicalRisk.inspectionInstructions.map((inst, idx) => (
-                        <li key={idx}>{inst}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {(() => {
+                  const rawInst = synthesis.primaryTechnicalRisk.inspectionInstructions;
+                  const instList = Array.isArray(rawInst)
+                    ? rawInst
+                    : typeof rawInst === 'string' && (rawInst as string).trim().length > 0
+                      ? [(rawInst as string).trim()]
+                      : [];
+                  if (instList.length === 0) return null;
+                  return (
+                    <div className="space-y-1">
+                      <span className="font-bold text-emerald-300 block">🔍 Ekspertiz Kontrol Adımları:</span>
+                      <ul className="list-disc ml-4 text-slate-300 space-y-0.5">
+                        {instList.map((inst, idx) => (
+                          <li key={idx}>{inst}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

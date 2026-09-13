@@ -1,5 +1,6 @@
 import { VehicleReportScoringService } from '../vehicle-report-scoring.service';
 import { VehicleReportSemanticValidationService } from '../vehicle-report-semantic-validation.service';
+import { ResearchEvidenceValidationService } from '../research-evidence-validation.service';
 
 describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
   let scoringService: VehicleReportScoringService;
@@ -389,6 +390,299 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
 
       expect(formattedHeader).toBe('122 PS (Toplam Hibrit Sistem Gücü)');
       expect(formattedHeader).not.toContain('122 (Toplam Hibrit Sistem Gücü) HP');
+    });
+  });
+
+  describe('Power Resolution Precedence & Stage 1 Evidence Promotion (Architectural Invariant)', () => {
+    let localScoringService: VehicleReportScoringService;
+    let localValidationService: VehicleReportSemanticValidationService;
+    let contradictionService: any;
+    let fallbackService: any;
+    let providerService: any;
+
+    beforeEach(() => {
+      localScoringService = new VehicleReportScoringService();
+      localValidationService = new VehicleReportSemanticValidationService();
+      contradictionService = new (require('../vehicle-report-contradiction.service').VehicleReportContradictionService)();
+      fallbackService = new (require('../vehicle-report-fallback.service').VehicleReportFallbackService)(localScoringService, contradictionService);
+      providerService = new (require('../vehicle-report-provider.service').VehicleReportProviderService)(
+        null as any,
+        fallbackService,
+        null as any,
+        localValidationService,
+        localScoringService,
+        null as any
+      );
+    });
+
+    it('Scenario 1: DB power exists → DB wins over Stage 1 and Stage 2', () => {
+      const dbContext = {
+        vehicleIdentity: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYear: 2020,
+          fuelType: 'Benzin',
+          transmissionName: 'DSG',
+          engineCode: '1.5 eTSI',
+          enginePowerHp: 150,
+          powerUnit: 'HP',
+          powerSource: 'VEHICLE_DATABASE',
+        },
+        verifiedResearch: {
+          verifiedTechnicalSpecs: {
+            powerHp: 147,
+            powerUnit: 'PS',
+            powerSource: 'VERIFIED_STAGE_1',
+          },
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-1', 'VEHICLE_REPORT', dbContext);
+      const stage2Content = { technicalSpecifications: { enginePowerHp: 160, powerUnit: 'HP' } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, dbContext);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(150);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('HP');
+      expect((baseReport.vehicleIdentity as any).powerSource).toBe('VEHICLE_DATABASE');
+      expect(baseReport.performanceUsage?.powerHp).toBe(150);
+      expect(baseReport.performanceUsage?.powerUnit).toBe('HP');
+    });
+
+    it('Scenario 2: DB null + verified Stage 1 power exists → Stage 1 wins over Stage 2', () => {
+      const stage1Context = {
+        vehicleIdentity: {
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: null,
+        },
+        verifiedResearch: {
+          verifiedTechnicalSpecs: {
+            powerHp: 122,
+            powerUnit: 'PS',
+            powerSource: 'VERIFIED_STAGE_1',
+            powerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER',
+          },
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-2', 'VEHICLE_REPORT', stage1Context);
+      const stage2Content = { technicalSpecifications: { enginePowerHp: 90, powerUnit: 'kW' } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, stage1Context);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(122);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('PS');
+      expect((baseReport.vehicleIdentity as any).powerSource).toBe('VERIFIED_STAGE_1');
+      expect((baseReport.vehicleIdentity as any).powerSemantic).toBe('TOTAL_HYBRID_SYSTEM_POWER');
+      expect(baseReport.performanceUsage?.powerHp).toBe(122);
+      expect(baseReport.performanceUsage?.powerUnit).toBe('PS');
+    });
+
+    it('Scenario 3: DB null + Stage 1 verified power exists + Stage 2 returns null → Stage 1 still survives', () => {
+      const stage1Context = {
+        vehicleIdentity: {
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: null,
+        },
+        verifiedResearch: {
+          verifiedTechnicalSpecs: {
+            powerHp: 122,
+            powerUnit: 'PS',
+            powerSource: 'VERIFIED_STAGE_1',
+            powerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER',
+          },
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-3', 'VEHICLE_REPORT', stage1Context);
+      // Stage 2 fails to return or returns null
+      const stage2Content = { technicalSpecifications: { enginePowerHp: null } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, stage1Context);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(122);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('PS');
+      expect((baseReport.vehicleIdentity as any).powerSource).toBe('VERIFIED_STAGE_1');
+      expect(baseReport.performanceUsage?.powerHp).toBe(122);
+      expect(baseReport.performanceUsage?.powerUnit).toBe('PS');
+    });
+
+    it('Scenario 4: DB null + no verified Stage 1 + evidence-backed Stage 2 exists → Stage 2 wins', () => {
+      const emptyContext = {
+        vehicleIdentity: {
+          brand: 'Renault',
+          model: 'Megane',
+          modelYear: 2018,
+          fuelType: 'Dizel',
+          transmissionName: 'EDC',
+          engineCode: '1.5 dCi',
+          enginePowerHp: null,
+        },
+        verifiedResearch: undefined,
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-4', 'VEHICLE_REPORT', emptyContext);
+      const stage2Content = { technicalSpecifications: { enginePowerHp: 110, powerUnit: 'HP' } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, emptyContext);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(110);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('HP');
+      expect((baseReport.vehicleIdentity as any).powerSource).toBe('AI_VERIFIED_TECHNICAL_SPECS');
+      expect(baseReport.performanceUsage?.powerHp).toBe(110);
+    });
+
+    it('Scenario 5: No trusted/evidence-backed value anywhere → null / —', () => {
+      const emptyContext = {
+        vehicleIdentity: {
+          brand: 'Custom',
+          model: 'Proto',
+          modelYear: 2024,
+          fuelType: 'Elektrik',
+          transmissionName: 'Direct',
+          engineCode: 'Experimental',
+          enginePowerHp: null,
+        },
+        verifiedResearch: undefined,
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-5', 'VEHICLE_REPORT', emptyContext);
+      const stage2Content = { technicalSpecifications: { enginePowerHp: null } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, emptyContext);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBeUndefined();
+      expect(baseReport.performanceUsage?.powerHp).toBeUndefined();
+    });
+
+    it('Scenario 6: Numeric field always remains pure number (never a string or object)', () => {
+      const ctx = {
+        vehicleIdentity: {
+          brand: 'BMW',
+          model: '320i',
+          modelYear: 2021,
+          fuelType: 'Benzin',
+          transmissionName: 'Otomatik',
+          engineCode: 'B48',
+          enginePowerHp: null,
+        },
+        verifiedResearch: {
+          verifiedTechnicalSpecs: {
+            powerHp: 170,
+            powerUnit: 'HP',
+            powerSource: 'VERIFIED_STAGE_1',
+          },
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-6', 'VEHICLE_REPORT', ctx);
+      (providerService as any).mapGeneratedContentToReport(baseReport, {}, ctx);
+
+      expect(typeof baseReport.vehicleIdentity.enginePowerHp).toBe('number');
+      expect(typeof baseReport.performanceUsage?.powerHp).toBe('number');
+      expect(Number.isFinite(baseReport.vehicleIdentity.enginePowerHp)).toBe(true);
+    });
+
+    it('Scenario 7: Original unit survives unchanged without silent conversion (90 kW → 90 kW, not 122 HP)', () => {
+      const kwContext = {
+        vehicleIdentity: {
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: null,
+        },
+        verifiedResearch: {
+          verifiedTechnicalSpecs: {
+            powerHp: 90,
+            powerUnit: 'kW',
+            powerSource: 'VERIFIED_STAGE_1',
+            powerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER',
+          },
+        },
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-7', 'VEHICLE_REPORT', kwContext);
+      (providerService as any).mapGeneratedContentToReport(baseReport, {}, kwContext);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(90);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('kW');
+      expect(baseReport.performanceUsage?.powerHp).toBe(90);
+      expect(baseReport.performanceUsage?.powerUnit).toBe('kW');
+
+      // Formatted frontend output
+      const isHybrid = baseReport.vehicleIdentity.fuelType.toLowerCase().includes('hibrit');
+      const powerUnit = baseReport.performanceUsage?.powerUnit || 'HP';
+      const label = `${baseReport.performanceUsage?.powerHp} ${powerUnit}${isHybrid ? ' (Toplam Hibrit Sistem Gücü)' : ''}`;
+      expect(label).toBe('90 kW (Toplam Hibrit Sistem Gücü)');
+    });
+
+    it('Scenario E: Real characterResearchCache production schema produces Stage 1 verified power and resolves in report precedence without manual mock', () => {
+      const realResearchInput = {
+        questions: {
+          engineTransmissionFit: {
+            synthesisedAnswer: '2020 Toyota Corolla 1.8 Hybrid Otomatik Flame TR varyantında motor ve şanzıman kombinasyonu toplam 122 PS sistem gücü üretir.',
+            sources: [
+              {
+                title: 'Toyota Corolla 1.8 Hybrid 2020 Test',
+                url: 'https://otomobil.com.tr/corolla-1-8-hybrid-test',
+                domain: 'otomobil.com.tr',
+                relevantSnippet: 'Corolla 1.8 Hybrid toplam 122 PS güç ve e-CVT şanzıman ile test edildi.',
+              },
+            ],
+          },
+        },
+      };
+
+      const ctx = {
+        vehicleIdentity: {
+          brand: 'Toyota',
+          model: 'Corolla',
+          modelYear: 2020,
+          fuelType: 'Hibrit',
+          transmissionName: 'e-CVT',
+          engineCode: '1.8 Hybrid',
+          enginePowerHp: null,
+        },
+        vehicleCharacterResearch: realResearchInput,
+      };
+
+      const evidenceValidationService = new ResearchEvidenceValidationService();
+      const validatedResearch = evidenceValidationService.validateResearchData(realResearchInput, ctx);
+      expect(validatedResearch.verifiedTechnicalSpecs).toBeDefined();
+      expect(validatedResearch.verifiedTechnicalSpecs?.powerHp).toBe(122);
+      expect(validatedResearch.verifiedTechnicalSpecs?.powerUnit).toBe('PS');
+
+      const validationContext = {
+        ...ctx,
+        verifiedResearch: validatedResearch,
+      };
+
+      const baseReport = fallbackService.generateFallbackReport('rep-8', 'VEHICLE_REPORT', validationContext);
+      const stage2EmptySpecs = { technicalSpecifications: { enginePowerHp: null } };
+
+      (providerService as any).mapGeneratedContentToReport(baseReport, stage2EmptySpecs, validationContext);
+
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(122);
+      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('PS');
+      expect((baseReport.vehicleIdentity as any).powerSource).toBe('VERIFIED_STAGE_1');
+      expect((baseReport.vehicleIdentity as any).powerSemantic).toBe('TOTAL_HYBRID_SYSTEM_POWER');
+      expect(baseReport.performanceUsage?.powerHp).toBe(122);
+      expect(baseReport.performanceUsage?.powerUnit).toBe('PS');
+      expect(baseReport.performanceUsage?.powerSource).toBe('VERIFIED_STAGE_1');
+      expect(baseReport.performanceUsage?.powerSemantic).toBe('TOTAL_HYBRID_SYSTEM_POWER');
     });
   });
 });

@@ -19,6 +19,7 @@ import { ClaimEvidenceService } from './claim-evidence.service';
 import { EvidenceValidatorService } from './evidence-validator.service';
 import { RawSourceStoreService } from './raw-source-store.service';
 import { VehicleCharacterResearchService } from './vehicle-character-research.service';
+import { VehicleReliabilityResearchService } from './vehicle-reliability-research.service';
 
 import { PdfTableExtractorService } from './equipment/pdf-table-extractor.service';
 import { TrimEquipmentResolverService } from './equipment/trim-equipment-resolver.service';
@@ -50,6 +51,7 @@ import { EquipmentResearchService } from './equipment/equipment-research.service
     TrimComparisonService,
     EquipmentResearchService,
     VehicleCharacterResearchService,
+    VehicleReliabilityResearchService,
     AiAnalysisService,
     CoverageService,
     AiReportGeneratorService,
@@ -72,6 +74,7 @@ import { EquipmentResearchService } from './equipment/equipment-research.service
     FirecrawlExtractProvider,
     EquipmentResearchService,
     VehicleCharacterResearchService,
+    VehicleReliabilityResearchService,
     PdfTableExtractorService,
     TrimEquipmentResolverService,
     EquipmentConfidenceService,

@@ -49,6 +49,282 @@ export interface VehicleReportScores {
   listingContradictionScore?: ReportScoreItem;
 }
 
+export type ModelRiskStateV6 =
+  | 'VERIFIED_LOW_RISK'
+  | 'VERIFIED_RISK_PRESENT'
+  | 'RESEARCH_COMPLETE_NO_DEFECT'
+  | 'INSUFFICIENT_RESEARCH'
+  | 'CONTRADICTORY_EVIDENCE';
+
+export type ConditionStateV6 =
+  | 'VERIFIED_CLEAN'
+  | 'VERIFIED_DEFECTS_PRESENT'
+  | 'PARTIAL_DATA'
+  | 'UNKNOWN';
+
+export type BuyabilityStateV6 =
+  | 'HIGHLY_RECOMMENDED'
+  | 'RECOMMENDED'
+  | 'CAUTION_HIGH_RISK'
+  | 'NOT_RECOMMENDED'
+  | 'PROVISIONAL_MODEL_ONLY'
+  | 'INSUFFICIENT_MODEL_DATA'
+  | 'INSUFFICIENT_DATA';
+
+export type DomainKeyV6 =
+  | 'POWERTRAIN_ENGINE'
+  | 'POWERTRAIN_TRANS'
+  | 'EMISSIONS_EXHAUST'
+  | 'HV_BATTERY_SYSTEM'
+  | 'THERMAL_COOLING'
+  | 'ELECTRONICS_BODY'
+  | 'CHASSIS_BRAKES'
+  | 'SAFETY_RECALL';
+
+export type ModelRiskQuantificationV6 =
+  | 'NOT_ESTIMABLE'
+  | 'QUALITATIVE_ONLY'
+  | 'PARTIAL_LOWER_BOUND'
+  | 'FULLY_QUANTIFIED'
+  | 'CERTIFIED_ZERO';
+
+export interface DomainBreakdownItemV6 {
+  domain: DomainKeyV6;
+  domainLabel: string;
+  score: number | null;
+  state: 'GOOD' | 'BAD' | 'UNKNOWN' | 'QUALITATIVE_RISK';
+  verifiedFactors: Array<{
+    key: string;
+    impact: number | null;
+    quantification?: 'NUMERIC' | 'QUALITATIVE';
+    explanation: string;
+  }>;
+}
+
+export interface TorqueScoutDecisionScoreV1 {
+  version: 'v1.0';
+  score: number | null;
+  scope: 'VARIANT' | 'VEHICLE' | 'INSUFFICIENT_DATA';
+  state: 'EXCELLENT' | 'GOOD' | 'CAUTION' | 'HIGH_RISK' | 'AVOID' | 'INSUFFICIENT_DATA';
+  modelDecisionRisk: number | null;
+  qualitativeSeverityBurden: number | null;
+  conditionRiskUsed: number | null;
+  confidenceScore: number;
+  priceModifierUsed: number;
+  limitingReason?: string | null;
+  explanation: {
+    modelRisk: string;
+    condition: string;
+    confidence: string;
+    price: string;
+  };
+}
+
+export interface VehicleReportScoresV6 {
+  scoringVersion: 'v6.0';
+
+  // 1. Model / Inherent Architecture Dimension
+  modelRiskScore: number | null;
+  modelRiskState: ModelRiskStateV6;
+  modelRiskQuantification: ModelRiskQuantificationV6;
+  modelCoverageScore: number;
+
+  // 2. Vehicle Instance Condition Dimension
+  vehicleConditionRisk: number | null;
+  conditionState: ConditionStateV6;
+  conditionCoverageScore: number;
+
+  // 3. Uncertainty & Evidence Confidence
+  confidenceScore: number;
+  confidenceLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+
+  // 4. Recommendation & Buyability
+  buyabilityScore: number | null;
+  buyabilityState: BuyabilityStateV6;
+
+  // 5. Decision Score V1 (Shadow Product Decision Layer)
+  decisionScoreV1?: TorqueScoutDecisionScoreV1;
+
+  // 6. Domain Explainability & Traceability
+  domainBreakdown: DomainBreakdownItemV6[];
+  traceDetails?: {
+    modelRiskEligibility: boolean;
+    conditionRiskEligibility: boolean;
+    buyabilityEligibility: boolean;
+    formulaTrace: Record<string, any>;
+  };
+}
+
+export type SeverityCategoryV6 =
+  | 'COSMETIC'
+  | 'FUNCTIONAL_MINOR'
+  | 'DRIVABILITY'
+  | 'BREAKDOWN'
+  | 'MAJOR_POWERTRAIN'
+  | 'SAFETY_CRITICAL';
+
+export type PrevalenceCategoryV6 =
+  | 'ISOLATED_BATCH'
+  | 'RECURRING_CHRONIC'
+  | 'UNIVERSAL_DESIGN_FLAW';
+
+export type DefectStatusV6 =
+  | 'ACTIVE_DESIGN_ISSUE'
+  | 'REMEDY_AVAILABLE'
+  | 'PRODUCTION_REVISED'
+  | 'UNKNOWN';
+
+export type CampaignStatusV6 =
+  | 'MODEL_CAMPAIGN_EXISTS'
+  | 'VIN_OPEN'
+  | 'VIN_COMPLETED'
+  | 'VIN_UNKNOWN';
+
+export type EvidenceNumericEligibilityV6 =
+  | 'NUMERIC_ELIGIBLE'
+  | 'QUALITATIVE_ONLY'
+  | 'REJECTED';
+
+export type ChannelStatusV6 =
+  | 'AVAILABLE_EXECUTED'
+  | 'AVAILABLE_NOT_EXECUTED'
+  | 'UNAVAILABLE'
+  | 'EXECUTION_FAILED'
+  | 'NOT_APPLICABLE';
+
+export interface LinkedEvidenceSource {
+  sourceId: string;
+  url?: string;
+  publisher: string;
+  sourceType: 'OFFICIAL_RECALL' | 'OFFICIAL_TSB' | 'TEARDOWN_STUDY' | 'SPECIALIST_DATA' | 'OTHER';
+  sourceTier: 'TIER_1' | 'TIER_2' | 'TIER_3';
+  publishedAt?: string;
+  evidenceSnippet: string;
+}
+
+export interface ResearchChannelTelemetry {
+  channelKey: string;
+  status: ChannelStatusV6;
+  queryOrEndpoint?: string;
+  sourcesEvaluatedCount: number;
+  sources: Array<{ sourceId: string; domain: string; tier: 'TIER_1' | 'TIER_2' | 'TIER_3' }>;
+  failureReason?: string;
+}
+
+export interface NegativeResearchProof {
+  domain: DomainKeyV6;
+  channels: ResearchChannelTelemetry[];
+  allAvailableChannelsExecuted: boolean;
+  unavailableChannelsDocumented: string[];
+  researchTimestamp: string;
+  variantApplicability: {
+    engineCode?: string;
+    transmissionCode?: string;
+    modelYear: number;
+    marketRegion?: string;
+  };
+  conclusion: 'SEARCH_COMPLETED_NO_VERIFIED_DEFECT_FOUND';
+}
+
+export interface NormalizedReliabilityEvidence {
+  id: string;
+  domain: DomainKeyV6;
+  title: string;
+  normalizedFailureMode: string;
+  affectedComponent: string;
+
+  // Grounded Severity
+  severityCategory: SeverityCategoryV6;
+  severityScore: number; // 1..10
+  severityBasis: string;
+
+  // Grounded Prevalence (Nullable - No synthetic fabrication)
+  prevalenceCategory: PrevalenceCategoryV6 | null;
+  prevalenceFactor: number | null; // 0.25..1.0 or null
+  prevalenceBasis: string;
+
+  // Applicability
+  applicability: {
+    brand: string;
+    model: string;
+    generation?: string;
+    modelYearFrom?: number;
+    modelYearTo?: number;
+    engineCode?: string;
+    transmissionCode?: string;
+    powertrainType?: string;
+  };
+
+  // Status
+  defectStatus: DefectStatusV6;
+  statusFactor: number;
+  campaignStatus?: CampaignStatusV6;
+
+  // Evidence Provenance & Clustering
+  linkedSources: LinkedEvidenceSource[];
+  numericEligibility: EvidenceNumericEligibilityV6;
+  rejectionReason?: string;
+}
+
+export interface ReliabilityDomainResult {
+  domain: DomainKeyV6;
+  state:
+    | 'UNRESEARCHED'
+    | 'RESEARCH_FAILED'
+    | 'PARTIAL'
+    | 'SEARCHED_NO_VERIFIED_DEFECT'
+    | 'VERIFIED_DEFECTS_FOUND'
+    | 'CONTRADICTORY'
+    | 'NOT_APPLICABLE';
+  weight: number;
+  coverageCredit: number; // 0.0, 0.4, 1.0
+  defects: NormalizedReliabilityEvidence[];
+  negativeProof?: NegativeResearchProof;
+  channels: ResearchChannelTelemetry[];
+}
+
+export type ReliabilityFreshnessState = 'FRESH' | 'STALE' | 'EXPIRED';
+
+export interface ReliabilityKnowledgeFreshness {
+  state: ReliabilityFreshnessState;
+  researchedAt: string;
+  lastVerifiedAt: string;
+  expiresAt: string;
+  isReused: boolean;
+  chronicFreshnessState?: ReliabilityFreshnessState;
+  recallFreshnessState?: ReliabilityFreshnessState;
+}
+
+export interface ReliabilityPerformanceTiming {
+  cacheLookupMs: number;
+  initialResearchMs: number;
+  recoveryMs: number;
+  totalResearchMs: number;
+  wasCached: boolean;
+}
+
+export interface ReliabilityRecoveryTelemetry {
+  recoveryExecuted: boolean;
+  recoveredDomainKeys: DomainKeyV6[];
+  additionalQueriesCount: number;
+}
+
+export interface VehicleReliabilityResearch {
+  researchId: string;
+  variantId?: string;
+  researchedAt: string;
+  applicableDomainCount: number;
+  reliabilityCoverageScore: number; // 0..100
+  domainResults: Record<DomainKeyV6, ReliabilityDomainResult>;
+  allVerifiedDefects: NormalizedReliabilityEvidence[];
+  qualitativeDefects: NormalizedReliabilityEvidence[];
+  unresolvedContradictions: string[];
+  discoveryTelemetry?: NormalizedReliabilityEvidence[];
+  freshness?: ReliabilityKnowledgeFreshness;
+  timing?: ReliabilityPerformanceTiming;
+  recoveryTelemetry?: ReliabilityRecoveryTelemetry;
+}
+
 export interface ExecutiveSummarySection {
   title: string;
   oneSentenceSummary: string;
@@ -68,7 +344,16 @@ export interface VehicleIdentitySection {
   modelYear: number;
   engineDisplacementCc?: number;
   enginePowerHp?: number;
+  sourcePowerValue?: number;
+  sourcePowerUnit?: string;
+  canonicalDisplayPowerHp?: number;
   powerUnit?: string;
+  powerSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  powerSemantic?: string;
+  engineTorqueNm?: number;
+  torqueUnit?: string;
+  torqueSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  torqueSemantic?: string;
   engineCode?: string;
   engineType?: string;
   enginePowerRpm?: string;
@@ -100,9 +385,16 @@ export interface EngineTransmissionSection {
 
 export interface PerformanceUsageSection {
   powerHp?: number;
+  sourcePowerValue?: number;
+  sourcePowerUnit?: string;
+  canonicalDisplayPowerHp?: number;
   powerUnit?: string;
+  powerSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  powerSemantic?: string;
   torqueNm?: number;
   torqueUnit?: string;
+  torqueSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  torqueSemantic?: string;
   powerRpm?: string;
   torqueRpm?: string;
   zeroToHundredKmh?: number;
@@ -420,6 +712,9 @@ export interface ComprehensiveVehicleReport {
   vehicleIdentity: VehicleIdentitySection;
   executiveSummary: ExecutiveSummarySection;
   scoring: VehicleReportScores;
+  scoringV6?: VehicleReportScoresV6;
+  torqueScoutDecisionScoreV1?: TorqueScoutDecisionScoreV1;
+  reliabilityResearchShadow?: VehicleReliabilityResearch;
 
   expertDecisionSynthesis?: ExpertDecisionSynthesis;
 
@@ -570,9 +865,21 @@ export interface SectionStatusMap {
   sellerQuestions: 'DERIVED' | 'VERIFIED' | 'FAILED';
 }
 
+export interface VerifiedTechnicalSpecsResearch {
+  powerHp?: number;
+  powerUnit?: 'HP' | 'PS' | 'kW' | string;
+  powerSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  powerSemantic?: 'TOTAL_HYBRID_SYSTEM_POWER' | 'ICE_ONLY_POWER' | 'ELECTRIC_ONLY_POWER' | 'STANDARD_POWER' | string;
+  torqueNm?: number;
+  torqueUnit?: 'Nm' | string;
+  torqueSource?: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | 'UNKNOWN';
+  torqueSemantic?: 'ICE_ONLY_TORQUE' | 'ELECTRIC_ONLY_TORQUE' | 'COMBINED_TORQUE' | 'STANDARD_TORQUE' | string;
+}
+
 export interface VehicleReportResearchData {
   vehicleIdentityResearch: Record<string, any>;
   vehicleCharacterResearch: VehicleCharacterResearch;
+  verifiedTechnicalSpecs?: VerifiedTechnicalSpecsResearch;
   equipmentResearch: Record<string, any>;
   reliabilityResearch: Record<string, any>;
   recallResearch: Record<string, any>;

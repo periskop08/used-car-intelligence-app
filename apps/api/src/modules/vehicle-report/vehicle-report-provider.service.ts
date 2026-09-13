@@ -1,10 +1,12 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { VehicleReportPromptService } from './vehicle-report-prompt.service';
 import { VehicleReportFallbackService } from './vehicle-report-fallback.service';
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
 import { VehicleReportSemanticValidationService } from './vehicle-report-semantic-validation.service';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
-import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData } from '@used-car-intelligence/shared';
+import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
+import { VehicleReliabilityResearchService } from '../research/vehicle-reliability-research.service';
+import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
 @Injectable()
@@ -18,7 +20,16 @@ export class VehicleReportProviderService {
     private semanticValidationService: VehicleReportSemanticValidationService,
     private scoringService: VehicleReportScoringService,
     private orchestratorProvider: ListingAiProviderService,
-  ) {}
+    @Optional() private scoringV6Service?: VehicleReportScoringV6Service,
+    @Optional() private reliabilityResearchService?: VehicleReliabilityResearchService,
+  ) {
+    if (!this.scoringV6Service) {
+      this.scoringV6Service = new VehicleReportScoringV6Service();
+    }
+    if (!this.reliabilityResearchService) {
+      this.reliabilityResearchService = new VehicleReliabilityResearchService();
+    }
+  }
 
   getRuntimeHealthStatus(): 'HEALTHY' | 'DEGRADED' {
     return 'HEALTHY';
@@ -51,11 +62,77 @@ export class VehicleReportProviderService {
     try {
       this.logger.log(`[DELEGATOR] Initiating Research Evidence Validation via Intelligence Orchestrator...`);
       verifiedResearch = this.evidenceValidationService.validateResearchData(
-        {},
+        vehicleContext?.vehicleCharacterResearch || {},
         vehicleContext,
       );
     } catch (e: any) {
       this.logger.warn(`Research validation notice: ${e?.message}`);
+    }
+
+    // PROMOTE STAGE 1 VERIFIED TECHNICAL EVIDENCE INTO NORMALIZED TECHNICAL IDENTITY
+    if (verifiedResearch?.verifiedTechnicalSpecs) {
+      const vSpecs = verifiedResearch.verifiedTechnicalSpecs;
+      if (!vehicleContext.vehicleIdentity.enginePowerHp && vSpecs.powerHp) {
+        vehicleContext.vehicleIdentity.enginePowerHp = vSpecs.powerHp;
+        vehicleContext.vehicleIdentity.powerUnit = vSpecs.powerUnit;
+        vehicleContext.vehicleIdentity.powerSource = vSpecs.powerSource || 'VERIFIED_STAGE_1';
+        vehicleContext.vehicleIdentity.powerSemantic = vSpecs.powerSemantic;
+      }
+      if (!vehicleContext.performanceSpecs.enginePowerHp && vSpecs.powerHp) {
+        vehicleContext.performanceSpecs.enginePowerHp = vSpecs.powerHp;
+        vehicleContext.performanceSpecs.powerUnit = vSpecs.powerUnit;
+        vehicleContext.performanceSpecs.powerSource = vSpecs.powerSource || 'VERIFIED_STAGE_1';
+        vehicleContext.performanceSpecs.powerSemantic = vSpecs.powerSemantic;
+      }
+      if (!vehicleContext.vehicleIdentity.engineTorqueNm && vSpecs.torqueNm) {
+        vehicleContext.vehicleIdentity.engineTorqueNm = vSpecs.torqueNm;
+        vehicleContext.vehicleIdentity.torqueUnit = vSpecs.torqueUnit;
+        vehicleContext.vehicleIdentity.torqueSource = vSpecs.torqueSource || 'VERIFIED_STAGE_1';
+        vehicleContext.vehicleIdentity.torqueSemantic = vSpecs.torqueSemantic;
+      }
+      if (!vehicleContext.performanceSpecs.engineTorqueNm && vSpecs.torqueNm) {
+        vehicleContext.performanceSpecs.engineTorqueNm = vSpecs.torqueNm;
+        vehicleContext.performanceSpecs.torqueUnit = vSpecs.torqueUnit;
+        vehicleContext.performanceSpecs.torqueSource = vSpecs.torqueSource || 'VERIFIED_STAGE_1';
+        vehicleContext.performanceSpecs.torqueSemantic = vSpecs.torqueSemantic;
+      }
+    }
+
+    // SHADOW STAGE 1: Execute VehicleReliabilityResearch in parallel (isolated fail-safe, zero score impact)
+    try {
+      if (this.reliabilityResearchService) {
+        const shadowRel = await this.reliabilityResearchService.runReliabilityResearch({
+          brand: vehicleContext?.vehicleIdentity?.brand,
+          model: vehicleContext?.vehicleIdentity?.model,
+          generation: vehicleContext?.vehicleIdentity?.generation,
+          modelYear: vehicleContext?.vehicleIdentity?.modelYear,
+          marketRegion: vehicleContext?.vehicleIdentity?.marketRegion,
+          bodyType: vehicleContext?.vehicleIdentity?.bodyType,
+          engineCode: vehicleContext?.vehicleIdentity?.engineCode,
+          transmissionCode: vehicleContext?.vehicleIdentity?.transmissionCode,
+          powertrainType: vehicleContext?.vehicleIdentity?.isElectric ? 'BEV' : vehicleContext?.vehicleIdentity?.isHybrid ? 'HEV' : 'ICE_PETROL',
+          isElectric: vehicleContext?.vehicleIdentity?.isElectric,
+          isHybrid: vehicleContext?.vehicleIdentity?.isHybrid,
+          existingDbProblems: vehicleContext?.verifiedDatabaseVehicleReport?.knownDatabaseProblems,
+          existingDbRecalls: vehicleContext?.verifiedDatabaseVehicleReport?.recalls,
+        });
+        baseReport.reliabilityResearchShadow = shadowRel;
+        if (this.scoringV6Service) {
+          try {
+            const shadowV6 = this.scoringV6Service.calculateScoresFromReliabilityResearch(
+              vehicleContext,
+              shadowRel,
+              vehicleContext?.listingContext,
+            );
+            baseReport.scoringV6 = shadowV6;
+          } catch (v6Err: any) {
+            this.logger.warn(`[SHADOW V6 ERROR] Shadow V6 scoring failed: ${v6Err?.message}`);
+          }
+        }
+        this.logger.log(`[SHADOW STAGE 1] Reliability Research completed: Coverage=${shadowRel.reliabilityCoverageScore}%, NumericDefects=${shadowRel.allVerifiedDefects.length}, QualitativeDefects=${shadowRel.qualitativeDefects.length}`);
+      }
+    } catch (relErr: any) {
+      this.logger.warn(`[SHADOW STAGE 1 ERROR] Reliability research shadow run failed: ${relErr?.message}`);
     }
 
     const validationContext = {
@@ -98,7 +175,7 @@ export class VehicleReportProviderService {
           this.logger.log(`[DELEGATOR] AI JSON Content extracted. Top-level keys: ${Object.keys(contentObj).join(', ')}`);
 
           // Map initial AI content to baseReport
-          this.mapGeneratedContentToReport(baseReport, contentObj);
+          this.mapGeneratedContentToReport(baseReport, contentObj, validationContext);
 
           // STAGE 4: Production Semantic Validation & Consistency Check
           let validation = this.semanticValidationService.validate(baseReport, validationContext);
@@ -141,7 +218,7 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
                     || repairedContent.content 
                     || repairedContent;
 
-                  this.mapGeneratedContentToReport(baseReport, repObj);
+                  this.mapGeneratedContentToReport(baseReport, repObj, validationContext);
 
                   // REVALIDATE AFTER REPAIR
                   validation = this.semanticValidationService.validate(baseReport, validationContext);
@@ -170,6 +247,28 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
 
           // Recalculate scores strictly on final validated report & context with preserved evidence types
           baseReport.scoring = this.scoringService.calculateScores(validationContext);
+
+          // V6 CUTOVER: Execute V6 Scoring engine with Stage 1 Reliability Research bridge
+          try {
+            let v6Scores;
+            if (baseReport.reliabilityResearchShadow) {
+              v6Scores = this.scoringV6Service.calculateScoresFromReliabilityResearch(
+                validationContext,
+                baseReport.reliabilityResearchShadow,
+                vehicleContext?.listingContext,
+              );
+            } else {
+              v6Scores = this.scoringV6Service.calculateScores(validationContext, vehicleContext?.listingContext);
+            }
+            baseReport.scoringV6 = v6Scores;
+            if (v6Scores.decisionScoreV1) {
+              baseReport.torqueScoutDecisionScoreV1 = v6Scores.decisionScoreV1;
+            }
+            this.logger.log(`[V6 SCORING] Calculated V6 Scores: Scope=${v6Scores.decisionScoreV1?.scope}, DecisionScore=${v6Scores.decisionScoreV1?.score}, State=${v6Scores.decisionScoreV1?.state}, Confidence=${v6Scores.confidenceScore}%, ModelRisk=${v6Scores.decisionScoreV1?.modelDecisionRisk}`);
+          } catch (v6Err: any) {
+            this.logger.warn(`[V6 SCORING ERROR] V6 scoring calculation failed: ${v6Err?.message}`);
+          }
+
           baseReport.status = 'COMPLETED';
 
           this.logger.log(`[DELEGATOR] Report updated successfully with AI content from ${orchestratorResult.providerName}`);
@@ -193,7 +292,7 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     throw new BadRequestException('TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.');
   }
 
-  private mapGeneratedContentToReport(baseReport: ComprehensiveVehicleReport, contentObj: any): void {
+  private mapGeneratedContentToReport(baseReport: ComprehensiveVehicleReport, contentObj: any, validationContext?: any): void {
     if (contentObj.executiveSummary) baseReport.executiveSummary = contentObj.executiveSummary as any;
     if (contentObj.usageScenarios) baseReport.usageScenarios = contentObj.usageScenarios as any;
 
@@ -299,6 +398,20 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
           supportingFactIds: item.supportingFactIds?.length ? item.supportingFactIds : ['AI_RESEARCH_ENGINE'],
         }));
       }
+
+      if (baseReport.expertDecisionSynthesis.primaryTechnicalRisk) {
+        const pRisk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk;
+        if (pRisk.symptoms && !Array.isArray(pRisk.symptoms)) {
+          pRisk.symptoms = typeof pRisk.symptoms === 'string' && (pRisk.symptoms as string).trim()
+            ? [(pRisk.symptoms as string).trim()]
+            : [];
+        }
+        if (pRisk.inspectionInstructions && !Array.isArray(pRisk.inspectionInstructions)) {
+          pRisk.inspectionInstructions = typeof pRisk.inspectionInstructions === 'string' && (pRisk.inspectionInstructions as string).trim()
+            ? [(pRisk.inspectionInstructions as string).trim()]
+            : [];
+        }
+      }
     } else if (!baseReport.expertDecisionSynthesis || !baseReport.expertDecisionSynthesis.purchaseConditions?.length) {
       // Flexible fallback mapper if AI returned pros/cons or sections and baseReport has no valid synthesis yet
       const vOverview = contentObj['Bu Araç Nasıl Bir Otomobil?'] 
@@ -361,61 +474,146 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       } as any;
     }
 
-    // 5. Map AI-derived verified technical specifications
-    if (contentObj.technicalSpecifications) {
-      const specs = contentObj.technicalSpecifications;
-      const fuelTypeLower = (baseReport.vehicleIdentity.fuelType || '').toLowerCase();
-      const isEv = fuelTypeLower.includes('elektrik') || fuelTypeLower.includes('electric') || fuelTypeLower.includes('bev');
+    // 5. Map verified technical specifications & apply Power/Torque Precedence:
+    // Precedence: Trusted DB value -> Verified Stage 1 value -> Evidence-backed Stage 2 value -> otherwise null
+    const fuelTypeLower = ((baseReport.vehicleIdentity?.fuelType || validationContext?.vehicleIdentity?.fuelType || '')).toLowerCase();
+    const isEv = fuelTypeLower.includes('elektrik') || fuelTypeLower.includes('electric') || fuelTypeLower.includes('bev');
+    const isHybrid = fuelTypeLower.includes('hibrit') || fuelTypeLower.includes('hybrid') || (baseReport.vehicleIdentity?.transmissionName || '').toLowerCase().includes('e-cvt');
 
-      if (isEv) {
-        baseReport.vehicleIdentity.engineDisplacementCc = undefined;
-      } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
-        baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
-      }
-      if (specs.enginePowerHp && !baseReport.vehicleIdentity.enginePowerHp) {
-        const numericHp = typeof specs.enginePowerHp === 'number'
-          ? specs.enginePowerHp
-          : parseInt(String(specs.enginePowerHp).replace(/\D/g, ''), 10) || undefined;
-        baseReport.vehicleIdentity.enginePowerHp = numericHp;
-      }
-      if (specs.powerUnit) {
-        (baseReport.vehicleIdentity as any).powerUnit = specs.powerUnit;
-      }
-      if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
-      if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
-      if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
-      if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
+    const specs = contentObj?.technicalSpecifications || {};
 
-      const currentPerf: any = baseReport.performanceUsage || {};
-      const hasDbPerformance = (
-        currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null ||
-        currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null ||
-        currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null ||
-        currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null
-      );
-
-      const numericPerfHp = typeof specs.enginePowerHp === 'number'
-        ? specs.enginePowerHp
-        : (typeof currentPerf.powerHp === 'number' ? currentPerf.powerHp : parseInt(String(specs.enginePowerHp || currentPerf.powerHp || '').replace(/\D/g, ''), 10) || undefined);
-
-      baseReport.performanceUsage = {
-        powerHp: (currentPerf.powerHp !== undefined && currentPerf.powerHp !== null) ? currentPerf.powerHp : numericPerfHp,
-        powerUnit: specs.powerUnit || (currentPerf as any).powerUnit || 'HP',
-        torqueNm: currentPerf.torqueNm || specs.engineTorqueNm,
-        torqueUnit: specs.torqueUnit || (currentPerf as any).torqueUnit || 'Nm',
-        zeroToHundredKmh: (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null) ? currentPerf.zeroToHundredKmh : specs.zeroToHundredKmh,
-        topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
-        cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
-        highwayFuelL100km: (currentPerf.highwayFuelL100km !== undefined && currentPerf.highwayFuelL100km !== null) ? currentPerf.highwayFuelL100km : specs.highwayFuelL100km,
-        combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null) ? currentPerf.combinedFuelL100km : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km),
-        trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
-        curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
-        rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
-          ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`
-          : baseReport.performanceUsage?.rangeFactorsNote,
-        supportingFactIds: hasDbPerformance ? ['VEHICLE_DATABASE'] : ['AI_VERIFIED_TECHNICAL_SPECS'],
-      };
+    if (isEv) {
+      baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+    } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
+      baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
     }
+    if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+    if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+    if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
+    if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
+
+    // --- POWER RESOLUTION PRECEDENCE ---
+    const dbPowerHp = (validationContext?.vehicleIdentity?.powerSource === 'VEHICLE_DATABASE' && typeof validationContext.vehicleIdentity.enginePowerHp === 'number')
+      ? validationContext.vehicleIdentity.enginePowerHp
+      : (typeof (baseReport.vehicleIdentity as any)?.enginePowerHp === 'number' && (baseReport.vehicleIdentity as any)?.powerSource === 'VEHICLE_DATABASE' ? baseReport.vehicleIdentity.enginePowerHp : null);
+    const dbPowerUnit = validationContext?.vehicleIdentity?.powerUnit || (baseReport.vehicleIdentity as any)?.powerUnit || 'HP';
+
+    const stage1Specs = validationContext?.verifiedResearch?.verifiedTechnicalSpecs;
+    const stage1PowerHp = (typeof stage1Specs?.powerHp === 'number' && stage1Specs.powerHp > 0) ? stage1Specs.powerHp : null;
+    const stage1PowerUnit = stage1Specs?.powerUnit || 'HP';
+    const stage1PowerSemantic = stage1Specs?.powerSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER');
+
+    const rawStage2Hp = specs.enginePowerHp;
+    const stage2PowerHp = typeof rawStage2Hp === 'number' ? rawStage2Hp : (typeof rawStage2Hp === 'string' && rawStage2Hp.trim() ? parseInt(rawStage2Hp.replace(/\D/g, ''), 10) || null : null);
+    const stage2PowerUnit = specs.powerUnit || 'HP';
+
+    let resolvedPowerHp: number | undefined = undefined;
+    let resolvedPowerUnit: 'HP' | 'PS' | 'kW' | undefined = undefined;
+    let resolvedPowerSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | undefined = undefined;
+    let resolvedPowerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER' | 'STANDARD_POWER' | undefined = undefined;
+
+    if (dbPowerHp !== null && dbPowerHp !== undefined) {
+      resolvedPowerHp = dbPowerHp;
+      resolvedPowerUnit = dbPowerUnit;
+      resolvedPowerSource = 'VEHICLE_DATABASE';
+      resolvedPowerSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+    } else if (stage1PowerHp !== null && stage1PowerHp !== undefined) {
+      resolvedPowerHp = stage1PowerHp;
+      resolvedPowerUnit = stage1PowerUnit;
+      resolvedPowerSource = 'VERIFIED_STAGE_1';
+      resolvedPowerSemantic = stage1PowerSemantic;
+    } else if (stage2PowerHp !== null && stage2PowerHp !== undefined && stage2PowerHp > 0) {
+      resolvedPowerHp = stage2PowerHp;
+      resolvedPowerUnit = stage2PowerUnit;
+      resolvedPowerSource = 'AI_VERIFIED_TECHNICAL_SPECS';
+      resolvedPowerSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+    }
+
+    const canonicalHp = (resolvedPowerHp !== undefined && resolvedPowerHp !== null)
+      ? (getCanonicalDisplayPowerHp(resolvedPowerHp, resolvedPowerUnit) ?? undefined)
+      : undefined;
+
+    baseReport.vehicleIdentity.enginePowerHp = resolvedPowerHp;
+    baseReport.vehicleIdentity.sourcePowerValue = resolvedPowerHp;
+    baseReport.vehicleIdentity.sourcePowerUnit = resolvedPowerUnit;
+    baseReport.vehicleIdentity.canonicalDisplayPowerHp = canonicalHp;
+    (baseReport.vehicleIdentity as any).powerUnit = resolvedPowerUnit;
+    (baseReport.vehicleIdentity as any).powerSource = resolvedPowerSource;
+    (baseReport.vehicleIdentity as any).powerSemantic = resolvedPowerSemantic;
+
+    // --- TORQUE RESOLUTION PRECEDENCE ---
+    const dbTorqueNm = (validationContext?.vehicleIdentity?.torqueSource === 'VEHICLE_DATABASE' && typeof validationContext.vehicleIdentity.engineTorqueNm === 'number')
+      ? validationContext.vehicleIdentity.engineTorqueNm
+      : (typeof (baseReport.vehicleIdentity as any)?.engineTorqueNm === 'number' && (baseReport.vehicleIdentity as any)?.torqueSource === 'VEHICLE_DATABASE' ? baseReport.vehicleIdentity.engineTorqueNm : null);
+    const dbTorqueUnit = validationContext?.vehicleIdentity?.torqueUnit || (baseReport.vehicleIdentity as any)?.torqueUnit || 'Nm';
+
+    const stage1TorqueNm = (typeof stage1Specs?.torqueNm === 'number' && stage1Specs.torqueNm > 0) ? stage1Specs.torqueNm : null;
+    const stage1TorqueUnit = stage1Specs?.torqueUnit || 'Nm';
+    const stage1TorqueSemantic = stage1Specs?.torqueSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE');
+
+    const rawStage2Torque = specs.engineTorqueNm;
+    const stage2TorqueNm = typeof rawStage2Torque === 'number' ? rawStage2Torque : (typeof rawStage2Torque === 'string' && rawStage2Torque.trim() ? parseInt(rawStage2Torque.replace(/\D/g, ''), 10) || null : null);
+    const stage2TorqueUnit = specs.torqueUnit || 'Nm';
+
+    let resolvedTorqueNm: number | undefined = undefined;
+    let resolvedTorqueUnit: string | undefined = undefined;
+    let resolvedTorqueSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | undefined = undefined;
+    let resolvedTorqueSemantic: string | undefined = undefined;
+
+    if (dbTorqueNm !== null && dbTorqueNm !== undefined) {
+      resolvedTorqueNm = dbTorqueNm;
+      resolvedTorqueUnit = dbTorqueUnit;
+      resolvedTorqueSource = 'VEHICLE_DATABASE';
+      resolvedTorqueSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE';
+    } else if (stage1TorqueNm !== null && stage1TorqueNm !== undefined) {
+      resolvedTorqueNm = stage1TorqueNm;
+      resolvedTorqueUnit = stage1TorqueUnit;
+      resolvedTorqueSource = 'VERIFIED_STAGE_1';
+      resolvedTorqueSemantic = stage1TorqueSemantic;
+    } else if (stage2TorqueNm !== null && stage2TorqueNm !== undefined && stage2TorqueNm > 0) {
+      resolvedTorqueNm = stage2TorqueNm;
+      resolvedTorqueUnit = stage2TorqueUnit;
+      resolvedTorqueSource = 'AI_VERIFIED_TECHNICAL_SPECS';
+      resolvedTorqueSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE';
+    }
+
+    (baseReport.vehicleIdentity as any).engineTorqueNm = resolvedTorqueNm;
+    (baseReport.vehicleIdentity as any).torqueUnit = resolvedTorqueUnit;
+    (baseReport.vehicleIdentity as any).torqueSource = resolvedTorqueSource;
+    (baseReport.vehicleIdentity as any).torqueSemantic = resolvedTorqueSemantic;
+
+    const currentPerf: any = baseReport.performanceUsage || {};
+    const hasDbPerformance = (
+      currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null ||
+      currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null ||
+      currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null ||
+      currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null
+    );
+
+    baseReport.performanceUsage = {
+      powerHp: resolvedPowerHp,
+      sourcePowerValue: resolvedPowerHp,
+      sourcePowerUnit: resolvedPowerUnit,
+      canonicalDisplayPowerHp: canonicalHp,
+      powerUnit: resolvedPowerUnit || 'HP',
+      powerSource: resolvedPowerSource,
+      powerSemantic: resolvedPowerSemantic,
+      torqueNm: resolvedTorqueNm,
+      torqueUnit: resolvedTorqueUnit || 'Nm',
+      torqueSource: resolvedTorqueSource,
+      torqueSemantic: resolvedTorqueSemantic,
+      zeroToHundredKmh: (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null) ? currentPerf.zeroToHundredKmh : specs.zeroToHundredKmh,
+      topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
+      cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
+      highwayFuelL100km: (currentPerf.highwayFuelL100km !== undefined && currentPerf.highwayFuelL100km !== null) ? currentPerf.highwayFuelL100km : specs.highwayFuelL100km,
+      combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null) ? currentPerf.combinedFuelL100km : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km),
+      trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
+      curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
+      rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
+        ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`
+        : baseReport.performanceUsage?.rangeFactorsNote,
+      supportingFactIds: (resolvedPowerSource === 'VEHICLE_DATABASE' || hasDbPerformance) ? ['VEHICLE_DATABASE'] : (resolvedPowerSource === 'VERIFIED_STAGE_1' ? ['AI_RESEARCH_ENGINE'] : ['AI_VERIFIED_TECHNICAL_SPECS']),
+    };
   }
 
   private sanitizeIncompatibleReportFields(baseReport: ComprehensiveVehicleReport, contextJson: any): void {

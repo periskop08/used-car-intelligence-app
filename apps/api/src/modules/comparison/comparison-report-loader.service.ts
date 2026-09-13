@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { CURRENT_REPORT_VERSION } from '../vehicle-report/vehicle-report-cache.service';
 import { ApprovalStatus } from '@prisma/client';
-import { ExpertDecisionSynthesis, ReportSupportingFact } from '@used-car-intelligence/shared';
+import { ExpertDecisionSynthesis, ReportSupportingFact, formatCanonicalPowerDisplay } from '@used-car-intelligence/shared';
 import * as crypto from 'crypto';
 
 export function generateDerivedFactId(reportId: string, criterion: string, sourcePath: string): string {
@@ -287,8 +287,13 @@ export function deriveComparisonFactsFromStoredReport(
   }
 
   // 5. PERFORMANCE
-  if (typeof perf.powerHp === 'number' && perf.powerHp > 0) {
-    addFact('PERFORMANCE', 'Motor Gücü', `${perf.powerHp} HP`, 'performanceUsage.powerHp');
+  const displayPower = formatCanonicalPowerDisplay(
+    perf.sourcePowerValue ?? perf.powerHp,
+    perf.sourcePowerUnit ?? perf.powerUnit ?? 'HP',
+    perf.powerSemantic,
+  );
+  if (displayPower !== '—') {
+    addFact('PERFORMANCE', 'Motor Gücü', displayPower, 'performanceUsage.powerHp');
   }
   if (typeof perf.torqueNm === 'number' && perf.torqueNm > 0) {
     addFact('PERFORMANCE', 'Motor Torku', `${perf.torqueNm} Nm`, 'performanceUsage.torqueNm');

@@ -42,7 +42,7 @@ describe('Research Module Tests', () => {
         WebSearchProvider,
         EvidenceRulesService,
         AiReportGeneratorService,
-        VehicleCharacterResearchService,
+        { provide: VehicleCharacterResearchService, useValue: {} },
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();

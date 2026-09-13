@@ -74,8 +74,15 @@ export class VehicleReportContextBuilderService {
     // ─────────────────────────────────────────────────────────────────────────
 
     // Build complete factory performance and technical specs (use actual specs if available, otherwise null to let AI rely on real vehicle knowledge)
-    let engineHp = specsJson.enginePowerHp || variant.engine?.horsepower || null;
-    let engineTorque = specsJson.engineTorqueNm || variant.engine?.torque || null;
+    const isHybridVariant = variant.fuelType === 'HYBRID' || (variant.engine?.fuelType || '').toUpperCase() === 'HYBRID';
+    let engineHp: number | null = specsJson.enginePowerHp || (isHybridVariant ? null : variant.engine?.horsepower) || null;
+    let engineTorque: number | null = specsJson.engineTorqueNm || (isHybridVariant ? null : variant.engine?.torque) || null;
+
+    // Never use legacy engine.horsepower = 100 on Hybrid
+    if (variant.engine?.horsepower === 100 && isHybridVariant && !specsJson.enginePowerHp) {
+      engineHp = null;
+    }
+
     const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
     const rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
     const engineCc = isElectricVariant ? null : rawEngineCc;
@@ -91,6 +98,14 @@ export class VehicleReportContextBuilderService {
       }
     }
 
+    const powerSource = engineHp ? 'VEHICLE_DATABASE' : undefined;
+    const powerUnit = specsJson.powerUnit || (engineHp ? 'HP' : undefined);
+    const powerSemantic = engineHp ? (isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER') : undefined;
+
+    const torqueSource = engineTorque ? 'VEHICLE_DATABASE' : undefined;
+    const torqueUnit = specsJson.torqueUnit || (engineTorque ? 'Nm' : undefined);
+    const torqueSemantic = engineTorque ? (isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE') : undefined;
+
     const transName = variant.transmission?.name || null;
     const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
     const driveType = specsJson.drivetrain || (variant as any).driveType || null;
@@ -104,8 +119,14 @@ export class VehicleReportContextBuilderService {
     const combinedFuelVal = specsJson.averageFuelConsumption ?? specsJson.combinedFuelL100km ?? null;
 
     const performanceData: Record<string, any> = {
-      enginePowerHp: null,
-      engineTorqueNm: null,
+      enginePowerHp: engineHp,
+      powerUnit: powerUnit,
+      powerSource: powerSource,
+      powerSemantic: powerSemantic,
+      engineTorqueNm: engineTorque,
+      torqueUnit: torqueUnit,
+      torqueSource: torqueSource,
+      torqueSemantic: torqueSemantic,
       engineDisplacementCc: engineCc,
       transmissionName: transName || null,
       transmissionSpeeds: null, // Let AI derive exact gear count (e.g. 6-speed for Kia Cerato, 5-speed for Civic)
@@ -129,8 +150,14 @@ export class VehicleReportContextBuilderService {
         bodyType: variant.bodyType || 'Sedan',
         modelYear: variant.year,
         engineDisplacementCc: engineCc,
-        enginePowerHp: null,
-        engineTorqueNm: null,
+        enginePowerHp: engineHp,
+        powerUnit: powerUnit,
+        powerSource: powerSource,
+        powerSemantic: powerSemantic,
+        engineTorqueNm: engineTorque,
+        torqueUnit: torqueUnit,
+        torqueSource: torqueSource,
+        torqueSemantic: torqueSemantic,
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineType: specsJson.engineType || null,
         fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
