@@ -73,11 +73,8 @@ export class VehicleReportContextBuilderService {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Build complete factory performance and technical specs (use actual specs if available, otherwise null to let AI rely on real vehicle knowledge)
+    // ─────────────────────────────────────────────────────────────────────────
     const isHybridVariant = variant.fuelType === 'HYBRID' || (variant.engine?.fuelType || '').toUpperCase() === 'HYBRID';
-    let engineHp: number | null = specsJson.enginePowerHp || (isHybridVariant ? null : variant.engine?.horsepower) || null;
-    let engineTorque: number | null = specsJson.engineTorqueNm || (isHybridVariant ? null : variant.engine?.torque) || null;
-
     const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
     const rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
     const engineCc = isElectricVariant ? null : rawEngineCc;
@@ -95,71 +92,67 @@ export class VehicleReportContextBuilderService {
     const combinedFuelVal = specsJson.averageFuelConsumption ?? specsJson.combinedFuelL100km ?? null;
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GENERIC SANITIZATION FOR UNVERIFIED / CORRUPT DB ENGINE POWER & TORQUE
+    // CANONICAL EXACT-VARIANT POWER RESOLUTION (NO HEURISTICS, ZERO PLACEHOLDERS)
     // ─────────────────────────────────────────────────────────────────────────
-    // When specsJson does NOT contain an explicit verified enginePowerHp, detect dummy placeholders or clear mismatches.
-    const isExplicitlyVerifiedSpec = Boolean(specsJson.enginePowerHp && specsJson.enginePowerHp > 0);
-    if (!isExplicitlyVerifiedSpec) {
-      const rawDbHp = variant.engine?.horsepower;
-      const rawDbTorque = variant.engine?.torque;
+    // Priority 1: Verified side-car VehiclePowerEnrichment (grounded exact variant research)
+    const powerEnrichment = await this.prisma.vehiclePowerEnrichment.findUnique({
+      where: { vehicleVariantId: variantId },
+    });
+    const isEnrichmentVerified = powerEnrichment?.verificationStatus === 'VERIFIED' && typeof powerEnrichment.powerHp === 'number' && powerEnrichment.powerHp > 0;
 
-      // 1. Generic placeholder pairs from legacy bulk import (e.g. 100 HP / 200 Nm or 110 HP / 143 Nm)
-      if ((rawDbHp === 100 && rawDbTorque === 200) || (rawDbHp === 110 && rawDbTorque === 143)) {
-        engineHp = null;
-        engineTorque = null;
-      }
+    // Priority 2: Verified TechnicalSpec table
+    const isSpecVerified = typeof specsJson.enginePowerHp === 'number' && specsJson.enginePowerHp > 0;
 
-      // 2. Never use legacy engine.horsepower = 100 on Hybrid
-      if (rawDbHp === 100 && isHybridVariant) {
-        engineHp = null;
-      }
+    let engineHp: number | null = null;
+    let powerUnit: 'HP' | 'PS' | 'kW' | undefined = undefined;
+    let powerSource: 'VEHICLE_DATABASE' | undefined = undefined;
+    let powerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER' | 'STANDARD_POWER' | undefined = undefined;
 
-      // 3. Forced induction / turbo engine power & torque bounds sanitization
-      const engineText = `${variant.engine?.code || ''} ${variant.engine?.description || ''} ${variant.trim?.name || ''}`.toLowerCase();
-      const hasForcedInduction = Boolean(
-        variant.engine?.hasTurbo ||
-        /\b(t|turbo|tsi|tfsi|tdi|cdti|hdi|dci|crdi|ecoboost|thp|tce|puretech|gdi|tgdi|biturbo|c-turbo|kompressor)\b/i.test(engineText) ||
-        /\d\.\d\s*t\b/i.test(engineText)
-      );
-
-      const dispCc = engineCc || 0;
-
-      if (hasForcedInduction) {
-        // Any 1.4L+ (1350cc+) turbo engine with <= 115 HP is a corrupt dummy value (1.4T is 125-150 HP, 1.6T is 150-200 HP)
-        if (dispCc >= 1350 && engineHp && engineHp <= 115) {
-          engineHp = null;
-        }
-        // Any 1.4L+ turbo engine with <= 210 Nm is a corrupt dummy value
-        if (dispCc >= 1350 && engineTorque && engineTorque <= 210) {
-          engineTorque = null;
-        }
-        // Any 1.9L+ (2.0L+) turbo engine with < 140 HP or < 220 Nm is corrupt
-        if (dispCc >= 1850 || engineText.includes('2.0')) {
-          if (engineHp && engineHp < 140) engineHp = null;
-          if (engineTorque && engineTorque < 220) engineTorque = null;
-        }
-      }
-
-      // 4. Performance / Physics contradiction: top speed >= 205 km/h or 0-100 <= 9.5s on passenger cars cannot have <= 115 HP
-      const topSpeedNum = typeof topSpeedVal === 'number' ? topSpeedVal : (typeof topSpeedVal === 'string' ? parseFloat(topSpeedVal) : null);
-      const accelNum = typeof zeroToHundred === 'number' ? zeroToHundred : (typeof zeroToHundred === 'string' ? parseFloat(zeroToHundred) : null);
-      if ((topSpeedNum && topSpeedNum >= 205) || (accelNum && accelNum > 0 && accelNum <= 9.5)) {
-        if (engineHp && engineHp <= 115) {
-          engineHp = null;
-        }
-        if (engineTorque && engineTorque < 220) {
-          engineTorque = null;
-        }
+    if (isEnrichmentVerified && powerEnrichment) {
+      engineHp = powerEnrichment.powerHp;
+      powerUnit = (powerEnrichment.sourceReportedUnit as any) || 'HP';
+      powerSource = 'VEHICLE_DATABASE';
+      powerSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+    } else if (isSpecVerified) {
+      engineHp = specsJson.enginePowerHp;
+      powerUnit = specsJson.powerUnit || 'HP';
+      powerSource = 'VEHICLE_DATABASE';
+      powerSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+    } else if (variant.engine?.horsepower && !isHybridVariant) {
+      // Check if DB horsepower is a known dummy placeholder
+      const rawDbHp = variant.engine.horsepower;
+      const rawDbTorque = variant.engine.torque;
+      const isDummyPair = (rawDbHp === 100 && rawDbTorque === 200) || (rawDbHp === 110 && rawDbTorque === 143);
+      if (!isDummyPair) {
+        engineHp = rawDbHp;
+        powerUnit = 'HP';
+        powerSource = 'VEHICLE_DATABASE';
+        powerSemantic = 'STANDARD_POWER';
       }
     }
 
-    const powerSource = engineHp ? 'VEHICLE_DATABASE' : undefined;
-    const powerUnit = specsJson.powerUnit || (engineHp ? 'HP' : undefined);
-    const powerSemantic = engineHp ? (isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER') : undefined;
+    // Torque Resolution
+    let engineTorque: number | null = null;
+    let torqueUnit: string | undefined = undefined;
+    let torqueSource: 'VEHICLE_DATABASE' | undefined = undefined;
+    let torqueSemantic: string | undefined = undefined;
 
-    const torqueSource = engineTorque ? 'VEHICLE_DATABASE' : undefined;
-    const torqueUnit = specsJson.torqueUnit || (engineTorque ? 'Nm' : undefined);
-    const torqueSemantic = engineTorque ? (isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE') : undefined;
+    if (typeof specsJson.engineTorqueNm === 'number' && specsJson.engineTorqueNm > 0) {
+      engineTorque = specsJson.engineTorqueNm;
+      torqueUnit = specsJson.torqueUnit || 'Nm';
+      torqueSource = 'VEHICLE_DATABASE';
+      torqueSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE';
+    } else if (variant.engine?.torque && !isHybridVariant) {
+      const rawDbHp = variant.engine.horsepower;
+      const rawDbTorque = variant.engine.torque;
+      const isDummyPair = (rawDbHp === 100 && rawDbTorque === 200) || (rawDbHp === 110 && rawDbTorque === 143);
+      if (!isDummyPair) {
+        engineTorque = rawDbTorque;
+        torqueUnit = 'Nm';
+        torqueSource = 'VEHICLE_DATABASE';
+        torqueSemantic = 'STANDARD_TORQUE';
+      }
+    }
 
     const performanceData: Record<string, any> = {
       enginePowerHp: engineHp,

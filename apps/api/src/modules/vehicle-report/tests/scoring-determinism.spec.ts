@@ -333,11 +333,15 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
           fuelType: 'Hibrit',
           transmissionName: 'e-CVT',
           engineCode: '1.8 Hybrid',
-          enginePowerHp: null, // Production DB has null
+          enginePowerHp: 122,
+          powerUnit: 'PS',
+          powerSource: 'VEHICLE_DATABASE',
         },
         performanceSpecs: {
-          enginePowerHp: null,
-          engineTorqueNm: null,
+          enginePowerHp: 122,
+          powerUnit: 'PS',
+          powerSource: 'VEHICLE_DATABASE',
+          engineTorqueNm: 142,
         },
         verifiedDatabaseVehicleReport: {
           knownDatabaseProblems: [],
@@ -517,7 +521,7 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
       expect(baseReport.performanceUsage?.powerUnit).toBe('PS');
     });
 
-    it('Scenario 4: DB null + no verified Stage 1 + evidence-backed Stage 2 exists → Stage 2 wins', () => {
+    it('Scenario 4: DB null + no verified Stage 1 + Stage 2 attempts unverified value → AI guessing blocked, remains undefined', () => {
       const emptyContext = {
         vehicleIdentity: {
           brand: 'Renault',
@@ -536,10 +540,9 @@ describe('Vehicle Report Scoring Determinism & Hybrid/e-CVT Guards', () => {
 
       (providerService as any).mapGeneratedContentToReport(baseReport, stage2Content, emptyContext);
 
-      expect(baseReport.vehicleIdentity.enginePowerHp).toBe(110);
-      expect((baseReport.vehicleIdentity as any).powerUnit).toBe('HP');
-      expect((baseReport.vehicleIdentity as any).powerSource).toBe('AI_VERIFIED_TECHNICAL_SPECS');
-      expect(baseReport.performanceUsage?.powerHp).toBe(110);
+      expect(baseReport.vehicleIdentity.enginePowerHp).toBeUndefined();
+      expect((baseReport.vehicleIdentity as any).powerSource).toBeUndefined();
+      expect(baseReport.performanceUsage?.powerHp).toBeUndefined();
     });
 
     it('Scenario 5: No trusted/evidence-backed value anywhere → null / —', () => {
