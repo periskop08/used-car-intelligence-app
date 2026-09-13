@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles } from "lucide-react";
+import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles, FileText } from "lucide-react";
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
 import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
@@ -330,47 +330,53 @@ export default function ListingDetail() {
 
           {/* Description */}
           {listing.description && (
-            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/90 flex flex-col gap-2">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-                Açıklama
-              </h3>
-              <p className="text-slate-800 text-xs sm:text-sm leading-relaxed whitespace-pre-line font-medium">
+            <div className="bg-gradient-to-b from-[#0e1e38] via-[#09152b] to-[#060e1e] rounded-2xl p-5 sm:p-6 shadow-xl shadow-blue-950/20 border border-blue-500/25 flex flex-col gap-3">
+              <div className="flex items-center gap-2.5 border-b border-blue-500/15 pb-3">
+                <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                <h3 className="text-xs sm:text-[13px] font-extrabold text-white uppercase tracking-wider">
+                  Açıklama
+                </h3>
+              </div>
+              <p className="text-slate-300 text-xs sm:text-[13px] leading-relaxed whitespace-pre-line font-normal">
                 {listing.description}
               </p>
             </div>
           )}
 
           {/* Condition Details (Boyalı / Değişen / Tramer) */}
-          <div className="flex flex-col gap-4 p-5 bg-white border border-slate-200/90 rounded-2xl shadow-sm">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">
-              Ekspertiz ve Boya/Değişen Durumu
-            </h3>
+          <div className="bg-gradient-to-b from-[#0e1e38] via-[#09152b] to-[#060e1e] rounded-2xl p-5 sm:p-6 shadow-xl shadow-blue-950/20 border border-blue-500/25 flex flex-col gap-4">
+            <div className="flex items-center gap-2.5 border-b border-blue-500/15 pb-3">
+              <Wrench className="w-4 h-4 text-sky-400 shrink-0" />
+              <h3 className="text-xs sm:text-[13px] font-extrabold text-white uppercase tracking-wider">
+                Ekspertiz ve Boya/Değişen Durumu
+              </h3>
+            </div>
 
             {/* Visual Car Silhouette (Read-only) */}
-            <div className="mt-1">
+            <div className="mt-0.5">
               <VehicleBodyConditionMap
                 mode="readOnly"
-                theme="light"
+                theme="dark"
                 localPaintedParts={listing.localPaintedParts}
                 paintedParts={listing.paintedParts}
                 changedParts={listing.changedParts}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3.5 border-t border-blue-500/15 text-xs">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-500">Tramer Kaydı:</span>
-                <span className="text-xs font-black text-red-600 mt-0.5">
+                <span className="text-[10px] font-bold text-slate-400">Tramer Kaydı:</span>
+                <span className="text-xs font-black text-rose-400 mt-0.5">
                   {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasar Kaydı Yok"}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-500">Hasar Kaydı Açıklaması:</span>
-                <span className="text-xs font-semibold text-slate-800 mt-0.5">{listing.damageRecord || "Belirtilmedi"}</span>
+                <span className="text-[10px] font-bold text-slate-400">Hasar Kaydı Açıklaması:</span>
+                <span className="text-xs text-slate-300 mt-0.5">{listing.damageRecord || "Belirtilmedi"}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-500">Bakım Geçmişi:</span>
-                <span className="text-xs font-semibold text-slate-800 mt-0.5">{listing.maintenanceHistory || "Belirtilmedi"}</span>
+                <span className="text-[10px] font-bold text-slate-400">Bakım Geçmişi:</span>
+                <span className="text-xs text-slate-300 mt-0.5">{listing.maintenanceHistory || "Belirtilmedi"}</span>
               </div>
             </div>
           </div>
