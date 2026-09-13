@@ -321,7 +321,6 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           </div>
         );
       })()}
->>>>>>> comparison-v7-preview
 
       {/* Legacy Schema Version Warning & Free Upgrade Banner */}
       {(!report.expertDecisionSynthesis || (report.schemaVersion || 1) < 2) && (
