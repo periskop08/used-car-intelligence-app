@@ -28,6 +28,22 @@ const TURKISH_CITIES = [
   "Samsun", "Mersin", "Eskişehir", "Trabzon", "Diyarbakır"
 ];
 
+export type ViewMode = "classic" | "list" | "gallery";
+
+function formatDateTr(dateStr: string | Date | undefined | null): string {
+  if (!dateStr) return "-";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "-";
+  }
+}
+
 export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,6 +72,23 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   const [page, setPage] = useState(1);
   const [urgentOnly, setUrgentOnly] = useState(isUrgentPage);
   const [showcaseOnly, setShowcaseOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("classic");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("torque_scout_listing_view_mode") as ViewMode;
+    if (saved && (saved === "classic" || saved === "list" || saved === "gallery")) {
+      setViewMode(saved);
+    }
+  }, []);
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("torque_scout_listing_view_mode", mode);
+    } catch (e) {
+      // ignore storage error
+    }
+  };
 
   // Pending brand/model resolution from URL queries (supports names or IDs)
   const [pendingBrandQuery, setPendingBrandQuery] = useState<string | null>(null);
@@ -1257,24 +1290,89 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
         {/* Right Listings Grid Column */}
         <div className="lg:col-span-3 flex flex-col gap-6">
           {/* Toolbar */}
-          <div className="flex items-center justify-between bg-slate-950/20 border border-white/5 px-6 py-4 rounded-2xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950/20 border border-white/5 px-6 py-4 rounded-2xl">
             <span className="text-xs font-bold text-slate-400">
               {loading || isUrlHydrating ? "İlanlar hazırlanıyor..." : `${total} İlan Bulundu`}
             </span>
 
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider">Sırala:</label>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
-              >
-                <option value="newest">En Yeni</option>
-                <option value="price_asc">Fiyat (Düşükten Yükseğe)</option>
-                <option value="price_desc">Fiyat (Yüksekten Düşüğe)</option>
-                <option value="km_asc">Kilometre (Düşükten Yükseğe)</option>
-                <option value="featured">Öne Çıkanlar</option>
-              </select>
+            <div className="flex items-center gap-3">
+              {/* View Switcher: Klasik | Liste | Galeri (Görsel 5) */}
+              <div className="inline-flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner">
+                {/* Klasik Tablo */}
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("classic")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    viewMode === "classic"
+                      ? "bg-slate-700 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                  title="Klasik Tablo Görünümü"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                    <line x1="15" y1="3" x2="15" y2="21" />
+                  </svg>
+                  <span className="hidden md:inline">Klasik</span>
+                </button>
+
+                {/* Liste */}
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("list")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    viewMode === "list"
+                      ? "bg-slate-700 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                  title="Yatay Liste Görünümü"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6" />
+                    <line x1="4" y1="11" x2="20" y2="11" />
+                    <line x1="4" y1="16" x2="20" y2="16" />
+                    <line x1="4" y1="21" x2="20" y2="21" />
+                  </svg>
+                  <span className="hidden md:inline">Liste</span>
+                </button>
+
+                {/* Galeri */}
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("gallery")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    viewMode === "gallery"
+                      ? "bg-slate-700 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  }`}
+                  title="Galeri Izgara Görünümü"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                  <span className="hidden md:inline">Galeri</span>
+                </button>
+              </div>
+
+              {/* Sorting */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider">Sırala:</label>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="bg-slate-900 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
+                >
+                  <option value="newest">En Yeni</option>
+                  <option value="price_asc">Fiyat (Düşükten Yükseğe)</option>
+                  <option value="price_desc">Fiyat (Yüksekten Düşüğe)</option>
+                  <option value="km_asc">Kilometre (Düşükten Yükseğe)</option>
+                  <option value="featured">Öne Çıkanlar</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1288,7 +1386,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
             </div>
           )}
 
-          {/* Grid list */}
+          {/* Grid list / Views */}
           {loading || isUrlHydrating ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4">
               <span className="animate-spin text-3xl">⏳</span>
@@ -1302,7 +1400,226 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               </span>
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
+          ) : viewMode === "classic" ? (
+            /* 1. KLASİK GÖRÜNÜM (Sahibinden tarzı detaylı tablo) */
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 shadow-xl backdrop-blur-sm">
+              <table className="w-full text-left text-xs text-slate-300 border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/90 border-b border-white/10 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-3.5 px-3 w-20 text-center">Fotoğraf</th>
+                    <th className="py-3.5 px-3">Marka</th>
+                    <th className="py-3.5 px-3">Model Ailesi</th>
+                    <th className="py-3.5 px-3">Motor / Versiyon</th>
+                    <th className="py-3.5 px-3">Donanım Paketi</th>
+                    <th className="py-3.5 px-4 min-w-[220px]">İlan Başlığı</th>
+                    <th className="py-3.5 px-3 text-center">Yıl</th>
+                    <th className="py-3.5 px-3 text-right">Km</th>
+                    <th className="py-3.5 px-3">Renk</th>
+                    <th className="py-3.5 px-4 text-right">Fiyat</th>
+                    <th className="py-3.5 px-3 text-center whitespace-nowrap">İlan Tarihi</th>
+                    <th className="py-3.5 px-3 whitespace-nowrap">İl / İlçe</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {listings.map((listing) => {
+                    const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                    const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "-";
+                    const modelName = listing.vehicleVariant?.model?.name || listing.customModel || "-";
+                    const engineCode = listing.vehicleVariant?.engine?.code || listing.customEngine || "-";
+                    const trimName = listing.vehicleVariant?.trim?.name || "-";
+                    const location = `${listing.city || ""}${listing.district ? ` / ${listing.district}` : ""}`.trim() || "-";
+
+                    return (
+                      <tr
+                        key={listing.id}
+                        onClick={() => router.push(`/listings/${listing.id}`)}
+                        className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer text-xs"
+                      >
+                        {/* Fotoğraf */}
+                        <td className="py-2.5 px-3">
+                          <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto">
+                            <img
+                              src={cover}
+                              alt={listing.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
+                              }}
+                            />
+                            {listing.isUrgent && (
+                              <span className="absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-sm" title="Acil İlan" />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Marka */}
+                        <td className="py-2.5 px-3 font-semibold text-slate-200 whitespace-nowrap">
+                          {brandName}
+                        </td>
+
+                        {/* Model Ailesi */}
+                        <td className="py-2.5 px-3 font-medium text-slate-300 whitespace-nowrap">
+                          {modelName}
+                        </td>
+
+                        {/* Motor / Versiyon */}
+                        <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                          {engineCode}
+                        </td>
+
+                        {/* Donanım Paketi */}
+                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">
+                          {trimName}
+                        </td>
+
+                        {/* İlan Başlığı */}
+                        <td className="py-2.5 px-4 font-bold text-slate-200 group-hover:text-orange-400 transition line-clamp-1 max-w-xs">
+                          <div className="flex items-center gap-1.5">
+                            {listing.isUrgent && <span className="text-[10px]" title="Acil İlan">🚨</span>}
+                            {listing.isShowcaseFeedActive && <span className="text-[10px]" title="Vitrin İlanı">⭐</span>}
+                            {listing.isAiReady && <span className="text-[10px]" title="AI Analizli">✨</span>}
+                            <span className="truncate">{listing.title}</span>
+                          </div>
+                        </td>
+
+                        {/* Yıl */}
+                        <td className="py-2.5 px-3 text-center text-slate-300 whitespace-nowrap font-medium">
+                          {listing.modelYear || "-"}
+                        </td>
+
+                        {/* Km */}
+                        <td className="py-2.5 px-3 text-right text-slate-300 whitespace-nowrap font-mono">
+                          {listing.kilometers !== undefined && listing.kilometers !== null ? listing.kilometers.toLocaleString("tr-TR") : "-"}
+                        </td>
+
+                        {/* Renk */}
+                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">
+                          {listing.color || "-"}
+                        </td>
+
+                        {/* Fiyat */}
+                        <td className="py-2.5 px-4 text-right font-black text-orange-400 whitespace-nowrap text-[13px]">
+                          {formatCurrency(listing.priceAmount, listing.currency)}
+                        </td>
+
+                        {/* İlan Tarihi */}
+                        <td className="py-2.5 px-3 text-center text-slate-400 whitespace-nowrap text-[11px]">
+                          {formatDateTr(listing.publishedAt || listing.createdAt)}
+                        </td>
+
+                        {/* İl / İlçe */}
+                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap text-[11px]">
+                          {location}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : viewMode === "list" ? (
+            /* 2. LİSTE GÖRÜNÜMÜ (Yatay kartlar) */
+            <div className="flex flex-col gap-3">
+              {listings.map((listing) => {
+                const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
+                const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "";
+                const modelName = listing.vehicleVariant?.model?.name || listing.customModel || "";
+                const engineCode = listing.vehicleVariant?.engine?.code || listing.customEngine || "";
+                const trimName = listing.vehicleVariant?.trim?.name || "";
+                const location = `${listing.city || ""}${listing.district ? ` / ${listing.district}` : ""}`.trim() || "-";
+
+                return (
+                  <a
+                    key={listing.id}
+                    href={`/listings/${listing.id}`}
+                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative w-full sm:w-56 aspect-[16/10] sm:aspect-[4/3] bg-slate-950 shrink-0 overflow-hidden">
+                      <button
+                        onClick={(e) => handleToggleFavorite(e, listing.id)}
+                        className={`absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full border flex items-center gap-1 transition shadow-lg backdrop-blur-md text-[11px] font-bold ${
+                          listing.isFavorited
+                            ? "bg-red-500/20 text-red-500 border-red-500/40"
+                            : "bg-slate-950/80 text-slate-450 border-white/10 hover:text-white"
+                        }`}
+                        title={listing.isFavorited ? "Favorilerden Kaldır" : "Favoriye Ekle"}
+                      >
+                        <span>{listing.isFavorited ? "❤️" : "🤍"}</span>
+                        {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
+                          <span className="text-[10px] font-extrabold">{listing.favoriteCount}</span>
+                        )}
+                      </button>
+
+                      <img
+                        src={cover}
+                        alt={listing.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
+                        }}
+                      />
+
+                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+                        {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
+                        {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
+                        {listing.isAiReady && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
+                            ✨ AI Analizli
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content Details */}
+                    <div className="p-4 flex-1 flex flex-col justify-between gap-3">
+                      <div>
+                        {/* Vehicle Taxonomy Pills */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                          <span className="text-orange-400 font-extrabold">{brandName}</span>
+                          <span>•</span>
+                          <span>{modelName}</span>
+                          {engineCode && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-slate-300">{engineCode}</span>
+                            </>
+                          )}
+                          {trimName && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-300">{trimName}</span>
+                            </>
+                          )}
+                        </div>
+
+                        <h3 className="text-sm sm:text-base font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-2">
+                          {listing.title}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-2">
+                          <span>Yıl: <strong className="text-slate-200">{listing.modelYear || "-"}</strong></span>
+                          <span>Km: <strong className="text-slate-200">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
+                          {listing.color && <span>Renk: <strong className="text-slate-200">{listing.color}</strong></span>}
+                          <span>Konum: <strong className="text-slate-200">{location}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/5 pt-3 flex items-center justify-between">
+                        <span className="text-xs text-slate-500">
+                          {formatDateTr(listing.publishedAt || listing.createdAt)}
+                        </span>
+                        <span className="text-base sm:text-lg font-black text-orange-400">
+                          {formatCurrency(listing.priceAmount, listing.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
           ) : (
+            /* 3. GALERİ GÖRÜNÜMÜ (4'lü ızgara kartlar) */
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";

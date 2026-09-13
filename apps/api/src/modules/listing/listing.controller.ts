@@ -203,7 +203,7 @@ export class ListingController {
             orderBy: { sortOrder: 'asc' },
           },
           vehicleVariant: {
-            include: { brand: true, model: true },
+            include: { brand: true, model: true, engine: true, trim: true },
           },
         },
       });
@@ -255,7 +255,7 @@ export class ListingController {
               orderBy: { sortOrder: 'asc' },
             },
             vehicleVariant: {
-              include: { brand: true, model: true },
+              include: { brand: true, model: true, engine: true, trim: true },
             },
             promotionEntitlements: {
               where: {
