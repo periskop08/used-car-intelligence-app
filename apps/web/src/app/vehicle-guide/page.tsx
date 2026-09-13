@@ -297,14 +297,14 @@ export default function VehicleGuidePage() {
     logAnalyticsEvent(currentCard.id, "GUIDE_LISTING_CTA_CLICKED");
     
     const query = new URLSearchParams();
-    query.set("brand", currentCard.brand);
-    query.set("model", currentCard.model);
-    query.set("minYear", currentCard.yearStart.toString());
+    if (currentCard.brand) query.set("brand", currentCard.brand.trim());
+    if (currentCard.model) query.set("model", currentCard.model.trim());
+    if (currentCard.yearStart) query.set("minYear", currentCard.yearStart.toString());
     if (currentCard.yearEnd) {
       query.set("maxYear", currentCard.yearEnd.toString());
     }
     if (currentCard.bodyType) {
-      query.set("bodyType", currentCard.bodyType);
+      query.set("bodyType", currentCard.bodyType.trim().toUpperCase());
     }
     
     window.location.href = `/listings?${query.toString()}`;

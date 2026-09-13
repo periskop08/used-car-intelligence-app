@@ -51,6 +51,11 @@ function ListingsContent() {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [showcaseOnly, setShowcaseOnly] = useState(false);
 
+  // Pending brand/model resolution from URL queries (supports names or IDs)
+  const [pendingBrandQuery, setPendingBrandQuery] = useState<string | null>(null);
+  const [pendingModelQuery, setPendingModelQuery] = useState<string | null>(null);
+  const [isUrlHydrating, setIsUrlHydrating] = useState<boolean>(true);
+
   // sahibinden.com style extended filters
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
@@ -108,10 +113,82 @@ function ListingsContent() {
       .catch((e) => console.error("Error fetching models:", e));
   }, [selectedBrand]);
 
+  // Resolve pending brand name/ID to matching brand in brands list
+  useEffect(() => {
+    if (!pendingBrandQuery || brands.length === 0) return;
+
+    const query = pendingBrandQuery.toLowerCase().trim();
+    let matched = brands.find(
+      (b) => b.id.toLowerCase() === query || b.name.toLowerCase() === query
+    );
+    if (!matched) {
+      matched = brands.find(
+        (b) =>
+          b.name.toLowerCase().includes(query) ||
+          query.includes(b.name.toLowerCase())
+      );
+    }
+
+    if (matched) {
+      setSelectedBrand(matched.id);
+      if (!pendingModelQuery) {
+        setIsUrlHydrating(false);
+      }
+    } else {
+      setIsUrlHydrating(false);
+    }
+    setPendingBrandQuery(null);
+  }, [brands, pendingBrandQuery, pendingModelQuery]);
+
+  // Resolve pending model name/ID to matching model in models list for selectedBrand
+  useEffect(() => {
+    if (!pendingModelQuery || !selectedBrand || models.length === 0) return;
+
+    const query = pendingModelQuery.toLowerCase().trim();
+    // 1. Direct UUID or exact name match
+    let matched = models.find(
+      (m) => m.id.toLowerCase() === query || m.name.toLowerCase() === query
+    );
+
+    // 2. Query starts with or contains model name (e.g., "IMPREZA 2.0R" starts with "impreza")
+    if (!matched) {
+      matched = models.find(
+        (m) =>
+          query.startsWith(m.name.toLowerCase()) ||
+          query.includes(m.name.toLowerCase()) ||
+          m.name.toLowerCase().includes(query)
+      );
+    }
+
+    // 3. Token-level match (e.g., first word of query matches first word of model name)
+    if (!matched) {
+      const queryFirstToken = query.split(/\s+/)[0];
+      if (queryFirstToken && queryFirstToken.length > 1) {
+        matched = models.find(
+          (m) => m.name.toLowerCase().split(/\s+/)[0] === queryFirstToken
+        );
+      }
+    }
+
+    if (matched) {
+      setSelectedModel(matched.id);
+    }
+    setPendingModelQuery(null);
+    setIsUrlHydrating(false);
+  }, [models, pendingModelQuery, selectedBrand]);
+
+  // Fail-safe timeout: ensure isUrlHydrating never blocks indefinitely
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsUrlHydrating(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Read URL parameters on load
   useEffect(() => {
-    const brand = searchParams.get("brandId");
-    const model = searchParams.get("modelId");
+    const brandParam = searchParams.get("brandId") || searchParams.get("brand");
+    const modelParam = searchParams.get("modelId") || searchParams.get("model");
     const engineVal = searchParams.get("engineId");
     const trimVal = searchParams.get("trimId");
     const variantId = searchParams.get("vehicleVariantId");
@@ -123,6 +200,8 @@ function ListingsContent() {
     const maxYearVal = searchParams.get("maxYear") || yearVal;
     const minP = searchParams.get("minPrice");
     const maxP = searchParams.get("maxPrice");
+    const minKmVal = searchParams.get("minKm");
+    const maxKmVal = searchParams.get("maxKm");
     const aiReady = searchParams.get("isAiReady") === "true";
     const urgentVal = searchParams.get("urgentOnly") === "true";
     const showcaseVal = searchParams.get("showcaseOnly") === "true";
@@ -135,16 +214,38 @@ function ListingsContent() {
     const powerParam = searchParams.get("powerRanges");
     const dispParam = searchParams.get("displacementRanges");
     
-    if (brand) setSelectedBrand(brand);
-    if (model) setSelectedModel(model);
+    if (brandParam) {
+      setPendingBrandQuery(brandParam);
+      setIsUrlHydrating(true);
+    } else {
+      setIsUrlHydrating(false);
+    }
+
+    if (modelParam) {
+      setPendingModelQuery(modelParam);
+    }
+
     if (engineVal) setSelectedEngineId(engineVal);
     if (trimVal) setSelectedTrimId(trimVal);
     if (variantId) setVehicleVariantId(variantId);
     if (minYearVal) setMinYear(minYearVal);
     if (maxYearVal) setMaxYear(maxYearVal);
-    if (bodyVal) setBodyTypes(bodyVal.split(","));
-    if (fuelVal) setFuelTypes(fuelVal.split(","));
-    if (transVal) setTransmissions(transVal.split(","));
+    if (minKmVal) setMinKm(minKmVal);
+    if (maxKmVal) setMaxKm(maxKmVal);
+
+    if (bodyVal) {
+      const parsedBodies = bodyVal
+        .split(",")
+        .map((b) => {
+          const upper = b.trim().toUpperCase();
+          if (upper === "STATION WAGON" || upper === "STATION_WAGON" || upper === "WAGON") return "WAGON";
+          return upper;
+        })
+        .filter(Boolean);
+      if (parsedBodies.length > 0) setBodyTypes(parsedBodies);
+    }
+    if (fuelVal) setFuelTypes(fuelVal.split(",").map((f) => f.trim().toUpperCase()));
+    if (transVal) setTransmissions(transVal.split(",").map((t) => t.trim().toUpperCase()));
     if (minP) setMinPrice(minP);
     if (maxP) setMaxPrice(maxP);
     if (aiReady) setIsAiReady(true);
@@ -239,8 +340,37 @@ function ListingsContent() {
   };
 
   useEffect(() => {
+    if (isUrlHydrating) return;
     fetchListings();
-  }, [page, sort, selectedBrand, selectedModel, vehicleVariantId, minPrice, maxPrice, fuelTypes, transmissions, bodyTypes, isAiReady, urgentOnly, showcaseOnly, token, preferenceProfileId, prefSessionId]);
+  }, [
+    isUrlHydrating,
+    page,
+    sort,
+    selectedBrand,
+    selectedModel,
+    vehicleVariantId,
+    minPrice,
+    maxPrice,
+    minYear,
+    maxYear,
+    fuelTypes,
+    transmissions,
+    bodyTypes,
+    isAiReady,
+    urgentOnly,
+    showcaseOnly,
+    token,
+    preferenceProfileId,
+    prefSessionId,
+  ]);
+
+  const handleBrandChange = (brandId: string) => {
+    setSelectedBrand(brandId);
+    setSelectedModel("");
+    setSelectedEngineId("");
+    setSelectedTrimId("");
+    setVehicleVariantId("");
+  };
 
   const handleToggleFavorite = (e: React.MouseEvent, listingId: string) => {
     e.preventDefault();
@@ -321,6 +451,9 @@ function ListingsContent() {
   };
 
   const handleClearFilters = () => {
+    setPendingBrandQuery(null);
+    setPendingModelQuery(null);
+    setIsUrlHydrating(false);
     setSelectedBrand("");
     setSelectedModel("");
     setSelectedEngineId("");
@@ -434,7 +567,7 @@ function ListingsContent() {
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marka & Model</label>
             <select
               value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
+              onChange={(e) => handleBrandChange(e.target.value)}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-orange-500 transition"
             >
               <option value="">Marka Seçin</option>
