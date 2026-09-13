@@ -1401,23 +1401,23 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
           ) : viewMode === "classic" ? (
-            /* 1. KLASİK GÖRÜNÜM (Sahibinden tarzı detaylı tablo) */
+            /* 1. KLASİK GÖRÜNÜM (Ferah, okunaklı ve dengeli detaylı tablo) */
             <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 shadow-xl backdrop-blur-sm">
-              <table className="w-full text-left text-xs text-slate-300 border-collapse">
+              <table className="w-full text-left text-sm text-slate-300 border-collapse">
                 <thead>
-                  <tr className="bg-slate-900/90 border-b border-white/10 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                    <th className="py-3.5 px-3 w-20 text-center">Fotoğraf</th>
-                    <th className="py-3.5 px-3">Marka</th>
-                    <th className="py-3.5 px-3">Model Ailesi</th>
-                    <th className="py-3.5 px-3">Motor / Versiyon</th>
-                    <th className="py-3.5 px-3">Donanım Paketi</th>
-                    <th className="py-3.5 px-4 min-w-[220px]">İlan Başlığı</th>
-                    <th className="py-3.5 px-3 text-center">Yıl</th>
-                    <th className="py-3.5 px-3 text-right">Km</th>
-                    <th className="py-3.5 px-3">Renk</th>
-                    <th className="py-3.5 px-4 text-right">Fiyat</th>
-                    <th className="py-3.5 px-3 text-center whitespace-nowrap">İlan Tarihi</th>
-                    <th className="py-3.5 px-3 whitespace-nowrap">İl / İlçe</th>
+                  <tr className="bg-slate-900/90 border-b border-white/10 text-[12px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-4 px-4 w-[104px] min-w-[104px] text-center">Fotoğraf</th>
+                    <th className="py-4 px-3.5 whitespace-nowrap">Marka</th>
+                    <th className="py-4 px-3.5 whitespace-nowrap">Model Ailesi</th>
+                    <th className="py-4 px-3.5 whitespace-nowrap">Motor / Versiyon</th>
+                    <th className="py-4 px-3.5 whitespace-nowrap">Donanım Paketi</th>
+                    <th className="py-4 px-4 min-w-[260px]">İlan Başlığı</th>
+                    <th className="py-4 px-3.5 text-center whitespace-nowrap">Yıl</th>
+                    <th className="py-4 px-3.5 text-right whitespace-nowrap">Km</th>
+                    <th className="py-4 px-3.5 whitespace-nowrap">Renk</th>
+                    <th className="py-4 px-4 text-right whitespace-nowrap">Fiyat</th>
+                    <th className="py-4 px-3.5 text-center whitespace-nowrap">İlan Tarihi</th>
+                    <th className="py-4 px-4 whitespace-nowrap">İl / İlçe</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -1433,11 +1433,11 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                       <tr
                         key={listing.id}
                         onClick={() => router.push(`/listings/${listing.id}`)}
-                        className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer text-xs"
+                        className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer h-[72px]"
                       >
-                        {/* Fotoğraf */}
-                        <td className="py-2.5 px-3">
-                          <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto">
+                        {/* Fotoğraf (72x54 / 80x60) */}
+                        <td className="py-3 px-4 w-[104px] min-w-[104px]">
+                          <div className="relative w-[80px] h-[60px] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto shadow-sm">
                             <img
                               src={cover}
                               alt={listing.title}
@@ -1447,68 +1447,70 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                               }}
                             />
                             {listing.isUrgent && (
-                              <span className="absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-sm" title="Acil İlan" />
+                              <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-md" title="Acil İlan" />
                             )}
                           </div>
                         </td>
 
                         {/* Marka */}
-                        <td className="py-2.5 px-3 font-semibold text-slate-200 whitespace-nowrap">
+                        <td className="py-3.5 px-3.5 font-semibold text-slate-100 text-[14px] whitespace-nowrap">
                           {brandName}
                         </td>
 
                         {/* Model Ailesi */}
-                        <td className="py-2.5 px-3 font-medium text-slate-300 whitespace-nowrap">
+                        <td className="py-3.5 px-3.5 font-medium text-slate-200 text-[14px] whitespace-nowrap">
                           {modelName}
                         </td>
 
                         {/* Motor / Versiyon */}
-                        <td className="py-2.5 px-3 text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                        <td className="py-3.5 px-3.5 text-slate-300 font-mono text-[13px] whitespace-nowrap">
                           {engineCode}
                         </td>
 
                         {/* Donanım Paketi */}
-                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">
+                        <td className="py-3.5 px-3.5 text-slate-300 text-[14px] whitespace-nowrap">
                           {trimName}
                         </td>
 
-                        {/* İlan Başlığı */}
-                        <td className="py-2.5 px-4 font-bold text-slate-200 group-hover:text-orange-400 transition line-clamp-1 max-w-xs">
-                          <div className="flex items-center gap-1.5">
-                            {listing.isUrgent && <span className="text-[10px]" title="Acil İlan">🚨</span>}
-                            {listing.isShowcaseFeedActive && <span className="text-[10px]" title="Vitrin İlanı">⭐</span>}
-                            {listing.isAiReady && <span className="text-[10px]" title="AI Analizli">✨</span>}
-                            <span className="truncate">{listing.title}</span>
+                        {/* İlan Başlığı (Daha belirgin 15px semibold) */}
+                        <td className="py-3.5 px-4 min-w-[260px]">
+                          <div className="flex items-center gap-2">
+                            {listing.isUrgent && <span className="text-[11px]" title="Acil İlan">🚨</span>}
+                            {listing.isShowcaseFeedActive && <span className="text-[11px]" title="Vitrin İlanı">⭐</span>}
+                            {listing.isAiReady && <span className="text-[11px]" title="AI Analizli">✨</span>}
+                            <span className="text-white font-semibold text-[15px] group-hover:text-orange-400 transition truncate max-w-sm">
+                              {listing.title}
+                            </span>
                           </div>
                         </td>
 
                         {/* Yıl */}
-                        <td className="py-2.5 px-3 text-center text-slate-300 whitespace-nowrap font-medium">
+                        <td className="py-3.5 px-3.5 text-center text-slate-200 text-[13px] whitespace-nowrap font-medium">
                           {listing.modelYear || "-"}
                         </td>
 
                         {/* Km */}
-                        <td className="py-2.5 px-3 text-right text-slate-300 whitespace-nowrap font-mono">
+                        <td className="py-3.5 px-3.5 text-right text-slate-200 text-[13px] whitespace-nowrap font-mono">
                           {listing.kilometers !== undefined && listing.kilometers !== null ? listing.kilometers.toLocaleString("tr-TR") : "-"}
                         </td>
 
                         {/* Renk */}
-                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">
+                        <td className="py-3.5 px-3.5 text-slate-300 text-[13px] whitespace-nowrap">
                           {listing.color || "-"}
                         </td>
 
                         {/* Fiyat */}
-                        <td className="py-2.5 px-4 text-right font-black text-orange-400 whitespace-nowrap text-[13px]">
+                        <td className="py-3.5 px-4 text-right font-black text-orange-400 whitespace-nowrap text-[15px]">
                           {formatCurrency(listing.priceAmount, listing.currency)}
                         </td>
 
                         {/* İlan Tarihi */}
-                        <td className="py-2.5 px-3 text-center text-slate-400 whitespace-nowrap text-[11px]">
+                        <td className="py-3.5 px-3.5 text-center text-slate-400 whitespace-nowrap text-[12px]">
                           {formatDateTr(listing.publishedAt || listing.createdAt)}
                         </td>
 
                         {/* İl / İlçe */}
-                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap text-[11px]">
+                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap text-[13px]">
                           {location}
                         </td>
                       </tr>
