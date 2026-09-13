@@ -273,16 +273,16 @@ export class TorqueScoutDecisionScoreService {
   }): TorqueScoutDecisionScoreV1['explanation'] {
     const { v6Scores, scope, modelDecisionRisk, qualitativePenalty, conditionRiskUsed, confidenceScore, priceModifierUsed } = params;
 
-    // Model Risk Explanation
+    // Model Risk Explanation (End-user friendly)
     let modelRiskExp = '';
     if (v6Scores.modelRiskState === 'VERIFIED_LOW_RISK') {
-      modelRiskExp = 'Doğrulanmış bağımsız araştırmada modele özgü kronik arıza kaydına rastlanmadı; düşük model riski sertifikalandı.';
+      modelRiskExp = 'Bu varyantta puan kırılmasına neden olan doğrulanmış önemli bir kronik teknik risk tespit edilmedi.';
     } else if (v6Scores.modelRiskQuantification === 'QUALITATIVE_ONLY') {
-      modelRiskExp = `Doğrulanmış kronik risk mevcut (Niteliksel Karar Düzeltmesi: ${qualitativePenalty}/100). Arıza sıklığı kantitatif olarak bilinmediği için uydurma frekans yerine doğrudan teknik arıza şiddeti esas alındı.`;
+      modelRiskExp = `Doğrulanmış kronik arıza bildirimleri ve servis kayıtları doğrultusunda ${qualitativePenalty} puan teknik risk kesintisi uygulandı.`;
     } else if (v6Scores.modelRiskQuantification === 'PARTIAL_LOWER_BOUND') {
-      modelRiskExp = `Kısmen sayısallaştırılmış kronik risk ve niteliksel arıza mevcuttur. Muhafazakar karar prensibi gereği üst sınır yükü (${modelDecisionRisk}/100) uygulandı.`;
+      modelRiskExp = `Doğrulanmış kronik arıza ve servis bültenleri doğrultusunda ${modelDecisionRisk} puan teknik risk kesintisi uygulandı.`;
     } else if (v6Scores.modelRiskQuantification === 'FULLY_QUANTIFIED') {
-      modelRiskExp = `Model seviyesi kronik risk yükü (${modelDecisionRisk}/100) saha arıza istatistikleri ve servis bültenleri üzerinden tam sayısallaştırılmıştır.`;
+      modelRiskExp = `Doğrulanmış servis bültenleri ve arıza kayıtları doğrultusunda ${modelDecisionRisk} puan teknik risk kesintisi uygulandı.`;
     } else {
       modelRiskExp = 'Model seviyesi güvenilirlik verisi henüz yeterli kanıt derinliğine ulaşmadı.';
     }
@@ -292,19 +292,19 @@ export class TorqueScoutDecisionScoreService {
     if (scope === 'VARIANT') {
       conditionExp = 'Spesifik araç ekspertiz veya kondisyon verisi girilmedi; bu değerlendirme varyant genel karakteristiğini yansıtmaktadır.';
     } else if (conditionRiskUsed === 0) {
-      conditionExp = 'Araç ekspertiz, hasar, bakım ve teşhis kayıtları temiz ve doğrulanmış durumdadır (Kusursuz kondisyon, 0 risk puanı).';
+      conditionExp = 'Araç ekspertiz, hasar, bakım ve teşhis kayıtları temiz ve doğrulanmış durumdadır (0 puan ceza).';
     } else if (conditionRiskUsed !== null && conditionRiskUsed > 0) {
-      conditionExp = `Araç kondisyonunda doğrulanmış kusur veya bakım açığı tespit edildi (Kondisyon Riski: ${conditionRiskUsed}/100).`;
+      conditionExp = `Araç kondisyonunda doğrulanmış kusur veya bakım açığı tespit edildi (${conditionRiskUsed} puan ceza).`;
     } else {
       conditionExp = 'Araç kondisyon verisi kısmi veya belirsizdir.';
     }
 
-    // Confidence Explanation ("Analiz Veri Güveni")
+    // Confidence Explanation
     let confidenceExp = '';
     if (confidenceScore >= 75) {
-      confidenceExp = `Yüksek analiz veri güveni (${confidenceScore}/100). Model değerlendirmesi güçlü ve derin kanıt tabanına dayanmaktadır.`;
+      confidenceExp = 'Model değerlendirmesi güçlü ve derin doğrulanmış kanıt tabanına dayanmaktadır.';
     } else if (confidenceScore >= 40) {
-      confidenceExp = `Standart analiz veri güveni (${confidenceScore}/100). Model değerlendirmesi bağımsız bülten ve katalog verilerine dayanmaktadır.`;
+      confidenceExp = 'Model değerlendirmesi bağımsız bülten ve katalog verilerine dayanmaktadır.';
     } else {
       confidenceExp = 'Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz.';
     }
