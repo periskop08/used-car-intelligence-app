@@ -56,9 +56,16 @@ export class VehicleService {
     });
   }
 
-  async getEngines(modelId: string) {
+  async getEngines(modelId: string, minYear?: number, maxYear?: number) {
+    const where: any = { modelId, status: ApprovalStatus.APPROVED };
+    if (minYear || maxYear) {
+      where.year = {};
+      if (minYear) where.year.gte = minYear;
+      if (maxYear) where.year.lte = maxYear;
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
-      where: { modelId, status: ApprovalStatus.APPROVED },
+      where,
       select: {
         engine: {
           select: {
@@ -81,34 +88,48 @@ export class VehicleService {
       .map((v) => v.engine)
       .filter((e): e is NonNullable<typeof e> => !!e);
 
-    return engines
-      .map((e) => {
-        const parts: string[] = [];
-        if (e.displacement) parts.push(`${e.displacement} cc`);
-        if (e.horsepower) parts.push(`${e.horsepower} HP`);
-        if (e.fuelType) {
-          const fuelMap: Record<string, string> = {
-            PETROL: 'Benzin',
-            DIESEL: 'Dizel',
-            HYBRID: 'Hibrit',
-            ELECTRIC: 'Elektrik',
-            LPG: 'LPG',
-          };
-          parts.push(fuelMap[e.fuelType] || e.fuelType);
-        }
-        const details = parts.length > 0 ? ` (${parts.join(', ')})` : '';
-        return {
+    const seenCodes = new Set<string>();
+    const uniqueEngines: Array<typeof engines[0] & { displayName: string }> = [];
+
+    for (const e of engines) {
+      const code = e.code.trim();
+      if (!seenCodes.has(code)) {
+        seenCodes.add(code);
+        uniqueEngines.push({
           ...e,
-          displayName: `${e.code}${details}`,
-        };
-      })
-      .sort((a, b) => (a.displacement || 0) - (b.displacement || 0) || (a.horsepower || 0) - (b.horsepower || 0));
+          displayName: code, // Clean code only: e.g. "1.5", "1.6", "2.0", "2.5" - NO cc and NO hp!
+        });
+      }
+    }
+
+    return uniqueEngines.sort((a, b) => {
+      const numA = parseFloat(a.displayName);
+      const numB = parseFloat(b.displayName);
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      return a.displayName.localeCompare(b.displayName, 'tr', { numeric: true });
+    });
   }
 
-  async getTrims(modelId: string, engineId?: string) {
+  async getTrims(modelId: string, engineId?: string, minYear?: number, maxYear?: number) {
     let where: any = { modelId, status: ApprovalStatus.APPROVED };
+    if (minYear || maxYear) {
+      where.year = {};
+      if (minYear) where.year.gte = minYear;
+      if (maxYear) where.year.lte = maxYear;
+    }
+
     if (engineId) {
-      where.engineId = engineId;
+      const selectedEngine = await this.prisma.engine.findUnique({
+        where: { id: engineId },
+        select: { code: true },
+      });
+      if (selectedEngine?.code) {
+        where.engine = { code: selectedEngine.code };
+      } else {
+        where.engineId = engineId;
+      }
     }
 
     let variants = await this.prisma.vehicleVariant.findMany({
@@ -126,8 +147,12 @@ export class VehicleService {
     });
 
     if (variants.length === 0 && engineId) {
+      const fallbackWhere: any = { modelId, status: ApprovalStatus.APPROVED };
+      if (minYear || maxYear) {
+        fallbackWhere.year = where.year;
+      }
       variants = await this.prisma.vehicleVariant.findMany({
-        where: { modelId, status: ApprovalStatus.APPROVED },
+        where: fallbackWhere,
         select: {
           trim: {
             select: {
@@ -145,7 +170,35 @@ export class VehicleService {
       .map((v) => v.trim)
       .filter((t): t is NonNullable<typeof t> => !!t);
 
-    return trims.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+    const INVALID_TRIM_TOKENS = new Set([
+      'bilmiyorum',
+      'seçiniz veya bilmiyorum',
+      'seciniz veya bilmiyorum',
+      'boş bırak',
+      'bos birak',
+      'genel',
+      'farketmez',
+      'yok',
+      'none',
+      'null',
+    ]);
+
+    const seenTrims = new Set<string>();
+    const uniqueTrims: typeof trims = [];
+
+    for (const t of trims) {
+      const trimmedName = t.name.trim();
+      const lower = trimmedName.toLowerCase();
+      if (!INVALID_TRIM_TOKENS.has(lower) && !seenTrims.has(lower)) {
+        seenTrims.add(lower);
+        uniqueTrims.push({
+          ...t,
+          name: trimmedName,
+        });
+      }
+    }
+
+    return uniqueTrims.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
   }
 
   async getVariants(modelId: string) {

@@ -123,7 +123,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
       .catch((e) => console.error("Error fetching models:", e));
   }, [selectedBrand]);
 
-  // Fetch Engines when selectedModel changes
+  // Fetch Engines when selectedModel or year range changes
   useEffect(() => {
     if (!selectedModel) {
       setEngines([]);
@@ -131,7 +131,10 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
       return;
     }
     setLoadingEngines(true);
-    fetch(`${API_URL}/vehicles/engines?modelId=${selectedModel}`)
+    let url = `${API_URL}/vehicles/engines?modelId=${selectedModel}`;
+    if (minYear) url += `&minYear=${encodeURIComponent(minYear)}`;
+    if (maxYear) url += `&maxYear=${encodeURIComponent(maxYear)}`;
+    fetch(url)
       .then((res) => res.json())
       .then((data) => setEngines(Array.isArray(data) ? data : []))
       .catch((e) => {
@@ -139,9 +142,9 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
         setEngines([]);
       })
       .finally(() => setLoadingEngines(false));
-  }, [selectedModel]);
+  }, [selectedModel, minYear, maxYear]);
 
-  // Fetch Trims when selectedModel or selectedEngineId changes
+  // Fetch Trims when selectedModel, selectedEngineId, or year range changes
   useEffect(() => {
     if (!selectedModel) {
       setTrims([]);
@@ -153,6 +156,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     if (selectedEngineId) {
       url += `&engineId=${selectedEngineId}`;
     }
+    if (minYear) url += `&minYear=${encodeURIComponent(minYear)}`;
+    if (maxYear) url += `&maxYear=${encodeURIComponent(maxYear)}`;
     fetch(url)
       .then((res) => res.json())
       .then((data) => setTrims(Array.isArray(data) ? data : []))
@@ -161,7 +166,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
         setTrims([]);
       })
       .finally(() => setLoadingTrims(false));
-  }, [selectedModel, selectedEngineId]);
+  }, [selectedModel, selectedEngineId, minYear, maxYear]);
 
   // Resolve pending brand name/ID to matching brand in brands list
   useEffect(() => {
@@ -688,7 +693,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               <option value="">{loadingEngines ? "Motorlar Yükleniyor..." : "Motor / Versiyon Seçin"}</option>
               {engines.map((eng) => (
                 <option key={eng.id} value={eng.id}>
-                  {eng.displayName || `${eng.code} (${eng.displacement ? `${eng.displacement} cc, ` : ''}${eng.horsepower ? `${eng.horsepower} HP` : ''})`}
+                  {eng.displayName || eng.code}
                 </option>
               ))}
             </select>
