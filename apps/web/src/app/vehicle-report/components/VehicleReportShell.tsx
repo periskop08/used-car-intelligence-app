@@ -149,6 +149,28 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           const stateCfg = getStateConfig(decisionScore.state);
           const hasConditionData = decisionScore.scope === 'VEHICLE' && decisionScore.conditionRiskUsed !== null && decisionScore.conditionRiskUsed !== undefined;
 
+          // Extract Primary Verified Risk Details for friendly display
+          const primaryRisk = report.expertDecisionSynthesis?.primaryTechnicalRisk;
+          const firstProblem = report.commonProblems?.[0];
+          const shadowDefects = report.reliabilityResearchShadow?.domainResults
+            ? Object.values(report.reliabilityResearchShadow.domainResults)
+                .flatMap((d: any) => d.defects || [])
+            : [];
+          const firstDefect = shadowDefects.find((df: any) => df.title || df.affectedComponent);
+
+          const riskTitle = primaryRisk?.title 
+            || firstProblem?.title 
+            || (firstDefect?.affectedComponent ? `${firstDefect.affectedComponent} Arızası` : null);
+
+          const riskExplanation = primaryRisk?.explanation 
+            || firstProblem?.symptoms?.[0] 
+            || firstDefect?.description
+            || null;
+
+          const riskInspection = primaryRisk?.inspectionInstructions?.[0] 
+            || firstProblem?.inspectionStep 
+            || null;
+
           const hasUnverifiedComplaints = Boolean(
             (report.commonProblems && report.commonProblems.length > 0) ||
             (report.reliabilityResearchShadow?.qualitativeDefects && report.reliabilityResearchShadow.qualitativeDefects.length > 0) ||
@@ -157,7 +179,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
 
           return (
             <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 shadow-xl space-y-5">
-              {/* Header Row: Score + State + Scope + Confidence */}
+              {/* Header Row: Score + State + Scope */}
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/10">
                 <div className="flex items-center gap-4">
                   <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center ${stateCfg.color}`}>
@@ -178,7 +200,9 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                     <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">
                       {isInsufficient
                         ? "Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz."
-                        : (decisionScore.explanation?.confidence || "Model değerlendirmesi bağımsız bülten ve katalog verilerine dayanmaktadır.")}
+                        : (report.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict 
+                           || report.executiveSummary?.oneSentenceSummary 
+                           || "Doğrulanmış teknik kronik riskler ve bağımsız servis bültenleri incelenerek hesaplandı.")}
                     </p>
                     {isInsufficient && hasUnverifiedComplaints && (
                       <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">
@@ -188,43 +212,54 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                     )}
                   </div>
                 </div>
-
-                {/* Independent Confidence Box */}
-                <div className="w-full md:w-auto bg-slate-950/60 border border-white/10 rounded-xl p-3 flex items-center justify-between md:flex-col md:items-end gap-2 shrink-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Analiz Veri Güveni</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full ${
-                          decisionScore.confidenceScore >= 75 ? 'bg-emerald-400' : decisionScore.confidenceScore >= 40 ? 'bg-amber-400' : 'bg-rose-400'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(0, decisionScore.confidenceScore))}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold text-slate-200">%{decisionScore.confidenceScore}</span>
-                  </div>
-                </div>
               </div>
 
               {/* Risk Breakdown */}
               <div className={`grid grid-cols-1 ${hasConditionData ? 'sm:grid-cols-2' : ''} gap-3 text-xs`}>
-                <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Model Teknik Riski</span>
-                  <span className="text-sm font-bold text-slate-200 mt-0.5 block">
-                    {decisionScore.modelDecisionRisk !== null ? `-${decisionScore.modelDecisionRisk} Puan Risk` : 'Belirlenemedi'}
-                  </span>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
-                    {decisionScore.explanation?.modelRisk || 'Kronik mekanik yükü'}
-                  </p>
+                <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Neden Puan Kırıldı?</span>
+                  
+                  {decisionScore.modelDecisionRisk && decisionScore.modelDecisionRisk > 0 ? (
+                    <div className="mt-1 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-rose-400">
+                          -{decisionScore.modelDecisionRisk} Puan
+                        </span>
+                        {riskTitle && (
+                          <span className="text-xs font-bold text-slate-200">
+                            • {riskTitle}
+                          </span>
+                        )}
+                      </div>
+                      {riskExplanation && (
+                        <p className="text-xs text-slate-300 leading-relaxed break-words">
+                          {riskExplanation}
+                        </p>
+                      )}
+                      {riskInspection && (
+                        <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1 pt-0.5">
+                          <span className="font-semibold shrink-0">🔍 Satın Almadan Önce:</span>
+                          <span>{riskInspection}</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1">
+                      <span className="text-sm font-bold text-emerald-400 block">
+                        Puan Kırılmadı (0 Risk)
+                      </span>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
+                        Bu varyantta puan kırılmasına neden olan doğrulanmış önemli bir kronik teknik risk tespit edilmedi.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {hasConditionData && (
-                  <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl">
+                  <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold block">Araç Kondisyon Etkisi</span>
-                    <span className="text-sm font-bold text-slate-200 mt-0.5 block">
-                      {`-${decisionScore.conditionRiskUsed} Puan Risk`}
+                    <span className="text-sm font-bold text-rose-400 mt-0.5 block">
+                      {`-${decisionScore.conditionRiskUsed} Puan`}
                     </span>
                     <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
                       {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı'}
