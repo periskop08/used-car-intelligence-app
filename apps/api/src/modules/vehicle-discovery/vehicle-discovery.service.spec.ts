@@ -207,7 +207,7 @@ describe('VehicleDiscoveryService', () => {
 
       expect(result.recommendation).toBeDefined();
       expect(result.recommendation.recommendedVariantId).toBe('variant-308-eat8');
-      expect(result.recommendation.listingsQuery.vehicleVariantId).toBe('variant-308-eat8');
+      expect((result.recommendation.listingsQuery as any).vehicleVariantId).toBe('variant-308-eat8');
       expect(result.recommendation.listingsQuery.minPrice).toBe(1000000);
       expect(result.recommendation.listingsQuery.maxPrice).toBe(1600000);
     });

@@ -416,8 +416,8 @@ export class VehicleReportSemanticValidationService {
                            fullTextLower.includes('batarya sağlık') ||
                            fullTextLower.includes('pil sağlık');
 
-    // Split text into clauses/sentences by punctuation and newlines
-    const segments = text.split(/(?<=[.!?\n;])\s+/);
+    // Split text into clauses/sentences by punctuation and newlines (preserving abbreviations like örn., vb., e.g.)
+    const segments = text.split(/(?<!(?:örn|vb|vs|dr|prof|av|cad|sok|no|e\.g|i\.e))\.(?!\d)\s+|(?<=[!?\n;])\s+/i);
 
     for (const segment of segments) {
       const lower = segment.toLowerCase();
@@ -458,8 +458,8 @@ export class VehicleReportSemanticValidationService {
 
         // False-Positive Guard: Charging statistics (e.g. %80 oranında DC hızlı şarj)
         const isChargingStatistic = surroundingText.includes('şarj') || 
-                                    surroundingText.includes('dc') || 
-                                    surroundingText.includes('ac') ||
+                                    /\bdc\b/i.test(surroundingText) || 
+                                    /\bac\b/i.test(surroundingText) ||
                                     lower.includes('hızlı şarj') ||
                                     lower.includes('şarj oranı') ||
                                     lower.includes('şarj kullanım');
@@ -538,35 +538,143 @@ export class VehicleReportSemanticValidationService {
     return claims;
   }
 
+  public static extractEvidenceUnits(verifiedResearch: any): string[] {
+    if (!verifiedResearch || typeof verifiedResearch !== 'object') return [];
+    const units: string[] = [];
+
+    // 1. Structured verified claims
+    if (Array.isArray(verifiedResearch.claims)) {
+      for (const c of verifiedResearch.claims) {
+        if (c?.verificationStatus === 'VERIFIED' && c?.claimText) {
+          units.push(String(c.claimText).trim());
+        }
+      }
+    }
+
+    // 2. Questions map (rawResearch.questions or verifiedResearch.questions)
+    if (verifiedResearch.questions && typeof verifiedResearch.questions === 'object') {
+      for (const qKey of Object.keys(verifiedResearch.questions)) {
+        const q = verifiedResearch.questions[qKey];
+        if (!q) continue;
+
+        // Individual sentences of synthesisedAnswer
+        if (typeof q.synthesisedAnswer === 'string') {
+          const sentences = q.synthesisedAnswer.split(/(?<!(?:örn|vb|vs|dr|prof|av|cad|sok|no|e\.g|i\.e))\.(?!\d)\s+|(?<=[!?\n;])\s+/i);
+          for (const s of sentences) {
+            const trimmed = s.trim();
+            if (trimmed) units.push(trimmed);
+          }
+        }
+
+        // Individual source snippets and titles
+        if (Array.isArray(q.sources)) {
+          for (const src of q.sources) {
+            if (src?.relevantSnippet && typeof src.relevantSnippet === 'string') {
+              units.push(src.relevantSnippet.trim());
+            }
+            if (src?.title && typeof src.title === 'string') {
+              units.push(src.title.trim());
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Grounding sources array
+    if (Array.isArray(verifiedResearch.groundingSources)) {
+      for (const src of verifiedResearch.groundingSources) {
+        if (src?.relevantSnippet && typeof src.relevantSnippet === 'string') {
+          units.push(src.relevantSnippet.trim());
+        }
+        if (src?.title && typeof src.title === 'string') {
+          units.push(src.title.trim());
+        }
+      }
+    }
+
+    // 4. Raw sources array
+    if (Array.isArray(verifiedResearch.sources)) {
+      for (const src of verifiedResearch.sources) {
+        if (src?.relevantSnippet && typeof src.relevantSnippet === 'string') {
+          units.push(src.relevantSnippet.trim());
+        }
+      }
+    }
+
+    // 5. Answers map or array
+    if (verifiedResearch.answers && typeof verifiedResearch.answers === 'object') {
+      for (const aKey of Object.keys(verifiedResearch.answers)) {
+        const ans = verifiedResearch.answers[aKey];
+        if (typeof ans === 'string') {
+          const sentences = ans.split(/(?<!(?:örn|vb|vs|dr|prof|av|cad|sok|no|e\.g|i\.e))\.(?!\d)\s+|(?<=[!?\n;])\s+/i);
+          for (const s of sentences) {
+            const trimmed = s.trim();
+            if (trimmed) units.push(trimmed);
+          }
+        }
+      }
+    }
+
+    return units;
+  }
+
   public static isClaimVerifiedInResearch(claim: NormalizedNumericClaim, verifiedResearch: any): boolean {
     if (!verifiedResearch) return false;
-    const verifiedClaims = Array.isArray(verifiedResearch?.claims) ? verifiedResearch.claims : [];
-    const researchStr = JSON.stringify(verifiedResearch).toLowerCase();
+    const units = VehicleReportSemanticValidationService.extractEvidenceUnits(verifiedResearch);
+    if (units.length === 0) return false;
 
     if (claim.subject === 'BATTERY_SOH' && claim.claimType === 'HEALTH_THRESHOLD') {
-      // Must match subject (SoH / battery health) + value + unit in verified evidence
-      const hasMatchingVerifiedClaim = verifiedClaims.some((c: any) => {
-        if (c.verificationStatus !== 'VERIFIED') return false;
-        const text = String(c.claimText || '').toLowerCase();
-        const hasSohContext = text.includes('soh') || text.includes('batarya') || text.includes('pil sağlığı') || text.includes('sağlık');
-        const hasVal = text.includes(`%${claim.value}`) || text.includes(`${claim.value}%`) || text.includes(`${claim.value} soh`) || text.includes(`soh ${claim.value}`);
-        return hasSohContext && hasVal;
+      const val = claim.value;
+
+      return units.some(unit => {
+        const uLower = unit.toLowerCase();
+
+        // 1. Numeric value match in this exact evidence unit
+        const hasVal = uLower.includes(`%${val}`) || 
+                       uLower.includes(`${val}%`) || 
+                       uLower.includes(`${val} soh`) || 
+                       uLower.includes(`soh ${val}`) ||
+                       uLower.includes(`${val} pil sağlığı`) ||
+                       uLower.includes(`% ${val}`);
+        if (!hasVal) return false;
+
+        // 2. Battery health / SoH context in this exact evidence unit
+        const hasSohContext = uLower.includes('soh') || 
+                              uLower.includes('batarya sağlığı') || 
+                              uLower.includes('pil sağlığı') || 
+                              uLower.includes('batarya sağlık') ||
+                              uLower.includes('pil sağlık') || 
+                              uLower.includes('state of health') ||
+                              uLower.includes('kapasite koruma') ||
+                              uLower.includes('capacity retention') ||
+                              uLower.includes('sağlık durumu');
+        if (!hasSohContext) return false;
+
+        // 3. Semantic Purpose Guard: Manufacturer warranty commitment vs Purchase Rejection / Health Threshold
+        const isPureWarranty = (uLower.includes('garanti') || uLower.includes('warranty') || uLower.includes('guarantee') || uLower.includes('taahhüt')) &&
+                               !uLower.includes('alım') && !uLower.includes('satın alma') && !uLower.includes('risk') &&
+                               !uLower.includes('kritik') && !uLower.includes('tavsiye') && !uLower.includes('test') &&
+                               !uLower.includes('düşüş') && !uLower.includes('yıpranma') && !uLower.includes('aşınma');
+
+        // If report claim is a purchase rejection / walk-away threshold (comparator BELOW), pure warranty does NOT verify it
+        if (isPureWarranty && claim.comparator === 'BELOW') {
+          return false;
+        }
+
+        return true;
       });
-
-      if (hasMatchingVerifiedClaim) return true;
-
-      // Research text deep match: value must be co-located with battery health/soh
-      const hasDeepMatch = (researchStr.includes(`%${claim.value}`) || researchStr.includes(`${claim.value}%`) || researchStr.includes(`soh ${claim.value}`) || researchStr.includes(`${claim.value} soh`)) &&
-                           (researchStr.includes('soh') || researchStr.includes('batarya sağlığı') || researchStr.includes('pil sağlığı'));
-      return hasDeepMatch;
     }
 
     if (claim.subject === 'WEAR_KM' && claim.claimType === 'WEAR_THRESHOLD') {
       const topic = claim.value === 60000 ? 'trim' : 'şanzıman';
-      const hasVerifiedProof = verifiedClaims.some(
-        (c: any) => c.verificationStatus === 'VERIFIED' && String(c.claimText || '').toLowerCase().includes(topic)
-      );
-      return hasVerifiedProof || researchStr.includes(topic);
+      return units.some(unit => {
+        const uLower = unit.toLowerCase();
+        const hasTopic = uLower.includes(topic);
+        const hasKm = uLower.includes(String(claim.value)) || 
+                      (claim.value === 60000 && (uLower.includes('60 bin') || uLower.includes('60k') || uLower.includes('60.000'))) ||
+                      (claim.value === 80000 && (uLower.includes('80 bin') || uLower.includes('80k') || uLower.includes('80.000')));
+        return hasTopic && hasKm;
+      });
     }
 
     return true;

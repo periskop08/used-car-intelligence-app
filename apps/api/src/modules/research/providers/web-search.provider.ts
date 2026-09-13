@@ -13,10 +13,68 @@ export class WebSearchProvider implements SearchProvider {
   public readonly syntheticSearchFallbackExists = false;
 
   async search(query: string, languageCode: string, countryCode: string): Promise<SearchResult[]> {
+    const tavilyKey = process.env.TAVILY_API_KEY;
     const serperKey = process.env.SERPER_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY;
 
-    // 1. Try Serper.dev Google Search API first if key is present
+    // 1. Try authentic Tavily Web Search API first if key is present
+    if (tavilyKey) {
+      this.logger.log(`Using Tavily Live Search for query: "${query}"`);
+      try {
+        const response = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(15000),
+          body: JSON.stringify({
+            api_key: tavilyKey,
+            query,
+            search_depth: 'advanced',
+            include_raw_content: true,
+            include_answer: false,
+            max_results: 5,
+          }),
+        });
+
+        if (response.ok) {
+          const data: any = await response.json();
+          const results = Array.isArray(data.results) ? data.results : [];
+          if (results.length > 0) {
+            return results.map((item: any, idx: number) => {
+              const itemUrl = item.url || '';
+              const sourceKind = this.determineSourceKind(itemUrl);
+              let domain = '';
+              try { domain = new URL(itemUrl).hostname.toLowerCase(); } catch {}
+              const snippetText = item.content || item.title || '';
+              const rawContentText = item.raw_content ? this.extractVisibleText(item.raw_content) : null;
+              const retrievedPageText = rawContentText && rawContentText.length > 30 ? rawContentText.slice(0, 20000) : null;
+              const retrievedPageExcerpt = retrievedPageText ? retrievedPageText.slice(0, 2000) : null;
+              const contentHash = crypto.createHash('sha256').update(retrievedPageText || snippetText).digest('hex');
+
+              return {
+                url: itemUrl,
+                resolvedUrl: itemUrl,
+                domain,
+                title: item.title || '',
+                snippet: snippetText,
+                providerSnippet: snippetText,
+                retrievedPageExcerpt,
+                retrievedPageText,
+                provider: 'serper' as const,
+                providerResultId: `tavily_${idx}`,
+                contentHash,
+                retrievedAt: new Date().toISOString(),
+                sourceKind,
+                reliabilityScore: this.getReliabilityScoreForKind(sourceKind),
+              };
+            });
+          }
+        }
+      } catch (error: any) {
+        this.logger.error(`Error performing Tavily Live Search: ${error.message}. Falling back...`);
+      }
+    }
+
+    // 2. Try Serper.dev Google Search API if key is present
     if (serperKey) {
       this.logger.log(`Using Serper.dev Live Search for query: "${query}"`);
       try {
@@ -103,10 +161,10 @@ export class WebSearchProvider implements SearchProvider {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(25000),
           body: JSON.stringify({
             contents: [{ parts: [{ text: query }] }],
-            tools: [{ google_search: {} }],
+            tools: [{ googleSearch: {} }],
           }),
         });
 

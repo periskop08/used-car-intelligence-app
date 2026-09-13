@@ -6,6 +6,8 @@ import { VehicleReportContextBuilderService } from './vehicle-report-context-bui
 import { ListingReportContextService } from './listing-report-context.service';
 import { VehicleReportDataService } from './vehicle-report-data.service';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
+import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
+import { TorqueScoutDecisionScoreService } from './torque-scout-decision-score.service';
 import { VehicleReportContradictionService } from './vehicle-report-contradiction.service';
 import { VehicleReportPromptService } from './vehicle-report-prompt.service';
 import { VehicleReportProviderService } from './vehicle-report-provider.service';
@@ -31,6 +33,8 @@ import { VehicleModule } from '../vehicle/vehicle.module';
     ListingReportContextService,
     VehicleReportDataService,
     VehicleReportScoringService,
+    VehicleReportScoringV6Service,
+    TorqueScoutDecisionScoreService,
     VehicleReportContradictionService,
     VehicleReportPromptService,
     VehicleReportProviderService,
@@ -42,6 +46,6 @@ import { VehicleModule } from '../vehicle/vehicle.module';
     VehicleReportQuotaService,
     VehicleReportJobWorkerService,
   ],
-  exports: [VehicleReportService],
+  exports: [VehicleReportService, VehicleReportScoringV6Service, TorqueScoutDecisionScoreService],
 })
 export class VehicleReportModule {}

@@ -1260,6 +1260,221 @@ describe('Technical Identity Verification & Pipeline Behavioral Tests', () => {
       );
     });
   });
+
+  describe('Behavior 18: General EV Battery-Health Evidence Locality & Semantic Purpose Tests', () => {
+    const genericEvFixtures = [
+      { brand: 'Tesla', model: 'Model Y', year: 2023 },
+      { brand: 'Togg', model: 'T10X', year: 2024 },
+      { brand: 'BYD', model: 'Atto 3', year: 2023 },
+      { brand: 'Hyundai', model: 'Ioniq 5', year: 2022 },
+      { brand: 'BMW', model: 'i4', year: 2023 },
+    ];
+
+    it('1. Cross-question percentage + SoH keyword -> MUST REJECT', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-cross-q',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Togg', model: 'T10X', modelYear: 2024, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Togg T10X Özeti',
+          keyWarnings: ['Batarya sağlığı %70 altına düştüğünde aracı almaktan kaçının.'],
+        },
+      };
+
+      const validation = validationService.validate(report, {
+        verifiedResearch: {
+          questions: {
+            q1: { synthesisedAnswer: 'Togg yerlilik oranı %70 seviyesindedir.' },
+            q2: { synthesisedAnswer: 'Batarya sağlığı yetkili servis tarafından kontrol edilmelidir.' },
+          },
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%70 SoH / Pil Sağlığı)');
+    });
+
+    it('2. Cross-source percentage + SoH keyword -> MUST REJECT', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-cross-src',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'BYD', model: 'Atto 3', modelYear: 2023, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'BYD Atto 3 Özeti',
+          keyWarnings: ['Batarya sağlığının %75 altında olması durumunda risk yüksektir.'],
+        },
+      };
+
+      const validation = validationService.validate(report, {
+        verifiedResearch: {
+          questions: {
+            q1: {
+              sources: [
+                { relevantSnippet: 'BYD fabrikasında otomasyon oranı %75 olarak ölçülmüştür.' },
+                { relevantSnippet: 'Blade batarya sağlığı periyodik testlerle takip edilmelidir.' },
+              ],
+            },
+          },
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%75 SoH / Pil Sağlığı)');
+    });
+
+    it('3. Same verified snippet SoH percentage -> MUST ACCEPT (evidence locality match)', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-locality-ok',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Hyundai', model: 'Ioniq 5', modelYear: 2022, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Hyundai Ioniq 5 Özeti',
+          keyWarnings: ['Batarya sağlığı %80 altına düştüğünde menzil kapasitesinde belirgin azalma görülebilir.'],
+        },
+      };
+
+      const validation = validationService.validate(report, {
+        verifiedResearch: {
+          questions: {
+            q1: {
+              sources: [
+                { relevantSnippet: 'Uzman incelemelerine göre bu modelde batarya sağlığı %80 seviyesinin altına indiğinde menzil performansı belirgin düşer.' },
+              ],
+            },
+          },
+        },
+      });
+
+      expect(validation.isValid).toBe(true);
+    });
+
+    it('4. Warranty threshold != purchase rejection threshold -> MUST REJECT purchase rejection when evidence is pure warranty', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-warranty-vs-rejection',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Togg', model: 'T10X', modelYear: 2024, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        expertDecisionSynthesis: {
+          ...base.expertDecisionSynthesis,
+          walkAwayConditions: [
+            { condition: 'Resmi servis tarafından doğrulanmış ciddi bir batarya sağlığı düşüşü (örn. %70\'in altı ve garanti dışı)', reason: 'Batarya maliyeti', priority: 'CRITICAL', supportingFactIds: ['FACT-1'] },
+          ],
+        },
+      };
+
+      // Evidence only contains manufacturer warranty commitment, NOT purchase rejection advice
+      const validation = validationService.validate(report, {
+        verifiedResearch: {
+          questions: {
+            q1: {
+              sources: [
+                { relevantSnippet: 'Togg batarya garantisi 8 yıl veya 160.000 km boyunca minimum %70 kapasite korumayı taahhüt eder.' },
+              ],
+            },
+          },
+        },
+      });
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%70 SoH / Pil Sağlığı)');
+    });
+
+    it('5. Unsupported EV SoH 70% -> MUST REJECT', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-70',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Tesla', model: 'Model Y', modelYear: 2023, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: { ...base.executiveSummary, title: 'Özet', keyWarnings: ['Batarya SoH %70 altı kritik kabul edilir.'] },
+      };
+      const validation = validationService.validate(report, { verifiedResearch: {} });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%70 SoH / Pil Sağlığı)');
+    });
+
+    it('6. Unsupported EV SoH 75% -> MUST REJECT', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-75',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'BMW', model: 'i4', modelYear: 2023, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: { ...base.executiveSummary, title: 'Özet', keyWarnings: ['Pil sağlığı %75 altında risklidir.'] },
+      };
+      const validation = validationService.validate(report, { verifiedResearch: {} });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%75 SoH / Pil Sağlığı)');
+    });
+
+    it('7. Unsupported EV SoH 85% -> MUST REJECT', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-85',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'BYD', model: 'Atto 3', modelYear: 2023, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: { ...base.executiveSummary, title: 'Özet', keyWarnings: ['SoH %85 ve üzeri olmalıdır.'] },
+      };
+      const validation = validationService.validate(report, { verifiedResearch: {} });
+      expect(validation.isValid).toBe(false);
+      expect(validation.reason).toContain('batarya sağlık yüzdesi (%85 SoH / Pil Sağlığı)');
+    });
+
+    it('8. Charging usage 20-80% -> MUST NOT be classified as SoH (ACCEPT)', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-charging-stat',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Tesla', model: 'Model 3', modelYear: 2022, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        sellerQuestions: [
+          { questionText: 'genellikle AC mi DC mi, % kaçta şarj edilip % kaça kadar kullanıldı?', expectedAnswerHint: 'Şarj alışkanlığı', priority: 'NORMAL' } as any,
+          { questionText: 'Batarya genellikle %20 ile %80 arasında mı şarj edildi?', expectedAnswerHint: 'Batarya ömrü', priority: 'NORMAL' } as any,
+        ],
+      };
+      const validation = validationService.validate(report, { verifiedResearch: {} });
+      expect(validation.isValid).toBe(true);
+    });
+
+    it('9. Battery capacity 60 kWh -> MUST NOT be classified as SoH (ACCEPT)', () => {
+      const base = createMockReport('OTOMATIK');
+      const report: ComprehensiveVehicleReport = {
+        ...base,
+        reportId: 'rep-ev-kwh-capacity',
+        vehicleIdentity: { ...base.vehicleIdentity, brand: 'Togg', model: 'T10X', modelYear: 2024, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+        executiveSummary: {
+          ...base.executiveSummary,
+          title: 'Togg T10X Özeti',
+          keyWarnings: ['Araçta 88.5 kWh batarya kapasitesi sunulmaktadır.'],
+        },
+      };
+      const validation = validationService.validate(report, { verifiedResearch: {} });
+      expect(validation.isValid).toBe(true);
+    });
+
+    it('10. Different EV brands with same unsupported threshold -> ALL REJECT (Generic Brand-Agnostic Guard)', () => {
+      const base = createMockReport('OTOMATIK');
+      genericEvFixtures.forEach((fixture) => {
+        const report: ComprehensiveVehicleReport = {
+          ...base,
+          reportId: `rep-${fixture.brand.toLowerCase()}-unsupported`,
+          vehicleIdentity: { ...base.vehicleIdentity, brand: fixture.brand, model: fixture.model, modelYear: fixture.year, fuelType: 'Elektrik', engineDisplacementCc: undefined },
+          executiveSummary: {
+            ...base.executiveSummary,
+            title: `${fixture.brand} ${fixture.model} Özeti`,
+            keyWarnings: [`Bu araçta %80 altı SoH seviyesi batarya yıpranmasını gösterir.`],
+          },
+        };
+
+        const validation = validationService.validate(report, { verifiedResearch: {} });
+        expect(validation.isValid).toBe(false);
+        expect(validation.reason).toContain('batarya sağlık yüzdesi (%80 SoH / Pil Sağlığı)');
+      });
+    });
+  });
 });
 
 

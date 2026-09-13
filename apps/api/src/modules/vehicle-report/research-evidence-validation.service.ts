@@ -24,11 +24,35 @@ export class ResearchEvidenceValidationService {
     const transmission = (identity.transmissionName || '').toLowerCase();
 
     // 1. Process & Grade Grounding Sources with Backend Reliability Scores
-    const rawSources: any[] = Array.isArray(rawResearch?.groundingSources) ? rawResearch.groundingSources : [];
-    const processedSources: GroundingSource[] = rawSources.map((src, idx) => {
+    // Normalize sources from both legacy (rawResearch.groundingSources) and production (rawResearch.questions[*] / vehicleCharacterResearch.questions[*])
+    const rawSourcesList: any[] = [];
+    const seenSourceKeys = new Set<string>();
+
+    const addSource = (src: any) => {
+      if (!src) return;
+      const key = (src.url || src.domain || src.title || '').trim().toLowerCase();
+      if (key && seenSourceKeys.has(key)) return;
+      if (key) seenSourceKeys.add(key);
+      rawSourcesList.push(src);
+    };
+
+    if (Array.isArray(rawResearch?.groundingSources)) {
+      rawResearch.groundingSources.forEach(addSource);
+    }
+
+    const questionContainer = rawResearch?.questions || rawResearch?.vehicleCharacterResearch?.questions || (rawResearch?.vehicleCharacterResearch && typeof rawResearch.vehicleCharacterResearch === 'object' && !rawResearch.vehicleCharacterResearch.questions ? rawResearch.vehicleCharacterResearch : null);
+    if (questionContainer && typeof questionContainer === 'object') {
+      Object.values(questionContainer).forEach((q: any) => {
+        if (Array.isArray(q?.sources)) {
+          q.sources.forEach(addSource);
+        }
+      });
+    }
+
+    const processedSources: GroundingSource[] = rawSourcesList.map((src, idx) => {
       const sourceKind = this.determineSourceKind(src.url, src.domain, src.sourceKind);
       const reliabilityScore = this.getReliabilityScore(sourceKind);
-      const contentHash = src.contentHash || `hash_${src.domain}_${idx}`;
+      const contentHash = src.contentHash || `hash_${src.domain || 'src'}_${idx}`;
       const canonicalSourceId = src.canonicalSourceId || `SRC-${idx + 1}`;
       const independenceGroupId = `GRP_${src.domain || 'unknown'}_${contentHash.slice(0, 8)}`;
 
@@ -44,7 +68,7 @@ export class ResearchEvidenceValidationService {
         contentHash,
         canonicalSourceId,
         independenceGroupId,
-        evidenceExcerpt: src.evidenceExcerpt || src.snippet || '',
+        evidenceExcerpt: src.evidenceExcerpt || src.relevantSnippet || src.snippet || '',
         evidenceLocation: src.evidenceLocation || {},
       };
     });
@@ -182,9 +206,117 @@ export class ResearchEvidenceValidationService {
           ? 'PARTIAL_WEB_VERIFIED'
           : 'DB_ONLY_FALLBACK';
 
+    // 5. Extract & Structure Verified Technical Specs (Power & Torque)
+    let verifiedTechnicalSpecs: any = undefined;
+    const isHybrid = brand.includes('toyota') || brand.includes('lexus') || engine.includes('hybrid') || (identity.fuelType || '').toLowerCase().includes('hibrit') || (identity.fuelType || '').toUpperCase() === 'HYBRID';
+
+    if (rawResearch?.verifiedTechnicalSpecs) {
+      const rawP = rawResearch.verifiedTechnicalSpecs;
+      const numHp = typeof rawP.powerHp === 'number' ? rawP.powerHp : (typeof rawP.powerHp === 'string' ? parseInt(rawP.powerHp.replace(/\D/g, ''), 10) || undefined : undefined);
+      const rawUnit = String(rawP.powerUnit || 'HP').toUpperCase();
+      const unit = rawUnit === 'BG' || rawUnit === 'BEYGIR' ? 'HP' : (rawUnit as 'HP' | 'PS' | 'KW');
+      verifiedTechnicalSpecs = {
+        powerHp: numHp,
+        powerUnit: unit,
+        powerSource: rawP.powerSource || 'VERIFIED_STAGE_1',
+        powerSemantic: rawP.powerSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER'),
+        torqueNm: typeof rawP.torqueNm === 'number' ? rawP.torqueNm : undefined,
+        torqueUnit: rawP.torqueUnit || 'Nm',
+        torqueSource: rawP.torqueSource || 'VERIFIED_STAGE_1',
+        torqueSemantic: rawP.torqueSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE'),
+      };
+    } else {
+      // Check if verified claims contain power / torque facts
+      const powerClaim = validatedClaims.find(
+        (c) => c.verificationStatus === 'VERIFIED' && (c.category === 'TECHNICAL' || c.category === 'GENERAL' || c.category === 'POWER') && /güç|power|hp|ps|kw/i.test(c.claimText),
+      );
+      if (powerClaim) {
+        const hpMatch = powerClaim.claimText.match(/(\d+)\s*(HP|PS|kW|bg|beygir)\b/i);
+        if (hpMatch) {
+          const val = parseInt(hpMatch[1], 10);
+          const rawUnit = hpMatch[2].toUpperCase();
+          const unit = rawUnit === 'BG' || rawUnit === 'BEYGIR' ? 'HP' : (rawUnit as 'HP' | 'PS' | 'KW');
+          verifiedTechnicalSpecs = {
+            powerHp: val,
+            powerUnit: unit,
+            powerSource: 'VERIFIED_STAGE_1',
+            powerSemantic: isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER',
+          };
+        }
+      }
+
+      // If still not found, search in normalized evidence collection
+      if (!verifiedTechnicalSpecs) {
+        const textSnippets: string[] = [];
+        if (typeof rawResearch === 'string') textSnippets.push(rawResearch);
+
+        // 1. Top-level answers & summaries (legacy schema)
+        if (rawResearch?.answers) {
+          Object.values(rawResearch.answers).forEach((a: any) => {
+            if (a?.answerText) textSnippets.push(a.answerText);
+            if (a?.searchSnippet) textSnippets.push(a.searchSnippet);
+          });
+        }
+        if (rawResearch?.engineTransmissionFit?.summary) {
+          textSnippets.push(rawResearch.engineTransmissionFit.summary);
+        }
+        if (rawResearch?.vehicleCharacterResearch?.engineTransmissionFit?.summary) {
+          textSnippets.push(rawResearch.vehicleCharacterResearch.engineTransmissionFit.summary);
+        }
+        if (Array.isArray(rawResearch?.groundingSources)) {
+          rawResearch.groundingSources.forEach((s: any) => {
+            if (s?.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
+          });
+        }
+
+        // 2. Production questions[*].synthesisedAnswer & questions[*].sources[*].relevantSnippet
+        if (questionContainer && typeof questionContainer === 'object') {
+          Object.values(questionContainer).forEach((q: any) => {
+            if (q?.synthesisedAnswer) textSnippets.push(q.synthesisedAnswer);
+            if (q?.summary) textSnippets.push(q.summary);
+            if (Array.isArray(q?.sources)) {
+              q.sources.forEach((s: any) => {
+                if (s?.relevantSnippet) textSnippets.push(s.relevantSnippet);
+                if (s?.snippet) textSnippets.push(s.snippet);
+                if (s?.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
+              });
+            }
+          });
+        }
+
+        // 3. Processed grounding sources excerpts
+        processedSources.forEach((s) => {
+          if (s.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
+        });
+
+        for (const text of textSnippets) {
+          const match = text.match(/\b(\d{2,3})\s*(HP|PS|kW|bg|beygir)\b/i);
+          if (match) {
+            const val = parseInt(match[1], 10);
+            if (val >= 40 && val <= 1000 && !(isHybrid && val === 100)) { // Skip legacy 100 on hybrid
+              const rawUnit = match[2].toUpperCase();
+              const unit = rawUnit === 'BG' || rawUnit === 'BEYGIR' ? 'HP' : (rawUnit as 'HP' | 'PS' | 'KW');
+              verifiedTechnicalSpecs = {
+                powerHp: val,
+                powerUnit: unit,
+                powerSource: 'VERIFIED_STAGE_1',
+                powerSemantic: isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER',
+              };
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!verifiedTechnicalSpecs && vehicleContext?.verifiedResearch?.verifiedTechnicalSpecs) {
+      verifiedTechnicalSpecs = vehicleContext.verifiedResearch.verifiedTechnicalSpecs;
+    }
+
     return {
       vehicleIdentityResearch: rawResearch?.vehicleIdentityResearch || {},
       vehicleCharacterResearch,
+      verifiedTechnicalSpecs,
       equipmentResearch: rawResearch?.equipmentResearch || {},
       reliabilityResearch: rawResearch?.reliabilityResearch || {},
       recallResearch: rawResearch?.recallResearch || {},

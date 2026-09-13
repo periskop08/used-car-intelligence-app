@@ -228,10 +228,10 @@ export class VehicleCharacterResearchService {
       if (englishQuery) {
         const resp = await this.tavilySearch.search(englishQuery, {
           searchDepth: 'advanced',
-          maxResults: 5,
+          maxResults: 4,
         });
         if (resp.results && resp.results.length > 0) {
-          sources = this.mapSearchResults(resp.results);
+          sources.push(...this.mapSearchResults(resp.results));
           usedProvider = 'tavily_en';
         }
       }
@@ -239,16 +239,23 @@ export class VehicleCharacterResearchService {
       this.logger.warn(`Tavily English search failed for ${questionId}: ${err.message}`);
     }
 
-    // Step 2: Tavily (Turkish template query) if step 1 returned 0 results
-    if (sources.length === 0 && turkishQuery) {
+    // Step 2: Tavily (Turkish template query) to capture market-specific technical specs
+    if (turkishQuery) {
       try {
         const resp = await this.tavilySearch.search(turkishQuery, {
           searchDepth: 'advanced',
-          maxResults: 5,
+          maxResults: 4,
         });
         if (resp.results && resp.results.length > 0) {
-          sources = this.mapSearchResults(resp.results);
-          usedProvider = 'tavily_tr';
+          const trSources = this.mapSearchResults(resp.results);
+          const existingUrls = new Set(sources.map((s) => s.url));
+          for (const ts of trSources) {
+            if (!existingUrls.has(ts.url)) {
+              sources.push(ts);
+              existingUrls.add(ts.url);
+            }
+          }
+          usedProvider = usedProvider ? `${usedProvider}+tavily_tr` : 'tavily_tr';
         }
       } catch (err: any) {
         this.logger.warn(`Tavily Turkish search failed for ${questionId}: ${err.message}`);

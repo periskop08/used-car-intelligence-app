@@ -183,7 +183,13 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - 'technicalSpecifications' JSON alanlarındaki 'enginePowerHp', 'engineTorqueNm' vb. sayısal alanlara KESİNLİKLE metin/semantik etiket GÖMÜLEMEZ. Bu alanlar her zaman saf sayı (Number) olmalıdır. Güç birimi 'powerUnit' ('HP' | 'PS' | 'kW') alanında saklanır.
    - Doğrulanmış güç değerini ve birimini kaynakta geçtiği orijinal haliyle koru (örn. kaynak 122 PS ise 'enginePowerHp': 122 ve 'powerUnit': 'PS'; kaynak 90 kW ise 'enginePowerHp': 90 ve 'powerUnit': 'kW'; DB'de 120 HP ise 120 ve 'powerUnit': 'HP'). Sessizce birim dönüştürme yapma.
    - Doğrulanmış içten yanmalı motor torkunu kaynakta geçtiği sayısal haliyle koru. Doğrulanmış elektrik motoru torku güvenilir kaynakta varsa ayrı belirt; güvenilir kanıtta yoksa tork uydurma ve ASLA benzinli ile elektrik torkunu toplayarak kombine hibrit tork hesaplama.
-   - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.`;
+   - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.
+10. OPSİYONEL SİSTEM VE SCR / ADBLUE KANIT KORUMASI (OPTIONAL-SYSTEM EVIDENCE GUARD):
+   - Dizel araçlarda SCR / AdBlue sistemi, Stage 1 teknik kimliğinde veya araştırma kanıtlarında açıkça doğrulanmadığı sürece:
+     a) 'inspectionChecklist' içinde kesin/şartsız bir "AdBlue Sistemi ve Seviyesini Kontrol Et" vb. kontrol adımı KESİNLİKLE ÜRETİLEMEZ.
+     b) 'sellerQuestions' içinde "AdBlue deposu ne zaman dolduruldu", "Hangi marka AdBlue kullanıldı" gibi araçta AdBlue deposu varmış gibi kesin sorular KESİNLİKLE ÜRETİLEMEZ.
+     c) Araçta kesin bir AdBlue tankı veya SCR sistemi olduğu iddia edilemez.
+   - Yalnızca genel eğitici açıklamalarda şartlı dil korunabilir (örn. "SCR/AdBlue sistemi bulunan modellerde...").`;
   }
 
   buildUserPrompt(vehicleContext: any): string {
@@ -202,8 +208,21 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 
     const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
 
-    const hpText = (perf.enginePowerHp && perf.enginePowerHp >= 140) ? `${perf.enginePowerHp} HP` : 'Gerçek Fabrika Verisiyle Tamamla';
-    const torqueText = (perf.engineTorqueNm && perf.engineTorqueNm >= 200) ? `${perf.engineTorqueNm} Nm Tork` : 'Gerçek Fabrika Verisiyle Tamamla';
+    const rawHpVal = identity.enginePowerHp || perf.enginePowerHp;
+    const powerUnit = identity.powerUnit || perf.powerUnit || 'HP';
+    const powerSemantic = identity.powerSemantic || perf.powerSemantic;
+    const powerSource = identity.powerSource || perf.powerSource;
+    const hpText = rawHpVal 
+      ? `${rawHpVal} ${powerUnit}${powerSemantic === 'TOTAL_HYBRID_SYSTEM_POWER' ? ' (Doğrulanmış Toplam Hibrit Sistem Gücü)' : ''}`
+      : 'Gerçek Fabrika Verisiyle Tamamla';
+
+    const rawTorqueVal = identity.engineTorqueNm || perf.engineTorqueNm;
+    const torqueUnit = identity.torqueUnit || perf.torqueUnit || 'Nm';
+    const torqueSemantic = identity.torqueSemantic || perf.torqueSemantic;
+    const torqueText = rawTorqueVal
+      ? `${rawTorqueVal} ${torqueUnit}${torqueSemantic === 'TOTAL_HYBRID_SYSTEM_TORQUE' ? ' (Doğrulanmış Hibrit Torku)' : ''}`
+      : 'Gerçek Fabrika Verisiyle Tamamla';
+
     const ccText = perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'Gerçek Hacim Verisiyle Tamamla';
     const zeroHundredText = perf.zeroToHundredKmh ? `${perf.zeroToHundredKmh} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
     const topSpeedText = perf.topSpeedKmh ? `${perf.topSpeedKmh} km/s` : 'Gerçek Veriyle Tamamla';
@@ -222,7 +241,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 3. Üretim Yılı: ${year}
 4. Kasa Tipi: ${body}
 5. Donanım Paketi Seviyesi: ${trim}${equipmentHighlights}${equipmentFeaturesText}
-6. Motor / Versiyon Kitle Kodu: ${engine}
+6. Motor / Versiyon Kitle Kodu: ${engine}${rawHpVal ? ` (Doğrulanmış Motor Gücü: ${hpText})` : ''}${rawTorqueVal ? ` (Doğrulanmış Tork: ${torqueText})` : ''}
 7. Yakıt Türü: ${fuel}
 8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}

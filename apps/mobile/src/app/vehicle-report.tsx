@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -942,6 +942,18 @@ export default function VehicleReportScreen() {
   }
 
   const synthesis = report?.expertDecisionSynthesis;
+  const rawPower = report?.performanceUsage?.sourcePowerValue 
+    ?? report?.vehicleIdentity?.sourcePowerValue 
+    ?? report?.performanceUsage?.powerHp 
+    ?? report?.vehicleIdentity?.enginePowerHp;
+  const powerUnit = report?.performanceUsage?.sourcePowerUnit 
+    ?? report?.vehicleIdentity?.sourcePowerUnit 
+    ?? (report?.performanceUsage as any)?.powerUnit 
+    ?? (report?.vehicleIdentity as any)?.powerUnit 
+    ?? 'HP';
+  const powerSemantic = report?.performanceUsage?.powerSemantic 
+    ?? (report?.vehicleIdentity as any)?.powerSemantic;
+  const hpDisplay = formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
   const hpValue = report?.performanceUsage?.powerHp || report?.vehicleIdentity?.enginePowerHp;
   const torqueValue = report?.performanceUsage?.torqueNm;
   const topSpeedValue = report?.performanceUsage?.topSpeedKmh;
@@ -1031,10 +1043,10 @@ export default function VehicleReportScreen() {
                 <Text style={styles.specChipTextLight}>{params.bodyType ? String(params.bodyType) : 'Sedan'}</Text>
               </View>
 
-              {Boolean(hpValue) && (
+              {hpDisplay !== '—' && (
                 <View style={[styles.specChipLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
                   <Ionicons name="flash-outline" size={13} color="#ea580c" />
-                  <Text style={[styles.specChipTextLight, { color: '#c2410c' }]}>{hpValue} HP</Text>
+                  <Text style={[styles.specChipTextLight, { color: '#c2410c' }]}>{hpDisplay}</Text>
                 </View>
               )}
             </View>
@@ -1413,7 +1425,7 @@ export default function VehicleReportScreen() {
             <View style={styles.techGridLight}>
               <View style={[styles.techCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
                 <Text style={styles.techLabelLight}>Motor Gücü</Text>
-                <Text style={[styles.techValLight, { color: '#ea580c' }]}>{hpValue ? `${hpValue} HP` : '—'}</Text>
+                <Text style={[styles.techValLight, { color: '#ea580c' }]}>{hpDisplay}</Text>
               </View>
 
               <View style={styles.techCardLight}>
