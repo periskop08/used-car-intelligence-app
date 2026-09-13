@@ -32,7 +32,7 @@ export function formatCustomerNo(user: { id: string; customerNo?: string | null;
   const date = user?.createdAt ? new Date(user.createdAt) : new Date();
   const yy = String(date.getFullYear()).slice(-2);
   const mm = String(date.getMonth() + 1).padStart(2, '0');
-  return `TS-${yy}${mm}-000001`;
+  return `TSU-${yy}${mm}-000001`;
 }
 
 export function formatUserDisplayName(user: {

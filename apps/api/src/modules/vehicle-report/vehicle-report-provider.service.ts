@@ -6,7 +6,7 @@ import { VehicleReportSemanticValidationService } from './vehicle-report-semanti
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
 import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
 import { VehicleReliabilityResearchService } from '../research/vehicle-reliability-research.service';
-import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp } from '@used-car-intelligence/shared';
+import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
 @Injectable()
@@ -51,7 +51,7 @@ export class VehicleReportProviderService {
     fallbackReason?: string;
     verifiedResearch?: VehicleReportResearchData;
   }> {
-    const baseReport = this.fallbackService.generateFallbackReport(
+    let baseReport = this.fallbackService.generateFallbackReport(
       reportId,
       'TORQUE_SCOUT_VEHICLE_REPORT',
       vehicleContext,
@@ -177,7 +177,14 @@ export class VehicleReportProviderService {
           // Map initial AI content to baseReport
           this.mapGeneratedContentToReport(baseReport, contentObj, validationContext);
 
-          // STAGE 4: Production Semantic Validation & Consistency Check
+          // STAGE 4.1: Fail-safe Item Shape Normalization (canonical arrays & field-specific extraction)
+          const normInitial = normalizeVehicleReportPayload(baseReport);
+          if (normInitial.warnings && normInitial.warnings.length > 0) {
+            this.logger.warn(`[STAGE 4.1 NORMALIZATION] Normalized ${normInitial.warnings.length} initial shape deviation(s): ${JSON.stringify(normInitial.warnings)}`);
+          }
+          baseReport = normInitial.data;
+
+          // STAGE 4.2: Production Semantic Validation & Consistency Check
           let validation = this.semanticValidationService.validate(baseReport, validationContext);
           let repairAttempted = false;
 
@@ -219,6 +226,8 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
                     || repairedContent;
 
                   this.mapGeneratedContentToReport(baseReport, repObj, validationContext);
+                  const normRepaired = normalizeVehicleReportPayload(baseReport);
+                  baseReport = normRepaired.data;
 
                   // REVALIDATE AFTER REPAIR
                   validation = this.semanticValidationService.validate(baseReport, validationContext);
@@ -234,12 +243,15 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
           if (!validation.isValid) {
             this.logger.warn(`[STAGE 4 SANITIZATION] Validation remaining invalid (${validation.reason}). Applying safe deterministic sanitization...`);
             this.sanitizeIncompatibleReportFields(baseReport, validationContext);
+            const normSanitized = normalizeVehicleReportPayload(baseReport);
+            baseReport = normSanitized.data;
+
             // FINAL VALIDATION AFTER SANITIZATION
             validation = this.semanticValidationService.validate(baseReport, validationContext);
             this.logger.log(`[STAGE 4 FINAL VALIDATION] Valid: ${validation.isValid}, Reason: ${validation.reason || 'None'}`);
           }
 
-          // FINAL VALIDATION GATE: Never return a dirty/invalid report as COMPLETED!
+          // FINAL VALIDATION GATE: Never return or persist a dirty/invalid report as COMPLETED!
           if (!validation.isValid) {
             this.logger.error(`[STAGE 4 GATE FAILED] Report could not be validated or sanitized (${validation.reason}). Rejecting dirty payload.`);
             throw new BadRequestException('TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.');
@@ -271,7 +283,7 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
 
           baseReport.status = 'COMPLETED';
 
-          this.logger.log(`[DELEGATOR] Report updated successfully with AI content from ${orchestratorResult.providerName}`);
+          this.logger.log(`[DELEGATOR] Report validated and normalized successfully with AI content from ${orchestratorResult.providerName}`);
 
           return {
             report: baseReport,

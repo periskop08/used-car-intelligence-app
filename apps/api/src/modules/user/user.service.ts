@@ -335,7 +335,7 @@ export class UserService {
     });
 
     const seqStr = String(updatedCounter.counter).padStart(6, '0');
-    return `TS-${period}-${seqStr}`;
+    return `TSU-${period}-${seqStr}`;
   }
 
   async ensureCustomerNo(user: any): Promise<string> {
@@ -512,7 +512,7 @@ export class UserService {
 
     let formatted = users.map((u) => {
       const yearMonth = u.createdAt ? `${new Date(u.createdAt).getFullYear().toString().slice(-2)}${(new Date(u.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
-      const customerNo = u.customerNo || `TS-${yearMonth}-000001`;
+      const customerNo = u.customerNo || `TSU-${yearMonth}-000001`;
       return {
         id: u.id,
         customerNo,
@@ -710,7 +710,7 @@ export class UserService {
     return {
       user: {
         id: user.id,
-        customerNo: user.customerNo || `TS-${user.id.slice(0, 8).toUpperCase()}`,
+        customerNo: user.customerNo || `TSU-${user.createdAt ? (new Date(user.createdAt).getFullYear().toString().slice(-2) + (new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0')) : '2609'}-000001`,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,

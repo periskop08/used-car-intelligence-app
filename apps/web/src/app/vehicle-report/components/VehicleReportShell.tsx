@@ -321,6 +321,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           </div>
         );
       })()}
+>>>>>>> comparison-v7-preview
 
       {/* Legacy Schema Version Warning & Free Upgrade Banner */}
       {(!report.expertDecisionSynthesis || (report.schemaVersion || 1) < 2) && (
@@ -364,7 +365,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       )}
 
       {/* SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-      {report.prePurchaseChecks && report.prePurchaseChecks.length > 0 && (
+      {Array.isArray(report.prePurchaseChecks) && report.prePurchaseChecks.length > 0 && (
         <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center gap-2 border-b border-white/10 pb-3">
             <ShieldCheck className="w-5 h-5 text-orange-400" />
@@ -433,7 +434,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
       </div>
 
       {/* SATICIYA SORULACAK KRİTİK SORULAR */}
-      {report.sellerQuestions && report.sellerQuestions.length > 0 && (
+      {Array.isArray(report.sellerQuestions) && report.sellerQuestions.length > 0 && (
         <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
           <div className="flex items-center gap-2 border-b border-white/10 pb-3">
             <HelpCircle className="w-5 h-5 text-purple-400" />
@@ -490,7 +491,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             </div>
           )}
 
-          {report.listingAnalysis.damageAssessment && report.listingAnalysis.damageAssessment.length > 0 && (
+          {Array.isArray(report.listingAnalysis.damageAssessment) && report.listingAnalysis.damageAssessment.length > 0 && (
             <div className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl space-y-1 text-xs">
               <span className="font-bold text-slate-200 block">🎨 Kaporta & Tramer Dökümü</span>
               <ul className="list-disc list-inside space-y-1 text-slate-300">

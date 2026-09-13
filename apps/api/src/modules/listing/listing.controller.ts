@@ -108,6 +108,9 @@ export class ListingController {
     @Query('sellerId') sellerId?: string,
     @Query('urgentOnly') urgentOnly?: string,
     @Query('showcaseOnly') showcaseOnly?: string,
+    @Query('engineId') engineId?: string,
+    @Query('trimId') trimId?: string,
+    @Query('transmissionId') transmissionId?: string,
   ) {
     const now = new Date();
     const filterParams = {
@@ -118,6 +121,9 @@ export class ListingController {
       vehicleVariantId,
       brandId,
       modelId,
+      engineId,
+      trimId,
+      transmissionId,
       minYear,
       maxYear,
       minPrice,
@@ -197,7 +203,7 @@ export class ListingController {
             orderBy: { sortOrder: 'asc' },
           },
           vehicleVariant: {
-            include: { brand: true, model: true },
+            include: { brand: true, model: true, engine: true, trim: true },
           },
         },
       });
@@ -249,7 +255,7 @@ export class ListingController {
               orderBy: { sortOrder: 'asc' },
             },
             vehicleVariant: {
-              include: { brand: true, model: true },
+              include: { brand: true, model: true, engine: true, trim: true },
             },
             promotionEntitlements: {
               where: {
@@ -466,7 +472,7 @@ export class ListingController {
         price: parseFloat(item.priceAmount.toString()),
         currency: item.currency,
         listingDate: new Date(item.publishedAt || item.createdAt).toLocaleDateString('tr-TR'),
-        listingNo: item.id.replace(/^TEST-SIMILAR-/, 'SIM-').substring(0, 8).toUpperCase(),
+        listingNo: item.listingNo || item.id,
         location,
         seller,
         vehicle,
@@ -476,7 +482,12 @@ export class ListingController {
         isFavorite: favoritedIds.has(item.id),
         isUrgent,
         isShowcaseFeedActive,
-        detailUrl: `/listings/${item.id}`,
+        detailUrl: `/listings/${item.listingNo || item.id}`,
+        localPaintedParts: (item.localPaintedParts as string[]) || [],
+        paintedParts: (item.paintedParts as string[]) || [],
+        changedParts: (item.changedParts as string[]) || [],
+        damageRecord: item.damageRecord || null,
+        tramerAmount: item.tramerAmount ? Number(item.tramerAmount) : 0,
       };
     });
 
@@ -484,6 +495,119 @@ export class ListingController {
       items: mappedItems,
       hasMore: result.hasMore,
       nextSeed: result.nextSeed,
+    };
+  }
+
+  @Get('listings/by-vehicle/:variantId')
+  @ApiOperation({ summary: 'Araç raporu için birebir eşleşen aktif ilanları getir' })
+  async getExactListingsByVehicle(
+    @Param('variantId') variantId: string,
+    @Req() req: Request,
+  ) {
+    const prisma = this.listingService['prisma'];
+    const variant = await prisma.vehicleVariant.findUnique({
+      where: { id: variantId },
+      include: {
+        brand: true,
+        model: true,
+        generation: true,
+        engine: true,
+        transmission: true,
+        trim: true,
+      },
+    });
+
+    if (!variant) {
+      throw new NotFoundException('Araç varyantı bulunamadı.');
+    }
+
+    // Build canonical 8-field filter context
+    const filterContext = {
+      brandId: variant.brandId,
+      brandName: variant.brand?.name || '',
+      modelId: variant.modelId,
+      modelName: variant.model?.name || '',
+      year: variant.year,
+      bodyType: variant.bodyType || null,
+      engineId: variant.engineId,
+      fuelType: variant.fuelType || null,
+      transmissionId: variant.transmissionId,
+      transmissionType: variant.transmission?.type || null,
+      trimId: variant.trimId,
+      trimName: variant.trim?.name || '',
+      vehicleVariantId: variant.id,
+    };
+
+    // Construct the exact-match WHERE condition matching public marketplace eligibility + 8 fields
+    const now = new Date();
+    const variantCondition: any = {
+      brandId: variant.brandId,
+      modelId: variant.modelId,
+      year: variant.year,
+    };
+    if (variant.bodyType) variantCondition.bodyType = variant.bodyType;
+    if (variant.fuelType) variantCondition.fuelType = variant.fuelType;
+    if (variant.engineId) variantCondition.engineId = variant.engineId;
+    if (variant.trimId) variantCondition.trimId = variant.trimId;
+    if (variant.transmissionId) variantCondition.transmissionId = variant.transmissionId;
+
+    const where: any = {
+      status: ListingStatus.ACTIVE,
+      OR: [
+        { vehicleVariantId: variant.id },
+        { vehicleVariant: variantCondition },
+      ],
+    };
+
+    // Identical WHERE for count and preview
+    const total = await prisma.vehicleListing.count({ where });
+
+    const items = await prisma.vehicleListing.findMany({
+      where,
+      take: 20,
+      orderBy: [
+        { isFeatured: 'desc' },
+        { isShowcaseFeedActive: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
+      include: {
+        media: { orderBy: { sortOrder: 'asc' } },
+        promotions: { orderBy: { createdAt: 'desc' } },
+        promotionEntitlements: true,
+      },
+    });
+
+    const mappedItems = items.map((item: any) => {
+      const formattedMedia = item.media ? this.formatMediaUrls(item.media, req) : [];
+      const primaryMedia = formattedMedia?.[0]?.url || item.media?.[0]?.url || null;
+      const promoSummary = this.promotionQueryService
+        ? this.promotionQueryService.resolveEffectivePromotions(item, now)
+        : null;
+
+      const hasShowcase = promoSummary?.showcase?.active ?? !!item.isShowcaseFeedActive;
+      const hasUrgent = promoSummary?.urgent?.active ?? !!item.isUrgent;
+
+      return {
+        id: item.id,
+        listingNo: item.listingNo || item.id,
+        title: item.title,
+        modelYear: item.modelYear,
+        kilometers: item.kilometers,
+        priceAmount: Number(item.priceAmount),
+        currency: item.currency || 'TRY',
+        city: item.city,
+        district: item.district || null,
+        imageUrl: primaryMedia,
+        isShowcaseFeedActive: hasShowcase,
+        isUrgent: hasUrgent,
+      };
+    });
+
+    return {
+      items: mappedItems,
+      total,
+      filterContext,
     };
   }
 
@@ -495,12 +619,18 @@ export class ListingController {
     @Req() req: Request,
     @GetUser() user?: UserPayload,
   ) {
-    const listing = await this.listingService['prisma'].vehicleListing.findUnique({
-      where: { id },
+    const listing = await this.listingService['prisma'].vehicleListing.findFirst({
+      where: {
+        OR: [
+          { listingNo: id },
+          { id: id },
+        ],
+      },
       include: {
         seller: {
           select: {
             id: true,
+            customerNo: true,
             firstName: true,
             lastName: true,
             phone: true,

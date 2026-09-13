@@ -1,38 +1,50 @@
 "use client";
 
 import React, { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { Siren, AlertCircle } from "lucide-react";
 
-interface UrgentListingBadgeProps {
-  size?: "small" | "medium";
+export interface UrgentListingBadgeProps {
+  size?: "xs" | "small" | "sm" | "medium" | "md" | "lg";
   animated?: boolean;
   className?: string;
+  withTooltip?: boolean;
 }
 
 export default function UrgentListingBadge({
   size = "small",
   animated = true,
   className = "",
+  withTooltip = false,
 }: UrgentListingBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  const paddingClass = size === "medium" ? "px-3 py-1 text-xs" : "px-2 py-0.5 text-[10px]";
+  // Normalize size alias
+  const isXs = size === "xs";
+  const isSm = size === "small" || size === "sm";
+  const isMd = size === "medium" || size === "md";
+  const isLg = size === "lg";
+
+  const sizeClasses = isXs
+    ? "w-[18px] h-[18px] p-[2.5px] rounded-[5px]"
+    : isMd
+    ? "w-7 h-7 sm:w-8 sm:h-8 p-1.5 rounded-lg"
+    : isLg
+    ? "w-9 h-9 p-2 rounded-xl"
+    : "w-[22px] h-[22px] sm:w-6 sm:h-6 p-1 rounded-md"; // default: sm
 
   return (
-    <div className={`relative inline-block ${className}`}>
+    <div className={`relative inline-flex items-center justify-center shrink-0 ${className}`}>
       <style jsx>{`
-        @keyframes urgentFlash {
+        @keyframes urgentCompactFlash {
           0%, 100% {
             opacity: 1;
             transform: scale(1);
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.7), inset 0 0 6px rgba(255, 255, 255, 0.4);
-            filter: brightness(1);
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.65), inset 0 0 3px rgba(255, 255, 255, 0.35);
           }
           50% {
-            opacity: 0.85;
+            opacity: 0.9;
             transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(239, 68, 68, 1), 0 0 10px rgba(255, 0, 0, 0.8);
-            filter: brightness(1.25);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.95), 0 0 6px rgba(255, 0, 0, 0.6);
           }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -41,36 +53,37 @@ export default function UrgentListingBadge({
           }
         }
         .urgent-badge-glow {
-          ${animated ? "animation: urgentFlash 1.5s ease-in-out infinite;" : ""}
+          ${animated ? "animation: urgentCompactFlash 1.5s ease-in-out infinite;" : ""}
         }
       `}</style>
 
       <button
         type="button"
+        role="status"
+        aria-label="Acil İlan"
+        title="Acil İlan"
         onClick={(e) => {
-          e.stopPropagation();
-          setShowTooltip(!showTooltip);
+          if (withTooltip) {
+            e.stopPropagation();
+            setShowTooltip(!showTooltip);
+          }
         }}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        className={`urgent-badge-glow font-black uppercase tracking-wider rounded-md bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white shadow-lg border border-red-400/60 flex items-center gap-1.5 cursor-pointer select-none ${paddingClass}`}
+        onMouseEnter={() => withTooltip && setShowTooltip(true)}
+        onMouseLeave={() => withTooltip && setShowTooltip(false)}
+        className={`urgent-badge-glow aspect-square flex items-center justify-center bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white shadow-md border border-red-300/60 backdrop-blur-xs select-none transition-transform ${sizeClasses}`}
       >
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-        </span>
-        <span>🚨 ACİL</span>
+        <Siren className="w-full h-full text-white shrink-0 drop-shadow-xs" />
       </button>
 
-      {showTooltip && (
-        <div 
+      {withTooltip && showTooltip && (
+        <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 top-full mt-1.5 w-64 p-2.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-red-500/30 text-[11px] text-slate-300 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 leading-relaxed"
+          className="absolute left-0 top-full mt-1.5 w-60 p-2.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-red-500/30 text-[11px] text-slate-300 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 leading-relaxed pointer-events-none"
         >
           <div className="flex items-start gap-1.5 font-medium">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <span>
-              Satıcı bu ilanı ücretli <strong>Acil İlan</strong> olarak işaretlemiştir. TorqueScout satış aciliyetini doğrulamamaktadır.
+              Satıcı bu ilanı <strong>Acil İlan</strong> olarak öne çıkarmıştır.
             </span>
           </div>
         </div>
@@ -78,3 +91,5 @@ export default function UrgentListingBadge({
     </div>
   );
 }
+
+export { UrgentListingBadge as UrgentBadge };

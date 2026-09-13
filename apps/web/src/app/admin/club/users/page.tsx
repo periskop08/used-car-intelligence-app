@@ -80,7 +80,7 @@ export default function AdminClubUsersPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Müşteri No (TS-2608-000123), Ad, Soyad veya E-posta..."
+            placeholder="Müşteri No (TSU-2608-000123), Ad, Soyad veya E-posta..."
             className="w-full bg-slate-900 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 font-mono"
           />
         </div>

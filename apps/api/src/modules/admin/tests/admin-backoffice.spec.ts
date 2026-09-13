@@ -183,14 +183,14 @@ describe('TorqueScout Admin Backoffice Acceptance Criteria Test Suite', () => {
   });
 
   // 11. Customer Number Concurrency Test
-  it('11. customer number concurrency test: simultaneous registration calls yield unique sequential TS-YYMM-NNNNNN values', async () => {
+  it('11. customer number concurrency test: simultaneous registration calls yield unique sequential TSU-YYMM-NNNNNN values', async () => {
     const period = '2608';
     let counter = 0;
 
     const generateAtomic = () => {
       counter++;
       const seq = String(counter).padStart(6, '0');
-      return `TS-${period}-${seq}`;
+      return `TSU-${period}-${seq}`;
     };
 
     const results = await Promise.all([
@@ -199,7 +199,7 @@ describe('TorqueScout Admin Backoffice Acceptance Criteria Test Suite', () => {
       Promise.resolve(generateAtomic()),
     ]);
 
-    expect(results).toEqual(['TS-2608-000001', 'TS-2608-000002', 'TS-2608-000003']);
+    expect(results).toEqual(['TSU-2608-000001', 'TSU-2608-000002', 'TSU-2608-000003']);
     expect(new Set(results).size).toBe(3);
   });
 

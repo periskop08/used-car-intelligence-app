@@ -258,7 +258,8 @@ export class ListingAiContextBuilderService {
     const sortedKeysJson = JSON.stringify(canonicalObject, Object.keys(canonicalObject).sort());
     const contextHash = crypto.createHash('sha256').update(sortedKeysJson).digest('hex');
 
-    const cleanPublicListingNo = `TS-L${listing.id.slice(0, 8).toUpperCase()}`;
+    const listingYearMonth = `${new Date(listing.createdAt).getFullYear().toString().slice(-2)}${(new Date(listing.createdAt).getMonth() + 1).toString().padStart(2, '0')}`;
+    const cleanPublicListingNo = listing.listingNo || `TSIN-${listingYearMonth}-000001`;
 
     return {
       listing: {

@@ -550,3 +550,67 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
+
+export function CompactMobileVehicleBodySvg({
+  paintedParts = [],
+  changedParts = [],
+  localPaintedParts = [],
+  width = 44,
+  height = 80,
+}: {
+  paintedParts?: string[];
+  changedParts?: string[];
+  localPaintedParts?: string[];
+  width?: number;
+  height?: number;
+}) {
+  const painted = Array.isArray(paintedParts) ? paintedParts : [];
+  const changed = Array.isArray(changedParts) ? changedParts : [];
+  const local = Array.isArray(localPaintedParts) ? localPaintedParts : [];
+
+  const getPartColor = (partKey: string) => {
+    if (changed.includes(partKey)) {
+      return { fill: 'rgba(239, 68, 68, 0.75)', stroke: '#dc2626' };
+    }
+    if (painted.includes(partKey)) {
+      return { fill: 'rgba(59, 130, 246, 0.75)', stroke: '#2563eb' };
+    }
+    if (local.includes(partKey)) {
+      return { fill: 'rgba(245, 158, 11, 0.75)', stroke: '#d97706' };
+    }
+    return { fill: '#ffffff', stroke: '#cbd5e1' };
+  };
+
+  return (
+    <Svg width={width} height={height} viewBox="0 0 200 370">
+      <Path
+        d="M 50 35 C 50 25, 150 25, 150 35 C 165 60, 168 110, 162 180 C 168 250, 165 300, 152 350 C 150 360, 50 360, 48 350 C 35 300, 32 250, 38 180 C 32 110, 35 60, 50 35 Z"
+        fill="#f8fafc"
+        stroke="#94a3b8"
+        strokeWidth={1.5}
+      />
+      <Rect x="23" y="60" width="14" height="32" rx="4" fill="#64748b" />
+      <Rect x="163" y="60" width="14" height="32" rx="4" fill="#64748b" />
+      <Rect x="23" y="280" width="14" height="32" rx="4" fill="#64748b" />
+      <Rect x="163" y="280" width="14" height="32" rx="4" fill="#64748b" />
+
+      <Path d="M 50 35 Q 100 20 150 35 L 142 45 Q 100 35 58 45 Z" {...getPartColor('FRONT_BUMPER')} strokeWidth={1.5} />
+      <Path d="M 58 45 Q 100 35 142 45 L 135 110 L 65 110 Z" {...getPartColor('HOOD')} strokeWidth={1.5} />
+      <Path d="M 50 35 L 58 45 L 65 110 L 38 110 C 34 85 36 55 50 35 Z" {...getPartColor('LEFT_FRONT_FENDER')} strokeWidth={1.5} />
+      <Path d="M 150 35 C 164 55 166 85 162 110 L 135 110 L 142 45 Z" {...getPartColor('RIGHT_FRONT_FENDER')} strokeWidth={1.5} />
+      <Path d="M 38 110 L 65 110 L 65 180 L 38 180 Z" {...getPartColor('LEFT_FRONT_DOOR')} strokeWidth={1.5} />
+      <Path d="M 135 110 L 162 110 L 162 180 L 135 180 Z" {...getPartColor('RIGHT_FRONT_DOOR')} strokeWidth={1.5} />
+      <Rect x="65" y="110" width="70" height="140" rx="8" {...getPartColor('ROOF')} strokeWidth={1.5} />
+      <Path d="M 38 180 L 65 180 L 65 250 L 38 250 Z" {...getPartColor('LEFT_REAR_DOOR')} strokeWidth={1.5} />
+      <Path d="M 135 180 L 162 180 L 162 250 L 135 250 Z" {...getPartColor('RIGHT_REAR_DOOR')} strokeWidth={1.5} />
+      <Path d="M 38 250 L 65 250 L 60 330 L 53 340 C 36 320 34 280 38 250 Z" {...getPartColor('LEFT_REAR_FENDER')} strokeWidth={1.5} />
+      <Path d="M 65 250 L 135 250 L 140 330 Q 100 340 60 330 Z" {...getPartColor('TRUNK')} strokeWidth={1.5} />
+      <Path d="M 135 250 L 162 250 C 166 280 164 320 147 340 L 140 330 Z" {...getPartColor('RIGHT_REAR_FENDER')} strokeWidth={1.5} />
+      <Path d="M 53 340 Q 100 350 147 340 L 152 350 Q 100 365 48 350 Z" {...getPartColor('REAR_BUMPER')} strokeWidth={1.5} />
+      <Ellipse cx="61" cy="41" rx="5" ry="2.5" fill="#facc15" opacity={0.9} />
+      <Ellipse cx="139" cy="41" rx="5" ry="2.5" fill="#facc15" opacity={0.9} />
+      <Rect x="52" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity={0.9} />
+      <Rect x="138" y="342" width="10" height="3" rx="0.5" fill="#ef4444" opacity={0.9} />
+    </Svg>
+  );
+}

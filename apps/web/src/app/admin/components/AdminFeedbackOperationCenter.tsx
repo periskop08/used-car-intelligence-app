@@ -751,7 +751,7 @@ export default function AdminFeedbackOperationCenter({ token }: AdminFeedbackOpe
                             </span>
                           </div>
                           <span className="font-mono text-xs font-bold text-slate-200 bg-slate-900 border border-white/10 px-3 py-1 rounded-xl">
-                            İlan No: {fb.listingNoSnapshot || fb.listingId?.substring(0, 8).toUpperCase()}
+                            İlan No: {fb.listingNoSnapshot || fb.listing?.listingNo || '—'}
                           </span>
                         </div>
 

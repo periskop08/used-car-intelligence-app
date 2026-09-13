@@ -152,6 +152,7 @@ export default function CreateListing() {
   const [standardSuccessModalOpen, setStandardSuccessModalOpen] = useState(false);
   const [checkoutUnavailableModalOpen, setCheckoutUnavailableModalOpen] = useState(false);
   const [createdListingForModal, setCreatedListingForModal] = useState<any>(null);
+  const [listingNoCopied, setListingNoCopied] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
   // Step 1: Canonical Vehicle Taxonomy State
@@ -2018,6 +2019,31 @@ export default function CreateListing() {
                 İlanınız moderasyon ekibimiz tarafından kontrol edilecek. Durumu İlanlarım bölümünden takip edebilirsiniz.
               </p>
             </div>
+
+            {createdListingForModal?.listingNo && (
+              <div className="w-full bg-slate-950/60 border border-orange-500/30 rounded-2xl p-4 flex flex-col gap-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">İlan Numarası (TSIN)</span>
+                <div className="flex items-center justify-between bg-slate-900/90 px-4 py-2.5 rounded-xl border border-white/5">
+                  <span className="font-mono text-base font-black text-orange-400 tracking-wider">
+                    {createdListingForModal.listingNo}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdListingForModal.listingNo);
+                      setListingNoCopied(true);
+                      setTimeout(() => setListingNoCopied(false), 2000);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    {listingNoCopied ? "✓ Kopyalandı" : "Kopyala"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 text-left leading-relaxed">
+                  İlan durumunuzu veya destek taleplerinizi sorgularken bu ilan numarasını kullanabilirsiniz.
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full pt-2">
               <button
                 onClick={() => router.push("/dashboard/listings?tab=active")}

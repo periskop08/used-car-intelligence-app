@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import UrgentListingBadge from "./UrgentListingBadge";
+import ShowcaseBadge from "./ShowcaseBadge";
 import { formatImageUrl } from "../../utils/media";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -77,13 +78,9 @@ export default function ListingCard({ listing, onFavoriteToggle, isFavorite }: L
         />
 
         {/* Top Left: Badges */}
-        <div className="absolute top-2 left-2 z-20 flex flex-col gap-1 items-start">
-          {listing.isUrgent && <UrgentListingBadge size="small" animated />}
-          {listing.isShowcaseFeedActive && (
-            <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
-              ⭐ Vitrin
-            </span>
-          )}
+        <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5">
+          {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
+          {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
         </div>
 
         {/* Top Right: Favorite Button with Count */}

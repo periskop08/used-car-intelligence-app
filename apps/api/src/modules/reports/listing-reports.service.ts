@@ -159,7 +159,7 @@ export class ListingReportsService {
       where: { status: 'ACTIVE' },
       include: {
         seller: {
-          select: { id: true, firstName: true, lastName: true, email: true, createdAt: true },
+          select: { id: true, firstName: true, lastName: true, email: true, customerNo: true, createdAt: true },
         },
         _count: {
           select: { leads: true, views: true, favorites: true },
@@ -171,8 +171,7 @@ export class ListingReportsService {
 
     const enrichedListings = listings.map((l) => {
       const yearMonth = `${l.seller.createdAt.getFullYear().toString().slice(-2)}${(l.seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-      const shortId = l.seller.id.slice(0, 6).toUpperCase();
-      const customerNo = `TS-${yearMonth}-${shortId}`;
+      const customerNo = l.seller.customerNo || `TSU-${yearMonth}-000001`;
       const sellerName = `${l.seller.firstName || ''} ${l.seller.lastName || ''}`.trim() || l.seller.email.split('@')[0];
 
       const views = l._count.views || 0;
@@ -181,9 +180,11 @@ export class ListingReportsService {
       const favoriteRate = views > 0 ? Number(((favorites / views) * 100).toFixed(1)) : 0;
       const conversionRate = views > 0 ? Number(((leads / views) * 100).toFixed(1)) : 0;
 
+      const listingYearMonth = `${new Date(l.createdAt).getFullYear().toString().slice(-2)}${(new Date(l.createdAt).getMonth() + 1).toString().padStart(2, '0')}`;
+
       return {
         id: l.id,
-        listingNo: `TS-${l.id.substring(0, 8).toUpperCase()}`,
+        listingNo: l.listingNo || `TSIN-${listingYearMonth}-000001`,
         title: l.title,
         priceAmount: l.priceAmount,
         status: l.status,
@@ -478,16 +479,16 @@ export class ListingReportsService {
 
     const formatIssueItem = (l: any, reason: string) => {
       let sellerName = 'Bilinmiyor';
-      let customerNo = 'TS-UNKNOWN';
+      let customerNo = 'TSU-UNKNOWN';
       if (l.seller) {
         const yearMonth = `${l.seller.createdAt.getFullYear().toString().slice(-2)}${(l.seller.createdAt.getMonth() + 1).toString().padStart(2, '0')}`;
-        const shortId = l.seller.id.slice(0, 6).toUpperCase();
-        customerNo = `TS-${yearMonth}-${shortId}`;
+        customerNo = l.seller.customerNo || `TSU-${yearMonth}-000001`;
         sellerName = `${l.seller.firstName || ''} ${l.seller.lastName || ''}`.trim() || l.seller.email.split('@')[0];
       }
+      const listingYearMonth = `${new Date(l.createdAt).getFullYear().toString().slice(-2)}${(new Date(l.createdAt).getMonth() + 1).toString().padStart(2, '0')}`;
       return {
         id: l.id,
-        listingNo: `TS-${l.id.substring(0, 8).toUpperCase()}`,
+        listingNo: l.listingNo || `TSIN-${listingYearMonth}-000001`,
         title: l.title || 'Başlıksız İlan',
         sellerId: l.sellerId || null,
         sellerName,

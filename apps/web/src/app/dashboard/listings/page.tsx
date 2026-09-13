@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
 import { AlertCircle, Trash2, X, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { formatImageUrl } from "@/utils/media";
@@ -80,6 +81,7 @@ function SellerDashboardContent() {
   const [token, setToken] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
+  const [copiedListingId, setCopiedListingId] = useState<string | null>(null);
   const [promotionModalListing, setPromotionModalListing] = useState<any | null>(null);
 
   useEffect(() => {
@@ -561,12 +563,8 @@ function SellerDashboardContent() {
                     <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-base font-bold text-slate-200 truncate">{listing.title}</h2>
-                        {listing.isUrgent && <UrgentListingBadge size="small" />}
-                        {listing.isShowcaseFeedActive && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
-                            ⭐ Vitrin
-                          </span>
-                        )}
+                        {listing.isUrgent && <UrgentListingBadge size="sm" />}
+                        {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
                         <span
                           className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                             isResubmitted
@@ -616,6 +614,26 @@ function SellerDashboardContent() {
                               : "Acil"}
                           </span>
                         )}
+
+                        {listing.listingNo && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(listing.listingNo);
+                              setCopiedListingId(listing.id);
+                              setTimeout(() => setCopiedListingId(null), 2000);
+                            }}
+                            title="İlan numarasını kopyalamak için tıklayın"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-800/80 hover:bg-slate-750 border border-slate-700/60 hover:border-orange-500/40 text-slate-300 font-mono text-[10px] font-bold transition cursor-pointer"
+                          >
+                            <span className="text-[9px] text-slate-400 font-sans font-semibold">İlan No:</span>
+                            <span className="text-orange-400 font-bold">{listing.listingNo}</span>
+                            <span className="text-[10px] text-slate-400 ml-0.5">
+                              {copiedListingId === listing.id ? "✓" : "📋"}
+                            </span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
@@ -649,7 +667,7 @@ function SellerDashboardContent() {
                       </button>
                     )}
                     <button
-                      onClick={() => router.push(`/listings/${listing.id}`)}
+                      onClick={() => router.push(`/listings/${listing.listingNo || listing.id}`)}
                       className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-850 border border-white/5 text-slate-300 hover:bg-white/5 transition cursor-pointer"
                     >
                       İlanı Gör

@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../../constants/vehicleImages';
 import UrgentBadge from '../../components/UrgentBadge';
+import ShowcaseBadge from '../../components/ShowcaseBadge';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
@@ -708,12 +709,7 @@ export default function ListingsScreen() {
 
           <View style={styles.imageBadgesRow}>
             {item.isUrgent && <UrgentBadge size="small" />}
-            {item.isShowcaseFeedActive && (
-              <View style={styles.showcaseBadge}>
-                <Ionicons name="star" size={11} color="#ffffff" />
-                <Text style={styles.showcaseBadgeText}>VİTRİN</Text>
-              </View>
-            )}
+            {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
           </View>
 
           <TouchableOpacity

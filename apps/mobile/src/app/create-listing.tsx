@@ -17,6 +17,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import UrgentBadge from '../components/UrgentBadge';
+import ShowcaseBadge from '../components/ShowcaseBadge';
 
 let ImagePicker: any = null;
 try {
@@ -1763,10 +1765,8 @@ export default function CreateListingScreen() {
                 }
               >
                 <View style={styles.promoOptionHeader}>
-                  <View style={styles.promoOptionIconWrapUrgent}>
-                    <Ionicons name="flame" size={18} color="#dc2626" />
-                  </View>
-                  <View style={{ flex: 1 }}>
+                  <UrgentBadge size="medium" animated={false} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.promoOptionTitle}>Acil İlan</Text>
                     <Text style={styles.promoOptionDesc}>Kırmızı ACİL rozeti &amp; Acil listesi</Text>
                   </View>
@@ -1798,10 +1798,8 @@ export default function CreateListingScreen() {
                 }
               >
                 <View style={styles.promoOptionHeader}>
-                  <View style={styles.promoOptionIconWrapVitrin}>
-                    <Ionicons name="star" size={18} color="#f59e0b" />
-                  </View>
-                  <View style={{ flex: 1 }}>
+                  <ShowcaseBadge size="medium" />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.promoOptionTitle}>Vitrin + Akış</Text>
                     <Text style={styles.promoOptionDesc}>Ana Sayfa Vitrin ve İlan Akışı</Text>
                   </View>
@@ -1837,10 +1835,11 @@ export default function CreateListingScreen() {
                 </View>
 
                 <View style={styles.promoOptionHeader}>
-                  <View style={styles.promoOptionIconWrapBundle}>
-                    <Ionicons name="flash" size={18} color="#ea580c" />
+                  <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                    <UrgentBadge size="small" animated={false} />
+                    <ShowcaseBadge size="small" />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.promoOptionTitle}>Hızlı Satış Paketi</Text>
                     <Text style={styles.promoOptionDesc}>Acil İlan + Vitrin + İlan Akışı Kombo</Text>
                   </View>

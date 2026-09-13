@@ -28,6 +28,9 @@ export interface MarketplaceFilterParams {
   vehicleVariantId?: string;
   brandId?: string;
   modelId?: string;
+  engineId?: string;
+  trimId?: string;
+  transmissionId?: string;
   minYear?: string;
   maxYear?: string;
   minPrice?: string;
@@ -222,12 +225,15 @@ export function buildMarketplaceListingWhere(
 
   if (params.vehicleVariantId) {
     where.vehicleVariantId = params.vehicleVariantId;
-  } else {
-    if (params.brandId || params.modelId) {
-      where.vehicleVariant = {};
-      if (params.brandId) where.vehicleVariant.brandId = params.brandId;
-      if (params.modelId) where.vehicleVariant.modelId = params.modelId;
-    }
+  }
+
+  if (params.brandId || params.modelId || params.engineId || params.trimId || params.transmissionId) {
+    if (!where.vehicleVariant) where.vehicleVariant = {};
+    if (params.brandId) where.vehicleVariant.brandId = params.brandId;
+    if (params.modelId) where.vehicleVariant.modelId = params.modelId;
+    if (params.engineId) where.vehicleVariant.engineId = params.engineId;
+    if (params.trimId) where.vehicleVariant.trimId = params.trimId;
+    if (params.transmissionId) where.vehicleVariant.transmissionId = params.transmissionId;
   }
 
   if (params.minYear || params.maxYear) {

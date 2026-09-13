@@ -233,7 +233,7 @@ function FeedbackPageContent() {
                 <div className="flex items-center justify-between font-mono">
                   <span className="text-slate-400 font-bold">İlan No:</span>
                   <strong className="text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
-                    {listingId?.substring(0, 8).toUpperCase()}
+                    {listingDetails?.listingNo || (listingId?.startsWith('TSIN-') ? listingId : '—')}
                   </strong>
                 </div>
                 {listingDetails && (

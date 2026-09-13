@@ -18,7 +18,9 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import CompactListingCard from '@/components/listings/CompactListingCard';
 import UrgentListingBadge from '@/components/listings/UrgentListingBadge';
+import ShowcaseBadge from '@/components/listings/ShowcaseBadge';
 
 interface SimilarListingItem {
   id: string;
@@ -196,52 +198,9 @@ export default function SimilarListingsWidget({
             </div>
           ) : (
             /* Görünürde Tam 5 benzer ilan sınırı (max-h-[385px]), 10 ilana kadar iç kaydırma */
-            <div className="max-h-[385px] overflow-y-auto pr-1 flex flex-col gap-2.5 custom-scrollbar overscroll-contain">
+            <div className="max-h-[385px] overflow-y-auto pr-1 flex flex-col gap-2 custom-scrollbar overscroll-contain">
               {miniListings.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/listings/${item.id}`}
-                  className="flex items-center gap-2.5 p-2 rounded-xl bg-[#0a1122]/90 hover:bg-[#101b33] border border-white/5 hover:border-orange-500/40 transition group shadow-sm select-none"
-                >
-                  <div className="w-16 h-14 rounded-lg overflow-hidden bg-slate-900 border border-white/10 shrink-0 relative flex items-center justify-center">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-slate-950 flex items-center justify-center text-slate-600">
-                        <Car className="w-5 h-5 text-slate-500" />
-                      </div>
-                    )}
-                    {item.isUrgent && (
-                      <div className="absolute top-0.5 left-0.5 z-10 scale-[0.7] origin-top-left">
-                        <UrgentListingBadge size="small" animated />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col min-w-0 flex-1 justify-center">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <h4 className="text-[11.5px] font-bold text-slate-200 truncate group-hover:text-orange-400 transition leading-snug">
-                        {item.title}
-                      </h4>
-                      {item.isShowcaseFeedActive && (
-                        <span className="shrink-0 px-1 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[7.5px] uppercase tracking-wider shadow border border-amber-300">
-                          ⭐ Vitrin
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[9.5px] text-slate-400 font-medium truncate mt-0.5">
-                      {item.modelYear} • {item.kilometers.toLocaleString('tr-TR')} km •{' '}
-                      {item.district || item.city}
-                    </div>
-                    <div className="text-xs font-black text-orange-400 mt-0.5 leading-none">
-                      {formatPrice(item.priceAmount)}
-                    </div>
-                  </div>
-                </Link>
+                <CompactListingCard key={item.id} listing={item} variant="sidebar" />
               ))}
             </div>
           )}
@@ -320,25 +279,21 @@ export default function SimilarListingsWidget({
                         <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-bold">
                           #{idx + 1}
                         </span>
-                        {car.isUrgent && (
-                          <div className="absolute top-1.5 right-1.5 z-10 scale-90 origin-top-right">
-                            <UrgentListingBadge size="small" animated />
-                          </div>
-                        )}
-                        {car.isShowcaseFeedActive && (
-                          <div className="absolute bottom-1.5 left-1.5 z-10">
-                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[8.5px] uppercase tracking-wider shadow-lg border border-amber-300">
-                              ⭐ Vitrin + Akış
-                            </span>
+                        {(car.isUrgent || car.isShowcaseFeedActive) && (
+                          <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                            {car.isUrgent && <UrgentListingBadge size="xs" />}
+                            {car.isShowcaseFeedActive && <ShowcaseBadge size="xs" />}
                           </div>
                         )}
                       </div>
 
                       <div className="flex flex-col min-w-0 flex-1 justify-between py-0.5">
                         <div className="space-y-1">
-                          <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition truncate leading-snug">
-                            {car.title}
-                          </h4>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition truncate leading-snug">
+                              {car.title}
+                            </h4>
+                          </div>
 
                           <div className="text-sm sm:text-base font-black text-orange-400 leading-tight">
                             {formatPrice(car.priceAmount)}

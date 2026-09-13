@@ -12,6 +12,7 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CLOUDFLARE_VEHICLE_IMAGES } from '../constants/vehicleImages';
 import UrgentBadge from '../components/UrgentBadge';
 import ShowcaseBadge from '../components/ShowcaseBadge';
+import VehicleConditionVisualizer, { PART_LABELS, CompactMobileVehicleBodySvg } from '../components/VehicleConditionVisualizer';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -185,6 +187,11 @@ interface ListingFeedItem {
   isUrgent?: boolean;
   isShowcaseFeedActive?: boolean;
   detailUrl: string;
+  localPaintedParts?: string[];
+  paintedParts?: string[];
+  changedParts?: string[];
+  damageRecord?: string | null;
+  tramerAmount?: number;
 }
 
 export default function ListingFeedScreen() {
@@ -198,9 +205,10 @@ export default function ListingFeedScreen() {
   const [seed, setSeed] = useState<string>('');
 
   // States per listing id
-  const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'desc' | 'loc'>>({});
+  const [activeTabs, setActiveTabs] = useState<Record<string, 'info' | 'expertise'>>({});
   const [activePhotoIndices, setActivePhotoIndices] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [selectedExpertiseItem, setSelectedExpertiseItem] = useState<ListingFeedItem | null>(null);
 
   const [seenIds, setSeenIds] = useState<string[]>([]);
   const loadingMoreRef = useRef(false);
@@ -242,11 +250,17 @@ export default function ListingFeedScreen() {
       }
 
       const data = await response.json();
-      const newItems: ListingFeedItem[] = data.items || [];
+      const rawItems = data.items || [];
+      const newItems: ListingFeedItem[] = rawItems.map((item: any) => ({
+        ...item,
+        localPaintedParts: item.localPaintedParts || [],
+        paintedParts: item.paintedParts || [],
+        changedParts: item.changedParts || [],
+      }));
 
       if (replace) {
         setListings(newItems);
-        const tabs: Record<string, 'info' | 'desc' | 'loc'> = {};
+        const tabs: Record<string, 'info' | 'expertise'> = {};
         const photos: Record<string, number> = {};
         const favs: Record<string, boolean> = {};
 
@@ -393,6 +407,29 @@ export default function ListingFeedScreen() {
             if (prev.includes(item.id)) return prev;
             return [...prev, item.id];
           });
+
+          // Live Condition Synchronizer: Guarantees 1:1 match with real vehicle listing
+          fetch(`${API_URL}/listings/${item.id}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((detail) => {
+              if (detail) {
+                setListings((prev) =>
+                  prev.map((l) =>
+                    l.id === item.id
+                      ? {
+                          ...l,
+                          localPaintedParts: detail.localPaintedParts || [],
+                          paintedParts: detail.paintedParts || [],
+                          changedParts: detail.changedParts || [],
+                          damageRecord: detail.damageRecord || null,
+                          tramerAmount: detail.tramerAmount || 0,
+                        }
+                      : l
+                  )
+                );
+              }
+            })
+            .catch(() => {});
         }
 
         // Prefetch next page
@@ -425,23 +462,23 @@ export default function ListingFeedScreen() {
             style={styles.gearCircle}
             activeOpacity={0.8}
           >
-            <Ionicons name="chevron-back" size={22} color="#ffffff" />
+            <Ionicons name="settings-sharp" size={20} color="#ffffff" />
           </TouchableOpacity>
 
           <Text style={styles.feedTitle}>📦 İLAN AKIŞI</Text>
 
           <View style={styles.row}>
-            <TouchableOpacity onPress={() => handleShare(item)} style={styles.actionCircularBtn}>
-              <Ionicons name="share-social-outline" size={18} color="#475569" />
+            <TouchableOpacity onPress={() => handleShare(item)} style={styles.darkCircularBtn}>
+              <Ionicons name="share-social-outline" size={19} color="#0f172a" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleFavoriteToggle(item.id, item)}
               style={[
-                styles.actionCircularBtn,
+                styles.darkCircularBtn,
                 isFav && { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
               ]}
             >
-              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? '#ef4444' : '#475569'} />
+              <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={19} color={isFav ? '#ef4444' : '#0f172a'} />
             </TouchableOpacity>
           </View>
         </View>
@@ -459,22 +496,11 @@ export default function ListingFeedScreen() {
                 cachePolicy="memory-disk"
               />
 
-              {/* Promotional Badges: Urgent & Showcase (Pills as in screenshot) */}
+              {/* Promotional Badges: Urgent & Showcase */}
               {(item.isUrgent || item.isShowcaseFeedActive) && (
                 <View style={styles.promoBadgesWrap}>
-                  {item.isUrgent && (
-                    <View style={styles.urgentPillBadge}>
-                      <Text style={styles.urgentDot}>•</Text>
-                      <Text style={styles.urgentFire}>🔥</Text>
-                      <Text style={styles.urgentPillText}>ACİL</Text>
-                    </View>
-                  )}
-                  {item.isShowcaseFeedActive && (
-                    <View style={styles.showcasePillBadge}>
-                      <Text style={styles.showcaseStar}>★</Text>
-                      <Text style={styles.showcasePillText}>VİTRİN</Text>
-                    </View>
-                  )}
+                  {item.isUrgent && <UrgentBadge size="small" />}
+                  {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
                 </View>
               )}
 
@@ -520,12 +546,18 @@ export default function ListingFeedScreen() {
                 {item.title.toUpperCase()}
               </Text>
               <View style={styles.infoLine}>
-                <Text style={styles.infoSubText}>
-                  👤 {item.seller.displayName} ({item.seller.memberSince})
-                </Text>
-                <Text style={styles.infoSubText}>
-                  📍 {item.location.city}, {item.location.district || 'Merkez'}
-                </Text>
+                <View style={styles.metaItem}>
+                  <Ionicons name="person" size={13} color="#64748b" style={{ marginRight: 4 }} />
+                  <Text style={styles.infoSubText} numberOfLines={1}>
+                    {item.seller.displayName} ({item.seller.memberSince})
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Ionicons name="location-sharp" size={13} color="#ef4444" style={{ marginRight: 2 }} />
+                  <Text style={styles.infoSubText} numberOfLines={1}>
+                    {item.location.city}, {item.location.district || 'Merkez'}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -538,28 +570,28 @@ export default function ListingFeedScreen() {
               </Text>
             </View>
 
-            {/* 4. Tab Bar (Özellikler & Konum) */}
+            {/* 4. Tab Bar (Özellikler & Ekspertiz Durumu) */}
             <View style={styles.tabBar}>
-              {(['info', 'loc'] as const).map((tab) => (
+              {(['info', 'expertise'] as const).map((tab) => (
                 <TouchableOpacity
                   key={tab}
                   style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
                   onPress={() => setActiveTabs((prev) => ({ ...prev, [item.id]: tab }))}
                 >
                   <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>
-                    {tab === 'info' ? '📋 Özellikler' : '📍 Konum'}
+                    {tab === 'info' ? '📋 Özellikler' : '🛡️ Ekspertiz Durumu'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* 5. Tab Content Box (Özellikler or Konum) */}
+            {/* 5. Tab Content Box (Özellikler or Ekspertiz Durumu) */}
             <View style={styles.tabContentContainer}>
               {/* Right Floating Vertical Swipe Guide Indicator inside the table */}
               <View style={styles.scrollGuidePill} pointerEvents="none">
-                <Ionicons name="chevron-up" size={10} color="#94a3b8" />
+                <Ionicons name="chevron-up" size={10} color="#64748b" />
                 <Ionicons name="swap-vertical" size={12} color="#ea580c" />
-                <Ionicons name="chevron-down" size={10} color="#94a3b8" />
+                <Ionicons name="chevron-down" size={10} color="#64748b" />
               </View>
 
               {activeTab === 'info' ? (
@@ -586,21 +618,92 @@ export default function ListingFeedScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.locBox}>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Şehir</Text>
-                    <Text style={styles.infoValue}>{item.location.city}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>İlçe / Mahalle</Text>
-                    <Text style={styles.infoValue}>{item.location.district || 'Merkez'}</Text>
-                  </View>
+                <View style={styles.expertiseContainer}>
+                  {/* Left: Interactive Compact Vehicle Body SVG */}
                   <TouchableOpacity
-                    onPress={() => router.push(`/listings/${item.id}` as any)}
-                    style={styles.detailLink}
+                    onPress={() => setSelectedExpertiseItem(item)}
+                    style={styles.compactSvgBox}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.locLinkText}>Haritada Göster ➔</Text>
+                    <CompactMobileVehicleBodySvg
+                      localPaintedParts={item.localPaintedParts}
+                      paintedParts={item.paintedParts}
+                      changedParts={item.changedParts}
+                      width={38}
+                      height={76}
+                    />
                   </TouchableOpacity>
+
+                  {/* Right: Damage Status Breakdown */}
+                  <View style={styles.expertiseInfoBox}>
+                    {(() => {
+                      const localList = item.localPaintedParts || [];
+                      const paintedList = item.paintedParts || [];
+                      const changedList = item.changedParts || [];
+                      const hasIssues = localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+
+                      if (!hasIssues) {
+                        return (
+                          <View style={{ justifyContent: 'center', height: '100%', gap: 2 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Ionicons name="shield-checkmark" size={13} color="#10b981" />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#10b981' }}>
+                                Hatasız & Orijinal
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 9.5, color: '#64748b' }} numberOfLines={1}>
+                              Boya veya değişen parçası yoktur.
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => setSelectedExpertiseItem(item)}
+                              style={{ alignSelf: 'flex-start', marginTop: 2 }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
+                                Detaylı Şemayı Gör ➔
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+
+                      return (
+                        <View style={{ justifyContent: 'space-evenly', height: '100%' }}>
+                          {localList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#d97706' }]}>Lokal ({localList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#b45309' }]} numberOfLines={1}>
+                                {localList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
+                          {paintedList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#2563eb' }]}>Boyalı ({paintedList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#1d4ed8' }]} numberOfLines={1}>
+                                {paintedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
+                          {changedList.length > 0 && (
+                            <View style={styles.infoRowCompact}>
+                              <Text style={[styles.infoLabelCompact, { color: '#dc2626' }]}>Değişen ({changedList.length})</Text>
+                              <Text style={[styles.infoValCompact, { color: '#b91c1c' }]} numberOfLines={1}>
+                                {changedList.map((p) => PART_LABELS[p] || p).join(', ')}
+                              </Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            onPress={() => setSelectedExpertiseItem(item)}
+                            style={{ alignSelf: 'flex-end', marginTop: 1 }}
+                          >
+                            <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#ea580c' }}>
+                              Detaylı Şemayı Gör ➔
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })()}
+                  </View>
                 </View>
               )}
             </View>
@@ -627,7 +730,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnOutline}
                 activeOpacity={0.8}
               >
-                <Ionicons name="document-text-outline" size={16} color="#0f172a" style={{ marginRight: 6 }} />
+                <Ionicons name="document-text-outline" size={17} color="#0f172a" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextOutline}>İlana Git</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -635,7 +738,7 @@ export default function ListingFeedScreen() {
                 style={styles.ctaBtnSolid}
                 activeOpacity={0.85}
               >
-                <Ionicons name="chatbubbles-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                <Ionicons name="chatbubble-ellipses-outline" size={17} color="#ffffff" style={{ marginRight: 6 }} />
                 <Text style={styles.ctaTextSolid}>Mesaj Gönder</Text>
               </TouchableOpacity>
             </View>
@@ -647,7 +750,7 @@ export default function ListingFeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <StatusBar barStyle="dark-content" backgroundColor="#f0f4f9" />
       {loading && listings.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#ea580c" />
@@ -700,6 +803,52 @@ export default function ListingFeedScreen() {
           />
         </View>
       )}
+
+      {/* Full Expertise / Condition Modal */}
+      {selectedExpertiseItem && (
+        <Modal
+          visible={!!selectedExpertiseItem}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSelectedExpertiseItem(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="shield-checkmark" size={20} color="#ea580c" />
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    Ekspertiz ve Boya/Değişen Durumu
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedExpertiseItem(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={22} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ maxHeight: windowHeight * 0.72 }} showsVerticalScrollIndicator={false}>
+                <VehicleConditionVisualizer
+                  paintedParts={selectedExpertiseItem.paintedParts}
+                  changedParts={selectedExpertiseItem.changedParts}
+                  localPaintedParts={selectedExpertiseItem.localPaintedParts}
+                  damageRecord={selectedExpertiseItem.damageRecord || undefined}
+                  tramerAmount={selectedExpertiseItem.tramerAmount || 0}
+                />
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => setSelectedExpertiseItem(null)}
+                style={styles.modalDoneBtn}
+              >
+                <Text style={styles.modalDoneText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -707,14 +856,14 @@ export default function ListingFeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0f4f9',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0f4f9',
   },
   loadingText: {
     marginTop: 12,
@@ -751,18 +900,18 @@ const styles = StyleSheet.create({
   },
   feedWrapper: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0f4f9',
   },
   feedList: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f0f4f9',
   },
   cardContainer: {
     width: windowWidth,
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingTop: 4,
-    paddingBottom: 8,
+    backgroundColor: '#f0f4f9',
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
     justifyContent: 'space-between',
   },
   topActions: {
@@ -770,22 +919,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingBottom: 4,
+    paddingBottom: 6,
   },
   gearCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#ea580c',
+    backgroundColor: '#2563eb',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#ea580c',
+    shadowColor: '#2563eb',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 4,
   },
-  actionCircularBtn: {
+  darkCircularBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -796,12 +945,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 3,
     elevation: 2,
   },
   feedTitle: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: 1.2,
@@ -819,36 +968,36 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'space-between',
     position: 'relative',
-    shadowColor: '#000000',
+    shadowColor: '#64748b',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
   cardContentTop: {
-    gap: 8,
+    gap: 7,
   },
   cardContentBottom: {
-    gap: 8,
+    gap: 6,
   },
   scrollGuidePill: {
     position: 'absolute',
     right: 8,
     top: '50%',
     transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 10,
-    paddingHorizontal: 4,
+    borderRadius: 12,
+    paddingHorizontal: 3.5,
     paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 3,
     zIndex: 30,
   },
@@ -857,8 +1006,6 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     backgroundColor: '#f1f5f9',
     position: 'relative',
   },
@@ -877,18 +1024,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   urgentPillBadge: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 9,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3.5,
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    shadowColor: '#dc2626',
+    shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -907,27 +1052,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   showcasePillBadge: {
-    backgroundColor: '#d97706',
-    paddingHorizontal: 9,
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3.5,
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-    shadowColor: '#d97706',
+    shadowColor: '#f59e0b',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.35,
     shadowRadius: 4,
     elevation: 3,
   },
   showcaseStar: {
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 10,
+    fontWeight: 'bold',
   },
   showcasePillText: {
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 10.5,
     fontWeight: '900',
     letterSpacing: 0.6,
@@ -940,13 +1084,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   photoCountText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#f8fafc',
+    color: '#ffffff',
   },
   carouselBtns: {
     position: 'absolute',
@@ -962,17 +1104,15 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailsContainer: {
-    marginTop: 6,
+    marginTop: 4,
     gap: 2,
   },
   titleText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: 0.2,
@@ -983,27 +1123,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
   },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   infoSubText: {
     fontSize: 11,
     color: '#64748b',
     fontWeight: '600',
   },
   breadcrumbContainer: {
-    marginTop: 5,
+    marginTop: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#dbeafe',
     borderRadius: 8,
   },
   breadcrumbText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#1d4ed8',
+    color: '#2563eb',
   },
   tabBar: {
-    marginTop: 6,
+    marginTop: 4,
     flexDirection: 'row',
     gap: 8,
   },
@@ -1017,21 +1161,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabButtonActive: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#ffffff',
     borderColor: '#ea580c',
+    borderWidth: 1.5,
   },
   tabButtonText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#64748b',
   },
   tabButtonTextActive: {
     color: '#ea580c',
+    fontWeight: '800',
   },
   tabContentContainer: {
-    marginTop: 6,
+    marginTop: 4,
     height: 94,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 10,
@@ -1049,13 +1195,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
     paddingVertical: 1.5,
   },
   infoLabel: {
     fontSize: 11,
     color: '#64748b',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: 11,
@@ -1063,18 +1209,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   infoValuePrice: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#ea580c',
   },
   descriptionCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginTop: 8,
+    marginTop: 4,
     gap: 4,
   },
   descriptionCardHeader: {
@@ -1118,19 +1264,14 @@ const styles = StyleSheet.create({
   },
   ctaBtnOutline: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#cbd5e1',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
   },
   ctaTextOutline: {
     fontSize: 12.5,
@@ -1138,8 +1279,8 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   ctaBtnSolid: {
-    flex: 1,
-    paddingVertical: 11,
+    flex: 1.2,
+    paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#ea580c',
     flexDirection: 'row',
@@ -1147,7 +1288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#ea580c',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.35,
     shadowRadius: 5,
     elevation: 3,
   },
@@ -1155,5 +1296,93 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '900',
     color: '#ffffff',
+  },
+  expertiseContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 28,
+    gap: 8,
+  },
+  compactSvgBox: {
+    width: 44,
+    height: 82,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 2,
+  },
+  expertiseInfoBox: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'space-evenly',
+  },
+  infoRowCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingVertical: 1,
+  },
+  infoLabelCompact: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoValCompact: {
+    fontSize: 10,
+    fontWeight: '700',
+    maxWidth: 140,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#0f172a',
+    maxWidth: 260,
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalDoneBtn: {
+    backgroundColor: '#ea580c',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalDoneText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

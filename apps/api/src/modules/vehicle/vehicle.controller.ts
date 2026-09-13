@@ -37,6 +37,48 @@ export class VehicleController {
     return this.vehicleService.getModels(brandId);
   }
 
+  @Get('engines')
+  @ApiOperation({ summary: 'Modele Ait Motor Seçeneklerini Al' })
+  @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })
+  @ApiQuery({ name: 'minYear', required: false, description: 'Min Yıl' })
+  @ApiQuery({ name: 'maxYear', required: false, description: 'Max Yıl' })
+  @ApiQuery({ name: 'year', required: false, description: 'Belirli Yıl' })
+  getEngines(
+    @Query('modelId') modelId: string,
+    @Query('minYear') minYear?: string,
+    @Query('maxYear') maxYear?: string,
+    @Query('year') year?: string,
+  ) {
+    if (!modelId) {
+      throw new BadRequestException('modelId query parametresi gereklidir.');
+    }
+    const minY = minYear ? parseInt(minYear, 10) : year ? parseInt(year, 10) : undefined;
+    const maxY = maxYear ? parseInt(maxYear, 10) : year ? parseInt(year, 10) : undefined;
+    return this.vehicleService.getEngines(modelId, minY, maxY);
+  }
+
+  @Get('trims')
+  @ApiOperation({ summary: 'Modele ve İsteğe Bağlı Motora Ait Donanım Paketlerini Al' })
+  @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })
+  @ApiQuery({ name: 'engineId', required: false, description: 'Motor UUIDsi' })
+  @ApiQuery({ name: 'minYear', required: false, description: 'Min Yıl' })
+  @ApiQuery({ name: 'maxYear', required: false, description: 'Max Yıl' })
+  @ApiQuery({ name: 'year', required: false, description: 'Belirli Yıl' })
+  getTrims(
+    @Query('modelId') modelId: string,
+    @Query('engineId') engineId?: string,
+    @Query('minYear') minYear?: string,
+    @Query('maxYear') maxYear?: string,
+    @Query('year') year?: string,
+  ) {
+    if (!modelId) {
+      throw new BadRequestException('modelId query parametresi gereklidir.');
+    }
+    const minY = minYear ? parseInt(minYear, 10) : year ? parseInt(year, 10) : undefined;
+    const maxY = maxYear ? parseInt(maxYear, 10) : year ? parseInt(year, 10) : undefined;
+    return this.vehicleService.getTrims(modelId, engineId, minY, maxY);
+  }
+
   @Get('variants')
   @ApiOperation({ summary: 'Modele Ait Varyantları Al' })
   @ApiQuery({ name: 'modelId', required: true, description: 'Model UUIDsi' })

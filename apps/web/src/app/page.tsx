@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import BuyerPackagesSection from "../components/BuyerPackagesSection";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
 import { vehicleTaxonomyApi } from "@/services/vehicleTaxonomyApi";
@@ -933,14 +934,12 @@ export default function Home() {
                             (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                           }}
                         />
-                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
+                        <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
                           {listing.isUrgent && (
-                            <UrgentListingBadge size="small" animated />
+                            <UrgentListingBadge size="sm" animated />
                           )}
                           {listing.isShowcaseFeedActive && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow border border-amber-300/40">
-                              ⭐ Vitrin
-                            </span>
+                            <ShowcaseBadge size="sm" />
                           )}
                           {listing.isAiReady && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 flex items-center gap-1 shadow">

@@ -3,7 +3,8 @@
 import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
 
 function LoginContent() {
   const router = useRouter();
@@ -15,6 +16,7 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
 
   const redirectTarget = searchParams.get("redirect") || "/";
+  const isExpired = searchParams.get("expired") === "1";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +57,12 @@ function LoginContent() {
           <h1 className="text-2xl font-black text-slate-200">Giriş Yap</h1>
           <p className="text-xs text-slate-400 mt-1">Lütfen hesabınıza ait giriş bilgilerini girin.</p>
         </div>
+
+        {isExpired && !error && (
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs px-4 py-3 rounded-xl font-semibold">
+            ⏱️ Oturum süreniz doldu. Güvenliğiniz için lütfen tekrar giriş yapın.
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl font-semibold">

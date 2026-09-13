@@ -402,9 +402,7 @@ export default function ListingDetailScreen() {
       })
     : '05.09.2026';
 
-  const listingNumber =
-    listing.listingNo ||
-    (listing.id ? listing.id.substring(0, 8).toUpperCase() : '-');
+  const listingNumber = listing.listingNo || '-';
 
   const sellerTypeLabel =
     listing.sellerType === 'DEALER'

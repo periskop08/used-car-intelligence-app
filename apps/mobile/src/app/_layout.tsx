@@ -1,11 +1,13 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export default function RootLayout() {
   return (
-    <View style={styles.container}>
-      <Stack
+    <ErrorBoundary>
+      <View style={styles.container}>
+        <Stack
         screenOptions={{
           headerStyle: {
             backgroundColor: '#ffffff',
@@ -43,7 +45,8 @@ export default function RootLayout() {
         <Stack.Screen name="ilan-akisi" options={{ title: 'İlan Akışı', headerBackTitle: 'Geri', headerShown: false }} />
       </Stack>
     </View>
-  );
+  </ErrorBoundary>
+);
 }
 
 const styles = StyleSheet.create({

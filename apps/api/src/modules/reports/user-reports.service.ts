@@ -111,7 +111,7 @@ export class UserReportsService {
       if (!user) throw new NotFoundException('Kullanıcı bulunamadı.');
 
       const yearMonth = user.createdAt ? `${new Date(user.createdAt).getFullYear().toString().slice(-2)}${(new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
-      const customerNoFormatted = user.customerNo || `TS-${yearMonth}-000001`;
+      const customerNoFormatted = user.customerNo || `TSU-${yearMonth}-000001`;
 
       return {
         profile: {

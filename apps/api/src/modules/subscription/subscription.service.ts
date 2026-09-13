@@ -905,7 +905,7 @@ export class SubscriptionService {
 
     const formattedUsers = users.map((u) => {
       const yearMonth = u.createdAt ? `${new Date(u.createdAt).getFullYear().toString().slice(-2)}${(new Date(u.createdAt).getMonth() + 1).toString().padStart(2, '0')}` : '2607';
-      const customerNo = u.customerNo || `TS-${yearMonth}-000001`;
+      const customerNo = u.customerNo || `TSU-${yearMonth}-000001`;
       return {
         id: u.id,
         customerNo,

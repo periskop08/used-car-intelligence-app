@@ -105,14 +105,14 @@ export class ListingModerationService implements OnModuleInit {
     if (user?.customerNo) return user.customerNo;
     const year = user?.createdAt ? new Date(user.createdAt).getFullYear().toString().slice(-2) : '26';
     const month = user?.createdAt ? (new Date(user.createdAt).getMonth() + 1).toString().padStart(2, '0') : '07';
-    return `TS-${year}${month}-000001`;
+    return `TSU-${year}${month}-000001`;
   }
 
   private formatPublicListingNo(listing: any): string {
-    const year = listing.createdAt ? new Date(listing.createdAt).getFullYear().toString().slice(-2) : '26';
-    const month = listing.createdAt ? (new Date(listing.createdAt).getMonth() + 1).toString().padStart(2, '0') : '08';
-    const num = listing.id ? listing.id.replace(/-/g, '').substring(0, 6).toUpperCase() : '000000';
-    return `TS-ILAN-${year}${month}-${num}`;
+    if (listing?.listingNo) return listing.listingNo;
+    const year = listing?.createdAt ? new Date(listing.createdAt).getFullYear().toString().slice(-2) : '26';
+    const month = listing?.createdAt ? (new Date(listing.createdAt).getMonth() + 1).toString().padStart(2, '0') : '08';
+    return `TSIN-${year}${month}-000001`;
   }
 
   public async getAuthoritativeListingDurationDays(sellerId?: string, tier?: string): Promise<number> {
@@ -175,6 +175,7 @@ export class ListingModerationService implements OnModuleInit {
         ...(pkg ? { subscriptionTier: pkg } : {}),
         ...(search ? {
           OR: [
+            { customerNo: { contains: search, mode: 'insensitive' } },
             { firstName: { contains: search, mode: 'insensitive' } },
             { lastName: { contains: search, mode: 'insensitive' } },
             { username: { contains: search, mode: 'insensitive' } },
@@ -449,7 +450,8 @@ export class ListingModerationService implements OnModuleInit {
     return {
       listing: {
         id: l.id,
-        publicListingNo: this.formatPublicListingNo(l),
+        listingNo: l.listingNo || this.formatPublicListingNo(l),
+        publicListingNo: l.listingNo || this.formatPublicListingNo(l),
         title: l.title,
         brand,
         model,
@@ -980,6 +982,7 @@ export class ListingModerationService implements OnModuleInit {
     if (query.search) {
       const s = query.search.trim();
       where.OR = [
+        { listingNo: { contains: s, mode: 'insensitive' } },
         { id: { contains: s, mode: 'insensitive' } },
         { title: { contains: s, mode: 'insensitive' } },
         { city: { contains: s, mode: 'insensitive' } },

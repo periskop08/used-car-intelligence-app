@@ -207,7 +207,7 @@ export function ClubCommentDrawer({
                   {comment.authorFormatted || comment.author?.name || 'Kullanıcı'}
                 </span>
                 <span className="text-slate-400 text-[11px] font-mono">
-                  {comment.author?.customerNo || 'TS-MEMBER'} · {comment.author?.email || '—'}
+                  {comment.author?.customerNo || 'TSU-MEMBER'} · {comment.author?.email || '—'}
                 </span>
               </div>
               {onOpenUserDrawer && comment.author?.id && (

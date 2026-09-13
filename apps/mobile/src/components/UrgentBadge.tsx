@@ -1,40 +1,43 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Animated } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-interface UrgentBadgeProps {
-  size?: 'small' | 'medium';
+export interface UrgentBadgeProps {
+  size?: 'xs' | 'small' | 'sm' | 'medium' | 'md' | 'lg';
+  animated?: boolean;
 }
 
-export default function UrgentBadge({ size = 'small' }: UrgentBadgeProps) {
+export default function UrgentBadge({ size = 'small', animated = true }: UrgentBadgeProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
+    if (!animated) return;
+
     const animation = Animated.loop(
       Animated.parallel([
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.08,
-            duration: 700,
+            duration: 750,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 700,
+            duration: 750,
             useNativeDriver: true,
           }),
         ]),
         Animated.sequence([
-          Animated.timing(opacityAnim, {
-            toValue: 0.8,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacityAnim, {
+          Animated.timing(glowAnim, {
             toValue: 1,
-            duration: 700,
-            useNativeDriver: true,
+            duration: 750,
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.7,
+            duration: 750,
+            useNativeDriver: false,
           }),
         ]),
       ])
@@ -42,78 +45,52 @@ export default function UrgentBadge({ size = 'small' }: UrgentBadgeProps) {
     animation.start();
 
     return () => animation.stop();
-  }, [pulseAnim, opacityAnim]);
+  }, [pulseAnim, glowAnim, animated]);
 
-  const isMedium = size === 'medium';
+  const isXs = size === 'xs';
+  const isMd = size === 'medium' || size === 'md';
+  const isLg = size === 'lg';
+
+  const dimension = isXs ? 18 : isMd ? 28 : isLg ? 34 : 22;
+  const iconSize = isXs ? 12 : isMd ? 18 : isLg ? 22 : 14;
+  const radius = isXs ? 4 : isMd ? 7 : isLg ? 8 : 5.5;
 
   return (
     <Animated.View
+      accessible={true}
+      accessibilityLabel="Acil İlan"
+      accessibilityRole="alert"
       style={[
         styles.badgeContainer,
-        isMedium && styles.badgeContainerMedium,
         {
+          width: dimension,
+          height: dimension,
+          borderRadius: radius,
           transform: [{ scale: pulseAnim }],
-          opacity: opacityAnim,
+          shadowOpacity: animated ? glowAnim : 0.4,
         },
       ]}
     >
-      {/* Blinking White Dot */}
-      <View style={styles.dotWrap}>
-        <View style={styles.blinkingDot} />
-      </View>
-
-      <Ionicons name="flame" size={isMedium ? 13 : 11} color="#ffffff" />
-      <Text style={[styles.badgeText, isMedium && styles.badgeTextMedium]}>
-        ACİL
-      </Text>
+      <MaterialCommunityIcons
+        name="alarm-light"
+        size={iconSize}
+        color="#ffffff"
+      />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   badgeContainer: {
-    flexDirection: 'row',
+    aspectRatio: 1,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     backgroundColor: '#dc2626',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: 'rgba(254, 202, 202, 0.7)',
     shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 4,
-  },
-  badgeContainerMedium: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  dotWrap: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 1,
-  },
-  blinkingDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ffffff',
-  },
-  badgeText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 0.6,
-  },
-  badgeTextMedium: {
-    fontSize: 11,
   },
 });

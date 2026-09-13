@@ -402,7 +402,7 @@ export function AdminUserDrawer({
                     {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || 'Kullanıcı'}
                   </h2>
                   <span className="text-xs font-mono font-bold text-orange-400 block mt-0.5">
-                    {user?.customerNo || 'TS-Müşteri'}
+                    {user?.customerNo || 'TSU-Müşteri'}
                   </span>
                 </div>
               </div>
@@ -686,7 +686,7 @@ export function AdminUserDrawer({
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <span className="text-[10px] font-mono text-orange-400 font-bold block">{l.id.slice(0, 12)}</span>
+                                  <span className="text-[10px] font-mono text-orange-400 font-bold block">{l.listingNo || l.id}</span>
                                   <strong className="text-white font-bold text-sm block mt-0.5 group-hover:text-orange-300 transition">
                                     {vehicleTitle}
                                   </strong>
@@ -952,7 +952,7 @@ export function AdminUserDrawer({
             <div className="flex justify-between items-start pb-3 border-b border-white/10">
               <div>
                 <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
-                  İLAN NO: {moderationActionListing.id.slice(0, 12)}
+                  İLAN NO: {moderationActionListing.listingNo || moderationActionListing.id}
                 </span>
                 <h3 className="text-base font-bold text-white mt-1">
                   {moderationActionType === 'REQUEST_REVISION'
@@ -1066,7 +1066,7 @@ export function AdminUserDrawer({
             <div className="flex justify-between items-start pb-3 border-b border-white/10">
               <div>
                 <span className="text-[10px] font-mono text-orange-400 font-bold uppercase block">
-                  İLAN NO: {historyListing.id.slice(0, 12)}
+                  İLAN NO: {historyListing.listingNo || historyListing.id}
                 </span>
                 <h3 className="text-base font-bold text-white mt-1">İlan Moderasyon Geçmişi</h3>
               </div>

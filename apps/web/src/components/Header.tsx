@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { formatImageUrl } from "../utils/media";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
 
 export default function Header() {
   const pathname = usePathname();
@@ -63,7 +64,15 @@ export default function Header() {
       fetch(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then(res => (res.ok ? res.json() : null))
+        .then(res => {
+          if (res.status === 401) {
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("user");
+            setUser(null);
+            return null;
+          }
+          return res.ok ? res.json() : null;
+        })
         .then(freshUser => {
           if (freshUser) {
             setUser(prev => {

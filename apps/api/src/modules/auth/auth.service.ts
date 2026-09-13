@@ -49,7 +49,7 @@ export class AuthService implements OnModuleInit {
     });
 
     const seqStr = String(updatedCounter.counter).padStart(6, '0');
-    return `TS-${period}-${seqStr}`;
+    return `TSU-${period}-${seqStr}`;
   }
 
   async register(dto: RegisterDto) {

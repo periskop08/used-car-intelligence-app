@@ -62,7 +62,7 @@ export default function ClubUserSearch({ onSelectUser }: ClubUserSearchProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Müşteri No (TS-2608-000123), Ad Soyad veya Kullanıcı Adı yazın..."
+          placeholder="Müşteri No (TSU-2608-000123), Ad Soyad veya Kullanıcı Adı yazın..."
           className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition font-mono"
         />
         {searching && (
