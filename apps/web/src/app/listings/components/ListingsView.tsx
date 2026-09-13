@@ -89,7 +89,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   const [listings, setListings] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [token, setToken] = useState("");
   const [preferenceProfileId, setPreferenceProfileId] = useState("");
@@ -1259,7 +1259,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           {/* Toolbar */}
           <div className="flex items-center justify-between bg-slate-950/20 border border-white/5 px-6 py-4 rounded-2xl">
             <span className="text-xs font-bold text-slate-400">
-              {loading ? "Yükleniyor..." : `${total} İlan Bulundu`}
+              {loading || isUrlHydrating ? "İlanlar hazırlanıyor..." : `${total} İlan Bulundu`}
             </span>
 
             <div className="flex items-center gap-2">
@@ -1289,10 +1289,10 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           )}
 
           {/* Grid list */}
-          {loading ? (
+          {loading || isUrlHydrating ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4">
               <span className="animate-spin text-3xl">⏳</span>
-              <span className="text-slate-400 font-bold text-sm">İlanlar yükleniyor, lütfen bekleyin...</span>
+              <span className="text-slate-400 font-bold text-sm">İlanlar hazırlanıyor, lütfen bekleyin...</span>
             </div>
           ) : listings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4 border border-dashed border-white/10 rounded-3xl bg-slate-950/5">
