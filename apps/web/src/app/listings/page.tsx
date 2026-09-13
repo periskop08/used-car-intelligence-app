@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ListingFilters from "../../components/listings/ListingFilters";
 import UrgentListingBadge from "../../components/listings/UrgentListingBadge";
+import ShowcaseBadge from "../../components/listings/ShowcaseBadge";
 import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
 import {
@@ -1077,14 +1078,12 @@ function ListingsContent() {
                           (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
                         }}
                       />
-                      <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
+                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
                         {listing.isUrgent && (
-                          <UrgentListingBadge size="small" animated />
+                          <UrgentListingBadge size="sm" animated />
                         )}
                         {listing.isShowcaseFeedActive && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
-                            ⭐ Vitrin
-                          </span>
+                          <ShowcaseBadge size="sm" />
                         )}
                         {listing.isAiReady && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md flex items-center gap-1">

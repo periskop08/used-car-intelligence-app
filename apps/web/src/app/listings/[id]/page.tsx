@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Send, MessageSquare, Phone, User, CheckCircle2, AlertCircle, X, Heart, ListFilter, ChevronUp, ChevronDown, Wrench, Sparkles, FileText } from "lucide-react";
 import ListingAiAdvisorCard from "../components/ListingAiAdvisorCard";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import IsiCepteListingRecommendationWidget from "../components/IsiCepteListingRecommendationWidget";
 import SimilarListingsWidget from "../components/SimilarListingsWidget";
 import { formatCurrency } from "@/utils/formatters";
@@ -242,7 +243,8 @@ export default function ListingDetail() {
             <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
-              {listing.isUrgent && <UrgentListingBadge size="medium" animated />}
+              {listing.isUrgent && <UrgentListingBadge size="md" animated withTooltip />}
+              {listing.isShowcaseFeedActive && <ShowcaseBadge size="md" withTooltip />}
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-full">
                 ❤️ {listing.favoriteCount || 0} Favori
               </span>

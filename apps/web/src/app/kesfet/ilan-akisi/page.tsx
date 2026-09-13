@@ -22,6 +22,8 @@ import {
   VehicleBodyConditionMap,
   CompactVehicleBodySvg,
 } from "@/components/VehicleBodyConditionMap";
+import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import {
   BODY_PART_LABELS,
   VehicleBodyPart,
@@ -541,21 +543,16 @@ function FeedCardDeck() {
             />
 
             {/* Top-Left Badges: Acil & Vitrin */}
-            <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2 flex-wrap">
-              {currentItem.isUrgent && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-600 text-white font-black text-[10px] uppercase tracking-wider shadow-lg border border-red-400/50 animate-pulse">
-                  <span>•</span>
-                  <span>🔥</span>
-                  <span>ACİL</span>
-                </div>
-              )}
-              {currentItem.isShowcaseFeedActive && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-lg border border-amber-300">
-                  <span>★</span>
-                  <span>VİTRİN</span>
-                </div>
-              )}
-            </div>
+            {(currentItem.isUrgent || currentItem.isShowcaseFeedActive) && (
+              <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2">
+                {currentItem.isUrgent && (
+                  <UrgentListingBadge size="md" animated />
+                )}
+                {currentItem.isShowcaseFeedActive && (
+                  <ShowcaseBadge size="md" />
+                )}
+              </div>
+            )}
 
             {/* Photo Counter */}
             {currentItem.photos.length > 1 && (

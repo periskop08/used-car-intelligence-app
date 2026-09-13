@@ -3,6 +3,7 @@
 import React from "react";
 import { CheckCircle2, Star, Flame, AlertCircle } from "lucide-react";
 import UrgentListingBadge from "./UrgentListingBadge";
+import ShowcaseBadge from "./ShowcaseBadge";
 
 export type PromotionSku = "URGENT_LISTING" | "SHOWCASE_FEED" | "URGENT_SHOWCASE_BUNDLE" | null;
 
@@ -81,9 +82,7 @@ export default function ListingPromotionCards({
           {/* Header */}
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-1 rounded-lg bg-red-500/10 border border-red-500/20">
-                <UrgentListingBadge size="small" animated />
-              </div>
+              <UrgentListingBadge size="md" animated />
               <h4 className="font-extrabold text-white text-base">Acil İlan</h4>
             </div>
             <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${
@@ -124,9 +123,7 @@ export default function ListingPromotionCards({
         >
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-3">
-              <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <Star className="w-5 h-5" />
-              </span>
+              <ShowcaseBadge size="md" />
               <h4 className="font-extrabold text-white text-base">Vitrin + Akış</h4>
             </div>
             <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${
@@ -172,9 +169,10 @@ export default function ListingPromotionCards({
 
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-3">
-              <span className="p-2 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                <Flame className="w-5 h-5" />
-              </span>
+              <div className="flex items-center gap-1.5">
+                <UrgentListingBadge size="sm" animated />
+                <ShowcaseBadge size="sm" />
+              </div>
               <h4 className="font-extrabold text-white text-base">Hızlı Satış</h4>
             </div>
             <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition shrink-0 ${

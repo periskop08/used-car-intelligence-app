@@ -3,6 +3,8 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { Car } from "lucide-react";
+import UrgentListingBadge from "./UrgentListingBadge";
+import ShowcaseBadge from "./ShowcaseBadge";
 
 export interface CompactListingData {
   id: string;
@@ -117,28 +119,22 @@ export default function CompactListingCard({
           </div>
         )}
 
-        {/* Small ACİL Chip (strictly top-left, compact size ~60% of original, never covers vehicle) */}
-        {listing.isUrgent && (
-          <span
-            className={`absolute top-1 left-1 z-10 inline-flex items-center ${
-              isSidebar
-                ? "gap-0.5 px-1 py-0.2 text-[8px]"
-                : "gap-1 px-1.5 py-0.5 text-[9px]"
-            } rounded bg-red-600/95 text-white font-extrabold tracking-wider uppercase shadow-md border border-red-400/40 backdrop-blur-xs`}
-          >
-            <span
-              className={`${
-                isSidebar ? "w-1 h-1" : "w-1.5 h-1.5"
-              } rounded-full bg-white animate-pulse shrink-0`}
-            />
-            <span>ACİL</span>
-          </span>
+        {/* Compact Badges (strictly top-left corner, icon-only, never covers vehicle) */}
+        {(listing.isUrgent || listing.isShowcaseFeedActive) && (
+          <div className="absolute top-1 left-1 z-10 flex items-center gap-1">
+            {listing.isUrgent && (
+              <UrgentListingBadge size={isSidebar ? "xs" : "sm"} />
+            )}
+            {listing.isShowcaseFeedActive && (
+              <ShowcaseBadge size={isSidebar ? "xs" : "sm"} />
+            )}
+          </div>
         )}
       </div>
 
-      {/* 2. RIGHT TEXT COLUMN (Title + VİTRİN chip, Year/Km/Location, Price) */}
+      {/* 2. RIGHT TEXT COLUMN (Title, Year/Km/Location, Price) */}
       <div className="flex flex-col min-w-0 flex-1 justify-center py-0.5">
-        {/* Row 1: Title + Small VİTRİN Chip (Next to title, NEVER on thumbnail) */}
+        {/* Row 1: Title */}
         <div className="flex items-center gap-1.5 min-w-0">
           <h4
             className={`${
@@ -148,16 +144,6 @@ export default function CompactListingCard({
           >
             {listing.title}
           </h4>
-          {listing.isShowcaseFeedActive && (
-            <span
-              className={`shrink-0 inline-flex items-center gap-0.5 ${
-                isSidebar ? "px-1 py-0.2 text-[7.5px]" : "px-1.5 py-0.5 text-[8px]"
-              } rounded-md bg-amber-500 text-slate-950 font-black uppercase tracking-wider shadow-xs border border-amber-300`}
-            >
-              <span className="text-[8px]">⭐</span>
-              <span>VİTRİN</span>
-            </span>
-          )}
         </div>
 
         {/* Row 2: Year • Km • Location */}

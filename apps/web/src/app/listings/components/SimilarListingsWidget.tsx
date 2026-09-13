@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 
 import CompactListingCard from '@/components/listings/CompactListingCard';
+import UrgentListingBadge from '@/components/listings/UrgentListingBadge';
+import ShowcaseBadge from '@/components/listings/ShowcaseBadge';
 
 interface SimilarListingItem {
   id: string;
@@ -277,11 +279,11 @@ export default function SimilarListingsWidget({
                         <span className="absolute top-1.5 left-1.5 bg-black/70 backdrop-blur-sm text-white text-[9px] font-mono px-1.5 py-0.5 rounded font-bold">
                           #{idx + 1}
                         </span>
-                        {car.isUrgent && (
-                          <span className="absolute top-1.5 right-1.5 z-10 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600/95 text-white font-extrabold text-[9px] tracking-wider uppercase shadow-md border border-red-400/40">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
-                            <span>ACİL</span>
-                          </span>
+                        {(car.isUrgent || car.isShowcaseFeedActive) && (
+                          <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                            {car.isUrgent && <UrgentListingBadge size="xs" />}
+                            {car.isShowcaseFeedActive && <ShowcaseBadge size="xs" />}
+                          </div>
                         )}
                       </div>
 
@@ -291,12 +293,6 @@ export default function SimilarListingsWidget({
                             <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-orange-400 transition truncate leading-snug">
                               {car.title}
                             </h4>
-                            {car.isShowcaseFeedActive && (
-                              <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[8px] uppercase tracking-wider shadow-xs border border-amber-300">
-                                <span className="text-[8.5px]">⭐</span>
-                                <span>VİTRİN</span>
-                              </span>
-                            )}
                           </div>
 
                           <div className="text-sm sm:text-base font-black text-orange-400 leading-tight">

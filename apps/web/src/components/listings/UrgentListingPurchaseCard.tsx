@@ -8,6 +8,7 @@ import {
   requestUrgentQuote 
 } from "../../lib/listing-promotion-api";
 import { AlertCircle, ShieldAlert, Sparkles, CheckCircle2 } from "lucide-react";
+import UrgentListingBadge from "./UrgentListingBadge";
 
 interface UrgentListingPurchaseCardProps {
   listingId?: string;
@@ -76,9 +77,7 @@ export default function UrgentListingPurchaseCard({
       {/* Top Banner */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-xl shrink-0">
-            🚨
-          </div>
+          <UrgentListingBadge size="md" animated />
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span>Acil İlan Hizmeti</span>

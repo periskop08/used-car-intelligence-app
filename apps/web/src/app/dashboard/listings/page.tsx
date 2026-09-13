@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import UrgentListingBadge from "@/components/listings/UrgentListingBadge";
+import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import ListingPromotionsManagement from "@/components/listings/ListingPromotionsManagement";
 import { AlertCircle, Trash2, X, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { formatImageUrl } from "@/utils/media";
@@ -562,12 +563,8 @@ function SellerDashboardContent() {
                     <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-base font-bold text-slate-200 truncate">{listing.title}</h2>
-                        {listing.isUrgent && <UrgentListingBadge size="small" />}
-                        {listing.isShowcaseFeedActive && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-500/90 text-slate-950 font-black text-[9px] uppercase tracking-wider shadow-lg border border-amber-300/40">
-                            ⭐ Vitrin
-                          </span>
-                        )}
+                        {listing.isUrgent && <UrgentListingBadge size="sm" />}
+                        {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
                         <span
                           className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
                             isResubmitted

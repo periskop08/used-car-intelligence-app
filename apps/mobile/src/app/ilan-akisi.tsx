@@ -496,22 +496,11 @@ export default function ListingFeedScreen() {
                 cachePolicy="memory-disk"
               />
 
-              {/* Promotional Badges: Urgent & Showcase (Pills as in screenshot) */}
+              {/* Promotional Badges: Urgent & Showcase */}
               {(item.isUrgent || item.isShowcaseFeedActive) && (
                 <View style={styles.promoBadgesWrap}>
-                  {item.isUrgent && (
-                    <View style={styles.urgentPillBadge}>
-                      <Text style={styles.urgentDot}>•</Text>
-                      <Text style={styles.urgentFire}>🔥</Text>
-                      <Text style={styles.urgentPillText}>ACİL</Text>
-                    </View>
-                  )}
-                  {item.isShowcaseFeedActive && (
-                    <View style={styles.showcasePillBadge}>
-                      <Text style={styles.showcaseStar}>★</Text>
-                      <Text style={styles.showcasePillText}>VİTRİN</Text>
-                    </View>
-                  )}
+                  {item.isUrgent && <UrgentBadge size="small" />}
+                  {item.isShowcaseFeedActive && <ShowcaseBadge size="small" />}
                 </View>
               )}
 
