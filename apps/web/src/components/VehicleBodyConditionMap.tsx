@@ -12,11 +12,12 @@ import {
 } from "@used-car-intelligence/shared";
 
 export interface VehicleBodyConditionMapProps {
-  mode: "editable" | "readOnly";
-  localPaintedParts?: string[] | null;
-  paintedParts?: string[] | null;
-  changedParts?: string[] | null;
-  onChange?: (updated: {
+  mode?: "editable" | "readOnly";
+  theme?: "dark" | "light";
+  localPaintedParts?: string[];
+  paintedParts?: string[];
+  changedParts?: string[];
+  onChange?: (data: {
     localPaintedParts: string[];
     paintedParts: string[];
     changedParts: string[];
@@ -27,6 +28,7 @@ export interface VehicleBodyConditionMapProps {
 
 export function VehicleBodyConditionMap({
   mode = "readOnly",
+  theme = "dark",
   localPaintedParts = [],
   paintedParts = [],
   changedParts = [],
@@ -34,6 +36,7 @@ export function VehicleBodyConditionMap({
   className = "",
   showTitle = true,
 }: VehicleBodyConditionMapProps) {
+  const isLight = theme === "light";
   const [hoveredPart, setHoveredPart] = useState<string>("");
   const [selectedPartForEdit, setSelectedPartForEdit] = useState<VehicleBodyPart | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -63,21 +66,41 @@ export function VehicleBodyConditionMap({
   const getPartColorClass = (part: VehicleBodyPart) => {
     const status = statusMap[part];
     if (status === BodyPartStatus.REPLACED) {
+      if (isLight) {
+        return mode === "editable"
+          ? "fill-red-500/35 stroke-red-600 hover:fill-red-500/50 cursor-pointer"
+          : "fill-red-500/35 stroke-red-600";
+      }
       return mode === "editable"
         ? "fill-red-500/40 stroke-red-400 hover:fill-red-500/55 cursor-pointer"
         : "fill-red-500/40 stroke-red-400";
     }
     if (status === BodyPartStatus.PAINTED) {
+      if (isLight) {
+        return mode === "editable"
+          ? "fill-blue-500/35 stroke-blue-600 hover:fill-blue-500/50 cursor-pointer"
+          : "fill-blue-500/35 stroke-blue-600";
+      }
       return mode === "editable"
         ? "fill-blue-500/40 stroke-blue-400 hover:fill-blue-500/55 cursor-pointer"
         : "fill-blue-500/40 stroke-blue-400";
     }
     if (status === BodyPartStatus.LOCAL_PAINTED) {
+      if (isLight) {
+        return mode === "editable"
+          ? "fill-amber-500/35 stroke-amber-600 hover:fill-amber-500/50 cursor-pointer"
+          : "fill-amber-500/35 stroke-amber-600";
+      }
       return mode === "editable"
         ? "fill-orange-500/40 stroke-orange-400 hover:fill-orange-500/55 cursor-pointer"
         : "fill-orange-500/40 stroke-orange-400";
     }
     // ORIGINAL - default unfilled
+    if (isLight) {
+      return mode === "editable"
+        ? "fill-white stroke-slate-300 hover:fill-slate-100 cursor-pointer"
+        : "fill-white stroke-slate-300";
+    }
     return mode === "editable"
       ? "fill-slate-900/50 stroke-white/10 hover:fill-slate-800/60 cursor-pointer"
       : "fill-slate-900/50 stroke-white/10";
@@ -130,10 +153,10 @@ export function VehicleBodyConditionMap({
     <div className={`flex flex-col gap-4 ${className}`}>
       {showTitle && (
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+          <span className={`text-xs font-black uppercase tracking-wider ${isLight ? "text-slate-900" : "text-slate-200"}`}>
             Boyalı veya Değişen Parça Görseli
           </span>
-          <p className="text-[11px] text-slate-400">
+          <p className={`text-[11px] ${isLight ? "text-slate-600" : "text-slate-400"}`}>
             {mode === "editable"
               ? "Aracın kaporta durumunu aşağıdaki görsel üzerinden ilgili parçalara tıklayarak seçebilirsiniz."
               : "Aracın ekspertiz ve kaporta durumu şeffaf olarak listelenmiştir."}
@@ -142,44 +165,60 @@ export function VehicleBodyConditionMap({
       )}
 
       {/* Legend */}
-      <div className="flex items-center gap-3.5 text-[10px] font-bold flex-wrap bg-slate-950/30 p-2.5 rounded-xl border border-white/5">
-        <span className="flex items-center gap-1.5 text-slate-400">
-          <span className="w-3 h-3 rounded bg-slate-900 border border-white/10 inline-block shadow-inner" />
+      <div className={`flex items-center gap-3.5 text-[10px] font-bold flex-wrap p-2.5 rounded-xl border ${
+        isLight
+          ? "bg-slate-50 border-slate-200"
+          : "bg-slate-950/30 border-white/5"
+      }`}>
+        <span className={`flex items-center gap-1.5 ${isLight ? "text-slate-700" : "text-slate-400"}`}>
+          <span className={`w-3 h-3 rounded inline-block shadow-xs ${
+            isLight ? "bg-white border border-slate-300" : "bg-slate-900 border border-white/10"
+          }`} />
           Orijinal
         </span>
-        <span className="flex items-center gap-1.5 text-orange-400">
-          <span className="w-3 h-3 rounded bg-orange-500/40 border border-orange-400 inline-block shadow-sm" />
+        <span className={`flex items-center gap-1.5 ${isLight ? "text-amber-800" : "text-orange-400"}`}>
+          <span className={`w-3 h-3 rounded inline-block shadow-xs ${
+            isLight ? "bg-amber-100 border border-amber-500" : "bg-orange-500/40 border border-orange-400"
+          }`} />
           Lokal Boyalı
         </span>
-        <span className="flex items-center gap-1.5 text-blue-400">
-          <span className="w-3 h-3 rounded bg-blue-500/40 border border-blue-400 inline-block shadow-sm" />
+        <span className={`flex items-center gap-1.5 ${isLight ? "text-blue-800" : "text-blue-400"}`}>
+          <span className={`w-3 h-3 rounded inline-block shadow-xs ${
+            isLight ? "bg-blue-100 border border-blue-500" : "bg-blue-500/40 border border-blue-400"
+          }`} />
           Boyalı
         </span>
-        <span className="flex items-center gap-1.5 text-red-400">
-          <span className="w-3 h-3 rounded bg-red-500/40 border border-red-400 inline-block shadow-sm" />
+        <span className={`flex items-center gap-1.5 ${isLight ? "text-red-800" : "text-red-400"}`}>
+          <span className={`w-3 h-3 rounded inline-block shadow-xs ${
+            isLight ? "bg-red-100 border border-red-500" : "bg-red-500/40 border border-red-400"
+          }`} />
           Değişen
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
         {/* Sol Kolon: SVG Araç Silüeti Haritası */}
-        <div className="md:col-span-6 flex flex-col items-center justify-center p-3 bg-slate-950/40 rounded-2xl border border-white/5 relative">
+        <div className={`md:col-span-6 flex flex-col items-center justify-center p-3 rounded-2xl border relative ${
+          isLight
+            ? "bg-slate-50/80 border-slate-200"
+            : "bg-slate-950/40 border-white/5"
+        }`}>
           <div className="relative w-[200px] h-[370px] flex items-center justify-center">
             <svg viewBox="0 0 200 370" className="w-full h-full drop-shadow-md select-none">
               {/* Car Body Outer Shell (Ghost Line) */}
               <path
                 d="M 50 35 C 50 25, 150 25, 150 35 C 165 60, 168 110, 162 180 C 168 250, 165 300, 152 350 C 150 360, 50 360, 48 350 C 35 300, 32 250, 38 180 C 32 110, 35 60, 50 35 Z"
-                fill="#0f172a"
-                stroke="#334155"
+                fill={isLight ? "#f1f5f9" : "#0f172a"}
+                stroke={isLight ? "#cbd5e1" : "#334155"}
                 strokeWidth="1.5"
-                className="opacity-70"
+                className={isLight ? "opacity-90" : "opacity-70"}
               />
 
               {/* Wheels */}
-              <rect x="23" y="60" width="14" height="32" rx="4" fill="#1e293b" />
-              <rect x="163" y="60" width="14" height="32" rx="4" fill="#1e293b" />
-              <rect x="23" y="280" width="14" height="32" rx="4" fill="#1e293b" />
-              <rect x="163" y="280" width="14" height="32" rx="4" fill="#1e293b" />
+              <rect x="23" y="60" width="14" height="32" rx="4" fill={isLight ? "#475569" : "#1e293b"} />
+              <rect x="163" y="60" width="14" height="32" rx="4" fill={isLight ? "#475569" : "#1e293b"} />
+              <rect x="23" y="280" width="14" height="32" rx="4" fill={isLight ? "#475569" : "#1e293b"} />
+              <rect x="163" y="280" width="14" height="32" rx="4" fill={isLight ? "#475569" : "#1e293b"} />
 
               {/* 1. FRONT BUMPER */}
               <path
@@ -404,7 +443,9 @@ export function VehicleBodyConditionMap({
           </div>
 
           {/* Hover Status Label Indicator */}
-          <span className="text-[11px] font-bold text-slate-400 min-h-[16px] block text-center mt-2">
+          <span className={`text-[11px] font-bold min-h-[16px] block text-center mt-2 ${
+            isLight ? "text-slate-600" : "text-slate-400"
+          }`}>
             {getHoverStatusText()}
           </span>
         </div>
@@ -412,23 +453,33 @@ export function VehicleBodyConditionMap({
         {/* Sağ Kolon: Seçilen Parçalar Özeti (3 Ayrı Grup) */}
         <div className="md:col-span-6 flex flex-col gap-3 h-full">
           {/* 1. LOKAL BOYALI PARÇALAR */}
-          <div className="flex flex-col gap-2 bg-slate-950/45 p-3.5 border border-white/5 rounded-2xl">
-            <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-orange-400" />
+          <div className={`flex flex-col gap-2 p-3.5 border rounded-2xl ${
+            isLight
+              ? "bg-amber-50/70 border-amber-200"
+              : "bg-slate-950/45 border-white/5"
+          }`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+              isLight ? "text-amber-900" : "text-orange-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isLight ? "bg-amber-600" : "bg-orange-400"}`} />
               Lokal Boyalı Parçalar ({localPaintedList.length})
             </span>
-            <ul className="text-xs text-slate-300 flex flex-col gap-1.5">
+            <ul className={`text-xs flex flex-col gap-1.5 ${isLight ? "text-slate-900" : "text-slate-300"}`}>
               {localPaintedList.map((p) => (
                 <li
                   key={p}
-                  className="flex items-center justify-between bg-orange-500/10 px-2.5 py-1 rounded-lg text-[11px] border border-orange-500/20"
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border ${
+                    isLight
+                      ? "bg-white border-amber-200/80 shadow-2xs"
+                      : "bg-orange-500/10 border-orange-500/20"
+                  }`}
                 >
-                  <span className="font-medium text-slate-200">{BODY_PART_LABELS[p]}</span>
-                  <span className="font-bold text-orange-400 text-[10px]">Lokal Boya</span>
+                  <span className={`font-semibold ${isLight ? "text-slate-900" : "text-slate-200"}`}>{BODY_PART_LABELS[p]}</span>
+                  <span className={`font-bold text-[10px] ${isLight ? "text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded" : "text-orange-400"}`}>Lokal Boya</span>
                 </li>
               ))}
               {localPaintedList.length === 0 && (
-                <span className="text-slate-500 font-medium text-[11px] italic py-0.5">
+                <span className={`font-medium text-[11px] italic py-0.5 ${isLight ? "text-slate-400" : "text-slate-500"}`}>
                   Lokal boyalı parça yok.
                 </span>
               )}
@@ -436,23 +487,33 @@ export function VehicleBodyConditionMap({
           </div>
 
           {/* 2. BOYALI PARÇALAR */}
-          <div className="flex flex-col gap-2 bg-slate-950/45 p-3.5 border border-white/5 rounded-2xl">
-            <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
+          <div className={`flex flex-col gap-2 p-3.5 border rounded-2xl ${
+            isLight
+              ? "bg-blue-50/70 border-blue-200"
+              : "bg-slate-950/45 border-white/5"
+          }`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+              isLight ? "text-blue-900" : "text-blue-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isLight ? "bg-blue-600" : "bg-blue-400"}`} />
               Boyalı Parçalar ({paintedList.length})
             </span>
-            <ul className="text-xs text-slate-300 flex flex-col gap-1.5">
+            <ul className={`text-xs flex flex-col gap-1.5 ${isLight ? "text-slate-900" : "text-slate-300"}`}>
               {paintedList.map((p) => (
                 <li
                   key={p}
-                  className="flex items-center justify-between bg-blue-500/10 px-2.5 py-1 rounded-lg text-[11px] border border-blue-500/20"
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border ${
+                    isLight
+                      ? "bg-white border-blue-200/80 shadow-2xs"
+                      : "bg-blue-500/10 border-blue-500/20"
+                  }`}
                 >
-                  <span className="font-medium text-slate-200">{BODY_PART_LABELS[p]}</span>
-                  <span className="font-bold text-blue-400 text-[10px]">Boyalı</span>
+                  <span className={`font-semibold ${isLight ? "text-slate-900" : "text-slate-200"}`}>{BODY_PART_LABELS[p]}</span>
+                  <span className={`font-bold text-[10px] ${isLight ? "text-blue-800 bg-blue-100/90 px-1.5 py-0.5 rounded" : "text-blue-400"}`}>Boyalı</span>
                 </li>
               ))}
               {paintedList.length === 0 && (
-                <span className="text-slate-500 font-medium text-[11px] italic py-0.5">
+                <span className={`font-medium text-[11px] italic py-0.5 ${isLight ? "text-slate-400" : "text-slate-500"}`}>
                   Boyalı parça yok.
                 </span>
               )}
@@ -460,23 +521,33 @@ export function VehicleBodyConditionMap({
           </div>
 
           {/* 3. DEĞİŞEN PARÇALAR */}
-          <div className="flex flex-col gap-2 bg-slate-950/45 p-3.5 border border-white/5 rounded-2xl">
-            <span className="text-[10px] font-black text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-400" />
+          <div className={`flex flex-col gap-2 p-3.5 border rounded-2xl ${
+            isLight
+              ? "bg-red-50/70 border-red-200"
+              : "bg-slate-950/45 border-white/5"
+          }`}>
+            <span className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+              isLight ? "text-red-900" : "text-red-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isLight ? "bg-red-600" : "bg-red-400"}`} />
               Değişen Parçalar ({replacedList.length})
             </span>
-            <ul className="text-xs text-slate-300 flex flex-col gap-1.5">
+            <ul className={`text-xs flex flex-col gap-1.5 ${isLight ? "text-slate-900" : "text-slate-300"}`}>
               {replacedList.map((p) => (
                 <li
                   key={p}
-                  className="flex items-center justify-between bg-red-500/10 px-2.5 py-1 rounded-lg text-[11px] border border-red-500/20"
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border ${
+                    isLight
+                      ? "bg-white border-red-200/80 shadow-2xs"
+                      : "bg-red-500/10 border-red-500/20"
+                  }`}
                 >
-                  <span className="font-medium text-slate-200">{BODY_PART_LABELS[p]}</span>
-                  <span className="font-bold text-red-400 text-[10px]">Değişen</span>
+                  <span className={`font-semibold ${isLight ? "text-slate-900" : "text-slate-200"}`}>{BODY_PART_LABELS[p]}</span>
+                  <span className={`font-bold text-[10px] ${isLight ? "text-red-800 bg-red-100/90 px-1.5 py-0.5 rounded" : "text-red-400"}`}>Değişen</span>
                 </li>
               ))}
               {replacedList.length === 0 && (
-                <span className="text-slate-500 font-medium text-[11px] italic py-0.5">
+                <span className={`font-medium text-[11px] italic py-0.5 ${isLight ? "text-slate-400" : "text-slate-500"}`}>
                   Değişen parça yok.
                 </span>
               )}

@@ -330,42 +330,47 @@ export default function ListingDetail() {
 
           {/* Description */}
           {listing.description && (
-            <div className="flex flex-col gap-1">
-              <h3 className="text-[11px] font-extrabold text-slate-200 uppercase tracking-wider">Açıklama</h3>
-              <p className="text-slate-300 text-xs leading-snug whitespace-pre-line bg-slate-900/30 p-3 rounded-xl border border-white/5">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/90 flex flex-col gap-2">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
+                Açıklama
+              </h3>
+              <p className="text-slate-800 text-xs sm:text-sm leading-relaxed whitespace-pre-line font-medium">
                 {listing.description}
               </p>
             </div>
           )}
 
           {/* Condition Details (Boyalı / Değişen / Tramer) */}
-          <div className="flex flex-col gap-4 p-5 bg-slate-900/20 border border-white/5 rounded-2xl">
-            <h3 className="text-xs font-black text-slate-300 uppercase tracking-widest border-b border-white/5 pb-2">Ekspertiz ve Boya/Değişen Durumu</h3>
+          <div className="flex flex-col gap-4 p-5 bg-white border border-slate-200/90 rounded-2xl shadow-sm">
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">
+              Ekspertiz ve Boya/Değişen Durumu
+            </h3>
 
             {/* Visual Car Silhouette (Read-only) */}
             <div className="mt-1">
               <VehicleBodyConditionMap
                 mode="readOnly"
+                theme="light"
                 localPaintedParts={listing.localPaintedParts}
                 paintedParts={listing.paintedParts}
                 changedParts={listing.changedParts}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-white/5 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs">
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400">Tramer Kaydı:</span>
-                <span className="text-xs font-black text-red-400 mt-0.5">
+                <span className="text-[10px] font-bold text-slate-500">Tramer Kaydı:</span>
+                <span className="text-xs font-black text-red-600 mt-0.5">
                   {listing.tramerAmount > 0 ? `${listing.tramerAmount.toLocaleString('tr-TR')} TL` : "Hasar Kaydı Yok"}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400">Hasar Kaydı Açıklaması:</span>
-                <span className="text-xs text-slate-300 mt-0.5">{listing.damageRecord || "Belirtilmedi"}</span>
+                <span className="text-[10px] font-bold text-slate-500">Hasar Kaydı Açıklaması:</span>
+                <span className="text-xs font-semibold text-slate-800 mt-0.5">{listing.damageRecord || "Belirtilmedi"}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400">Bakım Geçmişi:</span>
-                <span className="text-xs text-slate-300 mt-0.5">{listing.maintenanceHistory || "Belirtilmedi"}</span>
+                <span className="text-[10px] font-bold text-slate-500">Bakım Geçmişi:</span>
+                <span className="text-xs font-semibold text-slate-800 mt-0.5">{listing.maintenanceHistory || "Belirtilmedi"}</span>
               </div>
             </div>
           </div>
