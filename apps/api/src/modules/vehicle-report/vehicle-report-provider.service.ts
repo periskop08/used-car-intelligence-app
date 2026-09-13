@@ -511,17 +511,13 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     const dbPowerUnit = validationContext?.vehicleIdentity?.powerUnit || (baseReport.vehicleIdentity as any)?.powerUnit || 'HP';
 
     const stage1Specs = validationContext?.verifiedResearch?.verifiedTechnicalSpecs;
-    const stage1PowerHp = (typeof stage1Specs?.powerHp === 'number' && stage1Specs.powerHp > 0) ? stage1Specs.powerHp : null;
+    const stage1PowerHp = (typeof stage1Specs?.powerHp === 'number' && stage1Specs.powerHp > 0 && stage1Specs.powerSource === 'VERIFIED_STAGE_1') ? stage1Specs.powerHp : null;
     const stage1PowerUnit = stage1Specs?.powerUnit || 'HP';
     const stage1PowerSemantic = stage1Specs?.powerSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER');
 
-    const rawStage2Hp = specs.enginePowerHp;
-    const stage2PowerHp = typeof rawStage2Hp === 'number' ? rawStage2Hp : (typeof rawStage2Hp === 'string' && rawStage2Hp.trim() ? parseInt(rawStage2Hp.replace(/\D/g, ''), 10) || null : null);
-    const stage2PowerUnit = specs.powerUnit || 'HP';
-
     let resolvedPowerHp: number | undefined = undefined;
     let resolvedPowerUnit: 'HP' | 'PS' | 'kW' | undefined = undefined;
-    let resolvedPowerSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | undefined = undefined;
+    let resolvedPowerSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | undefined = undefined;
     let resolvedPowerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER' | 'STANDARD_POWER' | undefined = undefined;
 
     if (dbPowerHp !== null && dbPowerHp !== undefined) {
@@ -534,11 +530,6 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       resolvedPowerUnit = stage1PowerUnit;
       resolvedPowerSource = 'VERIFIED_STAGE_1';
       resolvedPowerSemantic = stage1PowerSemantic;
-    } else if (stage2PowerHp !== null && stage2PowerHp !== undefined && stage2PowerHp > 0) {
-      resolvedPowerHp = stage2PowerHp;
-      resolvedPowerUnit = stage2PowerUnit;
-      resolvedPowerSource = 'AI_VERIFIED_TECHNICAL_SPECS';
-      resolvedPowerSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
     }
 
     const canonicalHp = (resolvedPowerHp !== undefined && resolvedPowerHp !== null)
@@ -559,17 +550,13 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       : (typeof (baseReport.vehicleIdentity as any)?.engineTorqueNm === 'number' && (baseReport.vehicleIdentity as any)?.torqueSource === 'VEHICLE_DATABASE' ? baseReport.vehicleIdentity.engineTorqueNm : null);
     const dbTorqueUnit = validationContext?.vehicleIdentity?.torqueUnit || (baseReport.vehicleIdentity as any)?.torqueUnit || 'Nm';
 
-    const stage1TorqueNm = (typeof stage1Specs?.torqueNm === 'number' && stage1Specs.torqueNm > 0) ? stage1Specs.torqueNm : null;
+    const stage1TorqueNm = (typeof stage1Specs?.torqueNm === 'number' && stage1Specs.torqueNm > 0 && stage1Specs.torqueSource === 'VERIFIED_STAGE_1') ? stage1Specs.torqueNm : null;
     const stage1TorqueUnit = stage1Specs?.torqueUnit || 'Nm';
     const stage1TorqueSemantic = stage1Specs?.torqueSemantic || (isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE');
 
-    const rawStage2Torque = specs.engineTorqueNm;
-    const stage2TorqueNm = typeof rawStage2Torque === 'number' ? rawStage2Torque : (typeof rawStage2Torque === 'string' && rawStage2Torque.trim() ? parseInt(rawStage2Torque.replace(/\D/g, ''), 10) || null : null);
-    const stage2TorqueUnit = specs.torqueUnit || 'Nm';
-
     let resolvedTorqueNm: number | undefined = undefined;
     let resolvedTorqueUnit: string | undefined = undefined;
-    let resolvedTorqueSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | 'AI_VERIFIED_TECHNICAL_SPECS' | undefined = undefined;
+    let resolvedTorqueSource: 'VEHICLE_DATABASE' | 'VERIFIED_STAGE_1' | undefined = undefined;
     let resolvedTorqueSemantic: string | undefined = undefined;
 
     if (dbTorqueNm !== null && dbTorqueNm !== undefined) {
@@ -582,11 +569,6 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       resolvedTorqueUnit = stage1TorqueUnit;
       resolvedTorqueSource = 'VERIFIED_STAGE_1';
       resolvedTorqueSemantic = stage1TorqueSemantic;
-    } else if (stage2TorqueNm !== null && stage2TorqueNm !== undefined && stage2TorqueNm > 0) {
-      resolvedTorqueNm = stage2TorqueNm;
-      resolvedTorqueUnit = stage2TorqueUnit;
-      resolvedTorqueSource = 'AI_VERIFIED_TECHNICAL_SPECS';
-      resolvedTorqueSemantic = isHybrid ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE';
     }
 
     (baseReport.vehicleIdentity as any).engineTorqueNm = resolvedTorqueNm;

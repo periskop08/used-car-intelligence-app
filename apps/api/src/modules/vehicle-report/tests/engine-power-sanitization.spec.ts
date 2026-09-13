@@ -7,9 +7,17 @@ describe('Engine Power & Torque Generic Sanitization Tests', () => {
     getVehicleCharacter: jest.fn().mockResolvedValue(null),
   };
 
-  it('should sanitize bulk-seeded legacy placeholder (100 HP / 200 Nm) when technicalSpec is unverified', async () => {
+  it('should use verified side-car VehiclePowerEnrichment (150 HP) when present', async () => {
     const mockPrisma = {
       aiVehicleReport: { findUnique: jest.fn().mockResolvedValue(null) },
+      vehiclePowerEnrichment: {
+        findUnique: jest.fn().mockResolvedValue({
+          vehicleVariantId: 'v-astra-14t',
+          verificationStatus: 'VERIFIED',
+          powerHp: 150,
+          sourceReportedUnit: 'HP',
+        }),
+      },
       vehicleVariant: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'v-astra-14t',
@@ -20,6 +28,43 @@ describe('Engine Power & Torque Generic Sanitization Tests', () => {
           engine: {
             id: 'eng-14t',
             code: '1.4 T',
+            horsepower: 100, // Legacy dummy placeholder in DB engine
+            torque: 200,
+            displacement: 1400,
+            hasTurbo: true,
+            fuelType: 'GASOLINE',
+          },
+          transmission: { name: 'Otomatik', speeds: 6 },
+          problems: [],
+          specs: null,
+        }),
+      },
+    };
+
+    builder = new VehicleReportContextBuilderService(mockPrisma as any, mockCharResearchService as any);
+    const res = await builder.buildVehicleContext('v-astra-14t');
+
+    // Must be resolved to verified 150 HP from VehiclePowerEnrichment
+    expect(res.vehicleContext.vehicleIdentity.enginePowerHp).toBe(150);
+    expect(res.vehicleContext.vehicleIdentity.powerUnit).toBe('HP');
+    expect((res.vehicleContext.vehicleIdentity as any).powerSource).toBe('VEHICLE_DATABASE');
+    expect(res.vehicleContext.performanceSpecs.enginePowerHp).toBe(150);
+  });
+
+  it('should sanitize unverified legacy dummy placeholder (100 HP / 200 Nm) to null so AI cannot guess', async () => {
+    const mockPrisma = {
+      aiVehicleReport: { findUnique: jest.fn().mockResolvedValue(null) },
+      vehiclePowerEnrichment: { findUnique: jest.fn().mockResolvedValue(null) },
+      vehicleVariant: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'v-unverified-dummy',
+          year: 2017,
+          fuelType: 'GASOLINE',
+          model: { name: 'Sample', brand: { name: 'Brand' } },
+          trim: { name: 'Base' },
+          engine: {
+            id: 'eng-dummy',
+            code: '1.4',
             horsepower: 100, // Legacy dummy placeholder
             torque: 200,      // Legacy dummy placeholder
             displacement: 1400,
@@ -28,65 +73,25 @@ describe('Engine Power & Torque Generic Sanitization Tests', () => {
           },
           transmission: { name: 'Otomatik', speeds: 6 },
           problems: [],
-          technicalSpecs: [
-            {
-              specs: {
-                topSpeed: 215,
-                acceleration0to100: 8.9,
-                weight: 1310,
-              },
-            },
-          ],
+          specs: null,
         }),
       },
     };
 
     builder = new VehicleReportContextBuilderService(mockPrisma as any, mockCharResearchService as any);
-    const res = await builder.buildVehicleContext('v-astra-14t');
+    const res = await builder.buildVehicleContext('v-unverified-dummy');
 
-    // Must be sanitized to null so AI can derive real factory 150 HP / 245 Nm
+    // Must be null (not 100)
     expect(res.vehicleContext.vehicleIdentity.enginePowerHp).toBeNull();
     expect(res.vehicleContext.vehicleIdentity.engineTorqueNm).toBeNull();
     expect((res.vehicleContext.vehicleIdentity as any).powerSource).toBeUndefined();
     expect((res.vehicleContext.vehicleIdentity as any).torqueSource).toBeUndefined();
   });
 
-  it('should sanitize 1.4L+ turbo engines with power <= 115 HP or torque <= 210 Nm', async () => {
+  it('should preserve genuinely verified specs in TechnicalSpec table', async () => {
     const mockPrisma = {
       aiVehicleReport: { findUnique: jest.fn().mockResolvedValue(null) },
-      vehicleVariant: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: 'v-cruze-14t',
-          year: 2016,
-          fuelType: 'GASOLINE',
-          model: { name: 'Cruze', brand: { name: 'Chevrolet' } },
-          trim: { name: 'LT' },
-          engine: {
-            id: 'eng-14t-cruze',
-            code: '1.4 Turbo',
-            horsepower: 105,
-            torque: 180,
-            displacement: 1364,
-            hasTurbo: true,
-            fuelType: 'GASOLINE',
-          },
-          transmission: { name: 'Otomatik', speeds: 6 },
-          problems: [],
-          technicalSpecs: [],
-        }),
-      },
-    };
-
-    builder = new VehicleReportContextBuilderService(mockPrisma as any, mockCharResearchService as any);
-    const res = await builder.buildVehicleContext('v-cruze-14t');
-
-    expect(res.vehicleContext.vehicleIdentity.enginePowerHp).toBeNull();
-    expect(res.vehicleContext.vehicleIdentity.engineTorqueNm).toBeNull();
-  });
-
-  it('should preserve genuinely verified specs in technicalSpec json', async () => {
-    const mockPrisma = {
-      aiVehicleReport: { findUnique: jest.fn().mockResolvedValue(null) },
+      vehiclePowerEnrichment: { findUnique: jest.fn().mockResolvedValue(null) },
       vehicleVariant: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'v-corolla-hybrid',

@@ -245,56 +245,19 @@ export class ResearchEvidenceValidationService {
         }
       }
 
-      // If still not found, search in normalized evidence collection
-      if (!verifiedTechnicalSpecs) {
-        const textSnippets: string[] = [];
-        if (typeof rawResearch === 'string') textSnippets.push(rawResearch);
-
-        // 1. Top-level answers & summaries (legacy schema)
-        if (rawResearch?.answers) {
-          Object.values(rawResearch.answers).forEach((a: any) => {
-            if (a?.answerText) textSnippets.push(a.answerText);
-            if (a?.searchSnippet) textSnippets.push(a.searchSnippet);
-          });
-        }
-        if (rawResearch?.engineTransmissionFit?.summary) {
-          textSnippets.push(rawResearch.engineTransmissionFit.summary);
-        }
-        if (rawResearch?.vehicleCharacterResearch?.engineTransmissionFit?.summary) {
-          textSnippets.push(rawResearch.vehicleCharacterResearch.engineTransmissionFit.summary);
-        }
-        if (Array.isArray(rawResearch?.groundingSources)) {
-          rawResearch.groundingSources.forEach((s: any) => {
-            if (s?.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
-          });
-        }
-
-        // 2. Production questions[*].synthesisedAnswer & questions[*].sources[*].relevantSnippet
-        if (questionContainer && typeof questionContainer === 'object') {
-          Object.values(questionContainer).forEach((q: any) => {
-            if (q?.synthesisedAnswer) textSnippets.push(q.synthesisedAnswer);
-            if (q?.summary) textSnippets.push(q.summary);
-            if (Array.isArray(q?.sources)) {
-              q.sources.forEach((s: any) => {
-                if (s?.relevantSnippet) textSnippets.push(s.relevantSnippet);
-                if (s?.snippet) textSnippets.push(s.snippet);
-                if (s?.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
-              });
-            }
-          });
-        }
-
-        // 3. Processed grounding sources excerpts
-        processedSources.forEach((s) => {
-          if (s.evidenceExcerpt) textSnippets.push(s.evidenceExcerpt);
-        });
-
-        for (const text of textSnippets) {
-          const match = text.match(/\b(\d{2,3})\s*(HP|PS|kW|bg|beygir)\b/i);
-          if (match) {
-            const val = parseInt(match[1], 10);
-            if (val >= 40 && val <= 1000 && !(isHybrid && val === 100)) { // Skip legacy 100 on hybrid
-              const rawUnit = match[2].toUpperCase();
+      // Check structured question container for engine_character synthesized answer
+      if (!verifiedTechnicalSpecs && questionContainer && typeof questionContainer === 'object') {
+        const engineAnswer =
+          questionContainer.engine_character?.synthesisedAnswer ||
+          questionContainer.engineTransmissionFit?.synthesisedAnswer ||
+          questionContainer.engineTransmissionFit?.summary ||
+          rawResearch?.engineTransmissionFit?.summary;
+        if (engineAnswer && typeof engineAnswer === 'string') {
+          const hpMatch = engineAnswer.match(/(\d+)\s*(HP|PS|kW|bg|beygir)\b/i);
+          if (hpMatch) {
+            const val = parseInt(hpMatch[1], 10);
+            if (val >= 40 && val <= 1500) {
+              const rawUnit = hpMatch[2].toUpperCase();
               const unit = rawUnit === 'BG' || rawUnit === 'BEYGIR' ? 'HP' : (rawUnit as 'HP' | 'PS' | 'KW');
               verifiedTechnicalSpecs = {
                 powerHp: val,
@@ -302,7 +265,6 @@ export class ResearchEvidenceValidationService {
                 powerSource: 'VERIFIED_STAGE_1',
                 powerSemantic: isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER',
               };
-              break;
             }
           }
         }

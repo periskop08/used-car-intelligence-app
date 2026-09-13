@@ -279,9 +279,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
-10. HİBRİT VE e-CVT AKTARMA MİMARİSİ:
-    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) gir. Güç birimini 'powerUnit' ('HP' | 'PS' | 'kW') alanında belirt.
-    - Doğrulanmış DB/kaynak güç ve tork sayısal değerlerini ve birimlerini aynen koru. Asla kombine hibrit tork hesaplama veya kanıtta olmayan tork uydurma.
+10. MOTOR GÜCÜ VE TORK DOĞRULUK KURALI:
+    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) veya doğrulanmadıysa null gir. Güç birimini 'powerUnit' ('HP' | 'PS' | 'kW') alanında belirt.
+    - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} ${powerUnit}` : 'Verilmedi'}), teknik özelliklerde ve metinlerde aynen bu değeri kullan.
+    - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
