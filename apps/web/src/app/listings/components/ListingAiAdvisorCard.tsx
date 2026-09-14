@@ -100,7 +100,6 @@ export default function ListingAiAdvisorCard({
     const token = localStorage.getItem("accessToken");
     if (!token) {
       fetchQuota();
-      fetchStructuredReport();
       return;
     }
 
@@ -115,7 +114,6 @@ export default function ListingAiAdvisorCard({
         if (data.quota) setQuota(data.quota);
 
         if (msgList.length > 0) {
-          setIsOpen(true);
           setShowQuickQuestions(false);
         }
       }
@@ -123,7 +121,6 @@ export default function ListingAiAdvisorCard({
       console.error("Failed to fetch conversation", e);
     } finally {
       fetchQuota();
-      fetchStructuredReport();
     }
   };
 
@@ -147,7 +144,7 @@ export default function ListingAiAdvisorCard({
     setActiveMode("CHAT");
   };
 
-  const handleGetReport = async () => {
+  const handleGetReport = async (forceRefresh: boolean = false) => {
     setIsOpen(true);
     setActiveMode("REPORT");
 
@@ -157,9 +154,32 @@ export default function ListingAiAdvisorCard({
       return;
     }
 
+    if (!forceRefresh && structuredReport) {
+      return;
+    }
+
     setInitializing(true);
 
     try {
+      if (!forceRefresh) {
+        try {
+          const currentRes = await fetch(`${API_URL}/vehicle-reports/by-listing/${listingId}/current`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (currentRes.ok) {
+            const currentData = await currentRes.json();
+            if (currentData && currentData.reportData) {
+              setStructuredReport(currentData.reportData as ComprehensiveVehicleReport);
+              setInitializing(false);
+              fetchQuota();
+              return;
+            }
+          }
+        } catch (checkErr) {
+          console.warn("Could not check cached listing report:", checkErr);
+        }
+      }
+
       const idempotencyKey = `listing_report_${listingId}_${Date.now()}`;
       const res = await fetch(`${API_URL}/vehicle-reports`, {
         method: "POST",
@@ -171,7 +191,7 @@ export default function ListingAiAdvisorCard({
           mode: "LISTING_REPORT",
           listingId,
           idempotencyKey,
-          forceRefresh: true,
+          forceRefresh,
         }),
       });
 
@@ -386,6 +406,17 @@ export default function ListingAiAdvisorCard({
             </>
           )}
 
+          {isOpen && (
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+            >
+              <ChevronUp className="w-4 h-4 text-orange-400" />
+              <span>Daralt</span>
+            </button>
+          )}
+
           {isOpen && (messages.length > 0 || structuredReport) && (
             <button
               type="button"
@@ -416,11 +447,11 @@ export default function ListingAiAdvisorCard({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
           <button
             type="button"
-            onClick={handleGetReport}
+            onClick={() => handleGetReport(false)}
             className="py-4 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
           >
             <FileText className="w-4.5 h-4.5 text-white shrink-0" />
-            <span>Aracı incele & Al Raporu Al</span>
+            <span>Aracı İncele & AI Raporu Al</span>
           </button>
 
           <button
@@ -477,7 +508,7 @@ export default function ListingAiAdvisorCard({
               ) : structuredReport ? (
                 <VehicleReportShell 
                   report={structuredReport} 
-                  onRefresh={handleGetReport} 
+                  onRefresh={() => handleGetReport(true)} 
                   isRefreshing={initializing} 
                 />
               ) : initialReportMsg ? (
@@ -505,7 +536,7 @@ export default function ListingAiAdvisorCard({
                 <button
                   type="button"
                   disabled={initializing}
-                  onClick={handleGetReport}
+                  onClick={() => handleGetReport(true)}
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs shadow-xl shadow-orange-500/20 transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 active:scale-95"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-white" />
