@@ -1384,8 +1384,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
           ) : viewMode === "list" ? (
-            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar) */
-            <div className="flex flex-col gap-3">
+            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar - %25 kompakt ölçek) */
+            <div className="flex flex-col gap-2.5">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                 const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "";
@@ -1398,13 +1398,13 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                   <a
                     key={listing.id}
                     href={`/listings/${listing.id}`}
-                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
+                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
                   >
-                    {/* Thumbnail */}
-                    <div className="relative w-full sm:w-56 aspect-[16/10] sm:aspect-[4/3] bg-slate-950 shrink-0 overflow-hidden">
+                    {/* Thumbnail (%25 küçültülmüş ölçek: 224px -> 168px) */}
+                    <div className="relative w-full sm:w-[168px] aspect-[16/10] sm:aspect-[4/3] bg-slate-950 shrink-0 overflow-hidden">
                       <button
                         onClick={(e) => handleToggleFavorite(e, listing.id)}
-                        className={`absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full border flex items-center gap-1 transition shadow-lg backdrop-blur-md text-[11px] font-bold ${
+                        className={`absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-full border flex items-center gap-1 transition shadow-lg backdrop-blur-md text-[10px] font-bold ${
                           listing.isFavorited
                             ? "bg-red-500/20 text-red-500 border-red-500/40"
                             : "bg-slate-950/80 text-slate-450 border-white/10 hover:text-white"
@@ -1413,7 +1413,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                       >
                         <span>{listing.isFavorited ? "❤️" : "🤍"}</span>
                         {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
-                          <span className="text-[10px] font-extrabold">{listing.favoriteCount}</span>
+                          <span className="text-[9px] font-extrabold">{listing.favoriteCount}</span>
                         )}
                       </button>
 
@@ -1426,22 +1426,22 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                         }}
                       />
 
-                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+                      <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
                         {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
                         {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
                         {listing.isAiReady && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
-                            ✨ AI Analizli
+                          <span className="text-[8.5px] font-bold px-1 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
+                            ✨ AI
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Content Details */}
-                    <div className="p-4 flex-1 flex flex-col justify-between gap-3">
+                    <div className="p-3 flex-1 flex flex-col justify-between gap-2">
                       <div>
                         {/* Vehicle Taxonomy Pills */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                           <span className="text-orange-400 font-extrabold">{brandName}</span>
                           <span>•</span>
                           <span>{modelName}</span>
@@ -1459,11 +1459,11 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                           )}
                         </div>
 
-                        <h3 className="text-sm sm:text-base font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-2">
+                        <h3 className="text-xs sm:text-[13.5px] font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-1 sm:line-clamp-2 leading-snug">
                           {listing.title}
                         </h3>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-2">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400 mt-1">
                           <span>Yıl: <strong className="text-slate-200">{listing.modelYear || "-"}</strong></span>
                           <span>Km: <strong className="text-slate-200">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
                           {listing.color && <span>Renk: <strong className="text-slate-200">{listing.color}</strong></span>}
@@ -1471,11 +1471,11 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                         </div>
                       </div>
 
-                      <div className="border-t border-white/5 pt-3 flex items-center justify-between">
-                        <span className="text-xs text-slate-500">
+                      <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-500">
                           {formatDateTr(listing.publishedAt || listing.createdAt)}
                         </span>
-                        <span className="text-base sm:text-lg font-black text-orange-400">
+                        <span className="text-sm sm:text-[15px] font-black text-orange-400">
                           {formatCurrency(listing.priceAmount, listing.currency)}
                         </span>
                       </div>
