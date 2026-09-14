@@ -132,7 +132,10 @@ export default function ListingAiAdvisorCard({
     (m) => m.messageType === "INITIAL_ANALYSIS" || m.messageType === "VEHICLE_REPORT"
   );
   const chatMessages = messages.filter(
-    (m) => m.messageType !== "INITIAL_ANALYSIS" && m.messageType !== "VEHICLE_REPORT"
+    (m) =>
+      (m.role === "USER" || m.role === "ASSISTANT") &&
+      m.messageType !== "INITIAL_ANALYSIS" &&
+      m.messageType !== "VEHICLE_REPORT"
   );
 
   const reportRemaining = quota?.reportQuota?.remaining ?? (quota?.unlimited ? "∞" : 0);
@@ -300,9 +303,13 @@ export default function ListingAiAdvisorCard({
 
   const handleClearConversation = async () => {
     const token = localStorage.getItem("accessToken") || localStorage.getItem("token");
-    if (!token) return;
+    if (!token) {
+      setMessages([]);
+      setShowQuickQuestions(true);
+      return;
+    }
 
-    if (!confirm("Tüm konuşma geçmişiniz silinecektir. Onaylıyor musunuz?")) return;
+    if (!confirm("Chatbot sohbet geçmişiniz temizlenecektir. Onaylıyor musunuz?")) return;
 
     try {
       const res = await fetch(`${API_URL}/api/listings/${listingId}/ai-conversation`, {
@@ -311,13 +318,13 @@ export default function ListingAiAdvisorCard({
       });
       if (res.ok) {
         setMessages([]);
-        setStructuredReport(null);
-        setIsOpen(false);
-        setActiveMode("REPORT");
+        setShowQuickQuestions(true);
         fetchQuota();
       }
     } catch (e) {
       console.error("Failed to clear conversation", e);
+      setMessages([]);
+      setShowQuickQuestions(true);
     }
   };
 
@@ -417,28 +424,16 @@ export default function ListingAiAdvisorCard({
             </button>
           )}
 
-          {isOpen && (messages.length > 0 || structuredReport) && (
+          {isOpen && chatMessages.length > 0 && (
             <button
               type="button"
               onClick={handleClearConversation}
-              title="Konuşma ve rapor geçmişini temizle"
+              title="Sohbet geçmişini temizle"
               className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 transition cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Disclaimer Notice */}
-      <div className="p-3 rounded-2xl bg-slate-950/80 border border-white/5 text-xs text-slate-400 leading-relaxed flex items-start gap-2.5">
-        <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-        <div>
-          Bu değerlendirme ilan sahibi tarafından beyan edilen veriler üzerinden hazırlanır. Bağımsız ekspertiz yerine geçmez. Aracın genel kronik raporunu incelemek için{" "}
-          <Link href="/aracini-bul" className="text-orange-400 underline font-bold hover:text-orange-300">
-            Araç Sorgulama
-          </Link>{" "}
-          bölümüne gidin.
         </div>
       </div>
 
@@ -493,7 +488,7 @@ export default function ListingAiAdvisorCard({
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Chatbot Sohbeti ({chatMessages.length})</span>
+              <span>Chatbot Sohbeti{chatMessages.length > 0 ? ` (${chatMessages.length})` : ""}</span>
             </button>
           </div>
 
@@ -549,6 +544,19 @@ export default function ListingAiAdvisorCard({
           {/* CHAT MODE VIEW */}
           {activeMode === "CHAT" && (
             <div className="space-y-4">
+              {chatMessages.length > 0 && (
+                <div className="flex justify-end pb-1">
+                  <button
+                    type="button"
+                    onClick={handleClearConversation}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs font-bold transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sohbeti Temizle</span>
+                  </button>
+                </div>
+              )}
+
               {/* Quick Questions */}
               <div className="space-y-2">
                 <button
