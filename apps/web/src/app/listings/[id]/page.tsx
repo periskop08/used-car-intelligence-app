@@ -570,31 +570,44 @@ export default function ListingDetail() {
               {/* Garanti */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Garanti</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.warranty ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{(listing.hasWarranty || listing.warranty) ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Ağır Hasar Kayıtlı */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Ağır Hasar Kayıtlı</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.tramerAmount > 200000 || listing.heavyDamage ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{(listing.heavyDamage || listing.tramerAmount > 200000) ? "Evet" : "Hayır"}</span>
               </div>
 
               {/* Plaka / Uyruk */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Plaka / Uyruk</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.plateOrigin || "Türkiye (TR) Plakalı"}</span>
+                <span className="font-semibold text-slate-200 text-right">
+                  {(() => {
+                    const p = listing.plateType || listing.plateOrigin;
+                    if (p === 'FOREIGN_PLATE') return 'Yabancı Plakalı';
+                    if (p === 'BLUE_PLATE') return 'Mavi (MA) Plakalı';
+                    return 'Türkiye (TR) Plakalı';
+                  })()}
+                </span>
               </div>
 
               {/* Kimden */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1 border-b border-dashed border-white/10">
                 <span className="font-bold text-slate-400">Kimden</span>
-                <span className="font-extrabold text-red-400 text-right">{listing.sellerType === 'GALLERY' ? 'Galeriden' : 'Sahibinden'}</span>
+                <span className="font-extrabold text-red-400 text-right">
+                  {(() => {
+                    if (listing.sellerType === 'GALLERY') return 'Galeriden';
+                    if (listing.sellerType === 'AUTHORIZED_DEALER') return 'Yetkili Bayiden';
+                    return 'Sahibinden';
+                  })()}
+                </span>
               </div>
 
               {/* Takas */}
               <div className="grid grid-cols-[105px_1fr] items-center gap-2 py-1">
                 <span className="font-bold text-slate-400">Takas</span>
-                <span className="font-semibold text-slate-200 text-right">{listing.exchange ? "Evet" : "Hayır"}</span>
+                <span className="font-semibold text-slate-200 text-right">{(listing.exchangeable || listing.exchange) ? "Evet" : "Hayır"}</span>
               </div>
             </div>
           </div>
