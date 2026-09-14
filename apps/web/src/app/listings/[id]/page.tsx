@@ -258,34 +258,20 @@ export default function ListingDetail() {
       {/* MERKEZ ANA İÇERİK KONTEYNERİ (1060px Ortalanmış Kompakt) */}
       <div className="w-full max-w-[1060px] flex flex-col gap-4 shrink-0">
         
-        {/* Back button & Title & Price Header (Aligned with 3 Columns Below) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-5 items-end border-b border-white/10 pb-2.5">
-          {/* Sol Kolon (lg:col-span-6): Başlık ve İlan Detay Bilgileri */}
-          <div className="lg:col-span-6">
-            <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
-              {listing.isUrgent && <UrgentListingBadge size="md" animated withTooltip />}
-              {listing.isShowcaseFeedActive && <ShowcaseBadge size="md" withTooltip />}
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-full">
-                ❤️ {listing.favoriteCount || 0} Favori
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 canvas-subtitle font-bold uppercase tracking-wider mt-0.5">
-              {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
-            </p>
-          </div>
-
-          {/* Orta Kolon (lg:col-span-3): Fiyat (Araç Bilgileri Kartının Üstüne Alındı) */}
-          <div className="lg:col-span-3 text-left">
-            <span className="text-xl md:text-2xl font-black bg-gradient-to-r from-orange-500 to-amber-400 bg-clip-text text-transparent block">
-              {formatCurrency(listing.priceAmount, listing.currency)}
+        {/* Back button & Title Header */}
+        <div className="flex flex-col gap-1 border-b border-white/10 pb-2.5">
+          <a href="/listings" className="text-[10px] text-orange-500 hover:underline font-bold block mb-0.5">← İlan Listesine Dön</a>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg md:text-xl font-black text-slate-100 canvas-title tracking-tight">{listing.title}</h1>
+            {listing.isUrgent && <UrgentListingBadge size="md" animated withTooltip />}
+            {listing.isShowcaseFeedActive && <ShowcaseBadge size="md" withTooltip />}
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-full">
+              ❤️ {listing.favoriteCount || 0} Favori
             </span>
           </div>
-
-
-          {/* Sağ Kolon (lg:col-span-3): Satıcı Hizalaması */}
-          <div className="hidden lg:block lg:col-span-3" />
+          <p className="text-[11px] text-slate-400 canvas-subtitle font-bold uppercase tracking-wider mt-0.5">
+            {listing.modelYear} • {listing.kilometers.toLocaleString('tr-TR')} km • {listing.city} {listing.district ? `/ ${listing.district}` : ""}
+          </p>
         </div>
 
         {/* 3-Column Main Grid Layout */}
@@ -444,8 +430,26 @@ export default function ListingDetail() {
 
         {/* 2. ORTA KOLON (lg:col-span-3): Sahibinden Tarzı Daraltılmış Kompakt Araç Bilgileri Tablosu */}
         <div className="lg:col-span-3 flex flex-col justify-between gap-5 h-full">
-          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2 shadow-xl max-w-[270px] w-full">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+          <div className="bg-[#0b0f19]/95 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex flex-col gap-2.5 shadow-xl max-w-[270px] w-full">
+            {/* ÖNE ÇIKARILMIŞ ARAÇ FİYATI BLOĞU (Hero Price Banner) */}
+            <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500/20 via-amber-500/10 to-slate-900/90 border border-orange-500/35 shadow-lg shadow-orange-500/5 flex flex-col gap-1 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Araç Fiyatı</span>
+                </span>
+                {(listing.exchangeable || listing.exchange) && (
+                  <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
+                    Takasa Uygun
+                  </span>
+                )}
+              </div>
+              <div className="text-xl sm:text-2xl font-black bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-300 bg-clip-text text-transparent font-mono tracking-tight">
+                {formatCurrency(listing.priceAmount, listing.currency)}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 pt-0.5">
               <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5">
                 <span>📋 Araç Bilgileri</span>
               </h3>
