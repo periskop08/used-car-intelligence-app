@@ -884,7 +884,8 @@ export default function Home() {
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <span>⚡ Acil İlanlar</span>
+              <UrgentListingBadge size="xs" animated={promoTab === 'acil'} interactive={false} />
+              <span>Acil İlanlar</span>
             </button>
           </div>
 
