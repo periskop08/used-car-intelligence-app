@@ -750,6 +750,8 @@ export class ListingController {
 
     return {
       ...listing,
+      exchange: listing.exchangeable,
+      warranty: listing.hasWarranty,
       technicalFacts,
       isUrgent,
       isShowcaseFeedActive,

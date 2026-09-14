@@ -58,7 +58,7 @@ export default function SimilarListingsWidget({
   className = '',
 }: SimilarListingsWidgetProps) {
   const [mounted, setMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [items, setItems] = useState<SimilarListingItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -157,7 +157,7 @@ export default function SimilarListingsWidget({
       {/* 1. Header: Açılır / Kapanır Buton Barı */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-white/[0.02] transition select-none border-b border-white/5"
+        className={`p-3.5 sm:p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-white/[0.02] transition select-none ${isOpen ? 'border-b border-white/5' : ''}`}
       >
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 shrink-0">

@@ -8,6 +8,7 @@ export interface UrgentListingBadgeProps {
   animated?: boolean;
   className?: string;
   withTooltip?: boolean;
+  interactive?: boolean;
 }
 
 export default function UrgentListingBadge({
@@ -15,6 +16,7 @@ export default function UrgentListingBadge({
   animated = true,
   className = "",
   withTooltip = false,
+  interactive = true,
 }: UrgentListingBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -57,23 +59,33 @@ export default function UrgentListingBadge({
         }
       `}</style>
 
-      <button
-        type="button"
-        role="status"
-        aria-label="Acil İlan"
-        title="Acil İlan"
-        onClick={(e) => {
-          if (withTooltip) {
-            e.stopPropagation();
-            setShowTooltip(!showTooltip);
-          }
-        }}
-        onMouseEnter={() => withTooltip && setShowTooltip(true)}
-        onMouseLeave={() => withTooltip && setShowTooltip(false)}
-        className={`urgent-badge-glow aspect-square flex items-center justify-center bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white shadow-md border border-red-300/60 backdrop-blur-xs select-none transition-transform ${sizeClasses}`}
-      >
-        <Siren className="w-full h-full text-white shrink-0 drop-shadow-xs" />
-      </button>
+      {interactive ? (
+        <button
+          type="button"
+          role="status"
+          aria-label="Acil İlan"
+          title="Acil İlan"
+          onClick={(e) => {
+            if (withTooltip) {
+              e.stopPropagation();
+              setShowTooltip(!showTooltip);
+            }
+          }}
+          onMouseEnter={() => withTooltip && setShowTooltip(true)}
+          onMouseLeave={() => withTooltip && setShowTooltip(false)}
+          className={`urgent-badge-glow aspect-square flex items-center justify-center bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white shadow-md border border-red-300/60 backdrop-blur-xs select-none transition-transform ${sizeClasses}`}
+        >
+          <Siren className="w-full h-full text-white shrink-0 drop-shadow-xs" />
+        </button>
+      ) : (
+        <span
+          role="status"
+          aria-label="Acil İlan"
+          className={`urgent-badge-glow aspect-square flex items-center justify-center bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white shadow-md border border-red-300/60 backdrop-blur-xs select-none ${sizeClasses}`}
+        >
+          <Siren className="w-full h-full text-white shrink-0 drop-shadow-xs" />
+        </span>
+      )}
 
       {withTooltip && showTooltip && (
         <div

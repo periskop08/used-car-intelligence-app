@@ -125,24 +125,37 @@ export class ListingAiService implements OnModuleInit {
       };
     } else if (conversation.activeContextHash !== context.contextHash) {
       // Context has changed (listing updated by seller)
-      await this.prisma.$transaction([
-        this.prisma.listingAiConversation.update({
+      const hasPriorMessages = (conversation.messages || []).some(
+        (m) => m.role === 'USER' || m.role === 'ASSISTANT',
+      );
+      if (hasPriorMessages) {
+        await this.prisma.$transaction([
+          this.prisma.listingAiConversation.update({
+            where: { id: conversation.id },
+            data: {
+              activeContextHash: context.contextHash,
+              lastContextChangedAt: new Date(),
+            },
+          }),
+          this.prisma.listingAiMessage.create({
+            data: {
+              conversationId: conversation.id,
+              role: 'SYSTEM',
+              messageType: ListingAiMessageType.CONTEXT_SEPARATOR,
+              content: 'ℹ️ İlan bilgileri güncellendi. Bu noktadan sonraki yanıtlar ilanın yeni verilerine dayanır.',
+              contextHash: context.contextHash,
+            },
+          }),
+        ]);
+      } else {
+        await this.prisma.listingAiConversation.update({
           where: { id: conversation.id },
           data: {
             activeContextHash: context.contextHash,
             lastContextChangedAt: new Date(),
           },
-        }),
-        this.prisma.listingAiMessage.create({
-          data: {
-            conversationId: conversation.id,
-            role: 'SYSTEM',
-            messageType: ListingAiMessageType.CONTEXT_SEPARATOR,
-            content: 'ℹ️ İlan bilgileri güncellendi. Bu noktadan sonraki yanıtlar ilanın yeni verilerine dayanır.',
-            contextHash: context.contextHash,
-          },
-        }),
-      ]);
+        });
+      }
 
       conversation = await this.prisma.listingAiConversation.findUnique({
         where: { id: conversation.id },

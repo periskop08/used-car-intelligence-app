@@ -28,7 +28,7 @@ const TURKISH_CITIES = [
   "Samsun", "Mersin", "Eskişehir", "Trabzon", "Diyarbakır"
 ];
 
-export type ViewMode = "classic" | "list" | "gallery";
+export type ViewMode = "list" | "gallery";
 
 function formatDateTr(dateStr: string | Date | undefined | null): string {
   if (!dateStr) return "-";
@@ -44,7 +44,7 @@ function formatDateTr(dateStr: string | Date | undefined | null): string {
   }
 }
 
-export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean }) {
+export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: { isUrgentPage?: boolean; isShowcasePage?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -71,13 +71,15 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [urgentOnly, setUrgentOnly] = useState(isUrgentPage);
-  const [showcaseOnly, setShowcaseOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("classic");
+  const [showcaseOnly, setShowcaseOnly] = useState(isShowcasePage);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     const saved = localStorage.getItem("torque_scout_listing_view_mode") as ViewMode;
-    if (saved && (saved === "classic" || saved === "list" || saved === "gallery")) {
+    if (saved && (saved === "list" || saved === "gallery")) {
       setViewMode(saved);
+    } else {
+      setViewMode("list");
     }
   }, []);
 
@@ -292,7 +294,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     const maxKmVal = searchParams.get("maxKm");
     const aiReady = searchParams.get("isAiReady") === "true";
     const urgentVal = isUrgentPage || searchParams.get("urgentOnly") === "true";
-    const showcaseVal = searchParams.get("showcaseOnly") === "true";
+    const showcaseVal = isShowcasePage || searchParams.get("showcaseOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
     const profileId = searchParams.get("preferenceProfileId");
@@ -534,7 +536,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     if (maxKm) params.set("maxKm", maxKm);
     if (isAiReady) params.set("isAiReady", "true");
     if (urgentOnly || isUrgentPage) params.set("urgentOnly", "true");
-    if (showcaseOnly) params.set("showcaseOnly", "true");
+    if (showcaseOnly || isShowcasePage) params.set("showcaseOnly", "true");
     if (city) params.set("city", city);
     if (district) params.set("district", district);
     if (fuelTypes.length > 0) params.set("fuelType", fuelTypes.join(","));
@@ -554,7 +556,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     if (includeDescription) params.set("includeDescription", "true");
 
     const newQuery = params.toString();
-    const basePath = isUrgentPage ? "/listings/urgent" : "/listings";
+    const basePath = isUrgentPage ? "/listings/urgent" : (isShowcasePage ? "/listings/showcase" : "/listings");
     router.push(newQuery ? `${basePath}?${newQuery}` : basePath);
     fetchListings();
   };
@@ -579,7 +581,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     setMaxKm("");
     setIsAiReady(false);
     setUrgentOnly(isUrgentPage);
-    setShowcaseOnly(false);
+    setShowcaseOnly(isShowcasePage);
     setCity("");
     setDistrict("");
     setSelectedCurrency("TRY");
@@ -599,7 +601,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     setKeyword("");
     setIncludeDescription(false);
     setPage(1);
-    const basePath = isUrgentPage ? "/listings/urgent" : "/listings";
+    const basePath = isUrgentPage ? "/listings/urgent" : (isShowcasePage ? "/listings/showcase" : "/listings");
     router.push(basePath);
   };
 
@@ -634,9 +636,19 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
 
 
   return (
-    <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
       {/* Title Header */}
-      {isUrgentPage ? (
+      {isShowcasePage ? (
+        <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-yellow-950/50 border border-amber-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <ShowcaseBadge size="medium" />
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Vitrin İlanlar</h1>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+            TorqueScout vitrin görünürlük hakkı aktif olan ve hızlı satış paketi kapsamındaki tüm öne çıkan araç ilanları.
+          </p>
+        </div>
+      ) : isUrgentPage ? (
         <div className="bg-gradient-to-r from-red-950/60 via-slate-900 to-rose-950/50 border border-red-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
           <div className="flex items-center gap-3">
             <UrgentListingBadge size="medium" animated />
@@ -659,9 +671,9 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="flex flex-col lg:flex-row items-start gap-4">
         {/* Left Sidebar Filter Column */}
-        <form onSubmit={handleFilterSubmit} className="lg:col-span-1 flex flex-col gap-5 bg-slate-900/20 border border-white/5 p-6 rounded-3xl h-fit max-h-[85vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleFilterSubmit} className="w-full lg:w-[220px] shrink-0 flex flex-col gap-3.5 bg-slate-900/20 border border-white/5 p-4 rounded-3xl h-fit max-h-[85vh] overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-slate-200 text-xs uppercase tracking-wider">Detaylı Filtreleme</h3>
             <button type="button" onClick={handleClearFilters} className="text-xs text-orange-500 hover:underline">Temizle</button>
@@ -1263,21 +1275,23 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           )}
 
           {/* Vitrin İlanları Toggle */}
-          <div className="flex items-center gap-2 cursor-pointer mt-1">
-            <input
-              type="checkbox"
-              id="showcaseOnlyCheckbox"
-              checked={showcaseOnly}
-              onChange={(e) => setShowcaseOnly(e.target.checked)}
-              className="accent-amber-500 rounded border-white/10"
-            />
-            <label htmlFor="showcaseOnlyCheckbox" className="text-xs font-black text-amber-400 cursor-pointer select-none flex items-center gap-1">
-              ⭐ Yalnızca Vitrin İlanları
-            </label>
-          </div>
+          {!isShowcasePage && (
+            <div className="flex items-center gap-2 cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                id="showcaseOnlyCheckbox"
+                checked={showcaseOnly}
+                onChange={(e) => setShowcaseOnly(e.target.checked)}
+                className="accent-amber-500 rounded border-white/10"
+              />
+              <label htmlFor="showcaseOnlyCheckbox" className="text-xs font-black text-amber-400 cursor-pointer select-none flex items-center gap-1">
+                ⭐ Yalnızca Vitrin İlanları
+              </label>
+            </div>
+          )}
 
           {/* Sticky Apply Button */}
-          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-6 -mb-6 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
+          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
             <button
               type="submit"
               className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 active:scale-[0.98]"
@@ -1287,8 +1301,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           </div>
         </form>
 
-        {/* Right Listings Grid Column */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
+        {/* Right Listings Column */}
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950/20 border border-white/5 px-6 py-4 rounded-2xl">
             <span className="text-xs font-bold text-slate-400">
@@ -1296,27 +1310,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
             </span>
 
             <div className="flex items-center gap-3">
-              {/* View Switcher: Klasik | Liste | Galeri (Görsel 5) */}
+              {/* View Switcher: Liste | Galeri */}
               <div className="inline-flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner">
-                {/* Klasik Tablo */}
-                <button
-                  type="button"
-                  onClick={() => handleViewModeChange("classic")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    viewMode === "classic"
-                      ? "bg-slate-700 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                  }`}
-                  title="Klasik Tablo Görünümü"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="9" y1="3" x2="9" y2="21" />
-                    <line x1="15" y1="3" x2="15" y2="21" />
-                  </svg>
-                  <span className="hidden md:inline">Klasik</span>
-                </button>
-
                 {/* Liste */}
                 <button
                   type="button"
@@ -1400,128 +1395,9 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               </span>
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
-          ) : viewMode === "classic" ? (
-            /* 1. KLASİK GÖRÜNÜM (Ferah, okunaklı ve dengeli detaylı tablo) */
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 shadow-xl backdrop-blur-sm">
-              <table className="w-full text-left text-sm text-slate-300 border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/90 border-b border-white/10 text-[12px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                    <th className="py-4 px-4 w-[104px] min-w-[104px] text-center">Fotoğraf</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Marka</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Model Ailesi</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Motor / Versiyon</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Donanım Paketi</th>
-                    <th className="py-4 px-4 min-w-[260px]">İlan Başlığı</th>
-                    <th className="py-4 px-3.5 text-center whitespace-nowrap">Yıl</th>
-                    <th className="py-4 px-3.5 text-right whitespace-nowrap">Km</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Renk</th>
-                    <th className="py-4 px-4 text-right whitespace-nowrap">Fiyat</th>
-                    <th className="py-4 px-3.5 text-center whitespace-nowrap">İlan Tarihi</th>
-                    <th className="py-4 px-4 whitespace-nowrap">İl / İlçe</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {listings.map((listing) => {
-                    const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                    const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "-";
-                    const modelName = listing.vehicleVariant?.model?.name || listing.customModel || "-";
-                    const engineCode = listing.vehicleVariant?.engine?.code || listing.customEngine || "-";
-                    const trimName = listing.vehicleVariant?.trim?.name || "-";
-                    const location = `${listing.city || ""}${listing.district ? ` / ${listing.district}` : ""}`.trim() || "-";
-
-                    return (
-                      <tr
-                        key={listing.id}
-                        onClick={() => router.push(`/listings/${listing.id}`)}
-                        className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer h-[72px]"
-                      >
-                        {/* Fotoğraf (72x54 / 80x60) */}
-                        <td className="py-3 px-4 w-[104px] min-w-[104px]">
-                          <div className="relative w-[80px] h-[60px] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto shadow-sm">
-                            <img
-                              src={cover}
-                              alt={listing.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
-                              }}
-                            />
-                            {listing.isUrgent && (
-                              <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-md" title="Acil İlan" />
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Marka */}
-                        <td className="py-3.5 px-3.5 font-semibold text-slate-100 text-[14px] whitespace-nowrap">
-                          {brandName}
-                        </td>
-
-                        {/* Model Ailesi */}
-                        <td className="py-3.5 px-3.5 font-medium text-slate-200 text-[14px] whitespace-nowrap">
-                          {modelName}
-                        </td>
-
-                        {/* Motor / Versiyon */}
-                        <td className="py-3.5 px-3.5 text-slate-300 font-mono text-[13px] whitespace-nowrap">
-                          {engineCode}
-                        </td>
-
-                        {/* Donanım Paketi */}
-                        <td className="py-3.5 px-3.5 text-slate-300 text-[14px] whitespace-nowrap">
-                          {trimName}
-                        </td>
-
-                        {/* İlan Başlığı (Daha belirgin 15px semibold) */}
-                        <td className="py-3.5 px-4 min-w-[260px]">
-                          <div className="flex items-center gap-2">
-                            {listing.isUrgent && <span className="text-[11px]" title="Acil İlan">🚨</span>}
-                            {listing.isShowcaseFeedActive && <span className="text-[11px]" title="Vitrin İlanı">⭐</span>}
-                            {listing.isAiReady && <span className="text-[11px]" title="AI Analizli">✨</span>}
-                            <span className="text-white font-semibold text-[15px] group-hover:text-orange-400 transition truncate max-w-sm">
-                              {listing.title}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Yıl */}
-                        <td className="py-3.5 px-3.5 text-center text-slate-200 text-[13px] whitespace-nowrap font-medium">
-                          {listing.modelYear || "-"}
-                        </td>
-
-                        {/* Km */}
-                        <td className="py-3.5 px-3.5 text-right text-slate-200 text-[13px] whitespace-nowrap font-mono">
-                          {listing.kilometers !== undefined && listing.kilometers !== null ? listing.kilometers.toLocaleString("tr-TR") : "-"}
-                        </td>
-
-                        {/* Renk */}
-                        <td className="py-3.5 px-3.5 text-slate-300 text-[13px] whitespace-nowrap">
-                          {listing.color || "-"}
-                        </td>
-
-                        {/* Fiyat */}
-                        <td className="py-3.5 px-4 text-right font-black text-orange-400 whitespace-nowrap text-[15px]">
-                          {formatCurrency(listing.priceAmount, listing.currency)}
-                        </td>
-
-                        {/* İlan Tarihi */}
-                        <td className="py-3.5 px-3.5 text-center text-slate-400 whitespace-nowrap text-[12px]">
-                          {formatDateTr(listing.publishedAt || listing.createdAt)}
-                        </td>
-
-                        {/* İl / İlçe */}
-                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap text-[13px]">
-                          {location}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
           ) : viewMode === "list" ? (
-            /* 2. LİSTE GÖRÜNÜMÜ (Yatay kartlar) */
-            <div className="flex flex-col gap-3">
+            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar - Kare ve kırpmasız görsel, %20 kompakt ölçek) */
+            <div className="flex flex-col gap-2.5">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                 const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "";
@@ -1534,13 +1410,13 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                   <a
                     key={listing.id}
                     href={`/listings/${listing.id}`}
-                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
+                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
                   >
-                    {/* Thumbnail */}
-                    <div className="relative w-full sm:w-56 aspect-[16/10] sm:aspect-[4/3] bg-slate-950 shrink-0 overflow-hidden">
+                    {/* Thumbnail (Kare, Kırpmasız Görsel) */}
+                    <div className="relative w-full sm:w-[136px] aspect-square bg-slate-950 shrink-0 overflow-hidden flex items-center justify-center">
                       <button
                         onClick={(e) => handleToggleFavorite(e, listing.id)}
-                        className={`absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-full border flex items-center gap-1 transition shadow-lg backdrop-blur-md text-[11px] font-bold ${
+                        className={`absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-full border flex items-center gap-1 transition shadow-lg backdrop-blur-md text-[10px] font-bold ${
                           listing.isFavorited
                             ? "bg-red-500/20 text-red-500 border-red-500/40"
                             : "bg-slate-950/80 text-slate-450 border-white/10 hover:text-white"
@@ -1549,35 +1425,35 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                       >
                         <span>{listing.isFavorited ? "❤️" : "🤍"}</span>
                         {listing.favoriteCount !== undefined && listing.favoriteCount > 0 && (
-                          <span className="text-[10px] font-extrabold">{listing.favoriteCount}</span>
+                          <span className="text-[9px] font-extrabold">{listing.favoriteCount}</span>
                         )}
                       </button>
 
                       <img
                         src={cover}
                         alt={listing.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-contain p-1 group-hover:scale-105 transition duration-500"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
                         }}
                       />
 
-                      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+                      <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
                         {listing.isUrgent && <UrgentListingBadge size="sm" animated />}
                         {listing.isShowcaseFeedActive && <ShowcaseBadge size="sm" />}
                         {listing.isAiReady && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
-                            ✨ AI Analizli
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-orange-600/90 text-white backdrop-blur-sm border border-orange-500/30 shadow-md">
+                            ✨ AI
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Content Details */}
-                    <div className="p-4 flex-1 flex flex-col justify-between gap-3">
+                    {/* Content Details (%20 küçültülmüş ölçek) */}
+                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
                       <div>
-                        {/* Vehicle Taxonomy Pills */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        {/* 1. Vehicle Taxonomy */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                           <span className="text-orange-400 font-extrabold">{brandName}</span>
                           <span>•</span>
                           <span>{modelName}</span>
@@ -1595,23 +1471,31 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                           )}
                         </div>
 
-                        <h3 className="text-sm sm:text-base font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-2">
-                          {listing.title}
-                        </h3>
+                        {/* 2. İlan Başlığı Bloğu: Label + Ana Başlık */}
+                        <div className="mt-1.5 sm:mt-2 flex flex-col">
+                          <span className="text-[9px] sm:text-[9.5px] font-extrabold uppercase tracking-widest text-slate-500 select-none">
+                            İLAN BAŞLIĞI
+                          </span>
+                          <h3 className="text-sm sm:text-[15px] font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-1 sm:line-clamp-2 leading-snug mt-0.5 sm:mt-1">
+                            {listing.title}
+                          </h3>
+                        </div>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-2">
-                          <span>Yıl: <strong className="text-slate-200">{listing.modelYear || "-"}</strong></span>
-                          <span>Km: <strong className="text-slate-200">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
-                          {listing.color && <span>Renk: <strong className="text-slate-200">{listing.color}</strong></span>}
-                          <span>Konum: <strong className="text-slate-200">{location}</strong></span>
+                        {/* 3. Metadata Row (Yıl, Km, Renk, Konum) */}
+                        <div className="flex flex-wrap items-center gap-x-3.5 sm:gap-x-4 gap-y-1 text-[11px] sm:text-[11.5px] text-slate-400 mt-2 sm:mt-2.5">
+                          <span>Yıl: <strong className="text-slate-200 font-semibold">{listing.modelYear || "-"}</strong></span>
+                          <span>Km: <strong className="text-slate-200 font-semibold">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
+                          {listing.color && <span>Renk: <strong className="text-slate-200 font-semibold">{listing.color}</strong></span>}
+                          <span>Konum: <strong className="text-slate-200 font-semibold">{location}</strong></span>
                         </div>
                       </div>
 
-                      <div className="border-t border-white/5 pt-3 flex items-center justify-between">
-                        <span className="text-xs text-slate-500">
+                      {/* 4. Alt Alan (Divider + Tarih & Fiyat) */}
+                      <div className="border-t border-white/5 mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 flex items-center justify-between">
+                        <span className="text-[10.5px] text-slate-500 font-medium">
                           {formatDateTr(listing.publishedAt || listing.createdAt)}
                         </span>
-                        <span className="text-base sm:text-lg font-black text-orange-400">
+                        <span className="text-sm sm:text-base font-black text-orange-400">
                           {formatCurrency(listing.priceAmount, listing.currency)}
                         </span>
                       </div>
