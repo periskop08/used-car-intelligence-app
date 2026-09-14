@@ -293,6 +293,13 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       * **3. Sürüş Dinamikleri & Mekanik Karakter:** (Aracın sürüş dinamikleri, süspansiyon darbe emişi, yol tutuşu ve ekspertizde bakılacak kritik mekanik detaylar)
       * **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)
     - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
+12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK VE KALİTE KURALLARI:
+    - **Tercih Etmek İçin Güçlü Nedenler ('strongestReasonsToChoose'):** En az 3-4 adet güçlü ve somut teknik/pratik neden yaz (Motor gücü/verimliliği, şanzıman akıcılığı, seçilen donanım paketinin öne çıkan özellikleri, ikinci el likiditesi). Asla 1-2 maddeyle geçiştirme!
+    - **Satın Almadan Önce Bilinecek Tavizler ('compromisesAndLimitations'):** En az 3 adet gerçekçi kullanım/tasarım tavizi yaz (Kompakt sedan arka koltuk yaşam alanı/diz mesafesi, çift kavramanın dur-kalk trafikteki çalışma karakteristiği, süspansiyon sertliği, premium servis ve parça işletme maliyeti). KESİNLİKLE kronik arızaları veya sızıntı kusurlarını buraya taviz diye kopyalama; burası aracın yapısal, tasarım ve sınıf sınırlarıdır!
+    - **Kimler İçin Mantıklı? ('suitableFor'):** En az 3 gerçekçi kullanıcı profili ve yaşam tarzı tanımla (Örn. Şehirli profesyoneller, dinamik sürüş ve konfor arayanlar, prestijli kompakt sedan isteyenler).
+    - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 gerçekçi profil tanımla (Örn. Kalabalık çocuklu aileler, çok düşük bakım ve parça bütçesi olanlar, sürekli yoğun dur-kalk trafikte ticari kullanım yapanlar). KESİNLİKLE "off-road yapanlar", "yarış pistine çıkanlar", "ağır yük taşıyanlar" gibi binek araca uymayan absürt veya saçma klişeler YAZMA!
+    - **Hangi Şartlarda Değerlendirilebilir? ('purchaseConditions'):** En az 3 somut ekspertiz ve bakım koşulu belirt (Servis geçmişi, şanzıman geçiş testi, lifte kaldırma kontrolleri).
+    - **Hangi Durumda Satın Almaktan Vazgeçilmeli? ('walkAwayConditions'):** En az 3 kritik vazgeçme kriteri belirt (Taşıyıcı şasi/iskelet işlemi, ağır şanzıman vuruntusu/kaçırması, motor mekanik hasarı).
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
@@ -308,12 +315,37 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
       "trafficBehavior": "Yoğun dur-kalk trafikte kavrama/vites davranışı, düşük devir torku ve kalkış dinamikleri...", 
       "comfortAssessment": "Koltuk ergonomisi, uzun yol yorgunluğu, kabin izolasyonu ve süspansiyon konforu..." 
     },
-    "strongestReasonsToChoose": [ { "title": "...", "explanation": "..." } ],
-    "compromisesAndLimitations": [ { "title": "...", "explanation": "..." } ],
-    "suitableFor": [ { "profile": "...", "explanation": "..." } ],
-    "notSuitableFor": [ { "profile": "...", "explanation": "..." } ],
-    "purchaseConditions": [ { "condition": "...", "reason": "...", "priority": "ÖNEMLİ" } ],
-    "walkAwayConditions": [ { "condition": "...", "reason": "...", "priority": "KRİTİK" } ]
+    "strongestReasonsToChoose": [
+      { "title": "Motor Gücü ve Verimlilik Dengesi", "explanation": "..." },
+      { "title": "Donanım Paketi ve Kabin Kalitesi", "explanation": "..." },
+      { "title": "Şanzıman Akıcılığı ve Sürüş Hissi", "explanation": "..." },
+      { "title": "İkinci El Değer Koruması ve Talep", "explanation": "..." }
+    ],
+    "compromisesAndLimitations": [
+      { "title": "Kompakt Sedan Arka Koltuk Yaşam Alanı", "explanation": "..." },
+      { "title": "Çift Kavrama Şanzımanın Trafik Karakteri", "explanation": "..." },
+      { "title": "Premium Servis ve Yedek Parça Maliyetleri", "explanation": "..." }
+    ],
+    "suitableFor": [
+      { "profile": "Şehirli Profesyoneller ve Bireysel Kullanıcılar", "explanation": "..." },
+      { "profile": "Dinamik Sürüş ve Rafine Konfor Arayanlar", "explanation": "..." },
+      { "profile": "Prestijli ve Değerini Koruyan Kompakt Sedan İsteyenler", "explanation": "..." }
+    ],
+    "notSuitableFor": [
+      { "profile": "Geniş ve Kalabalık Aileler", "explanation": "..." },
+      { "profile": "Çok Düşük İşletme ve Bakım Bütçesi Arayanlar", "explanation": "..." },
+      { "profile": "Sürekli Ağır Sıkışık Trafikte Yoğun Kilometre Yapanlar", "explanation": "..." }
+    ],
+    "purchaseConditions": [
+      { "condition": "Belgeli Servis ve Ağır Bakım Geçmişi", "reason": "...", "priority": "ÖNEMLİ" },
+      { "condition": "Şanzıman Kavrama ve Geçiş Performans Testi", "reason": "...", "priority": "ÖNEMLİ" },
+      { "condition": "Lift Üzerinde Detaylı Alt Takım ve Sıvı Kaçağı İncelemesi", "reason": "...", "priority": "ÖNEMLİ" }
+    ],
+    "walkAwayConditions": [
+      { "condition": "Taşıyıcı İskelet / Şasi / Kule / Direk Hasarı", "reason": "...", "priority": "KRİTİK" },
+      { "condition": "Ağır Şanzıman Vuruntusu veya Mekatronik Basınç Kaybı", "reason": "...", "priority": "KRİTİK" },
+      { "condition": "Motor Mekanik Hasarı veya İhmal Edilmiş Soğutma/Yağ Sistemi", "reason": "...", "priority": "KRİTİK" }
+    ]
   },
   "executiveSummary": { "oneSentenceSummary": "...", "strongestAdvantage": "...", "biggestRisk": "..." },
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
