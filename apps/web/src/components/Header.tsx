@@ -180,6 +180,9 @@ export default function Header() {
               <a href="/listings/urgent" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
                 <span>🚨</span> Acil İlanlar
               </a>
+              <a href="/listings/showcase" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
+                <span>⭐</span> Vitrin İlanlar
+              </a>
               <a href="/listings/create" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
                 <span>➕</span> İlan Ver
               </a>
@@ -485,6 +488,12 @@ export default function Header() {
                   <div className="flex flex-col gap-3 pl-4 mt-2 animate-in fade-in duration-200">
                     <a href="/listings" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
                       🚗 Tüm İlanlar
+                    </a>
+                    <a href="/listings/urgent" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
+                      🚨 Acil İlanlar
+                    </a>
+                    <a href="/listings/showcase" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
+                      ⭐ Vitrin İlanlar
                     </a>
                     <a href="/listings/create" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
                       ➕ İlan Ver

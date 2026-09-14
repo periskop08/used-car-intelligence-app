@@ -44,7 +44,7 @@ function formatDateTr(dateStr: string | Date | undefined | null): string {
   }
 }
 
-export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean }) {
+export function ListingsView({ isUrgentPage = false, isShowcasePage = false }: { isUrgentPage?: boolean; isShowcasePage?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -71,7 +71,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
   const [urgentOnly, setUrgentOnly] = useState(isUrgentPage);
-  const [showcaseOnly, setShowcaseOnly] = useState(false);
+  const [showcaseOnly, setShowcaseOnly] = useState(isShowcasePage);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
@@ -294,7 +294,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     const maxKmVal = searchParams.get("maxKm");
     const aiReady = searchParams.get("isAiReady") === "true";
     const urgentVal = isUrgentPage || searchParams.get("urgentOnly") === "true";
-    const showcaseVal = searchParams.get("showcaseOnly") === "true";
+    const showcaseVal = isShowcasePage || searchParams.get("showcaseOnly") === "true";
     const statusVal = searchParams.get("vehicleStatus");
     const cityVal = searchParams.get("city");
     const profileId = searchParams.get("preferenceProfileId");
@@ -536,7 +536,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     if (maxKm) params.set("maxKm", maxKm);
     if (isAiReady) params.set("isAiReady", "true");
     if (urgentOnly || isUrgentPage) params.set("urgentOnly", "true");
-    if (showcaseOnly) params.set("showcaseOnly", "true");
+    if (showcaseOnly || isShowcasePage) params.set("showcaseOnly", "true");
     if (city) params.set("city", city);
     if (district) params.set("district", district);
     if (fuelTypes.length > 0) params.set("fuelType", fuelTypes.join(","));
@@ -556,7 +556,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     if (includeDescription) params.set("includeDescription", "true");
 
     const newQuery = params.toString();
-    const basePath = isUrgentPage ? "/listings/urgent" : "/listings";
+    const basePath = isUrgentPage ? "/listings/urgent" : (isShowcasePage ? "/listings/showcase" : "/listings");
     router.push(newQuery ? `${basePath}?${newQuery}` : basePath);
     fetchListings();
   };
@@ -581,7 +581,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     setMaxKm("");
     setIsAiReady(false);
     setUrgentOnly(isUrgentPage);
-    setShowcaseOnly(false);
+    setShowcaseOnly(isShowcasePage);
     setCity("");
     setDistrict("");
     setSelectedCurrency("TRY");
@@ -601,7 +601,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
     setKeyword("");
     setIncludeDescription(false);
     setPage(1);
-    const basePath = isUrgentPage ? "/listings/urgent" : "/listings";
+    const basePath = isUrgentPage ? "/listings/urgent" : (isShowcasePage ? "/listings/showcase" : "/listings");
     router.push(basePath);
   };
 
@@ -638,7 +638,17 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
       {/* Title Header */}
-      {isUrgentPage ? (
+      {isShowcasePage ? (
+        <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-yellow-950/50 border border-amber-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <ShowcaseBadge size="medium" />
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Vitrin İlanlar</h1>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+            TorqueScout vitrin görünürlük hakkı aktif olan ve hızlı satış paketi kapsamındaki tüm öne çıkan araç ilanları.
+          </p>
+        </div>
+      ) : isUrgentPage ? (
         <div className="bg-gradient-to-r from-red-950/60 via-slate-900 to-rose-950/50 border border-red-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
           <div className="flex items-center gap-3">
             <UrgentListingBadge size="medium" animated />
@@ -1265,18 +1275,20 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           )}
 
           {/* Vitrin İlanları Toggle */}
-          <div className="flex items-center gap-2 cursor-pointer mt-1">
-            <input
-              type="checkbox"
-              id="showcaseOnlyCheckbox"
-              checked={showcaseOnly}
-              onChange={(e) => setShowcaseOnly(e.target.checked)}
-              className="accent-amber-500 rounded border-white/10"
-            />
-            <label htmlFor="showcaseOnlyCheckbox" className="text-xs font-black text-amber-400 cursor-pointer select-none flex items-center gap-1">
-              ⭐ Yalnızca Vitrin İlanları
-            </label>
-          </div>
+          {!isShowcasePage && (
+            <div className="flex items-center gap-2 cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                id="showcaseOnlyCheckbox"
+                checked={showcaseOnly}
+                onChange={(e) => setShowcaseOnly(e.target.checked)}
+                className="accent-amber-500 rounded border-white/10"
+              />
+              <label htmlFor="showcaseOnlyCheckbox" className="text-xs font-black text-amber-400 cursor-pointer select-none flex items-center gap-1">
+                ⭐ Yalnızca Vitrin İlanları
+              </label>
+            </div>
+          )}
 
           {/* Sticky Apply Button */}
           <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
