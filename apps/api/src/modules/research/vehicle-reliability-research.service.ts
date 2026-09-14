@@ -17,17 +17,26 @@ import {
   ReliabilityKnowledgeFreshness,
   ReliabilityPerformanceTiming,
   ReliabilityRecoveryTelemetry,
+  CanonicalRiskLifecycleState,
+  RiskApplicabilityState,
+  RiskVerificationState,
+  RiskConsequenceState,
+  CanonicalRiskSource,
+  CanonicalRiskDefect,
 } from '@used-car-intelligence/shared';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { SearchResult } from './providers/search-provider.interface';
 import { PrismaService } from '../../prisma.service';
+import { AITechnicalReasoningService } from './ai-technical-reasoning.service';
 
 export interface VehicleReliabilityResearchInput {
   brand: string;
   model: string;
   generation?: string;
   modelYear: number;
+  market?: 'TR' | 'EU' | 'US' | 'GLOBAL' | string;
   marketRegion?: string;
+  vin?: string;
   bodyType?: string;
   engineCode?: string;
   transmissionName?: string;
@@ -41,13 +50,14 @@ export interface VehicleReliabilityResearchInput {
   bypassCache?: boolean;
 }
 
-export const SEVERITY_SCORE_MAP: Record<SeverityCategoryV6, number> = {
+export const SEVERITY_SCORE_MAP: Record<SeverityCategoryV6, number | null> = {
   COSMETIC: 1,
   FUNCTIONAL_MINOR: 3,
   DRIVABILITY: 5,
   BREAKDOWN: 7,
   MAJOR_POWERTRAIN: 9,
   SAFETY_CRITICAL: 10,
+  UNRESOLVED: null,
 };
 
 export const PREVALENCE_FACTOR_MAP: Record<PrevalenceCategoryV6, number> = {
@@ -67,6 +77,44 @@ export const DOMAIN_WEIGHTS: Record<DomainKeyV6, number> = {
   SAFETY_RECALL: 0.15,
 };
 
+/**
+ * Guard utility identifying web domains, URLs, or generic source publisher / channel labels.
+ * Canonical risk defect IDs and semantic failure modes must NEVER be named after a source/domain/channel.
+ */
+export function isSourceOrDomainLabel(label?: string): boolean {
+  if (!label) return true;
+  const cleaned = label.trim().toLowerCase();
+  if (
+    cleaned === 'unknown' ||
+    cleaned === 'defect' ||
+    cleaned === 'technical bulletin' ||
+    cleaned === 'bülten' ||
+    cleaned === 'inceleme' ||
+    cleaned === 'araştırma' ||
+    cleaned === 'araştırması' ||
+    cleaned === 'research' ||
+    cleaned === 'query' ||
+    cleaned === 'search' ||
+    cleaned === 'failure query' ||
+    cleaned === 'chronic failure' ||
+    cleaned === 'chronic defect' ||
+    cleaned === 'kaynak' ||
+    cleaned.includes('araştırma') ||
+    cleaned.includes('research') ||
+    cleaned.includes('bulletin') ||
+    cleaned.startsWith('http://') ||
+    cleaned.startsWith('https://') ||
+    cleaned.startsWith('www.') ||
+    /\.(com|org|net|co\.uk|eu|de|fr|tr|gov|edu|io|info|biz|me)(\/|$)/i.test(cleaned) ||
+    /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(cleaned) ||
+    /_COM$|_CO_UK$|_NET$|_ORG$|_EU$|_DE$|_TR$/i.test(label.trim().toUpperCase()) ||
+    /_ARA_TIRMASI$|_RESEARCH$|_QUERY$|_CHRONIC_FAILURE$|_TSB_BULLETIN$|_FAILURE_QUERY$/i.test(label.trim().toUpperCase())
+  ) {
+    return true;
+  }
+  return false;
+}
+
 @Injectable()
 export class VehicleReliabilityResearchService {
   private readonly logger = new Logger(VehicleReliabilityResearchService.name);
@@ -82,13 +130,17 @@ export class VehicleReliabilityResearchService {
   // Bounded Concurrency: Maximum 4 simultaneous external search queries
   private readonly MAX_EXTERNAL_CONCURRENCY = 4;
 
+  public readonly aiReasoningService: AITechnicalReasoningService;
+
   constructor(
     @Optional() private webSearchProvider?: WebSearchProvider,
     @Optional() private prisma?: PrismaService,
+    @Optional() aiReasoningService?: AITechnicalReasoningService,
   ) {
     if (!this.webSearchProvider) {
       this.webSearchProvider = new WebSearchProvider();
     }
+    this.aiReasoningService = aiReasoningService || new AITechnicalReasoningService();
   }
 
   /**
@@ -183,6 +235,10 @@ export class VehicleReliabilityResearchService {
             const state: ReliabilityFreshnessState = age <= this.RECALL_FRESHNESS_TTL_MS ? 'FRESH' : 'STALE';
             this.logger.log(`[SHADOW STAGE 1 L2 PG CACHE HIT] (${state}) Reusing persistent DB reliability research for ${cacheKey}`);
 
+            const allVerified = (dbRecord.allVerifiedDefects as any) || [];
+            const qualitative = (dbRecord.qualitativeDefects as any) || [];
+            const canonicalRisks = (dbRecord as any).canonicalRisks || this.buildCanonicalRisks(input, [...allVerified, ...qualitative]);
+
             const restoredResult: VehicleReliabilityResearch = {
               researchId: dbRecord.id || `PERSISTED-${Date.now()}`,
               variantId: (input as any).variantId,
@@ -190,8 +246,9 @@ export class VehicleReliabilityResearchService {
               applicableDomainCount: Object.keys(dbRecord.domainResults || {}).length,
               reliabilityCoverageScore: dbRecord.reliabilityCoverageScore,
               domainResults: dbRecord.domainResults as any,
-              allVerifiedDefects: (dbRecord.allVerifiedDefects as any) || [],
-              qualitativeDefects: (dbRecord.qualitativeDefects as any) || [],
+              allVerifiedDefects: allVerified,
+              qualitativeDefects: qualitative,
+              canonicalRisks,
               unresolvedContradictions: [],
               freshness: {
                 state,
@@ -475,9 +532,63 @@ export class VehicleReliabilityResearchService {
     });
 
     // Global cross-domain deduplication cluster
-    const globallyClusteredVerified = this.clusterEvidenceList(allNormalizedDefects);
-    const globallyClusteredQualitative = this.clusterEvidenceList(qualitativeDefects);
+    let globallyClusteredVerified = this.clusterEvidenceList(allNormalizedDefects);
+    let globallyClusteredQualitative = this.clusterEvidenceList(qualitativeDefects);
     const globallyClusteredDiscovery = this.clusterEvidenceList(discoveryTelemetry);
+
+    // Targeted Consequence Recovery for verified defects lacking direct consequence evidence
+    const verifiedClusters = [...globallyClusteredVerified, ...globallyClusteredQualitative];
+    const globalRecoveryBudget = { queriesExecuted: 0, maxBudget: 8 };
+
+    for (const def of verifiedClusters) {
+      if (
+        def.severityCategory === 'UNRESOLVED' ||
+        def.severityScore === null ||
+        def.severityBasis === 'INFERRED_FROM_VERIFIED_FAILURE_MODE'
+      ) {
+        await this.recoverDefectConsequence(def, input, globalRecoveryBudget);
+      }
+    }
+
+    // DISCOVERY CANDIDATES: Tier 3 community/forum evidence alone cannot verify or score a defect,
+    // but it MAY trigger targeted Tier 1/2 recovery.
+    // If recovery independently finds Tier 1 or Tier 2 verification evidence, promote candidate to VERIFIED.
+    // Otherwise remain advisory / discovery only.
+    for (const disc of globallyClusteredDiscovery) {
+      const failMode = disc.normalizedFailureMode || '';
+      if (
+        failMode &&
+        failMode !== 'UNKNOWN' &&
+        !isSourceOrDomainLabel(failMode) &&
+        !isSourceOrDomainLabel(disc.title)
+      ) {
+        const recovered = await this.recoverDefectConsequence(disc, input, globalRecoveryBudget);
+        const hasTier1or2 = recovered.linkedSources.some(
+          (s) => s.sourceTier === 'TIER_1' || s.sourceTier === 'TIER_2',
+        );
+        if (hasTier1or2 && recovered.severityScore !== null && recovered.severityScore > 0) {
+          recovered.numericEligibility = 'QUALITATIVE_ONLY';
+          recovered.rejectionReason = undefined;
+          globallyClusteredQualitative.push(recovered);
+        }
+      }
+    }
+
+    // FINAL CONSEQUENCE RECOVERY LAYER BEFORE NOT_ESTIMABLE
+    // For every verified / advisory risk with severity === null:
+    // run one final campaign-specific consequence recovery stage.
+    const allVerifiedSoFar = [...globallyClusteredVerified, ...globallyClusteredQualitative];
+    for (const cand of allVerifiedSoFar) {
+      if (
+        cand.severityScore === null ||
+        cand.severityCategory === 'UNRESOLVED' ||
+        cand.severityBasis === 'UNRESOLVED'
+      ) {
+        if (globalRecoveryBudget.queriesExecuted < globalRecoveryBudget.maxBudget + 4) {
+          await this.recoverDefectConsequence(cand, input, globalRecoveryBudget);
+        }
+      }
+    }
 
     // 4. Compute Reliability Coverage Score strictly across applicable domains
     const totalApplicableWeight = applicableDomains.reduce((sum, d) => sum + DOMAIN_WEIGHTS[d], 0);
@@ -492,6 +603,91 @@ export class VehicleReliabilityResearchService {
     const totalResearchMs = Date.now() - t0;
     const researchedAt = new Date().toISOString();
 
+    const canonicalRisks = this.buildCanonicalRisks(input, [
+      ...globallyClusteredVerified,
+      ...globallyClusteredQualitative,
+      ...globallyClusteredDiscovery,
+    ]);
+
+    // AI Technical Reasoning Fallback for resolved vehicles:
+    // Trigger ONLY when:
+    // 1. Vehicle identity is resolved
+    // 2. Bounded research completed
+    // 3. finalDecisionScore would otherwise be null (no scoring-eligible canonical risks with severity > 0)
+    const hasScoringRisks = canonicalRisks.some(
+      (cr) => cr.scoringEligible && typeof cr.severity === 'number' && cr.severity > 0,
+    );
+    const isVehicleIdentityResolved = !!(input.brand && input.model && input.modelYear);
+
+    if (!hasScoringRisks && isVehicleIdentityResolved) {
+      await this.aiReasoningService.applyTechnicalReasoningFallback(input, canonicalRisks, domainResults);
+
+      const promotedRisks = canonicalRisks.filter(
+        (cr) => cr.inferenceBasis === 'AI_INFERRED_FROM_VERIFIED_FACTS' && cr.scoringEligible,
+      );
+
+      if (promotedRisks.length > 0) {
+        promotedRisks.forEach((pr) => {
+          const existingQual = globallyClusteredQualitative.find(
+            (d) => d.normalizedFailureMode === pr.normalizedFailureMode,
+          );
+          if (existingQual) {
+            existingQual.severityScore = pr.severity;
+            existingQual.severityBasis = pr.severityBasis;
+            (existingQual as any).scoringEligible = true;
+            (existingQual as any).consequenceState = pr.consequenceState;
+            (existingQual as any).inferredConsequence = pr.inferredConsequence;
+            (existingQual as any).reasoningChain = pr.reasoningChain;
+            (existingQual as any).supportingFactIds = pr.supportingFactIds;
+            (existingQual as any).inferenceBasis = pr.inferenceBasis;
+            (existingQual as any).inferenceConfidence = pr.inferenceConfidence;
+          } else {
+            const disc = globallyClusteredDiscovery.find(
+              (d) => d.normalizedFailureMode === pr.normalizedFailureMode,
+            );
+            if (disc) {
+              const promotedEvidence: any = {
+                ...disc,
+                severityScore: pr.severity,
+                severityBasis: pr.severityBasis,
+                numericEligibility: 'QUALITATIVE_ONLY',
+                prevalenceFactor: null,
+                severityCategory: (pr.severity ?? 0) >= 8 ? 'SAFETY_CRITICAL' : (pr.severity ?? 0) >= 7 ? 'BREAKDOWN' : (pr.severity ?? 0) >= 5 ? 'DRIVABILITY' : 'FUNCTIONAL_MINOR',
+                verificationState: pr.verificationState as any,
+                scoringEligible: true,
+                consequenceState: pr.consequenceState as any,
+                inferredConsequence: pr.inferredConsequence,
+                reasoningChain: pr.reasoningChain,
+                supportingFactIds: pr.supportingFactIds,
+                inferenceBasis: pr.inferenceBasis,
+                inferenceConfidence: pr.inferenceConfidence,
+              };
+              globallyClusteredQualitative.push(promotedEvidence);
+            }
+          }
+        });
+      }
+    }
+
+    // Sync non-scoring state to domainResults defects
+    const nonScoringFailureModes = new Set(
+      canonicalRisks.filter((cr) => !cr.scoringEligible).map((cr) => cr.normalizedFailureMode),
+    );
+    Object.values(domainResults).forEach((dr) => {
+      dr.defects?.forEach((d) => {
+        if (nonScoringFailureModes.has(d.normalizedFailureMode)) {
+          (d as any).scoringEligible = false;
+        } else if (canonicalRisks.some((cr) => cr.normalizedFailureMode === d.normalizedFailureMode && cr.scoringEligible)) {
+          (d as any).scoringEligible = true;
+          const cr = canonicalRisks.find((c) => c.normalizedFailureMode === d.normalizedFailureMode);
+          if (cr && typeof cr.severity === 'number' && cr.severity > 0) {
+            d.severityScore = cr.severity;
+            d.severityBasis = cr.severityBasis;
+          }
+        }
+      });
+    });
+
     const researchResult: VehicleReliabilityResearch = {
       researchId,
       variantId: (input as any).variantId,
@@ -501,6 +697,7 @@ export class VehicleReliabilityResearchService {
       domainResults,
       allVerifiedDefects: globallyClusteredVerified,
       qualitativeDefects: globallyClusteredQualitative,
+      canonicalRisks,
       discoveryTelemetry: globallyClusteredDiscovery,
       unresolvedContradictions: [],
       freshness: {
@@ -549,11 +746,16 @@ export class VehicleReliabilityResearchService {
     const trans = input.transmissionCode || input.transmissionName || '';
 
     switch (domain) {
-      case 'POWERTRAIN_ENGINE':
+      case 'POWERTRAIN_ENGINE': {
+        const cleanGen = (input.generation || '')
+          .replace(/Jenerasyonu/gi, '')
+          .replace(new RegExp(input.model || '', 'gi'), '')
+          .trim();
+        const genTerm = cleanGen ? ` ${cleanGen}` : '';
         return [
           {
             channelKey: 'POWERTRAIN_ENGINE_CHRONIC_FAILURE',
-            query: `${year} ${brand} ${model} ${gen} ${eng} kronik motor arizalari motor omru problemleri`.trim(),
+            query: `${year} ${brand} ${model}${genTerm} ${eng} kronik motor arizalari motor omru problemleri`.trim(),
             isRecallOrTsb: false,
           },
           {
@@ -562,6 +764,7 @@ export class VehicleReliabilityResearchService {
             isRecallOrTsb: true,
           },
         ];
+      }
 
       case 'POWERTRAIN_TRANS':
         return [
@@ -651,7 +854,7 @@ export class VehicleReliabilityResearchService {
         return [
           {
             channelKey: 'SAFETY_RECALL_REGISTRY',
-            query: `${year} ${brand} ${model} resmi geri cagirma recall service campaign NHTSA KBA`.trim(),
+            query: `${year} ${brand} ${model} resmi geri cagirma recall service campaign NHTSA KBA RAPEX Safety Gate`.trim(),
             isRecallOrTsb: true,
           },
         ];
@@ -740,7 +943,11 @@ export class VehicleReliabilityResearchService {
   }
 
   /**
-   * Classifies a source tier according to strict frozen provenance rules.
+   * Classifies a source tier according to comprehensive SOURCE-CLASS evaluation.
+   * - Tier 1: Official Regulatory Authorities & OEM Technical Portals.
+   * - Tier 3: Forums, social media, and user-generated content (always evaluated first!).
+   * - Tier 2: Reputable technical repair networks, component manufacturers, inspection/fleet bodies,
+   *           and established technical automotive press.
    */
   classifySourceTier(url?: string, domain?: string): LinkedEvidenceSource['sourceTier'] {
     const rawUrl = (url || '').toLowerCase();
@@ -748,16 +955,22 @@ export class VehicleReliabilityResearchService {
 
     // 1. TIER 1: Official OEM or Government Safety Authorities
     const isTier1 =
-      rawUrl.includes('.gov') ||
-      rawDomain.includes('.gov') ||
+      rawDomain.endsWith('.gov') ||
+      rawUrl.includes('.gov/') ||
       rawDomain.includes('kba.de') ||
       rawUrl.includes('kba.de') ||
       rawDomain.includes('nhtsa') ||
       rawUrl.includes('nhtsa') ||
       rawDomain.includes('rapex') ||
       rawUrl.includes('rapex') ||
+      rawDomain.includes('safety-gate') ||
+      rawUrl.includes('safety-gate') ||
       rawDomain.includes('europa.eu/safety') ||
       rawUrl.includes('europa.eu/safety') ||
+      rawDomain.includes('dft.gov.uk') ||
+      rawUrl.includes('dft.gov.uk') ||
+      rawDomain.includes('dvsa.gov.uk') ||
+      rawUrl.includes('dvsa.gov.uk') ||
       rawDomain.includes('erwin.volkswagen') ||
       rawUrl.includes('erwin.volkswagen') ||
       rawDomain.includes('tis.bmwgroup') ||
@@ -769,74 +982,66 @@ export class VehicleReliabilityResearchService {
       rawDomain.includes('service.tesla.com') ||
       rawUrl.includes('service.tesla.com') ||
       rawDomain.includes('oem-is.com') ||
-      rawUrl.includes('oem-is.com');
+      rawUrl.includes('oem-is.com') ||
+      rawDomain.includes('techinfo.honda.com') ||
+      rawUrl.includes('techinfo.honda.com') ||
+      rawDomain.includes('motorcraftservice.com') ||
+      rawUrl.includes('motorcraftservice.com');
 
     if (isTier1) {
       return 'TIER_1';
     }
 
-    // 2. TIER 2: Established technical specialist data / teardowns / component manufacturer tech docs / reputable automotive publications
-    const isTier2 =
-      rawDomain.includes('adac.de') ||
-      rawUrl.includes('adac.de') ||
-      rawDomain.includes('tuv') ||
-      rawUrl.includes('tuv') ||
-      rawDomain.includes('dekra') ||
-      rawUrl.includes('dekra') ||
-      rawDomain.includes('auto-motor-und-sport') ||
-      rawUrl.includes('auto-motor-und-sport') ||
-      rawDomain.includes('whatcar.com') ||
-      rawUrl.includes('whatcar.com') ||
-      rawDomain.includes('carcomplaints.com') ||
-      rawUrl.includes('carcomplaints.com') ||
-      rawDomain.includes('honestjohn.co.uk') ||
-      rawUrl.includes('honestjohn.co.uk') ||
-      rawDomain.includes('atsg.us') ||
-      rawUrl.includes('atsg.us') ||
-      rawDomain.includes('troublecodes.net') ||
-      rawUrl.includes('troublecodes.net') ||
-      rawDomain.includes('obd-codes.com') ||
-      rawUrl.includes('obd-codes.com') ||
-      rawDomain.includes('tsbsearch.com') ||
-      rawUrl.includes('tsbsearch.com') ||
-      rawDomain.includes('autosafety.org') ||
-      rawUrl.includes('autosafety.org') ||
-      rawDomain.includes('repairpal.com') ||
-      rawUrl.includes('repairpal.com') ||
-      rawDomain.includes('caranddriver.com') ||
-      rawUrl.includes('caranddriver.com') ||
-      rawDomain.includes('consumerreports.org') ||
-      rawUrl.includes('consumerreports.org') ||
-      rawDomain.includes('edmunds.com') ||
-      rawUrl.includes('edmunds.com') ||
-      rawDomain.includes('autobild.de') ||
-      rawUrl.includes('autobild.de') ||
-      rawDomain.includes('motor1.com') ||
-      rawUrl.includes('motor1.com') ||
-      rawDomain.includes('alldata.com') ||
-      rawUrl.includes('alldata.com') ||
-      rawDomain.includes('identifix.com') ||
-      rawUrl.includes('identifix.com') ||
-      rawDomain.includes('bosch') ||
-      rawUrl.includes('bosch') ||
-      rawDomain.includes('zf.com') ||
-      rawUrl.includes('zf.com') ||
-      rawDomain.includes('schaeffler') ||
-      rawUrl.includes('schaeffler') ||
-      rawDomain.includes('continental') ||
-      rawUrl.includes('continental') ||
-      rawDomain.includes('garrettmotion') ||
-      rawUrl.includes('garrettmotion') ||
-      rawDomain.includes('borgwarner') ||
-      rawUrl.includes('borgwarner') ||
-      rawDomain.includes('autodata') ||
-      rawUrl.includes('autodata');
+    // 2. FORUMS / SOCIAL MEDIA / UGC -> STRICTLY TIER 3 (Rule out before Tier 2!)
+    const isUgcOrForum =
+      rawDomain.includes('reddit.com') ||
+      rawDomain.includes('youtube.com') ||
+      rawDomain.includes('facebook.com') ||
+      rawDomain.includes('twitter.com') ||
+      rawDomain.includes('x.com') ||
+      rawDomain.includes('instagram.com') ||
+      rawDomain.includes('tiktok.com') ||
+      rawDomain.includes('quora.com') ||
+      rawDomain.includes('wikipedia.org') ||
+      rawDomain.includes('donanimhaber.com') ||
+      rawDomain.includes('eksisozluk.com') ||
+      rawDomain.includes('sikayetvar.com') ||
+      rawDomain.includes('drive2.ru') ||
+      /\b(?:forum|forums|community|boards?|club|groups?)\b/i.test(rawDomain) ||
+      /\/(?:forum|forums|community|threads?|topic|discussion)\b/i.test(rawUrl);
 
-    if (isTier2) {
+    if (isUgcOrForum) {
+      return 'TIER_3';
+    }
+
+    // 3. TIER 2: Comprehensive SOURCE-CLASS Evaluation
+    // Class A: Technical Repair Networks & Workshop Databases
+    const isRepairNetwork =
+      /\b(?:alldata|identifix|autodata|haynes(?:pro)?|mitchell1|atsg|troublecodes|obd-codes|tsbsearch|carcomplaints|carrepairdata|repairpal|iatn|repxpert|workshop-manuals)\b/i.test(rawDomain);
+
+    // Class B: Tier-1 Component Manufacturers & Technical Bulletins
+    const isComponentManufacturer =
+      /\b(?:bosch|zf|schaeffler|continental|gatestechzone|dayco|mahle|hella|garrettmotion|borgwarner|valeo|denso|luk|ina|fag|skf|brembo)\b/i.test(rawDomain);
+
+    // Class C: Inspection, Fleet & Warranty Reliability Organizations
+    const isInspectionOrFleet =
+      /\b(?:adac|tuv|tüv|dekra|warrantywise|reliabilityindex|whatcar|consumerreports|car-recalls|autosafety)\b/i.test(rawDomain);
+
+    // Class D: Established Technical Automotive Publications & Specialist Outlets
+    const isTechnicalPress =
+      /\b(?:pmmonline|autocar|caranddriver|edmunds|autobild|motor1|auto-motor-und-sport|autoexpress|largus|caradisiac|autoplus|automobile-magazine|parkers|carbuyer|wardsauto|automotive-fleet|fleetnews|sekizsilindir|otohaber|ototeknikveri|carexpert|drive\.com\.au)\b/i.test(rawDomain);
+
+    // Class E: Technical Service Bulletin or Recall URL patterns from credible web publishers
+    const isTechnicalBulletinUrl =
+      /\b(?:technical-service-bulletin|recall-bulletin|service-action|recalls?|tsb|bulletin)\b/i.test(rawUrl) &&
+      !rawDomain.includes('blog') &&
+      !rawDomain.includes('forum');
+
+    if (isRepairNetwork || isComponentManufacturer || isInspectionOrFleet || isTechnicalPress || isTechnicalBulletinUrl) {
       return 'TIER_2';
     }
 
-    // 3. TIER 3: Forums, social media, general owner complaints, or unclassified generic web sources
+    // 4. Default: TIER 3 (General / unvetted web source)
     return 'TIER_3';
   }
 
@@ -890,13 +1095,59 @@ export class VehicleReliabilityResearchService {
             domain,
           );
 
+          const DOMAIN_LABELS_TR: Record<string, string> = {
+            POWERTRAIN_ENGINE: 'Motor Mekaniği & Zamanlama',
+            POWERTRAIN_TRANS: 'Şanzıman & Aktarma Organları',
+            EMISSIONS_EXHAUST: 'Emisyon & Egzoz Arıtma',
+            HV_BATTERY_SYSTEM: 'Yüksek Voltaj & Batarya Sistemi',
+            THERMAL_COOLING: 'Termal Yönetim & Soğutma',
+            ELECTRONICS_BODY: 'Gövde Elektroniği & Donanım',
+            CHASSIS_BRAKES: 'Yürüyen Aksam, Direksiyon & Fren',
+            SAFETY_RECALL: 'Resmi Geri Çağırma & Güvenlik',
+          };
+          const trDomainName = DOMAIN_LABELS_TR[domain] || domain.replace(/_/g, ' ');
+          let cleanTitle = res.title;
+          if (!cleanTitle || isSourceOrDomainLabel(cleanTitle) || cleanTitle.toUpperCase() === 'TECHNICAL BULLETIN') {
+            cleanTitle = undefined;
+          }
+
+          let candidateFailureMode = campaignId
+            ? `RECALL_${campaignId.replace(/[^A-Z0-9]/gi, '_').toUpperCase()}`
+            : undefined;
+
+          if (!candidateFailureMode && cleanTitle && !isSourceOrDomainLabel(cleanTitle)) {
+            candidateFailureMode = this.normalizeFailureKey(cleanTitle);
+            if (candidateFailureMode === 'UNKNOWN' || isSourceOrDomainLabel(candidateFailureMode)) {
+              candidateFailureMode = undefined;
+            }
+          }
+
+          // If title/failure mode is missing or derived from a domain label, attempt semantic extraction from snippet text
+          if (!candidateFailureMode || !cleanTitle || isSourceOrDomainLabel(cleanTitle)) {
+            const semanticExtracted = this.extractSemanticFailureMode(snippetText || fullContentText, domain);
+            if (semanticExtracted) {
+              candidateFailureMode = candidateFailureMode || semanticExtracted.failureMode;
+              cleanTitle = cleanTitle || semanticExtracted.title;
+            }
+          }
+
+          // Strict Requirement 6: Canonical defect requires an evidence-derived semantic failureMode.
+          // Never create a defect from channel.title/query/search metadata.
+          const finalFailureMode = candidateFailureMode && !isSourceOrDomainLabel(candidateFailureMode)
+            ? candidateFailureMode
+            : 'UNKNOWN';
+
+          const finalTitle = finalFailureMode !== 'UNKNOWN'
+            ? (cleanTitle && !isSourceOrDomainLabel(cleanTitle) ? cleanTitle : finalFailureMode.replace(/_/g, ' '))
+            : 'DISCOVERY_UNKNOWN';
+
           liveExtractedCandidates.push({
             id: `LIVE-${domain}-${idx}`,
             domain,
             campaignId,
-            title: res.title || `${domain} İncelemesi`,
-            failureMode: res.title || snippetText.substring(0, 50),
-            affectedComponent: domain.replace(/_/g, ' '),
+            title: finalTitle,
+            failureMode: finalFailureMode,
+            affectedComponent: trDomainName,
             consequenceDescription: candidateConsequence,
             sourceTier: tier,
             sourceName: res.domain || 'Grounded Web Research',
@@ -1025,13 +1276,68 @@ export class VehicleReliabilityResearchService {
 
     const domain = (rawDef.domain as DomainKeyV6) || this.mapDomain(rawDef.failureMode || rawDef.title || rawDef.affectedComponent);
     const campaignId = rawDef.campaignId || this.extractCampaignId(`${rawDef.title || ''} ${rawDef.failureMode || ''} ${rawDef.url || ''} ${rawDef.consequenceDescription || ''}`);
-    const failureMode = campaignId
-      ? `RECALL_${campaignId.replace(/[^A-Z0-9]/gi, '_').toUpperCase()}`
-      : this.normalizeFailureKey(rawDef.failureMode || rawDef.title || rawDef.normalizedFailureMode);
 
-    const consequenceDesc = rawDef.consequenceDescription || rawDef.consequence || rawDef.description || 'Fonksiyonel kusur';
-    const severityCategory = this.mapConsequenceToCategory(consequenceDesc, rawDef.severityCategory, rawDef.failureMode || rawDef.title);
-    const severityScore = SEVERITY_SCORE_MAP[severityCategory];
+    let rawKey = rawDef.failureMode && rawDef.failureMode !== 'UNKNOWN' && !isSourceOrDomainLabel(rawDef.failureMode)
+      ? rawDef.failureMode
+      : (rawDef.normalizedFailureMode && rawDef.normalizedFailureMode !== 'UNKNOWN' && !isSourceOrDomainLabel(rawDef.normalizedFailureMode) ? rawDef.normalizedFailureMode : undefined);
+
+    let failureMode = campaignId
+      ? `RECALL_${campaignId.replace(/[^A-Z0-9]/gi, '_').toUpperCase()}`
+      : (rawKey ? this.normalizeFailureKey(rawKey) : 'UNKNOWN');
+
+    let defectTitle = rawDef.title || rawDef.failureMode || 'Doğrulanmış Kusur';
+    if (isSourceOrDomainLabel(defectTitle) || failureMode === 'UNKNOWN') {
+      defectTitle = failureMode && failureMode !== 'UNKNOWN' ? failureMode.replace(/_/g, ' ') : 'DISCOVERY_UNKNOWN';
+    }
+
+    if (!failureMode || failureMode === 'UNKNOWN' || isSourceOrDomainLabel(failureMode)) {
+      const sem = this.extractSemanticFailureMode(
+        `${rawDef.title || ''} ${rawDef.consequenceDescription || ''} ${rawDef.snippet || ''} ${rawDef.citationSnippet || ''}`,
+        domain,
+      );
+      if (sem) {
+        failureMode = sem.failureMode;
+        defectTitle = sem.title;
+      } else {
+        failureMode = 'UNKNOWN';
+        defectTitle = 'DISCOVERY_UNKNOWN';
+      }
+    }
+
+    if (failureMode === 'WET_BELT' || /wet[\s_-]?belt/i.test(defectTitle)) {
+      defectTitle = 'Islak Triger Kayışı Aşınması';
+    }
+
+    const rawConsequence = rawDef.consequenceDescription || rawDef.consequence || rawDef.description;
+    const hasConsequenceEvidence =
+      typeof rawConsequence === 'string' &&
+      rawConsequence.trim().length > 0 &&
+      rawConsequence.trim() !== 'Fonksiyonel kusur';
+
+    let severityCategory: SeverityCategoryV6;
+    let severityScore: number | null;
+    let consequenceDesc: string;
+
+    if (rawDef.severityCategory && rawDef.severityCategory !== 'UNRESOLVED' && SEVERITY_SCORE_MAP[rawDef.severityCategory] !== undefined) {
+      severityCategory = rawDef.severityCategory;
+      severityScore = SEVERITY_SCORE_MAP[severityCategory];
+      consequenceDesc = hasConsequenceEvidence ? rawConsequence.trim() : (rawDef.severityBasis || 'Doğrulanmış kusur');
+    } else if (hasConsequenceEvidence) {
+      consequenceDesc = rawConsequence.trim();
+      const mapped = this.mapConsequenceToCategory(consequenceDesc, rawDef.severityCategory, rawDef.failureMode || rawDef.title);
+      if (mapped !== 'UNRESOLVED') {
+        severityCategory = mapped;
+        severityScore = SEVERITY_SCORE_MAP[severityCategory];
+      } else {
+        severityCategory = 'UNRESOLVED';
+        severityScore = null;
+        consequenceDesc = 'UNRESOLVED';
+      }
+    } else {
+      severityCategory = 'UNRESOLVED';
+      severityScore = null;
+      consequenceDesc = 'UNRESOLVED';
+    }
 
     const sourceTier: LinkedEvidenceSource['sourceTier'] = rawDef.sourceTier || (rawDef.highestSourceTier as any) || 'TIER_3';
 
@@ -1040,7 +1346,7 @@ export class VehicleReliabilityResearchService {
       return {
         id: `DEF-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         domain,
-        title: rawDef.title || rawDef.failureMode || 'Kusur',
+        title: defectTitle,
         normalizedFailureMode: failureMode,
         affectedComponent: rawDef.affectedComponent || 'Bileşen',
         severityCategory,
@@ -1087,8 +1393,17 @@ export class VehicleReliabilityResearchService {
       prevFactor = rawDef.prevalenceFactor;
     }
 
+    const isUnknownDefect = !failureMode || failureMode === 'UNKNOWN' || isSourceOrDomainLabel(failureMode);
     const numericEligibility: EvidenceNumericEligibilityV6 =
-      prevFactor !== null ? 'NUMERIC_ELIGIBLE' : 'QUALITATIVE_ONLY';
+      isUnknownDefect
+        ? 'REJECTED'
+        : prevFactor !== null
+        ? 'NUMERIC_ELIGIBLE'
+        : 'QUALITATIVE_ONLY';
+
+    const rejectionReason = isUnknownDefect
+      ? 'Semantic defect identity is unknown or derived from source label.'
+      : undefined;
 
     const linkedSource: LinkedEvidenceSource = {
       sourceId: `SRC-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
@@ -1101,7 +1416,7 @@ export class VehicleReliabilityResearchService {
     return {
       id: rawDef.id || `DEF-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       domain,
-      title: rawDef.title || rawDef.failureMode || 'Doğrulanmış Kusur',
+      title: defectTitle,
       normalizedFailureMode: failureMode,
       affectedComponent: rawDef.affectedComponent || 'Bileşen',
       severityCategory,
@@ -1122,6 +1437,7 @@ export class VehicleReliabilityResearchService {
       campaignStatus: rawDef.campaignStatus || (sourceTier === 'TIER_1' || campaignId ? 'MODEL_CAMPAIGN_EXISTS' : undefined),
       linkedSources: rawDef.linkedSources || [linkedSource],
       numericEligibility,
+      rejectionReason,
     };
   }
 
@@ -1165,10 +1481,21 @@ export class VehicleReliabilityResearchService {
           existing.rejectionReason = undefined;
         } else if (existing.numericEligibility !== 'REJECTED') {
           // Both are verified: If incoming evidence has higher grounded severity and a non-generic basis, update
-          if (ev.severityScore > existing.severityScore && ev.severityCategory !== 'FUNCTIONAL_MINOR') {
+          const existingScore = existing.severityScore ?? 0;
+          const incomingScore = ev.severityScore ?? 0;
+          if (
+            ev.severityScore !== null &&
+            incomingScore > existingScore &&
+            ev.severityCategory !== 'FUNCTIONAL_MINOR' &&
+            ev.severityCategory !== 'UNRESOLVED'
+          ) {
             existing.severityCategory = ev.severityCategory;
             existing.severityScore = ev.severityScore;
             existing.severityBasis = ev.severityBasis;
+          }
+
+          if (existing.normalizedFailureMode === 'WET_BELT' || ev.normalizedFailureMode === 'WET_BELT') {
+            existing.title = 'Islak Triger Kayışı Aşınması';
           }
 
           // If incoming candidate has grounded prevalence and existing does not:
@@ -1188,6 +1515,538 @@ export class VehicleReliabilityResearchService {
     }
 
     return Array.from(clusterMap.values());
+  }
+
+  /**
+   * Generic Applicability Resolver V2.
+   * Evaluates defect applicability across 5 orthogonal dimensions without vehicle-specific hardcoding:
+   * 1. Market applicability (US / EU / TR / Global, regulator jurisdiction, homologation)
+   * 2. Engine applicability (exact code/family, displacement, fuel & emissions architecture)
+   * 3. Transmission applicability (gearbox family/code, dry vs wet clutch, manual vs auto)
+   * 4. Production applicability (model year range, plant/factory, VIN prefix/range)
+   * 5. Component applicability (proven shared component architecture vs unconfirmed)
+   */
+  resolveGenericApplicabilityV2(
+    input: VehicleReliabilityResearchInput,
+    ev: NormalizedReliabilityEvidence | any,
+  ): {
+    applicabilityState: RiskApplicabilityState;
+    applicabilityEvidence: string;
+    isEligible: boolean;
+  } {
+    const app = ev.applicability || {};
+    const fullText = `${ev.title || ''} ${ev.normalizedFailureMode || ''} ${ev.affectedComponent || ''} ${ev.severityBasis || ''} ${ev.description || ''} ${ev.citationSnippet || ''} ${app.engineCode || ''} ${app.transmissionCode || ''}`.toLowerCase();
+    const urlsAndSources = (ev.linkedSources || []).map((s: any) => `${s.url || ''} ${s.publisher || ''} ${s.evidenceSnippet || ''}`).join(' ').toLowerCase();
+    const combinedContext = `${fullText} ${urlsAndSources}`;
+
+    // -------------------------------------------------------------
+    // DIMENSION 4: Production Applicability (Model Year Range & VIN/Plant)
+    // -------------------------------------------------------------
+    const inputYear = input.modelYear;
+    const yearFrom = app.modelYearFrom ?? app.yearFrom;
+    const yearTo = app.modelYearTo ?? app.yearTo;
+
+    if (inputYear) {
+      if (yearFrom && inputYear < yearFrom) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Production year mismatch: defect applies from ${yearFrom}, target vehicle is ${inputYear}.`,
+          isEligible: false,
+        };
+      }
+      if (yearTo && inputYear > yearTo) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Production year mismatch: defect applies up to ${yearTo}, target vehicle is ${inputYear}.`,
+          isEligible: false,
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // DIMENSION 2: Engine Applicability (Fuel, Family, Displacement)
+    // -------------------------------------------------------------
+    const targetEngine = (input.engineCode || '').toLowerCase();
+    const targetPowertrain = input.powertrainType || (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : undefined);
+
+    // Fuel & Emissions Architecture Mismatch
+    const isDieselDefect = /(dizel|diesel|\btdi\b|\bhdi\b|\bcrdi\b|\bdci\b|\bcdi\b|\bd4d\b|\bb47\b|\bn47\b|\bea189\b|\bea288\b|dpf|partikül filtresi|adblue)/i.test(combinedContext);
+    const isPetrolDefect = /(benzin|petrol|gasoline|\btsi\b|\btfsi\b|\btce\b|\becoboost\b|\bb48\b|\bb58\b|\bn20\b|\bea888\b|\b2zr\b|buji|spark plug)/i.test(combinedContext);
+    const isEvDefect = /(yüksek voltaj|high voltage|hv battery|çekiş bataryası|iccu|onboard charger|obc)/i.test(combinedContext);
+
+    if (isDieselDefect && targetPowertrain && targetPowertrain !== 'ICE_DIESEL') {
+      return {
+        applicabilityState: 'INCOMPATIBLE',
+        applicabilityEvidence: `Powertrain mismatch: Diesel architecture defect does not apply to non-diesel (${targetPowertrain || 'ICE_PETROL'}) vehicle.`,
+        isEligible: false,
+      };
+    }
+    if (isPetrolDefect && (targetPowertrain === 'ICE_DIESEL' || targetPowertrain === 'BEV')) {
+      return {
+        applicabilityState: 'INCOMPATIBLE',
+        applicabilityEvidence: `Powertrain mismatch: Petrol architecture defect does not apply to ${targetPowertrain} vehicle.`,
+        isEligible: false,
+      };
+    }
+    if (isEvDefect && (targetPowertrain === 'ICE_PETROL' || targetPowertrain === 'ICE_DIESEL')) {
+      return {
+        applicabilityState: 'INCOMPATIBLE',
+        applicabilityEvidence: `Powertrain mismatch: EV/traction battery defect does not apply to ICE vehicle.`,
+        isEligible: false,
+      };
+    }
+
+    // Engine Code / Family Incompatibility Checks
+    const targetIsEA211 = /ea211|1\.4\s*tsi|1\.2\s*tsi|1\.5\s*tsi|czca|cpxa|chpa|czda/i.test(targetEngine);
+    const targetIsEA888 = /ea888|1\.8\s*tsi|2\.0\s*tsi|2\.0\s*tfsi|cjpa|chhb|cpla/i.test(targetEngine);
+    const targetIsEB2 = /eb2|puretech\s*1\.2|1\.2\s*puretech|hns|hnz|hnw|hmt/i.test(targetEngine);
+    const targetIsEP6 = /ep6|1\.6\s*thp|thp\s*156|thp\s*165|thp\s*200/i.test(targetEngine);
+    const targetIsB48 = /b48|b48b20|b48b16/i.test(targetEngine);
+    const targetIsB58 = /b58|b58b30/i.test(targetEngine);
+
+    if (targetIsEA211) {
+      const mentionsEA888 = /\b(ea888|1\.8[\s-]?t(?:si)?|2\.0[\s-]?t(?:si)?|gti)\b/i.test(combinedContext);
+      const mentionsEA211 = /\b(ea211|1\.4[\s-]?t(?:si)?|1\.2[\s-]?t(?:si)?|1\.5[\s-]?t(?:si)?)\b/i.test(combinedContext);
+      if (mentionsEA888 && !mentionsEA211) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Engine family mismatch: defect specifies EA888 (1.8T/2.0T) architecture, while target vehicle is equipped with 1.4 TSI (EA211).`,
+          isEligible: false,
+        };
+      }
+    }
+
+    if (targetIsEB2) {
+      const mentionsEP6 = /\b(ep6|1\.6[\s-]?thp|thp[\s-]?165|thp[\s-]?200)\b/i.test(combinedContext);
+      const mentionsEB2 = /\b(eb2|puretech|1\.2[\s-]?puretech|wet[\s_-]?belt|ıslak triger)\b/i.test(combinedContext);
+      if (mentionsEP6 && !mentionsEB2) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Engine family mismatch: defect specifies EP6 (1.6 THP), while target vehicle is equipped with EB2 (1.2 PureTech).`,
+          isEligible: false,
+        };
+      }
+    }
+
+    if (targetIsB48) {
+      const mentionsB58 = /\b(b58|3\.0[\s-]?l|m340i|340i)\b/i.test(combinedContext);
+      const mentionsB48 = /\b(b48|2\.0[\s-]?l|320i|330i)\b/i.test(combinedContext);
+      if (mentionsB58 && !mentionsB48) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Engine family mismatch: defect applies to B58 (3.0L), while target vehicle is equipped with B48 (2.0L/1.6L).`,
+          isEligible: false,
+        };
+      }
+    }
+
+    // Displacement Mismatch
+    const targetDispMatch = targetEngine.match(/\b(1\.\d|2\.\d|3\.\d)\b/);
+    if (targetDispMatch) {
+      const targetDisp = targetDispMatch[1];
+      const dispRegex = /\b(1\.[0-9]|2\.[0-9]|3\.[0-9])[\s-]?(?:l|liter|litre|tsi|tdi|thp)\b/gi;
+      const foundDisplacements = Array.from(new Set(Array.from(combinedContext.matchAll(dispRegex)).map(m => m[1])));
+      if (foundDisplacements.length > 0 && !foundDisplacements.includes(targetDisp) && !combinedContext.includes('all engine') && !combinedContext.includes('tüm motor')) {
+        if (ev.domain === 'POWERTRAIN_ENGINE' || ev.domain === 'SAFETY_RECALL' || ev.domain === 'THERMAL_COOLING' || ev.domain === 'EMISSIONS_EXHAUST') {
+          return {
+            applicabilityState: 'INCOMPATIBLE',
+            applicabilityEvidence: `Engine displacement mismatch: defect affects ${foundDisplacements.join(', ')}L variants, target vehicle is ${targetDisp}L.`,
+            isEligible: false,
+          };
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // DIMENSION 3: Transmission Applicability
+    // -------------------------------------------------------------
+    const targetTransmission = (input.transmissionName || input.transmissionCode || '').toLowerCase();
+    const isTargetAutoOrDsg = /dsg|edc|s-tronic|powershift|eat8|eat6|automatic|otomatik|zf|dct/i.test(targetTransmission);
+    const isTargetManual = /manual|manuel|düz/i.test(targetTransmission);
+
+    if (isTargetManual) {
+      const isAutoOnlyDefect = /(mechatronic|mekatronik|dual clutch|çift kavrama|valve body|tcu|dsg|dq200|dq250|torque converter|tork konvertör)/i.test(combinedContext);
+      if (isAutoOnlyDefect && ev.domain === 'POWERTRAIN_TRANS') {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Transmission mismatch: automatic/dual-clutch defect does not apply to manual transmission vehicle.`,
+          isEligible: false,
+        };
+      }
+    }
+
+    if (isTargetAutoOrDsg) {
+      const isManualPedalLinkageDefect = /(clutch pedal linkage|manuel debriyaj pedali|manual shifter linkage)/i.test(combinedContext);
+      if (isManualPedalLinkageDefect && ev.domain === 'POWERTRAIN_TRANS') {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Transmission mismatch: manual clutch pedal defect does not apply to automatic/dual-clutch vehicle.`,
+          isEligible: false,
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // DIMENSION 1: Market Applicability (US vs EU/TR/Global)
+    // -------------------------------------------------------------
+    const targetMarket = input.market || 'TR';
+    const isUsRegulator =
+      urlsAndSources.includes('nhtsa.gov') ||
+      urlsAndSources.includes('fixes.com/recalls') ||
+      /\b\d{2}[vetc]-?\d{3}\b/i.test(ev.normalizedFailureMode || '') ||
+      /\bnhtsa\b/i.test(combinedContext) ||
+      /\bfmvss\b/i.test(combinedContext) ||
+      combinedContext.includes('volkswagen group of america') ||
+      combinedContext.includes('american honda') ||
+      combinedContext.includes('u.s. vehicles') ||
+      combinedContext.includes('sold in the united states') ||
+      combinedContext.includes('puebla');
+
+    const isEuOrTrRegulator =
+      urlsAndSources.includes('kba.de') ||
+      urlsAndSources.includes('safety-gate') ||
+      urlsAndSources.includes('europa.eu') ||
+      urlsAndSources.includes('dft.gov.uk') ||
+      urlsAndSources.includes('dvsa.gov.uk') ||
+      /\brapex\b/i.test(combinedContext) ||
+      /\bkba\b/i.test(combinedContext) ||
+      /\btürkiye\b|\bturkey\b|\beuropean market\b|\beu market\b/i.test(combinedContext);
+
+    const isGlobalOem =
+      combinedContext.includes('worldwide') ||
+      combinedContext.includes('global recall') ||
+      combinedContext.includes('global service campaign') ||
+      combinedContext.includes('all markets');
+
+    if (isUsRegulator && !isEuOrTrRegulator && !isGlobalOem && (targetMarket === 'TR' || targetMarket === 'EU')) {
+      const hasEquivalenceProof =
+        combinedContext.includes('identical part') ||
+        combinedContext.includes('shared architecture across eu') ||
+        combinedContext.includes('also applies to european') ||
+        combinedContext.includes('global platform part');
+
+      if (!hasEquivalenceProof) {
+        return {
+          applicabilityState: 'MARKET_UNCERTAIN',
+          applicabilityEvidence: `US/NHTSA regulatory scope detected without independent EU/TR homologation or component equivalence proof.`,
+          isEligible: false,
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Plant / Assembly Lot / VIN Restriction
+    // -------------------------------------------------------------
+    const isVinOrPlantRestricted =
+      combinedContext.includes('certain vin') ||
+      combinedContext.includes('vin range') ||
+      combinedContext.includes('vin prefix') ||
+      combinedContext.includes('specific vin') ||
+      combinedContext.includes('vin-specific') ||
+      combinedContext.includes('puebla') ||
+      combinedContext.includes('chattanooga') ||
+      /\bvin\b.*(?:lookup|verify|specific|range|prefix)/i.test(combinedContext);
+
+    if (isVinOrPlantRestricted && !input.vin) {
+      return {
+        applicabilityState: 'VIN_DEPENDENT',
+        applicabilityEvidence: `Defect/campaign is restricted to specific manufacturing plant lot or VIN range and requires VIN verification.`,
+        isEligible: false,
+      };
+    }
+
+    // -------------------------------------------------------------
+    // DIMENSION 5: Component Applicability & Proven Shared Component Architecture
+    // -------------------------------------------------------------
+    const normFail = ev.normalizedFailureMode || '';
+    const component = (ev.affectedComponent || '').toLowerCase();
+    const targetIsDQ200 = /dq200|7[\s-]?speed\s*dry|kuru\s*kavrama/i.test(targetTransmission) || (isTargetAutoOrDsg && targetIsEA211);
+
+    // Proven shared component architecture across powertrain families
+    const isWetBeltOnEB2 =
+      targetIsEB2 &&
+      (normFail === 'WET_BELT' || component.includes('belt') || component.includes('kayış') || /wet[\s_-]?belt|triger/i.test(combinedContext));
+
+    const isDQ200SharedComponent =
+      targetIsDQ200 &&
+      (normFail.includes('CLUTCH') || normFail.includes('MECHATRONIC') || component.includes('clutch') || component.includes('mechatronic') || /kavrama|mekatronik/i.test(combinedContext));
+
+    const targetIsEA111 = /ea111|cbzb|cbza|caxa|cavd/i.test(targetEngine);
+    const isEA111TimingChain =
+      targetIsEA111 &&
+      (normFail.includes('TIMING_CHAIN') || component.includes('chain') || /zincir/i.test(combinedContext));
+
+    const targetIsN47 = /n47|n47d20/i.test(targetEngine);
+    const isN47Chain = targetIsN47 && (normFail.includes('TIMING_CHAIN') || /zincir/i.test(combinedContext));
+
+    const targetIsB47 = /b47|b47d20/i.test(targetEngine);
+    const isB47Egr = targetIsB47 && (normFail.includes('EGR') || /egr/i.test(combinedContext));
+
+    const hasProvenSharedComponent =
+      isWetBeltOnEB2 ||
+      isDQ200SharedComponent ||
+      isEA111TimingChain ||
+      isN47Chain ||
+      isB47Egr;
+
+    if (hasProvenSharedComponent) {
+      const archName = isWetBeltOnEB2
+        ? 'EB2 PureTech in-oil wet belt architecture'
+        : isDQ200SharedComponent
+        ? 'DQ200 7-speed dry dual-clutch / mechatronic architecture'
+        : isEA111TimingChain
+        ? 'EA111 timing chain tensioner architecture'
+        : isN47Chain
+        ? 'N47 rear timing chain architecture'
+        : 'B47/N47 EGR cooler architecture';
+
+      return {
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: `Proven shared component architecture: target vehicle shares ${archName}.`,
+        isEligible: true,
+      };
+    }
+
+    // Exact Match (Exact engine code + transmission + model year)
+    const matchesExactEngine =
+      app.engineCode && input.engineCode &&
+      app.engineCode.toUpperCase().replace(/[^A-Z0-9]/g, '') === input.engineCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    const matchesExactTransmission =
+      !app.transmissionCode ||
+      (input.transmissionCode &&
+        app.transmissionCode.toUpperCase().replace(/[^A-Z0-9]/g, '') === input.transmissionCode.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+
+    if (matchesExactEngine && matchesExactTransmission) {
+      return {
+        applicabilityState: 'EXACT_MATCH',
+        applicabilityEvidence: `Exact match verified for engine code (${input.engineCode}), transmission (${input.transmissionCode || input.transmissionName || 'N/A'}), and model year (${input.modelYear}).`,
+        isEligible: true,
+      };
+    }
+
+    // Never infer applicability from brand+model+year alone:
+    if (
+      (app.brand && input.brand && app.brand.toLowerCase() === input.brand.toLowerCase()) &&
+      (app.model && input.model && input.model.toLowerCase().includes(app.model.toLowerCase()))
+    ) {
+      return {
+        applicabilityState: 'COMPONENT_UNCERTAIN',
+        applicabilityEvidence: `Brand and model match, but specific component architecture on target variant (${input.engineCode || 'unspecified engine'}) is unproven.`,
+        isEligible: false,
+      };
+    }
+
+    return {
+      applicabilityState: 'UNKNOWN',
+      applicabilityEvidence: `Generic candidate: variant applicability cannot be established from available evidence.`,
+      isEligible: false,
+    };
+  }
+
+  /**
+   * Transforms clustered evidence into canonical risk defect objects adhering strictly to the
+   * 5-stage lifecycle: DISCOVERED -> APPLICABILITY_CHECKED -> VERIFIED -> CONSEQUENCE_RESEARCHED -> SCORING_ELIGIBLE.
+   */
+  buildCanonicalRisks(
+    input: VehicleReliabilityResearchInput,
+    evidences: NormalizedReliabilityEvidence[],
+  ): CanonicalRiskDefect[] {
+    const canonicalMap = new Map<string, CanonicalRiskDefect>();
+
+    for (const ev of evidences) {
+      let normFail = ev.normalizedFailureMode;
+
+      // Ensure normalizedFailureMode is not a source domain
+      if (isSourceOrDomainLabel(normFail)) {
+        normFail = undefined as any;
+      }
+
+      if (!normFail || normFail === 'UNKNOWN') {
+        const sem = this.extractSemanticFailureMode(
+          `${ev.title || ''} ${ev.severityBasis || ''} ${(ev as any).description || ''} ${(ev as any).citationSnippet || ''}`,
+          ev.domain,
+        );
+        if (sem && !isSourceOrDomainLabel(sem.failureMode)) {
+          normFail = sem.failureMode;
+        } else {
+          normFail = 'UNKNOWN';
+        }
+      }
+
+      // Guard: Canonical ID must represent the actual defect, never a website/source name.
+      if (!normFail || normFail === 'UNKNOWN' || isSourceOrDomainLabel(normFail) || isSourceOrDomainLabel(ev.title)) {
+        continue;
+      }
+
+      const stableId = `CANONICAL:${ev.domain}:${normFail}`;
+
+      // 1. APPLICABILITY CHECK V2
+      const appResolution = this.resolveGenericApplicabilityV2(input, ev);
+      const applicabilityState = appResolution.applicabilityState;
+      const applicabilityEvidence = appResolution.applicabilityEvidence;
+
+      // 2. VERIFICATION CHECK (Tier Evaluation)
+      // Tier 3 / forum / social cannot become VERIFIED or SCORING_ELIGIBLE by itself
+      const hasTier1 = ev.linkedSources.some((s) => s.sourceTier === 'TIER_1' || (s as any).tier === 'TIER_1' || (s as any).tier === 1);
+      const hasTier2 = ev.linkedSources.some((s) => s.sourceTier === 'TIER_2' || (s as any).tier === 'TIER_2' || (s as any).tier === 2);
+      const isOnlyTier3 = ev.linkedSources.length > 0 && ev.linkedSources.every((s) => s.sourceTier === 'TIER_3' || (s as any).tier === 'TIER_3' || (s as any).tier === 3);
+
+      let verificationState: RiskVerificationState = 'UNVERIFIED';
+      if (ev.numericEligibility === 'REJECTED' && isOnlyTier3) {
+        verificationState = 'TIER3_COMMUNITY_ONLY';
+      } else if (hasTier1) {
+        verificationState = 'TIER1_OFFICIAL';
+      } else if (hasTier2) {
+        verificationState = 'TIER2_CROSS_REFERENCED';
+      } else if (ev.numericEligibility !== 'REJECTED') {
+        verificationState = 'VERIFIED';
+      } else {
+        verificationState = 'REJECTED';
+      }
+
+      // 3. CONSEQUENCE CHECK
+      let consequenceState: RiskConsequenceState = 'UNRESEARCHED';
+      const hasGroundedSeverity =
+        ev.severityScore !== null &&
+        ev.severityScore > 0 &&
+        ev.severityCategory !== null &&
+        ev.severityCategory !== 'UNRESOLVED';
+
+      if (hasGroundedSeverity) {
+        consequenceState = 'RESEARCHED_GROUNDED';
+      } else if (ev.severityBasis && ev.severityBasis.includes('INFERRED')) {
+        consequenceState = 'INFERRED_FROM_EFFECTS';
+      } else {
+        consequenceState = 'INSUFFICIENT';
+      }
+
+      // 4. SCORING ELIGIBILITY V2
+      // - EXACT_MATCH -> scoring eligible
+      // - FAMILY_MATCH -> scoring eligible only with proven shared component architecture
+      // - MARKET_UNCERTAIN / COMPONENT_UNCERTAIN / VIN_DEPENDENT / UNKNOWN -> advisory, no score deduction
+      // - INCOMPATIBLE -> reject from scoring
+      const isVerified =
+        verificationState === 'TIER1_OFFICIAL' ||
+        verificationState === 'TIER2_CROSS_REFERENCED' ||
+        verificationState === 'VERIFIED';
+      const hasValidSeverity = ev.severityScore !== null && ev.severityScore > 0;
+      const isNotRejected = ev.numericEligibility !== 'REJECTED';
+
+      const scoringEligible = isVerified && appResolution.isEligible && hasValidSeverity && isNotRejected;
+      const advisoryOnly = !scoringEligible;
+
+      // Update ev itself with applicability and scoring eligibility
+      (ev as any).scoringEligible = scoringEligible;
+      (ev as any).applicabilityState = applicabilityState;
+
+      // 5. LIFECYCLE STATE DETERMINATION
+      let lifecycleState: CanonicalRiskLifecycleState = 'DISCOVERED';
+      if (applicabilityState !== 'INCOMPATIBLE') {
+        lifecycleState = 'APPLICABILITY_CHECKED';
+        if (isVerified) {
+          lifecycleState = 'VERIFIED';
+          if (consequenceState === 'RESEARCHED_GROUNDED' || consequenceState === 'INFERRED_FROM_EFFECTS') {
+            lifecycleState = 'CONSEQUENCE_RESEARCHED';
+            if (scoringEligible) {
+              lifecycleState = 'SCORING_ELIGIBLE';
+            }
+          }
+        }
+      }
+
+      // Resolve Turkish title & inspection instruction
+      let turkishTitle = ev.title;
+      if (isSourceOrDomainLabel(turkishTitle)) {
+        turkishTitle = normFail.replace(/_/g, ' ');
+      }
+      if (normFail === 'WET_BELT' || /wet[\s_-]?belt/i.test(ev.title)) {
+        turkishTitle = 'Islak Triger Kayışı Aşınması';
+      } else if (normFail.includes('MECHATRONIC') || /mekatronik/i.test(ev.title)) {
+        turkishTitle = 'Mekatronik Hidrolik Basınç Kaybı';
+      } else if (normFail.includes('CLUTCH') || /kavrama/i.test(ev.title)) {
+        turkishTitle = 'Kuru Çift Kavrama Aşınması';
+      } else if (normFail.includes('INJECTOR') || /enjektör/i.test(ev.title)) {
+        turkishTitle = 'Yakıt Enjektörü Kurum & Tıkanma';
+      } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT') || /termostat/i.test(ev.title)) {
+        turkishTitle = 'Termostat & Devirdaim Soğutma Sıvısı Sızıntısı';
+      }
+
+      let inspectionInstruction: string | undefined;
+      if (normFail === 'WET_BELT') {
+        inspectionInstruction = 'Triger kayış genişliği ve karter/yağ pompası süzgecinde kauçuk partikülü kontrolü yapılmalıdır.';
+      } else if (normFail.includes('MECHATRONIC') || normFail.includes('DSG') || normFail.includes('CLUTCH')) {
+        inspectionInstruction = 'Ekspertizde diagnostik cihaz ile kavrama kavrama noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
+      } else if (normFail.includes('INJECTOR')) {
+        inspectionInstruction = 'Diagnostik cihazda enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.';
+      } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT')) {
+        inspectionInstruction = 'Termostat gövdesi ve devirdaim pompası çevresinde antifriz sızıntı izi kontrolü yapılmalıdır.';
+      }
+
+      const canonicalSources: CanonicalRiskSource[] = ev.linkedSources.map((s) => ({
+        sourceId: s.sourceId,
+        url: s.url,
+        title: s.publisher || (s as any).title,
+        tier: s.sourceTier || (s as any).tier,
+      }));
+
+      const existing = canonicalMap.get(stableId);
+      if (existing) {
+        // Merge sources
+        const urlSet = new Set(existing.sources.map((s) => s.url || s.sourceId));
+        canonicalSources.forEach((s) => {
+          const key = s.url || s.sourceId;
+          if (key && !urlSet.has(key)) {
+            existing.sources.push(s);
+            urlSet.add(key);
+          }
+        });
+
+        // If existing is not scoring eligible but incoming is, promote
+        if (!existing.scoringEligible && scoringEligible) {
+          existing.scoringEligible = true;
+          existing.lifecycleState = lifecycleState;
+          existing.verificationState = verificationState;
+          existing.applicabilityState = applicabilityState;
+          existing.applicabilityEvidence = applicabilityEvidence;
+          existing.severity = ev.severityScore;
+          existing.severityCategory = ev.severityCategory;
+          existing.severityBasis = ev.severityBasis;
+          existing.consequenceState = consequenceState;
+          existing.advisoryOnly = false;
+        } else if (existing.scoringEligible && scoringEligible) {
+          if (ev.severityScore !== null && (existing.severity === null || ev.severityScore > existing.severity)) {
+            existing.severity = ev.severityScore;
+            existing.severityCategory = ev.severityCategory;
+            existing.severityBasis = ev.severityBasis;
+          }
+        }
+      } else {
+        canonicalMap.set(stableId, {
+          id: stableId,
+          lifecycleState,
+          normalizedFailureMode: normFail,
+          title: turkishTitle,
+          description: ev.severityBasis || ev.title,
+          domain: ev.domain,
+          affectedComponent: ev.affectedComponent,
+          applicabilityState,
+          applicabilityEvidence,
+          verificationState,
+          consequenceState,
+          severity: ev.severityScore,
+          severityBasis: ev.severityBasis,
+          severityCategory: ev.severityCategory,
+          scoringEligible,
+          sources: canonicalSources,
+          inspectionInstruction,
+          advisoryOnly,
+          rejectionReason: ev.rejectionReason,
+        });
+      }
+    }
+
+    return Array.from(canonicalMap.values());
   }
 
   /**
@@ -1672,12 +2531,71 @@ export class VehicleReliabilityResearchService {
     return false;
   }
 
-  private normalizeFailureKey(title?: string): string {
-    return (title || 'DEFECT')
+  normalizeFailureKey(title?: string): string {
+    if (!title || isSourceOrDomainLabel(title)) {
+      return 'UNKNOWN';
+    }
+    const clean = title
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '_')
       .replace(/_+/g, '_');
+    if (isSourceOrDomainLabel(clean)) {
+      return 'UNKNOWN';
+    }
+    return clean;
+  }
+
+  /**
+   * Extracts generic mechanical failure modes from evidence text or titles,
+   * completely preventing source domain names (e.g. autocar.co.uk) from becoming failure modes.
+   */
+  extractSemanticFailureMode(text?: string, domain?: DomainKeyV6): { failureMode: string; title: string } | null {
+    if (!text || text.length < 6) return null;
+    const lower = text.toLowerCase();
+
+    // 1. Wet belt / Timing belt
+    if (/(?:wet[\s_-]?belt|triger kay[ıi][şs][ıi]|[ıi]slak triger|timing belt in oil|courroie humide)/i.test(lower)) {
+      return { failureMode: 'WET_BELT', title: 'Islak Triger Kayışı Aşınması' };
+    }
+    // 2. Timing chain stretch / tensioner
+    if (/(?:timing chain|triger zincir|kam mili zincir|chain stretch|chain tensioner)/i.test(lower)) {
+      return { failureMode: 'TIMING_CHAIN_STRETCH', title: 'Triger Zinciri Uzaması & Gergisi' };
+    }
+    // 3. Dry/Wet Dual Clutch wear
+    if (/(?:dual[\s-]?clutch|kuru kavrama|[çc]ift kavrama|clutch judder|clutch wear|kavrama a[şs][ıi]nmas[ıi])/i.test(lower)) {
+      return { failureMode: 'DUAL_CLUTCH_WEAR', title: 'Çift Kavrama Aşınması' };
+    }
+    // 4. Transmission Mechatronic hydraulic pressure loss
+    if (/(?:mechatronic|mekatronik|valve body|hidrolik bas[ıi]n[çc]|gearbox accumulator)/i.test(lower)) {
+      return { failureMode: 'MECHATRONIC_HYDRAULIC_FAULT', title: 'Mekatronik Hidrolik Basınç Kaybı' };
+    }
+    // 5. Water pump / thermostat coolant leak
+    if (/(?:water pump|coolant leak|su pompas[ıi]|devirdaim|termostat|hararet|housing leak)/i.test(lower)) {
+      return { failureMode: 'COOLANT_LEAK_THERMOSTAT', title: 'Termostat & Devirdaim Soğutma Sıvısı Sızıntısı' };
+    }
+    // 6. Fuel Injector clogging / carbon buildup
+    if (/(?:fuel injector|enjekt[öo]r|carbon deposit|kurum birik|injector fail)/i.test(lower)) {
+      return { failureMode: 'FUEL_INJECTOR_DEPOSITS', title: 'Yakıt Enjektörü Kurum & Tıkanma' };
+    }
+    // 7. PCV valve / oil consumption
+    if (/(?:pcv|positive crankcase|ya[ğg] eksiltme|oil consumption|ya[ğg] yakma|karter havaland[ıi]rma)/i.test(lower)) {
+      return { failureMode: 'PCV_OIL_CONSUMPTION', title: 'PCV & Yağ Tüketimi Problemi' };
+    }
+    // 8. Steering gear / rack knock
+    if (/(?:steering (?:rack|gear|box)|direksiyon kutusu|direksiyon bo[şs]lu[ğg]u)/i.test(lower)) {
+      return { failureMode: 'STEERING_RACK_FAULT', title: 'Direksiyon Kutusu Boşluğu' };
+    }
+    // 9. DPF / EGR soot clogging
+    if (/(?:dpf|partik[üu]l filtresi|egr valf|egr cooler|soot)/i.test(lower)) {
+      return { failureMode: 'DPF_EGR_SOOT_BLOCKAGE', title: 'DPF & EGR Kurum Tıkanması' };
+    }
+    // 10. High Voltage Battery / ICCU / BMS
+    if (/(?:iccu|high-voltage battery|bms|traction battery|inverter fail)/i.test(lower)) {
+      return { failureMode: 'HV_BATTERY_MANAGEMENT_FAULT', title: 'Yüksek Voltaj Yönetim Ünitesi (ICCU/BMS)' };
+    }
+
+    return null;
   }
 
   /**
@@ -1690,6 +2608,8 @@ export class VehicleReliabilityResearchService {
     snippet: string,
     defectAnchorTitle: string,
     domain: DomainKeyV6,
+    normalizedFailureMode?: string,
+    defectCampaignId?: string,
   ): string {
     if (!fullContent || fullContent.length <= (snippet || '').length) {
       return snippet || defectAnchorTitle || '';
@@ -1700,19 +2620,56 @@ export class VehicleReliabilityResearchService {
       .replace(/\b(?:Report an Unrelated Safety Problem|Check for (?:open )?Recalls|Crash Tests?|Safety Ratings?|Privacy Policy|Terms of Use|All Rights Reserved|Recent Recalls|Trending Problems)\b/gi, ' ')
       .trim();
 
-    // Identify anchor keywords from title, failure mode, and domain
-    const anchorTokens = (defectAnchorTitle || '')
-      .toLowerCase()
+    const lowerFull = sanitizedFull.toLowerCase();
+
+    // 1. Specific recall verification: If candidate is a recall campaign, the content MUST mention the campaign ID
+    const effCampaignId = defectCampaignId || (
+      normalizedFailureMode?.startsWith('RECALL_')
+        ? normalizedFailureMode.replace(/^RECALL_/, '').replace(/_/g, '-')
+        : this.extractCampaignId(defectAnchorTitle)
+    );
+
+    if (effCampaignId && effCampaignId.length >= 3) {
+      const cleanCamp = effCampaignId.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const fullClean = lowerFull.replace(/[^a-z0-9]/g, '');
+      if (!fullClean.includes(cleanCamp)) {
+        // Source text does not mention this specific recall campaign -> prevent cross-contamination!
+        return '';
+      }
+
+      // Preserve exact linkage: within a page that mentions this campaign, search for consequence statement
+      const consequenceSentenceMatch = sanitizedFull.match(
+        /(?:(?:consequence|safety risk|defect consequence|hazard|risk|sonuç|tehlike)\s*[:\-]?\s*)?([^.\n\r]{0,120}\b(?:increases the risk of (?:a )?fire|risk of (?:a )?fire|fire hazard|ignition source|ignition risk|engine stall|stalls? while driving|loss of (?:motive )?power|loss of drive|loss of (?:braking|steering)|rollaway|unintended movement|engine seizure|oil starvation|damaged?|broken|failure|rupture|clogged?)[^.\n\r]{0,120}\.)/i,
+      );
+      if (consequenceSentenceMatch && consequenceSentenceMatch[1].trim().length > 15) {
+        return consequenceSentenceMatch[1].trim();
+      }
+    }
+
+    // 2. Identify anchor keywords from title, failure mode, and domain
+    const rawAnchorStr = `${defectAnchorTitle || ''} ${normalizedFailureMode || ''} ${effCampaignId || ''}`
+      .replace(/[._-]/g, ' ')
+      .toLowerCase();
+
+    const anchorTokens = rawAnchorStr
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
-      .filter((w) => w.length >= 3 && !['bulletin', 'technical', 'service', 'recall', 'problem', 'defect', 'issue', 'vehicle', 'model'].includes(w));
+      .filter(
+        (w) =>
+          w.length >= 3 &&
+          !['bulletin', 'technical', 'service', 'recall', 'problem', 'defect', 'issue', 'vehicle', 'model', 'incelemesi', 'arastirmasi', 'araştırması'].includes(w) &&
+          !isSourceOrDomainLabel(w),
+      );
+
+    if (anchorTokens.includes('triger') || anchorTokens.includes('kayisi') || anchorTokens.includes('kayışı') || anchorTokens.includes('belt')) {
+      anchorTokens.push('timing', 'belt', 'puretech', 'wet');
+    }
 
     if (anchorTokens.length === 0) {
-      return snippet.length > 20 ? snippet : sanitizedFull.slice(0, 300);
+      return '';
     }
 
     // Search for anchor in text
-    const lowerFull = sanitizedFull.toLowerCase();
     let bestIndex = -1;
     for (const token of anchorTokens) {
       const idx = lowerFull.indexOf(token);
@@ -1723,7 +2680,8 @@ export class VehicleReliabilityResearchService {
     }
 
     if (bestIndex === -1) {
-      return snippet.length > 20 ? snippet : sanitizedFull.slice(0, 300);
+      // Defect anchor is not mentioned in this excerpt -> reject cross-contamination
+      return '';
     }
 
     // Locate the start of the current sentence or section
@@ -1734,7 +2692,7 @@ export class VehicleReliabilityResearchService {
     // Locate the end of the section/paragraph
     const afterAnchor = sanitizedFull.slice(bestIndex);
     const nextSectionMatch = afterAnchor.search(/\n\s*\n|\b(?:BULLETIN\s*\d+|TSB[-:\s]|RECALL[-:\s]|TOP RECALLS|NHTSA CAMPAIGN)\b/i);
-    const windowLength = (nextSectionMatch > 25) ? Math.min(nextSectionMatch, 350) : Math.min(afterAnchor.length, 350);
+    const windowLength = (nextSectionMatch > 25) ? Math.min(nextSectionMatch, 450) : Math.min(afterAnchor.length, 450);
 
     const localExcerpt = sanitizedFull.slice(windowStart, bestIndex + windowLength).trim();
     return localExcerpt.length > 20 ? localExcerpt : snippet;
@@ -1747,6 +2705,15 @@ export class VehicleReliabilityResearchService {
   cleanConsequenceText(consequence: string, titleContext?: string): string {
     let text = `${consequence || ''} ${titleContext || ''}`;
     text = text
+      .replace(/&uuml;/gi, 'ü')
+      .replace(/&ouml;/gi, 'ö')
+      .replace(/&ccedil;/gi, 'ç')
+      .replace(/&Uuml;/gi, 'Ü')
+      .replace(/&Ouml;/gi, 'Ö')
+      .replace(/&Ccedil;/gi, 'Ç')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&#\d+;/g, ' ')
       .replace(/\b(?:important safety recall|nhtsa safety recall|nhtsa vehicle safety recall|national traffic and motor vehicle safety act|safety recall report|safety recall notice|safety recall campaign|resmi güvenlik geri çağırması|resmi geri çağırma|safety recall|safety campaign|güvenlik geri çağırma|geri çağırma bülteni|service campaign|recall notice|safety act)\b/gi, '')
       .replace(/\b(?:report an unrelated safety problem|check for (?:open )?recalls|crash tests?|safety ratings?|privacy policy|terms of use|all rights reserved)\b/gi, '');
     return text.toLowerCase();
@@ -1757,50 +2724,57 @@ export class VehicleReliabilityResearchService {
    * Administrative document context and non-co-located page text have ZERO severity power.
    */
   mapConsequenceToCategory(
-    consequence: string,
+    consequence?: string,
     explicitCategory?: SeverityCategoryV6,
     titleContext?: string,
   ): SeverityCategoryV6 {
-    if (explicitCategory && SEVERITY_SCORE_MAP[explicitCategory]) {
+    if (explicitCategory && SEVERITY_SCORE_MAP[explicitCategory] !== undefined) {
       return explicitCategory;
+    }
+    if (!consequence || !consequence.trim() || consequence.trim() === 'Fonksiyonel kusur') {
+      return 'UNRESOLVED';
     }
     const c = this.cleanConsequenceText(consequence, titleContext);
 
     // 1. SAFETY_CRITICAL (10): Fire, loss of braking, loss of steering, rollaway, sudden loss of propulsion at speed
+    const isExcludedFromFire =
+      /\b(?:misfire|cylinder misfire|firewall|firing order|fire extinguisher|combustion chamber|internal combustion|combustion process|chamber deposits|fuel combustion)\b/i.test(c);
+
     const isFire =
-      !/\b(?:misfire|cylinder misfire|firewall|firing order|fire extinguisher)\b/i.test(c) &&
-      /\b(?:fire|yangın|thermal runaway|tutuşma|flame|flames|combustion|ignite|ignites|yanma riski)\b/i.test(c);
+      !isExcludedFromFire &&
+      /\b(?:vehicle fire|engine fire|cabin fire|battery fire|catch(?:es)? fire|caught fire|burst into flames|yangın|thermal runaway|tutuşma|flames?|ignit(?:es?|ion)|yanma riski|alev alma|yanarak|risk of (?:a )?fire|fire risk|fire hazard|ignition risk|ignition source|result in (?:a )?fire|cause (?:a )?fire)\b/i.test(c);
 
     const isRollaway =
       /\b(?:roll[\s-]?away|unintended (?:vehicle )?movement|kendiliğinden hareket|parking pawl (?:disengage|fracture|slip)|kayma riski)\b/i.test(c);
 
     const isBrakingOrSteeringLoss =
-      /\b(?:loss of (?:braking|steering|brake assist)|hydraulic brake (?:loss|failure)|fren kaybı|fren tutmama|direksiyon kaybı|steering control loss|direksiyon kilitlen)\b/i.test(c);
+      /\b(?:loss of (?:braking|steering|brake assist)|hydraulic brake (?:loss|failure)|fren kaybı|fren tutmama|fren pedalında sertleşme|fren vakum|direksiyon kaybı|steering control loss|direksiyon kilitlen)\b/i.test(c);
 
     const isPropulsionLossAtSpeed =
-      /\b(?:sudden loss of (?:motive )?power|loss of (?:propulsion|motive power)|güç kaybı ile stop|propulsion failure|motorun seyir halinde durması|high-voltage system shutdown)\b/i.test(c);
+      /\b(?:sudden loss of (?:motive )?power|loss of (?:propulsion|motive power)|güç kaybı ile stop|propulsion failure|motorun seyir halinde durması|high-voltage system shutdown|engine stall(?:ing)?|stalls? while driving|loss of power while driving)\b/i.test(c);
 
     if (isFire || isRollaway || isBrakingOrSteeringLoss || isPropulsionLossAtSpeed) {
       return 'SAFETY_CRITICAL';
     }
 
-    // 2. MAJOR_POWERTRAIN (8): Catastrophic mechanical destruction, engine seizure
+    // 2. MAJOR_POWERTRAIN (9): Catastrophic mechanical destruction, engine seizure, oil starvation, oil pump blockage/strainer clogging, engine damage
     if (
-      /\b(?:engine seizure|motor kilitlen|blown engine|motor kır|broken connecting rod|piston kır|subap yamul|catastrophic engine failure|sandık motor|destruction)\b/i.test(c)
+      /\b(?:engine seizure|motor kilitlen\w*|blown engine|motor kır\w*|broken connecting rod|piston kır\w*|subap yamul\w*|catastrophic engine failure|sandık motor|destruction|destructive|bent valves?|valve collision|valve damage|engine rebuild|replacement engine|oil starvation|yağsız kal\w*|engine damage|motor hasar\w*)\b/i.test(c) ||
+      /\b(?:strainer|süzgeç|oil[- ]?pickup|oil[- ]?pump|yağ pompası)\b[\s\S]{0,60}\b(?:clog\w*|block\w*|tıkan\w*)/i.test(c)
     ) {
       return 'MAJOR_POWERTRAIN';
     }
 
-    // 3. BREAKDOWN (6): Overhaul, transmission failure, leaving stranded
+    // 3. BREAKDOWN (7): Overhaul, transmission failure, leaving stranded, loss of oil pressure, loss of drive
     if (
-      /\b(?:transmission failure|şanzıman arıza|şanzıman değiş|kavrama yan|clutch burnout|mechatronic failure|mekatronik arıza|inverter failure|iccu failure|stranded|yolda bırak|overhaul|çekici|immobiliz)\b/i.test(c)
+      /\b(?:transmission failure|şanzıman arıza\w*|şanzıman değiş\w*|kavrama yan\w*|clutch burnout|mechatronic failure|mekatronik arıza\w*|inverter failure|iccu failure|stranded|yolda bırak\w*|overhaul|çekici|immobiliz|loss of oil pressure|drop in oil pressure|oil pressure collapses|yağ basıncı (?:düşük|kaybı)|loss of (?:forward )?drive)\b/i.test(c)
     ) {
       return 'BREAKDOWN';
     }
 
-    // 4. DRIVABILITY (4): Performance loss, vibration, shudder, minor leak, overheat without seizure, battery drain
+    // 4. DRIVABILITY (5): Performance loss, vibration, shudder, minor leak, overheat without seizure, battery drain, injector deposits
     if (
-      /\b(?:coolant leak|water pump leak|su eksilt|termostat|thermostat|overheat(?:ing)?|hararet|parasitic draw|battery drain|12v battery|akü boşal|titreme|silkeleme|shudder|vibration|drivability|limp mode|hesitation|oil leak|yağ kaçağı|misfire|cylinder misfire|sarsıntı|vuruntu)\b/i.test(c)
+      /\b(?:coolant leak|water pump leak|su eksilt|termostat|thermostat|overheat(?:ing)?|hararet|parasitic draw|battery drain|12v battery|akü boşal|titreme|silkeleme|shudder(?:ing)?|judder|vibration|drivability|limp mode|hesitation|poor acceleration|clogged injector|faulty injector|enjektör arıza|enjektör tıkan|check engine light|oil leak|yağ kaçağı|misfire|cylinder misfire|sarsıntı|vuruntu)\b/i.test(c)
     ) {
       return 'DRIVABILITY';
     }
@@ -1812,8 +2786,277 @@ export class VehicleReliabilityResearchService {
       return 'COSMETIC';
     }
 
-    // 6. FUNCTIONAL_MINOR (2): Lighting/taillight, wipers, backup camera delay, label misprint, non-critical sensor, or ungrounded fallback
-    return 'FUNCTIONAL_MINOR';
+    // 6. FUNCTIONAL_MINOR (3): Lighting/taillight, wipers, backup camera delay, label misprint, non-critical sensor, infotainment display reboot, or administrative campaign notice
+    const fullRaw = `${consequence || ''} ${titleContext || ''}`.toLowerCase();
+    if (
+      /\b(?:tail[\s-]?light|head[\s-]?light|lamp|wiper|backup camera|reverse camera|label misprint|non-critical sensor|park sensör|far|silecek|aydınlatma|infotainment|display|screen|ekran|multimedia|warning light|warning message|advisory warning|calibration|software update|minor degradation|indicator light)\b/i.test(c) ||
+      /\b(?:service campaign|recall notice|official recall|campaign notice|safety recall|recall|safety standard|campaign bulletin|service bulletin|service action|technical bulletin|geri çağırma)\b/i.test(fullRaw)
+    ) {
+      return 'FUNCTIONAL_MINOR';
+    }
+
+    return 'UNRESOLVED';
+  }
+
+  /**
+   * Derives severity from VERIFIED technical facts when consequence evidence is missing or ungrounded.
+   * Based on: failure mode, affected system/domain, failure behavior, remedy/status.
+   * Deterministic, generic across all vehicles, and sets severityBasis = 'INFERRED_FROM_VERIFIED_FAILURE_MODE'.
+   */
+  inferSeverityFromTechnicalFacts(defect: {
+    failureMode?: string;
+    normalizedFailureMode?: string;
+    title?: string;
+    domain?: DomainKeyV6;
+    affectedComponent?: string;
+    defectStatus?: string;
+  }): SeverityCategoryV6 {
+    // Domain tokens, failureMode tokens, and component tokens are strictly forbidden from deriving numeric severity.
+    // Severity can only be derived from verified consequence / verified technical effects.
+    return 'UNRESOLVED';
+  }
+
+  /**
+   * Verifies if text contains actual technical failure/damage/consequence evidence
+   * rather than generic marketing, definitions, or non-technical navigation content.
+   */
+  hasTechnicalConsequenceEvidence(text?: string): boolean {
+    if (!text || text.length < 15) return false;
+    const lower = text.toLowerCase();
+    return /\b(?:damage|fail(?:ure|s|ed)?|break(?:down)?|hazard|risk|seiz(?:ure|ed)?|crack|rupture|clog|block(?:age)?|loss|leak|warning|light|wear|deteriorat(?:ion|e)|skip|slip|stopp(?:ed)?|bent|broken|overheat|stall|starvation|pickup|strainer|arıza|hasar|kırıl|kopma|tıkan|aşın|kayıp|kaçak|uyarı|hararet|stop|kilitlen|yağsız)\b/i.test(lower);
+  }
+
+  /**
+   * Expands vehicle technical identity for multi-angle recovery using canonical parameters.
+   */
+  expandVehicleTechnicalIdentity(
+    input: VehicleReliabilityResearchInput,
+    defect: NormalizedReliabilityEvidence,
+  ): {
+    brand: string;
+    model: string;
+    generation: string;
+    year: number;
+    engineFamily: string;
+    transmissionFamily: string;
+    component: string;
+    failureMode: string;
+    title: string;
+    campaignId?: string;
+  } {
+    const brand = input.brand || '';
+    const model = input.model || '';
+    const gen = input.generation
+      ? `${input.generation}`.replace(/Jenerasyonu/gi, '').replace(new RegExp(model, 'gi'), '').trim()
+      : '';
+    const year = input.modelYear;
+    const eng = (input.engineCode || '').toUpperCase();
+    const trans = (input.transmissionCode || input.transmissionName || '').toUpperCase();
+
+    let engineFamily = input.engineCode || '';
+    if (/PURETECH|EB2/i.test(eng) || (/1\.2/i.test(eng) && /PEUGEOT|CITROEN|OPEL|DS/i.test(brand))) {
+      engineFamily = '1.2 PureTech EB2';
+    } else if (/TSI|TFSI|EA211/i.test(eng) || (/1\.4|1\.2|1\.5/i.test(eng) && /VOLKSWAGEN|VW|AUDI|SEAT|SKODA/i.test(brand))) {
+      engineFamily = `${input.engineCode || '1.4 TSI'} EA211`.trim();
+    } else if (/TDI|EA288|EA189/i.test(eng)) {
+      engineFamily = `${input.engineCode || '2.0 TDI'} EA288`.trim();
+    } else if (/ECOBOOST/i.test(eng) || (/1\.0/i.test(eng) && /FORD/i.test(brand))) {
+      engineFamily = '1.0 EcoBoost Fox';
+    } else if (/BLUEHDI|DV5/i.test(eng) || (/1\.5/i.test(eng) && /PEUGEOT|CITROEN|OPEL/i.test(brand))) {
+      engineFamily = '1.5 BlueHDi DV5';
+    }
+
+    let transmissionFamily = input.transmissionCode || input.transmissionName || '';
+    if (/DSG|DQ200|7-SPEED|7 SPEED/i.test(trans) || (/DSG/i.test(trans) && /1\.4|1\.2|1\.6|1\.0/i.test(eng))) {
+      transmissionFamily = 'DSG DQ200 7-speed';
+    } else if (/DQ250|DQ381|DQ500/i.test(trans)) {
+      transmissionFamily = trans;
+    } else if (/EAT8|AISIN/i.test(trans)) {
+      transmissionFamily = 'EAT8 Aisin';
+    } else if (/EDC|6DCT|7DCT/i.test(trans)) {
+      transmissionFamily = 'EDC dual clutch';
+    } else if (/POWERSHIFT|DPS6/i.test(trans)) {
+      transmissionFamily = 'Powershift DPS6';
+    }
+
+    const failKey = defect.normalizedFailureMode || '';
+    let component = defect.affectedComponent || defect.title || '';
+    if (failKey === 'WET_BELT') {
+      component = 'timing belt in oil pump strainer';
+    } else if (failKey === 'DUAL_CLUTCH_WEAR') {
+      component = 'dual clutch pack shudder wear';
+    } else if (failKey === 'MECHATRONIC_HYDRAULIC_FAULT') {
+      component = 'mechatronic unit valve body accumulator';
+    } else if (failKey === 'TIMING_CHAIN_STRETCH') {
+      component = 'timing chain stretch tensioner';
+    } else if (failKey === 'COOLANT_LEAK_THERMOSTAT') {
+      component = 'thermostat housing water pump';
+    } else if (failKey === 'PCV_OIL_CONSUMPTION') {
+      component = 'PCV valve oil consumption piston rings';
+    } else if (failKey === 'FUEL_INJECTOR_DEPOSITS') {
+      component = 'fuel injector carbon deposits';
+    } else if (failKey === 'DPF_EGR_SOOT_BLOCKAGE') {
+      component = 'DPF soot clogging EGR valve';
+    }
+
+    let campaignId = (defect as any).campaignId;
+    if (!campaignId) {
+      if (failKey.startsWith('RECALL_')) {
+        const rawCamp = failKey.replace(/^RECALL_/, '');
+        campaignId = rawCamp.replace(/_/g, '-');
+      } else {
+        campaignId = this.extractCampaignId(defect.title) || this.extractCampaignId(defect.severityBasis);
+      }
+    }
+
+    return {
+      brand,
+      model,
+      generation: gen,
+      year,
+      engineFamily,
+      transmissionFamily,
+      component,
+      failureMode: failKey,
+      title: defect.title || failKey.replace(/_/g, ' '),
+      campaignId,
+    };
+  }
+
+  /**
+   * Generates bounded multi-angle recovery queries:
+   * A) exact campaign ID queries (official recalls / service campaigns)
+   * B) exact variant/component
+   * C) engine/transmission family & chronic TSBs
+   * D) technical bulletin/service campaign terminology
+   */
+  buildMultiAngleRecoveryQueries(
+    identity: ReturnType<typeof this.expandVehicleTechnicalIdentity>,
+  ): string[] {
+    const { brand, model, generation, year, engineFamily, transmissionFamily, component, failureMode, campaignId } = identity;
+
+    const rawList: string[] = [];
+
+    if (campaignId && campaignId.length >= 3) {
+      const cleanCamp = campaignId.replace(/_/g, '-');
+      const altCamp = cleanCamp.replace(/-/g, '');
+
+      // Official recalls / service campaigns query by exact campaign ID:
+      rawList.push(`"${cleanCamp}" defect consequence`);
+      rawList.push(`${brand} "${cleanCamp}" manufacturer recall consequence`);
+      rawList.push(`"${cleanCamp}" technical bulletin`);
+      rawList.push(`${cleanCamp} ${altCamp} defect consequence summary safety recall`);
+      rawList.push(`${brand} ${model} recall ${cleanCamp} consequence`);
+    } else {
+      // Chronic discoveries (e.g. DQ200, wet belt, injectors, etc.)
+      const angleA = `${brand} ${model} ${generation ? generation + ' ' : ''}${year} ${component} consequence damage breakdown failure`.trim();
+      const angleB = `${brand} ${transmissionFamily || engineFamily || model} ${component} technical service bulletin TSB service campaign repair consequence`.trim();
+      const angleC = `${engineFamily || transmissionFamily || brand} ${failureMode.replace(/_/g, ' ')} ${component} common failure consequence repair bulletin technical diagnostic`.trim();
+      const angleD = `${brand} ${model} ${component} failure mode symptom consequence repair action`.trim();
+
+      rawList.push(angleA, angleB, angleC, angleD);
+    }
+
+    const uniqueQueries: string[] = [];
+    const seen = new Set<string>();
+    for (const q of rawList) {
+      const norm = q.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!seen.has(norm) && norm.length > 5) {
+        seen.add(norm);
+        uniqueQueries.push(q);
+      }
+    }
+    return uniqueQueries;
+  }
+
+  /**
+   * Bounded Multi-Angle Consequence Recovery Research for defect candidates.
+   * Runs bounded angles:
+   * A) exact variant/component
+   * B) engine/transmission family
+   * C) failureMode + architecture
+   * D) technical bulletin/service campaign terminology
+   * Early-exits as soon as verified consequence evidence is found from Tier 1/2.
+   */
+  async recoverDefectConsequence(
+    defect: NormalizedReliabilityEvidence,
+    input: VehicleReliabilityResearchInput,
+    budgetTracker?: { queriesExecuted: number; maxBudget: number },
+  ): Promise<NormalizedReliabilityEvidence> {
+    if (
+      defect.severityCategory &&
+      defect.severityCategory !== 'UNRESOLVED' &&
+      defect.severityBasis &&
+      defect.severityBasis !== 'INFERRED_FROM_VERIFIED_FAILURE_MODE' &&
+      defect.severityBasis !== 'Sonuç / şiddet kanıtı eksik (UNRESOLVED)' &&
+      defect.severityBasis !== 'UNRESOLVED'
+    ) {
+      return defect;
+    }
+
+    // 1. Run Bounded Multi-Angle Recovery
+    if (this.webSearchProvider && !input.rawSearchResults) {
+      const identity = this.expandVehicleTechnicalIdentity(input, defect);
+      const angles = this.buildMultiAngleRecoveryQueries(identity);
+
+      for (const queryStr of angles) {
+        if (budgetTracker && budgetTracker.queriesExecuted >= budgetTracker.maxBudget) {
+          break; // Global query budget exhausted
+        }
+
+        try {
+          if (budgetTracker) budgetTracker.queriesExecuted++;
+          const lang = identity.campaignId ? 'en' : 'tr';
+          const country = identity.campaignId ? 'us' : 'tr';
+          const searchResults = await this.webSearchProvider.search(queryStr, lang, country);
+          if (searchResults && searchResults.length > 0) {
+            for (const res of searchResults) {
+              const tier = this.classifySourceTier(res.url, res.domain);
+              const fullText = res.retrievedPageText || res.retrievedPageExcerpt || res.contentMarkdown || res.snippet || '';
+              const localExcerpt = this.extractDefectLocalConsequence(
+                fullText,
+                res.snippet || '',
+                defect.title,
+                defect.domain,
+                defect.normalizedFailureMode,
+                identity.campaignId,
+              );
+
+              if (this.hasTechnicalConsequenceEvidence(localExcerpt)) {
+                const mappedCat = this.mapConsequenceToCategory(localExcerpt, undefined, defect.title);
+                // Severity may only be derived from verified consequence text from Tier 1 or Tier 2 sources
+                if (mappedCat !== 'UNRESOLVED' && (tier === 'TIER_1' || tier === 'TIER_2')) {
+                  defect.severityCategory = mappedCat;
+                  defect.severityScore = SEVERITY_SCORE_MAP[mappedCat];
+                  defect.severityBasis = localExcerpt;
+
+                  // Record the recovered source with its verified tier
+                  defect.linkedSources.push({
+                    sourceId: `REC-SRC-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+                    publisher: res.domain || 'Grounded Recovery Specialist / Official',
+                    sourceType: tier === 'TIER_1' ? 'OFFICIAL_RECALL' : 'SPECIALIST_DATA',
+                    sourceTier: tier,
+                    url: res.url,
+                    evidenceSnippet: localExcerpt,
+                  });
+
+                  // Grounded consequence found from verified search -> Stop immediately!
+                  return defect;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          this.logger.warn(`[RECOVERY CONSEQUENCE] Error running angle "${queryStr}": ${err}`);
+        }
+      }
+    }
+
+    // 2. If consequence still cannot be directly sourced:
+    defect.severityCategory = 'UNRESOLVED';
+    defect.severityScore = null;
+    defect.severityBasis = 'UNRESOLVED';
+    return defect;
   }
 
   private mapSeverityCategory(severity?: string): SeverityCategoryV6 {

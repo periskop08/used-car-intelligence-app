@@ -2,8 +2,12 @@ import { VehicleReliabilityResearchService, VehicleReliabilityResearchInput, SEV
 import {
   NormalizedReliabilityEvidence,
   ResearchChannelTelemetry,
+  CanonicalRiskDefect,
 } from '@used-car-intelligence/shared';
 import { WebSearchProvider } from '../providers/web-search.provider';
+import { TorqueScoutDecisionScoreService } from '../../vehicle-report/torque-scout-decision-score.service';
+import { VehicleReportScoringV6Service } from '../../vehicle-report/vehicle-report-scoring-v6.service';
+import { AITechnicalReasoningService } from '../ai-technical-reasoning.service';
 
 describe('VehicleReliabilityResearchService (Stage 1 Shadow Producer)', () => {
   let mockSearchProvider: Partial<WebSearchProvider>;
@@ -1576,5 +1580,1333 @@ describe('VehicleReliabilityResearchService (Stage 1 Shadow Producer)', () => {
 
     expect(normalized).toBeNull();
   });
-});
 
+  describe('Canonical Risk Lifecycle & Provenance Hardening (Regression Suite)', () => {
+    it('Regression 1: Tier3 wet-belt discovery can trigger Tier1/2 recovery but cannot score alone', async () => {
+      // Step 1: Tier 3 evidence alone is marked REJECTED and cannot score
+      const tier3WetBelt = {
+        domain: 'POWERTRAIN_ENGINE',
+        title: 'Peugeot 1.2 PureTech Triger Kayışı Aşınması',
+        failureMode: 'WET_BELT',
+        consequenceDescription: 'Forum şikayeti: Triger kayışı erken yıpranıyor',
+        sourceTier: 'TIER_3',
+        sourceName: 'araclo.com',
+        url: 'https://araclo.com/puretech-triger',
+      };
+
+      const normalizedTier3 = service.normalizeDefectCandidate(tier3WetBelt as any, {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+        engineCode: '1.2 PureTech',
+        powertrainType: 'ICE_PETROL',
+      });
+
+      expect(normalizedTier3).not.toBeNull();
+      expect(normalizedTier3?.numericEligibility).toBe('REJECTED');
+
+      // Canonicalization of Tier 3 alone produces non-scoring advisory
+      const canonicalTier3 = service.buildCanonicalRisks(
+        { brand: 'Peugeot', model: '3008', modelYear: 2019, engineCode: '1.2 PureTech' },
+        [normalizedTier3!],
+      );
+      expect(canonicalTier3[0].scoringEligible).toBe(false);
+      expect(canonicalTier3[0].verificationState).toBe('TIER3_COMMUNITY_ONLY');
+
+      // Step 2: When targeted recovery finds independent Tier 2 evidence, it promotes to VERIFIED
+      mockSearchProvider.search = jest.fn().mockResolvedValue([
+        {
+          title: 'Professional Motor Mechanic Wet Belt Diagnosis',
+          url: 'https://pmmonline.co.uk/technical/puretech-wet-belt',
+          domain: 'pmmonline.co.uk',
+          snippet: 'Delamination of the timing belt clogs the oil pump strainer, causing oil starvation and severe engine damage.',
+        },
+      ]);
+
+      const recovered = await service.recoverDefectConsequence(normalizedTier3!, {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+        engineCode: '1.2 PureTech',
+      });
+
+      expect(recovered.severityCategory).toBe('MAJOR_POWERTRAIN');
+      expect(recovered.severityScore).toBe(9);
+      expect(recovered.linkedSources.some((s) => s.sourceTier === 'TIER_2')).toBe(true);
+
+      // Now promote because Tier 2 was independently established
+      recovered.numericEligibility = 'QUALITATIVE_ONLY';
+      recovered.rejectionReason = undefined;
+
+      const canonicalRecovered = service.buildCanonicalRisks(
+        { brand: 'Peugeot', model: '3008', modelYear: 2019, engineCode: '1.2 PureTech' },
+        [recovered],
+      );
+      expect(canonicalRecovered[0].scoringEligible).toBe(true);
+      expect(canonicalRecovered[0].severity).toBe(9);
+      expect(canonicalRecovered[0].verificationState).toBe('TIER2_CROSS_REFERENCED');
+    });
+
+    it('Regression 2: autocar.co.uk can never become a failureMode or canonical defect ID', () => {
+      const candidateFromDomain = {
+        domain: 'EMISSIONS_EXHAUST',
+        title: 'autocar.co.uk',
+        failureMode: 'autocar.co.uk',
+        sourceTier: 'TIER_2',
+        sourceName: 'autocar.co.uk',
+        url: 'https://www.autocar.co.uk/used-car-buying-guide',
+        snippet: 'General used car advice without defect anchor.',
+      };
+
+      const normalized = service.normalizeDefectCandidate(candidateFromDomain as any, {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+      });
+
+      // Since failureMode/title was just a domain and no defect was found, normalizedFailureMode is UNKNOWN and rejected
+      expect(normalized?.normalizedFailureMode).toBe('UNKNOWN');
+      expect(normalized?.numericEligibility).toBe('REJECTED');
+
+      // Canonical ID guard rejects any ID derived from source domain
+      const canonical = service.buildCanonicalRisks(
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 },
+        [normalized!],
+      );
+      expect(canonical.some((c) => c.id.includes('AUTOCAR_CO_UK'))).toBe(false);
+      expect(canonical.some((c) => c.scoringEligible)).toBe(false);
+    });
+
+    it('Regression 3: "combustion chamber" does not trigger SAFETY_CRITICAL / fire', () => {
+      const injectorText =
+        'poor acceleration, or check engine light. Cause : Faulty or clogged injectors, often due to poor fuel quality or carbon deposits in the combustion chamber. Fix : Replace or clean the fuel injectors.';
+
+      const category = service.mapConsequenceToCategory(injectorText, undefined, 'Yakıt Enjektörü');
+      expect(category).not.toBe('SAFETY_CRITICAL');
+      expect(category).toBe('DRIVABILITY'); // Mapped to 5 (DRIVABILITY), never 10 (FIRE)
+    });
+
+    it('Regression 4: recovery evidence cannot contaminate another recall cluster', () => {
+      const pageText =
+        'Volkswagen Golf Problems: Spark plugs, fuel injectors and carbon deposits. Also recalls: Recall 16V-647 for fuel pump leak.';
+
+      // Searching for unrelated recall 23V-999 on the same page returns empty string (no match)
+      const unrelatedExcerpt = service.extractDefectLocalConsequence(
+        pageText,
+        'Short snippet without recall info',
+        'Recall 23V-999',
+        'SAFETY_RECALL',
+        'RECALL_23V_999',
+      );
+      expect(unrelatedExcerpt).toBe(''); // Cleanly rejected, prevents cross-contamination!
+
+      // Searching for the actual recall 16V-647 returns the matching excerpt
+      const matchingExcerpt = service.extractDefectLocalConsequence(
+        pageText,
+        'Recall 16V-647',
+        'Recall 16V-647',
+        'SAFETY_RECALL',
+        'RECALL_16V_647',
+      );
+      expect(matchingExcerpt).toContain('16V-647');
+    });
+
+    it('Regression 5: chronic defect verification without recall', () => {
+      const mechanicalDefect = {
+        domain: 'POWERTRAIN_TRANS',
+        title: 'Volkswagen Golf 7-speed DSG Dry Dual Clutch Judder',
+        failureMode: 'DUAL_CLUTCH_WEAR',
+        consequenceDescription: 'Dry dual clutch judder and severe slippage during acceleration requiring clutch pack replacement.',
+        sourceTier: 'TIER_2',
+        sourceName: 'tsbsearch.com',
+        url: 'https://tsbsearch.com/Volkswagen/dsg-clutch-tsb',
+      };
+
+      const normalized = service.normalizeDefectCandidate(mechanicalDefect as any, {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        transmissionCode: 'DQ200',
+      });
+
+      expect(normalized).not.toBeNull();
+      expect(normalized?.numericEligibility).toBe('QUALITATIVE_ONLY');
+      expect(normalized?.domain).toBe('POWERTRAIN_TRANS');
+      expect(normalized?.severityCategory).toBe('DRIVABILITY'); // clutch judder & slippage -> 5
+
+      const canonical = service.buildCanonicalRisks(
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015, transmissionCode: 'DQ200' },
+        [normalized!],
+      );
+
+      expect(canonical.length).toBe(1);
+      expect(canonical[0].id).toBe('CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR');
+      expect(canonical[0].scoringEligible).toBe(true);
+      expect(canonical[0].severity).toBe(5);
+      expect(canonical[0].verificationState).toBe('TIER2_CROSS_REFERENCED');
+    });
+
+    it('Regression 6: multi-angle recovery builds distinct queries and recovers consequence', async () => {
+      const identity = service.expandVehicleTechnicalIdentity(
+        {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYear: 2015,
+          generation: 'VII',
+          engineCode: '1.4 TSI',
+          transmissionCode: 'DQ200',
+        },
+        {
+          domain: 'POWERTRAIN_TRANS',
+          title: 'Kuru Çift Kavrama Aşınması',
+          normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        } as any,
+      );
+
+      expect(identity.engineFamily).toContain('EA211');
+      expect(identity.transmissionFamily).toContain('DQ200');
+
+      const angles = service.buildMultiAngleRecoveryQueries(identity);
+      expect(angles.length).toBeGreaterThanOrEqual(3);
+      expect(angles.some((q) => q.includes('consequence damage breakdown failure'))).toBe(true);
+      expect(angles.some((q) => q.includes('technical service bulletin TSB'))).toBe(true);
+
+      mockSearchProvider.search = jest.fn().mockResolvedValue([
+        {
+          title: 'DSG Dual Clutch Diagnosis',
+          url: 'https://atsg.us/dsg-clutch',
+          domain: 'atsg.us',
+          snippet: 'Premature wear of clutch discs leads to shuddering and loss of forward drive.',
+        },
+      ]);
+
+      const candidate = {
+        domain: 'POWERTRAIN_TRANS',
+        title: 'Kuru Çift Kavrama Aşınması',
+        normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        linkedSources: [],
+      } as any;
+
+      const recovered = await service.recoverDefectConsequence(candidate, {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+      });
+
+      expect(recovered.severityCategory).toBe('BREAKDOWN'); // loss of forward drive -> 7
+      expect(recovered.linkedSources.some((s) => s.sourceTier === 'TIER_2')).toBe(true);
+    });
+
+    it('Regression 7: source-class Tier2 evaluation correctly classifies repair, press, and inspection bodies vs forums', () => {
+      // Tier 1
+      expect(service.classifySourceTier('https://www.nhtsa.gov/recalls', 'nhtsa.gov')).toBe('TIER_1');
+      expect(service.classifySourceTier('https://erwin.volkswagen.de/erwin', 'erwin.volkswagen.de')).toBe('TIER_1');
+
+      // Tier 2: Repair networks, component makers, inspection bodies, technical press
+      expect(service.classifySourceTier('https://alldata.com/repair-info', 'alldata.com')).toBe('TIER_2');
+      expect(service.classifySourceTier('https://www.bosch-mobility.com/tech', 'bosch-mobility.com')).toBe('TIER_2');
+      expect(service.classifySourceTier('https://www.adac.de/rund-ums-fahrzeug/tests', 'adac.de')).toBe('TIER_2');
+      expect(service.classifySourceTier('https://www.whatcar.com/reliability-survey', 'whatcar.com')).toBe('TIER_2');
+      expect(service.classifySourceTier('https://www.autobild.de/tuev-report', 'autobild.de')).toBe('TIER_2');
+      expect(service.classifySourceTier('https://pmmonline.co.uk/technical/timing', 'pmmonline.co.uk')).toBe('TIER_2');
+
+      // Tier 3: Forums, social, UGC
+      expect(service.classifySourceTier('https://www.golfmk7.com/forums/showthread.php', 'golfmk7.com')).toBe('TIER_3');
+      expect(service.classifySourceTier('https://forum.donanimhaber.com/puretech-sorun', 'forum.donanimhaber.com')).toBe('TIER_3');
+      expect(service.classifySourceTier('https://www.reddit.com/r/MechanicAdvice', 'reddit.com')).toBe('TIER_3');
+      expect(service.classifySourceTier('https://www.peugeotforums.com/threads/puretech', 'peugeotforums.com')).toBe('TIER_3');
+    });
+
+    it('Regression 8: channel title cannot become a defect or canonical ID', () => {
+      const channelCandidate = {
+        domain: 'POWERTRAIN_ENGINE',
+        title: 'Motor Mekaniği & Zamanlama Araştırması',
+        failureMode: 'UNKNOWN',
+        sourceTier: 'TIER_1',
+        sourceName: 'Search Metadata',
+        citationSnippet: 'General search summary without defect anchor',
+      };
+
+      const normalized = service.normalizeDefectCandidate(channelCandidate as any, {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+      });
+
+      expect(normalized?.numericEligibility).toBe('REJECTED');
+      expect(normalized?.normalizedFailureMode).toBe('UNKNOWN');
+
+      const canonical = service.buildCanonicalRisks(
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 },
+        [normalized!],
+      );
+
+      expect(canonical.some((c) => c.id.includes('MOTOR_MEKANI'))).toBe(false);
+      expect(canonical.some((c) => c.id.includes('ARA_TIRMA'))).toBe(false);
+      expect(canonical.length).toBe(0);
+    });
+
+    it('Regression 9: incomplete research != verified zero risk', () => {
+      // Incomplete research: 0 defects found, but coverage credit is shallow (< 0.60)
+      const scoringService = new (require('../../vehicle-report/vehicle-report-scoring-v6.service').VehicleReportScoringV6Service)();
+      const mockLowCoverageResearch = {
+        reliabilityCoverageScore: 40, // 40% coverage
+        allVerifiedDefects: [],
+        qualitativeDefects: [],
+        canonicalRisks: [],
+        domainResults: {},
+      };
+
+      const scores = scoringService.calculateScoresFromReliabilityResearch(
+        {
+          vehicleIdentity: { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 },
+        },
+        mockLowCoverageResearch as any,
+      );
+
+      expect(scores.modelRiskState).toBe('INSUFFICIENT_RESEARCH');
+      expect(scores.modelRiskScore).toBeNull();
+      expect(scores.decisionScoreV1?.modelDecisionRisk).toBeNull();
+      expect(scores.decisionScoreV1?.score).toBeNull();
+      expect(scores.decisionScoreV1?.scope).toBe('INSUFFICIENT_DATA');
+    });
+
+    it('Regression 10: Tier3 discovery -> independent Tier1/2 promotion', async () => {
+      const tier3Candidate = {
+        domain: 'POWERTRAIN_ENGINE',
+        title: 'PureTech Islak Triger Kopması Forum Bildirimi',
+        failureMode: 'WET_BELT',
+        sourceTier: 'TIER_3',
+        sourceName: 'peugeotturkey.com',
+        url: 'https://peugeotturkey.com/forum/triger',
+        citationSnippet: 'Forum kullanıcısı triger kayışının erken koptuğunu söylüyor.',
+      };
+
+      const normalized = service.normalizeDefectCandidate(tier3Candidate as any, {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+        engineCode: '1.2 PureTech',
+      });
+
+      // Initially Tier 3 alone is non-scoring and rejected
+      expect(normalized?.numericEligibility).toBe('REJECTED');
+
+      mockSearchProvider.search = jest.fn().mockResolvedValue([
+        {
+          title: 'Gates TechZone PureTech Wet Belt Technical Bulletin',
+          url: 'https://gatestechzone.com/en/bulletins/puretech-timing-belt',
+          domain: 'gatestechzone.com',
+          snippet: 'Belt degradation causes oil pump pickup clogging and engine seizure.',
+        },
+      ]);
+
+      const recovered = await service.recoverDefectConsequence(normalized!, {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+        engineCode: '1.2 PureTech',
+      });
+
+      expect(recovered.severityCategory).toBe('MAJOR_POWERTRAIN'); // engine seizure -> 9
+      expect(recovered.linkedSources.some((s) => s.sourceTier === 'TIER_2')).toBe(true);
+
+      // Independent Tier 2 evidence promotes the discovery to QUALITATIVE_ONLY
+      recovered.numericEligibility = 'QUALITATIVE_ONLY';
+      recovered.rejectionReason = undefined;
+
+      const canonical = service.buildCanonicalRisks(
+        { brand: 'Peugeot', model: '3008', modelYear: 2019, engineCode: '1.2 PureTech' },
+        [recovered],
+      );
+
+      expect(canonical[0].scoringEligible).toBe(true);
+      expect(canonical[0].verificationState).toBe('TIER2_CROSS_REFERENCED');
+      expect(canonical[0].severity).toBe(9);
+    });
+
+    it('Regression 11: 3008-like case: UNRESOLVED consequence must never become severity 10 from CHASSIS_BRAKES / DIREKSIYON tokens', async () => {
+      // Chassis / brake recall with generic ungrounded description (missing technical consequence)
+      const ungroundedRecall = {
+        domain: 'CHASSIS_BRAKES',
+        title: 'RECALL ED 3',
+        affectedComponent: 'Direksiyon ve Fren Sistemi',
+        failureMode: 'RECALL_ED_3',
+        sourceTier: 'TIER_1',
+        citationSnippet: 'Official campaign notice without technical consequence or damage description.',
+      };
+
+      const normalized = service.normalizeDefectCandidate(ungroundedRecall as any, {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+      });
+
+      expect(normalized?.severityCategory).toBe('UNRESOLVED');
+      expect(normalized?.severityScore).toBeNull();
+      expect(normalized?.severityBasis).toBe('UNRESOLVED');
+
+      // Even if inferSeverityFromTechnicalFacts is called directly, domain/component tokens cannot derive severity
+      const directInferred = service.inferSeverityFromTechnicalFacts(ungroundedRecall as any);
+      expect(directInferred).toBe('UNRESOLVED');
+
+      const canonical = service.buildCanonicalRisks(
+        { brand: 'Peugeot', model: '3008', modelYear: 2019 },
+        [normalized!],
+      );
+
+      expect(canonical[0].severity).toBeNull();
+      expect(canonical[0].scoringEligible).toBe(false);
+      expect(canonical[0].advisoryOnly).toBe(true);
+    });
+
+    it('Regression 12: Golf-like case: verified advisory defects + unresolved discoveries + no severity must never produce 100/100 via modelDecisionRisk=0', () => {
+      const scoringService = new (require('../../vehicle-report/vehicle-report-scoring-v6.service').VehicleReportScoringV6Service)();
+
+      // Golf scenario: 2 advisory recalls with no severity + 7 unresolved community discoveries
+      const mockGolfResearch = {
+        reliabilityCoverageScore: 100,
+        allVerifiedDefects: [],
+        qualitativeDefects: [],
+        canonicalRisks: [
+          {
+            id: 'CANONICAL:SAFETY_RECALL:RECALL_16V_647',
+            title: 'RECALL 16V 647',
+            domain: 'SAFETY_RECALL',
+            verificationState: 'TIER1_OFFICIAL',
+            consequenceState: 'INSUFFICIENT',
+            severity: null,
+            scoringEligible: false,
+            advisoryOnly: true,
+          },
+          {
+            id: 'CANONICAL:SAFETY_RECALL:RECALL_S_2015_GOLF_PROBLEMS_SPARK_BOSCH_FUEL_PUMP',
+            title: 'RECALL S 2015 GOLF PROBLEMS SPARK BOSCH FUEL PUMP',
+            domain: 'SAFETY_RECALL',
+            verificationState: 'TIER2_CROSS_REFERENCED',
+            consequenceState: 'INSUFFICIENT',
+            severity: null,
+            scoringEligible: false,
+            advisoryOnly: true,
+          },
+          {
+            id: 'CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR',
+            title: 'Kuru Çift Kavrama Aşınması',
+            domain: 'POWERTRAIN_TRANS',
+            normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+            verificationState: 'TIER3_COMMUNITY_ONLY',
+            consequenceState: 'RESEARCHED_GROUNDED',
+            severity: 7,
+            scoringEligible: false,
+          },
+        ],
+        domainResults: {
+          SAFETY_RECALL: {
+            domain: 'SAFETY_RECALL',
+            state: 'VERIFIED_DEFECTS_FOUND',
+            coverageCredit: 1.0,
+            defects: [
+              {
+                campaignNumber: '16V-647',
+                title: 'RECALL 16V 647',
+                numericEligibility: 'QUALITATIVE_ONLY',
+                severityScore: null,
+                severityCategory: 'UNRESOLVED',
+              },
+            ],
+          },
+        },
+      };
+
+      const scores = scoringService.calculateScoresFromReliabilityResearch(
+        {
+          vehicleIdentity: { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 },
+        },
+        mockGolfResearch as any,
+      );
+
+      // Verified advisory defects exist, but none have severity
+      expect(scores.modelRiskState).toBe('VERIFIED_RISK_PRESENT');
+      // In 5-Tier Impact & 3-Tier Evidence engine, DQ200 clutch wear (-12 * 0.7 = -8) produces 92/100 (never 100/100 or null)
+      expect(scores.decisionScoreV1?.modelDecisionRisk).toBe(8);
+      expect(scores.decisionScoreV1?.score).toBe(92);
+      expect(scores.decisionScoreV1?.state).toBe('EXCELLENT');
+      expect(scores.decisionScoreV1?.score).not.toBe(100);
+    });
+  });
+
+  describe('Regression: Final Consequence Recovery Layer before NOT_ESTIMABLE', () => {
+    let mockSearchProvider: any;
+    let researchServiceWithMock: VehicleReliabilityResearchService;
+
+    beforeEach(() => {
+      mockSearchProvider = {
+        search: jest.fn(),
+      };
+      researchServiceWithMock = new VehicleReliabilityResearchService(mockSearchProvider);
+    });
+
+    // 1. Campaign ID consequence recovery
+    it('1. Campaign ID consequence recovery: recovers consequence and severity from exact campaign ID queries', async () => {
+      const identity = researchServiceWithMock.expandVehicleTechnicalIdentity(
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 } as any,
+        {
+          id: 'DEF-1',
+          domain: 'SAFETY_RECALL',
+          title: 'RECALL 16V 647: Suction Pump Fuel Leak',
+          normalizedFailureMode: 'RECALL_16V_647',
+          affectedComponent: 'Resmi Geri Çağırma & Güvenlik',
+          severityCategory: 'UNRESOLVED',
+          severityScore: null,
+          severityBasis: 'UNRESOLVED',
+          prevalenceCategory: null,
+          prevalenceFactor: null,
+          prevalenceBasis: '',
+          applicability: {} as any,
+          defectStatus: 'REMEDY_AVAILABLE',
+          statusFactor: 0.2,
+          linkedSources: [],
+          numericEligibility: 'QUALITATIVE_ONLY',
+        },
+      );
+
+      const queries = researchServiceWithMock.buildMultiAngleRecoveryQueries(identity);
+      expect(queries).toContain('"16V-647" defect consequence');
+      expect(queries).toContain('Volkswagen "16V-647" manufacturer recall consequence');
+      expect(queries).toContain('"16V-647" technical bulletin');
+
+      mockSearchProvider.search.mockResolvedValueOnce([
+        {
+          url: 'https://fixes.com/recalls/16V647000',
+          domain: 'fixes.com',
+          snippet: 'NHTSA 16V-647 recall notice',
+          retrievedPageText: 'NHTSA Recall 16V-647: A fuel leak in the presence of an ignition source increases the risk of a fire.',
+        },
+      ]);
+
+      const defectToRecover: NormalizedReliabilityEvidence = {
+        id: 'DEF-1',
+        domain: 'SAFETY_RECALL',
+        title: 'RECALL 16V 647',
+        normalizedFailureMode: 'RECALL_16V_647',
+        affectedComponent: 'Resmi Geri Çağırma & Güvenlik',
+        severityCategory: 'UNRESOLVED',
+        severityScore: null,
+        severityBasis: 'UNRESOLVED',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        applicability: {} as any,
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        linkedSources: [],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const recovered = await researchServiceWithMock.recoverDefectConsequence(
+        defectToRecover,
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 } as any,
+      );
+
+      expect(recovered.severityCategory).toBe('SAFETY_CRITICAL');
+      expect(recovered.severityScore).toBe(10);
+      expect(recovered.severityBasis).toContain('increases the risk of a fire');
+      expect(recovered.linkedSources.length).toBeGreaterThan(0);
+    });
+
+    // 2. Same-campaign linkage
+    it('2. Same-campaign linkage: rejects cross-candidate consequence reuse when campaign ID does not match', () => {
+      const pageForDifferentCampaign = `
+        NHTSA Recall 15V-123: Airbag inflator rupture may cause sharp metal fragments to strike vehicle occupants, resulting in serious injury.
+      `;
+
+      // Query for 16V-647 against page for 15V-123
+      const excerpt = researchServiceWithMock.extractDefectLocalConsequence(
+        pageForDifferentCampaign,
+        'Different campaign snippet',
+        'RECALL 16V 647',
+        'SAFETY_RECALL',
+        'RECALL_16V_647',
+      );
+
+      // Must be rejected because 16V-647 is NOT in the document!
+      expect(excerpt).toBe('');
+    });
+
+    // 3. No component->severity shortcut
+    it('3. No component->severity shortcut: forbidden tokens without verified consequence text remain UNRESOLVED', () => {
+      const components = [
+        'fuel leak',
+        'injector',
+        'sensor',
+        'software',
+        'mechatronic',
+        'clutch',
+        'wet belt',
+      ];
+
+      for (const comp of components) {
+        const inferred = researchServiceWithMock.inferSeverityFromTechnicalFacts({
+          title: comp,
+          affectedComponent: comp,
+          failureMode: comp.toUpperCase().replace(/\s+/g, '_'),
+          domain: 'POWERTRAIN_ENGINE',
+        });
+        expect(inferred).toBe('UNRESOLVED');
+
+        const cat = researchServiceWithMock.mapConsequenceToCategory(
+          comp,
+          undefined,
+          comp,
+        );
+        // Without verified consequence words (like fire, breakdown, seizure, limp mode, etc.), component token alone cannot produce severity
+        expect(cat).toBe('UNRESOLVED');
+      }
+    });
+
+    // 4. Unresolved official campaign remains null
+    it('4. Unresolved official campaign remains null: when consequence is missing, severity remains null and NOT_ESTIMABLE', async () => {
+      mockSearchProvider.search.mockResolvedValueOnce([
+        {
+          url: 'https://example.com/recall/16V647000',
+          domain: 'example.com',
+          snippet: 'Recall notice published.',
+          retrievedPageText: 'Recall 16V-647 notice published. Contact dealer for remedy.',
+        },
+      ]);
+
+      const defect: NormalizedReliabilityEvidence = {
+        id: 'DEF-UNRESOLVED',
+        domain: 'SAFETY_RECALL',
+        title: 'RECALL 16V 647',
+        normalizedFailureMode: 'RECALL_16V_647',
+        affectedComponent: 'Resmi Geri Çağırma & Güvenlik',
+        severityCategory: 'UNRESOLVED',
+        severityScore: null,
+        severityBasis: 'UNRESOLVED',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        applicability: {} as any,
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        linkedSources: [],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const recovered = await researchServiceWithMock.recoverDefectConsequence(
+        defect,
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015 } as any,
+      );
+
+      expect(recovered.severityScore).toBeNull();
+      expect(recovered.severityCategory).toBe('UNRESOLVED');
+    });
+
+    // 5. Verified consequence can promote to scoringEligible
+    it('5. Verified consequence can promote to scoringEligible: candidate promoted once severity is verified', () => {
+      const verifiedEvidence: NormalizedReliabilityEvidence = {
+        id: 'DEF-RECOVERED',
+        domain: 'SAFETY_RECALL',
+        title: 'RECALL 16V 647',
+        normalizedFailureMode: 'RECALL_16V_647',
+        affectedComponent: 'Resmi Geri Çağırma & Güvenlik',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 10,
+        severityBasis: 'A fuel leak in the presence of an ignition source increases the risk of a fire.',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        applicability: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYearFrom: 2015,
+          modelYearTo: 2015,
+          engineCode: '1.8T EA888',
+        } as any,
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        linkedSources: [
+          {
+            sourceId: 'SRC-1',
+            publisher: 'NHTSA Official / fixes.com',
+            sourceType: 'OFFICIAL_RECALL',
+            sourceTier: 'TIER_1',
+            url: 'https://fixes.com/recalls/16V647000',
+            evidenceSnippet: 'increases the risk of a fire',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = researchServiceWithMock.buildCanonicalRisks(
+        { brand: 'Volkswagen', model: 'Golf', modelYear: 2015, engineCode: '1.8T EA888', market: 'US' } as any,
+        [verifiedEvidence],
+      );
+
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+      expect(risk.scoringEligible).toBe(true);
+      expect(risk.lifecycleState).toBe('SCORING_ELIGIBLE');
+      expect(risk.severity).toBe(10);
+      expect(risk.consequenceState).toBe('RESEARCHED_GROUNDED');
+    });
+  });
+
+  describe('Generic Applicability Resolver V2 Regressions', () => {
+    // 1. same model/year but different engine must not inherit recall
+    it('Regression 1: same model/year but different engine must not inherit recall', () => {
+      const golf14TsiInput: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      const ea888RecallEvidence: NormalizedReliabilityEvidence = {
+        id: 'DEF-RECALL-EA888',
+        domain: 'SAFETY_RECALL',
+        title: 'Volkswagen Golf 2.0T EA888 Fuel Rail Leak Recall',
+        normalizedFailureMode: 'RECALL_EA888_FUEL_LEAK',
+        affectedComponent: 'Fuel Rail High Pressure Line',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 9,
+        severityBasis: 'Fuel leak from high pressure rail under extreme thermal cycles increases fire risk',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        applicability: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYearFrom: 2014,
+          modelYearTo: 2016,
+          engineCode: '2.0T EA888',
+        } as any,
+        linkedSources: [
+          {
+            sourceId: 'SRC-1',
+            publisher: 'Official Safety Recall Bulletin',
+            sourceTier: 'TIER_1',
+            sourceType: 'OFFICIAL_RECALL',
+            url: 'https://kba.de/recalls/volkswagen-golf-ea888',
+            evidenceSnippet: 'Volkswagen Golf 2.0T EA888 fuel rail recall',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = service.buildCanonicalRisks(golf14TsiInput, [ea888RecallEvidence]);
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+      expect(risk.applicabilityState).toBe('INCOMPATIBLE');
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.advisoryOnly).toBe(true);
+      expect(risk.applicabilityEvidence).toContain('Engine family mismatch');
+    });
+
+    // 2. US-market recall must not score EU/TR car automatically
+    it('Regression 2: US-market recall must not score EU/TR car automatically', () => {
+      const euroGolfInput: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI',
+        transmissionName: 'DSG',
+        powertrainType: 'ICE_PETROL',
+        market: 'TR',
+      };
+
+      const nhtsaUsOnlyRecall: NormalizedReliabilityEvidence = {
+        id: 'DEF-NHTSA-16V647',
+        domain: 'SAFETY_RECALL',
+        title: 'NHTSA 16V-647 Fuel Suction Pump Recall',
+        normalizedFailureMode: 'RECALL_16V_647',
+        affectedComponent: 'Fuel Tank Suction Pump',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 10,
+        severityBasis: 'Suction pump leak in EVAP canister increases fire risk in presence of ignition source',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        applicability: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYearFrom: 2015,
+          modelYearTo: 2016,
+        } as any,
+        linkedSources: [
+          {
+            sourceId: 'SRC-NHTSA',
+            publisher: 'NHTSA Official Safety Portal',
+            sourceTier: 'TIER_1',
+            sourceType: 'OFFICIAL_RECALL',
+            url: 'https://www.nhtsa.gov/recalls?nhtsaId=16V647',
+            evidenceSnippet: 'Volkswagen Group of America recall for U.S. vehicles subject to FMVSS',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = service.buildCanonicalRisks(euroGolfInput, [nhtsaUsOnlyRecall]);
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+      expect(risk.applicabilityState).toBe('MARKET_UNCERTAIN');
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.advisoryOnly).toBe(true);
+      expect(risk.applicabilityEvidence).toContain('US/NHTSA regulatory scope');
+    });
+
+    // 3. VIN/plant-restricted recall remains advisory without VIN proof
+    it('Regression 3: VIN/plant-restricted recall remains advisory without VIN proof', () => {
+      const golfWithoutVin: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI',
+        transmissionName: 'DSG',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      const plantRestrictedRecall: NormalizedReliabilityEvidence = {
+        id: 'DEF-PLANT-RESTRICTED',
+        domain: 'SAFETY_RECALL',
+        title: 'Rear Camber Link Torque Specification',
+        normalizedFailureMode: 'RECALL_CAMBER_BOLT',
+        affectedComponent: 'Rear Suspension Camber Bolt',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 8,
+        severityBasis: 'Improper bolt torque during assembly at Puebla assembly plant',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        applicability: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYearFrom: 2015,
+          modelYearTo: 2015,
+        } as any,
+        linkedSources: [
+          {
+            sourceId: 'SRC-PLANT',
+            publisher: 'Official Recall Bulletin',
+            sourceTier: 'TIER_1',
+            sourceType: 'OFFICIAL_RECALL',
+            url: 'https://kba.de/recalls/vw-rear-suspension',
+            evidenceSnippet: 'Affects only certain VIN range manufactured at Puebla plant. Specific VIN lookup required.',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = service.buildCanonicalRisks(golfWithoutVin, [plantRestrictedRecall]);
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+      expect(risk.applicabilityState).toBe('VIN_DEPENDENT');
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.advisoryOnly).toBe(true);
+      expect(risk.applicabilityEvidence).toContain('VIN verification');
+    });
+
+    // 4. exact shared component + engine family can allow FAMILY_MATCH
+    it('Regression 4: exact shared component + engine family can allow FAMILY_MATCH', () => {
+      const peugeot3008Input: VehicleReliabilityResearchInput = {
+        brand: 'Peugeot',
+        model: '3008',
+        modelYear: 2019,
+        engineCode: '1.2 PureTech EB2DTS',
+        transmissionName: 'EAT8',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      const wetBeltDefect: NormalizedReliabilityEvidence = {
+        id: 'DEF-WET-BELT',
+        domain: 'POWERTRAIN_ENGINE',
+        title: 'PureTech EB2 Wet Belt Degradation',
+        normalizedFailureMode: 'WET_BELT',
+        affectedComponent: 'Timing Belt in Oil',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 10,
+        severityBasis: 'Rubber belt degradation in engine oil leads to oil starvation and vacuum pump braking assist failure',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        applicability: {
+          brand: 'Peugeot',
+          model: '3008',
+          modelYearFrom: 2016,
+          modelYearTo: 2021,
+          engineCode: 'EB2',
+        } as any,
+        linkedSources: [
+          {
+            sourceId: 'SRC-RAPEX',
+            publisher: 'EU Safety Gate RAPEX A12/01504/20',
+            sourceTier: 'TIER_1',
+            sourceType: 'OFFICIAL_RECALL',
+            url: 'https://ec.europa.eu/safety-gate/alerts/A12-01504-20',
+            evidenceSnippet: 'In-oil wet timing belt degradation on 1.2 PureTech EB2 engines',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = service.buildCanonicalRisks(peugeot3008Input, [wetBeltDefect]);
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+      expect(risk.applicabilityState).toBe('FAMILY_MATCH');
+      expect(risk.scoringEligible).toBe(true);
+      expect(risk.advisoryOnly).toBe(false);
+      expect(risk.applicabilityEvidence).toContain('EB2 PureTech in-oil wet belt architecture');
+    });
+
+    // 5. incompatible recall consequence may remain stored as advisory but cannot score
+    it('Regression 5: incompatible recall consequence may remain stored as advisory but cannot score', () => {
+      const golf14TsiInput: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG',
+        powertrainType: 'ICE_PETROL',
+        market: 'TR',
+      };
+
+      const nhtsa16V647Evidence: NormalizedReliabilityEvidence = {
+        id: 'DEF-16V647',
+        domain: 'SAFETY_RECALL',
+        title: 'NHTSA 16V-647 Suction Pump Leak',
+        normalizedFailureMode: 'RECALL_16V_647',
+        affectedComponent: 'Suction Jet Pump in Fuel Tank',
+        severityCategory: 'SAFETY_CRITICAL',
+        severityScore: 10,
+        severityBasis: 'A fuel leak in the presence of an ignition source increases the risk of a fire.',
+        prevalenceCategory: null,
+        prevalenceFactor: null,
+        prevalenceBasis: '',
+        defectStatus: 'REMEDY_AVAILABLE',
+        statusFactor: 0.2,
+        applicability: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYearFrom: 2015,
+          modelYearTo: 2016,
+          engineCode: '2.0T EA888',
+        } as any,
+        linkedSources: [
+          {
+            sourceId: 'SRC-16V647',
+            publisher: 'NHTSA Safety Portal',
+            sourceTier: 'TIER_1',
+            sourceType: 'OFFICIAL_RECALL',
+            url: 'https://www.nhtsa.gov/recalls?nhtsaId=16V647',
+            evidenceSnippet: 'Volkswagen Golf GTI SportWagen suction pump failure causing fire hazard',
+          },
+        ],
+        numericEligibility: 'QUALITATIVE_ONLY',
+      };
+
+      const canonicalRisks = service.buildCanonicalRisks(golf14TsiInput, [nhtsa16V647Evidence]);
+      expect(canonicalRisks.length).toBe(1);
+      const risk = canonicalRisks[0];
+
+      // Consequence description is preserved
+      expect(risk.severityBasis).toContain('increases the risk of a fire');
+      expect(risk.severity).toBe(10);
+      expect(risk.consequenceState).toBe('RESEARCHED_GROUNDED');
+
+      // But applicability is INCOMPATIBLE and scoring is rejected
+      expect(risk.applicabilityState).toBe('INCOMPATIBLE');
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.advisoryOnly).toBe(true);
+
+      // Now pass this canonical risk to TorqueScoutDecisionScoreService and verify NO score deduction
+      const decisionScoreService = new TorqueScoutDecisionScoreService();
+      const scoringV6Service = new VehicleReportScoringV6Service(decisionScoreService);
+
+      const vehicleContext = {
+        vehicleIdentity: {
+          brand: 'Volkswagen',
+          model: 'Golf',
+          modelYear: 2015,
+          engineCode: '1.4 TSI',
+          transmissionName: 'DSG',
+          fuelType: 'Benzin',
+        },
+        verifiedResearch: {
+          webSearchPerformed: true,
+          groundingSources: [
+            { title: 'KBA Official Safety Portal', tier: 1 },
+            { title: 'ADAC Vehicle Testing', tier: 2 },
+            { title: 'TUV Reliability Report', tier: 2 },
+          ],
+          reliabilityResearch: [],
+          qualitativeDefects: [],
+          recallResearch: [],
+        },
+        canonicalRisks,
+      };
+
+      const v6Scores = scoringV6Service.calculateScores(vehicleContext);
+      const decisionScore = v6Scores.decisionScoreV1;
+
+      // Ensure this severity-10 incompatible risk did NOT deduct any points
+      expect(decisionScore?.deductedRisks.length).toBe(0);
+      expect(decisionScore?.modelDecisionRisk).toBe(0);
+      expect(decisionScore?.score).toBe(100);
+    });
+  });
+
+  describe('AI Technical Reasoning Fallback (Generic Resolution)', () => {
+    // 1. DQ200-like verified architecture + technical facts can form a consequence chain
+    it('1. DQ200-like verified architecture + technical facts can form a consequence chain', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'DQ200 Kuru Çift Kavrama',
+        normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        title: 'Kuru Çift Kavrama Aşınması',
+        severity: null,
+        severityBasis: 'Unresolved severity',
+        severityCategory: null,
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'Proven shared component architecture on DQ200 7-speed dry dual-clutch transmission with friction lining thermal wear in stop-and-go driving',
+        verificationState: 'TIER1_OFFICIAL',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'VERIFIED',
+        sources: [
+          {
+            sourceId: 'SRC-TSB-1',
+            url: 'https://oem-tech-portal.de/bulletins/dq200-clutch-shudder',
+            title: 'OEM Service Campaign - DQ200 Clutch Judder and Thermal Wear',
+            tier: 'TIER_1',
+          },
+          {
+            sourceId: 'SRC-TECH-2',
+            url: 'https://adac.de/repair/dq200-clutch-teardown',
+            title: 'ADAC Technical Teardown: DQ200 friction lining thermal wear causing slip and judder',
+            tier: 'TIER_2',
+          },
+        ],
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      expect(risk.scoringEligible).toBe(true);
+      expect(risk.severity).toBe(5);
+      expect(risk.consequenceState).toBe('INFERRED_FROM_EFFECTS');
+      expect(risk.inferenceBasis).toBe('AI_INFERRED_FROM_VERIFIED_FACTS');
+      expect(risk.inferenceConfidence).toBe('HIGH');
+      expect(risk.supportingFactIds).toBeDefined();
+      expect(risk.supportingFactIds!.length).toBeGreaterThanOrEqual(2);
+      expect(risk.reasoningChain).toContain('friction lining thermal stress');
+      expect(risk.inferredConsequence).toContain('Kuru çift kavrama sürtünme balatalarının');
+    });
+
+    // 2. forum-only facts cannot score
+    it('2. forum-only facts cannot score', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Candidate has only Tier 3 forum sources and NO verified component design fact
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:UNVERIFIED_FORUM_NOISE',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'Şanzıman Gövdesi',
+        normalizedFailureMode: 'UNVERIFIED_FORUM_NOISE',
+        title: 'Forum Community Noise Claim',
+        severity: null,
+        severityBasis: 'Community claim',
+        severityCategory: null,
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'General forum thread mention',
+        verificationState: 'TIER3_COMMUNITY_ONLY',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'DISCOVERED',
+        sources: [
+          {
+            sourceId: 'SRC-FORUM-1',
+            url: 'https://golf-enthusiasts-forum.com/thread/123',
+            title: 'User posts that gearbox makes weird noise',
+            tier: 'TIER_3',
+          },
+          {
+            sourceId: 'SRC-FORUM-2',
+            url: 'https://car-talk-forum.com/gearbox-judder',
+            title: 'Another anonymous forum user complaint',
+            tier: 'TIER_3',
+          },
+        ],
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // Must NOT score
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.severity).toBeNull();
+      expect(risk.inferenceBasis).toBeUndefined();
+    });
+
+    // 3. one isolated fact cannot score
+    it('3. one isolated fact cannot score', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Candidate has ONLY the vehicle architecture fact (no second verified fact)
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:ISOLATED_DEFECT',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'Bilinmeyen Mekanizma',
+        normalizedFailureMode: 'ISOLATED_DEFECT',
+        title: 'Isolated Defect Candidate',
+        severity: null,
+        severityBasis: 'Unresolved',
+        severityCategory: null,
+        applicabilityState: 'EXACT_MATCH',
+        applicabilityEvidence: undefined, // No component design fact
+        verificationState: 'UNVERIFIED',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'DISCOVERED',
+        sources: [], // No TSB / Tier 1 / Tier 2 sources
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // Exactly 1 fact exists (FACT_ARCH_...) -> fewer than 2 verified facts -> cannot score
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.severity).toBeNull();
+      expect(risk.inferenceBasis).toBeUndefined();
+    });
+
+    // 4. conflicting facts cannot create blind severity
+    it('4. conflicting facts cannot create blind severity', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Conflicting facts: Source 1 says minor cosmetic noise, Source 2 verified TSB reports friction lining thermal wear causing slip/judder
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'DQ200 Kuru Çift Kavrama',
+        normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        title: 'Kuru Çift Kavrama Aşınması',
+        severity: null,
+        severityBasis: 'Conflicting reports',
+        severityCategory: null,
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'Proven shared component architecture on DQ200 7-speed dry dual-clutch transmission',
+        verificationState: 'TIER1_OFFICIAL',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'VERIFIED',
+        sources: [
+          {
+            sourceId: 'SRC-1',
+            url: 'https://oem-tech-portal.de/bulletins/dq200-review',
+            title: 'Tech Review claiming minor cosmetic noise and normal wear',
+            tier: 'TIER_2',
+          },
+          {
+            sourceId: 'SRC-2',
+            url: 'https://oem-tech-portal.de/bulletins/dq200-clutch-tsb',
+            title: 'OEM TSB: Friction lining thermal wear causing slip and judder',
+            tier: 'TIER_1',
+          },
+        ],
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // Resolves conservatively using verified functional evidence:
+      // Severity is 5 (drivability consequence), NOT blind severity 10, NOT null
+      expect(risk.scoringEligible).toBe(true);
+      expect(risk.severity).toBe(5);
+      expect(risk.consequenceState).toBe('INFERRED_FROM_EFFECTS');
+      expect(risk.inferenceBasis).toBe('AI_INFERRED_FROM_VERIFIED_FACTS');
+      expect(risk.supportingFactIds!.length).toBeGreaterThanOrEqual(2);
+    });
+
+    // 5. direct verified consequence overrides AI inference
+    it('5. direct verified consequence overrides AI inference', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Candidate ALREADY has a direct verified consequence and grounded severity
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:MECHATRONIC_PRESSURE_LOSS',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'DQ200 Mekatronik',
+        normalizedFailureMode: 'MECHATRONIC_PRESSURE_LOSS',
+        title: 'Mekatronik Hidrolik Basınç Kaybı',
+        severity: 8,
+        severityBasis: 'Official OEM TSB: hydraulic pressure loss causing transmission shutdown',
+        severityCategory: 'SAFETY_CRITICAL',
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'Proven shared component architecture on DQ200 electro-hydraulic mechatronic unit',
+        verificationState: 'TIER1_OFFICIAL',
+        consequenceState: 'RESEARCHED_GROUNDED',
+        scoringEligible: true,
+        advisoryOnly: false,
+        lifecycleState: 'SCORING_ELIGIBLE',
+        sources: [
+          {
+            sourceId: 'SRC-TSB-MECH',
+            url: 'https://kba.de/recalls/dq200-mechatronic',
+            title: 'KBA Official Safety Recall - Loss of Hydraulic Pressure',
+            tier: 'TIER_1',
+          },
+        ],
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // Direct verified consequence MUST NOT be overwritten
+      expect(risk.severity).toBe(8);
+      expect(risk.severityBasis).toBe('Official OEM TSB: hydraulic pressure loss causing transmission shutdown');
+      expect(risk.consequenceState).toBe('RESEARCHED_GROUNDED');
+      expect(risk.inferenceBasis).toBeUndefined(); // AI inference was bypassed
+    });
+
+    // 6. "component exists" alone cannot become scored defect
+    it('6. "component exists" alone cannot become scored defect', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Candidate has proven component architecture match on target vehicle, BUT zero external verified defect sources
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'DQ200 Kuru Çift Kavrama',
+        normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        title: 'Kuru Çift Kavrama Aşınması',
+        severity: null,
+        severityBasis: 'Unresolved severity',
+        severityCategory: null,
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'Proven shared component architecture: target vehicle shares DQ200 7-speed dry dual-clutch / mechatronic architecture.',
+        verificationState: 'VERIFIED',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'VERIFIED',
+        sources: [], // No external TSB or technical defect evidence
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // Merely having a DQ200 on the vehicle CANNOT produce a numeric defect score
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.severity).toBeNull();
+      expect(risk.advisoryOnly).toBe(true);
+      expect(risk.inferenceConfidence).not.toBe('HIGH');
+    });
+
+    // 7. same source split into two facts cannot satisfy independence
+    it('7. same source split into two facts cannot satisfy independence', async () => {
+      const aiReasoning = new AITechnicalReasoningService();
+      const input: VehicleReliabilityResearchInput = {
+        brand: 'Volkswagen',
+        model: 'Golf',
+        modelYear: 2015,
+        engineCode: '1.4 TSI EA211',
+        transmissionName: 'DSG DQ200',
+        powertrainType: 'ICE_PETROL',
+      };
+
+      // Both vehicle identity and component design come from the same vehicle catalog input
+      // Only 1 external source is attached (requires at least 2 independent external verified facts)
+      const risk: CanonicalRiskDefect = {
+        id: 'CANONICAL:POWERTRAIN_TRANS:DUAL_CLUTCH_WEAR',
+        domain: 'POWERTRAIN_TRANS',
+        affectedComponent: 'DQ200 Kuru Çift Kavrama',
+        normalizedFailureMode: 'DUAL_CLUTCH_WEAR',
+        title: 'Kuru Çift Kavrama Aşınması',
+        severity: null,
+        severityBasis: 'Single source only',
+        severityCategory: null,
+        applicabilityState: 'FAMILY_MATCH',
+        applicabilityEvidence: 'Proven shared component architecture: target vehicle shares DQ200 7-speed dry dual-clutch / mechatronic architecture.',
+        verificationState: 'TIER1_OFFICIAL',
+        consequenceState: 'INSUFFICIENT',
+        scoringEligible: false,
+        advisoryOnly: true,
+        lifecycleState: 'VERIFIED',
+        sources: [
+          {
+            sourceId: 'SRC-SINGLE-1',
+            url: 'https://single-source.de/tsb/1',
+            title: 'Single TSB without independent corroboration',
+            tier: 'TIER_1',
+          },
+        ],
+      };
+
+      await aiReasoning.applyTechnicalReasoningFallback(input, [risk]);
+
+      // FACT_ARCH and applicability cannot be counted as 2 independent facts; with only 1 external source, cannot score
+      expect(risk.scoringEligible).toBe(false);
+      expect(risk.severity).toBeNull();
+      expect(risk.advisoryOnly).toBe(true);
+      expect(risk.inferenceConfidence).not.toBe('HIGH');
+    });
+  });
+});

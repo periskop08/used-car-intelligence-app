@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  CanonicalRiskDefect,
+  DeductedRiskItem,
   TorqueScoutDecisionScoreV1,
   VehicleReportScoresV6,
 } from '@used-car-intelligence/shared';
@@ -9,6 +11,7 @@ export interface DecisionScoreCalculationInput {
   qualitativeDefects?: any[];
   recalls?: any[];
   priceModifier?: number;
+  canonicalRisks?: CanonicalRiskDefect[];
 }
 
 @Injectable()
@@ -22,101 +25,57 @@ export class TorqueScoutDecisionScoreService {
    * NEVER represents statistical failure probability or occurrence likelihood.
    */
   calculateDecisionScore(input: DecisionScoreCalculationInput): TorqueScoutDecisionScoreV1 {
-    const { v6Scores, qualitativeDefects = [], recalls = [], priceModifier = 0 } = input;
+    const { v6Scores, qualitativeDefects = [], recalls = [], priceModifier = 0, canonicalRisks = [] } = input;
 
-    // 1. Calculate Qualitative Buying-Decision Penalty across affected domains (Option B Calibration)
-    const qualitativePenalty = this.calculateQualitativePenalty(
-      v6Scores,
+    // 1. Evaluate Canonical / Qualitative Risks via 5-Tier Impact & 3-Tier Evidence Engine
+    const { totalRiskPenalty, deduplicatedRisks, verifiedRisks } = this.calculateAdditiveRiskPenalties(
+      canonicalRisks,
       qualitativeDefects,
       recalls,
+      v6Scores,
     );
 
-    // 2. Determine Model Decision Risk (Bounded Buying-Decision Penalty)
-    let modelDecisionRisk: number | null = null;
-    let modelRiskLimitingReason: string | null = null;
+    const isInsufficient =
+      v6Scores.modelRiskState === 'INSUFFICIENT_RESEARCH' && totalRiskPenalty === 0;
 
-    switch (v6Scores.modelRiskState) {
-      case 'CONTRADICTORY_EVIDENCE':
-      case 'INSUFFICIENT_RESEARCH':
-        modelDecisionRisk = null;
-        modelRiskLimitingReason = 'Model seviyesi güvenilirlik araştırması yetersiz veya çelişkili kanıt içeriyor.';
-        break;
+    const modelDecisionRisk = isInsufficient ? null : totalRiskPenalty;
 
-      case 'RESEARCH_COMPLETE_NO_DEFECT':
-        // Research complete but not certified deep zero
-        modelDecisionRisk = null;
-        modelRiskLimitingReason = 'Model araştırması tamamlandı ancak sıfır-risk sertifikasyonu için derinlik eşiği karşılanmadı.';
-        break;
-
-      case 'VERIFIED_LOW_RISK':
-        modelDecisionRisk = 0;
-        break;
-
-      case 'VERIFIED_RISK_PRESENT':
-        if (v6Scores.modelRiskQuantification === 'QUALITATIVE_ONLY') {
-          modelDecisionRisk = qualitativePenalty;
-        } else if (v6Scores.modelRiskQuantification === 'PARTIAL_LOWER_BOUND') {
-          // Conservative upper envelope: max(numericSubset, qualitativePenalty) to avoid double counting
-          const numRisk = v6Scores.modelRiskScore ?? 0;
-          const qualPen = qualitativePenalty ?? 0;
-          modelDecisionRisk = Math.max(numRisk, qualPen);
-        } else if (v6Scores.modelRiskQuantification === 'FULLY_QUANTIFIED') {
-          modelDecisionRisk = v6Scores.modelRiskScore;
-        } else {
-          modelDecisionRisk = qualitativePenalty;
-        }
-        break;
-
-      default:
-        modelDecisionRisk = null;
-        break;
-    }
-
-    // 3. Determine Scope & Final Score
+    // 2. Determine Scope & Final Score (Base 100, additive deductions)
     const hasEligibleCondition =
       v6Scores.vehicleConditionRisk !== null &&
       v6Scores.conditionCoverageScore >= 35;
 
     let score: number | null = null;
     let scope: TorqueScoutDecisionScoreV1['scope'] = 'INSUFFICIENT_DATA';
-    let limitingReason: string | null = modelRiskLimitingReason;
+    let limitingReason: string | null = null;
     let conditionRiskUsed: number | null = null;
 
     // Price modifier bounded to [-15, +10]
     const clampedPriceModifier = Math.min(10, Math.max(-15, Math.round(priceModifier)));
 
-    if (v6Scores.confidenceScore < 40) {
+    if (isInsufficient) {
       score = null;
       scope = 'INSUFFICIENT_DATA';
-      limitingReason = 'Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz.';
-      conditionRiskUsed = hasEligibleCondition ? v6Scores.vehicleConditionRisk : null;
-    } else if (modelDecisionRisk === null) {
-      score = null;
-      scope = 'INSUFFICIENT_DATA';
-      conditionRiskUsed = hasEligibleCondition ? v6Scores.vehicleConditionRisk : null;
+      limitingReason = 'Bu araç varyantı için güvenilirlik araştırması henüz tamamlanmadı.';
     } else if (!hasEligibleCondition) {
-      // VARIANT-level score (No specific vehicle condition data)
-      // Option B: Decision score directly reflects technical risk (100 - modelDecisionRisk)
-      // Confidence is reported independently as "Analiz Veri Güveni"
+      // VARIANT-level score (Pure technical risk model: 100 - totalRiskPenalty)
       scope = 'VARIANT';
       conditionRiskUsed = null;
 
-      const rawVariantScore = 100 - modelDecisionRisk;
-      score = Math.round(Math.min(100, Math.max(0, rawVariantScore)));
+      const rawVariantScore = 100 - totalRiskPenalty;
+      score = Math.round(Math.min(100, Math.max(15, rawVariantScore)));
     } else {
-      // VEHICLE-specific score (Specific condition data available)
-      // Option B: Decision score directly reflects combined technical & condition risk + price modifier
-      // Confidence is reported independently as "Analiz Veri Güveni"
+      // VEHICLE-specific score (Combined technical & vehicle condition + price modifier)
       scope = 'VEHICLE';
       conditionRiskUsed = v6Scores.vehicleConditionRisk;
 
-      const baseVehicleScore = 100 - (0.45 * modelDecisionRisk + 0.55 * (v6Scores.vehicleConditionRisk ?? 0));
+      const baseVehicleScore = 100 - (0.45 * totalRiskPenalty + 0.55 * (v6Scores.vehicleConditionRisk ?? 0));
       const adjustedScore = baseVehicleScore + clampedPriceModifier;
 
-      score = Math.round(Math.min(100, Math.max(0, adjustedScore)));
+      score = Math.round(Math.min(100, Math.max(15, adjustedScore)));
     }
 
-    // 4. Map State Recommendation Band
+    // 3. Map State Recommendation Band with Guardrails
     let state: TorqueScoutDecisionScoreV1['state'] = 'INSUFFICIENT_DATA';
     if (score === null) {
       state = 'INSUFFICIENT_DATA';
@@ -132,18 +91,56 @@ export class TorqueScoutDecisionScoreService {
       state = 'AVOID';
     }
 
-    // 5. Deterministic Explanations (Strictly NO '%' or probability semantics)
+    // Critical Defect Recommendation Guardrail:
+    // If vehicle has any verified STRONG + CRITICAL risk (e.g. engine destruction, fire hazard, brake loss),
+    // recommendation state CANNOT be GOOD or EXCELLENT regardless of score!
+    const strongCriticalRisks = deduplicatedRisks.filter(
+      (r) => r.evidenceLevel === 'STRONG' && r.impactClass === 'CRITICAL',
+    );
+    if (strongCriticalRisks.length >= 2) {
+      state = 'AVOID';
+    } else if (strongCriticalRisks.length === 1) {
+      if (state === 'EXCELLENT' || state === 'GOOD') {
+        state = 'CAUTION';
+      }
+    }
+
+    // 4. Deterministic Explanations
     const explanation = this.buildDeterministicExplanation({
       v6Scores,
       scope,
       modelDecisionRisk,
-      qualitativePenalty,
+      qualitativePenalty: totalRiskPenalty,
       conditionRiskUsed,
       confidenceScore: v6Scores.confidenceScore,
       priceModifierUsed: clampedPriceModifier,
       score,
       state,
     });
+
+    const deductedRisks: DeductedRiskItem[] = deduplicatedRisks
+      .filter((r) => (r.netDeduction ?? 0) > 0)
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        normalizedFailureMode: r.normalizedFailureMode,
+        domain: r.domain,
+        severity: r.severity,
+        severityBasis: r.severityBasis,
+        impactClass: r.impactClass,
+        evidenceLevel: r.evidenceLevel,
+        basePenalty: r.basePenalty,
+        evidenceMultiplier: r.evidenceMultiplier,
+        netDeduction: r.netDeduction,
+        inspectionInstruction: r.inspectionInstruction,
+        reason: r.description || r.severityBasis || r.title,
+        sources: r.sources,
+        inferredConsequence: r.inferredConsequence,
+        reasoningChain: r.reasoningChain,
+        supportingFactIds: r.supportingFactIds,
+        inferenceBasis: r.inferenceBasis,
+        inferenceConfidence: r.inferenceConfidence,
+      }));
 
     return {
       version: 'v1.0',
@@ -151,84 +148,308 @@ export class TorqueScoutDecisionScoreService {
       scope,
       state,
       modelDecisionRisk,
-      qualitativeSeverityBurden: qualitativePenalty,
+      totalRiskPenalty,
+      qualitativeSeverityBurden: totalRiskPenalty,
       conditionRiskUsed,
       confidenceScore: v6Scores.confidenceScore,
       priceModifierUsed: clampedPriceModifier,
       limitingReason,
+      deductedRisks,
+      verifiedRisks,
       explanation,
     };
   }
 
   /**
-   * Calculates Qualitative Buying-Decision Penalty using Option B (Progressive Convex Power Function).
-   * For each affected domain:
-   *   DomainBurden_d = (maxVerifiedSeverityInDomain / 10) ^ 1.8
-   * Across affected domains:
-   *   AggregateBurden = 0.75 * max(DomainBurden) + 0.25 * mean(DomainBurden)
-   *   DomainMultiplier = 1 + 0.20 * min(2, affectedDomains - 1)
-   *   QualitativePenalty = round(50 * AggregateBurden * DomainMultiplier)
-   * Clamped 0..100.
+   * 5-Tier Impact & 3-Tier Evidence Additive Deduction Engine.
+   * Calculates transparent point deductions with root-cause deduplication.
    */
-  private calculateQualitativePenalty(
+  private calculateAdditiveRiskPenalties(
+    canonicalRisks: CanonicalRiskDefect[] = [],
+    qualitativeDefects: any[] = [],
+    recalls: any[] = [],
     v6Scores: VehicleReportScoresV6,
-    qualitativeDefects: any[],
-    recalls: any[],
-  ): number | null {
-    // Gather all qualitative candidates from domain breakdown or arrays
-    const domainSeverities: Record<string, number[]> = {};
+  ): {
+    totalRiskPenalty: number;
+    deduplicatedRisks: CanonicalRiskDefect[];
+    verifiedRisks: CanonicalRiskDefect[];
+  } {
+    // 1. Collect all candidates
+    const candidates: CanonicalRiskDefect[] = [];
 
-    // 1. From domainBreakdown verified qualitative factors
-    v6Scores.domainBreakdown?.forEach((d) => {
-      const qualFactors = d.verifiedFactors.filter(
-        (f) => f.quantification === 'QUALITATIVE' || f.impact === null,
-      );
-      if (qualFactors.length > 0) {
-        if (!domainSeverities[d.domain]) domainSeverities[d.domain] = [];
-      }
-    });
-
-    // 2. Map explicit qualitativeDefects and recalls into domain severities
-    const allQual = [
-      ...(Array.isArray(qualitativeDefects) ? qualitativeDefects : []),
-      ...(Array.isArray(recalls) ? recalls : []),
-    ];
-
-    allQual.forEach((d: any) => {
-      if (d.numericEligibility === 'REJECTED') return;
-      const dKey = d.domain || this.resolveDomainKey(d);
-      const sev = this.extractSeverityNumber(d);
-      if (sev > 0) {
-        if (!domainSeverities[dKey]) domainSeverities[dKey] = [];
-        domainSeverities[dKey].push(sev);
-      }
-    });
-
-    const affectedDomainKeys = Object.keys(domainSeverities).filter(
-      (k) => domainSeverities[k].length > 0,
-    );
-
-    if (affectedDomainKeys.length === 0) {
-      if (v6Scores.modelRiskState === 'VERIFIED_LOW_RISK') return 0;
-      return null;
+    if (canonicalRisks && canonicalRisks.length > 0) {
+      candidates.push(...canonicalRisks);
+    } else {
+      // Fallback from qualitative defects & recalls
+      const allQual = [
+        ...(Array.isArray(qualitativeDefects) ? qualitativeDefects : []),
+        ...(Array.isArray(recalls) ? recalls : []),
+      ];
+      allQual.forEach((d: any) => {
+        if (d.numericEligibility === 'REJECTED') return;
+        const dKey = d.domain || this.resolveDomainKey(d);
+        const sev = this.extractSeverityNumber(d);
+        const rawKey = (d.normalizedFailureMode || d.failureMode || d.title || '').trim().toUpperCase();
+        candidates.push({
+          id: `CANONICAL:${dKey}:${rawKey || 'DEFECT'}`,
+          lifecycleState: 'SCORING_ELIGIBLE',
+          normalizedFailureMode: rawKey || 'DEFECT',
+          title: d.title || 'Doğrulanmış Teknik Kusur',
+          description: d.description || d.severityBasis,
+          domain: dKey as any,
+          affectedComponent: d.affectedComponent || dKey,
+          applicabilityState: 'EXACT',
+          verificationState: 'VERIFIED',
+          consequenceState: 'RESEARCHED_GROUNDED',
+          severity: sev,
+          severityBasis: d.severityBasis || 'GROUNDED_RESEARCH',
+          scoringEligible: true,
+          sources: d.linkedSources || [],
+          inspectionInstruction: d.inspectionInstructions?.[0] || d.inspectionInstruction,
+        });
+      });
     }
 
-    // For each affected domain: DomainBurden_d = (maxVerifiedSeverity / 10) ^ 1.8
-    const domainBurdens: number[] = affectedDomainKeys.map((k) => {
-      const maxSev = Math.max(...domainSeverities[k]);
-      const normSev = Math.min(1.0, Math.max(0.1, maxSev / 10.0));
-      return Math.pow(normSev, 1.8);
+    // 2. Classify each candidate: ImpactClass & EvidenceLevel
+    candidates.forEach((cr) => {
+      cr.impactClass = this.resolveImpactClass(cr);
+      cr.evidenceLevel = this.resolveEvidenceLevel(cr);
+      cr.basePenalty = this.getBasePenaltyForImpact(cr.impactClass);
+      cr.evidenceMultiplier = this.getEvidenceMultiplier(cr.evidenceLevel);
+      cr.netDeduction = Math.round(cr.basePenalty * cr.evidenceMultiplier);
     });
 
-    const maxDomainBurden = Math.max(...domainBurdens);
-    const meanDomainBurden =
-      domainBurdens.reduce((sum, b) => sum + b, 0) / domainBurdens.length;
+    // 3. Root-Cause Deduplication
+    // Group by root cause (Domain + Component + FailureMode cluster)
+    const rootCauseMap = new Map<string, CanonicalRiskDefect>();
 
-    const aggregateBurden = 0.75 * maxDomainBurden + 0.25 * meanDomainBurden;
-    const domainMultiplier = 1 + 0.20 * Math.min(2, affectedDomainKeys.length - 1);
+    candidates.forEach((cr) => {
+      const compNorm = (cr.affectedComponent || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const modeNorm = (cr.normalizedFailureMode || cr.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const rootKey = `${cr.domain}:${compNorm || modeNorm}`;
 
-    const qualitativePenalty = Math.round(50 * aggregateBurden * domainMultiplier);
-    return Math.min(100, Math.max(0, qualitativePenalty));
+      const existing = rootCauseMap.get(rootKey);
+      if (!existing) {
+        rootCauseMap.set(rootKey, cr);
+      } else {
+        // Keep the candidate with higher net deduction
+        if ((cr.netDeduction ?? 0) > (existing.netDeduction ?? 0)) {
+          rootCauseMap.set(rootKey, cr);
+        }
+      }
+    });
+
+    const deduplicatedRisks = Array.from(rootCauseMap.values());
+
+    // 4. Clean Additive Sum (Capped at 85 to guarantee min score floor of 15)
+    const sumDeductions = deduplicatedRisks.reduce((acc, r) => acc + (r.netDeduction ?? 0), 0);
+    const totalRiskPenalty = Math.min(85, Math.max(0, sumDeductions));
+
+    // Verified risks for transparent report listing
+    const verifiedRisks = candidates.filter(
+      (r) =>
+        r.verificationState === 'VERIFIED' ||
+        r.verificationState === 'TIER1_OFFICIAL' ||
+        r.verificationState === 'TIER2_CROSS_REFERENCED' ||
+        (r.sources && r.sources.length > 0),
+    );
+
+    return {
+      totalRiskPenalty,
+      deduplicatedRisks,
+      verifiedRisks,
+    };
+  }
+
+  /**
+   * Resolves the 5-Tier Impact Class based on grounded consequence semantics.
+   */
+  resolveImpactClass(cr: CanonicalRiskDefect): 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL' {
+    if (cr.impactClass) return cr.impactClass;
+
+    const text = `${cr.title || ''} ${cr.normalizedFailureMode || ''} ${cr.severityBasis || ''} ${cr.inferredConsequence || ''} ${cr.description || ''} ${cr.reasoningChain || ''}`.toLowerCase();
+
+    // 1. CRITICAL (-25): Safety critical, engine destruction, fire, total brake assist loss
+    if (
+      (cr.severityCategory as string) === 'SAFETY_CRITICAL' ||
+      text.includes('yangın') ||
+      text.includes('fire') ||
+      text.includes('fren vakum') ||
+      text.includes('brake assist') ||
+      text.includes('oil starvation') ||
+      text.includes('yağ süzgeci') ||
+      text.includes('motor kırma') ||
+      text.includes('catastrophic') ||
+      text.includes('engine destruction') ||
+      text.includes('engine failure') ||
+      text.includes('rollaway')
+    ) {
+      return 'CRITICAL';
+    }
+
+    // 2. MAJOR_REPAIR (-18): Breakdown, limp mode, transmission lockout, pressure loss, timing chain jump
+    if (
+      (cr.severityCategory as string) === 'BREAKDOWN' ||
+      cr.severityCategory === 'MAJOR_POWERTRAIN' ||
+      text.includes('limp') ||
+      text.includes('lockout') ||
+      text.includes('acil mod') ||
+      text.includes('pressure loss') ||
+      text.includes('basınç kaybı') ||
+      text.includes('yolda kalma') ||
+      text.includes('chain elongation') ||
+      text.includes('chain slack') ||
+      text.includes('zincir uzama') ||
+      text.includes('akümülatör') ||
+      text.includes('accumulator') ||
+      text.includes('hpfp')
+    ) {
+      return 'MAJOR_REPAIR';
+    }
+
+    // 3. SERIOUS (-12): Severe functional, drivability, clutch shudder/slip, noticeable vibration
+    if (
+      cr.severityCategory === 'DRIVABILITY' ||
+      (cr.severityCategory as string) === 'FUNCTIONAL_SEVERE' ||
+      text.includes('judder') ||
+      text.includes('titreme') ||
+      text.includes('kavrama kaçırma') ||
+      text.includes('clutch slip') ||
+      text.includes('hesitation') ||
+      text.includes('silkeleme') ||
+      text.includes('lining wear') ||
+      text.includes('kuru çift kavrama') ||
+      text.includes('dry-clutch') ||
+      text.includes('dq200') ||
+      text.includes('shudder')
+    ) {
+      return 'SERIOUS';
+    }
+
+    // 4. MODERATE (-7): Early wear, thermostat/water pump seepage, sensor, auxiliary fault
+    if (
+      (cr.severityCategory as string) === 'FUNCTIONAL_MODERATE' ||
+      text.includes('sızıntı') ||
+      text.includes('leak') ||
+      text.includes('seepage') ||
+      text.includes('termostat') ||
+      text.includes('thermostat') ||
+      text.includes('su pompası') ||
+      text.includes('water pump') ||
+      text.includes('terleme') ||
+      text.includes('sensor') ||
+      text.includes('buji')
+    ) {
+      return 'MODERATE';
+    }
+
+    // 5. MINOR (-3): Cosmetic, interior trim vibration, infotainment screen lag
+    if (
+      cr.severityCategory === 'FUNCTIONAL_MINOR' ||
+      cr.severityCategory === 'COSMETIC' ||
+      text.includes('trim') ||
+      text.includes('fitil') ||
+      text.includes('multimedya') ||
+      text.includes('infotainment') ||
+      text.includes('gıcırtı') ||
+      text.includes('ekran') ||
+      text.includes('cosmetic')
+    ) {
+      return 'MINOR';
+    }
+
+    // Fallback by numeric severity if available
+    const sev = cr.severity ?? 0;
+    if (sev >= 9) return 'CRITICAL';
+    if (sev >= 7) return 'MAJOR_REPAIR';
+    if (sev >= 5) return 'SERIOUS';
+    if (sev >= 3) return 'MODERATE';
+    return 'MINOR';
+  }
+
+  /**
+   * Resolves the 3-Tier Evidence Level based on applicability & verification provenance.
+   */
+  resolveEvidenceLevel(cr: CanonicalRiskDefect): 'WEAK' | 'MODERATE' | 'STRONG' {
+    if (cr.evidenceLevel) return cr.evidenceLevel;
+
+    // Incompatible or market-uncertain recalls with no local homologation proof -> WEAK (0 penalty)
+    if (
+      cr.applicabilityState === 'MARKET_UNCERTAIN' ||
+      cr.applicabilityState === 'INCOMPATIBLE' ||
+      cr.applicabilityState === 'COMPONENT_UNCERTAIN' ||
+      cr.applicabilityState === 'UNKNOWN'
+    ) {
+      return 'WEAK';
+    }
+
+    // Official TSB / Recall / Cross-referenced teardown with exact or proven family applicability -> STRONG
+    const hasOfficialSources = (cr.sources || []).some(
+      (s) => s.tier === 'TIER_1' || s.tier === 'TIER_2' || s.tier === 1 || s.tier === 2,
+    );
+
+    if (
+      (cr.verificationState === 'TIER1_OFFICIAL' || cr.verificationState === 'TIER2_CROSS_REFERENCED' || hasOfficialSources) &&
+      (cr.applicabilityState === 'EXACT' ||
+        cr.applicabilityState === 'EXACT_MATCH' ||
+        (cr.applicabilityState === 'FAMILY_MATCH' && cr.applicabilityEvidence?.includes('Proven shared component')))
+    ) {
+      return 'STRONG';
+    }
+
+    // Shared component architecture with established chronic field vulnerability (e.g. DQ200 on Golf 7) -> MODERATE
+    const text = `${cr.title || ''} ${cr.normalizedFailureMode || ''} ${cr.affectedComponent || ''}`.toLowerCase();
+    const isSharedComponentVulnerability =
+      (cr.applicabilityState === 'FAMILY_MATCH' && cr.applicabilityEvidence?.includes('Proven shared component')) ||
+      text.includes('dq200') ||
+      text.includes('kuru çift kavrama') ||
+      text.includes('kuru kavrama') ||
+      text.includes('dual_clutch_wear') ||
+      text.includes('wet_belt') ||
+      text.includes('wet belt') ||
+      text.includes('yağ içi triger');
+
+    if (isSharedComponentVulnerability) {
+      return 'MODERATE';
+    }
+
+    // Verified defect with grounded consequence -> MODERATE
+    if (cr.verificationState === 'VERIFIED' && cr.scoringEligible) {
+      return 'MODERATE';
+    }
+
+    // Uncorroborated forum rumour or insufficient evidence without shared component link -> WEAK
+    return 'WEAK';
+  }
+
+  getBasePenaltyForImpact(impact: 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL'): number {
+    switch (impact) {
+      case 'CRITICAL':
+        return 25;
+      case 'MAJOR_REPAIR':
+        return 18;
+      case 'SERIOUS':
+        return 12;
+      case 'MODERATE':
+        return 7;
+      case 'MINOR':
+        return 3;
+      default:
+        return 3;
+    }
+  }
+
+  getEvidenceMultiplier(level: 'WEAK' | 'MODERATE' | 'STRONG'): number {
+    switch (level) {
+      case 'STRONG':
+        return 1.0;
+      case 'MODERATE':
+        return 0.7;
+      case 'WEAK':
+        return 0.0;
+      default:
+        return 0.0;
+    }
   }
 
   private extractSeverityNumber(defect: any): number {

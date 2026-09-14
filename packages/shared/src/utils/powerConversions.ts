@@ -25,21 +25,21 @@ export interface ConvertedPower {
   sourceReportedUnit: 'HP' | 'PS' | 'KW';
 }
 
-export const PS_TO_HP_FACTOR = 0.9863200706;
-export const KW_TO_HP_FACTOR = 1.34102209;
-export const HP_TO_KW_FACTOR = 0.745699872;
+export const PS_TO_HP_FACTOR = 1.0; // In TR/EU automotive market standard, PS (Metric Horsepower) is 1:1 with catalog HP (Beygir Gücü)
+export const KW_TO_HP_FACTOR = 1.3596216173; // Metric horsepower conversion (1 kW = 1.35962 PS/HP)
+export const HP_TO_KW_FACTOR = 0.73549875;
 export const PS_TO_KW_FACTOR = 0.73549875;
 export const KW_TO_PS_FACTOR = 1.3596216173;
-export const HP_TO_PS_FACTOR = 1.0138696654;
+export const HP_TO_PS_FACTOR = 1.0;
 
 /**
  * Converts reported power values (HP, PS, kW) to canonical normalized units
- * using standard automotive physics conversion constants.
+ * using TR / European automotive catalog standards (Metric Horsepower / DIN PS = HP / BG).
  *
- * CANONICAL POWER NORMALIZATION:
- * PS -> HP: HP = PS * 0.9863200706
- * kW -> HP: HP = kW * 1.34102209
- * HP -> HP: no conversion
+ * CANONICAL POWER NORMALIZATION (TR/EU Standard):
+ * PS -> HP: HP = PS (150 PS -> 150 HP)
+ * kW -> HP: HP = round(kW * 1.35962) (110 kW -> 150 HP)
+ * HP -> HP: no conversion (150 HP -> 150 HP)
  *
  * Source data values and units remain preserved and unmutated.
  */
@@ -49,7 +49,7 @@ export function convertPowerUnits(value: number, unit: string): ConvertedPower {
 
   if (normalizedUnit === 'KW') {
     const ps = Math.round(val * KW_TO_PS_FACTOR);
-    const hp = Math.round(val * KW_TO_HP_FACTOR);
+    const hp = ps;
     return {
       sourceReportedValue: val,
       sourceReportedUnit: 'KW',
@@ -62,7 +62,7 @@ export function convertPowerUnits(value: number, unit: string): ConvertedPower {
   if (normalizedUnit === 'PS' || normalizedUnit === 'BG' || normalizedUnit === 'PK') {
     const ps = Math.round(val);
     const kw = Math.round((val * PS_TO_KW_FACTOR) * 10) / 10;
-    const hp = Math.round(val * PS_TO_HP_FACTOR);
+    const hp = ps;
     return {
       sourceReportedValue: val,
       sourceReportedUnit: 'PS',
@@ -72,10 +72,10 @@ export function convertPowerUnits(value: number, unit: string): ConvertedPower {
     };
   }
 
-  // Imperial BHP / Generic HP
+  // HP / Beygir Gücü
   const hp = Math.round(val);
-  const ps = Math.round(val * HP_TO_PS_FACTOR);
-  const kw = Math.round((val * HP_TO_KW_FACTOR) * 10) / 10;
+  const ps = hp;
+  const kw = Math.round((val * PS_TO_KW_FACTOR) * 10) / 10;
   return {
     sourceReportedValue: val,
     sourceReportedUnit: 'HP',
@@ -86,9 +86,9 @@ export function convertPowerUnits(value: number, unit: string): ConvertedPower {
 }
 
 /**
- * Computes canonical HP from source power value and unit.
- * PS -> HP: HP = PS * 0.9863200706
- * kW -> HP: HP = kW * 1.34102209
+ * Computes canonical HP from source power value and unit for TR/EU market.
+ * PS -> HP: HP = PS (150 PS -> 150 HP)
+ * kW -> HP: HP = round(kW * 1.35962) (110 kW -> 150 HP)
  * HP -> HP: no conversion
  * Round to nearest integer.
  */
@@ -108,12 +108,12 @@ export function getCanonicalDisplayPowerHp(
 
   const u = (sourceUnit || 'HP').trim().toUpperCase();
   if (u === 'PS' || u === 'BG' || u === 'PK') {
-    return Math.round(numericVal * PS_TO_HP_FACTOR);
+    return Math.round(numericVal);
   }
   if (u === 'KW') {
-    return Math.round(numericVal * KW_TO_HP_FACTOR);
+    return Math.round(numericVal * KW_TO_PS_FACTOR);
   }
-  // HP or BHP
+  // HP
   return Math.round(numericVal);
 }
 
