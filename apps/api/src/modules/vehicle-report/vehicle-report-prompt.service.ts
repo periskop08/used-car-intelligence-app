@@ -233,30 +233,6 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
       : '';
 
-    const canonicalRisks: any[] = vehicleContext?.canonicalRisks || vehicleContext?.reliabilityResearchShadow?.canonicalRisks || [];
-    const verifiedScoringRisks = canonicalRisks.filter((r: any) => r.scoringEligible);
-    const verifiedAdvisoryRisks = canonicalRisks.filter((r: any) => !r.scoringEligible && (r.verificationState === 'VERIFIED' || r.verificationState === 'TIER1_OFFICIAL' || r.verificationState === 'TIER2_CROSS_REFERENCED'));
-
-    let canonicalRisksPrompt = '';
-    if (verifiedScoringRisks.length === 0 && verifiedAdvisoryRisks.length === 0) {
-      canonicalRisksPrompt = `
-11. KANONİK RİSK KORUMASI VE SIFIR-KRONİK İDDİA KURALI (ZERO UNVERIFIED RISK GUARD):
-    - [DOĞRULANMIŞ KRONİK RİSK BULUNAMADI - 0 TEKNİK RİSK KESİNTİSİ]
-    - Bu araç varyantı için doğrulanan hiçbir kronik mekanik arıza, servis bülteni veya fabrika kusuru bulunmamaktadır.
-    - Karar Puanı (Decision Score) bu araç için teknik ceza UYGULAMAMIŞTIR.
-    - KESİNLİKLE YASAK: Yapay zeka model hafızandan araç-spesifik kronik bir arıza, yaygın parça kusuru veya fabrika zafiyeti İCAT EDEMEZSİN ("bu araçta kronik kavrama arızası vardır", "triger kopması yaygındır" gibi iddialar YASAKTIR).
-    - 'biggestRisk', 'walkAwayConditions' gibi alanlarda araca özgü kronik arıza varmış gibi yazma; yalnızca düzenli servis geçmişi teyidi ve standart ekspertiz kontrolü tavsiyesi ver.`;
-    } else {
-      canonicalRisksPrompt = `
-11. KANONİK RİSK SINIRLAMASI VE DOĞRULANMIŞ RİSK LİSTESİ:
-    - Aşağıdaki liste, bu araç varyantına uygulanabilirliği araştırma motorunca doğrulanmış YEGÂNE teknik/kronik risklerdir:
-      a) Puan Düşüren Doğrulanmış Riskler (Scoring-Eligible):
-${verifiedScoringRisks.length > 0 ? JSON.stringify(verifiedScoringRisks.map((r: any) => ({ id: r.id, title: r.title, failureMode: r.normalizedFailureMode, domain: r.domain, severity: r.severity, inspection: r.inspectionInstruction })), null, 2) : '      [Puan düşüren doğrulanmış risk yok - 0 puan kesintisi]'}
-      b) Bilgilendirme Amaçlı Doğrulanmış Riskler (Advisory / Non-Scoring):
-${verifiedAdvisoryRisks.length > 0 ? JSON.stringify(verifiedAdvisoryRisks.map((r: any) => ({ id: r.id, title: r.title, failureMode: r.normalizedFailureMode, domain: r.domain, note: 'Bilgilendirme amaçlıdır; karar puanını düşürmez' })), null, 2) : '      [Yok]'}
-    - KESİNLİKLE YASAK: Yukarıdaki listede yer almayan hiçbir arıza veya parçayı araca özel "kronik sorun", "yatkın arıza", "kronik kusur" olarak sunamazsın!
-    - Bilgilendirme amaçlı (Advisory) riskleri karar puanını düşürmüş gibi anlatamazsın.`;
-    }
 
     return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
@@ -309,13 +285,12 @@ ${verifiedAdvisoryRisks.length > 0 ? JSON.stringify(verifiedAdvisoryRisks.map((r
     - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} ${powerUnit}` : 'Verilmedi'}), teknik özelliklerde ve metinlerde aynen bu değeri kullan.
     - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
-${canonicalRisksPrompt}
-12. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
+11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
     - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
     - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, şu 4 alt başlığı içeren, zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime):
       * **1. Motor ve Şanzıman Uyumu:** (Motor mimarisi, gaz tepkisi, şanzıman kavrama karakteri, vites geçiş hissiyatı ve mekanik uyumu)
       * **2. Donanım Seviyesi (${trim || 'Seçilen Paket'}):** (Bu paketin araca kattığı kilit konfor, teknolojik aksamlar ve kabin atmosferi)
-      * **3. Doğrulanmış Teknik Bulgular & Mekanik Karakter:** (Aracın sürüş dinamikleri, süspansiyon darbe emişi, yol tutuşu ve ekspertizde bakılacak kritik mekanik detaylar)
+      * **3. Sürüş Dinamikleri & Mekanik Karakter:** (Aracın sürüş dinamikleri, süspansiyon darbe emişi, yol tutuşu ve ekspertizde bakılacak kritik mekanik detaylar)
       * **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)
     - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
 
