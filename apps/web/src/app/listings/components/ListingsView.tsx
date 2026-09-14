@@ -28,7 +28,7 @@ const TURKISH_CITIES = [
   "Samsun", "Mersin", "Eskişehir", "Trabzon", "Diyarbakır"
 ];
 
-export type ViewMode = "classic" | "list" | "gallery";
+export type ViewMode = "list" | "gallery";
 
 function formatDateTr(dateStr: string | Date | undefined | null): string {
   if (!dateStr) return "-";
@@ -41,21 +41,6 @@ function formatDateTr(dateStr: string | Date | undefined | null): string {
     });
   } catch {
     return "-";
-  }
-}
-
-function formatDateTwoLines(dateStr: string | Date | undefined | null): { dayMonth: string; year: string } {
-  if (!dateStr) return { dayMonth: "-", year: "" };
-  try {
-    const d = new Date(dateStr);
-    const day = d.getDate();
-    const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-    return {
-      dayMonth: `${day} ${months[d.getMonth()]}`,
-      year: `${d.getFullYear()}`,
-    };
-  } catch {
-    return { dayMonth: "-", year: "" };
   }
 }
 
@@ -87,12 +72,14 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
   const [page, setPage] = useState(1);
   const [urgentOnly, setUrgentOnly] = useState(isUrgentPage);
   const [showcaseOnly, setShowcaseOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("classic");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
     const saved = localStorage.getItem("torque_scout_listing_view_mode") as ViewMode;
-    if (saved && (saved === "classic" || saved === "list" || saved === "gallery")) {
+    if (saved && (saved === "list" || saved === "gallery")) {
       setViewMode(saved);
+    } else {
+      setViewMode("list");
     }
   }, []);
 
@@ -1311,27 +1298,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
             </span>
 
             <div className="flex items-center gap-3">
-              {/* View Switcher: Klasik | Liste | Galeri (Görsel 5) */}
+              {/* View Switcher: Liste | Galeri */}
               <div className="inline-flex items-center bg-slate-900 border border-white/10 rounded-xl p-0.5 shadow-inner">
-                {/* Klasik Tablo */}
-                <button
-                  type="button"
-                  onClick={() => handleViewModeChange("classic")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    viewMode === "classic"
-                      ? "bg-slate-700 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                  }`}
-                  title="Klasik Tablo Görünümü"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="9" y1="3" x2="9" y2="21" />
-                    <line x1="15" y1="3" x2="15" y2="21" />
-                  </svg>
-                  <span className="hidden md:inline">Klasik</span>
-                </button>
-
                 {/* Liste */}
                 <button
                   type="button"
@@ -1415,139 +1383,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               </span>
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
-          ) : viewMode === "classic" ? (
-            /* 1. KLASİK GÖRÜNÜM (Ferah, okunaklı ve dengeli detaylı tablo) */
-            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 shadow-xl backdrop-blur-sm">
-              <table className="w-full text-left border-collapse table-auto">
-                <thead>
-                  <tr className="bg-slate-900/90 border-b border-white/10 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                    <th className="py-3 px-1 w-[86px] min-w-[86px] text-center">Fotoğraf</th>
-                    <th className="py-3 px-1.5 whitespace-nowrap">Marka</th>
-                    <th className="py-3 px-1.5 whitespace-nowrap">Model Ailesi</th>
-                    <th className="py-3 px-1.5 whitespace-nowrap">Motor / Versiyon</th>
-                    <th className="py-3 px-1.5 whitespace-nowrap">Donanım Paketi</th>
-                    <th className="py-3 px-2 min-w-[130px]">İlan Başlığı</th>
-                    <th className="py-3 px-1 text-center whitespace-nowrap">Yıl</th>
-                    <th className="py-3 px-1.5 text-right whitespace-nowrap">Km</th>
-                    <th className="py-3 px-1 text-center whitespace-nowrap">Renk</th>
-                    <th className="py-3 px-1.5 text-right whitespace-nowrap">Fiyat</th>
-                    <th className="py-3 px-1 text-center whitespace-nowrap">İlan Tarihi</th>
-                    <th className="py-3 px-1.5 whitespace-nowrap">İl / İlçe</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {listings.map((listing) => {
-                    const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
-                    const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "-";
-                    const modelName = listing.vehicleVariant?.model?.name || listing.customModel || "-";
-                    const engineCode = listing.vehicleVariant?.engine?.code || listing.customEngine || "-";
-                    const trimName = listing.vehicleVariant?.trim?.name || "-";
-                    const dateParts = formatDateTwoLines(listing.publishedAt || listing.createdAt);
-
-                    return (
-                      <tr
-                        key={listing.id}
-                        onClick={() => router.push(`/listings/${listing.id}`)}
-                        className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer h-[70px]"
-                      >
-                        {/* Fotoğraf (80x60) */}
-                        <td className="py-2 px-1 w-[86px] min-w-[86px]">
-                          <div className="relative w-[80px] h-[60px] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto shadow-sm">
-                            <img
-                              src={cover}
-                              alt={listing.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = "/placeholder-car.jpg";
-                              }}
-                            />
-                            {listing.isUrgent && (
-                              <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-md" title="Acil İlan" />
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Marka */}
-                        <td className="py-2 px-1.5 font-semibold text-slate-100 text-[12px] whitespace-nowrap">
-                          {brandName}
-                        </td>
-
-                        {/* Model Ailesi */}
-                        <td className="py-2 px-1.5 font-medium text-slate-200 text-[12px] whitespace-nowrap">
-                          {modelName}
-                        </td>
-
-                        {/* Motor / Versiyon */}
-                        <td className="py-2 px-1.5 text-slate-300 font-mono text-[11px] whitespace-nowrap">
-                          {engineCode}
-                        </td>
-
-                        {/* Donanım Paketi */}
-                        <td className="py-2 px-1.5 text-slate-300 text-[11px] whitespace-nowrap">
-                          {trimName}
-                        </td>
-
-                        {/* İlan Başlığı (2 Satır desteği) */}
-                        <td className="py-2 px-2 min-w-[130px] max-w-[210px]">
-                          <div className="flex items-start gap-1">
-                            {(listing.isUrgent || listing.isShowcaseFeedActive || listing.isAiReady) && (
-                              <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                                {listing.isUrgent && <span className="text-[10px]" title="Acil İlan">🚨</span>}
-                                {listing.isShowcaseFeedActive && <span className="text-[10px]" title="Vitrin İlanı">⭐</span>}
-                                {listing.isAiReady && <span className="text-[10px]" title="AI Analizli">✨</span>}
-                              </div>
-                            )}
-                            <span className="text-white font-semibold text-[12px] leading-snug group-hover:text-orange-400 transition line-clamp-2 break-words">
-                              {listing.title}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Yıl */}
-                        <td className="py-2 px-1 text-center text-slate-200 text-[11px] whitespace-nowrap font-medium">
-                          {listing.modelYear || "-"}
-                        </td>
-
-                        {/* Km */}
-                        <td className="py-2 px-1.5 text-right text-slate-200 text-[11px] whitespace-nowrap font-mono">
-                          {listing.kilometers !== undefined && listing.kilometers !== null ? listing.kilometers.toLocaleString("tr-TR") : "-"}
-                        </td>
-
-                        {/* Renk */}
-                        <td className="py-2 px-1 text-center text-slate-300 text-[11px] whitespace-nowrap">
-                          {listing.color || "-"}
-                        </td>
-
-                        {/* Fiyat */}
-                        <td className="py-2 px-1.5 text-right font-black text-orange-400 whitespace-nowrap text-[13px]">
-                          {formatCurrency(listing.priceAmount, listing.currency)}
-                        </td>
-
-                        {/* İlan Tarihi (2 Satır: Gün Ay / Yıl) */}
-                        <td className="py-2 px-1 text-center whitespace-nowrap text-[10.5px] leading-tight">
-                          <div className="flex flex-col items-center">
-                            <span className="text-slate-300 font-medium">{dateParts.dayMonth}</span>
-                            {dateParts.year && <span className="text-slate-500 text-[9.5px]">{dateParts.year}</span>}
-                          </div>
-                        </td>
-
-                        {/* İl / İlçe (2 Satır: İl / İlçe) */}
-                        <td className="py-2 px-1.5 whitespace-nowrap text-[11px] leading-tight">
-                          <div className="flex flex-col">
-                            <span className="text-slate-200 font-medium">{listing.city || "-"}</span>
-                            {listing.district && (
-                              <span className="text-slate-400 text-[10px]">{listing.district}</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
           ) : viewMode === "list" ? (
-            /* 2. LİSTE GÖRÜNÜMÜ (Yatay kartlar) */
+            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar) */
             <div className="flex flex-col gap-3">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
