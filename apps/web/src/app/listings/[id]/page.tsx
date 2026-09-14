@@ -863,7 +863,7 @@ export default function ListingDetail() {
       </div>
 
       {/* 4. ALT DİKDÖRTGEN BÖLÜM: TorqueScout İlan Zekası (Araç Raporu + Chatbot Danışmanı) */}
-      <div className="max-w-7xl mx-auto px-4 pb-8">
+      <div className="w-full px-4 pb-8">
         <ListingAiAdvisorCard listingId={listing.id} publicListingNo={listing.listingNo || listing.publicListingNo} />
       </div>
 

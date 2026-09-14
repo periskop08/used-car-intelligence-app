@@ -439,11 +439,11 @@ export default function ListingAiAdvisorCard({
 
       {/* Closed State: Two Side-by-Side Action Buttons */}
       {!isOpen && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1 w-full">
           <button
             type="button"
             onClick={() => handleGetReport(false)}
-            className="py-4 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
+            className="py-4 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer w-full"
           >
             <FileText className="w-4.5 h-4.5 text-white shrink-0" />
             <span>Aracı İncele & AI Raporu Al</span>
@@ -452,7 +452,7 @@ export default function ListingAiAdvisorCard({
           <button
             type="button"
             onClick={handleStartChat}
-            className="py-4 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-orange-500/40 text-orange-300 hover:text-white font-black text-xs sm:text-sm shadow-lg transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
+            className="py-4 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-orange-500/40 text-orange-300 hover:text-white font-black text-xs sm:text-sm shadow-lg transition flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer w-full"
           >
             <MessageSquare className="w-4.5 h-4.5 text-orange-400 shrink-0" />
             <span>Chatbot ile Konuş</span>
@@ -462,9 +462,9 @@ export default function ListingAiAdvisorCard({
 
       {/* Open State: Report & Chatbot Container */}
       {isOpen && (
-        <div className="flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           {/* Top Mode Switcher Bar */}
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-950/80 border border-white/10">
+          <div className="w-full flex items-center gap-2 p-1.5 rounded-2xl bg-slate-950/80 border border-white/10">
             <button
               type="button"
               onClick={() => setActiveMode("REPORT")}
@@ -543,7 +543,7 @@ export default function ListingAiAdvisorCard({
 
           {/* CHAT MODE VIEW */}
           {activeMode === "CHAT" && (
-            <div className="space-y-4">
+            <div className="w-full space-y-4">
               {chatMessages.length > 0 && (
                 <div className="flex justify-end pb-1">
                   <button
