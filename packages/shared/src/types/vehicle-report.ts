@@ -101,17 +101,118 @@ export interface DomainBreakdownItemV6 {
   }>;
 }
 
+export type CanonicalRiskLifecycleState =
+  | 'DISCOVERED'
+  | 'APPLICABILITY_CHECKED'
+  | 'VERIFIED'
+  | 'CONSEQUENCE_RESEARCHED'
+  | 'SCORING_ELIGIBLE';
+
+export type RiskApplicabilityState =
+  | 'EXACT_MATCH'
+  | 'FAMILY_MATCH'
+  | 'MARKET_UNCERTAIN'
+  | 'COMPONENT_UNCERTAIN'
+  | 'VIN_DEPENDENT'
+  | 'INCOMPATIBLE'
+  | 'UNKNOWN'
+  | 'EXACT';
+
+export type RiskVerificationState =
+  | 'UNVERIFIED'
+  | 'TIER3_COMMUNITY_ONLY'
+  | 'TIER2_CROSS_REFERENCED'
+  | 'TIER1_OFFICIAL'
+  | 'VERIFIED'
+  | 'REJECTED';
+
+export type RiskConsequenceState =
+  | 'UNRESEARCHED'
+  | 'RESEARCHED_GROUNDED'
+  | 'INFERRED_FROM_EFFECTS'
+  | 'INSUFFICIENT';
+
+export interface CanonicalRiskSource {
+  sourceId?: string;
+  url?: string;
+  title?: string;
+  tier?: number | 'TIER_1' | 'TIER_2' | 'TIER_3';
+  channel?: string;
+  sourceKind?: string;
+}
+
+export type ImpactClass = 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL';
+export type EvidenceLevel = 'WEAK' | 'MODERATE' | 'STRONG';
+
+export interface CanonicalRiskDefect {
+  id: string;
+  lifecycleState: CanonicalRiskLifecycleState;
+  normalizedFailureMode: string;
+  title: string;
+  description?: string;
+  domain: DomainKeyV6 | string;
+  affectedComponent: string;
+  applicabilityState: RiskApplicabilityState;
+  applicabilityEvidence?: string;
+  verificationState: RiskVerificationState;
+  consequenceState: RiskConsequenceState;
+  severity: number | null;
+  severityBasis?: string;
+  severityCategory?: SeverityCategoryV6 | null;
+  scoringEligible: boolean;
+  impactClass?: ImpactClass;
+  evidenceLevel?: EvidenceLevel;
+  basePenalty?: number;
+  evidenceMultiplier?: number;
+  netDeduction?: number;
+  sources: CanonicalRiskSource[];
+  inspectionInstruction?: string;
+  advisoryOnly?: boolean;
+  rejectionReason?: string;
+  inferredConsequence?: string;
+  reasoningChain?: string;
+  supportingFactIds?: string[];
+  inferenceBasis?: 'AI_INFERRED_FROM_VERIFIED_FACTS' | string;
+  inferenceConfidence?: 'LOW' | 'MEDIUM' | 'HIGH' | number;
+}
+
+export interface DeductedRiskItem {
+  id: string;
+  title: string;
+  normalizedFailureMode: string;
+  domain: DomainKeyV6 | string;
+  severity: number | null;
+  severityBasis?: string;
+  impactClass?: ImpactClass;
+  evidenceLevel?: EvidenceLevel;
+  basePenalty?: number;
+  evidenceMultiplier?: number;
+  netDeduction?: number;
+  inspectionInstruction?: string;
+  reason?: string;
+  sources?: CanonicalRiskSource[];
+  inferredConsequence?: string;
+  reasoningChain?: string;
+  supportingFactIds?: string[];
+  inferenceBasis?: string;
+  inferenceConfidence?: 'LOW' | 'MEDIUM' | 'HIGH' | number;
+}
+
 export interface TorqueScoutDecisionScoreV1 {
   version: 'v1.0';
   score: number | null;
   scope: 'VARIANT' | 'VEHICLE' | 'INSUFFICIENT_DATA';
   state: 'EXCELLENT' | 'GOOD' | 'CAUTION' | 'HIGH_RISK' | 'AVOID' | 'INSUFFICIENT_DATA';
   modelDecisionRisk: number | null;
+  totalRiskPenalty?: number | null;
   qualitativeSeverityBurden: number | null;
   conditionRiskUsed: number | null;
   confidenceScore: number;
   priceModifierUsed: number;
   limitingReason?: string | null;
+  deductedRisks?: DeductedRiskItem[];
+  verifiedRisks?: CanonicalRiskDefect[];
+  unresolvedMaterialDiscoveryCount?: number;
   explanation: {
     modelRisk: string;
     condition: string;
@@ -128,6 +229,7 @@ export interface VehicleReportScoresV6 {
   modelRiskState: ModelRiskStateV6;
   modelRiskQuantification: ModelRiskQuantificationV6;
   modelCoverageScore: number;
+  unresolvedMaterialDiscoveryCount?: number;
 
   // 2. Vehicle Instance Condition Dimension
   vehicleConditionRisk: number | null;
@@ -161,7 +263,8 @@ export type SeverityCategoryV6 =
   | 'DRIVABILITY'
   | 'BREAKDOWN'
   | 'MAJOR_POWERTRAIN'
-  | 'SAFETY_CRITICAL';
+  | 'SAFETY_CRITICAL'
+  | 'UNRESOLVED';
 
 export type PrevalenceCategoryV6 =
   | 'ISOLATED_BATCH'
@@ -233,9 +336,9 @@ export interface NormalizedReliabilityEvidence {
   normalizedFailureMode: string;
   affectedComponent: string;
 
-  // Grounded Severity
-  severityCategory: SeverityCategoryV6;
-  severityScore: number; // 1..10
+  // Grounded Severity (Nullable if ungrounded / consequence evidence is insufficient)
+  severityCategory: SeverityCategoryV6 | null;
+  severityScore: number | null; // 1..10 or null
   severityBasis: string;
 
   // Grounded Prevalence (Nullable - No synthetic fabrication)
@@ -318,6 +421,7 @@ export interface VehicleReliabilityResearch {
   domainResults: Record<DomainKeyV6, ReliabilityDomainResult>;
   allVerifiedDefects: NormalizedReliabilityEvidence[];
   qualitativeDefects: NormalizedReliabilityEvidence[];
+  canonicalRisks?: CanonicalRiskDefect[];
   unresolvedContradictions: string[];
   discoveryTelemetry?: NormalizedReliabilityEvidence[];
   freshness?: ReliabilityKnowledgeFreshness;
@@ -717,6 +821,7 @@ export interface ComprehensiveVehicleReport {
   reliabilityResearchShadow?: VehicleReliabilityResearch;
 
   expertDecisionSynthesis?: ExpertDecisionSynthesis;
+  technicalSpecifications?: TechnicalSpecificationsData;
 
   engineTransmission: EngineTransmissionSection;
   performanceUsage: PerformanceUsageSection;

@@ -6,22 +6,22 @@ import {
 
 describe('Canonical Power Display Normalization Suite', () => {
   describe('Requirement 1-4: Unit Conversion to Canonical HP', () => {
-    it('1. 217 PS -> 214 HP (PS conversion: 217 * 0.9863200706 = 214.03 -> 214 HP)', () => {
+    it('1. 217 PS -> 217 HP (TR/EU metric standard: 1 PS = 1 HP/BG)', () => {
       const canonicalHp = getCanonicalDisplayPowerHp(217, 'PS');
-      expect(canonicalHp).toBe(214);
-      expect(formatCanonicalPowerDisplay(217, 'PS')).toBe('214 HP');
+      expect(canonicalHp).toBe(217);
+      expect(formatCanonicalPowerDisplay(217, 'PS')).toBe('217 HP');
     });
 
-    it('2. 122 PS -> 120 HP (PS conversion: 122 * 0.9863200706 = 120.33 -> 120 HP)', () => {
+    it('2. 122 PS -> 122 HP (TR/EU metric standard: 1 PS = 1 HP/BG)', () => {
       const canonicalHp = getCanonicalDisplayPowerHp(122, 'PS');
-      expect(canonicalHp).toBe(120);
-      expect(formatCanonicalPowerDisplay(122, 'PS')).toBe('120 HP');
+      expect(canonicalHp).toBe(122);
+      expect(formatCanonicalPowerDisplay(122, 'PS')).toBe('122 HP');
     });
 
-    it('3. 90 kW -> 121 HP (kW conversion: 90 * 1.34102209 = 120.69 -> 121 HP)', () => {
+    it('3. 90 kW -> 122 HP (kW conversion: 90 * 1.35962 = 122.36 -> 122 HP)', () => {
       const canonicalHp = getCanonicalDisplayPowerHp(90, 'kW');
-      expect(canonicalHp).toBe(121);
-      expect(formatCanonicalPowerDisplay(90, 'kW')).toBe('121 HP');
+      expect(canonicalHp).toBe(122);
+      expect(formatCanonicalPowerDisplay(90, 'kW')).toBe('122 HP');
     });
 
     it('4. 170 HP -> 170 HP (HP: no conversion)', () => {
@@ -42,16 +42,16 @@ describe('Canonical Power Display Normalization Suite', () => {
   });
 
   describe('Requirement 6: Hybrid Semantic Formatting', () => {
-    it('6. hybrid semantic: 122 PS + TOTAL_HYBRID_SYSTEM_POWER -> 120 HP (Toplam Hibrit Sistem Gücü)', () => {
+    it('6. hybrid semantic: 122 PS + TOTAL_HYBRID_SYSTEM_POWER -> 122 HP (Toplam Hibrit Sistem Gücü)', () => {
       const formatted = formatCanonicalPowerDisplay(122, 'PS', 'TOTAL_HYBRID_SYSTEM_POWER');
-      expect(formatted).toBe('120 HP (Toplam Hibrit Sistem Gücü)');
+      expect(formatted).toBe('122 HP (Toplam Hibrit Sistem Gücü)');
 
       const formattedObj = formatCanonicalPowerDisplay({
         sourceValue: 122,
         sourceUnit: 'PS',
         powerSemantic: 'TOTAL_HYBRID_SYSTEM_POWER',
       });
-      expect(formattedObj).toBe('120 HP (Toplam Hibrit Sistem Gücü)');
+      expect(formattedObj).toBe('122 HP (Toplam Hibrit Sistem Gücü)');
     });
 
     it('Conventional ICE: 170 HP -> 170 HP without semantic suffix', () => {
@@ -83,8 +83,8 @@ describe('Canonical Power Display Normalization Suite', () => {
       );
 
       // Conversions produced expected canonical outputs
-      expect(displayString).toBe('214 HP');
-      expect(canonicalHp).toBe(214);
+      expect(displayString).toBe('217 HP');
+      expect(canonicalHp).toBe(217);
 
       // Source data MUST remain completely unchanged
       expect(JSON.stringify(sourceRecord)).toBe(sourceRecordSnapshot);
@@ -95,11 +95,11 @@ describe('Canonical Power Display Normalization Suite', () => {
       const converted = convertPowerUnits(217, 'PS');
       expect(converted.sourceReportedValue).toBe(217);
       expect(converted.sourceReportedUnit).toBe('PS');
-      expect(converted.powerHp).toBe(214);
+      expect(converted.powerHp).toBe(217);
       expect(converted.powerPs).toBe(217);
     });
 
-    it('Toyota Corolla Hybrid: 122 PS source is preserved and renders 120 HP (Toplam Hibrit Sistem Gücü)', () => {
+    it('Toyota Corolla Hybrid: 122 PS source is preserved and renders 122 HP (Toplam Hibrit Sistem Gücü)', () => {
       const corollaSpecs = {
         sourceReportedValue: 122,
         sourceReportedUnit: 'PS' as const,
@@ -109,14 +109,14 @@ describe('Canonical Power Display Normalization Suite', () => {
       const converted = convertPowerUnits(corollaSpecs.sourceReportedValue, corollaSpecs.sourceReportedUnit);
       expect(converted.sourceReportedValue).toBe(122);
       expect(converted.sourceReportedUnit).toBe('PS');
-      expect(converted.powerHp).toBe(120);
+      expect(converted.powerHp).toBe(122);
 
       const display = formatCanonicalPowerDisplay(
         corollaSpecs.sourceReportedValue,
         corollaSpecs.sourceReportedUnit,
         corollaSpecs.powerSemantic,
       );
-      expect(display).toBe('120 HP (Toplam Hibrit Sistem Gücü)');
+      expect(display).toBe('122 HP (Toplam Hibrit Sistem Gücü)');
     });
   });
 });

@@ -117,6 +117,10 @@ export class VehicleReportProviderService {
           existingDbRecalls: vehicleContext?.verifiedDatabaseVehicleReport?.recalls,
         });
         baseReport.reliabilityResearchShadow = shadowRel;
+        if (vehicleContext) {
+          vehicleContext.reliabilityResearchShadow = shadowRel;
+          vehicleContext.canonicalRisks = shadowRel.canonicalRisks;
+        }
         if (this.scoringV6Service) {
           try {
             const shadowV6 = this.scoringV6Service.calculateScoresFromReliabilityResearch(
@@ -138,6 +142,8 @@ export class VehicleReportProviderService {
     const validationContext = {
       ...vehicleContext,
       verifiedResearch: verifiedResearch || undefined,
+      reliabilityResearchShadow: baseReport.reliabilityResearchShadow,
+      canonicalRisks: baseReport.reliabilityResearchShadow?.canonicalRisks,
     };
 
     // STAGE 2: Delegate Report Intent to Unified Vehicle Intelligence Orchestrator
@@ -695,18 +701,142 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       }
     }
 
-    // 4. Primary Technical Risk Grounding Sanitization
-    const hasExplicitZeroEvidence = Boolean(
-      contextJson &&
-      Array.isArray(contextJson.problems) && contextJson.problems.length === 0 &&
-      Array.isArray(contextJson?.verifiedDatabaseVehicleReport?.knownDatabaseProblems) && contextJson.verifiedDatabaseVehicleReport.knownDatabaseProblems.length === 0 &&
-      (!contextJson?.verifiedResearch?.chronicFaults || contextJson.verifiedResearch.chronicFaults.length === 0)
+    // 4. Canonical Risk Grounding Sanitization
+    const canonicalRisks: any[] =
+      baseReport.reliabilityResearchShadow?.canonicalRisks ||
+      contextJson?.reliabilityResearchShadow?.canonicalRisks ||
+      contextJson?.canonicalRisks ||
+      [];
+    const verifiedScoringRisks = canonicalRisks.filter((r: any) => r.scoringEligible);
+    const verifiedAnyRisks = canonicalRisks.filter(
+      (r: any) =>
+        r.verificationState === 'VERIFIED' ||
+        r.verificationState === 'TIER1_OFFICIAL' ||
+        r.verificationState === 'TIER2_CROSS_REFERENCED',
     );
 
-    if (hasExplicitZeroEvidence && baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
-      const risk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk as any;
-      if (risk && risk.state !== 'NO_VERIFIED_PRIMARY_RISK') {
+    if (verifiedScoringRisks.length === 0) {
+      if (baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
         baseReport.expertDecisionSynthesis.primaryTechnicalRisk = null as any;
+      }
+    } else {
+      const topRisk = verifiedScoringRisks[0];
+      if (baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
+        const pRisk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk as any;
+        const matchesVerified = verifiedScoringRisks.some(
+          (vr: any) =>
+            vr.normalizedFailureMode === pRisk.normalizedFailureMode ||
+            vr.title?.toLowerCase().includes((pRisk.title || '').toLowerCase()) ||
+            (pRisk.title || '').toLowerCase().includes(vr.title?.toLowerCase()),
+        );
+        if (!matchesVerified) {
+          pRisk.title = topRisk.title;
+          pRisk.riskTitle = topRisk.title;
+          pRisk.normalizedFailureMode = topRisk.normalizedFailureMode;
+          pRisk.explanation = topRisk.description || topRisk.severityBasis;
+          if (topRisk.inspectionInstruction) {
+            pRisk.inspectionInstructions = [topRisk.inspectionInstruction];
+          }
+        }
+      }
+    }
+
+    // Cleanse ungrounded vehicle-specific chronic risk claims from AI narrative
+    const verifiedFailureModes = new Set(verifiedAnyRisks.map((r: any) => r.normalizedFailureMode));
+    const verifiedTitles = verifiedAnyRisks.map((r: any) => (r.title || '').toLowerCase());
+
+    const isClaimVerified = (text: string): boolean => {
+      if (!text || typeof text !== 'string') return true;
+      const lower = text.toLowerCase();
+      const chronicKeywords = ['kronik', 'yatkın', 'kronik sorun', 'yaygın arıza', 'kronik arıza', 'kronik kusur', 'kronik mekatronik', 'kronik triger'];
+      const hasChronicClaim = chronicKeywords.some((kw) => lower.includes(kw));
+      if (!hasChronicClaim) return true;
+
+      return (
+        verifiedTitles.some((vt) => vt.length > 3 && lower.includes(vt)) ||
+        (lower.includes('triger') && verifiedFailureModes.has('WET_BELT')) ||
+        (lower.includes('mekatronik') && (verifiedFailureModes.has('MECHATRONIC_PRESSURE_DROP') || verifiedFailureModes.has('DSG_MECHATRONIC_WEAR')))
+      );
+    };
+
+    const sanitizeChronicText = (str: string): string => {
+      if (!str || typeof str !== 'string') return str;
+      if (isClaimVerified(str)) return str;
+      return str
+        .replace(/kronik\s+(?:bir\s+)?(?:arıza|sorun|kusur|problem|hasar|zafiyet|risk)\s*(?:bulunmaktadır|vardır|mevcuttur|görülmektedir)?/gi, 'düzenli periyodik bakım geçmişi kontrol edilmelidir')
+        .replace(/kronik\s+(?:olarak\s+)?(?:bozulan|arızalanan|aşınan)/gi, 'aşınmaya bağlı kontrol edilmesi gereken')
+        .replace(/(?:bu\s+araçta\s+)?kronik\s+/gi, 'yaş ve kilometreye bağlı potansiyel ')
+        .trim();
+    };
+
+    if (baseReport.executiveSummary) {
+      if (baseReport.executiveSummary.biggestRisk && !isClaimVerified(baseReport.executiveSummary.biggestRisk)) {
+        baseReport.executiveSummary.biggestRisk = verifiedScoringRisks.length > 0
+          ? verifiedScoringRisks[0].title
+          : 'Doğrulanmış spesifik bir kronik arıza kaydı bulunmamakla birlikte, düzenli periyodik bakım geçmişi ve ekspertiz kontrolü teyit edilmelidir.';
+      }
+    }
+
+    if (synth) {
+      if (Array.isArray(synth.compromisesAndLimitations)) {
+        synth.compromisesAndLimitations.forEach((item: any) => {
+          if (item.title) item.title = sanitizeChronicText(item.title);
+          if (item.explanation) item.explanation = sanitizeChronicText(item.explanation);
+        });
+      }
+      if (Array.isArray(synth.walkAwayConditions)) {
+        synth.walkAwayConditions.forEach((item: any) => {
+          if (item.condition) item.condition = sanitizeChronicText(item.condition);
+          if (item.reason) item.reason = sanitizeChronicText(item.reason);
+        });
+      }
+    }
+
+    // 5. Canonical Engine Power & Torque Consistency:
+    // If powerHp is verified in context, enforce it across technicalSpecifications, vehicleIdentity, and performanceUsage.
+    // If powerHp is unverified, strip ungrounded HP/torque claims from AI narrative fields.
+    const contextPowerHp = contextJson?.performanceData?.enginePowerHp ?? (contextJson?.vehicleIdentity as any)?.enginePowerHp ?? null;
+    const contextTorqueNm = contextJson?.performanceData?.engineTorqueNm ?? (contextJson?.vehicleIdentity as any)?.engineTorqueNm ?? null;
+
+    if (contextPowerHp !== null && typeof contextPowerHp === 'number' && contextPowerHp > 0) {
+      if (baseReport.technicalSpecifications) {
+        baseReport.technicalSpecifications.enginePowerHp = contextPowerHp;
+      }
+      if (baseReport.vehicleIdentity) {
+        (baseReport.vehicleIdentity as any).enginePowerHp = contextPowerHp;
+      }
+      if (baseReport.performanceUsage) {
+        baseReport.performanceUsage.powerHp = contextPowerHp;
+      }
+    } else {
+      if (baseReport.technicalSpecifications && baseReport.technicalSpecifications.enginePowerHp !== null) {
+        baseReport.technicalSpecifications.enginePowerHp = null as any;
+      }
+      const sanitizeUnverifiedPowerText = (str: string): string => {
+        if (!str || typeof str !== 'string') return str;
+        return str
+          .replace(/\b\d{2,4}\s*(?:HP|bg|beygir|kW|PS)\b(?:\s*(?:gücü|gücünde|güç|motor gücü))?/gi, 'motor gücü')
+          .replace(/\b\d{2,4}\s*(?:Nm|tork|newton\s*metre)\b(?:\s*(?:torku|torkunda|tork))?/gi, 'tork değeri')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+      if (synth) {
+        if (Array.isArray(synth.strongestReasonsToChoose)) {
+          synth.strongestReasonsToChoose.forEach((item: any) => {
+            if (item.title) item.title = sanitizeUnverifiedPowerText(item.title);
+            if (item.explanation) item.explanation = sanitizeUnverifiedPowerText(item.explanation);
+          });
+        }
+        if (Array.isArray(synth.compromisesAndLimitations)) {
+          synth.compromisesAndLimitations.forEach((item: any) => {
+            if (item.title) item.title = sanitizeUnverifiedPowerText(item.title);
+            if (item.explanation) item.explanation = sanitizeUnverifiedPowerText(item.explanation);
+          });
+        }
+        if (synth.vehicleCharacter) {
+          if (synth.vehicleCharacter.headline) synth.vehicleCharacter.headline = sanitizeUnverifiedPowerText(synth.vehicleCharacter.headline);
+          if (synth.vehicleCharacter.detailedAssessment) synth.vehicleCharacter.detailedAssessment = sanitizeUnverifiedPowerText(synth.vehicleCharacter.detailedAssessment);
+        }
       }
     }
   }

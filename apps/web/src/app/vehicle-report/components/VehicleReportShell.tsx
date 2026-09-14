@@ -152,24 +152,101 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           // Extract Primary Verified Risk Details for friendly display
           const primaryRisk = report.expertDecisionSynthesis?.primaryTechnicalRisk;
           const firstProblem = report.commonProblems?.[0];
-          const shadowDefects = report.reliabilityResearchShadow?.domainResults
-            ? Object.values(report.reliabilityResearchShadow.domainResults)
-                .flatMap((d: any) => d.defects || [])
-            : [];
-          const firstDefect = shadowDefects.find((df: any) => df.title || df.affectedComponent);
+          const shadowDefects = [
+            ...(report.reliabilityResearchShadow?.allVerifiedDefects || []),
+            ...(report.reliabilityResearchShadow?.qualitativeDefects || []),
+            ...(report.reliabilityResearchShadow?.domainResults
+              ? Object.values(report.reliabilityResearchShadow.domainResults).flatMap((d: any) => d.defects || [])
+              : []),
+          ];
+          const firstDefect = shadowDefects.find((df: any) => df.normalizedFailureMode || df.title || df.affectedComponent);
 
-          const riskTitle = primaryRisk?.title 
-            || firstProblem?.title 
-            || (firstDefect?.affectedComponent ? `${firstDefect.affectedComponent} Arızası` : null);
+          const DOMAIN_LABELS_TR: Record<string, string> = {
+            POWERTRAIN_ENGINE: 'Motor Mekaniği & Zamanlama',
+            POWERTRAIN_TRANS: 'Şanzıman & Aktarma Organları',
+            EMISSIONS_EXHAUST: 'Emisyon & Egzoz Sistemi',
+            HV_BATTERY_SYSTEM: 'Yüksek Voltaj & Batarya Sistemi',
+            THERMAL_COOLING: 'Termal Yönetim & Soğutma',
+            ELECTRONICS_BODY: 'Gövde Elektroniği & Donanım',
+            CHASSIS_BRAKES: 'Yürüyen Aksam, Direksiyon & Fren',
+            SAFETY_RECALL: 'Resmi Geri Çağırma & Güvenlik',
+          };
+
+          const FAILURE_MODE_LABELS_TR: Record<string, string> = {
+            WET_BELT: 'Islak Triger Kayışı Aşınması',
+            WET_TIMING_BELT: 'Islak Triger Kayışı Aşınması',
+            TIMING_BELT: 'Triger Kayışı Aşınması',
+            TIMING_CHAIN: 'Triger Zinciri Uzaması / Aşınması',
+            COOLANT_LEAK: 'Soğutma Sıvısı Kaçağı',
+            OIL_LEAK: 'Motor Yağı Kaçağı',
+            OIL_FILTER_HOUSING: 'Yağ Filtre Gövdesi Kaçağı',
+            MECHATRONIC: 'Mekatronik & Çift Kavrama Arızası',
+            CLUTCH_WEAR: 'Kavrama Aşınması',
+            BATTERY_DRAIN: '12V Akü Boşalması',
+            ICCU_FAILURE: 'ICCU Entegre Şarj Kontrol Ünitesi Arızası',
+            CONTROL_ARM: 'Salıncak / Süspansiyon Burcu Boşluğu',
+          };
+
+          const isRawEnumOrSlug = (val?: string): boolean => {
+            if (!val) return false;
+            const trimmed = val.trim();
+            if (trimmed.toLowerCase() === 'wet-belt' || trimmed.toUpperCase() === 'WET_BELT') return true;
+            if (/^[A-Z0-9_]{3,}$/.test(trimmed)) return true;
+            if (/^[a-z0-9]+(-[a-z0-9]+)+$/.test(trimmed)) return true;
+            if (trimmed === 'TECHNICAL BULLETIN' || trimmed.startsWith('RECALL_')) return true;
+            return false;
+          };
+
+          const resolveFailureModeLabel = (candidate?: any): string | null => {
+            if (!candidate) return null;
+            const rawKey = (candidate.normalizedFailureMode || candidate.failureMode || candidate.title || '')
+              .trim()
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, '_')
+              .replace(/_+/g, '_');
+
+            if (rawKey === 'WET_BELT' || rawKey.includes('WET_BELT') || /wet[\s_-]?belt/i.test(candidate.title || '')) {
+              return 'Islak Triger Kayışı Aşınması';
+            }
+            if (FAILURE_MODE_LABELS_TR[rawKey]) {
+              return FAILURE_MODE_LABELS_TR[rawKey];
+            }
+            return null;
+          };
+
+          const failureModeLabel = resolveFailureModeLabel(firstDefect)
+            || resolveFailureModeLabel(primaryRisk)
+            || resolveFailureModeLabel(firstProblem);
+
+          const defectComp = firstDefect?.affectedComponent || '';
+          const cleanComp = DOMAIN_LABELS_TR[defectComp.toUpperCase()] || defectComp;
+
+          // Turkish failure mode user label prioritized above all generic titles / raw slugs / domains
+          const defectFallbackTitle = failureModeLabel
+            || (firstDefect?.title && !isRawEnumOrSlug(firstDefect.title) ? firstDefect.title : null)
+            || (cleanComp ? `${cleanComp} İncelemesi` : null);
+
+          const riskTitle = failureModeLabel
+            || (primaryRisk?.title && !isRawEnumOrSlug(primaryRisk.title) ? primaryRisk.title : null)
+            || (firstProblem?.title && !isRawEnumOrSlug(firstProblem.title) ? firstProblem.title : null)
+            || defectFallbackTitle;
+
+          const genericExplanation = firstDefect?.normalizedFailureMode === 'WET_BELT' || /wet[\s_-]?belt/i.test(firstDefect?.title || '')
+            ? 'Motor yağı içinde çalışan triger kayışının zamanla ufalanarak yağ pompasını tıkaması ve motor yağlama basıncını düşürme riski.'
+            : firstDefect?.description || null;
 
           const riskExplanation = primaryRisk?.explanation 
             || firstProblem?.symptoms?.[0] 
-            || firstDefect?.description
-            || null;
+            || (firstDefect?.severityBasis && firstDefect.severityBasis !== 'INFERRED_FROM_VERIFIED_FAILURE_MODE' ? firstDefect.severityBasis : null)
+            || genericExplanation;
 
           const riskInspection = primaryRisk?.inspectionInstructions?.[0] 
             || firstProblem?.inspectionStep 
-            || null;
+            || (firstDefect?.normalizedFailureMode === 'WET_BELT' || /wet[\s_-]?belt/i.test(firstDefect?.title || '') ? 'Triger kayış genişliği ve karter/yağ pompası süzgecinde kauçuk partikülü kontrolü yapılmalıdır.' : null);
+
+          const deductedRisks = (decisionScore as any)?.deductedRisks || [];
+          const totalRiskPenalty = (decisionScore as any)?.totalRiskPenalty ?? decisionScore.modelDecisionRisk ?? 0;
+          const hasDeductedRisks = Boolean(totalRiskPenalty > 0 && deductedRisks.length > 0);
 
           const hasUnverifiedComplaints = Boolean(
             (report.commonProblems && report.commonProblems.length > 0) ||
@@ -219,37 +296,47 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl">
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">Neden Puan Kırıldı?</span>
                   
-                  {decisionScore.modelDecisionRisk && decisionScore.modelDecisionRisk > 0 ? (
-                    <div className="mt-1 space-y-1.5">
+                  {hasDeductedRisks ? (
+                    <div className="mt-1 space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-rose-400">
-                          -{decisionScore.modelDecisionRisk} Puan
+                          -{totalRiskPenalty} Puan
                         </span>
-                        {riskTitle && (
-                          <span className="text-xs font-bold text-slate-200">
-                            • {riskTitle}
-                          </span>
-                        )}
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          (Doğrulanmış Teknik Risk Kesintisi)
+                        </span>
                       </div>
-                      {riskExplanation && (
-                        <p className="text-xs text-slate-300 leading-relaxed break-words">
-                          {riskExplanation}
-                        </p>
-                      )}
-                      {riskInspection && (
-                        <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1 pt-0.5">
-                          <span className="font-semibold shrink-0">🔍 Satın Almadan Önce:</span>
-                          <span>{riskInspection}</span>
-                        </p>
-                      )}
+                      <div className="space-y-2 pt-0.5">
+                        {deductedRisks.map((dRisk: any, idx: number) => {
+                          const dTitle = resolveFailureModeLabel(dRisk) || dRisk.title || 'Doğrulanmış Teknik Kusur';
+                          return (
+                            <div key={dRisk.id || idx} className="space-y-1 pb-1.5 border-b border-white/5 last:border-b-0 last:pb-0">
+                              <span className="text-xs font-bold text-slate-200 block">
+                                • {dTitle}
+                              </span>
+                              {(dRisk.reason || dRisk.description) && (
+                                <p className="text-xs text-slate-300 leading-relaxed break-words">
+                                  {dRisk.reason || dRisk.description}
+                                </p>
+                              )}
+                              {dRisk.inspectionInstruction && (
+                                <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1 pt-0.5">
+                                  <span className="font-semibold shrink-0">🔍 Satın Almadan Önce:</span>
+                                  <span>{dRisk.inspectionInstruction}</span>
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-1">
                       <span className="text-sm font-bold text-emerald-400 block">
-                        Puan Kırılmadı (0 Risk)
+                        Puan Düşüren Risk Yok
                       </span>
                       <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
-                        Bu varyantta puan kırılmasına neden olan doğrulanmış önemli bir kronik teknik risk tespit edilmedi.
+                        Bu varyantta puan düşüren doğrulanmış teknik risk tespit edilmedi.
                       </p>
                     </div>
                   )}

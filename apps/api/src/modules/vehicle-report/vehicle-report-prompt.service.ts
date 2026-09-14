@@ -233,6 +233,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
       : '';
 
+
     return `Merhaba TorqueScout Yapay Zeka Danışmanı! Lütfen aşağıdaki 8 KİLİT ARAÇ FİLTRE VERİSİNİ analiz et ve 9 temel soruyu (Bu araç ve donanımı nasıl bir otomobil, Güçlü Nedenler, Tavizler & Km Aşınma Skalası, Kimler İçin Mantıklı, Kimler İçin Uygun Değil, Hangi Şartlarda Değerlendirilebilir, Hangi Durumda Vazgeçilmeli, Ekspertiz Kontrol Listesi, Satıcıya Sorulacak Sorular) yanıtlayan zengin bir TorqueScout Araç İnceleme Raporu JSON çıktısı oluştur:
 
 --- ANALİZ EDİLECEK 8 KİLİT ARAÇ KİMLİK FİLTRESİ ---
@@ -284,13 +285,29 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} ${powerUnit}` : 'Verilmedi'}), teknik özelliklerde ve metinlerde aynen bu değeri kullan.
     - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
+11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
+    - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
+    - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, şu 4 alt başlığı içeren, zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime):
+      * **1. Motor ve Şanzıman Uyumu:** (Motor mimarisi, gaz tepkisi, şanzıman kavrama karakteri, vites geçiş hissiyatı ve mekanik uyumu)
+      * **2. Donanım Seviyesi (${trim || 'Seçilen Paket'}):** (Bu paketin araca kattığı kilit konfor, teknolojik aksamlar ve kabin atmosferi)
+      * **3. Sürüş Dinamikleri & Mekanik Karakter:** (Aracın sürüş dinamikleri, süspansiyon darbe emişi, yol tutuşu ve ekspertizde bakılacak kritik mekanik detaylar)
+      * **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)
+    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
   "expertDecisionSynthesis": {
-    "vehicleCharacter": { "headline": "...", "detailedAssessment": "..." },
+    "vehicleCharacter": { 
+      "headline": "Çarpıcı ve araca/donanıma özel uzman başlığı", 
+      "detailedAssessment": "Şu 4 alt başlığı içeren zengin ve derin teknik analiz:\n* **1. Motor ve Şanzıman Uyumu:** ...\n* **2. Donanım Seviyesi (${trim || 'Paket'}):** ...\n* **3. Doğrulanmış Teknik Bulgular & Mekanik Karakter:** ...\n* **4. Tüketim & Kullanım Maliyeti:** ..." 
+    },
     "trimPackageComparison": { "selectedTrimName": "${trim}", "comparisonNarrative": "...", "keyAddedFeatures": [...], "missingFeaturesInLowerTrim": [...] },
-    "dailyUseAssessment": { "cityUse": "...", "highwayUse": "...", "trafficBehavior": "...", "comfortAssessment": "..." },
+    "dailyUseAssessment": { 
+      "cityUse": "Şehir içi manevra, dar sokak pratikliği, süspansiyon darbe sönümleme ve dur-kalk şanzıman tepkileri...", 
+      "highwayUse": "Otoyol seyir kararlılığı, yüksek hız izolasyonu, ara hızlanma ve kabin sessizliği...", 
+      "trafficBehavior": "Yoğun dur-kalk trafikte kavrama/vites davranışı, düşük devir torku ve kalkış dinamikleri...", 
+      "comfortAssessment": "Koltuk ergonomisi, uzun yol yorgunluğu, kabin izolasyonu ve süspansiyon konforu..." 
+    },
     "strongestReasonsToChoose": [ { "title": "...", "explanation": "..." } ],
     "compromisesAndLimitations": [ { "title": "...", "explanation": "..." } ],
     "suitableFor": [ { "profile": "...", "explanation": "..." } ],

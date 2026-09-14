@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleCharacterResearchService } from '../research/vehicle-character-research.service';
+import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class VehicleReportContextBuilderService {
   constructor(
     private prisma: PrismaService,
     private vehicleCharacterResearch: VehicleCharacterResearchService,
+    @Optional() private powerEnrichmentService?: VehiclePowerEnrichmentService,
   ) {}
 
   async buildVehicleContext(variantId: string) {
@@ -95,9 +97,21 @@ export class VehicleReportContextBuilderService {
     // CANONICAL EXACT-VARIANT POWER RESOLUTION (NO HEURISTICS, ZERO PLACEHOLDERS)
     // ─────────────────────────────────────────────────────────────────────────
     // Priority 1: Verified side-car VehiclePowerEnrichment (grounded exact variant research)
-    const powerEnrichment = await this.prisma.vehiclePowerEnrichment.findUnique({
+    let powerEnrichment = await this.prisma.vehiclePowerEnrichment.findUnique({
       where: { vehicleVariantId: variantId },
     });
+
+    if ((!powerEnrichment || powerEnrichment.verificationStatus !== 'VERIFIED') && this.powerEnrichmentService) {
+      try {
+        const researched = await this.powerEnrichmentService.researchVariantPower(variantId);
+        if (researched) {
+          powerEnrichment = researched as any;
+        }
+      } catch (err: any) {
+        this.logger.warn(`[POWER ENRICHMENT AUTORUN] Exact-variant power research skipped: ${err?.message}`);
+      }
+    }
+
     const isEnrichmentVerified = powerEnrichment?.verificationStatus === 'VERIFIED' && typeof powerEnrichment.powerHp === 'number' && powerEnrichment.powerHp > 0;
 
     // Priority 2: Verified TechnicalSpec table
@@ -128,6 +142,30 @@ export class VehicleReportContextBuilderService {
         powerUnit = 'HP';
         powerSource = 'VEHICLE_DATABASE';
         powerSemantic = 'STANDARD_POWER';
+      }
+    }
+
+    // Engine-Identity Sibling Power Resolution (Canonical Variant Fact Reuse)
+    if (!engineHp && variant.engineId && variant.modelId && variant.brandId) {
+      const verifiedSibling = await this.prisma.vehicleVariant.findFirst({
+        where: {
+          brandId: variant.brandId,
+          modelId: variant.modelId,
+          engineId: variant.engineId,
+          id: { not: variant.id },
+          powerEnrichment: {
+            verificationStatus: 'VERIFIED',
+          },
+        },
+        include: {
+          powerEnrichment: true,
+        },
+      });
+      if (verifiedSibling?.powerEnrichment?.powerHp) {
+        engineHp = verifiedSibling.powerEnrichment.powerHp;
+        powerUnit = (verifiedSibling.powerEnrichment.sourceReportedUnit as any) || 'HP';
+        powerSource = 'VEHICLE_DATABASE';
+        powerSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
       }
     }
 

@@ -68,6 +68,8 @@ export class WebSearchProvider implements SearchProvider {
               };
             });
           }
+        } else {
+          this.logger.warn(`Tavily search returned status ${response.status}. Falling back to next search provider...`);
         }
       } catch (error: any) {
         this.logger.error(`Error performing Tavily Live Search: ${error.message}. Falling back...`);
@@ -254,15 +256,15 @@ export class WebSearchProvider implements SearchProvider {
         }
 
         const sourceKind = this.determineSourceKind(resolvedUrl);
+        const modelGroundedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const effectiveSnippet = retrievedPageExcerpt || (modelGroundedText.length > 20 ? modelGroundedText.slice(0, 1500) : title);
 
         results.push({
           url: resolvedUrl,
           resolvedUrl,
           domain,
           title,
-          // Authentic raw text: either page excerpt or title.
-          // NEVER use Gemini's generated response prose as retrieved text.
-          snippet: retrievedPageExcerpt || title,
+          snippet: effectiveSnippet,
           providerSnippet: null, // No raw Serper snippet, discovered via grounding
           retrievedPageExcerpt,
           retrievedPageText,

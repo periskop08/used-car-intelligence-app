@@ -9,8 +9,10 @@ import {
   DomainKeyV6,
   DomainBreakdownItemV6,
   VehicleReliabilityResearch,
+  CanonicalRiskDefect,
 } from '@used-car-intelligence/shared';
 import { TorqueScoutDecisionScoreService } from './torque-scout-decision-score.service';
+import { isSourceOrDomainLabel } from '../research/vehicle-reliability-research.service';
 
 export interface V6ScoringInputContext {
   vehicleIdentity?: any;
@@ -112,7 +114,7 @@ export class VehicleReportScoringV6Service {
     }
 
     const recallDefects = (reliabilityResearch?.domainResults?.SAFETY_RECALL?.defects || []).filter(
-      (d) => d.numericEligibility !== 'REJECTED',
+      (d) => d.numericEligibility !== 'REJECTED' && (d as any).scoringEligible !== false,
     );
 
     return {
@@ -247,15 +249,16 @@ export class VehicleReportScoringV6Service {
       ...(Array.isArray(rawQualitative) ? rawQualitative : []),
     ];
 
-    // Filter verified defect evidences (excluding rejected Tier 3)
+    // Filter verified defect evidences (excluding rejected Tier 3 and non-scoring candidates)
     const applicableDefects = allProblemCandidates.filter((p: any) => {
       if (p.numericEligibility === 'REJECTED') return false;
+      if (p.scoringEligible === false) return false;
       const type = p.problemType;
       return type === 'VERIFIED_FAILURE' || type === 'CHRONIC' || !type;
     });
 
     const applicableRecalls = (Array.isArray(rawRecalls) ? rawRecalls : []).filter(
-      (r: any) => r.numericEligibility !== 'REJECTED',
+      (r: any) => r.numericEligibility !== 'REJECTED' && r.scoringEligible !== false,
     );
 
     // Evaluate Domain Sub-Scores
@@ -396,6 +399,38 @@ export class VehicleReportScoringV6Service {
       });
     });
 
+    // Ingest Canonical Risks and Discovery Telemetry
+    const canonicalRisks: CanonicalRiskDefect[] =
+      (vehicleContext?.canonicalRisks && Array.isArray(vehicleContext.canonicalRisks))
+        ? vehicleContext.canonicalRisks
+        : (relObj?.canonicalRisks && Array.isArray(relObj.canonicalRisks))
+        ? relObj.canonicalRisks
+        : [];
+
+    const discoveryTelemetry: any[] =
+      (relObj?.discoveryTelemetry && Array.isArray(relObj.discoveryTelemetry))
+        ? relObj.discoveryTelemetry
+        : (vehicleContext?.discoveryTelemetry && Array.isArray(vehicleContext.discoveryTelemetry))
+        ? vehicleContext.discoveryTelemetry
+        : [];
+
+    // Count non-scoring discoveries with actual semantic failure modes (not UNKNOWN, not domain/query labels)
+    const unresolvedCanonical = canonicalRisks.filter((cr) => {
+      if (cr.scoringEligible) return false;
+      const failMode = cr.normalizedFailureMode || '';
+      const isSemantic = failMode && failMode !== 'UNKNOWN' && !isSourceOrDomainLabel(failMode) && !isSourceOrDomainLabel(cr.title);
+      const isUnresolved = cr.verificationState === 'TIER3_COMMUNITY_ONLY' || cr.consequenceState === 'INSUFFICIENT' || cr.severity === null;
+      return isSemantic && isUnresolved;
+    });
+
+    const unresolvedFromDiscovery = discoveryTelemetry.filter((d: any) => {
+      const failMode = d.normalizedFailureMode || '';
+      const isSemantic = failMode && failMode !== 'UNKNOWN' && !isSourceOrDomainLabel(failMode) && !isSourceOrDomainLabel(d.title);
+      return isSemantic && !canonicalRisks.some((cr) => cr.normalizedFailureMode === failMode);
+    });
+
+    const unresolvedMaterialDiscoveryCount = unresolvedCanonical.length + unresolvedFromDiscovery.length;
+
     // Tally Verified Defects
     const numericVerifiedDefectCount = activeDomains.reduce(
       (sum, k) => sum + domainNumericFactors[k].length,
@@ -424,9 +459,40 @@ export class VehicleReportScoringV6Service {
       modelRiskState = 'VERIFIED_RISK_PRESENT';
 
       if (numericVerifiedDefectCount === 0) {
-        // Qualitative-Only: Verified risk exists, but magnitude is unknown
-        modelRiskScore = null;
-        modelRiskQuantification = 'QUALITATIVE_ONLY';
+        // Check if ANY verified defect has a valid numeric severity
+        const hasVerifiedSeverity =
+          applicableDefects.some((d: any) =>
+            (typeof d.severityScore === 'number' && d.severityScore > 0) ||
+            (typeof d.severityNum === 'number' && d.severityNum > 0) ||
+            (typeof d.severity === 'number' && d.severity > 0) ||
+            (d.severityCategory && d.severityCategory !== 'UNRESOLVED')
+          ) ||
+          applicableRecalls.some((r: any) =>
+            (typeof r.severityScore === 'number' && r.severityScore > 0) ||
+            (typeof r.severityNum === 'number' && r.severityNum > 0) ||
+            (typeof r.severity === 'number' && r.severity > 0) ||
+            (r.severityCategory && r.severityCategory !== 'UNRESOLVED')
+          ) ||
+          canonicalRisks.some(
+            (cr) =>
+              (cr.verificationState === 'VERIFIED' ||
+                cr.verificationState === 'TIER1_OFFICIAL' ||
+                cr.verificationState === 'TIER2_CROSS_REFERENCED') &&
+              cr.scoringEligible === true &&
+              typeof cr.severity === 'number' &&
+              cr.severity > 0,
+          );
+
+        if (!hasVerifiedSeverity) {
+          // If verified defects exist but all have severity=null:
+          // state = VERIFIED_RISK_PRESENT, modelRiskScore = null, quantification = NOT_ESTIMABLE
+          modelRiskScore = null;
+          modelRiskQuantification = 'NOT_ESTIMABLE';
+        } else {
+          // Qualitative-Only: Verified risk exists with severity, but quantitative incidence is unknown
+          modelRiskScore = null;
+          modelRiskQuantification = 'QUALITATIVE_ONLY';
+        }
       } else {
         // Numeric calculation on the numeric subset only
         const maxDomain = Math.max(...activeDomains.map((k) => domainScores[k] ?? 0));
@@ -440,11 +506,21 @@ export class VehicleReportScoringV6Service {
       }
     } else {
       // 0 defects found across all domains
-      if (modelCoverageNorm >= 0.80) {
+      // VERIFIED_LOW_RISK only when:
+      // - zero verified defects
+      // - sufficient coverage (modelCoverageNorm >= 0.80)
+      // - valid negative-proof conditions satisfied
+      // - no unresolved material discoveries / contradictions
+      const hasUnresolvedDiscoveries = unresolvedMaterialDiscoveryCount > 0;
+
+      if (modelCoverageNorm >= 0.80 && !hasUnresolvedDiscoveries && !contradictionDetected) {
         modelRiskState = 'VERIFIED_LOW_RISK';
         modelRiskScore = 0;
         modelRiskQuantification = 'CERTIFIED_ZERO';
       } else {
+        // RESEARCH_COMPLETE_NO_DEFECT:
+        // zero verified defects with sufficient-but-not-certified negative proof
+        // (or blocked by unresolved material discoveries / coverage 60-79%)
         modelRiskState = 'RESEARCH_COMPLETE_NO_DEFECT';
         modelRiskScore = null;
         modelRiskQuantification = 'NOT_ESTIMABLE';
@@ -651,6 +727,7 @@ export class VehicleReportScoringV6Service {
       modelRiskState,
       modelRiskQuantification,
       modelCoverageScore,
+      unresolvedMaterialDiscoveryCount,
       vehicleConditionRisk,
       conditionState,
       conditionCoverageScore,
@@ -680,6 +757,7 @@ export class VehicleReportScoringV6Service {
         qualitativeDefects: rawQualitative,
         recalls: rawRecalls,
         priceModifier: listingContext?.priceModifier,
+        canonicalRisks: (vehicleContext?.canonicalRisks || relObj?.canonicalRisks || (vehicleContext?.reliabilityResearchShadow as any)?.canonicalRisks || []),
       });
     } catch (dsErr: any) {
       this.logger.warn(`[SHADOW DECISION SCORE ERROR] Decision score calculation failed: ${dsErr?.message}`);
