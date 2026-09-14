@@ -634,7 +634,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
 
 
   return (
-    <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
+    <div className="w-full max-w-[1680px] mx-auto px-3 sm:px-6 py-8 flex flex-col gap-6">
       {/* Title Header */}
       {isUrgentPage ? (
         <div className="bg-gradient-to-r from-red-950/60 via-slate-900 to-rose-950/50 border border-red-500/30 rounded-3xl p-6 md:p-8 shadow-2xl space-y-3 relative overflow-hidden">
@@ -659,9 +659,9 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="flex flex-col lg:flex-row items-start gap-5">
         {/* Left Sidebar Filter Column */}
-        <form onSubmit={handleFilterSubmit} className="lg:col-span-1 flex flex-col gap-5 bg-slate-900/20 border border-white/5 p-6 rounded-3xl h-fit max-h-[85vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleFilterSubmit} className="w-full lg:w-[250px] shrink-0 flex flex-col gap-4 bg-slate-900/20 border border-white/5 p-4 sm:p-5 rounded-3xl h-fit max-h-[85vh] overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-slate-200 text-xs uppercase tracking-wider">Detaylı Filtreleme</h3>
             <button type="button" onClick={handleClearFilters} className="text-xs text-orange-500 hover:underline">Temizle</button>
@@ -1277,7 +1277,7 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           </div>
 
           {/* Sticky Apply Button */}
-          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-6 -mb-6 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
+          <div className="sticky bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 border-t border-white/5 flex flex-col gap-2 z-10 shadow-[0_-8px_24px_rgba(0,0,0,0.6)] rounded-b-3xl">
             <button
               type="submit"
               className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-orange-500/20 flex items-center justify-center gap-1.5 active:scale-[0.98]"
@@ -1287,8 +1287,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           </div>
         </form>
 
-        {/* Right Listings Grid Column */}
-        <div className="lg:col-span-3 flex flex-col gap-6">
+        {/* Right Listings Column */}
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
           {/* Toolbar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950/20 border border-white/5 px-6 py-4 rounded-2xl">
             <span className="text-xs font-bold text-slate-400">
@@ -1403,21 +1403,21 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
           ) : viewMode === "classic" ? (
             /* 1. KLASİK GÖRÜNÜM (Ferah, okunaklı ve dengeli detaylı tablo) */
             <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/40 shadow-xl backdrop-blur-sm">
-              <table className="w-full text-left text-sm text-slate-300 border-collapse">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-900/90 border-b border-white/10 text-[12px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                    <th className="py-4 px-4 w-[104px] min-w-[104px] text-center">Fotoğraf</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Marka</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Model Ailesi</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Motor / Versiyon</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Donanım Paketi</th>
-                    <th className="py-4 px-4 min-w-[260px]">İlan Başlığı</th>
-                    <th className="py-4 px-3.5 text-center whitespace-nowrap">Yıl</th>
-                    <th className="py-4 px-3.5 text-right whitespace-nowrap">Km</th>
-                    <th className="py-4 px-3.5 whitespace-nowrap">Renk</th>
-                    <th className="py-4 px-4 text-right whitespace-nowrap">Fiyat</th>
-                    <th className="py-4 px-3.5 text-center whitespace-nowrap">İlan Tarihi</th>
-                    <th className="py-4 px-4 whitespace-nowrap">İl / İlçe</th>
+                  <tr className="bg-slate-900/90 border-b border-white/10 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                    <th className="py-3 px-1.5 w-[92px] min-w-[92px] text-center">Fotoğraf</th>
+                    <th className="py-3 px-2 whitespace-nowrap">Marka</th>
+                    <th className="py-3 px-2 whitespace-nowrap">Model Ailesi</th>
+                    <th className="py-3 px-2 whitespace-nowrap">Motor / Versiyon</th>
+                    <th className="py-3 px-2 whitespace-nowrap">Donanım Paketi</th>
+                    <th className="py-3 px-2.5 min-w-[150px]">İlan Başlığı</th>
+                    <th className="py-3 px-2 text-center whitespace-nowrap">Yıl</th>
+                    <th className="py-3 px-2 text-right whitespace-nowrap">Km</th>
+                    <th className="py-3 px-2 whitespace-nowrap">Renk</th>
+                    <th className="py-3 px-2.5 text-right whitespace-nowrap">Fiyat</th>
+                    <th className="py-3 px-2 text-center whitespace-nowrap">İlan Tarihi</th>
+                    <th className="py-3 px-2.5 whitespace-nowrap">İl / İlçe</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -1435,8 +1435,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                         onClick={() => router.push(`/listings/${listing.id}`)}
                         className="group hover:bg-white/[0.04] transition duration-150 cursor-pointer h-[72px]"
                       >
-                        {/* Fotoğraf (72x54 / 80x60) */}
-                        <td className="py-3 px-4 w-[104px] min-w-[104px]">
+                        {/* Fotoğraf (80x60) */}
+                        <td className="py-2.5 px-1.5 w-[92px] min-w-[92px]">
                           <div className="relative w-[80px] h-[60px] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 mx-auto shadow-sm">
                             <img
                               src={cover}
@@ -1453,64 +1453,64 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                         </td>
 
                         {/* Marka */}
-                        <td className="py-3.5 px-3.5 font-semibold text-slate-100 text-[14px] whitespace-nowrap">
+                        <td className="py-2.5 px-2 font-semibold text-slate-100 text-[13px] whitespace-nowrap">
                           {brandName}
                         </td>
 
                         {/* Model Ailesi */}
-                        <td className="py-3.5 px-3.5 font-medium text-slate-200 text-[14px] whitespace-nowrap">
+                        <td className="py-2.5 px-2 font-medium text-slate-200 text-[13px] whitespace-nowrap">
                           {modelName}
                         </td>
 
                         {/* Motor / Versiyon */}
-                        <td className="py-3.5 px-3.5 text-slate-300 font-mono text-[13px] whitespace-nowrap">
+                        <td className="py-2.5 px-2 text-slate-300 font-mono text-[12px] whitespace-nowrap">
                           {engineCode}
                         </td>
 
                         {/* Donanım Paketi */}
-                        <td className="py-3.5 px-3.5 text-slate-300 text-[14px] whitespace-nowrap">
+                        <td className="py-2.5 px-2 text-slate-300 text-[12px] whitespace-nowrap">
                           {trimName}
                         </td>
 
-                        {/* İlan Başlığı (Daha belirgin 15px semibold) */}
-                        <td className="py-3.5 px-4 min-w-[260px]">
-                          <div className="flex items-center gap-2">
-                            {listing.isUrgent && <span className="text-[11px]" title="Acil İlan">🚨</span>}
-                            {listing.isShowcaseFeedActive && <span className="text-[11px]" title="Vitrin İlanı">⭐</span>}
-                            {listing.isAiReady && <span className="text-[11px]" title="AI Analizli">✨</span>}
-                            <span className="text-white font-semibold text-[15px] group-hover:text-orange-400 transition truncate max-w-sm">
+                        {/* İlan Başlığı */}
+                        <td className="py-2.5 px-2.5 min-w-[150px]">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {listing.isUrgent && <span className="text-[11px] shrink-0" title="Acil İlan">🚨</span>}
+                            {listing.isShowcaseFeedActive && <span className="text-[11px] shrink-0" title="Vitrin İlanı">⭐</span>}
+                            {listing.isAiReady && <span className="text-[11px] shrink-0" title="AI Analizli">✨</span>}
+                            <span className="text-white font-semibold text-[13px] group-hover:text-orange-400 transition truncate max-w-[180px] lg:max-w-[220px] xl:max-w-[340px] 2xl:max-w-none">
                               {listing.title}
                             </span>
                           </div>
                         </td>
 
                         {/* Yıl */}
-                        <td className="py-3.5 px-3.5 text-center text-slate-200 text-[13px] whitespace-nowrap font-medium">
+                        <td className="py-2.5 px-2 text-center text-slate-200 text-[12px] whitespace-nowrap font-medium">
                           {listing.modelYear || "-"}
                         </td>
 
                         {/* Km */}
-                        <td className="py-3.5 px-3.5 text-right text-slate-200 text-[13px] whitespace-nowrap font-mono">
+                        <td className="py-2.5 px-2 text-right text-slate-200 text-[12px] whitespace-nowrap font-mono">
                           {listing.kilometers !== undefined && listing.kilometers !== null ? listing.kilometers.toLocaleString("tr-TR") : "-"}
                         </td>
 
                         {/* Renk */}
-                        <td className="py-3.5 px-3.5 text-slate-300 text-[13px] whitespace-nowrap">
+                        <td className="py-2.5 px-2 text-slate-300 text-[12px] whitespace-nowrap">
                           {listing.color || "-"}
                         </td>
 
                         {/* Fiyat */}
-                        <td className="py-3.5 px-4 text-right font-black text-orange-400 whitespace-nowrap text-[15px]">
+                        <td className="py-2.5 px-2.5 text-right font-black text-orange-400 whitespace-nowrap text-[14px]">
                           {formatCurrency(listing.priceAmount, listing.currency)}
                         </td>
 
                         {/* İlan Tarihi */}
-                        <td className="py-3.5 px-3.5 text-center text-slate-400 whitespace-nowrap text-[12px]">
+                        <td className="py-2.5 px-2 text-center text-slate-400 whitespace-nowrap text-[11px]">
                           {formatDateTr(listing.publishedAt || listing.createdAt)}
                         </td>
 
                         {/* İl / İlçe */}
-                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap text-[13px]">
+                        <td className="py-2.5 px-2.5 text-slate-300 whitespace-nowrap text-[12px]">
                           {location}
                         </td>
                       </tr>
