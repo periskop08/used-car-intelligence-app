@@ -1384,8 +1384,8 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
               <button onClick={handleClearFilters} className="text-xs text-orange-500 font-bold hover:underline">Filtreleri Temizle</button>
             </div>
           ) : viewMode === "list" ? (
-            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar - %25 kompakt ölçek) */
-            <div className="flex flex-col gap-2.5">
+            /* 1. LİSTE GÖRÜNÜMÜ (Yatay kartlar - Net hiyerarşi ve ferah spacing) */
+            <div className="flex flex-col gap-3.5">
               {listings.map((listing) => {
                 const cover = listing.media && listing.media[0] ? formatImageUrl(listing.media[0].url) : "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=60";
                 const brandName = listing.vehicleVariant?.brand?.name || listing.customBrand || "";
@@ -1398,9 +1398,9 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                   <a
                     key={listing.id}
                     href={`/listings/${listing.id}`}
-                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
+                    className="group flex flex-col sm:flex-row items-stretch bg-slate-900/40 border border-white/5 rounded-2xl overflow-hidden hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/5 transition duration-300"
                   >
-                    {/* Thumbnail (%25 küçültülmüş ölçek: 224px -> 168px) */}
+                    {/* Thumbnail */}
                     <div className="relative w-full sm:w-[168px] aspect-[16/10] sm:aspect-[4/3] bg-slate-950 shrink-0 overflow-hidden">
                       <button
                         onClick={(e) => handleToggleFavorite(e, listing.id)}
@@ -1438,10 +1438,10 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                     </div>
 
                     {/* Content Details */}
-                    <div className="p-3 flex-1 flex flex-col justify-between gap-2">
+                    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
                       <div>
-                        {/* Vehicle Taxonomy Pills */}
-                        <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        {/* 1. Vehicle Taxonomy */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                           <span className="text-orange-400 font-extrabold">{brandName}</span>
                           <span>•</span>
                           <span>{modelName}</span>
@@ -1459,23 +1459,31 @@ export function ListingsView({ isUrgentPage = false }: { isUrgentPage?: boolean 
                           )}
                         </div>
 
-                        <h3 className="text-xs sm:text-[13.5px] font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-1 sm:line-clamp-2 leading-snug">
-                          {listing.title}
-                        </h3>
+                        {/* 2. İlan Başlığı Bloğu: Label + Ana Başlık */}
+                        <div className="mt-2.5 sm:mt-3 flex flex-col">
+                          <span className="text-[10px] sm:text-[10.5px] font-extrabold uppercase tracking-widest text-slate-500 select-none">
+                            İLAN BAŞLIĞI
+                          </span>
+                          <h3 className="text-base sm:text-[18px] lg:text-[19px] font-bold text-slate-100 group-hover:text-orange-400 transition line-clamp-1 sm:line-clamp-2 leading-snug mt-1">
+                            {listing.title}
+                          </h3>
+                        </div>
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400 mt-1">
-                          <span>Yıl: <strong className="text-slate-200">{listing.modelYear || "-"}</strong></span>
-                          <span>Km: <strong className="text-slate-200">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
-                          {listing.color && <span>Renk: <strong className="text-slate-200">{listing.color}</strong></span>}
-                          <span>Konum: <strong className="text-slate-200">{location}</strong></span>
+                        {/* 3. Metadata Row (Yıl, Km, Renk, Konum) */}
+                        <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-1.5 text-xs sm:text-[13px] text-slate-400 mt-3.5 sm:mt-4">
+                          <span>Yıl: <strong className="text-slate-200 font-semibold">{listing.modelYear || "-"}</strong></span>
+                          <span>Km: <strong className="text-slate-200 font-semibold">{listing.kilometers ? listing.kilometers.toLocaleString("tr-TR") : "-"} km</strong></span>
+                          {listing.color && <span>Renk: <strong className="text-slate-200 font-semibold">{listing.color}</strong></span>}
+                          <span>Konum: <strong className="text-slate-200 font-semibold">{location}</strong></span>
                         </div>
                       </div>
 
-                      <div className="border-t border-white/5 pt-2 flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500">
+                      {/* 4. Alt Alan (Divider + Tarih & Fiyat) */}
+                      <div className="border-t border-white/5 mt-4 sm:mt-5 pt-3 sm:pt-3.5 flex items-center justify-between">
+                        <span className="text-xs text-slate-500 font-medium">
                           {formatDateTr(listing.publishedAt || listing.createdAt)}
                         </span>
-                        <span className="text-sm sm:text-[15px] font-black text-orange-400">
+                        <span className="text-base sm:text-xl font-black text-orange-400">
                           {formatCurrency(listing.priceAmount, listing.currency)}
                         </span>
                       </div>
