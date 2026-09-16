@@ -187,6 +187,12 @@ export class TorqueScoutDecisionScoreService {
       ];
       allQual.forEach((d: any) => {
         if (d.numericEligibility === 'REJECTED') return;
+        if (d.scoringEligible === false) return;
+        if (d.advisoryOnly === true) return;
+        // Filter out unverified complaints and user observations
+        if (d.problemType === 'REPORTED_COMPLAINT' || d.problemType === 'OBSERVED_BEHAVIOR') return;
+        if (this.isNonMechanicalCosmeticRisk(d)) return;
+
         const dKey = d.domain || this.resolveDomainKey(d);
         const sev = this.extractSeverityNumber(d);
         const rawKey = (d.normalizedFailureMode || d.failureMode || d.title || '').trim().toUpperCase();
@@ -198,8 +204,8 @@ export class TorqueScoutDecisionScoreService {
           description: d.description || d.severityBasis,
           domain: dKey as any,
           affectedComponent: d.affectedComponent || dKey,
-          applicabilityState: 'EXACT',
-          verificationState: 'VERIFIED',
+          applicabilityState: d.applicabilityState || 'EXACT',
+          verificationState: d.verificationState || 'VERIFIED',
           consequenceState: 'RESEARCHED_GROUNDED',
           severity: sev,
           severityBasis: d.severityBasis || 'GROUNDED_RESEARCH',
@@ -266,6 +272,10 @@ export class TorqueScoutDecisionScoreService {
    */
   resolveImpactClass(cr: CanonicalRiskDefect): 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL' {
     if (cr.impactClass) return cr.impactClass;
+
+    if (this.isNonMechanicalCosmeticRisk(cr)) {
+      return 'MINOR';
+    }
 
     const text = `${cr.title || ''} ${cr.normalizedFailureMode || ''} ${cr.severityBasis || ''} ${cr.inferredConsequence || ''} ${cr.description || ''} ${cr.reasoningChain || ''}`.toLowerCase();
 
@@ -373,12 +383,14 @@ export class TorqueScoutDecisionScoreService {
   resolveEvidenceLevel(cr: CanonicalRiskDefect): 'WEAK' | 'MODERATE' | 'STRONG' {
     if (cr.evidenceLevel) return cr.evidenceLevel;
 
-    // Incompatible or market-uncertain recalls with no local homologation proof -> WEAK (0 penalty)
+    // Incompatible, market-uncertain, advisory, or cosmetic campaigns -> WEAK (0 penalty)
     if (
       cr.applicabilityState === 'MARKET_UNCERTAIN' ||
       cr.applicabilityState === 'INCOMPATIBLE' ||
       cr.applicabilityState === 'COMPONENT_UNCERTAIN' ||
-      cr.applicabilityState === 'UNKNOWN'
+      cr.applicabilityState === 'UNKNOWN' ||
+      cr.advisoryOnly === true ||
+      this.isNonMechanicalCosmeticRisk(cr)
     ) {
       return 'WEAK';
     }
@@ -422,7 +434,75 @@ export class TorqueScoutDecisionScoreService {
     return 'WEAK';
   }
 
-  getBasePenaltyForImpact(impact: 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL'): number {
+  /**
+   * Identifies non-mechanical cosmetic, interior trim, label/manual, or auxiliary campaigns
+   * that must NEVER deduct points from the vehicle buyability score.
+   */
+  isNonMechanicalCosmeticRisk(defect: any): boolean {
+    if (!defect) return false;
+    const text = `${defect.title || ''} ${defect.normalizedFailureMode || ''} ${defect.affectedComponent || ''} ${defect.description || ''} ${defect.severityBasis || ''} ${defect.inferredConsequence || ''} ${defect.reason || ''}`.toLowerCase();
+
+    const isCosmeticOrTrim =
+      text.includes('seat adjustment switch') ||
+      text.includes('seat frame trim') ||
+      text.includes('seat trim panel') ||
+      text.includes('koltuk ayar') ||
+      text.includes('koltuk plastik') ||
+      text.includes('düğme kapak') ||
+      text.includes('switch trim') ||
+      text.includes('glovebox') ||
+      text.includes('torpido mandal') ||
+      text.includes('sun visor') ||
+      text.includes('güneşlik') ||
+      text.includes('tire placard') ||
+      text.includes('lastik etiketi') ||
+      text.includes('owner manual') ||
+      text.includes('kullanım kılavuz') ||
+      text.includes('washer fluid cap') ||
+      text.includes('silecek lastiği') ||
+      text.includes('cup holder') ||
+      text.includes('bardaklık') ||
+      text.includes('floor mat') ||
+      text.includes('paspas') ||
+      text.includes('emblem') ||
+      text.includes('logo yapışkan') ||
+      text.includes('interior trim clip') ||
+      text.includes('trim klips') ||
+      text.includes('kapı döşeme klipsi') ||
+      text.includes('tavan döşemesi') ||
+      text.includes('boya soyulması') ||
+      text.includes('far buğulanması');
+
+    const isActuallyMechanicalOrSafety =
+      text.includes('fren') ||
+      text.includes('brake') ||
+      text.includes('direksiyon') ||
+      text.includes('steering') ||
+      text.includes('motor') ||
+      text.includes('engine') ||
+      text.includes('şanzıman') ||
+      text.includes('transmission') ||
+      text.includes('kavrama') ||
+      text.includes('clutch') ||
+      text.includes('yangın') ||
+      text.includes('fire') ||
+      text.includes('airbag') ||
+      text.includes('hava yastığı') ||
+      text.includes('yakıt sızıntı') ||
+      text.includes('fuel leak') ||
+      text.includes('rollaway') ||
+      text.includes('fren hidrolik') ||
+      text.includes('triger') ||
+      text.includes('timing chain') ||
+      text.includes('timing belt');
+
+    return isCosmeticOrTrim && !isActuallyMechanicalOrSafety;
+  }
+
+  getBasePenaltyForImpact(impact: 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL', cr?: CanonicalRiskDefect): number {
+    if (cr && this.isNonMechanicalCosmeticRisk(cr)) {
+      return 0;
+    }
     switch (impact) {
       case 'CRITICAL':
         return 25;

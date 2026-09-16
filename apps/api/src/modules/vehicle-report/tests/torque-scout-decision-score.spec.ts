@@ -368,4 +368,67 @@ describe('TorqueScout Decision Score Engine (5-Tier Impact & 3-Tier Evidence)', 
     expect(result.score).toBe(94);
     expect(result.state).toBe('EXCELLENT');
   });
+
+  // =========================================================================
+  // 8. Cosmetic, Incompatible Recall, & Unverified Complaint Isolation
+  // =========================================================================
+  test('Fixture 9: Cosmetic trim panels (e.g. seat adjustment switch panel), incompatible foreign recalls, and unverified complaints do NOT deduct points', () => {
+    const v6Scores = createBaseV6Scores();
+
+    // 1. Cosmetic non-mechanical recall
+    const cosmeticRecall: CanonicalRiskDefect = {
+      id: 'CANONICAL:SAFETY_RECALL:SEAT_SWITCH_PANEL',
+      domain: 'SAFETY_RECALL',
+      title: 'Recalls: Check the seat frame trim panel for damage near the seat adjustment switch',
+      normalizedFailureMode: 'SEAT_SWITCH_TRIM_PANEL',
+      affectedComponent: 'Seat Adjustment Switch Trim Panel',
+      severity: 3,
+      severityCategory: 'COSMETIC',
+      applicabilityState: 'EXACT_MATCH',
+      verificationState: 'TIER1_OFFICIAL',
+      consequenceState: 'RESEARCHED_GROUNDED',
+      lifecycleState: 'SCORING_ELIGIBLE',
+      scoringEligible: true,
+      sources: [{ sourceId: '1', title: 'NHTSA', tier: 'TIER_1' }],
+    };
+
+    // 2. Incompatible older-generation cross-model recall
+    const incompatibleRecall: CanonicalRiskDefect = {
+      id: 'CANONICAL:SAFETY_RECALL:AUDI_A1_A3_TT_2013',
+      domain: 'SAFETY_RECALL',
+      title: 'Audi A1, A3 And TT Recalled For Transmission Fault - Drive',
+      normalizedFailureMode: 'TRANSMISSION_FAULT_2013',
+      affectedComponent: 'DQ200 2008-2011 TCU',
+      severity: 10,
+      severityCategory: 'SAFETY_CRITICAL',
+      applicabilityState: 'INCOMPATIBLE',
+      applicabilityEvidence: 'Production year mismatch: defect applies up to 2011, target vehicle is 2020.',
+      verificationState: 'TIER1_OFFICIAL',
+      consequenceState: 'RESEARCHED_GROUNDED',
+      lifecycleState: 'DISCOVERED',
+      scoringEligible: false,
+      advisoryOnly: true,
+      sources: [{ sourceId: '2', title: 'Drive.com.au', tier: 'TIER_2' }],
+    };
+
+    const result = decisionScoreService.calculateDecisionScore({
+      v6Scores,
+      canonicalRisks: [cosmeticRecall, incompatibleRecall],
+      qualitativeDefects: [
+        {
+          title: 'Yağ Soğutucusu Sızıntısı',
+          description: 'Bazı kullanıcılar, yağ soğutucusunun sızdırma yapabileceğini bildirmiştir.',
+          problemType: 'REPORTED_COMPLAINT',
+          numericEligibility: 'REJECTED',
+          scoringEligible: false,
+        },
+      ],
+    });
+
+    // Score remains pristine 100 / EXCELLENT with ZERO point deduction!
+    expect(result.score).toBe(100);
+    expect(result.state).toBe('EXCELLENT');
+    expect(result.totalRiskPenalty).toBe(0);
+    expect(result.deductedRisks).toHaveLength(0);
+  });
 });

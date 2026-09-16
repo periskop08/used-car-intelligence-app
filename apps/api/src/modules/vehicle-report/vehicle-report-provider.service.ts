@@ -715,21 +715,23 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         r.verificationState === 'TIER2_CROSS_REFERENCED',
     );
 
-    if (verifiedScoringRisks.length === 0) {
+    const groundingPool = verifiedScoringRisks.length > 0 ? verifiedScoringRisks : canonicalRisks;
+
+    if (groundingPool.length === 0) {
       if (baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
         baseReport.expertDecisionSynthesis.primaryTechnicalRisk = null as any;
       }
     } else {
-      const topRisk = verifiedScoringRisks[0];
+      const topRisk = groundingPool[0];
       if (baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
         const pRisk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk as any;
-        const matchesVerified = verifiedScoringRisks.some(
+        const matchesGrounding = groundingPool.some(
           (vr: any) =>
             vr.normalizedFailureMode === pRisk.normalizedFailureMode ||
             vr.title?.toLowerCase().includes((pRisk.title || '').toLowerCase()) ||
             (pRisk.title || '').toLowerCase().includes(vr.title?.toLowerCase()),
         );
-        if (!matchesVerified) {
+        if (!matchesGrounding) {
           pRisk.title = topRisk.title;
           pRisk.riskTitle = topRisk.title;
           pRisk.normalizedFailureMode = topRisk.normalizedFailureMode;
@@ -773,7 +775,9 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       if (baseReport.executiveSummary.biggestRisk && !isClaimVerified(baseReport.executiveSummary.biggestRisk)) {
         baseReport.executiveSummary.biggestRisk = verifiedScoringRisks.length > 0
           ? verifiedScoringRisks[0].title
-          : 'Doğrulanmış spesifik bir kronik arıza kaydı bulunmamakla birlikte, düzenli periyodik bakım geçmişi ve ekspertiz kontrolü teyit edilmelidir.';
+          : (canonicalRisks.length > 0
+              ? canonicalRisks[0].title
+              : 'Doğrulanmış spesifik bir kronik arıza kaydı bulunmamakla birlikte, düzenli periyodik bakım geçmişi ve ekspertiz kontrolü teyit edilmelidir.');
       }
     }
 

@@ -87,6 +87,11 @@ export function isSourceOrDomainLabel(label?: string): boolean {
   if (
     cleaned === 'unknown' ||
     cleaned === 'defect' ||
+    cleaned === 'recalls' ||
+    cleaned === 'recall' ||
+    cleaned === 'service campaign' ||
+    cleaned === 'campaign' ||
+    cleaned === 'campaigns' ||
     cleaned === 'technical bulletin' ||
     cleaned === 'bülten' ||
     cleaned === 'inceleme' ||
@@ -99,6 +104,14 @@ export function isSourceOrDomainLabel(label?: string): boolean {
     cleaned === 'chronic failure' ||
     cleaned === 'chronic defect' ||
     cleaned === 'kaynak' ||
+    cleaned === 'carcomplaints' ||
+    cleaned === 'drive' ||
+    cleaned === 'nhtsa' ||
+    cleaned === 'kba' ||
+    cleaned === 'rapex' ||
+    cleaned === 'complaints' ||
+    cleaned === 'geri çağırma' ||
+    cleaned === 'geri cagirma' ||
     cleaned.includes('araştırma') ||
     cleaned.includes('research') ||
     cleaned.includes('bulletin') ||
@@ -1107,6 +1120,9 @@ export class VehicleReliabilityResearchService {
           };
           const trDomainName = DOMAIN_LABELS_TR[domain] || domain.replace(/_/g, ' ');
           let cleanTitle = res.title;
+          if (cleanTitle) {
+            cleanTitle = cleanTitle.replace(/\s*[-–|]\s*(Drive|CarComplaints|AutoExpress|What Car\??|NHTSA|KBA|Auto Bild|Parkers|Edmunds|Kelly Blue Book|KBB|Reddit|YouTube|Consumer Reports).*$/i, '').trim();
+          }
           if (!cleanTitle || isSourceOrDomainLabel(cleanTitle) || cleanTitle.toUpperCase() === 'TECHNICAL BULLETIN') {
             cleanTitle = undefined;
           }
@@ -1141,6 +1157,33 @@ export class VehicleReliabilityResearchService {
             ? (cleanTitle && !isSourceOrDomainLabel(cleanTitle) ? cleanTitle : finalFailureMode.replace(/_/g, ' '))
             : 'DISCOVERY_UNKNOWN';
 
+          // Extract explicit year or year range from search result context if present
+          const contextForYear = `${res.title || ''} ${snippetText} ${res.url || ''}`.toLowerCase();
+          let extractedYearFrom: number | undefined = undefined;
+          let extractedYearTo: number | undefined = undefined;
+
+          const rangeMatch = contextForYear.match(/\b(20[0-2][0-9])\s*[-–to\/]\s*(20[0-2][0-9])\b/i);
+          if (rangeMatch) {
+            extractedYearFrom = parseInt(rangeMatch[1], 10);
+            extractedYearTo = parseInt(rangeMatch[2], 10);
+          } else {
+            const singleMatch = contextForYear.match(/\b(200[0-9]|201[0-9]|202[0-6])\b/);
+            if (singleMatch) {
+              const y = parseInt(singleMatch[1], 10);
+              if (Math.abs(y - input.modelYear) >= 3) {
+                extractedYearFrom = y;
+                extractedYearTo = y;
+              }
+            }
+          }
+
+          const contextForComponent = `${res.title || ''} ${snippetText} ${fullContentText}`.toLowerCase();
+          const targetEngine = (input.engineCode || '').toLowerCase();
+          const matchesEngineText = targetEngine && targetEngine.length > 2 && contextForComponent.includes(targetEngine);
+
+          const targetTrans = (input.transmissionCode || input.transmissionName || '').toLowerCase();
+          const matchesTransText = targetTrans && targetTrans.length > 2 && contextForComponent.includes(targetTrans);
+
           liveExtractedCandidates.push({
             id: `LIVE-${domain}-${idx}`,
             domain,
@@ -1159,10 +1202,10 @@ export class VehicleReliabilityResearchService {
               brand: input.brand,
               model: input.model,
               generation: input.generation,
-              modelYearFrom: input.modelYear,
-              modelYearTo: input.modelYear,
-              engineCode: input.engineCode,
-              transmissionCode: input.transmissionCode,
+              modelYearFrom: extractedYearFrom,
+              modelYearTo: extractedYearTo,
+              engineCode: matchesEngineText ? input.engineCode : undefined,
+              transmissionCode: matchesTransText ? (input.transmissionCode || input.transmissionName) : undefined,
               powertrainType: input.powertrainType,
             },
           });
@@ -1970,6 +2013,21 @@ export class VehicleReliabilityResearchService {
         turkishTitle = 'Yakıt Enjektörü Kurum & Tıkanma';
       } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT') || /termostat/i.test(ev.title)) {
         turkishTitle = 'Termostat & Devirdaim Soğutma Sıvısı Sızıntısı';
+      } else if (/recalled for|transmission fault|recalled|recall\b|safety recall/i.test(turkishTitle)) {
+        if (normFail.includes('TRANS') || /transmission|şanzıman|gearbox/i.test(turkishTitle)) {
+          turkishTitle = 'Şanzıman / Mekatronik Yazılım Bülteni';
+        } else if (/seat/i.test(turkishTitle) || normFail.includes('SEAT')) {
+          turkishTitle = 'Koltuk Donanımı & Trim Kontrolü';
+        } else {
+          turkishTitle = normFail && normFail !== 'UNKNOWN' ? normFail.replace(/_/g, ' ') : 'Teknik Servis Bülteni';
+        }
+      }
+
+      let cleanDescription = ev.severityBasis || ev.title;
+      if (cleanDescription && /consequence:\s*an engine stall/i.test(cleanDescription)) {
+        cleanDescription = 'Yetkili servis bülteni kapsamında şanzıman ve kontrol ünitesi yazılım güncellemesi ile fonksiyonel çalışma kontrolü tavsiye edilmektedir.';
+      } else if (cleanDescription && /seat frame trim panel/i.test(cleanDescription)) {
+        cleanDescription = 'Koltuk ayar düğmesi çevresindeki plastik trim kapağının montaj durumu kontrol edilmelidir.';
       }
 
       let inspectionInstruction: string | undefined;
@@ -2011,14 +2069,14 @@ export class VehicleReliabilityResearchService {
           existing.applicabilityEvidence = applicabilityEvidence;
           existing.severity = ev.severityScore;
           existing.severityCategory = ev.severityCategory;
-          existing.severityBasis = ev.severityBasis;
+          existing.severityBasis = cleanDescription || ev.severityBasis;
           existing.consequenceState = consequenceState;
           existing.advisoryOnly = false;
         } else if (existing.scoringEligible && scoringEligible) {
           if (ev.severityScore !== null && (existing.severity === null || ev.severityScore > existing.severity)) {
             existing.severity = ev.severityScore;
             existing.severityCategory = ev.severityCategory;
-            existing.severityBasis = ev.severityBasis;
+            existing.severityBasis = cleanDescription || ev.severityBasis;
           }
         }
       } else {
@@ -2027,7 +2085,7 @@ export class VehicleReliabilityResearchService {
           lifecycleState,
           normalizedFailureMode: normFail,
           title: turkishTitle,
-          description: ev.severityBasis || ev.title,
+          description: cleanDescription || ev.severityBasis || ev.title,
           domain: ev.domain,
           affectedComponent: ev.affectedComponent,
           applicabilityState,
@@ -2035,7 +2093,7 @@ export class VehicleReliabilityResearchService {
           verificationState,
           consequenceState,
           severity: ev.severityScore,
-          severityBasis: ev.severityBasis,
+          severityBasis: cleanDescription || ev.severityBasis,
           severityCategory: ev.severityCategory,
           scoringEligible,
           sources: canonicalSources,
@@ -2170,6 +2228,21 @@ export class VehicleReliabilityResearchService {
         const probDomain = this.mapDomain(p.affectedComponent || p.title || p.description);
         if (probDomain !== domain) return;
 
+        const rawType = String((p as any).problemType || (p as any).type || '').toUpperCase();
+        const pDesc = String(p.description || '').toLowerCase();
+        const isUserComplaint =
+          rawType === 'REPORTED_COMPLAINT' ||
+          rawType === 'OBSERVED_BEHAVIOR' ||
+          pDesc.includes('bazı kullanıcılar') ||
+          pDesc.includes('kullanıcı bildirim') ||
+          pDesc.includes('şikayet') ||
+          pDesc.includes('şikâyet');
+
+        const sourceTier = isUserComplaint ? 'TIER_3' : 'TIER_2';
+        const sourceName = isUserComplaint
+          ? 'Kullanıcı Geri Bildirimi / Bildirilen Şikâyet'
+          : 'Doğrulanmış DB Kronik Sorunlar Kataloğu';
+
         const normalized = this.normalizeDefectCandidate(
           {
             id: p.id || `DB-PROB-${idx}`,
@@ -2179,11 +2252,13 @@ export class VehicleReliabilityResearchService {
             affectedComponent: p.affectedComponent || 'Bileşen',
             consequenceDescription: p.description || 'Kronik arıza kaydı',
             severityCategory: this.mapSeverityCategory(p.severity),
-            prevalenceCategory: 'RECURRING_CHRONIC',
+            prevalenceCategory: isUserComplaint ? null : 'RECURRING_CHRONIC',
             prevalenceFactor: null,
-            prevalenceBasis: 'DB kronik sorun kataloğu (niteliksel kanıt, insidans oranı eksik)',
-            sourceTier: 'TIER_2',
-            sourceName: 'Doğrulanmış DB Kronik Sorunlar Kataloğu',
+            prevalenceBasis: isUserComplaint
+              ? 'Kullanıcı geri bildirimi niteliğinde (teknik servis bülteni ile doğrulanmamış)'
+              : 'DB kronik sorun kataloğu (niteliksel kanıt, insidans oranı eksik)',
+            sourceTier,
+            sourceName,
             applicability: {
               brand: input.brand,
               model: input.model,
