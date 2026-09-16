@@ -128,6 +128,37 @@ export function isSourceOrDomainLabel(label?: string): boolean {
   return false;
 }
 
+/**
+ * Filter for social media posts, repair shop marketing, and clickbait video captions
+ * that must NEVER be extracted as verified technical defect evidence.
+ */
+export function isSocialMediaOrMarketingContent(url?: string, title?: string, snippet?: string): boolean {
+  const text = `${url || ''} ${title || ''} ${snippet || ''}`.toLowerCase();
+  return (
+    text.includes('instagram.com') ||
+    text.includes('facebook.com') ||
+    text.includes('tiktok.com') ||
+    text.includes('threads.net') ||
+    text.includes('on instagram') ||
+    text.includes('on facebook') ||
+    text.includes('on tiktok') ||
+    text.includes('usta notu') ||
+    text.includes("dm'den") ||
+    text.includes('dmden') ||
+    text.includes('dm den') ||
+    text.includes('fiyat için') ||
+    text.includes('whatsapp') ||
+    text.includes('abone ol') ||
+    text.includes('takip et') ||
+    text.includes('link profilde') ||
+    text.includes('aracımıza uygulanan') ||
+    text.includes('şikayeti giderilmiştir') ||
+    text.includes('sonrasında yapılan') ||
+    text.includes('garagex on instagram') ||
+    text.includes('bakimdayiz.com on instagram')
+  );
+}
+
 @Injectable()
 export class VehicleReliabilityResearchService {
   private readonly logger = new Logger(VehicleReliabilityResearchService.name);
@@ -1099,6 +1130,11 @@ export class VehicleReliabilityResearchService {
           return;
         }
 
+        // Filter out social media posts, repair shop reels/shorts, and marketing posts
+        if (isSocialMediaOrMarketingContent(res.url, res.title, snippetText)) {
+          return;
+        }
+
         if (snippetText.length > 20 || fullContentText.length > 20) {
           const campaignId = this.extractCampaignId(`${res.title || ''} ${snippetText} ${res.url || ''} ${fullContentText.slice(0, 1000)}`);
           const candidateConsequence = this.extractDefectLocalConsequence(
@@ -2011,8 +2047,12 @@ export class VehicleReliabilityResearchService {
         turkishTitle = 'Kuru Çift Kavrama Aşınması';
       } else if (normFail.includes('INJECTOR') || /enjektör/i.test(ev.title)) {
         turkishTitle = 'Yakıt Enjektörü Kurum & Tıkanma';
-      } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT') || /termostat/i.test(ev.title)) {
-        turkishTitle = 'Termostat & Devirdaim Soğutma Sıvısı Sızıntısı';
+      } else if (
+        normFail.includes('COOLANT') ||
+        normFail.includes('THERMOSTAT') ||
+        /termostat|su pompası|devirdaim|water pump|hararet/i.test(ev.title)
+      ) {
+        turkishTitle = 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
       } else if (/recalled for|transmission fault|recalled|recall\b|safety recall/i.test(turkishTitle)) {
         if (normFail.includes('TRANS') || /transmission|şanzıman|gearbox/i.test(turkishTitle)) {
           turkishTitle = 'Şanzıman / Mekatronik Yazılım Bülteni';
@@ -2024,7 +2064,24 @@ export class VehicleReliabilityResearchService {
       }
 
       let cleanDescription = ev.severityBasis || ev.title;
-      if (cleanDescription && /consequence:\s*an engine stall/i.test(cleanDescription)) {
+      if (
+        !cleanDescription ||
+        cleanDescription.toUpperCase() === 'UNRESOLVED' ||
+        isSocialMediaOrMarketingContent(undefined, undefined, cleanDescription) ||
+        cleanDescription.length < 15
+      ) {
+        if (normFail.includes('MECHATRONIC') || normFail.includes('TRANS') || /mekatronik|şanzıman|dsg|s-tronic/i.test(turkishTitle)) {
+          cleanDescription = 'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı yönünden kontrol edilmelidir.';
+        } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT') || /devirdaim|su pompası|termostat/i.test(turkishTitle)) {
+          cleanDescription = 'Soğutma sistemi devirdaim pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı kontrol edilmelidir.';
+        } else if (normFail.includes('INJECTOR') || /enjektör/i.test(turkishTitle)) {
+          cleanDescription = 'Yakıt püskürtme sistemi ve enjektör çalışma değerleri diagnostik cihazla kontrol edilmelidir.';
+        } else if (normFail === 'WET_BELT') {
+          cleanDescription = 'Motor yağı içinde çalışan triger kayışının aşınması ve yağ pompası süzgecinin tıkanma durumu kontrol edilmelidir.';
+        } else {
+          cleanDescription = 'Yetkili servis teknik bültenleri ve ekspertiz kontrol standartları kapsamında ilgili bileşen fiziki olarak kontrol edilmelidir.';
+        }
+      } else if (cleanDescription && /consequence:\s*an engine stall/i.test(cleanDescription)) {
         cleanDescription = 'Yetkili servis bülteni kapsamında şanzıman ve kontrol ünitesi yazılım güncellemesi ile fonksiyonel çalışma kontrolü tavsiye edilmektedir.';
       } else if (cleanDescription && /seat frame trim panel/i.test(cleanDescription)) {
         cleanDescription = 'Koltuk ayar düğmesi çevresindeki plastik trim kapağının montaj durumu kontrol edilmelidir.';

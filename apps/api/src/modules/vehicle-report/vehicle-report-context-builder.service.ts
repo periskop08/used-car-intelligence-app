@@ -249,7 +249,16 @@ export class VehicleReportContextBuilderService {
         buyabilityScore: reportCache?.buyabilityScore ?? null,
         knownDatabaseProblems: variant.problems.map((p) => {
           const rawType = String((p as any).problemType || '').toUpperCase();
-          const pType = (rawType === 'VERIFIED_FAILURE' || rawType === 'RECALL' || rawType === 'TSB')
+          const pStatus = String((p as any).status || '').toUpperCase();
+          const isVerified =
+            rawType === 'VERIFIED_FAILURE' ||
+            rawType === 'COMMON_PROBLEM' ||
+            rawType === 'CHRONIC' ||
+            rawType === 'RECALL' ||
+            rawType === 'TSB' ||
+            pStatus === 'APPROVED';
+
+          const pType = isVerified
             ? 'VERIFIED_FAILURE'
             : (rawType === 'OBSERVED_BEHAVIOR' ? 'OBSERVED_BEHAVIOR' : 'REPORTED_COMPLAINT');
 
