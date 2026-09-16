@@ -2229,14 +2229,24 @@ export class VehicleReliabilityResearchService {
         if (probDomain !== domain) return;
 
         const rawType = String((p as any).problemType || (p as any).type || '').toUpperCase();
+        const pStatus = String((p as any).status || '').toUpperCase();
         const pDesc = String(p.description || '').toLowerCase();
+
+        // An approved database problem with status === 'APPROVED' or problemType === 'COMMON_PROBLEM' is a VERIFIED DB problem (TIER_2)
+        const isApprovedDbProblem =
+          pStatus === 'APPROVED' ||
+          rawType === 'COMMON_PROBLEM' ||
+          rawType === 'CHRONIC' ||
+          rawType === 'VERIFIED_FAILURE';
+
         const isUserComplaint =
-          rawType === 'REPORTED_COMPLAINT' ||
-          rawType === 'OBSERVED_BEHAVIOR' ||
-          pDesc.includes('bazı kullanıcılar') ||
-          pDesc.includes('kullanıcı bildirim') ||
-          pDesc.includes('şikayet') ||
-          pDesc.includes('şikâyet');
+          !isApprovedDbProblem &&
+          (rawType === 'REPORTED_COMPLAINT' ||
+            rawType === 'OBSERVED_BEHAVIOR' ||
+            pStatus === 'REJECTED' ||
+            pDesc.includes('kullanıcı bildirim') ||
+            pDesc.includes('şikayet') ||
+            pDesc.includes('şikâyet'));
 
         const sourceTier = isUserComplaint ? 'TIER_3' : 'TIER_2';
         const sourceName = isUserComplaint

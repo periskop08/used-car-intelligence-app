@@ -381,17 +381,15 @@ export class TorqueScoutDecisionScoreService {
    * Resolves the 3-Tier Evidence Level based on applicability & verification provenance.
    */
   resolveEvidenceLevel(cr: CanonicalRiskDefect): 'WEAK' | 'MODERATE' | 'STRONG' {
-    if (cr.evidenceLevel) return cr.evidenceLevel;
+    if (cr.evidenceLevel && cr.evidenceLevel !== 'WEAK') return cr.evidenceLevel;
 
-    // Incompatible, market-uncertain, advisory, or cosmetic campaigns -> WEAK (0 penalty)
-    if (
-      cr.applicabilityState === 'MARKET_UNCERTAIN' ||
-      cr.applicabilityState === 'INCOMPATIBLE' ||
-      cr.applicabilityState === 'COMPONENT_UNCERTAIN' ||
-      cr.applicabilityState === 'UNKNOWN' ||
-      cr.advisoryOnly === true ||
-      this.isNonMechanicalCosmeticRisk(cr)
-    ) {
+    // Cosmetic campaigns are never mechanical penalties
+    if (this.isNonMechanicalCosmeticRisk(cr)) {
+      return 'WEAK';
+    }
+
+    // Incompatible or foreign market-uncertain recalls -> WEAK (0 penalty)
+    if (cr.applicabilityState === 'MARKET_UNCERTAIN' || cr.applicabilityState === 'INCOMPATIBLE') {
       return 'WEAK';
     }
 
@@ -409,17 +407,23 @@ export class TorqueScoutDecisionScoreService {
       return 'STRONG';
     }
 
-    // Shared component architecture with established chronic field vulnerability (e.g. DQ200 on Golf 7) -> MODERATE
-    const text = `${cr.title || ''} ${cr.normalizedFailureMode || ''} ${cr.affectedComponent || ''}`.toLowerCase();
+    // Shared component architecture with established chronic field vulnerability (e.g. DQ200 on Golf 7 / Audi A3, PureTech wet belt, VAG EA211 water pump) -> MODERATE
+    const text = `${cr.title || ''} ${cr.normalizedFailureMode || ''} ${cr.affectedComponent || ''} ${cr.description || ''}`.toLowerCase();
     const isSharedComponentVulnerability =
       (cr.applicabilityState === 'FAMILY_MATCH' && cr.applicabilityEvidence?.includes('Proven shared component')) ||
       text.includes('dq200') ||
       text.includes('kuru çift kavrama') ||
       text.includes('kuru kavrama') ||
-      text.includes('dual_clutch_wear') ||
+      text.includes('dual_clutch') ||
       text.includes('wet_belt') ||
       text.includes('wet belt') ||
-      text.includes('yağ içi triger');
+      text.includes('yağ içi triger') ||
+      text.includes('mekatronik') ||
+      text.includes('mechatronic') ||
+      text.includes('devirdaim') ||
+      text.includes('su pompası') ||
+      text.includes('water pump') ||
+      text.includes('termostat');
 
     if (isSharedComponentVulnerability) {
       return 'MODERATE';
@@ -430,7 +434,7 @@ export class TorqueScoutDecisionScoreService {
       return 'MODERATE';
     }
 
-    // Uncorroborated forum rumour or insufficient evidence without shared component link -> WEAK
+    // Uncorroborated forum rumour, cosmetic, or insufficient evidence -> WEAK
     return 'WEAK';
   }
 
