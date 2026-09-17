@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   CanonicalRiskDefect,
   DeductedRiskItem,
+  sanitizeTurkishDefectDescription,
+  sanitizeTurkishDefectTitle,
   TorqueScoutDecisionScoreV1,
   VehicleReportScoresV6,
 } from '@used-car-intelligence/shared';
@@ -121,30 +123,18 @@ export class TorqueScoutDecisionScoreService {
     const deductedRisks: DeductedRiskItem[] = deduplicatedRisks
       .filter((r) => (r.netDeduction ?? 0) > 0)
       .map((r) => {
-        let cleanReason = r.description || r.severityBasis || r.title;
-        if (
-          !cleanReason ||
-          cleanReason.toUpperCase() === 'UNRESOLVED' ||
-          cleanReason.toLowerCase().includes('usta notu') ||
-          cleanReason.toLowerCase().includes("dm'den") ||
-          cleanReason.toLowerCase().includes('instagram') ||
-          cleanReason.length < 15
-        ) {
-          if (r.domain === 'POWERTRAIN_TRANS' || /şanzıman|mekatronik|dsg|s-tronic/i.test(r.title || '')) {
-            cleanReason = 'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı yönünden kontrol edilmelidir.';
-          } else if (r.domain === 'THERMAL_COOLING' || /devirdaim|su pompası|termostat/i.test(r.title || '')) {
-            cleanReason = 'Soğutma sistemi devirdaim pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı kontrol edilmelidir.';
-          } else if (r.domain === 'POWERTRAIN_ENGINE' || /yağ soğutucu/i.test(r.title || '')) {
-            cleanReason = 'Motor mekaniği ve yağ soğutucusu bağlantı contalarında sızdırmazlık durumu periyodik bakım kapsamında incelenmelidir.';
-          } else {
-            cleanReason = 'Yetkili servis teknik bültenleri ve ekspertiz kontrol standartları kapsamında ilgili bileşen fiziki olarak kontrol edilmelidir.';
-          }
-        }
+        const cleanTitle = sanitizeTurkishDefectTitle(r.title, {
+          domain: r.domain,
+          failureMode: r.normalizedFailureMode,
+          component: r.affectedComponent,
+        });
 
-        let cleanTitle = r.title;
-        if (/hararetin gizli sebebi|usta notu|on instagram/i.test(cleanTitle || '')) {
-          cleanTitle = 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
-        }
+        const cleanReason = sanitizeTurkishDefectDescription(r.description || r.severityBasis || r.title, {
+          domain: r.domain,
+          failureMode: r.normalizedFailureMode,
+          title: cleanTitle,
+          component: r.affectedComponent,
+        });
 
         return {
           id: r.id,

@@ -990,3 +990,4 @@ export * from './utils/sourceTier';
 export * from './vehicleConditionAndColors';
 export * from './vehicleFilterRanges';
 export * from './utils/normalizeVehicleReportPayload';
+export * from './utils/sanitizeTurkishDefectReason';

@@ -23,6 +23,8 @@ import {
   RiskConsequenceState,
   CanonicalRiskSource,
   CanonicalRiskDefect,
+  sanitizeTurkishDefectDescription,
+  sanitizeTurkishDefectTitle,
 } from '@used-car-intelligence/shared';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { SearchResult } from './providers/search-provider.interface';
@@ -2035,10 +2037,11 @@ export class VehicleReliabilityResearchService {
       }
 
       // Resolve Turkish title & inspection instruction
-      let turkishTitle = ev.title;
-      if (isSourceOrDomainLabel(turkishTitle)) {
-        turkishTitle = normFail.replace(/_/g, ' ');
-      }
+      let turkishTitle = sanitizeTurkishDefectTitle(ev.title, {
+        domain: ev.domain,
+        failureMode: normFail,
+        component: ev.affectedComponent,
+      });
       if (normFail === 'WET_BELT' || /wet[\s_-]?belt/i.test(ev.title)) {
         turkishTitle = 'Islak Triger Kayışı Aşınması';
       } else if (normFail.includes('MECHATRONIC') || /mekatronik/i.test(ev.title)) {
@@ -2063,29 +2066,12 @@ export class VehicleReliabilityResearchService {
         }
       }
 
-      let cleanDescription = ev.severityBasis || ev.title;
-      if (
-        !cleanDescription ||
-        cleanDescription.toUpperCase() === 'UNRESOLVED' ||
-        isSocialMediaOrMarketingContent(undefined, undefined, cleanDescription) ||
-        cleanDescription.length < 15
-      ) {
-        if (normFail.includes('MECHATRONIC') || normFail.includes('TRANS') || /mekatronik|şanzıman|dsg|s-tronic/i.test(turkishTitle)) {
-          cleanDescription = 'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı yönünden kontrol edilmelidir.';
-        } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT') || /devirdaim|su pompası|termostat/i.test(turkishTitle)) {
-          cleanDescription = 'Soğutma sistemi devirdaim pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı kontrol edilmelidir.';
-        } else if (normFail.includes('INJECTOR') || /enjektör/i.test(turkishTitle)) {
-          cleanDescription = 'Yakıt püskürtme sistemi ve enjektör çalışma değerleri diagnostik cihazla kontrol edilmelidir.';
-        } else if (normFail === 'WET_BELT') {
-          cleanDescription = 'Motor yağı içinde çalışan triger kayışının aşınması ve yağ pompası süzgecinin tıkanma durumu kontrol edilmelidir.';
-        } else {
-          cleanDescription = 'Yetkili servis teknik bültenleri ve ekspertiz kontrol standartları kapsamında ilgili bileşen fiziki olarak kontrol edilmelidir.';
-        }
-      } else if (cleanDescription && /consequence:\s*an engine stall/i.test(cleanDescription)) {
-        cleanDescription = 'Yetkili servis bülteni kapsamında şanzıman ve kontrol ünitesi yazılım güncellemesi ile fonksiyonel çalışma kontrolü tavsiye edilmektedir.';
-      } else if (cleanDescription && /seat frame trim panel/i.test(cleanDescription)) {
-        cleanDescription = 'Koltuk ayar düğmesi çevresindeki plastik trim kapağının montaj durumu kontrol edilmelidir.';
-      }
+      let cleanDescription = sanitizeTurkishDefectDescription(ev.severityBasis || ev.title, {
+        domain: ev.domain,
+        failureMode: normFail,
+        title: turkishTitle,
+        component: ev.affectedComponent,
+      });
 
       let inspectionInstruction: string | undefined;
       if (normFail === 'WET_BELT') {
@@ -2123,17 +2109,18 @@ export class VehicleReliabilityResearchService {
           existing.lifecycleState = lifecycleState;
           existing.verificationState = verificationState;
           existing.applicabilityState = applicabilityState;
-          existing.applicabilityEvidence = applicabilityEvidence;
           existing.severity = ev.severityScore;
           existing.severityCategory = ev.severityCategory;
-          existing.severityBasis = cleanDescription || ev.severityBasis;
+          existing.severityBasis = ev.severityBasis;
+          existing.description = cleanDescription || ev.severityBasis;
           existing.consequenceState = consequenceState;
           existing.advisoryOnly = false;
         } else if (existing.scoringEligible && scoringEligible) {
           if (ev.severityScore !== null && (existing.severity === null || ev.severityScore > existing.severity)) {
             existing.severity = ev.severityScore;
             existing.severityCategory = ev.severityCategory;
-            existing.severityBasis = cleanDescription || ev.severityBasis;
+            existing.severityBasis = ev.severityBasis;
+            existing.description = cleanDescription || ev.severityBasis;
           }
         }
       } else {
@@ -2150,7 +2137,7 @@ export class VehicleReliabilityResearchService {
           verificationState,
           consequenceState,
           severity: ev.severityScore,
-          severityBasis: cleanDescription || ev.severityBasis,
+          severityBasis: ev.severityBasis,
           severityCategory: ev.severityCategory,
           scoringEligible,
           sources: canonicalSources,
