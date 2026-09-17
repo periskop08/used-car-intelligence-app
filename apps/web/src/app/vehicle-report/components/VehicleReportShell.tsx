@@ -324,10 +324,26 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                             title: dTitle,
                           });
 
+                          const deduction =
+                            typeof dRisk.netDeduction === "number"
+                              ? dRisk.netDeduction
+                              : typeof dRisk.deduction === "number"
+                              ? dRisk.deduction
+                              : typeof dRisk.penalty === "number"
+                              ? dRisk.penalty
+                              : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
+                              ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
+                              : null;
+
                           return (
                             <div key={dRisk.id || idx} className="space-y-1 pb-1.5 border-b border-white/5 last:border-b-0 last:pb-0">
                               <span className="text-xs font-bold text-slate-200 block">
                                 • {dTitle}
+                                {deduction && deduction > 0 ? (
+                                  <span className="text-rose-400 font-bold ml-1.5 inline-block">
+                                    (-{deduction} Puan)
+                                  </span>
+                                ) : null}
                               </span>
                               {dReason && (
                                 <p className="text-xs text-slate-300 leading-relaxed break-words">
