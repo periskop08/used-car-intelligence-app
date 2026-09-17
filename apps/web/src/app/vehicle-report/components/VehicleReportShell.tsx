@@ -259,13 +259,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             const rawCandidateTitle = resolveFailureModeLabel(dRisk) || dRisk.title || '';
             const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${rawCandidateTitle}`.toUpperCase();
             const deduction =
-              norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
-                ? 10
-                : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
-                ? 8
-                : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
-                ? 5
-                : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
+              typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
                 ? dRisk.netDeduction
                 : typeof dRisk.deduction === "number" && dRisk.deduction > 0
                 ? dRisk.deduction
@@ -273,6 +267,12 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 ? dRisk.penalty
                 : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
                 ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
+                : norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
+                ? 10
+                : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
+                ? 8
+                : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
+                ? 5
                 : 0;
             return acc + deduction;
           }, 0);
@@ -377,13 +377,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                         const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
 
                         let deduction =
-                          norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
-                            ? 10
-                            : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
-                            ? 8
-                            : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
-                            ? 5
-                            : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
+                          typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
                             ? dRisk.netDeduction
                             : typeof dRisk.deduction === "number" && dRisk.deduction > 0
                             ? dRisk.deduction
@@ -391,6 +385,12 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                             ? dRisk.penalty
                             : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
                             ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
+                            : norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
+                            ? 10
+                            : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
+                            ? 8
+                            : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
+                            ? 5
                             : null;
 
                         const cleanInspection = sanitizeTurkishInspectionInstruction(dRisk.inspectionInstruction);
