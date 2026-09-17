@@ -345,7 +345,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Üretici bültenleri, parça ömrü ve doğrulanmış arıza geçmişine dayalı teknik risk kesintileri:
+                        Otomotiv dünyasında geçerli kabul görmüş FMEA ve güvenilirlik mühendisliği ilkelerine dayalı formül hesaplaması yapılmıştır:
                       </p>
                     </div>
 
