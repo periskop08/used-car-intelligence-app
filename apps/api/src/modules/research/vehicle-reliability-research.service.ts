@@ -2077,9 +2077,9 @@ export class VehicleReliabilityResearchService {
       if (normFail === 'WET_BELT') {
         inspectionInstruction = 'Triger kayış genişliği ve karter/yağ pompası süzgecinde kauçuk partikülü kontrolü yapılmalıdır.';
       } else if (normFail.includes('MECHATRONIC') || normFail.includes('DSG') || normFail.includes('CLUTCH')) {
-        inspectionInstruction = 'Ekspertizde diagnostik cihaz ile kavrama kavrama noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
+        inspectionInstruction = 'Ekspertizde bilgisayarlı arıza tespit cihazı ile kavrama temas noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
       } else if (normFail.includes('INJECTOR')) {
-        inspectionInstruction = 'Diagnostik cihazda enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.';
+        inspectionInstruction = 'Bilgisayarlı arıza tespit cihazında enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.';
       } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT')) {
         inspectionInstruction = 'Termostat gövdesi ve devirdaim pompası çevresinde antifriz sızıntı izi kontrolü yapılmalıdır.';
       }

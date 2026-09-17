@@ -5,6 +5,7 @@ import {
   formatCanonicalPowerDisplay,
   sanitizeTurkishDefectDescription,
   sanitizeTurkishDefectTitle,
+  sanitizeTurkishInspectionInstruction,
 } from "@used-car-intelligence/shared";
 import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import { 
@@ -313,10 +314,12 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                       <div className="space-y-2 pt-0.5">
                         {deductedRisks.map((dRisk: any, idx: number) => {
                           const rawCandidateTitle = resolveFailureModeLabel(dRisk) || dRisk.title || 'Doğrulanmış Teknik Kusur';
-                          const dTitle = sanitizeTurkishDefectTitle(rawCandidateTitle, {
+                          let dTitle = sanitizeTurkishDefectTitle(rawCandidateTitle, {
                             domain: dRisk.domain,
                             failureMode: dRisk.normalizedFailureMode,
                           });
+                          // Remove any existing points badge from title if present
+                          dTitle = dTitle.replace(/\s*\(-?\d+\s*Puan\)/gi, '').trim();
 
                           const dReason = sanitizeTurkishDefectDescription(dRisk.reason || dRisk.description, {
                             domain: dRisk.domain,
@@ -324,36 +327,53 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                             title: dTitle,
                           });
 
-                          const deduction =
-                            typeof dRisk.netDeduction === "number"
+                          let deduction =
+                            typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
                               ? dRisk.netDeduction
-                              : typeof dRisk.deduction === "number"
+                              : typeof dRisk.deduction === "number" && dRisk.deduction > 0
                               ? dRisk.deduction
-                              : typeof dRisk.penalty === "number"
+                              : typeof dRisk.penalty === "number" && dRisk.penalty > 0
                               ? dRisk.penalty
                               : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
                               ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
                               : null;
 
+                          // Resilient fallback estimation if deduction is not in payload
+                          if (!deduction && totalRiskPenalty > 0) {
+                            const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
+                            if (norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')) {
+                              deduction = 12;
+                            } else if (norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')) {
+                              deduction = 8;
+                            } else if (norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')) {
+                              deduction = 3;
+                            }
+                          }
+
+                          const cleanInspection = sanitizeTurkishInspectionInstruction(dRisk.inspectionInstruction);
+
                           return (
                             <div key={dRisk.id || idx} className="space-y-1 pb-1.5 border-b border-white/5 last:border-b-0 last:pb-0">
-                              <span className="text-xs font-bold text-slate-200 block">
-                                • {dTitle}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-slate-400 font-bold">•</span>
                                 {deduction && deduction > 0 ? (
-                                  <span className="text-rose-400 font-bold ml-1.5 inline-block">
-                                    (-{deduction} Puan)
+                                  <span className="inline-flex items-center text-rose-400 font-extrabold bg-rose-500/15 border border-rose-500/25 px-1.5 py-0.5 rounded text-[11px] leading-none">
+                                    -{deduction} Puan
                                   </span>
                                 ) : null}
-                              </span>
+                                <span className="text-xs font-bold text-slate-200">
+                                  {dTitle}
+                                </span>
+                              </div>
                               {dReason && (
                                 <p className="text-xs text-slate-300 leading-relaxed break-words">
                                   {dReason}
                                 </p>
                               )}
-                              {dRisk.inspectionInstruction && (
+                              {cleanInspection && (
                                 <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1 pt-0.5">
                                   <span className="font-semibold shrink-0">🔍 Satın Almadan Önce:</span>
-                                  <span>{dRisk.inspectionInstruction}</span>
+                                  <span>{cleanInspection}</span>
                                 </p>
                               )}
                             </div>

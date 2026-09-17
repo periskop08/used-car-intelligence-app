@@ -4,6 +4,7 @@ import {
   DeductedRiskItem,
   sanitizeTurkishDefectDescription,
   sanitizeTurkishDefectTitle,
+  sanitizeTurkishInspectionInstruction,
   TorqueScoutDecisionScoreV1,
   VehicleReportScoresV6,
 } from '@used-car-intelligence/shared';
@@ -148,7 +149,7 @@ export class TorqueScoutDecisionScoreService {
           basePenalty: r.basePenalty,
           evidenceMultiplier: r.evidenceMultiplier,
           netDeduction: r.netDeduction,
-          inspectionInstruction: r.inspectionInstruction,
+          inspectionInstruction: sanitizeTurkishInspectionInstruction(r.inspectionInstruction),
           reason: cleanReason,
           sources: r.sources,
           inferredConsequence: r.inferredConsequence,

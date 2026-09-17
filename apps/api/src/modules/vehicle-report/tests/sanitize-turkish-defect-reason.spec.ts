@@ -2,6 +2,7 @@ import {
   isEnglishOrForeignText,
   sanitizeTurkishDefectDescription,
   sanitizeTurkishDefectTitle,
+  sanitizeTurkishInspectionInstruction,
 } from '@used-car-intelligence/shared';
 
 describe('sanitizeTurkishDefectReason', () => {
@@ -26,7 +27,7 @@ describe('sanitizeTurkishDefectReason', () => {
   });
 
   describe('sanitizeTurkishDefectDescription', () => {
-    it('replaces English recall snippet with authoritative Turkish engineering description', () => {
+    it('replaces English recall snippet with authoritative Turkish engineering description without (DSG / EDC)', () => {
       const raw =
         'RECALL: More than 16,000 VW Polo, Golf, Jetta and Passat cars have dual-clutch transmission issue ... The Golf has been caught up in a new recall.';
       const cleaned = sanitizeTurkishDefectDescription(raw, {
@@ -38,7 +39,21 @@ describe('sanitizeTurkishDefectReason', () => {
       expect(cleaned).not.toContain('RECALL');
       expect(cleaned).not.toContain('Golf');
       expect(cleaned).not.toContain('...');
+      expect(cleaned).not.toContain('(DSG / EDC)');
       expect(cleaned).toContain('çift kavramalı otomatik şanzıman');
+    });
+
+    it('removes (DSG / EDC) from existing Turkish descriptions', () => {
+      const raw =
+        'Kuru tip çift kavramalı otomatik şanzımanlarda (DSG / EDC) yoğun dur-kalk trafikte kavrama balatasında aşınma görülebilmektedir.';
+      const cleaned = sanitizeTurkishDefectDescription(raw, {
+        domain: 'POWERTRAIN_TRANS',
+        failureMode: 'DUAL_CLUTCH',
+      });
+      expect(cleaned).not.toContain('(DSG / EDC)');
+      expect(cleaned).toBe(
+        'Kuru tip çift kavramalı otomatik şanzımanlarda yoğun dur-kalk trafikte kavrama balatasında aşınma görülebilmektedir.',
+      );
     });
 
     it('cleans and completes Turkish sentences truncated with ellipsis (...)', () => {
@@ -97,6 +112,26 @@ describe('sanitizeTurkishDefectReason', () => {
           domain: 'THERMAL_COOLING',
         }),
       ).toBe('Devirdaim & Termostat Soğutma Sıvısı Sızıntısı');
+    });
+  });
+
+  describe('sanitizeTurkishInspectionInstruction', () => {
+    it('cleans loanword "diagnostik" and duplicate typo "kavrama kavrama noktası"', () => {
+      const raw =
+        'Ekspertizde diagnostik cihaz ile kavrama kavrama noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
+      const cleaned = sanitizeTurkishInspectionInstruction(raw);
+      expect(cleaned).toBe(
+        'Ekspertizde bilgisayarlı arıza tespit cihazı ile kavrama temas noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.',
+      );
+    });
+
+    it('replaces diagnostik cihazda with bilgisayarlı arıza tespit cihazında', () => {
+      const raw =
+        'Diagnostik cihazda enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.';
+      const cleaned = sanitizeTurkishInspectionInstruction(raw);
+      expect(cleaned).toBe(
+        'Bilgisayarlı arıza tespit cihazında enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.',
+      );
     });
   });
 });

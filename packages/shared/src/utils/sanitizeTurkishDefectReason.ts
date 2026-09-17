@@ -16,7 +16,7 @@ export interface DefectSanitizationContext {
 
 const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
   DUAL_CLUTCH:
-    'Kuru tip çift kavramalı otomatik şanzımanlarda (DSG / EDC) yoğun dur-kalk trafikte kavrama balatasında aşınma, kalkışta titreme veya vites geçiş kararsızlığı görülebilmektedir.',
+    'Kuru tip çift kavramalı otomatik şanzımanlarda yoğun dur-kalk trafikte kavrama balatasında aşınma, kalkışta titreme veya vites geçiş kararsızlığı görülebilmektedir.',
   MECHATRONIC:
     'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç tüpü ve valf gövdesinde basınç kaybı veya yazılım kararsızlığı yönünden kontrol edilmelidir.',
   COOLANT_LEAK:
@@ -30,11 +30,11 @@ const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
   OIL_LEAK:
     'Motor yağ soğutucusu contaları, filtre kütüğü ve külbütör kapağında ısıl döngülere bağlı sızdırmazlık durumu periyodik bakım kapsamında kontrol edilmelidir.',
   INJECTOR:
-    'Yüksek basınçlı yakıt enjektörlerinde kurum birikmesi veya püskürtme dengesizliği diagnostik cihazla kontrol edilmelidir.',
+    'Yüksek basınçlı yakıt enjektörlerinde kurum birikmesi veya püskürtme dengesizliği bilgisayarlı arıza tespit cihazıyla kontrol edilmelidir.',
   TURBO:
-    'Turboşarj mili boşluğu, wastegate ayarı ve intercooler boru bağlantılarında yağ kaçağı kontrol edilmelidir.',
+    'Turboşarj mili boşluğu, tahliye kapağı (wastegate) ayarı ve hava soğutucu boru bağlantılarında yağ kaçağı kontrol edilmelidir.',
   EGR_DPF:
-    'EGR valfi kurum birikimi ve Dizel Partikül Filtresi (DPF) doluluk oranı diagnostik cihazla incelenmelidir.',
+    'EGR valfi kurum birikimi ve Dizel Partikül Filtresi (DPF) doluluk oranı arıza tespit cihazıyla incelenmelidir.',
   BRAKE_VACUUM:
     'Fren hidrolik devresi, mekanik vakum pompası ve fren disk/balata aşınma seviyesi kontrol edilmelidir.',
   STEERING:
@@ -278,7 +278,64 @@ export function sanitizeTurkishDefectDescription(
     return getStandardTurkishDefectExplanation(context);
   }
 
-  // 4. Ensure proper punctuation finish
+  // 4. Clean parenthetical transmission acronyms like (DSG / EDC)
+  text = text.replace(/\s*\(\s*(?:DSG|EDC|DCT|POWERSHIFT)(?:\s*[\/,-]\s*(?:DSG|EDC|DCT|POWERSHIFT))*\s*\)/gi, '');
+  // Clean diagnostik loan words
+  text = text.replace(/diagnostik cihaz[ıi]?(?:yla|yle)/gi, 'bilgisayarlı arıza tespit cihazıyla');
+  text = text.replace(/diagnostik cihazda/gi, 'bilgisayarlı arıza tespit cihazında');
+  text = text.replace(/diagnostik cihaz[ıi]?/gi, 'bilgisayarlı arıza tespit cihazı');
+  text = text.replace(/diagnostik/gi, 'arıza tespit');
+  // Clean kavrama kavrama typo
+  text = text.replace(/kavrama kavrama noktas[ıi]/gi, 'kavrama temas noktası');
+  text = text.replace(/kavrama kavrama/gi, 'kavrama');
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  // 5. Ensure proper punctuation finish
+  if (text.endsWith(':') || text.endsWith(';') || text.endsWith(',')) {
+    text = text.slice(0, -1).trim();
+  }
+  if (!/[.!?]$/.test(text)) {
+    text += '.';
+  }
+
+  return text;
+}
+
+/**
+ * Sanitizes and cleans pre-purchase inspection instructions:
+ * Removes English loanwords ("diagnostik"), eliminates transmission acronyms in parens,
+ * and fixes duplicate typos like "kavrama kavrama noktası".
+ */
+export function sanitizeTurkishInspectionInstruction(
+  rawInstruction?: string | null,
+): string | undefined {
+  if (!rawInstruction) return undefined;
+
+  let text = rawInstruction.trim();
+  if (!text) return undefined;
+
+  // Clean duplicate typo "kavrama kavrama noktası"
+  text = text.replace(/kavrama kavrama noktas[ıi]/gi, 'kavrama temas noktası');
+  text = text.replace(/kavrama kavrama/gi, 'kavrama');
+
+  // Replace foreign "diagnostik" with Turkish equivalent
+  text = text.replace(/diagnostik cihaz[ıi]?(?:yla|yle)/gi, 'bilgisayarlı arıza tespit cihazıyla');
+  text = text.replace(/diagnostik cihazda/gi, 'bilgisayarlı arıza tespit cihazında');
+  text = text.replace(/diagnostik cihaz ile/gi, 'bilgisayarlı arıza tespit cihazı ile');
+  text = text.replace(/diagnostik cihaz[ıi]?/gi, 'bilgisayarlı arıza tespit cihazı');
+  text = text.replace(/diagnostik test[i|e]?/gi, 'bilgisayarlı arıza testi');
+  text = text.replace(/diagnostik/gi, 'arıza tespit');
+
+  // Remove parenthetical transmission acronyms like (DSG / EDC)
+  text = text.replace(/\s*\(\s*(?:DSG|EDC|DCT|POWERSHIFT)(?:\s*[\/,-]\s*(?:DSG|EDC|DCT|POWERSHIFT))*\s*\)/gi, '');
+
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  // Ensure first letter is capitalized
+  if (text.length > 0) {
+    text = text.charAt(0).toLocaleUpperCase('tr-TR') + text.slice(1);
+  }
+
   if (text.endsWith(':') || text.endsWith(';') || text.endsWith(',')) {
     text = text.slice(0, -1).trim();
   }
