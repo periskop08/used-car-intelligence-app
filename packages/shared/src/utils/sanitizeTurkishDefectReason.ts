@@ -136,6 +136,11 @@ export function isEnglishOrForeignText(text?: string): boolean {
     /\bwear\b/i,
     /\bpressure\b/i,
     /\bvalve\b/i,
+    /\bwater\b/i,
+    /\bcommon\b/i,
+    /\bmost\b/i,
+    /\bproblem\b/i,
+    /\bproblems\b/i,
   ];
 
   let matches = 0;
@@ -364,14 +369,30 @@ export function sanitizeTurkishDefectTitle(
     return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
   }
 
+  // Water leak / coolant English patterns
+  if (
+    /water\s*leak|coolant\s*leak|water\s*pump|most\s*common\s*water/i.test(title) ||
+    /water\s*leak|coolant\s*leak|water\s*pump/i.test(context.failureMode || '')
+  ) {
+    return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+  }
+
   // English or raw enum / slug titles
   if (isEnglishOrForeignText(title) || /^[A-Z0-9_-]{4,}$/.test(title)) {
     const normKey = `${context.failureMode || ''} ${title} ${context.component || ''}`.toUpperCase();
     if (normKey.includes('WET_BELT') || /wet[\s_-]?belt/i.test(normKey)) return 'Islak Triger Kayışı Aşınması';
     if (normKey.includes('MECHATRONIC')) return 'Mekatronik Hidrolik Basınç Kaybı';
     if (normKey.includes('CLUTCH') || normKey.includes('KAVRAMA') || normKey.includes('DSG')) return 'Kuru Çift Kavrama Aşınması';
-    if (normKey.includes('COOLANT') || normKey.includes('THERMOSTAT') || normKey.includes('WATER_PUMP')) return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
-    if (normKey.includes('CAMSHAFT')) return 'Kam Mili Ayarlayıcı Cıvatasının Gevşemesi';
+    if (
+      normKey.includes('COOLANT') ||
+      normKey.includes('THERMOSTAT') ||
+      normKey.includes('WATER') ||
+      normKey.includes('SU POMPA') ||
+      normKey.includes('HARARET')
+    ) {
+      return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+    }
+    if (normKey.includes('CAMSHAFT') || normKey.includes('KAM MİLİ')) return 'Kam Mili Ayarlayıcı Cıvatasının Gevşemesi';
     if (normKey.includes('TIMING_CHAIN')) return 'Triger Zinciri Uzaması / Aşınması';
     if (normKey.includes('OIL_LEAK')) return 'Motor Yağı ve Soğutucu Kaçağı';
     if (normKey.includes('INJECTOR')) return 'Yakıt Enjektörü Kurum & Tıkanma';
@@ -380,7 +401,7 @@ export function sanitizeTurkishDefectTitle(
     if (normKey.includes('STEERING')) return 'Direksiyon Kutusu Kontrolü';
 
     if (context.domain === 'POWERTRAIN_TRANS') return 'Otomatik Şanzıman / Mekatronik Kontrolü';
-    if (context.domain === 'THERMAL_COOLING') return 'Soğutma Sistemi & Termostat Kaçağı';
+    if (context.domain === 'THERMAL_COOLING') return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
     if (context.domain === 'POWERTRAIN_ENGINE') return 'Motor Mekaniği & Zamanlama Kontrolü';
     return 'Teknik Servis Bülteni';
   }

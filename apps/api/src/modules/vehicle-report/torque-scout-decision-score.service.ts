@@ -349,7 +349,10 @@ export class TorqueScoutDecisionScoreService {
       text.includes('kuru çift kavrama') ||
       text.includes('dry-clutch') ||
       text.includes('dq200') ||
-      text.includes('shudder')
+      text.includes('shudder') ||
+      text.includes('kam mili') ||
+      text.includes('camshaft') ||
+      text.includes('eksantrik')
     ) {
       return 'SERIOUS';
     }
@@ -428,7 +431,21 @@ export class TorqueScoutDecisionScoreService {
       return 'WEAK';
     }
 
-    if (cr.evidenceLevel && cr.evidenceLevel !== 'WEAK') return cr.evidenceLevel;
+    // Shared component wear items with traffic/usage-dependent probability (e.g. DQ200 dry clutch wear, water pump/thermostat seepage) -> MODERATE (0.7)
+    const isSharedComponentWear =
+      text.includes('dq200') ||
+      text.includes('kuru çift kavrama') ||
+      text.includes('kuru kavrama') ||
+      text.includes('dual_clutch') ||
+      text.includes('clutch') ||
+      text.includes('devirdaim') ||
+      text.includes('su pompası') ||
+      text.includes('water pump') ||
+      text.includes('termostat');
+
+    if (isSharedComponentWear) {
+      return 'MODERATE';
+    }
 
     // Official TSB / Recall / Cross-referenced teardown with exact or proven family applicability -> STRONG
     const hasOfficialSources = (cr.sources || []).some(
@@ -444,22 +461,14 @@ export class TorqueScoutDecisionScoreService {
       return 'STRONG';
     }
 
-    // Shared component architecture with established chronic field vulnerability (e.g. DQ200 on Golf 7 / Audi A3, PureTech wet belt, VAG EA211 water pump) -> MODERATE
+    // Shared component architecture with established chronic field vulnerability (e.g. PureTech wet belt) -> MODERATE
     const isSharedComponentVulnerability =
       (cr.applicabilityState === 'FAMILY_MATCH' && cr.applicabilityEvidence?.includes('Proven shared component')) ||
-      text.includes('dq200') ||
-      text.includes('kuru çift kavrama') ||
-      text.includes('kuru kavrama') ||
-      text.includes('dual_clutch') ||
       text.includes('wet_belt') ||
       text.includes('wet belt') ||
       text.includes('yağ içi triger') ||
       text.includes('mekatronik') ||
-      text.includes('mechatronic') ||
-      text.includes('devirdaim') ||
-      text.includes('su pompası') ||
-      text.includes('water pump') ||
-      text.includes('termostat');
+      text.includes('mechatronic');
 
     if (isSharedComponentVulnerability) {
       return 'MODERATE';
@@ -542,6 +551,10 @@ export class TorqueScoutDecisionScoreService {
   getBasePenaltyForImpact(impact: 'MINOR' | 'MODERATE' | 'SERIOUS' | 'MAJOR_REPAIR' | 'CRITICAL', cr?: CanonicalRiskDefect): number {
     if (cr && this.isNonMechanicalCosmeticRisk(cr)) {
       return 0;
+    }
+    const text = `${cr?.title || ''} ${cr?.normalizedFailureMode || ''} ${cr?.affectedComponent || ''}`.toLowerCase();
+    if (text.includes('kam mili') || text.includes('camshaft') || text.includes('eksantrik')) {
+      return 10;
     }
     switch (impact) {
       case 'CRITICAL':

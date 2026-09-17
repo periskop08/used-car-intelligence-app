@@ -327,8 +327,16 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                             title: dTitle,
                           });
 
+                          const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
+
                           let deduction =
-                            typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
+                            norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
+                              ? 10
+                              : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
+                              ? 8
+                              : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
+                              ? 5
+                              : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
                               ? dRisk.netDeduction
                               : typeof dRisk.deduction === "number" && dRisk.deduction > 0
                               ? dRisk.deduction
@@ -338,32 +346,20 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                               ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
                               : null;
 
-                          // Resilient fallback estimation if deduction is not in payload
-                          if (!deduction && totalRiskPenalty > 0) {
-                            const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
-                            if (norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')) {
-                              deduction = 12;
-                            } else if (norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')) {
-                              deduction = 8;
-                            } else if (norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')) {
-                              deduction = 3;
-                            }
-                          }
-
                           const cleanInspection = sanitizeTurkishInspectionInstruction(dRisk.inspectionInstruction);
 
                           return (
                             <div key={dRisk.id || idx} className="space-y-1 pb-1.5 border-b border-white/5 last:border-b-0 last:pb-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-slate-400 font-bold">•</span>
-                                {deduction && deduction > 0 ? (
-                                  <span className="inline-flex items-center text-rose-400 font-extrabold bg-rose-500/15 border border-rose-500/25 px-1.5 py-0.5 rounded text-[11px] leading-none">
-                                    -{deduction} Puan
-                                  </span>
-                                ) : null}
                                 <span className="text-xs font-bold text-slate-200">
                                   {dTitle}
                                 </span>
+                                {deduction && deduction > 0 ? (
+                                  <span className="inline-flex items-center text-rose-400 font-extrabold bg-rose-500/15 border border-rose-500/25 px-1.5 py-0.5 rounded text-[11px] leading-none ml-1">
+                                    -{deduction} Puan
+                                  </span>
+                                ) : null}
                               </div>
                               {dReason && (
                                 <p className="text-xs text-slate-300 leading-relaxed break-words">
