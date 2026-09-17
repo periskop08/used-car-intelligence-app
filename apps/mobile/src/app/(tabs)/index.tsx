@@ -1486,7 +1486,7 @@ export default function MobileDashboard() {
             <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
 
-          {/* 3. İlan Akışı */}
+          {/* 3. Akış */}
           <TouchableOpacity
             style={styles.kesfetCard}
             activeOpacity={0.85}
@@ -1496,8 +1496,8 @@ export default function MobileDashboard() {
               <Ionicons name="newspaper" size={20} color="#0284c7" />
             </View>
             <View style={styles.kesfetCardContent}>
-              <Text style={styles.kesfetCardText}>İlan Akışı</Text>
-              <Text style={styles.kesfetCardSubText}>Canlı Satılıklar</Text>
+              <Text style={styles.kesfetCardText}>Akış</Text>
+              <Text style={styles.kesfetCardSubText}>Canlı Paylaşımlar</Text>
             </View>
             <Ionicons name="chevron-forward" size={13} color="#cbd5e1" />
           </TouchableOpacity>
@@ -1690,13 +1690,13 @@ export default function MobileDashboard() {
               : 'Şu anda acil satılık aktif araç ilanı bulunmuyor.'}
           </Text>
           <Text style={styles.emptyPromoSub}>
-            Tüm satılık araçları incelemek için İlan Akışı'na göz atabilirsiniz.
+            Tüm paylaşımları ve satılık araçları incelemek için Akış'a göz atabilirsiniz.
           </Text>
           <TouchableOpacity
             style={styles.emptyPromoBtn}
             onPress={() => router.push('/ilan-akisi')}
           >
-            <Text style={styles.emptyPromoBtnText}>İlan Akışına Git ➔</Text>
+            <Text style={styles.emptyPromoBtnText}>Akışa Git ➔</Text>
           </TouchableOpacity>
         </View>
           )}

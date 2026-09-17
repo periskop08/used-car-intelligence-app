@@ -7,9 +7,10 @@ import { JwtService } from '@nestjs/jwt';
 
 import { ListingPromotionModule } from '../listing-promotion/listing-promotion.module';
 import { VehicleModule } from '../vehicle/vehicle.module';
+import { IsiCepteModule } from '../isi-cepte/isi-cepte.module';
 
 @Module({
-  imports: [ListingPromotionModule, VehicleModule],
+  imports: [ListingPromotionModule, VehicleModule, IsiCepteModule],
   controllers: [ListingController],
   providers: [PrismaService, ListingService, JwtService, R2Service],
   exports: [ListingService, R2Service],

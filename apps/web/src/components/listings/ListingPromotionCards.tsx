@@ -134,12 +134,12 @@ export default function ListingPromotionCards({
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed mb-4">
-            İlanınız ana sayfadaki <strong>Vitrin</strong> alanında ve Keşfet içerisindeki <strong>İlan Akışı</strong> bölümünde yer alır.
+            İlanınız ana sayfadaki <strong>Vitrin</strong> alanında ve Keşfet içerisindeki <strong>Akış</strong> bölümünde yer alır.
           </p>
 
           <ul className="space-y-2 text-[11px] text-slate-400 mb-6">
             <li className="flex items-center gap-2">✓ Ana Sayfa Vitrin alanı</li>
-            <li className="flex items-center gap-2">✓ Keşfet &gt; İlan Akışı</li>
+            <li className="flex items-center gap-2">✓ Keşfet &gt; Akış</li>
             <li className="flex items-center gap-2">✓ Maksimum ana sayfa görünürlüğü</li>
           </ul>
 
@@ -189,7 +189,7 @@ export default function ListingPromotionCards({
           <ul className="space-y-2 text-[11px] text-slate-300 font-medium mb-6">
             <li className="flex items-center gap-2 text-red-400 font-bold">✓ Kırmızı ACİL rozeti & Acil listesi</li>
             <li className="flex items-center gap-2 text-amber-400 font-bold">✓ Ana Sayfa Vitrin alanı</li>
-            <li className="flex items-center gap-2 text-orange-400 font-bold">✓ Keşfet &gt; İlan Akışı görünürlüğü</li>
+            <li className="flex items-center gap-2 text-orange-400 font-bold">✓ Keşfet &gt; Akış görünürlüğü</li>
           </ul>
 
           {/* Pricing Bottom */}

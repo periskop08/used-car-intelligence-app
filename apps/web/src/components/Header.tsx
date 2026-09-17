@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { formatImageUrl } from "../utils/media";
+import GlobalCitySelector from "./common/GlobalCitySelector";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
@@ -157,7 +158,7 @@ export default function Header() {
                 <span>🧭</span> Aracını Bul
               </a>
               <a href="/kesfet/ilan-akisi" className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white transition flex items-center gap-2">
-                <span>🎞️</span> İlan Akışı
+                <span>🎞️</span> Akış
               </a>
             </div>
           </div>
@@ -267,15 +268,18 @@ export default function Header() {
                   
                   <div className="px-3 py-2.5 border-b border-white/5 mb-1 flex flex-col">
                     <span className="text-xs text-slate-400 truncate font-semibold">{user.email}</span>
-                    <span className={`text-[9px] w-fit mt-1 px-1.5 py-0.5 rounded font-mono font-bold ${
-                      user.subscriptionTier === 'PROFESYONEL' || user.subscriptionTier === 'PREMIUM'
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
-                        : user.subscriptionTier === 'YETKIN' || user.subscriptionTier === 'STANDARD'
-                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                        : 'bg-slate-800 text-slate-300 border border-white/10'
-                    }`}>
-                      {user.subscriptionTier === 'TANISMA' ? 'TANIŞMA' : user.subscriptionTier === 'YETKIN' ? 'YETKİN' : user.subscriptionTier === 'PROFESYONEL' ? 'PROFESYONEL' : user.subscriptionTier}
-                    </span>
+                    <div className="flex items-center justify-between mt-1.5 gap-2">
+                      <span className={`text-[9px] w-fit px-1.5 py-0.5 rounded font-mono font-bold ${
+                        user.subscriptionTier === 'PROFESYONEL' || user.subscriptionTier === 'PREMIUM'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                          : user.subscriptionTier === 'YETKIN' || user.subscriptionTier === 'STANDARD'
+                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                          : 'bg-slate-800 text-slate-300 border border-white/10'
+                      }`}>
+                        {user.subscriptionTier === 'TANISMA' ? 'TANIŞMA' : user.subscriptionTier === 'YETKIN' ? 'YETKİN' : user.subscriptionTier === 'PROFESYONEL' ? 'PROFESYONEL' : user.subscriptionTier}
+                      </span>
+                      <GlobalCitySelector compact />
+                    </div>
                   </div>
 
                   {user.role === 'ADMIN' && (
@@ -376,6 +380,7 @@ export default function Header() {
           </div>
         ) : (
           <div className="hidden md:flex items-center gap-2.5">
+            <GlobalCitySelector compact />
             <a
               href="/register?redirect=/listings/create"
               className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 transition flex items-center gap-1 cursor-pointer"
@@ -421,6 +426,12 @@ export default function Header() {
           />
           <div className="fixed top-[77px] right-0 bottom-0 w-80 bg-[#070b14]/95 backdrop-blur-xl border-l border-white/5 shadow-2xl p-6 flex flex-col gap-6 overflow-y-auto z-40 md:hidden animate-in slide-in-from-right duration-300">
             
+            {/* Mobile City Selector */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+              <span className="text-xs font-semibold text-slate-300">Aktif Şehir</span>
+              <GlobalCitySelector />
+            </div>
+
             {/* Mobile Accordion Menu */}
             <div className="flex flex-col gap-4">
               
@@ -467,7 +478,7 @@ export default function Header() {
                       🧭 Aracını Bul
                     </a>
                     <a href="/kesfet/ilan-akisi" onClick={() => setMobileMenuOpen(false)} className="text-xs font-semibold text-slate-400 hover:text-white transition">
-                      🎞️ İlan Akışı
+                      🎞️ Akış
                     </a>
                   </div>
                 )}

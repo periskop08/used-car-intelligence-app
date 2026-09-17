@@ -16,11 +16,16 @@ import {
   BadRequestException,
   Res,
   Req,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 import { ListingService } from './listing.service';
 import { R2Service } from './r2.service';
+import { ISICEPTE_FEED_PROVIDER, IsiCepteFeedProvider } from '../isi-cepte/isicepte-feed-provider.interface';
+import { encodeFeedCursor } from './feed-cursor.util';
+import { PROVIDER_POST_INTERVAL, FeedItem, VehicleListingFeedItem } from '@used-car-intelligence/shared';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 import {
@@ -35,7 +40,6 @@ import { ListingStatus, MediaModerationStatus, ListingPromotionType, PromotionLi
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ListingPromotionQueryService } from '../listing-promotion/listing-promotion-query.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
-import { Optional } from '@nestjs/common';
 import {
   resolveCanonicalMediaList,
   resolveCanonicalMediaItem,
@@ -53,6 +57,7 @@ export class ListingController {
   constructor(
     private listingService: ListingService,
     private r2Service: R2Service,
+    @Inject(ISICEPTE_FEED_PROVIDER) private readonly isiCepteFeedProvider: IsiCepteFeedProvider,
     @Optional() private promotionQueryService?: ListingPromotionQueryService,
     @Optional() private variantTechnicalFactsService?: VariantTechnicalFactsService,
   ) {}
@@ -360,32 +365,34 @@ export class ListingController {
 
   @Get('listings/feed')
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: 'Reels tarzı dikey İlan Akışı verisi al' })
+  @ApiOperation({ summary: 'Reels tarzı dikey Akış verisi al (Araç İlanları + İşiCepte Usta Gönderileri 5:1)' })
   async getListingFeed(
     @Req() req: Request,
     @GetUser() user?: UserPayload,
     @Query('limit') limitStr?: string,
     @Query('excludeIds') excludeIdsStr?: string,
     @Query('seed') seed?: string,
+    @Query('cursor') cursorToken?: string,
+    @Query('cityId') cityId?: string,
   ) {
     const limit = parseInt(limitStr || '10', 10);
     const excludeIds = excludeIdsStr ? excludeIdsStr.split(',').map((x) => x.trim()).filter(Boolean) : [];
 
-    const result = await this.listingService.getListingFeed(limit, excludeIds, seed);
+    const result = await this.listingService.getListingFeed(limit, excludeIds, seed, cursorToken, cityId);
 
     let favoritedIds = new Set<string>();
     if (user?.id && result.items.length > 0) {
       const userFavs = await this.listingService['prisma'].favoriteListing.findMany({
         where: {
           userId: user.id,
-          listingId: { in: result.items.map((item) => item.id) },
+          listingId: { in: result.items.map((item: any) => item.id) },
         },
         select: { listingId: true },
       });
       favoritedIds = new Set(userFavs.map((f) => f.listingId));
     }
 
-    const mappedItems = result.items.map((item) => {
+    const mappedVehicles: VehicleListingFeedItem[] = result.items.map((item: any) => {
       const formattedMedia = item.media ? this.formatMediaUrls(item.media, req) : [];
       const photos = formattedMedia.map((m: any) => ({
         id: m.id,
@@ -491,12 +498,65 @@ export class ListingController {
       };
     });
 
+    // 2. Fetch eligible provider posts from adapter port (NullAdapter in production -> [])
+    const providerLimit = Math.ceil(limit / PROVIDER_POST_INTERVAL) + 2;
+    const providerPosts = await this.isiCepteFeedProvider.getEligiblePosts({
+      cityId: cityId || null,
+      limit: providerLimit,
+      seed: result.seed,
+      excludeIds,
+    });
+
+    // 3. Compose 5:1 feed
+    let currentGlobalVehicleCount = result.initialGlobalVehicleCount;
+    let currentProviderPosition = result.initialProviderPosition;
+    let postIdx = 0;
+    const composedItems: FeedItem[] = [];
+
+    for (const vehicleItem of mappedVehicles) {
+      currentGlobalVehicleCount++;
+      composedItems.push({
+        type: 'VEHICLE_LISTING',
+        id: vehicleItem.id,
+        data: vehicleItem,
+        ...(vehicleItem as any), // Legacy backward compatibility for top-level access
+      });
+
+      // Every PROVIDER_POST_INTERVAL (5) vehicle listings, insert 1 provider post if available
+      if (currentGlobalVehicleCount % PROVIDER_POST_INTERVAL === 0) {
+        if (postIdx < providerPosts.length) {
+          const post = providerPosts[postIdx++];
+          currentProviderPosition++;
+          composedItems.push({
+            type: 'ISICEPTE_PROVIDER_POST',
+            id: post.sourcePostId || post.providerId,
+            data: post,
+          });
+        }
+      }
+    }
+
+    let nextCursor: string | null = null;
+    if (result.hasMore) {
+      nextCursor = encodeFeedCursor({
+        offset: result.nextOffset,
+        globalVehicleCount: currentGlobalVehicleCount,
+        seed: result.seed,
+        cityId: cityId || null,
+        providerPosition: currentProviderPosition,
+      });
+    }
+
     return {
-      items: mappedItems,
+      items: composedItems,
+      vehicleTotalCount: result.totalCount,
+      totalCount: result.totalCount,
       hasMore: result.hasMore,
-      nextSeed: result.nextSeed,
+      nextCursor,
+      seed: result.seed,
     };
   }
+
 
   @Get('listings/by-vehicle/:variantId')
   @ApiOperation({ summary: 'Araç raporu için birebir eşleşen aktif ilanları getir' })

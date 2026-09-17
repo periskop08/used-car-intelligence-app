@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ConflictException, ForbiddenException,
 import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto } from './user.dto';
+import { getCanonicalCityId } from '@used-car-intelligence/shared';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { ListingStatus } from '@prisma/client';
 const sharp = require('sharp');
@@ -67,6 +68,7 @@ export class UserService {
         displayNamePreference: true,
         notificationSettings: true,
         subscriptionTier: true,
+        activeCityId: true,
         role: true,
         createdAt: true,
         isActive: true,
@@ -103,6 +105,29 @@ export class UserService {
       role: effectiveRole as any,
       subscriptionTier: effectiveTier,
       notificationSettings: settings,
+      activeCityId: user.activeCityId || null,
+    };
+  }
+
+  async updateActiveCity(userId: string, cityId?: string | null) {
+    let resolvedCityId: string | null = null;
+    if (cityId && cityId.trim() !== '' && cityId.trim().toUpperCase() !== 'ALL') {
+      const canonicalId = getCanonicalCityId(cityId.trim());
+      if (!canonicalId) {
+        throw new BadRequestException(`Geçersiz şehir ID'si: '${cityId}'. Lütfen geçerli bir Türkiye ili seçin.`);
+      }
+      resolvedCityId = canonicalId;
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { activeCityId: resolvedCityId },
+      select: { id: true, activeCityId: true },
+    });
+
+    return {
+      success: true,
+      activeCityId: updated.activeCityId,
     };
   }
 

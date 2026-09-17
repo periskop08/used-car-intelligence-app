@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import { API_BASE_URL } from "@/utils/apiConfig";
+import { useGlobalCity } from "@/context/GlobalCityContext";
 
 // Canonical locked 11 automotive categories
 const CANONICAL_ISICEPTE_OTO_CATEGORIES = [
@@ -92,13 +93,23 @@ function IsiCepteOneriyorContent() {
   const [availableBrands, setAvailableBrands] = useState<string[]>(["Tüm Markalar", ...INITIAL_CANONICAL_BRANDS]);
   const availableCategories = ["Tüm Kategoriler", ...CANONICAL_ISICEPTE_OTO_CATEGORIES];
 
+  const { activeCityId, activeCityName, setActiveCity } = useGlobalCity();
+
   // Filter form state (dropdown selections before submit)
-  const [selectedCity, setSelectedCity] = useState<string>(initialCity);
+  const [selectedCity, setSelectedCity] = useState<string>(() => {
+    if (initialCity !== "Tüm Şehirler") return initialCity;
+    if (activeCityName && activeCityName !== "Tüm Türkiye") return activeCityName;
+    return "Tüm Şehirler";
+  });
   const [selectedBrand, setSelectedBrand] = useState<string>(initialBrand);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
 
   // Applied filter state (triggers API fetch)
-  const [appliedCity, setAppliedCity] = useState<string>(initialCity);
+  const [appliedCity, setAppliedCity] = useState<string>(() => {
+    if (initialCity !== "Tüm Şehirler") return initialCity;
+    if (activeCityName && activeCityName !== "Tüm Türkiye") return activeCityName;
+    return "Tüm Şehirler";
+  });
   const [appliedBrand, setAppliedBrand] = useState<string>(initialBrand);
   const [appliedCategory, setAppliedCategory] = useState<string>(initialCategory);
 
@@ -107,6 +118,16 @@ function IsiCepteOneriyorContent() {
 
   // Session seed for stable randomization per page view
   const [sessionSeed] = useState(() => Math.random().toString(36).substring(2, 9));
+
+  // Sync state when global city changes (if URL city param is not explicitly set)
+  useEffect(() => {
+    if (!searchParams.get("city")) {
+      const cityToApply = activeCityName && activeCityName !== "Tüm Türkiye" ? activeCityName : "Tüm Şehirler";
+      setSelectedCity(cityToApply);
+      setAppliedCity(cityToApply);
+      setPage(1);
+    }
+  }, [activeCityName, searchParams]);
 
   // Update URL query parameters cleanly
   const syncUrlParams = useCallback(
@@ -235,6 +256,11 @@ function IsiCepteOneriyorContent() {
     setAppliedBrand(selectedBrand);
     setAppliedCategory(selectedCategory);
     syncUrlParams(selectedCity, selectedBrand, selectedCategory, scope);
+    if (selectedCity && selectedCity !== "Tüm Şehirler") {
+      setActiveCity(selectedCity);
+    } else {
+      setActiveCity(null);
+    }
   };
 
   const handleClearCityFilter = () => {
@@ -242,6 +268,7 @@ function IsiCepteOneriyorContent() {
     setAppliedCity("Tüm Şehirler");
     setPage(1);
     syncUrlParams("Tüm Şehirler", appliedBrand, appliedCategory, scope);
+    setActiveCity(null);
   };
 
   const handleClearBrandFilter = () => {
@@ -267,6 +294,7 @@ function IsiCepteOneriyorContent() {
     setAppliedCategory("Tüm Kategoriler");
     setPage(1);
     syncUrlParams("Tüm Şehirler", "Tüm Markalar", "Tüm Kategoriler", scope);
+    setActiveCity(null);
   };
 
   const handleToggleScope = (newScope: 'SHOWCASE_ONLY' | 'ALL_ELIGIBLE') => {

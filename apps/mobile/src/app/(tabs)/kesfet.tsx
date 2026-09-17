@@ -29,7 +29,7 @@ export default function KesfetHub() {
       color: '#ea580c',
     },
     {
-      title: 'İlan Akışı',
+      title: 'Akış',
       description: 'Aktif ilanları Reels / TikTok tarzı dikey bir akışta kaydırarak rastgele ve eğlenceli şekilde keşfedin.',
       icon: 'play-circle',
       route: '/ilan-akisi',

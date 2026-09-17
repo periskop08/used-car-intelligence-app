@@ -4,6 +4,7 @@ import { CreateListingDto, UpdateListingDto, CreateLeadDto } from './listing.dto
 import { ListingStatus, MediaModerationStatus, ListingPackageType, SubscriptionTier, PromotionLifecycleStatus, ListingPromotionType } from '@prisma/client';
 import { R2Service } from './r2.service';
 import { isValidCityAndDistrict, isApprovedVehicleColor, normalizeVehicleColor, sanitizeBodyPartArrays, VEHICLE_COLORS } from '@used-car-intelligence/shared';
+import { decodeFeedCursor } from './feed-cursor.util';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -768,8 +769,18 @@ CRITICAL SAFETY RULES:
     return favorites.map((f) => f.listing);
   }
 
-  async getListingFeed(limit: number, excludeIds?: string[], seed?: string) {
-    const activeSeed = seed || Math.random().toString(36).substring(2, 15);
+  async getListingFeed(
+    limit: number,
+    excludeIds?: string[],
+    seed?: string,
+    cursorToken?: string | null,
+    cityId?: string | null,
+  ) {
+    const cursor = decodeFeedCursor(cursorToken, cityId);
+    const activeSeed = cursor?.seed || seed || Math.random().toString(36).substring(2, 15);
+    const offset = cursor?.offset || 0;
+    const initialGlobalVehicleCount = cursor?.globalVehicleCount || 0;
+    const initialProviderPosition = cursor?.providerPosition || 0;
     
     // 1. Fetch Candidate Pool (Sadece Vitrin + Akış ve Hızlı Satış / Acil paketli ilanlar)
     const now = new Date();
@@ -931,14 +942,22 @@ CRITICAL SAFETY RULES:
       finalItems.push(pool.splice(foundIdx, 1)[0]);
     }
 
-    // Slice to limit
-    const items = finalItems.slice(0, limit);
-    const hasMore = finalItems.length > limit;
+    // Slice based on offset and limit
+    const totalCount = finalItems.length;
+    const items = finalItems.slice(offset, offset + limit);
+    const nextOffset = offset + items.length;
+    const hasMore = nextOffset < totalCount;
 
     return {
       items,
+      totalCount,
       hasMore,
+      seed: activeSeed,
       nextSeed: activeSeed,
+      offset,
+      nextOffset,
+      initialGlobalVehicleCount,
+      initialProviderPosition,
     };
   }
 

@@ -1,7 +1,7 @@
 import { Controller, Get, Patch, Post, Delete, Body, Query, Param, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto } from './user.dto';
+import { UpdateProfileDto, UpdatePasswordDto, UpdateNotificationsDto, CancelAccountDto, UpdateActiveCityDto } from './user.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser, UserPayload } from '../auth/get-user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -9,7 +9,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @ApiTags('Users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('users')
+@Controller(['users', 'auth'])
 export class UserController {
   constructor(private userService: UserService) {}
 
@@ -26,6 +26,15 @@ export class UserController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(user.id, dto);
+  }
+
+  @Patch(['me/active-city', 'active-city'])
+  @ApiOperation({ summary: 'Global Aktif Şehir Tercihini Güncelle' })
+  updateActiveCity(
+    @GetUser() user: UserPayload,
+    @Body() dto: UpdateActiveCityDto,
+  ) {
+    return this.userService.updateActiveCity(user.id, dto.cityId);
   }
 
   @Post('me/profile-photo')

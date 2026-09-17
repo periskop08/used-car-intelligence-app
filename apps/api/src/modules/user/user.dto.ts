@@ -62,6 +62,16 @@ export class UpdateNotificationsDto {
 
 export class CancelAccountDto {
   @IsString()
-  @IsNotEmpty({ message: 'İşlemi onaylamak için şifrenizi girmeniz gerekmidir.' })
+  @IsNotEmpty({ message: 'İşlemi onaylamak için şifrenizi girmeniz gereklidir.' })
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class UpdateActiveCityDto {
+  @IsOptional()
+  @IsString()
+  cityId?: string | null;
 }

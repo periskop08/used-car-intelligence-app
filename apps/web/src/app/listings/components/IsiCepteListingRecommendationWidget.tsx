@@ -21,6 +21,7 @@ import {
   Map,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
+import { useGlobalCity } from '@/context/GlobalCityContext';
 
 export interface IsiCepteShowcaseItem {
   id: string;
@@ -141,14 +142,17 @@ export default function IsiCepteListingRecommendationWidget({
   initialUserCity,
   className = '',
 }: IsiCepteListingRecommendationWidgetProps) {
+  const { activeCityId, activeCityName, setActiveCity } = useGlobalCity();
+
   // Mount state for SSR safe Portal rendering
   const [mounted, setMounted] = useState<boolean>(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // City state: prioritizes initialUserCity, then localStorage, or fallback empty (all cities)
+  // City state: prioritizes activeCityName from global context, then initialUserCity, then localStorage
   const [selectedCity, setSelectedCity] = useState<string>(() => {
+    if (activeCityName && activeCityName !== 'Tüm Türkiye') return activeCityName;
     if (initialUserCity && initialUserCity.trim() !== '') return initialUserCity.trim();
     if (typeof window !== 'undefined') {
       const storedCity = localStorage.getItem('userSelectedCity');
@@ -156,6 +160,15 @@ export default function IsiCepteListingRecommendationWidget({
     }
     return '';
   });
+
+  // Sync when global city changes
+  useEffect(() => {
+    if (activeCityName && activeCityName !== 'Tüm Türkiye') {
+      setSelectedCity(activeCityName);
+    } else if (activeCityId === null && !initialUserCity) {
+      setSelectedCity('');
+    }
+  }, [activeCityName, activeCityId, initialUserCity]);
 
   const [items, setItems] = useState<IsiCepteShowcaseItem[]>([]);
   const [showcaseItems, setShowcaseItems] = useState<IsiCepteShowcaseItem[]>([]);
@@ -248,6 +261,7 @@ export default function IsiCepteListingRecommendationWidget({
       localStorage.setItem('userSelectedCity', city);
     }
     setIsCitySelectorOpen(false);
+    setActiveCity(city || null);
   };
 
   const handleOpenDetail = (provider: IsiCepteShowcaseItem) => {

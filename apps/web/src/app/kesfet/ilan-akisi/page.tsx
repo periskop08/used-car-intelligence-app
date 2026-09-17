@@ -27,7 +27,10 @@ import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import {
   BODY_PART_LABELS,
   VehicleBodyPart,
+  IsiCepteProviderPostFeedItem,
 } from "@used-car-intelligence/shared";
+import { useGlobalCity } from "@/context/GlobalCityContext";
+import IsiCeptePostCard from "@/components/feed/IsiCeptePostCard";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://used-car-api-hzmu.onrender.com";
@@ -80,6 +83,19 @@ interface FeedItem {
   tramerAmount?: number;
 }
 
+export type MixedFeedItem =
+  | {
+      type: "VEHICLE_LISTING";
+      id: string;
+      data: FeedItem;
+    }
+  | {
+      type: "ISICEPTE_PROVIDER_POST";
+      id: string;
+      data: IsiCepteProviderPostFeedItem;
+    }
+  | (FeedItem & { type?: undefined });
+
 const FUEL_LABELS: Record<string, string> = {
   PETROL: "Benzin",
   DIESEL: "Dizel",
@@ -112,7 +128,8 @@ const formatTransmission = (trans?: string) => {
 };
 
 function FeedCardDeck() {
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const { activeCityId, activeCityName } = useGlobalCity();
+  const [items, setItems] = useState<MixedFeedItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"info" | "expertise">("info");
@@ -122,9 +139,11 @@ function FeedCardDeck() {
   const [isExpertiseModalOpen, setIsExpertiseModalOpen] = useState(false);
   const [seed, setSeed] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const isScrollingRef = useRef(false);
   const loadingMoreRef = useRef(false);
+  const activeCityRef = useRef<string | null>(activeCityId);
 
   // Mount logic: Check sessionStorage first to restore state on back navigation
   useEffect(() => {
@@ -153,8 +172,21 @@ function FeedCardDeck() {
     try {
       sessionStorage.setItem(STORAGE_KEY_SEED, initialSeed);
     } catch (_) {}
-    loadFeed(initialSeed, true);
+    loadFeed(initialSeed, true, null);
   }, []);
+
+  // React to global active city change: Reset feed and reload with fresh seed
+  useEffect(() => {
+    if (activeCityRef.current !== activeCityId) {
+      activeCityRef.current = activeCityId;
+      sessionStorage.removeItem(STORAGE_KEY_ITEMS);
+      sessionStorage.removeItem(STORAGE_KEY_INDEX);
+      const newSeed = Math.random().toString(36).substring(2, 15);
+      setSeed(newSeed);
+      setNextCursor(null);
+      loadFeed(newSeed, true, null);
+    }
+  }, [activeCityId]);
 
   // Persist currentIndex in sessionStorage on every step
   useEffect(() => {
@@ -179,7 +211,7 @@ function FeedCardDeck() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  const loadFeed = async (activeSeed: string, replace: boolean) => {
+  const loadFeed = async (activeSeed: string, replace: boolean, cursorParam?: string | null) => {
     if (loadingMoreRef.current) return;
     loadingMoreRef.current = true;
     if (replace) setLoading(true);
@@ -189,7 +221,18 @@ function FeedCardDeck() {
       const savedToken = localStorage.getItem("accessToken");
       if (savedToken) headers["Authorization"] = `Bearer ${savedToken}`;
 
-      const res = await fetch(`${API_BASE_URL}/listings/feed?limit=20&seed=${activeSeed}`, {
+      const targetCursor = cursorParam !== undefined ? cursorParam : (replace ? null : nextCursor);
+      const url = new URL(`${API_BASE_URL}/listings/feed`);
+      url.searchParams.set("limit", "20");
+      url.searchParams.set("seed", activeSeed);
+      if (activeCityId) {
+        url.searchParams.set("cityId", activeCityId);
+      }
+      if (targetCursor) {
+        url.searchParams.set("cursor", targetCursor);
+      }
+
+      const res = await fetch(url.toString(), {
         headers,
       });
 
@@ -198,7 +241,8 @@ function FeedCardDeck() {
       }
 
       const data = await res.json();
-      const rawList: FeedItem[] = data.items || [];
+      setNextCursor(data.nextCursor || null);
+      const rawList: any[] = data.items || [];
 
       if (rawList.length === 0 && replace) {
         // Fallback: Vitrin ve Acil ilanlarını getir
@@ -208,56 +252,74 @@ function FeedCardDeck() {
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           const fallbackItems = fallbackData.items || [];
-          const mappedFallback: FeedItem[] = fallbackItems.map((x: any) => ({
+          const mappedFallback: MixedFeedItem[] = fallbackItems.map((x: any) => ({
+            type: "VEHICLE_LISTING",
             id: x.id,
-            title: x.title,
-            price: Number(x.priceAmount),
-            currency: x.currency || "TRY",
-            listingDate: new Date(x.publishedAt || x.createdAt).toLocaleDateString("tr-TR"),
-            listingNo: x.listingNo || x.id,
-            description: x.description,
-            location: { city: x.city, district: x.district || "Merkez" },
-            seller: {
-              id: x.sellerId,
-              displayName: x.seller?.firstName ? `${x.seller.firstName} ${x.seller.lastName}` : "İlan Sahibi",
-              memberSince: "Temmuz 2026",
+            data: {
+              id: x.id,
+              title: x.title,
+              price: Number(x.priceAmount),
+              currency: x.currency || "TRY",
+              listingDate: new Date(x.publishedAt || x.createdAt).toLocaleDateString("tr-TR"),
+              listingNo: x.listingNo || x.id,
+              description: x.description,
+              location: { city: x.city, district: x.district || "Merkez" },
+              seller: {
+                id: x.sellerId,
+                displayName: x.seller?.firstName ? `${x.seller.firstName} ${x.seller.lastName}` : "İlan Sahibi",
+                memberSince: "Temmuz 2026",
+              },
+              vehicle: {
+                brand: x.vehicleVariant?.brand?.name || x.customBrand || "Otomobil",
+                modelFamily: x.vehicleVariant?.model?.name || x.customModel || "",
+                modelName: x.vehicleVariant?.model?.name || x.customModel || "",
+                year: x.modelYear,
+                fuelType: x.fuelType,
+                transmissionType: x.transmission,
+                mileage: x.kilometers,
+              },
+              photos: x.media?.map((m: any, idx: number) => ({ id: m.id || String(idx), url: m.url, order: idx })) || [],
+              breadcrumb: [
+                "Vasıta",
+                "Otomobil",
+                x.customBrand || x.vehicleVariant?.brand?.name || "Araç",
+                x.customModel || x.vehicleVariant?.model?.name || "",
+              ].filter(Boolean),
+              isFavorite: !!x.isFavorited,
+              isUrgent: !!x.isUrgent,
+              isShowcaseFeedActive: !!x.isShowcaseFeedActive,
+              localPaintedParts: (x.localPaintedParts as string[]) || [],
+              paintedParts: (x.paintedParts as string[]) || [],
+              changedParts: (x.changedParts as string[]) || [],
+              damageRecord: x.damageRecord || null,
+              tramerAmount: x.tramerAmount ? Number(x.tramerAmount) : 0,
             },
-            vehicle: {
-              brand: x.vehicleVariant?.brand?.name || x.customBrand || "Otomobil",
-              modelFamily: x.vehicleVariant?.model?.name || x.customModel || "",
-              modelName: x.vehicleVariant?.model?.name || x.customModel || "",
-              year: x.modelYear,
-              fuelType: x.fuelType,
-              transmissionType: x.transmission,
-              mileage: x.kilometers,
-            },
-            photos: x.media?.map((m: any, idx: number) => ({ id: m.id || String(idx), url: m.url, order: idx })) || [],
-            breadcrumb: [
-              "Vasıta",
-              "Otomobil",
-              x.customBrand || x.vehicleVariant?.brand?.name || "Araç",
-              x.customModel || x.vehicleVariant?.model?.name || "",
-            ].filter(Boolean),
-            isFavorite: !!x.isFavorited,
-            isUrgent: !!x.isUrgent,
-            isShowcaseFeedActive: !!x.isShowcaseFeedActive,
-            localPaintedParts: (x.localPaintedParts as string[]) || [],
-            paintedParts: (x.paintedParts as string[]) || [],
-            changedParts: (x.changedParts as string[]) || [],
-            damageRecord: x.damageRecord || null,
-            tramerAmount: x.tramerAmount ? Number(x.tramerAmount) : 0,
           }));
           setItems(mappedFallback);
           return;
         }
       }
 
-      const cleanList: FeedItem[] = rawList.map((it: any) => ({
-        ...it,
-        localPaintedParts: it.localPaintedParts || [],
-        paintedParts: it.paintedParts || [],
-        changedParts: it.changedParts || [],
-      }));
+      const cleanList: MixedFeedItem[] = rawList.map((it: any) => {
+        if (it.type === "ISICEPTE_PROVIDER_POST") {
+          return {
+            type: "ISICEPTE_PROVIDER_POST",
+            id: it.id,
+            data: it.data,
+          };
+        }
+        const vData = it.data || it;
+        return {
+          type: "VEHICLE_LISTING",
+          id: it.id || vData.id,
+          data: {
+            ...vData,
+            localPaintedParts: vData.localPaintedParts || [],
+            paintedParts: vData.paintedParts || [],
+            changedParts: vData.changedParts || [],
+          },
+        };
+      });
 
       if (replace) {
         setItems(cleanList);
@@ -265,40 +327,42 @@ function FeedCardDeck() {
         setActivePhotoIdx(0);
         const favMap: Record<string, boolean> = {};
         cleanList.forEach((it) => {
-          favMap[it.id] = it.isFavorite;
+          if (it.type === "VEHICLE_LISTING") {
+            favMap[it.data.id] = it.data.isFavorite;
+          }
         });
         setFavorites(favMap);
       } else {
         setItems((prev) => {
           const ids = new Set(prev.map((p) => p.id));
-          const newOnes = rawList.filter((it) => !ids.has(it.id));
+          const newOnes = cleanList.filter((it) => !ids.has(it.id));
           return [...prev, ...newOnes];
         });
       }
     } catch (err) {
-      console.error("İlan Akışı yüklenirken hata:", err);
+      console.error("Akış yüklenirken hata:", err);
     } finally {
       setLoading(false);
       loadingMoreRef.current = false;
     }
   };
 
-  // Sonraki İlan (Functional state update ile yarış koşullarını ve atlamaları engeller)
+  // Sonraki Paylaşım / İlan
   const handleNext = useCallback(() => {
     setCurrentIndex((prev) => {
       const next = prev + 1;
       if (next < items.length) {
         setActivePhotoIdx(0);
         setActiveTab("info");
-        // Sona 3 ilan kala arka planda yeni ilanlar ekle
-        if (next >= items.length - 3) {
-          loadFeed(seed, false);
+        // Sona 3 kart kala arka planda yeni sayfa ekle
+        if (next >= items.length - 3 && nextCursor) {
+          loadFeed(seed, false, nextCursor);
         }
         return next;
       }
       return prev;
     });
-  }, [items.length, seed]);
+  }, [items.length, seed, nextCursor]);
 
   // Önceki İlan (Kullanıcı geri bastığında her zaman tam olarak az önce geçtiği doğru kartı gösterir)
   const handlePrev = useCallback(() => {
@@ -374,14 +438,17 @@ function FeedCardDeck() {
   };
 
   const currentItem = items[currentIndex];
+  const isProviderPost = currentItem && currentItem.type === "ISICEPTE_PROVIDER_POST";
+  const vehicleItem: FeedItem | null = isProviderPost
+    ? null
+    : ((currentItem?.type === "VEHICLE_LISTING" ? currentItem.data : currentItem) as FeedItem | null);
 
-  // Guaranteed Live Expertise Synchronization:
-  // Fetches single listing details directly from the API to ensure 100% parity with the listing's own detail page!
+  // Guaranteed Live Expertise Synchronization for vehicle listings:
   useEffect(() => {
-    if (!currentItem?.id) return;
+    if (!vehicleItem?.id) return;
 
     let isCancelled = false;
-    fetch(`${API_BASE_URL}/listings/${currentItem.id}`)
+    fetch(`${API_BASE_URL}/listings/${vehicleItem.id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((detail) => {
         if (!isCancelled && detail) {
@@ -390,18 +457,33 @@ function FeedCardDeck() {
           const cParts = Array.isArray(detail.changedParts) ? detail.changedParts : [];
 
           setItems((prev) =>
-            prev.map((it) =>
-              it.id === currentItem.id
-                ? {
+            prev.map((it) => {
+              const targetId = it.type === "VEHICLE_LISTING" ? it.data.id : it.id;
+              if (targetId === vehicleItem.id) {
+                if (it.type === "VEHICLE_LISTING") {
+                  return {
                     ...it,
-                    localPaintedParts: lParts,
-                    paintedParts: pParts,
-                    changedParts: cParts,
-                    damageRecord: detail.damageRecord || null,
-                    tramerAmount: detail.tramerAmount ? Number(detail.tramerAmount) : 0,
-                  }
-                : it
-            )
+                    data: {
+                      ...it.data,
+                      localPaintedParts: lParts,
+                      paintedParts: pParts,
+                      changedParts: cParts,
+                      damageRecord: detail.damageRecord || null,
+                      tramerAmount: detail.tramerAmount ? Number(detail.tramerAmount) : 0,
+                    },
+                  };
+                }
+                return {
+                  ...it,
+                  localPaintedParts: lParts,
+                  paintedParts: pParts,
+                  changedParts: cParts,
+                  damageRecord: detail.damageRecord || null,
+                  tramerAmount: detail.tramerAmount ? Number(detail.tramerAmount) : 0,
+                };
+              }
+              return it;
+            })
           );
         }
       })
@@ -410,7 +492,7 @@ function FeedCardDeck() {
     return () => {
       isCancelled = true;
     };
-  }, [currentItem?.id]);
+  }, [vehicleItem?.id]);
 
   if (loading && items.length === 0) {
     return (
@@ -452,7 +534,7 @@ function FeedCardDeck() {
   }
 
   const currentPhotoUrl =
-    currentItem.photos[activePhotoIdx]?.url ||
+    vehicleItem?.photos?.[activePhotoIdx]?.url ||
     "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=800&q=80";
 
   return (
@@ -492,321 +574,332 @@ function FeedCardDeck() {
         </div>
 
         {/* ========================================================================= */}
-        {/* MERKEZ: İLAN KARTI (GÖRSEL 1 YAPISI, MOBİLDE AÇIK TEMA, SOL ÜSTTE MAVİ AYARLAR) */}
+        {/* MERKEZ: İLAN / GÖNDERİ KARTI */}
         {/* ========================================================================= */}
-        <div className="w-full max-w-[430px] sm:max-w-[450px] bg-white md:bg-[#0a1224] border border-slate-200/90 md:border-white/10 rounded-[26px] sm:rounded-[28px] p-3.5 sm:p-5 shadow-xl md:shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
-          {/* 1. Header Bar: Mobilde Mavi Ayarlar Butonu, Başlık solda/ortada, Paylaş & Kalp sağda */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 md:border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-full bg-[#2563eb] text-white flex items-center justify-center shadow-md shadow-blue-500/30 shrink-0 md:hidden">
-                <Settings className="w-4 h-4" />
-              </div>
-              <span className="text-base sm:text-lg hidden md:inline">📦</span>
-              <span className="text-xs sm:text-sm font-black text-slate-900 md:text-white tracking-widest uppercase">
-                İlan Akışı
-              </span>
-            </div>
-
-            {/* Right: Share & Favorite */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleShare(currentItem)}
-                className="w-9 h-9 rounded-full bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border border-slate-200 md:border-white/10 flex items-center justify-center text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white transition shadow-sm cursor-pointer"
-                title="Paylaş"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFavoriteToggle(currentItem.id)}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center transition shadow-sm cursor-pointer ${
-                  favorites[currentItem.id]
-                    ? "bg-red-50 md:bg-red-500/20 border-red-300 md:border-red-500/50 text-red-500"
-                    : "bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border-slate-200 md:border-white/10 text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white"
-                }`}
-                title="Favorilere Ekle"
-              >
-                <Heart
-                  className={`w-4 h-4 ${favorites[currentItem.id] ? "fill-red-500" : ""}`}
-                />
-              </button>
-            </div>
+        {isProviderPost ? (
+          <div className="w-full max-w-[430px] sm:max-w-[450px]">
+            <IsiCeptePostCard post={(currentItem as any).data} />
           </div>
-
-          {/* 2. Photo Section with Badges */}
-          <div className="mt-3.5 relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-slate-100 md:bg-slate-950 border border-slate-200 md:border-white/10 group flex items-center justify-center">
-            <img
-              src={currentPhotoUrl}
-              alt={currentItem.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-            />
-
-            {/* Top-Left Badges: Acil & Vitrin */}
-            {(currentItem.isUrgent || currentItem.isShowcaseFeedActive) && (
-              <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2">
-                {currentItem.isUrgent && (
-                  <UrgentListingBadge size="md" animated />
-                )}
-                {currentItem.isShowcaseFeedActive && (
-                  <ShowcaseBadge size="md" />
+        ) : vehicleItem ? (
+          <div className="w-full max-w-[430px] sm:max-w-[450px] bg-white md:bg-[#0a1224] border border-slate-200/90 md:border-white/10 rounded-[26px] sm:rounded-[28px] p-3.5 sm:p-5 shadow-xl md:shadow-2xl flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+            {/* 1. Header Bar: Mobilde Mavi Ayarlar Butonu, Başlık solda/ortada, Paylaş & Kalp sağda */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 md:border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full bg-[#2563eb] text-white flex items-center justify-center shadow-md shadow-blue-500/30 shrink-0 md:hidden">
+                  <Settings className="w-4 h-4" />
+                </div>
+                <span className="text-base sm:text-lg hidden md:inline">📦</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 md:text-white tracking-widest uppercase">
+                  Akış
+                </span>
+                {activeCityName && activeCityName !== "Tüm Türkiye" && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    📍 {activeCityName}
+                  </span>
                 )}
               </div>
-            )}
 
-            {/* Photo Counter */}
-            {currentItem.photos.length > 1 && (
-              <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-md border border-white/10">
-                {activePhotoIdx + 1} / {currentItem.photos.length}
-              </div>
-            )}
-
-            {/* Multi-Photo Navigation Arrows */}
-            {currentItem.photos.length > 1 && (
-              <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none">
+              {/* Right: Share & Favorite */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActivePhotoIdx((prev) => Math.max(0, prev - 1));
-                  }}
-                  className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                  onClick={() => handleShare(vehicleItem)}
+                  className="w-9 h-9 rounded-full bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border border-slate-200 md:border-white/10 flex items-center justify-center text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white transition shadow-sm cursor-pointer"
+                  title="Paylaş"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <Share2 className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActivePhotoIdx((prev) =>
-                      Math.min(currentItem.photos.length - 1, prev + 1)
-                    );
-                  }}
-                  className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                  onClick={() => handleFavoriteToggle(vehicleItem.id)}
+                  className={`w-9 h-9 rounded-full border flex items-center justify-center transition shadow-sm cursor-pointer ${
+                    favorites[vehicleItem.id]
+                      ? "bg-red-50 md:bg-red-500/20 border-red-300 md:border-red-500/50 text-red-500"
+                      : "bg-white md:bg-[#0c1527] hover:bg-slate-100 md:hover:bg-[#15223e] border-slate-200 md:border-white/10 text-slate-700 md:text-slate-300 hover:text-slate-900 md:hover:text-white"
+                  }`}
+                  title="Favorilere Ekle"
                 >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 3. Title & Seller Row */}
-          <div className="mt-3 space-y-1">
-            <h3 className="text-sm sm:text-base font-black text-slate-900 md:text-white uppercase tracking-wide truncate">
-              {currentItem.title}
-            </h3>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 md:text-slate-400 font-medium">
-              <span className="truncate max-w-[60%]">
-                👤 {currentItem.seller.displayName} ({currentItem.seller.memberSince})
-              </span>
-              <span className="truncate max-w-[40%] text-right text-slate-600 md:text-slate-300">
-                📍 {currentItem.location.city}, {currentItem.location.district || "Merkez"}
-              </span>
-            </div>
-          </div>
-
-          {/* 4. Breadcrumb Chip */}
-          <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-[#eff6ff] md:bg-blue-500/10 border border-[#dbeafe] md:border-blue-500/25 text-[#2563eb] md:text-blue-400 text-[10.5px] font-bold truncate">
-            {currentItem.breadcrumb && currentItem.breadcrumb.length > 0
-              ? currentItem.breadcrumb.join(" > ")
-              : `Vasıta > Otomobil > ${currentItem.vehicle.brand} > ${currentItem.vehicle.modelFamily}`}
-          </div>
-
-          {/* 5. Segmented Tabs (Özellikler & Ekspertiz Durumu) */}
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("info")}
-              className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === "info"
-                  ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
-                  : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
-              }`}
-            >
-              <span>📋</span>
-              <span>Özellikler</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("expertise")}
-              className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === "expertise"
-                  ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
-                  : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
-              }`}
-            >
-              <span>🛡️</span>
-              <span>Ekspertiz Durumu</span>
-            </button>
-          </div>
-
-          {/* 6. Tab Content Table (Sabit Boyutlandırılmış / Kart Fiziki Yapısını Değiştirmez) */}
-          <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 relative h-[116px] min-h-[116px] flex flex-col justify-center overflow-hidden">
-            {/* Right Floating Scroll Guide Indicator Pill */}
-            <div
-              onClick={handleNext}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-white md:bg-[#0c162b] border border-slate-300 md:border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-600 md:text-orange-400 shadow-md cursor-pointer hover:bg-orange-50 md:hover:bg-orange-500/20 transition z-20"
-              title="Sonraki İlana Geç"
-            >
-              <ChevronUp className="w-2.5 h-2.5 text-slate-400" />
-              <ArrowUpDown className="w-3 h-3 text-orange-500" />
-              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
-            </div>
-
-            {activeTab === "info" ? (
-              <div className="space-y-1.5 pr-7 text-xs">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
-                  <span className="text-slate-500 md:text-slate-400 font-medium">Fiyat</span>
-                  <span className="font-black text-orange-600 md:text-orange-400 text-sm">
-                    {currentItem.price.toLocaleString("tr-TR")} {currentItem.currency || "TL"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
-                  <span className="text-slate-500 md:text-slate-400 font-medium">İlan No</span>
-                  <span className="font-mono font-bold text-slate-900 md:text-slate-200">
-                    {currentItem.listingNo}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
-                  <span className="text-slate-500 md:text-slate-400 font-medium">Yıl / KM</span>
-                  <span className="font-semibold text-slate-900 md:text-slate-200">
-                    {currentItem.vehicle.year} • {currentItem.vehicle.mileage.toLocaleString("tr-TR")} km
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500 md:text-slate-400 font-medium">Yakıt / Vites</span>
-                  <span className="font-semibold text-slate-900 md:text-slate-200 truncate max-w-[170px]">
-                    {formatFuel(currentItem.vehicle.fuelType)} • {formatTransmission(currentItem.vehicle.transmissionType)}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 pr-7 h-full">
-                {/* Sol: Ölçeklendirilmiş SVG Araç Şeması (Tıklanınca Tam Ekran Açar) */}
-                <div
-                  onClick={() => setIsExpertiseModalOpen(true)}
-                  className="w-[50px] h-[92px] shrink-0 bg-slate-50 md:bg-slate-950/70 rounded-xl border border-slate-200 md:border-white/10 p-1 flex items-center justify-center cursor-pointer hover:border-orange-500/50 hover:bg-slate-100 md:hover:bg-slate-900/80 transition group"
-                  title="Detaylı Ekspertiz Şemasını Büyüt"
-                >
-                  <CompactVehicleBodySvg
-                    localPaintedParts={currentItem.localPaintedParts}
-                    paintedParts={currentItem.paintedParts}
-                    changedParts={currentItem.changedParts}
-                    className="w-full h-full group-hover:scale-105 transition"
+                  <Heart
+                    className={`w-4 h-4 ${favorites[vehicleItem.id] ? "fill-red-500" : ""}`}
                   />
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Photo Section with Badges */}
+            <div className="mt-3.5 relative w-full h-48 sm:h-52 rounded-2xl overflow-hidden bg-slate-100 md:bg-slate-950 border border-slate-200 md:border-white/10 group flex items-center justify-center">
+              <img
+                src={currentPhotoUrl}
+                alt={vehicleItem.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+              />
+
+              {/* Top-Left Badges: Acil & Vitrin */}
+              {(vehicleItem.isUrgent || vehicleItem.isShowcaseFeedActive) && (
+                <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2">
+                  {vehicleItem.isUrgent && (
+                    <UrgentListingBadge size="md" animated />
+                  )}
+                  {vehicleItem.isShowcaseFeedActive && (
+                    <ShowcaseBadge size="md" />
+                  )}
                 </div>
+              )}
 
-                {/* Sağ: Ekspertiz Özeti ve Buton */}
-                <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1 text-xs">
-                  {(() => {
-                    const localList = currentItem.localPaintedParts || [];
-                    const paintedList = currentItem.paintedParts || [];
-                    const changedList = currentItem.changedParts || [];
-                    const hasDamages =
-                      localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+              {/* Photo Counter */}
+              {vehicleItem.photos.length > 1 && (
+                <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-md border border-white/10">
+                  {activePhotoIdx + 1} / {vehicleItem.photos.length}
+                </div>
+              )}
 
-                    if (!hasDamages) {
-                      return (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-emerald-600 md:text-emerald-400 font-black text-xs">
-                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                            <span>Hatasız & Orijinal</span>
+              {/* Multi-Photo Navigation Arrows */}
+              {vehicleItem.photos.length > 1 && (
+                <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivePhotoIdx((prev) => Math.max(0, prev - 1));
+                    }}
+                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivePhotoIdx((prev) =>
+                        Math.min(vehicleItem.photos.length - 1, prev + 1)
+                      );
+                    }}
+                    className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition pointer-events-auto border border-white/10"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Title & Seller Row */}
+            <div className="mt-3 space-y-1">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 md:text-white uppercase tracking-wide truncate">
+                {vehicleItem.title}
+              </h3>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 md:text-slate-400 font-medium">
+                <span className="truncate max-w-[60%]">
+                  👤 {vehicleItem.seller.displayName} ({vehicleItem.seller.memberSince})
+                </span>
+                <span className="truncate max-w-[40%] text-right text-slate-600 md:text-slate-300">
+                  📍 {vehicleItem.location.city}, {vehicleItem.location.district || "Merkez"}
+                </span>
+              </div>
+            </div>
+
+            {/* 4. Breadcrumb Chip */}
+            <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-[#eff6ff] md:bg-blue-500/10 border border-[#dbeafe] md:border-blue-500/25 text-[#2563eb] md:text-blue-400 text-[10.5px] font-bold truncate">
+              {vehicleItem.breadcrumb && vehicleItem.breadcrumb.length > 0
+                ? vehicleItem.breadcrumb.join(" > ")
+                : `Vasıta > Otomobil > ${vehicleItem.vehicle.brand} > ${vehicleItem.vehicle.modelFamily}`}
+            </div>
+
+            {/* 5. Segmented Tabs (Özellikler & Ekspertiz Durumu) */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("info")}
+                className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeTab === "info"
+                    ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
+                    : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
+                }`}
+              >
+                <span>📋</span>
+                <span>Özellikler</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("expertise")}
+                className={`py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeTab === "expertise"
+                    ? "bg-white md:bg-orange-500/10 border-orange-500 text-orange-600 md:text-orange-400 shadow-sm"
+                    : "bg-[#f8fafc] md:bg-white/[0.02] border-slate-200 md:border-white/10 text-slate-500 md:text-slate-400 hover:text-slate-900 md:hover:text-white"
+                }`}
+              >
+                <span>🛡️</span>
+                <span>Ekspertiz Durumu</span>
+              </button>
+            </div>
+
+            {/* 6. Tab Content Table (Sabit Boyutlandırılmış / Kart Fiziki Yapısını Değiştirmez) */}
+            <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 relative h-[116px] min-h-[116px] flex flex-col justify-center overflow-hidden">
+              {/* Right Floating Scroll Guide Indicator Pill */}
+              <div
+                onClick={handleNext}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-white md:bg-[#0c162b] border border-slate-300 md:border-orange-500/40 rounded-xl px-1 py-1.5 flex flex-col items-center justify-center gap-0.5 text-orange-600 md:text-orange-400 shadow-md cursor-pointer hover:bg-orange-50 md:hover:bg-orange-500/20 transition z-20"
+                title="Sonraki Karta Geç"
+              >
+                <ChevronUp className="w-2.5 h-2.5 text-slate-400" />
+                <ArrowUpDown className="w-3 h-3 text-orange-500" />
+                <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+              </div>
+
+              {activeTab === "info" ? (
+                <div className="space-y-1.5 pr-7 text-xs">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                    <span className="text-slate-500 md:text-slate-400 font-medium">Fiyat</span>
+                    <span className="font-black text-orange-600 md:text-orange-400 text-sm">
+                      {vehicleItem.price.toLocaleString("tr-TR")} {vehicleItem.currency || "TL"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                    <span className="text-slate-500 md:text-slate-400 font-medium">İlan No</span>
+                    <span className="font-mono font-bold text-slate-900 md:text-slate-200">
+                      {vehicleItem.listingNo}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 md:border-white/[0.04]">
+                    <span className="text-slate-500 md:text-slate-400 font-medium">Yıl / KM</span>
+                    <span className="font-semibold text-slate-900 md:text-slate-200">
+                      {vehicleItem.vehicle.year} • {vehicleItem.vehicle.mileage.toLocaleString("tr-TR")} km
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 md:text-slate-400 font-medium">Yakıt / Vites</span>
+                    <span className="font-semibold text-slate-900 md:text-slate-200 truncate max-w-[170px]">
+                      {formatFuel(vehicleItem.vehicle.fuelType)} • {formatTransmission(vehicleItem.vehicle.transmissionType)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 pr-7 h-full">
+                  {/* Sol: Ölçeklendirilmiş SVG Araç Şeması (Tıklanınca Tam Ekran Açar) */}
+                  <div
+                    onClick={() => setIsExpertiseModalOpen(true)}
+                    className="w-[50px] h-[92px] shrink-0 bg-slate-50 md:bg-slate-950/70 rounded-xl border border-slate-200 md:border-white/10 p-1 flex items-center justify-center cursor-pointer hover:border-orange-500/50 hover:bg-slate-100 md:hover:bg-slate-900/80 transition group"
+                    title="Detaylı Ekspertiz Şemasını Büyüt"
+                  >
+                    <CompactVehicleBodySvg
+                      localPaintedParts={vehicleItem.localPaintedParts}
+                      paintedParts={vehicleItem.paintedParts}
+                      changedParts={vehicleItem.changedParts}
+                      className="w-full h-full group-hover:scale-105 transition"
+                    />
+                  </div>
+
+                  {/* Sağ: Ekspertiz Özeti ve Buton */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1 text-xs">
+                    {(() => {
+                      const localList = vehicleItem.localPaintedParts || [];
+                      const paintedList = vehicleItem.paintedParts || [];
+                      const changedList = vehicleItem.changedParts || [];
+                      const hasDamages =
+                        localList.length > 0 || paintedList.length > 0 || changedList.length > 0;
+
+                      if (!hasDamages) {
+                        return (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-emerald-600 md:text-emerald-400 font-black text-xs">
+                              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                              <span>Hatasız & Orijinal</span>
+                            </div>
+                            <p className="text-[10.5px] text-slate-500 md:text-slate-400 leading-tight">
+                              Boya ve değişen parça bulunmamaktadır.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setIsExpertiseModalOpen(true)}
+                              className="text-[10px] text-emerald-600 md:text-emerald-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                            >
+                              <span>Detaylı Şemayı Aç ➔</span>
+                            </button>
                           </div>
-                          <p className="text-[10.5px] text-slate-500 md:text-slate-400 leading-tight">
-                            Boya ve değişen parça bulunmamaktadır.
-                          </p>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-0.5">
+                          {localList.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-amber-600 md:text-orange-400 font-bold truncate">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 shadow-sm" />
+                              <span className="truncate">
+                                Lokal ({localList.length}): {localList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                              </span>
+                            </div>
+                          )}
+                          {paintedList.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-blue-600 md:text-blue-400 font-bold truncate">
+                              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 shadow-sm" />
+                              <span className="truncate">
+                                Boyalı ({paintedList.length}): {paintedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                              </span>
+                            </div>
+                          )}
+                          {changedList.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[10.5px] text-red-600 md:text-red-400 font-bold truncate">
+                              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 shadow-sm" />
+                              <span className="truncate">
+                                Değişen ({changedList.length}): {changedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
+                              </span>
+                            </div>
+                          )}
                           <button
                             type="button"
                             onClick={() => setIsExpertiseModalOpen(true)}
-                            className="text-[10px] text-emerald-600 md:text-emerald-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
+                            className="text-[10px] text-orange-600 md:text-orange-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
                           >
-                            <span>Detaylı Şemayı Aç ➔</span>
+                            <span>Detaylı Şemayı Gör ➔</span>
                           </button>
                         </div>
                       );
-                    }
-
-                    return (
-                      <div className="space-y-0.5">
-                        {localList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-amber-600 md:text-orange-400 font-bold truncate">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 shadow-sm" />
-                            <span className="truncate">
-                              Lokal ({localList.length}): {localList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
-                            </span>
-                          </div>
-                        )}
-                        {paintedList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-blue-600 md:text-blue-400 font-bold truncate">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 shadow-sm" />
-                            <span className="truncate">
-                              Boyalı ({paintedList.length}): {paintedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
-                            </span>
-                          </div>
-                        )}
-                        {changedList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-[10.5px] text-red-600 md:text-red-400 font-bold truncate">
-                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 shadow-sm" />
-                            <span className="truncate">
-                              Değişen ({changedList.length}): {changedList.map((p) => BODY_PART_LABELS[p as VehicleBodyPart] || p).join(", ")}
-                            </span>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setIsExpertiseModalOpen(true)}
-                          className="text-[10px] text-orange-600 md:text-orange-400 hover:underline font-black flex items-center gap-1 cursor-pointer pt-0.5"
-                        >
-                          <span>Detaylı Şemayı Gör ➔</span>
-                        </button>
-                      </div>
-                    );
-                  })()}
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* 7. Dedicated Description Card */}
-          <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 md:text-white flex items-center gap-1">
-                <span>📝</span>
-                <span>İlan Açıklaması</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsDescModalOpen(true)}
-                className="text-[11px] font-bold text-orange-600 md:text-orange-400 hover:underline transition cursor-pointer"
-              >
-                Tümünü Gör ➔
-              </button>
+              )}
             </div>
-            <p className="text-[11px] text-slate-600 md:text-slate-400 line-clamp-3 leading-relaxed">
-              {currentItem.description
-                ? currentItem.description.replace(/\n+/g, " ").trim()
-                : "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
-            </p>
-          </div>
 
-          {/* 8. Bottom Action Buttons */}
-          <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
-            <Link
-              href={`/listings/${currentItem.listingNo || currentItem.id}`}
-              className="py-2.5 px-3 rounded-xl bg-white md:bg-[#0e182e] hover:bg-slate-50 md:hover:bg-[#162547] border-2 border-slate-200 md:border-white/15 text-slate-900 md:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <FileText className="w-4 h-4 text-slate-600 md:text-slate-300" />
-              <span>İlana Git</span>
-            </Link>
-            <Link
-              href={`/dashboard/messages?listingId=${currentItem.id}`}
-              className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/30 cursor-pointer"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Mesaj Gönder</span>
-            </Link>
+            {/* 7. Dedicated Description Card */}
+            <div className="mt-2.5 p-3 rounded-2xl bg-white md:bg-[#060d1b] border border-slate-200 md:border-white/5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 md:text-white flex items-center gap-1">
+                  <span>📝</span>
+                  <span>İlan Açıklaması</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDescModalOpen(true)}
+                  className="text-[11px] font-bold text-orange-600 md:text-orange-400 hover:underline transition cursor-pointer"
+                >
+                  Tümünü Gör ➔
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 md:text-slate-400 line-clamp-3 leading-relaxed">
+                {vehicleItem.description
+                  ? vehicleItem.description.replace(/\n+/g, " ").trim()
+                  : "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
+              </p>
+            </div>
+
+            {/* 8. Bottom Action Buttons */}
+            <div className="mt-3.5 grid grid-cols-2 gap-2.5 pt-1">
+              <Link
+                href={`/listings/${vehicleItem.listingNo || vehicleItem.id}`}
+                className="py-2.5 px-3 rounded-xl bg-white md:bg-[#0e182e] hover:bg-slate-50 md:hover:bg-[#162547] border-2 border-slate-200 md:border-white/15 text-slate-900 md:text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-slate-600 md:text-slate-300" />
+                <span>İlana Git</span>
+              </Link>
+              <Link
+                href={`/dashboard/messages?listingId=${vehicleItem.id}`}
+                className="py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/30 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Mesaj Gönder</span>
+              </Link>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* SAĞ YÖN OKU: SONRAKİ İLAN (Desktop Only) */}
         <div className="hidden md:flex flex-col items-center gap-2 shrink-0">
@@ -873,7 +966,7 @@ function FeedCardDeck() {
               </button>
             </div>
             <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar text-xs text-slate-700 md:text-slate-300 leading-relaxed whitespace-pre-line">
-              {currentItem.description ||
+              {vehicleItem?.description ||
                 "Bu araç TorqueScout yapay zeka analizinden geçmiştir. Ekspertiz, hasar ve kronik sorun kayıtları denetlenmiştir."}
             </div>
           </div>
@@ -881,7 +974,7 @@ function FeedCardDeck() {
       )}
 
       {/* Full Expertise / Vehicle Condition Modal (Görsel 1 ile Birebir Aynı Şema) */}
-      {isExpertiseModalOpen && (
+      {isExpertiseModalOpen && vehicleItem && (
         <div
           onClick={() => setIsExpertiseModalOpen(false)}
           className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
@@ -898,7 +991,7 @@ function FeedCardDeck() {
                     Ekspertiz ve Boya/Değişen Durumu
                   </h4>
                   <p className="text-xs text-slate-500 md:text-slate-400 font-medium">
-                    {currentItem.title}
+                    {vehicleItem.title}
                   </p>
                 </div>
               </div>
@@ -913,9 +1006,9 @@ function FeedCardDeck() {
 
             <VehicleBodyConditionMap
               mode="readOnly"
-              localPaintedParts={currentItem.localPaintedParts || []}
-              paintedParts={currentItem.paintedParts || []}
-              changedParts={currentItem.changedParts || []}
+              localPaintedParts={vehicleItem.localPaintedParts || []}
+              paintedParts={vehicleItem.paintedParts || []}
+              changedParts={vehicleItem.changedParts || []}
               showTitle={true}
             />
 

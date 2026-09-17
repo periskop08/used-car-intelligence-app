@@ -1,6 +1,7 @@
 import "./globals.css";
 import React from "react";
 import Header from "../components/Header";
+import { GlobalCityProvider } from "../context/GlobalCityContext";
 
 export const metadata = {
   title: "Used Car Intelligence App",
@@ -22,17 +23,19 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col">
-        {/* Client Header component */}
-        <Header />
+        <GlobalCityProvider>
+          {/* Client Header component */}
+          <Header />
 
-        {/* Core Layout Main View */}
-        <main className="flex-1 flex flex-col">{children}</main>
+          {/* Core Layout Main View */}
+          <main className="flex-1 flex flex-col">{children}</main>
 
-        {/* Footer */}
-        <footer className="border-t border-white/5 bg-[#020617]/40 py-8 text-center text-xs text-slate-600">
-          <p>© 2026 TorqueScout. Tüm hakları saklıdır.</p>
-          <p className="mt-2 text-slate-700">AI analizi doğruluğu teknik veriler ve onaylanmış sorunlara dayanmaktadır.</p>
-        </footer>
+          {/* Footer */}
+          <footer className="border-t border-white/5 bg-[#020617]/40 py-8 text-center text-xs text-slate-600">
+            <p>© 2026 TorqueScout. Tüm hakları saklıdır.</p>
+            <p className="mt-2 text-slate-700">AI analizi doğruluğu teknik veriler ve onaylanmış sorunlara dayanmaktadır.</p>
+          </footer>
+        </GlobalCityProvider>
       </body>
     </html>
   );
