@@ -230,8 +230,56 @@ export function getStandardTurkishDefectExplanation(context: DefectSanitizationC
 }
 
 /**
+ * Detects whether a text segment contains volatile currency/pricing/repair-cost data.
+ * Second-hand vehicle repair prices in Turkey fluctuate rapidly; showing stale or inaccurate
+ * monetary amounts (TL, EUR, USD) creates legal and informational risk.
+ */
+export function containsPriceOrCostData(text?: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+
+  // Specific currency numbers or symbols: e.g. "15.000 TL", "20 bin TL", "50000 TL", "€1200", "$500", "2000 euro", "15000 lira"
+  const currencyPattern = /\b\d+[\.,\d]*\s*(?:tl|türk\s*lirası|lira|bin\s*tl|usd|eur|euro|dolar|gbp|pound)\b/i;
+  const symbolPattern = /(?:[\$€£₺]\s*\d+[\.,\d]*|\d+[\.,\d]*\s*[\$€£₺])/;
+
+  // Cost/expense statements tied to monetary numbers: e.g. "maliyeti 25000", "masrafı 30000 civarında", "40.000 civarı masraf"
+  const costNumberPattern = /\b(?:maliyet|masraf|fiyat|ücret|fatura|onarımı|parça\s*bedeli)\b[^.!?\n]*\b\d+[\.,\d]*/i;
+  const numberCostPattern = /\b\d+[\.,\d]*[^.!?\n]*(?:maliyet|masraf|fiyat|ücret|fatura|tutar)/i;
+
+  return (
+    currencyPattern.test(lower) ||
+    symbolPattern.test(text) ||
+    costNumberPattern.test(lower) ||
+    numberCostPattern.test(lower)
+  );
+}
+
+/**
+ * Strips any sentences containing repair prices, currency amounts, or cost claims from the text.
+ * If all sentences are removed or the remaining text is insufficient, returns null so an authoritative
+ * technical fallback can be used.
+ */
+export function stripPriceAndCostInformation(text?: string): string | null {
+  if (!text) return null;
+
+  if (!containsPriceOrCostData(text)) {
+    return text.trim();
+  }
+
+  // Split text into individual sentences preserving punctuation
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const cleanSentences = sentences.filter((s) => !containsPriceOrCostData(s));
+
+  const joined = cleanSentences.join(' ').trim();
+  if (joined.length < 25) {
+    return null;
+  }
+  return joined;
+}
+
+/**
  * Cleans, completes, and formats a Turkish defect explanation so that no English text,
- * no truncated ellipsis (...), and no social media jargon ever reaches the user.
+ * no truncated ellipsis (...), no social media jargon, and no volatile pricing data ever reaches the user.
  */
 export function sanitizeTurkishDefectDescription(
   rawReason: string | undefined | null,
@@ -253,12 +301,21 @@ export function sanitizeTurkishDefectDescription(
     return getStandardTurkishDefectExplanation(context);
   }
 
-  // 2. Reject English or foreign recall/news texts
+  // 2. Strict No-Price/Cost Policy: Strip any volatile repair costs, currencies, or price figures
+  if (containsPriceOrCostData(text)) {
+    const stripped = stripPriceAndCostInformation(text);
+    if (!stripped) {
+      return getStandardTurkishDefectExplanation(context);
+    }
+    text = stripped;
+  }
+
+  // 3. Reject English or foreign recall/news texts
   if (isEnglishOrForeignText(text)) {
     return getStandardTurkishDefectExplanation(context);
   }
 
-  // 3. Handle truncation, ellipses (... or …), and cut-off sentences
+  // 4. Handle truncation, ellipses (... or …), and cut-off sentences
   if (text.includes('...') || text.includes('…')) {
     // Look for complete sentence(s) before the first ellipsis
     const preEllipsis = text.split(/\.{3}|…/)[0].trim();
@@ -318,6 +375,13 @@ export function sanitizeTurkishInspectionInstruction(
 
   let text = rawInstruction.trim();
   if (!text) return undefined;
+
+  // Clean price/cost references if any
+  if (containsPriceOrCostData(text)) {
+    const stripped = stripPriceAndCostInformation(text);
+    if (!stripped) return undefined;
+    text = stripped;
+  }
 
   // Clean duplicate typo "kavrama kavrama noktası"
   text = text.replace(/kavrama kavrama noktas[ıi]/gi, 'kavrama temas noktası');

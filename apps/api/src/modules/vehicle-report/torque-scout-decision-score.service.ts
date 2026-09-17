@@ -238,7 +238,7 @@ export class TorqueScoutDecisionScoreService {
     candidates.forEach((cr) => {
       cr.impactClass = this.resolveImpactClass(cr);
       cr.evidenceLevel = this.resolveEvidenceLevel(cr);
-      cr.basePenalty = this.getBasePenaltyForImpact(cr.impactClass);
+      cr.basePenalty = this.getBasePenaltyForImpact(cr.impactClass, cr);
       cr.evidenceMultiplier = this.getEvidenceMultiplier(cr.evidenceLevel);
       cr.netDeduction = Math.round(cr.basePenalty * cr.evidenceMultiplier);
     });
@@ -357,15 +357,21 @@ export class TorqueScoutDecisionScoreService {
       return 'SERIOUS';
     }
 
-    // 4. MODERATE (-7): Early wear, thermostat/water pump seepage, sensor, auxiliary fault
+    // 4. MODERATE (-7): Early wear, thermostat/water pump seepage, cooling leak, sensor, auxiliary fault
     if (
+      cr.domain === 'THERMAL_COOLING' ||
       (cr.severityCategory as string) === 'FUNCTIONAL_MODERATE' ||
+      text.includes('soğutma') ||
+      text.includes('coolant') ||
+      text.includes('hararet') ||
       text.includes('sızıntı') ||
+      text.includes('kaçak') ||
       text.includes('leak') ||
       text.includes('seepage') ||
       text.includes('termostat') ||
       text.includes('thermostat') ||
       text.includes('su pompası') ||
+      text.includes('devirdaim') ||
       text.includes('water pump') ||
       text.includes('terleme') ||
       text.includes('sensor') ||

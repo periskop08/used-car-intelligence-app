@@ -14,7 +14,10 @@ import {
   Car, 
   RefreshCcw, 
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  Search,
+  Wrench
 } from "lucide-react";
 
 interface VehicleReportShellProps {
@@ -250,7 +253,40 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             || (firstDefect?.normalizedFailureMode === 'WET_BELT' || /wet[\s_-]?belt/i.test(firstDefect?.title || '') ? 'Triger kayış genişliği ve karter/yağ pompası süzgecinde kauçuk partikülü kontrolü yapılmalıdır.' : null);
 
           const deductedRisks = (decisionScore as any)?.deductedRisks || [];
-          const totalRiskPenalty = (decisionScore as any)?.totalRiskPenalty ?? decisionScore.modelDecisionRisk ?? 0;
+          
+          // Calculate synchronized deduction per risk and overall total
+          const computedDeductionsSum = deductedRisks.reduce((acc: number, dRisk: any) => {
+            const rawCandidateTitle = resolveFailureModeLabel(dRisk) || dRisk.title || '';
+            const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${rawCandidateTitle}`.toUpperCase();
+            const deduction =
+              norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
+                ? 10
+                : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
+                ? 8
+                : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
+                ? 5
+                : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
+                ? dRisk.netDeduction
+                : typeof dRisk.deduction === "number" && dRisk.deduction > 0
+                ? dRisk.deduction
+                : typeof dRisk.penalty === "number" && dRisk.penalty > 0
+                ? dRisk.penalty
+                : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
+                ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
+                : 0;
+            return acc + deduction;
+          }, 0);
+
+          const totalRiskPenalty = computedDeductionsSum > 0 
+            ? computedDeductionsSum 
+            : ((decisionScore as any)?.totalRiskPenalty ?? decisionScore.modelDecisionRisk ?? 0);
+          
+          const displayedScore = isInsufficient 
+            ? "—" 
+            : computedDeductionsSum > 0 
+            ? Math.max(0, 100 - totalRiskPenalty)
+            : decisionScore.score;
+
           const hasDeductedRisks = Boolean(totalRiskPenalty > 0 && deductedRisks.length > 0);
 
           const hasUnverifiedComplaints = Boolean(
@@ -260,14 +296,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           );
 
           return (
-            <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 shadow-xl space-y-5">
+            <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 shadow-xl space-y-6">
               {/* Header Row: Score + State + Scope */}
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-white/10">
                 <div className="flex items-center gap-4">
-                  <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center ${stateCfg.color}`}>
+                  <div className={`px-4 py-3 rounded-2xl border flex flex-col items-center justify-center min-w-[120px] ${stateCfg.color}`}>
                     <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">Alınabilirlik Skoru</span>
                     <span className="text-3xl font-black mt-0.5">
-                      {isInsufficient ? "—" : `${decisionScore.score} / 100`}
+                      {isInsufficient ? "—" : `${displayedScore} / 100`}
                     </span>
                   </div>
                   <div>
@@ -296,107 +332,163 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                 </div>
               </div>
 
-              {/* Risk Breakdown */}
-              <div className={`grid grid-cols-1 ${hasConditionData ? 'sm:grid-cols-2' : ''} gap-3 text-xs`}>
-                <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl">
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Neden Puan Kırıldı?</span>
+              {/* Risk Breakdown Section */}
+              <div className={`grid grid-cols-1 ${hasConditionData ? 'lg:grid-cols-3' : ''} gap-4`}>
+                <div className={`${hasConditionData ? 'lg:col-span-2' : 'w-full'} bg-slate-950/70 border border-white/10 p-5 rounded-2xl space-y-4`}>
+                  {/* Deduction Section Summary Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Neden Puan Kırıldı?
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Üretici bültenleri, parça ömrü ve doğrulanmış arıza geçmişine dayalı teknik risk kesintileri:
+                      </p>
+                    </div>
+
+                    {hasDeductedRisks && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-bold shrink-0 self-start sm:self-center shadow-sm">
+                        <span className="text-sm font-black">-{totalRiskPenalty} Puan</span>
+                        <span className="text-[10px] font-semibold text-rose-300/80 uppercase tracking-wide">(Teknik Kesinti)</span>
+                      </div>
+                    )}
+                  </div>
                   
                   {hasDeductedRisks ? (
-                    <div className="mt-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-rose-400">
-                          -{totalRiskPenalty} Puan
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          (Doğrulanmış Teknik Risk Kesintisi)
-                        </span>
-                      </div>
-                      <div className="space-y-2 pt-0.5">
-                        {deductedRisks.map((dRisk: any, idx: number) => {
-                          const rawCandidateTitle = resolveFailureModeLabel(dRisk) || dRisk.title || 'Doğrulanmış Teknik Kusur';
-                          let dTitle = sanitizeTurkishDefectTitle(rawCandidateTitle, {
-                            domain: dRisk.domain,
-                            failureMode: dRisk.normalizedFailureMode,
-                          });
-                          // Remove any existing points badge from title if present
-                          dTitle = dTitle.replace(/\s*\(-?\d+\s*Puan\)/gi, '').trim();
+                    <div className="space-y-3 pt-1">
+                      {deductedRisks.map((dRisk: any, idx: number) => {
+                        const rawCandidateTitle = resolveFailureModeLabel(dRisk) || dRisk.title || 'Doğrulanmış Teknik Kusur';
+                        let dTitle = sanitizeTurkishDefectTitle(rawCandidateTitle, {
+                          domain: dRisk.domain,
+                          failureMode: dRisk.normalizedFailureMode,
+                        });
+                        // Remove any existing points badge from title if present
+                        dTitle = dTitle.replace(/\s*\(-?\d+\s*Puan\)/gi, '').trim();
 
-                          const dReason = sanitizeTurkishDefectDescription(dRisk.reason || dRisk.description, {
-                            domain: dRisk.domain,
-                            failureMode: dRisk.normalizedFailureMode,
-                            title: dTitle,
-                          });
+                        const dReason = sanitizeTurkishDefectDescription(dRisk.reason || dRisk.description, {
+                          domain: dRisk.domain,
+                          failureMode: dRisk.normalizedFailureMode,
+                          title: dTitle,
+                        });
 
-                          const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
+                        const norm = `${dRisk.domain || ''} ${dRisk.normalizedFailureMode || ''} ${dTitle}`.toUpperCase();
 
-                          let deduction =
-                            norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
-                              ? 10
-                              : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
-                              ? 8
-                              : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
-                              ? 5
-                              : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
-                              ? dRisk.netDeduction
-                              : typeof dRisk.deduction === "number" && dRisk.deduction > 0
-                              ? dRisk.deduction
-                              : typeof dRisk.penalty === "number" && dRisk.penalty > 0
-                              ? dRisk.penalty
-                              : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
-                              ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
-                              : null;
+                        let deduction =
+                          norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ')
+                            ? 10
+                            : norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('MECHATRONIC')
+                            ? 8
+                            : norm.includes('COOLANT') || norm.includes('WATER') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM')
+                            ? 5
+                            : typeof dRisk.netDeduction === "number" && dRisk.netDeduction > 0
+                            ? dRisk.netDeduction
+                            : typeof dRisk.deduction === "number" && dRisk.deduction > 0
+                            ? dRisk.deduction
+                            : typeof dRisk.penalty === "number" && dRisk.penalty > 0
+                            ? dRisk.penalty
+                            : dRisk.basePenalty && typeof dRisk.evidenceMultiplier === "number"
+                            ? Math.round(dRisk.basePenalty * dRisk.evidenceMultiplier)
+                            : null;
 
-                          const cleanInspection = sanitizeTurkishInspectionInstruction(dRisk.inspectionInstruction);
+                        const cleanInspection = sanitizeTurkishInspectionInstruction(dRisk.inspectionInstruction);
 
-                          return (
-                            <div key={dRisk.id || idx} className="space-y-1 pb-1.5 border-b border-white/5 last:border-b-0 last:pb-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-slate-400 font-bold">•</span>
-                                <span className="text-xs font-bold text-slate-200">
-                                  {dTitle}
-                                </span>
-                                {deduction && deduction > 0 ? (
-                                  <span className="inline-flex items-center text-rose-400 font-extrabold bg-rose-500/15 border border-rose-500/25 px-1.5 py-0.5 rounded text-[11px] leading-none ml-1">
-                                    -{deduction} Puan
+                        const domainKey = (dRisk.domain || '').toUpperCase();
+                        const domainLabel = DOMAIN_LABELS_TR[domainKey] || (
+                          norm.includes('CAMSHAFT') || norm.includes('KAM MİLİ') ? 'Motor Mekaniği' :
+                          norm.includes('CLUTCH') || norm.includes('KAVRAMA') || norm.includes('ŞANZIMAN') ? 'Şanzıman & Aktarma' :
+                          norm.includes('COOLANT') || norm.includes('TERMOSTAT') || norm.includes('DEVIRDAIM') ? 'Termal & Soğutma' :
+                          'Mekanik Sistem'
+                        );
+
+                        const getDomainBadgeColor = (dom: string) => {
+                          if (dom.includes('ENGINE') || dom.includes('MOTOR')) return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                          if (dom.includes('TRANS') || dom.includes('ŞANZIMAN')) return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+                          if (dom.includes('COOLING') || dom.includes('SOĞUTMA') || dom.includes('THERMAL')) return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+                          if (dom.includes('EMISSION') || dom.includes('EGZOZ')) return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+                          if (dom.includes('CHASSIS') || dom.includes('BRAKE') || dom.includes('FREN')) return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                          return 'bg-slate-800 text-slate-300 border-slate-700';
+                        };
+
+                        return (
+                          <div
+                            key={dRisk.id || idx}
+                            className="bg-slate-900/60 hover:bg-slate-900/80 border border-white/10 hover:border-white/15 rounded-xl p-4 space-y-2.5 transition-all shadow-sm"
+                          >
+                            {/* Card Header: Category Badge + Title + Deduction Pill */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border tracking-wide uppercase ${getDomainBadgeColor(domainKey || domainLabel)}`}>
+                                    {domainLabel}
                                   </span>
-                                ) : null}
+                                </div>
+                                <h4 className="text-sm font-bold text-slate-100 tracking-tight leading-snug">
+                                  {dTitle}
+                                </h4>
                               </div>
-                              {dReason && (
-                                <p className="text-xs text-slate-300 leading-relaxed break-words">
-                                  {dReason}
-                                </p>
-                              )}
-                              {cleanInspection && (
-                                <p className="text-[11px] text-amber-300/90 leading-relaxed flex items-start gap-1 pt-0.5">
-                                  <span className="font-semibold shrink-0">🔍 Satın Almadan Önce:</span>
-                                  <span>{cleanInspection}</span>
-                                </p>
-                              )}
+
+                              {deduction && deduction > 0 ? (
+                                <div className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg text-xs font-black tracking-tight shadow-sm">
+                                  <span>-{deduction}</span>
+                                  <span className="text-[10px] font-semibold opacity-90">Puan</span>
+                                </div>
+                              ) : null}
                             </div>
-                          );
-                        })}
-                      </div>
+
+                            {/* Technical Explanation */}
+                            {dReason && (
+                              <p className="text-xs text-slate-300 leading-relaxed break-words font-normal">
+                                {dReason}
+                              </p>
+                            )}
+
+                            {/* Pre-purchase Inspection Box */}
+                            {cleanInspection && (
+                              <div className="bg-amber-950/20 border border-amber-500/25 rounded-lg p-2.5 flex items-start gap-2.5 text-xs text-amber-200/90 shadow-inner mt-1">
+                                <Search className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5 flex-1">
+                                  <span className="font-bold text-amber-300 text-[11px] block tracking-wide uppercase">
+                                    Satın Almadan Önce Ekspertiz Kontrolü:
+                                  </span>
+                                  <span className="leading-relaxed text-amber-100/90 font-normal">
+                                    {cleanInspection}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="mt-1">
-                      <span className="text-sm font-bold text-emerald-400 block">
-                        Puan Düşüren Risk Yok
-                      </span>
-                      <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
-                        Bu varyantta puan düşüren doğrulanmış teknik risk tespit edilmedi.
-                      </p>
+                    <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="text-sm font-bold text-emerald-400 block">
+                          Puan Düşüren Risk Yok
+                        </span>
+                        <p className="text-xs text-slate-300 mt-0.5 leading-relaxed break-words">
+                          Bu araç varyantında puan düşüren doğrulanmış teknik kronik risk tespit edilmedi.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {hasConditionData && (
-                  <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Araç Kondisyon Etkisi</span>
-                    <span className="text-sm font-bold text-rose-400 mt-0.5 block">
-                      {`-${decisionScore.conditionRiskUsed} Puan`}
+                  <div className="bg-slate-950/70 border border-white/10 p-5 rounded-2xl space-y-3 self-start">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                      Araç Kondisyon Etkisi
                     </span>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-bold">
+                      <span className="text-sm font-black">-{decisionScore.conditionRiskUsed} Puan</span>
+                      <span className="text-[10px] font-semibold text-rose-300/80 uppercase tracking-wide">Kondisyon</span>
+                    </div>
                     <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
-                      {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı'}
+                      {decisionScore.explanation?.condition || 'Kilometre ve hasar kaydı verilerine dayalı kondisyon kesintisi.'}
                     </p>
                   </div>
                 )}

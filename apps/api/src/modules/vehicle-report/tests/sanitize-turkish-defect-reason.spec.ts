@@ -97,6 +97,26 @@ describe('sanitizeTurkishDefectReason', () => {
       expect(ustaNotu).not.toContain("DM'den");
       expect(ustaNotu).toContain('devirdaim su pompası ve termostat gövdesinde sızdırmazlık');
     });
+
+    it('strictly strips volatile pricing and repair cost data (TL, EUR, USD, etc.)', () => {
+      const withPrice =
+        'Kavrama balatasında aşınma görülebilmektedir. Yetkili serviste onarım maliyeti 45.000 TL civarındadır.';
+      const cleaned = sanitizeTurkishDefectDescription(withPrice, {
+        domain: 'POWERTRAIN_TRANS',
+        failureMode: 'DUAL_CLUTCH',
+      });
+      expect(cleaned).not.toContain('45.000 TL');
+      expect(cleaned).not.toContain('maliyet');
+      expect(cleaned).toBe('Kavrama balatasında aşınma görülebilmektedir.');
+
+      const onlyPrice = 'Parça değişimi ve işçilik bedeli 25 bin TL tutmaktadır.';
+      const fallbackCleaned = sanitizeTurkishDefectDescription(onlyPrice, {
+        domain: 'POWERTRAIN_TRANS',
+        failureMode: 'DUAL_CLUTCH',
+      });
+      expect(fallbackCleaned).not.toContain('25 bin TL');
+      expect(fallbackCleaned).toContain('çift kavramalı otomatik şanzıman');
+    });
   });
 
   describe('sanitizeTurkishDefectTitle', () => {
