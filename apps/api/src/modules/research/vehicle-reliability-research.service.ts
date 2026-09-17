@@ -1075,7 +1075,7 @@ export class VehicleReliabilityResearchService {
 
     // Class D: Established Technical Automotive Publications & Specialist Outlets
     const isTechnicalPress =
-      /\b(?:pmmonline|autocar|caranddriver|edmunds|autobild|motor1|auto-motor-und-sport|autoexpress|largus|caradisiac|autoplus|automobile-magazine|parkers|carbuyer|wardsauto|automotive-fleet|fleetnews|sekizsilindir|otohaber|ototeknikveri|carexpert|drive\.com\.au)\b/i.test(rawDomain);
+      /\b(?:pmmonline|autocar|caranddriver|edmunds|autobild|motor1|auto-motor-und-sport|autoexpress|largus|caradisiac|autoplus|automobile-magazine|parkers|carbuyer|wardsauto|automotive-fleet|fleetnews|sekizsilindir|otohaber|ototeknikveri|carexpert|drive\.com\.au|andcetin)\b/i.test(rawDomain);
 
     // Class E: Technical Service Bulletin or Recall URL patterns from credible web publishers
     const isTechnicalBulletinUrl =
