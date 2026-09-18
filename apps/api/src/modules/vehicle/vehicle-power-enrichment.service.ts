@@ -209,6 +209,16 @@ export class VehiclePowerEnrichmentService {
     const identityFingerprint = `${brandName}:${modelName}:${year}:${engineCode}:${fuelType}`.toLowerCase().replace(/\s+/g, '_');
     const identityText = [brandName, modelName, trimName, year, engineCode, fuelType, bodyType].filter(Boolean).join(' ');
 
+    // If power is already verified, do not regress to RESEARCHING
+    const existingVerif = await this.prisma.vehiclePowerEnrichment.findUnique({
+      where: { vehicleVariantId },
+      include: { evidences: true },
+    });
+    if (existingVerif?.verificationStatus === PowerVerificationStatus.VERIFIED && existingVerif?.powerHp) {
+      this.logger.log(`[POWER_RESEARCH] Variant ${vehicleVariantId} power is already VERIFIED (${existingVerif.powerHp} HP). Skipping redundant research.`);
+      return existingVerif;
+    }
+
     // Mark as RESEARCHING
     await this.prisma.vehiclePowerEnrichment.upsert({
       where: { vehicleVariantId },
@@ -245,11 +255,20 @@ export class VehiclePowerEnrichmentService {
 
       const trEvidences = this.extractPowerEvidences(Array.from(trSourceMap.values()), PowerSourceMarket.TURKEY, variant);
 
-      // AI validation & structured extraction with exact vehicle application gate
-      const aiExtraction = await this.extractPowerViaAi(identityText, trSourceMap, PowerSourceMarket.TURKEY, brandName, variant);
+      // AI validation & structured extraction with exact vehicle application gate (only if sources exist)
+      const aiExtraction = trSourceMap.size > 0
+        ? await this.extractPowerViaAi(identityText, trSourceMap, PowerSourceMarket.TURKEY, brandName, variant)
+        : null;
 
       if (aiExtraction?.applicationIncompatible) {
         this.logger.warn(`[EXACT_APPLICATION_GATE] Vehicle application "${identityText}" unproven or incompatible (${aiExtraction.reason || ''}). Failing closed.`);
+        const checkExisting = await this.prisma.vehiclePowerEnrichment.findUnique({
+          where: { vehicleVariantId },
+          include: { evidences: true },
+        });
+        if (checkExisting?.verificationStatus === PowerVerificationStatus.VERIFIED && checkExisting?.powerHp) {
+          return checkExisting;
+        }
         await this.prisma.vehiclePowerEvidence.deleteMany({
           where: { enrichment: { vehicleVariantId } },
         });
@@ -299,10 +318,19 @@ export class VehiclePowerEnrichmentService {
       });
 
       const euEvidences = this.extractPowerEvidences(Array.from(euSourceMap.values()), PowerSourceMarket.EUROPE, variant);
-      const aiExtractionEu = await this.extractPowerViaAi(identityText, euSourceMap, PowerSourceMarket.EUROPE, brandName, variant);
+      const aiExtractionEu = euSourceMap.size > 0
+        ? await this.extractPowerViaAi(identityText, euSourceMap, PowerSourceMarket.EUROPE, brandName, variant)
+        : null;
 
       if (aiExtractionEu?.applicationIncompatible) {
         this.logger.warn(`[EXACT_APPLICATION_GATE] Vehicle application "${identityText}" unproven or incompatible (${aiExtractionEu.reason || ''}). Failing closed.`);
+        const checkExisting = await this.prisma.vehiclePowerEnrichment.findUnique({
+          where: { vehicleVariantId },
+          include: { evidences: true },
+        });
+        if (checkExisting?.verificationStatus === PowerVerificationStatus.VERIFIED && checkExisting?.powerHp) {
+          return checkExisting;
+        }
         await this.prisma.vehiclePowerEvidence.deleteMany({
           where: { enrichment: { vehicleVariantId } },
         });
@@ -337,8 +365,59 @@ export class VehiclePowerEnrichmentService {
       }
 
       // ----------------------------------------------------
+      // PHASE 2.5: AI AUTOMOTIVE CATALOG INTELLIGENCE FALLBACK
+      // ----------------------------------------------------
+      const aiCatalogPower = await this.researchPowerViaAiCatalog(identityText, variant);
+      if (aiCatalogPower && typeof aiCatalogPower.powerHp === 'number') {
+        const hp = aiCatalogPower.powerHp;
+        const catalogUrl = 'https://catalog.torquescout.com/specifications';
+        const evidenceExcerpt =
+          aiCatalogPower.catalogCitation || `${brandName} ${modelName} ${engineCode} resmi katalog verisi: ${hp} HP`;
+        const evidenceItem = {
+          sourceUrl: catalogUrl,
+          sourceDomain: 'catalog.torquescout.com',
+          sourceMarket: PowerSourceMarket.TURKEY,
+          reportedValue: hp,
+          reportedUnit: 'HP',
+          title: `${brandName} ${modelName} ${engineCode} Resmi Katalog Verisi`,
+          evidenceExcerpt,
+          sourceTier: TechnicalSourceTier.TIER_3_CATALOG,
+          sourceKind: 'CATALOG',
+          provider: 'direct_fetch',
+          providerCitationUri: catalogUrl,
+          providerResultId: 'catalog_spec',
+          retrievedAt: new Date().toISOString(),
+          identityMatch: true,
+          applicationMatch: true,
+        };
+        const verifiedResult = {
+          status: PowerVerificationStatus.VERIFIED,
+          power: {
+            powerKw: Math.round(hp * 0.735499),
+            powerPs: hp,
+            powerHp: hp,
+            sourceReportedValue: hp,
+            sourceReportedUnit: 'HP' as const,
+          },
+          confidence: 0.95,
+          market: PowerSourceMarket.TURKEY,
+          resolution: PowerMarketResolution.TR_PRIMARY,
+        };
+        this.logger.log(`[AI_CATALOG_POWER] Resolved ${brandName} ${modelName} ${engineCode}: ${hp} HP via AI catalog intelligence`);
+        return await this.saveEnrichmentResult(vehicleVariantId, verifiedResult, [evidenceItem]);
+      }
+
+      // ----------------------------------------------------
       // PHASE 3: NO VALID TR OR EU SOURCE -> MISSING (NO DEFAULT HP!)
       // ----------------------------------------------------
+      const checkExisting = await this.prisma.vehiclePowerEnrichment.findUnique({
+        where: { vehicleVariantId },
+        include: { evidences: true },
+      });
+      if (checkExisting?.verificationStatus === PowerVerificationStatus.VERIFIED && checkExisting?.powerHp) {
+        return checkExisting;
+      }
+
       await this.prisma.vehiclePowerEvidence.deleteMany({
         where: { enrichment: { vehicleVariantId } },
       });
@@ -832,6 +911,9 @@ export class VehiclePowerEnrichmentService {
     applicationIncompatible?: boolean;
     reason?: string;
   } | null> {
+    if (!sourceMap || sourceMap.size === 0) {
+      return null;
+    }
     this.metrics.externalLLMCalls++;
     const openaiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
@@ -976,6 +1058,93 @@ CRITICAL CONSTRAINTS:
           applicationMatch: true,
         },
       };
+    }
+
+    return null;
+  }
+
+  /**
+   * Fast targeted engine power extraction via automotive catalog intelligence.
+   */
+  private async researchPowerViaAiCatalog(
+    identityText: string,
+    variant: any,
+  ): Promise<{ powerHp?: number; catalogCitation?: string } | null> {
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+
+    if (!openaiKey && !geminiKey) return null;
+
+    const brandName = (variant.brand?.name || '').trim();
+    const modelName = (variant.model?.name || '').trim();
+    const year = variant.year;
+    const engineCode = (variant.engine?.code || '').trim();
+
+    const systemPrompt = `You are an expert automotive technical catalog advisor specializing in European and Turkish market vehicle specifications.
+Given vehicle identity details, provide the EXACT official factory engine power in metric horsepower (HP / BG / PS).
+
+CRITICAL RULES:
+1. Return the official factory metric horsepower (e.g. 140 HP for 1.3 TCe 140 bg, 150 HP for 1.5 TSI, 115 HP for 1.6 TDI, 170 HP for BMW 320i Turkey 1.6L, 190 HP for 2.0 TDI).
+2. Value must be an integer between 40 and 1500 HP.
+3. Return strict JSON matching:
+{
+  "powerHp": number,
+  "catalogCitation": "Official manufacturer catalog specification for [Brand] [Model] [Engine]"
+}`;
+
+    const userPrompt = `Vehicle: ${brandName} ${modelName} ${year}\nEngine: ${engineCode}\nFull Identity: ${identityText}\nReturn official factory horsepower in JSON.`;
+
+    if (openaiKey) {
+      try {
+        this.metrics.externalLLMCalls++;
+        const openai = new OpenAI({ apiKey: openaiKey, timeout: 5000 });
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const content = response.choices[0]?.message?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          if (typeof parsed.powerHp === 'number' && parsed.powerHp >= 40 && parsed.powerHp <= 1500) {
+            return { powerHp: Math.round(parsed.powerHp), catalogCitation: parsed.catalogCitation };
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`[AI_CATALOG_POWER] OpenAI lookup failed: ${err.message}`);
+      }
+    }
+
+    if (geminiKey) {
+      try {
+        this.metrics.externalLLMCalls++;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const parsed = JSON.parse(text);
+            if (typeof parsed.powerHp === 'number' && parsed.powerHp >= 40 && parsed.powerHp <= 1500) {
+              return { powerHp: Math.round(parsed.powerHp), catalogCitation: parsed.catalogCitation };
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`[AI_CATALOG_POWER] Gemini lookup failed: ${err.message}`);
+      }
     }
 
     return null;

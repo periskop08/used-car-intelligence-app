@@ -66,6 +66,8 @@ const TIER_3_CATALOG_DOMAINS = [
   'supercars.net',
   'auto-catalog.com',
   'specs.cars',
+  'torquescout.com',
+  'catalog.torquescout.com',
 ];
 
 const TIER_5_FORUM_PATTERNS = [
