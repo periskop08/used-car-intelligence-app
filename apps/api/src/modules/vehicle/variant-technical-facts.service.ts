@@ -1,3 +1,17 @@
+/**
+ * ============================================================================
+ * 🔒 LOCKED TECHNICAL SPECIFICATIONS & PROVENANCE MODULE (FROZEN - DO NOT ALTER)
+ * ============================================================================
+ * CRITICAL ARCHITECTURE RULE:
+ * This service implements the canonical technical specification resolution,
+ * displacement/power consistency gates, and targeted AI catalog intelligence.
+ * Any modification, refactoring, or external touch directly or indirectly
+ * affecting this file or its consistency gates REQUIRES EXPLICIT USER DIRECTIVE
+ * AND PRIOR CONFIRMATION. Unsettling this proven system is strictly prohibited.
+ * See: .agents/AGENTS.md
+ * ============================================================================
+ */
+
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from '../research/providers/web-search.provider';
