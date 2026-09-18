@@ -307,7 +307,7 @@ export default function IsiCepteListingRecommendationWidget({
 
   return (
     <div
-      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans h-[590px] max-h-[590px] ${className}`}
+      className={`glass p-4 rounded-2xl border border-orange-500/30 bg-gradient-to-b from-orange-950/20 via-[#0b0f19] to-[#0b0f19] flex flex-col justify-between gap-3 shadow-xl relative overflow-hidden font-sans w-full max-w-[320px] mx-auto lg:mx-0 h-[590px] max-h-[590px] ${className}`}
     >
       <span className="absolute -top-10 -right-10 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></span>
 

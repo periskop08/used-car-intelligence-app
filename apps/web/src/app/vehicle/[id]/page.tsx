@@ -1125,7 +1125,7 @@ export default function VehicleDetail() {
           <SafeSection title="İş Cepte Önerileri">
             <IsiCepteListingRecommendationWidget
               vehicleBrand={vehicle?.brand || "Bu Araç"}
-              className="w-full h-[590px] max-h-[590px]"
+              className="w-full max-w-[320px] mx-auto lg:mx-0"
             />
           </SafeSection>
 

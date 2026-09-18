@@ -747,7 +747,7 @@ export default function ListingDetail() {
             vehicleBrand={listing.brand || vehicle?.brand?.name || "Bu Araç"}
             initialUserCity={listing.city}
             listingId={listing.id}
-            className="w-full h-[590px] max-h-[590px]"
+            className="w-full max-w-[320px] mx-auto lg:mx-0"
           />
         </div>
 
