@@ -25,7 +25,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "engineCode": "Spesifik Kod (Doğrulandıysa) veya Aile Adı",
     "engineDisplacementCc": 1598,
     "enginePowerHp": 120,
-    "powerUnit": "HP | PS | kW",
+    "powerUnit": "HP | kW",
     "engineTorqueNm": 250,
     "torqueUnit": "Nm",
     "transmissionFamily": "DSG / ZF 8HP / EDC vb.",
@@ -180,8 +180,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 7. CÜMLE TAMAMLAMA: Tüm paragrafları NOKTA (.) ile biten %100 TAM CÜMLELERLE tamamla. Asla metni yarım bırakma!
 8. Yalnızca geçerli JSON üret.
 9. HİBRİT VE e-CVT MİMARİSİ VE GÜÇ/TORK KORUMASI:
-   - 'technicalSpecifications' JSON alanlarındaki 'enginePowerHp', 'engineTorqueNm' vb. sayısal alanlara KESİNLİKLE metin/semantik etiket GÖMÜLEMEZ. Bu alanlar her zaman saf sayı (Number) olmalıdır. Güç birimi 'powerUnit' ('HP' | 'PS' | 'kW') alanında saklanır.
-   - Doğrulanmış güç değerini ve birimini kaynakta geçtiği orijinal haliyle koru (örn. kaynak 122 PS ise 'enginePowerHp': 122 ve 'powerUnit': 'PS'; kaynak 90 kW ise 'enginePowerHp': 90 ve 'powerUnit': 'kW'; DB'de 120 HP ise 120 ve 'powerUnit': 'HP'). Sessizce birim dönüştürme yapma.
+   - 'technicalSpecifications' JSON alanlarındaki 'enginePowerHp', 'engineTorqueNm' vb. sayısal alanlara KESİNLİKLE metin/semantik etiket GÖMÜLEMEZ. Bu alanlar her zaman saf sayı (Number) olmalıdır. Güç birimi 'powerUnit' ('HP' | 'kW') alanında saklanır. KESİNLİKLE 'PS' birimi KULLANILAMAZ.
+   - TÜRKİYE PAZARI GÜÇ BİRİMİ STANDARDI: Raporun hiçbir yerinde (açıklamalar, başlıklar, detaylı analiz paragrafları, teknik özellikler vb.) 'PS' terimi KULLANILAMAZ! Türkiye otomotiv pazarında beygir gücü daima 'HP' (Beygir Gücü) olarak adlandırılır. Metinlerde ve açıklamalarda '125 PS' yerine daima '125 HP' yazılmalıdır. Dış kaynak veya katalogda 'PS' (Alman DIN normu) geçse dahi metinde ve teknik alanda daima 'HP' olarak yaz; KESİNLİKLE 'PS' yazma.
    - Doğrulanmış içten yanmalı motor torkunu kaynakta geçtiği sayısal haliyle koru. Doğrulanmış elektrik motoru torku güvenilir kaynakta varsa ayrı belirt; güvenilir kanıtta yoksa tork uydurma ve ASLA benzinli ile elektrik torkunu toplayarak kombine hibrit tork hesaplama.
    - Toyota / Lexus e-CVT gibi planet dişli güç bölüştürücü (power-split) transaks sistemlerinde kesinlikle geleneksel kademeli şanzıman terimleri ("vites geçişleri", "vites vuruntusu/kaçırması", "kavrama balatası aşınması", "mekatronik arızası") KULLANILAMAZ. Bunun yerine sürekli kademesiz güç aktarımı, benzin-elektrik motor geçiş pürüzsüzlüğü, hibrit transaks planet dişli grubu ve invertör/elektrik motoru sağlığı dili kullanılmalıdır.
 10. OPSİYONEL SİSTEM VE SCR / ADBLUE KANIT KORUMASI (OPTIONAL-SYSTEM EVIDENCE GUARD):
@@ -209,11 +209,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
 
     const rawHpVal = identity.enginePowerHp || perf.enginePowerHp;
-    const powerUnit = identity.powerUnit || perf.powerUnit || 'HP';
     const powerSemantic = identity.powerSemantic || perf.powerSemantic;
     const powerSource = identity.powerSource || perf.powerSource;
     const hpText = rawHpVal 
-      ? `${rawHpVal} ${powerUnit}${powerSemantic === 'TOTAL_HYBRID_SYSTEM_POWER' ? ' (Doğrulanmış Toplam Hibrit Sistem Gücü)' : ''}`
+      ? `${rawHpVal} HP${powerSemantic === 'TOTAL_HYBRID_SYSTEM_POWER' ? ' (Doğrulanmış Toplam Hibrit Sistem Gücü)' : ''}`
       : 'Gerçek Fabrika Verisiyle Tamamla';
 
     const rawTorqueVal = identity.engineTorqueNm || perf.engineTorqueNm;
@@ -280,9 +279,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
    - 🔴 Kesik kule / şasi geometrisi bozuk / SRS/airbag sisteminin manipüle edildiğine dair bulgu: Kesin vazgeçme.
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
-10. MOTOR GÜCÜ VE TORK DOĞRULUK KURALI:
-    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) veya doğrulanmadıysa null gir. Güç birimini 'powerUnit' ('HP' | 'PS' | 'kW') alanında belirt.
-    - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} ${powerUnit}` : 'Verilmedi'}), teknik özelliklerde ve metinlerde aynen bu değeri kullan.
+10. MOTOR GÜCÜ VE TORK DOĞRULUK KURALI (KESİNLİKLE 'HP' KULLAN, 'PS' YASAK):
+    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) veya doğrulanmadıysa null gir. Güç birimini 'powerUnit' ('HP' | 'kW') alanında belirt.
+    - KESİNLİKLE 'PS' BİRİMİ VEYA TERİMİ KULLANMA! Türkiye otomotiv pazarında güç birimi her zaman 'HP' (Beygir Gücü) olarak adlandırılır. Açıklamalarda, analiz paragraflarında, başlıklarda ve teknik kartlarda '125 PS' yerine DAİMA '125 HP' yaz.
+    - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} HP` : 'Verilmedi'}), teknik özelliklerde ve metinlerde 'HP' birimiyle aynen bu değeri kullan.
     - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
@@ -404,7 +404,7 @@ ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilte
 ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
 1. Pazar ve Nesil Geçerliliği: Türkiye pazarında resmi distribütör ile satıldı mı? Kasa nesil kodu (örn. G20, B8, W205) ve makyaj/facelift durumu nedir?
 2. Motor Kimliği: Motor ailesi (örn. EA288, B48), spesifik motor kodu (örn. CRKB, B48B16), gerçek motor hacmi (cc - Elektrikli araçta null/undefined).
-3. Güç ve Tork: Resmi motor gücü (HP/PS) ve maksimum tork (Nm).
+3. Güç ve Tork: Resmi motor gücü (HP) ve maksimum tork (Nm).
 4. Şanzıman Kimliği: Şanzıman ailesi (örn. DSG, EDC, ZF 8HP), spesifik şanzıman kodu (örn. DQ200, 7G-DCT) ve kavrama tipi (Kuru Çift Kavrama, Islak Çift Kavrama, Tork Konvertörlü, CVT, Manuel).
 5. Aktarma ve Vites: İleri vites sayısı ve çekiş sistemi (FWD, RWD, AWD / Quattro / xDrive / 4MATIC).
 6. Triger Sistemi: Eksantrik tahrik tipi (Kayış veya Zincir).

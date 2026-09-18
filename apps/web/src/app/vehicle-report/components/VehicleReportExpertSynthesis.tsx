@@ -5,7 +5,8 @@ import {
   ExpertDecisionSynthesis, 
   ReportSupportingFact, 
   safeString,
-  formatVehicleAssessmentParagraphs
+  formatVehicleAssessmentParagraphs,
+  replacePsWithHp
 } from "@used-car-intelligence/shared";
 import { 
   Sparkles, 
@@ -24,7 +25,7 @@ import {
 
 const cleanRangeText = (text?: string): string => {
   if (!text) return "";
-  return text
+  return replacePsWithHp(text)
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)yla\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "$1 kapasitesine sahiptir")
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)\s+ve\s+yaklaşık\s+\d+\s*km\s*menzil,\s*sık\s+mola\s+ihtiyacını\s+azaltır/gi, "$1 kapasitesi sunar")
     .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "")
@@ -135,7 +136,7 @@ export default function VehicleReportExpertSynthesis({
             {renderSourceBadge(synthesis.vehicleCharacter.supportingFactIds)}
           </div>
 
-          <h4 className="text-base font-bold text-orange-400">{synthesis.vehicleCharacter.headline}</h4>
+          <h4 className="text-base font-bold text-orange-400">{replacePsWithHp(synthesis.vehicleCharacter.headline)}</h4>
           <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
             {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
               <p key={idx} className="leading-relaxed">
@@ -177,10 +178,10 @@ export default function VehicleReportExpertSynthesis({
             {toArray(synthesis.strongestReasonsToChoose).map((item, idx) => (
               <div key={idx} className="p-3.5 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-emerald-300">{item.title}</h4>
+                  <h4 className="text-xs font-bold text-emerald-300">{replacePsWithHp(item.title)}</h4>
                   {renderSourceBadge(item.supportingFactIds)}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{item.explanation}</p>
+                <p className="text-xs text-slate-300 leading-relaxed">{cleanRangeText(item.explanation)}</p>
               </div>
             ))}
           </div>
@@ -197,10 +198,10 @@ export default function VehicleReportExpertSynthesis({
             {toArray(synthesis.compromisesAndLimitations).map((item, idx) => (
               <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-amber-300">{item.title}</h4>
+                  <h4 className="text-xs font-bold text-amber-300">{replacePsWithHp(item.title)}</h4>
                   {renderSourceBadge(item.supportingFactIds)}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{item.explanation}</p>
+                <p className="text-xs text-slate-300 leading-relaxed">{cleanRangeText(item.explanation)}</p>
               </div>
             ))}
           </div>
@@ -220,10 +221,10 @@ export default function VehicleReportExpertSynthesis({
             {toArray(synthesis.suitableFor).map((prof, idx) => (
               <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">{prof.profile}</span>
+                  <span className="text-xs font-bold text-slate-200">{replacePsWithHp(prof.profile)}</span>
                   {renderSourceBadge(prof.supportingFactIds)}
                 </div>
-                <p className="text-xs text-slate-400">{prof.explanation}</p>
+                <p className="text-xs text-slate-400">{cleanRangeText(prof.explanation)}</p>
               </div>
             ))}
           </div>
@@ -240,10 +241,10 @@ export default function VehicleReportExpertSynthesis({
             {toArray(synthesis.notSuitableFor).map((prof, idx) => (
               <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">{prof.profile}</span>
+                  <span className="text-xs font-bold text-slate-200">{replacePsWithHp(prof.profile)}</span>
                   {renderSourceBadge(prof.supportingFactIds)}
                 </div>
-                <p className="text-xs text-slate-400">{prof.explanation}</p>
+                <p className="text-xs text-slate-400">{cleanRangeText(prof.explanation)}</p>
               </div>
             ))}
           </div>
@@ -337,13 +338,13 @@ export default function VehicleReportExpertSynthesis({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                     <ChevronRight className="w-3.5 h-3.5 text-emerald-400" />
-                    {cond.condition}
+                    {replacePsWithHp(cond.condition)}
                   </span>
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
                     {cond.priority}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 ml-5">{cond.reason}</p>
+                <p className="text-xs text-slate-300 ml-5">{cleanRangeText(cond.reason)}</p>
               </div>
             ))}
           </div>
@@ -362,13 +363,13 @@ export default function VehicleReportExpertSynthesis({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
                     <ChevronRight className="w-3.5 h-3.5 text-rose-400" />
-                    {cond.condition}
+                    {replacePsWithHp(cond.condition)}
                   </span>
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
                     {cond.priority}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 ml-5">{cond.reason}</p>
+                <p className="text-xs text-slate-300 ml-5">{cleanRangeText(cond.reason)}</p>
               </div>
             ))}
           </div>

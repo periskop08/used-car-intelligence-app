@@ -7,6 +7,7 @@
  * FAIL-SAFE != FAKE DATA.
  * Normalizer repairs shapes, it NEVER invents new semantic content, claims, or priorities.
  */
+import { replacePsWithHp, formatVehicleAssessmentText } from './sanitizeTurkishDefectReason';
 
 export type NormalizationClassification = 'LOSSLESS' | 'LOSSY' | 'REJECTED' | 'UNRECOVERABLE';
 
@@ -213,6 +214,26 @@ export function normalizeVehicleReportPayload(
 
   const report = { ...rawReport };
 
+  // 0. Canonical Power Unit Guard: Enforce Turkish Market Standard (Always HP, Never PS)
+  if (report.vehicleIdentity && typeof report.vehicleIdentity === 'object') {
+    if (report.vehicleIdentity.powerUnit === 'PS') {
+      report.vehicleIdentity.powerUnit = 'HP';
+    }
+  }
+  if (report.performanceUsage && typeof report.performanceUsage === 'object') {
+    if (report.performanceUsage.powerUnit === 'PS') {
+      report.performanceUsage.powerUnit = 'HP';
+    }
+    if (report.performanceUsage.sourcePowerUnit === 'PS') {
+      report.performanceUsage.sourcePowerUnit = 'HP';
+    }
+  }
+  if (report.technicalSpecifications && typeof report.technicalSpecifications === 'object') {
+    if (report.technicalSpecifications.powerUnit === 'PS') {
+      report.technicalSpecifications.powerUnit = 'HP';
+    }
+  }
+
   // 1. Scoring Guard
   if (!report.scoring || typeof report.scoring !== 'object') {
     report.scoring = {
@@ -345,6 +366,34 @@ export function normalizeVehicleReportPayload(
   if (report.expertDecisionSynthesis && typeof report.expertDecisionSynthesis === 'object') {
     const synth = { ...report.expertDecisionSynthesis };
 
+    // Vehicle Character (Bu Araç Nasıl Bir Otomobil?) - format flowing paragraphs & replace PS with HP
+    if (synth.vehicleCharacter && typeof synth.vehicleCharacter === 'object') {
+      const vc = { ...synth.vehicleCharacter };
+      if (vc.headline) vc.headline = replacePsWithHp(safeString(vc.headline));
+      if (vc.detailedAssessment) {
+        vc.detailedAssessment = formatVehicleAssessmentText(replacePsWithHp(safeString(vc.detailedAssessment)));
+      }
+      synth.vehicleCharacter = vc;
+    }
+
+    // Daily Use Assessment - replace PS with HP
+    if (synth.dailyUseAssessment && typeof synth.dailyUseAssessment === 'object') {
+      const dua = { ...synth.dailyUseAssessment };
+      if (dua.cityUse) dua.cityUse = replacePsWithHp(safeString(dua.cityUse));
+      if (dua.highwayUse) dua.highwayUse = replacePsWithHp(safeString(dua.highwayUse));
+      if (dua.trafficBehavior) dua.trafficBehavior = replacePsWithHp(safeString(dua.trafficBehavior));
+      if (dua.comfortAssessment) dua.comfortAssessment = replacePsWithHp(safeString(dua.comfortAssessment));
+      if (dua.practicalityAssessment) dua.practicalityAssessment = replacePsWithHp(safeString(dua.practicalityAssessment));
+      synth.dailyUseAssessment = dua;
+    }
+
+    // Technical Specifications Power Unit Guard (Never PS, always HP)
+    if (synth.technicalSpecifications && typeof synth.technicalSpecifications === 'object') {
+      const ts = { ...synth.technicalSpecifications };
+      if (ts.powerUnit === 'PS') ts.powerUnit = 'HP';
+      synth.technicalSpecifications = ts;
+    }
+
     // Primary Technical Risk
     if (synth.primaryTechnicalRisk && typeof synth.primaryTechnicalRisk === 'object') {
       const ptr = { ...synth.primaryTechnicalRisk };
@@ -415,7 +464,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ title: text });
+            res.push({ title: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `strongestReasonsToChoose[${i}]`,
@@ -427,8 +476,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const title = extractFieldString(item, WHITELISTS.reasonsToChoose);
           if (title) {
-            const entry: Record<string, any> = { title };
-            if (item.explanation) entry.explanation = safeString(item.explanation);
+            const entry: Record<string, any> = { title: replacePsWithHp(title) };
+            if (item.explanation) entry.explanation = replacePsWithHp(safeString(item.explanation));
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `strongestReasonsToChoose[${i}].supportingFactIds`, WHITELISTS.factIds);
             }
@@ -456,7 +505,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ title: text });
+            res.push({ title: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `compromisesAndLimitations[${i}]`,
@@ -468,8 +517,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const title = extractFieldString(item, WHITELISTS.compromisesAndLimitations);
           if (title) {
-            const entry: Record<string, any> = { title };
-            if (item.explanation) entry.explanation = safeString(item.explanation);
+            const entry: Record<string, any> = { title: replacePsWithHp(title) };
+            if (item.explanation) entry.explanation = replacePsWithHp(safeString(item.explanation));
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `compromisesAndLimitations[${i}].supportingFactIds`, WHITELISTS.factIds);
             }
@@ -497,7 +546,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ profile: text });
+            res.push({ profile: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `suitableFor[${i}]`,
@@ -509,8 +558,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const profile = extractFieldString(item, WHITELISTS.suitableFor);
           if (profile) {
-            const entry: Record<string, any> = { profile };
-            if (item.explanation) entry.explanation = safeString(item.explanation);
+            const entry: Record<string, any> = { profile: replacePsWithHp(profile) };
+            if (item.explanation) entry.explanation = replacePsWithHp(safeString(item.explanation));
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `suitableFor[${i}].supportingFactIds`, WHITELISTS.factIds);
             }
@@ -538,7 +587,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ profile: text });
+            res.push({ profile: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `notSuitableFor[${i}]`,
@@ -550,8 +599,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const profile = extractFieldString(item, WHITELISTS.notSuitableFor);
           if (profile) {
-            const entry: Record<string, any> = { profile };
-            if (item.explanation) entry.explanation = safeString(item.explanation);
+            const entry: Record<string, any> = { profile: replacePsWithHp(profile) };
+            if (item.explanation) entry.explanation = replacePsWithHp(safeString(item.explanation));
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `notSuitableFor[${i}].supportingFactIds`, WHITELISTS.factIds);
             }
@@ -579,7 +628,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ condition: text });
+            res.push({ condition: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `purchaseConditions[${i}]`,
@@ -591,8 +640,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const condition = extractFieldString(item, WHITELISTS.purchaseConditions);
           if (condition) {
-            const entry: Record<string, any> = { condition };
-            if (item.reason) entry.reason = safeString(item.reason);
+            const entry: Record<string, any> = { condition: replacePsWithHp(condition) };
+            if (item.reason) entry.reason = replacePsWithHp(safeString(item.reason));
             if (item.priority) entry.priority = safeString(item.priority);
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `purchaseConditions[${i}].supportingFactIds`, WHITELISTS.factIds);
@@ -621,7 +670,7 @@ export function normalizeVehicleReportPayload(
         if (typeof item === 'string') {
           const text = item.trim();
           if (text && text !== '[object Object]') {
-            res.push({ condition: text });
+            res.push({ condition: replacePsWithHp(text) });
             warnings.push({
               classification: 'LOSSLESS',
               field: `walkAwayConditions[${i}]`,
@@ -633,8 +682,8 @@ export function normalizeVehicleReportPayload(
         } else if (typeof item === 'object') {
           const condition = extractFieldString(item, WHITELISTS.walkAwayConditions);
           if (condition) {
-            const entry: Record<string, any> = { condition };
-            if (item.reason) entry.reason = safeString(item.reason);
+            const entry: Record<string, any> = { condition: replacePsWithHp(condition) };
+            if (item.reason) entry.reason = replacePsWithHp(safeString(item.reason));
             if (item.priority) entry.priority = safeString(item.priority);
             if (Array.isArray(item.supportingFactIds) && item.supportingFactIds.length > 0) {
               entry.supportingFactIds = normalizeStringArray(item.supportingFactIds, `walkAwayConditions[${i}].supportingFactIds`, WHITELISTS.factIds);
@@ -652,6 +701,14 @@ export function normalizeVehicleReportPayload(
         }
       });
       synth.walkAwayConditions = res;
+    }
+
+    // Final Conditional Verdict
+    if (synth.finalConditionalVerdict && typeof synth.finalConditionalVerdict === 'object') {
+      const fcv = { ...synth.finalConditionalVerdict };
+      if (fcv.shortVerdict) fcv.shortVerdict = replacePsWithHp(safeString(fcv.shortVerdict));
+      if (fcv.detailedVerdict) fcv.detailedVerdict = replacePsWithHp(safeString(fcv.detailedVerdict));
+      synth.finalConditionalVerdict = fcv;
     }
 
     report.expertDecisionSynthesis = synth;

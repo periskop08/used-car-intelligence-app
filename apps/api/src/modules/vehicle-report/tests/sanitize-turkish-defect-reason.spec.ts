@@ -5,6 +5,7 @@ import {
   sanitizeTurkishInspectionInstruction,
   formatVehicleAssessmentParagraphs,
   formatVehicleAssessmentText,
+  replacePsWithHp,
 } from '@used-car-intelligence/shared';
 
 describe('sanitizeTurkishDefectReason', () => {
@@ -166,7 +167,8 @@ describe('sanitizeTurkishDefectReason', () => {
       expect(paragraphs.length).toBe(4);
       expect(paragraphs[0]).not.toContain('**1.');
       expect(paragraphs[0]).not.toContain('Motor ve Şanzıman Uyumu:');
-      expect(paragraphs[0]).toContain("Ford'un 1.6 Ti-VCT motoru, 125 PS");
+      expect(paragraphs[0]).toContain("Ford'un 1.6 Ti-VCT motoru, 125 HP");
+      expect(paragraphs[0]).not.toContain('125 PS');
 
       expect(paragraphs[1]).not.toContain('**2.');
       expect(paragraphs[1]).not.toContain('Donanım Seviyesi');
@@ -183,14 +185,40 @@ describe('sanitizeTurkishDefectReason', () => {
       expect(text).not.toContain('* **2.');
       expect(text).not.toContain('* **3.');
       expect(text).not.toContain('* **4.');
+      expect(text).toContain('125 HP');
+      expect(text).not.toContain('125 PS');
     });
 
-    it('preserves already clean paragraph text', () => {
+    it('preserves already clean paragraph text while converting any lingering PS to HP', () => {
       const cleanText =
-        '2016 model Fiat Egea 1.3 Multijet Easy Sedan, bütçe dostu bir aile otomobilidir. Düşük yakıt tüketimi sunar.';
+        '2016 model Fiat Egea 1.3 Multijet Easy Sedan, bütçe dostu bir aile otomobilidir. 95 PS gücündedir.';
       const paragraphs = formatVehicleAssessmentParagraphs(cleanText);
       expect(paragraphs.length).toBe(1);
-      expect(paragraphs[0]).toBe(cleanText);
+      expect(paragraphs[0]).toBe(
+        '2016 model Fiat Egea 1.3 Multijet Easy Sedan, bütçe dostu bir aile otomobilidir. 95 HP gücündedir.',
+      );
+    });
+  });
+
+  describe('replacePsWithHp', () => {
+    it('converts diverse PS formats to HP strictly', () => {
+      expect(replacePsWithHp('125 PS gücündeki motoru')).toBe('125 HP gücündeki motoru');
+      expect(replacePsWithHp('125 ps gücüyle')).toBe('125 HP gücüyle');
+      expect(replacePsWithHp('125PS motor')).toBe('125 HP motor');
+      expect(replacePsWithHp("125 PS'lik ünite")).toBe("125 HP'lik ünite");
+      expect(replacePsWithHp('Motor gücü (122 PS)')).toBe('Motor gücü (122 HP)');
+      expect(replacePsWithHp('90 kW (122 PS)')).toBe('90 kW (122 HP)');
+      expect(replacePsWithHp('HP/PS')).toBe('HP');
+      expect(replacePsWithHp('PS gücünde')).toBe('HP gücünde');
+      expect(replacePsWithHp('150 PS')).toBe('150 HP');
+    });
+
+    it('does not corrupt non-PS terms like EPS, GPS, PS5', () => {
+      expect(replacePsWithHp('Elektrik destekli direksiyon sistemi (EPS) sorunsuz çalışır.')).toBe(
+        'Elektrik destekli direksiyon sistemi (EPS) sorunsuz çalışır.',
+      );
+      expect(replacePsWithHp('GPS navigasyon sistemi mevcuttur.')).toBe('GPS navigasyon sistemi mevcuttur.');
+      expect(replacePsWithHp('PS5 konsolu ile alakası yoktur.')).toBe('PS5 konsolu ile alakası yoktur.');
     });
   });
 });

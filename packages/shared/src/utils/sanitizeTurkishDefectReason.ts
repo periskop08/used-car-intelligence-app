@@ -474,18 +474,48 @@ export function sanitizeTurkishDefectTitle(
 }
 
 /**
+ * Replaces any occurrence of 'PS' (German DIN Pferdestärke) with 'HP' (Horsepower / Beygir Gücü),
+ * enforcing the Turkish automotive market standard where vehicle engine power is universally expressed in 'HP'.
+ *
+ * Examples:
+ * - "125 PS" -> "125 HP"
+ * - "125 ps" -> "125 HP"
+ * - "125PS" -> "125 HP"
+ * - "125 PS'lik" -> "125 HP'lik"
+ * - "125 ps'e" -> "125 HP'e"
+ * - "125 PS gücündeki motoru" -> "125 HP gücündeki motoru"
+ * - "PS gücü" -> "HP gücü"
+ * - "PS / HP" or "HP/PS" -> "HP"
+ */
+export function replacePsWithHp(text?: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\bHP\s*\/\s*PS\b/gi, 'HP')
+    .replace(/\bPS\s*\/\s*HP\b/gi, 'HP')
+    .replace(/\b(\d+)\s*PS('|\b)([a-zğüşıöç]*)/gi, '$1 HP$2$3')
+    .replace(/\b(\d+)PS\b/gi, '$1 HP')
+    .replace(/\(\s*PS\s*\)/gi, '(HP)')
+    .replace(/\bPS\s*(gücü|gücünde|güç|motor)/gi, 'HP $1')
+    .replace(/\bps\s*(gücü|gücünde|güç|motor)/gi, 'HP $1');
+}
+
+/**
  * Strips artificial section titles (e.g., "* **1. Motor ve Şanzıman Uyumu:**",
  * "* **2. Donanım Seviyesi (Titanium):**", etc.) from vehicle character detailed assessment,
  * transforming the analysis into clean, continuous, flowing paragraphs.
+ * Also replaces any 'PS' unit occurrences with 'HP'.
  */
 export function formatVehicleAssessmentParagraphs(rawText?: string): string[] {
   if (!rawText) return [];
+
+  // Replace PS with HP across narrative text
+  const sanitizedText = replacePsWithHp(rawText);
 
   // Match numbered or bold section titles
   const generalHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*\d+\.\s*[^,.:\n*]{2,60}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
   const knownHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*(?:\d+\.)?\s*(?:Motor\s*(?:ve|&)?\s*Şanzıman|Donanım\s*Seviyesi|Sürüş\s*Dinamikleri|Tüketim\s*(?:ve|&)?\s*Kullanım|Genel\s*Bakış|Yakıt\s*Tüketimi|Mekanik\s*Karakter|Teknik\s*Bulgular)[^,.:\n*]{0,40}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
 
-  let text = rawText;
+  let text = sanitizedText;
   let chunks = text.split(generalHeadingRegex).map((c) => c.trim()).filter(Boolean);
 
   if (chunks.length <= 1) {
@@ -497,8 +527,8 @@ export function formatVehicleAssessmentParagraphs(rawText?: string): string[] {
     .map((c) => c.replace(/^[*\-:\s]+/, '').trim())
     .filter((c) => c.length > 10);
 
-  if (paragraphs.length === 0 && rawText.trim().length > 0) {
-    return [rawText.replace(/^[*\-:\s]+/, '').trim()];
+  if (paragraphs.length === 0 && sanitizedText.trim().length > 0) {
+    return [sanitizedText.replace(/^[*\-:\s]+/, '').trim()];
   }
 
   return paragraphs;

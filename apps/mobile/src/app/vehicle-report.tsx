@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -1100,7 +1100,7 @@ export default function VehicleReportScreen() {
               defaultOpen={true}
             >
               {Boolean(synthesis.vehicleCharacter.headline) && (
-                <Text style={styles.characterHeadlineLight}>{synthesis.vehicleCharacter.headline}</Text>
+                <Text style={styles.characterHeadlineLight}>{replacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
               )}
               {Boolean(synthesis.vehicleCharacter.detailedAssessment) && (
                 <View style={{ gap: 8 }}>
@@ -1116,13 +1116,13 @@ export default function VehicleReportScreen() {
                   {Boolean(synthesis.dailyUseAssessment.cityUse) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Şehir İçi Kullanım</Text>
-                      <Text style={styles.dailyUseTextLight}>{synthesis.dailyUseAssessment.cityUse}</Text>
+                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.cityUse)}</Text>
                     </View>
                   )}
                   {Boolean(synthesis.dailyUseAssessment.highwayUse) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Otoyol ve Seyir</Text>
-                      <Text style={styles.dailyUseTextLight}>{synthesis.dailyUseAssessment.highwayUse}</Text>
+                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.highwayUse)}</Text>
                     </View>
                   )}
                 </View>
