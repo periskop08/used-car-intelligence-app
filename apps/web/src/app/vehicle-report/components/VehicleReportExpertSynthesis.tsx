@@ -176,12 +176,19 @@ export default function VehicleReportExpertSynthesis({
 
           <div className="space-y-3">
             {toArray(synthesis.strongestReasonsToChoose).map((item, idx) => (
-              <div key={idx} className="p-3.5 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-emerald-300">{replacePsWithHp(item.title)}</h4>
-                  {renderSourceBadge(item.supportingFactIds)}
+              <div 
+                key={idx} 
+                className="p-4 bg-emerald-950/20 hover:bg-emerald-950/30 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl space-y-2 transition-all shadow-sm"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0 shadow-sm" />
+                  <h4 className="text-sm font-bold text-emerald-300 leading-snug tracking-tight">
+                    {replacePsWithHp(item.title)}
+                  </h4>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{cleanRangeText(item.explanation)}</p>
+                <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed pl-4">
+                  {cleanRangeText(item.explanation)}
+                </p>
               </div>
             ))}
           </div>
@@ -196,12 +203,19 @@ export default function VehicleReportExpertSynthesis({
 
           <div className="space-y-3">
             {toArray(synthesis.compromisesAndLimitations).map((item, idx) => (
-              <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-amber-300">{replacePsWithHp(item.title)}</h4>
-                  {renderSourceBadge(item.supportingFactIds)}
+              <div 
+                key={idx} 
+                className="p-4 bg-amber-950/20 hover:bg-amber-950/30 border border-amber-500/20 hover:border-amber-500/40 rounded-xl space-y-2 transition-all shadow-sm"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0 shadow-sm" />
+                  <h4 className="text-sm font-bold text-amber-300 leading-snug tracking-tight">
+                    {replacePsWithHp(item.title)}
+                  </h4>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{cleanRangeText(item.explanation)}</p>
+                <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed pl-4">
+                  {cleanRangeText(item.explanation)}
+                </p>
               </div>
             ))}
           </div>
@@ -211,40 +225,58 @@ export default function VehicleReportExpertSynthesis({
       {/* 3. KİMLER İÇİN UYGUN / UYGUN DEĞİL? */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Uygun Olduğu Profiller */}
-        <div className="bg-[#090d1a] border border-blue-500/20 p-5 sm:p-6 rounded-2xl space-y-3 shadow-xl">
+        <div className="bg-[#090d1a] border border-blue-500/20 p-5 sm:p-6 rounded-2xl space-y-4 shadow-xl">
           <h3 className="text-sm font-black text-blue-400 uppercase tracking-wider flex items-center gap-2 border-b border-blue-500/20 pb-3">
             <UserCheck className="w-4 h-4 shrink-0" />
             <span>Kimler İçin Mantıklı?</span>
           </h3>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {toArray(synthesis.suitableFor).map((prof, idx) => (
-              <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">{replacePsWithHp(prof.profile)}</span>
-                  {renderSourceBadge(prof.supportingFactIds)}
+              <div 
+                key={idx} 
+                className="p-4 bg-blue-950/15 hover:bg-blue-950/25 border border-blue-500/20 hover:border-blue-500/40 rounded-xl space-y-1.5 transition-all shadow-sm"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 shrink-0 shadow-sm" />
+                  <span className="text-sm font-bold text-blue-200 leading-snug">
+                    {replacePsWithHp(prof.profile)}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-400">{cleanRangeText(prof.explanation)}</p>
+                {prof.explanation && (
+                  <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed pl-4">
+                    {cleanRangeText(prof.explanation)}
+                  </p>
+                )}
               </div>
             ))}
           </div>
         </div>
 
         {/* Uygun Olmayabileceği Profiller */}
-        <div className="bg-[#090d1a] border border-rose-500/20 p-5 sm:p-6 rounded-2xl space-y-3 shadow-xl">
+        <div className="bg-[#090d1a] border border-rose-500/20 p-5 sm:p-6 rounded-2xl space-y-4 shadow-xl">
           <h3 className="text-sm font-black text-rose-400 uppercase tracking-wider flex items-center gap-2 border-b border-rose-500/20 pb-3">
             <UserX className="w-4 h-4 shrink-0" />
             <span>Kimler İçin Uygun Olmayabilir?</span>
           </h3>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {toArray(synthesis.notSuitableFor).map((prof, idx) => (
-              <div key={idx} className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">{replacePsWithHp(prof.profile)}</span>
-                  {renderSourceBadge(prof.supportingFactIds)}
+              <div 
+                key={idx} 
+                className="p-4 bg-rose-950/15 hover:bg-rose-950/25 border border-rose-500/20 hover:border-rose-500/40 rounded-xl space-y-1.5 transition-all shadow-sm"
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 mt-2 shrink-0 shadow-sm" />
+                  <span className="text-sm font-bold text-rose-200 leading-snug">
+                    {replacePsWithHp(prof.profile)}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-400">{cleanRangeText(prof.explanation)}</p>
+                {prof.explanation && (
+                  <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed pl-4">
+                    {cleanRangeText(prof.explanation)}
+                  </p>
+                )}
               </div>
             ))}
           </div>
