@@ -51,7 +51,12 @@ export default function Home() {
   const [matchedVariantId, setMatchedVariantId] = useState<string | null>(null);
 
   const [allVariants, setAllVariants] = useState<any[]>([]);
+  const [isYearAutoSelected, setIsYearAutoSelected] = useState(false);
+  const [isBodyTypeAutoSelected, setIsBodyTypeAutoSelected] = useState(false);
+  const [isEngineAutoSelected, setIsEngineAutoSelected] = useState(false);
   const [isFuelTypeAutoSelected, setIsFuelTypeAutoSelected] = useState(false);
+  const [isTransmissionAutoSelected, setIsTransmissionAutoSelected] = useState(false);
+  const [isTrimAutoSelected, setIsTrimAutoSelected] = useState(false);
   const [noTrimFound, setNoTrimFound] = useState(false);
   const [suggestedAlternatives, setSuggestedAlternatives] = useState<any[]>([]);
 
@@ -139,26 +144,77 @@ export default function Home() {
       .catch(() => setLoadingBrands(false));
   }, []);
 
-  // Fetch Models when Brand changes
+  // Display & formatting helpers
+  const displayFuelType = (fuel: string) => {
+    switch (fuel) {
+      case "PETROL": return "Benzin";
+      case "DIESEL": return "Dizel";
+      case "LPG": return "LPG";
+      case "HYBRID": return "Hibrit";
+      case "PLUG_IN_HYBRID": return "Plug-in Hibrit";
+      case "ELECTRIC": return "Elektrik";
+      default: return fuel || "Diğer";
+    }
+  };
+
+  const displayBodyType = (body: string) => {
+    switch (body) {
+      case "SEDAN": return "Sedan";
+      case "HATCHBACK": return "Hatchback";
+      case "CONVERTIBLE": return "Cabrio";
+      case "COUPE": return "Coupe";
+      case "SUV": return "SUV";
+      case "WAGON": return "Station Wagon";
+      case "PICKUP": return "Pickup";
+      case "VAN": return "Van";
+      case "MINIVAN": return "Minivan";
+      default: return body || "Diğer";
+    }
+  };
+
+  const getTransmissionTr = (name: string): string => {
+    if (!name) return "Otomatik";
+    const lower = name.toLowerCase().trim();
+    if (lower.includes("manuel") || lower.includes("düz") || lower.includes("manual")) {
+      return "Manuel";
+    }
+    if (lower.includes("dsg") || lower.includes("edc") || lower.includes("powershift") || lower.includes("dct") || lower.includes("çift kavrama")) {
+      return "Yarı Otomatik";
+    }
+    return "Otomatik";
+  };
+
+  const getBrandName = (brandId = selectedBrand) => brands.find(b => b.id === brandId)?.name || "";
+  const getModelName = (modelId = selectedModel) => models.find(m => m.id === modelId)?.name || "";
+
+  // 1. Brand Change
   const handleBrandChange = (brandId: string) => {
     setSelectedBrand(brandId);
     setSelectedModel("");
-    setSelectedBodyType("");
     setSelectedYear("");
+    setSelectedBodyType("");
     setSelectedEngine("");
     setSelectedFuelType("");
-    setSelectedTrim("");
     setSelectedTransmission("");
-    
-    setModels([]);
-    setYears([]);
-    setEngines([]);
-    setFuelTypes([]);
-    setTrims([]);
-    setTransmissions([]);
+    setSelectedTrim("");
     setMatchedVariantId(null);
     setAllVariants([]);
     setNoTrimFound(false);
+
+    setIsYearAutoSelected(false);
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
 
     if (!brandId) return;
 
@@ -172,275 +228,351 @@ export default function Home() {
       .catch(() => setLoadingModels(false));
   };
 
-  // Fetch Variants when Model changes
+  // 2. Model Change
   const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
-    setSelectedBodyType("");
     setSelectedYear("");
+    setSelectedBodyType("");
     setSelectedEngine("");
     setSelectedFuelType("");
-    setSelectedTrim("");
     setSelectedTransmission("");
-
-    setYears([]);
-    setEngines([]);
-    setFuelTypes([]);
-    setTrims([]);
-    setTransmissions([]);
+    setSelectedTrim("");
     setMatchedVariantId(null);
     setAllVariants([]);
     setNoTrimFound(false);
 
-    if (!modelId) return;
+    setIsYearAutoSelected(false);
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
 
-    // Fetch all approved variants for this model family
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!modelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelObj = models.find(m => m.id === modelId);
+    const modelName = modelObj?.name || "";
+
+    // Fetch all variants for suggested alternatives & fast inspection
     fetch(`${API_URL}/vehicles/variants?modelId=${modelId}`)
       .then((res) => res.json())
       .then((data) => {
         setAllVariants(Array.isArray(data) ? data : []);
       })
       .catch(() => {});
-  };
 
-  // Fetch Years when Brand or Model changes
-  useEffect(() => {
-    setYears([]);
-    setSelectedYear("");
-    setBodyTypes([]);
-    setSelectedBodyType("");
-    setEngines([]);
-    setSelectedEngine("");
-    setFuelTypes([]);
-    setSelectedFuelType("");
-    setTransmissions([]);
-    setSelectedTransmission("");
-    setTrims([]);
-    setSelectedTrim("");
-    setMatchedVariantId(null);
-    setNoTrimFound(false);
-
-    if (!selectedBrand || !selectedModel) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
     if (!brandName || !modelName) return;
-    
+
     setLoadingYears(true);
     vehicleTaxonomyApi.getYears(brandName, modelName)
-      .then(data => {
+      .then((data) => {
         const list = data.map((item) => parseInt(item.value, 10));
         setYears(list);
-        if (list.length === 1) {
-          setSelectedYear(list[0].toString());
-        }
         setLoadingYears(false);
+        if (list.length === 1) {
+          handleYearChange(list[0].toString(), modelId, true);
+        }
       })
       .catch(() => setLoadingYears(false));
-  }, [selectedBrand, selectedModel, brands, models]);
+  };
 
-  // Fetch Body Types when Year changes
-  useEffect(() => {
-    setBodyTypes([]);
+  // 3. Year Change & Cascade
+  const handleYearChange = async (year: string, currentModelId = selectedModel, autoSelected = false) => {
+    setSelectedYear(year);
+    setIsYearAutoSelected(autoSelected);
+
     setSelectedBodyType("");
-    setEngines([]);
     setSelectedEngine("");
-    setFuelTypes([]);
     setSelectedFuelType("");
-    setTransmissions([]);
     setSelectedTransmission("");
-    setTrims([]);
     setSelectedTrim("");
     setMatchedVariantId(null);
     setNoTrimFound(false);
 
-    if (!selectedBrand || !selectedModel || !selectedYear) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
-    if (!brandName || !modelName) return;
-    
-    setLoadingBodyTypes(true);
-    vehicleTaxonomyApi.getBodyTypes(brandName, modelName, selectedYear)
-      .then(data => {
-        const list = data.map((item) => item.value.toUpperCase());
-        setBodyTypes(list);
-        if (list.length === 1) {
-          setSelectedBodyType(list[0]);
-        }
-        setLoadingBodyTypes(false);
-      })
-      .catch(() => setLoadingBodyTypes(false));
-  }, [selectedYear, selectedBrand, selectedModel, brands, models]);
-
-  // Fetch Engines when Body Type changes (Sequential: Brand -> Model -> Year -> Body Type -> Engine)
-  useEffect(() => {
-    setEngines([]);
-    setSelectedEngine("");
-    setFuelTypes([]);
-    setSelectedFuelType("");
-    setTransmissions([]);
-    setSelectedTransmission("");
-    setTrims([]);
-    setSelectedTrim("");
-    setNoTrimFound(false);
-
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
-    if (!brandName || !modelName) return;
-    
-    setLoadingEngines(true);
-    vehicleTaxonomyApi.getEngines(brandName, modelName, selectedYear, selectedBodyType)
-      .then(data => {
-        const list = data.map((item) => item.value);
-        setEngines(list);
-        if (list.length === 1) {
-          setSelectedEngine(list[0]);
-        }
-        setLoadingEngines(false);
-      })
-      .catch(() => setLoadingEngines(false));
-  }, [selectedBodyType, selectedBrand, selectedModel, selectedYear, brands, models]);
-
-  // Fetch Fuel Types when Engine changes (Sequential: Engine -> Fuel Type)
-  useEffect(() => {
-    setFuelTypes([]);
-    setSelectedFuelType("");
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
     setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
     setTransmissions([]);
-    setSelectedTransmission("");
     setTrims([]);
-    setSelectedTrim("");
-    setNoTrimFound(false);
 
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
+    if (!year || !currentModelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
     if (!brandName || !modelName) return;
-    
-    setLoadingFuels(true);
-    vehicleTaxonomyApi.getFuelTypes(brandName, modelName, selectedYear, selectedBodyType, selectedEngine)
-      .then(data => {
-        const list = data.map((item) => item.value);
-        setFuelTypes(list);
-        if (list.length === 1) {
-          setSelectedFuelType(list[0]);
-          setIsFuelTypeAutoSelected(true);
-        } else {
-          setIsFuelTypeAutoSelected(false);
-        }
-        setLoadingFuels(false);
-      })
-      .catch(() => setLoadingFuels(false));
-  }, [selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
 
-  // Fetch Transmissions when Fuel Type changes (Sequential: Fuel Type -> Transmission)
-  useEffect(() => {
-    setTransmissions([]);
-    setSelectedTransmission("");
-    setTrims([]);
-    setSelectedTrim("");
-    setNoTrimFound(false);
-
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine || !selectedFuelType) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
-    if (!brandName || !modelName) return;
-    
-    setLoadingTransmissions(true);
-    vehicleTaxonomyApi.getTransmissions(brandName, modelName, selectedYear, selectedBodyType, selectedEngine, selectedFuelType)
-      .then(data => {
-        const list = data.map((item) => item.value);
-        setTransmissions(list);
-        if (list.length === 1) {
-          setSelectedTransmission(list[0]);
-        }
-        setLoadingTransmissions(false);
-      })
-      .catch(() => setLoadingTransmissions(false));
-  }, [selectedFuelType, selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
-
-  // Fetch Trims (Donanım Paketleri) when Transmission changes
-  useEffect(() => {
-    setTrims([]);
-    setSelectedTrim("");
-    setNoTrimFound(false);
-
-    if (!selectedBrand || !selectedModel || !selectedYear || !selectedBodyType || !selectedEngine || !selectedFuelType || !selectedTransmission) return;
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
-    if (!brandName || !modelName) return;
-    
-    setLoadingTrims(true);
-    vehicleTaxonomyApi.getTrims(brandName, modelName, selectedYear, selectedBodyType, selectedEngine, selectedFuelType, selectedTransmission)
-      .then(data => {
-        const rawTrims = data.map((item) => item.value);
-        const cleanTrims = rawTrims.filter((t: string) => {
-          if (!t) return false;
-          const lower = t.toLowerCase().trim();
-          return !['bilmiyorum', 'seçiniz veya bilmiyorum', 'boş bırak', 'genel', 'farketmez', 'yok', 'none', 'null'].includes(lower);
-        });
-        
-        setTrims(cleanTrims);
-        if (cleanTrims.length === 1) {
-          setSelectedTrim(cleanTrims[0]);
-        }
-        if (cleanTrims.length === 0) {
-          setNoTrimFound(true);
-        } else {
-          setNoTrimFound(false);
-        }
-        setLoadingTrims(false);
-      })
-      .catch(() => {
-        setNoTrimFound(true);
-        setLoadingTrims(false);
-      });
-  }, [selectedTransmission, selectedFuelType, selectedEngine, selectedBrand, selectedModel, selectedYear, selectedBodyType, brands, models]);
-
-  // Match final Variant ID when ALL required filters are selected
-  useEffect(() => {
-    if (
-      !selectedBrand ||
-      !selectedModel ||
-      !selectedYear ||
-      !selectedBodyType ||
-      !selectedEngine ||
-      !selectedFuelType ||
-      !selectedTransmission ||
-      !selectedTrim
-    ) {
-      setMatchedVariantId(null);
-      return;
+    setLoadingBodyTypes(true);
+    try {
+      const data = await vehicleTaxonomyApi.getBodyTypes(brandName, modelName, year);
+      const list = data.map((item) => item.value.toUpperCase());
+      setBodyTypes(list);
+      if (list.length === 1) {
+        handleBodyTypeChange(list[0], year, currentModelId, true);
+      }
+    } catch {
+      setBodyTypes([]);
+    } finally {
+      setLoadingBodyTypes(false);
     }
-    
-    const brandName = brands.find(b => b.id === selectedBrand)?.name;
-    const modelName = models.find(m => m.id === selectedModel)?.name;
+  };
+
+  // 4. Body Type Change & Cascade
+  const handleBodyTypeChange = async (
+    body: string,
+    currentYear = selectedYear,
+    currentModelId = selectedModel,
+    autoSelected = false
+  ) => {
+    setSelectedBodyType(body);
+    setIsBodyTypeAutoSelected(autoSelected);
+
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!body || !currentYear || !currentModelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
     if (!brandName || !modelName) return;
-    
+
+    setLoadingEngines(true);
+    try {
+      const data = await vehicleTaxonomyApi.getEngines(brandName, modelName, currentYear, body);
+      const list = data.map((item) => item.value);
+      setEngines(list);
+      if (list.length === 1) {
+        handleEngineChange(list[0], body, currentYear, currentModelId, true);
+      }
+    } catch {
+      setEngines([]);
+    } finally {
+      setLoadingEngines(false);
+    }
+  };
+
+  // 5. Engine Change & Cascade
+  const handleEngineChange = async (
+    engine: string,
+    currentBody = selectedBodyType,
+    currentYear = selectedYear,
+    currentModelId = selectedModel,
+    autoSelected = false
+  ) => {
+    setSelectedEngine(engine);
+    setIsEngineAutoSelected(autoSelected);
+
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!engine || !currentBody || !currentYear || !currentModelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
+    if (!brandName || !modelName) return;
+
+    setLoadingFuels(true);
+    try {
+      const data = await vehicleTaxonomyApi.getFuelTypes(brandName, modelName, currentYear, currentBody, engine);
+      const list = data.map((item) => item.value);
+      setFuelTypes(list);
+      if (list.length === 1) {
+        handleFuelTypeChange(list[0], engine, currentBody, currentYear, currentModelId, true);
+      }
+    } catch {
+      setFuelTypes([]);
+    } finally {
+      setLoadingFuels(false);
+    }
+  };
+
+  // 6. Fuel Type Change & Cascade
+  const handleFuelTypeChange = async (
+    fuel: string,
+    currentEngine = selectedEngine,
+    currentBody = selectedBodyType,
+    currentYear = selectedYear,
+    currentModelId = selectedModel,
+    autoSelected = false
+  ) => {
+    setSelectedFuelType(fuel);
+    setIsFuelTypeAutoSelected(autoSelected);
+
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setTransmissions([]);
+    setTrims([]);
+
+    if (!fuel || !currentEngine || !currentBody || !currentYear || !currentModelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
+    if (!brandName || !modelName) return;
+
+    setLoadingTransmissions(true);
+    try {
+      const data = await vehicleTaxonomyApi.getTransmissions(brandName, modelName, currentYear, currentBody, currentEngine, fuel);
+      const list = data.map((item) => item.value);
+      setTransmissions(list);
+      if (list.length === 1) {
+        handleTransmissionChange(list[0], fuel, currentEngine, currentBody, currentYear, currentModelId, true);
+      }
+    } catch {
+      setTransmissions([]);
+    } finally {
+      setLoadingTransmissions(false);
+    }
+  };
+
+  // 7. Transmission Change & Cascade
+  const handleTransmissionChange = async (
+    trans: string,
+    currentFuel = selectedFuelType,
+    currentEngine = selectedEngine,
+    currentBody = selectedBodyType,
+    currentYear = selectedYear,
+    currentModelId = selectedModel,
+    autoSelected = false
+  ) => {
+    setSelectedTransmission(trans);
+    setIsTransmissionAutoSelected(autoSelected);
+
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setNoTrimFound(false);
+    setIsTrimAutoSelected(false);
+
+    setTrims([]);
+
+    if (!trans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModelId || !selectedBrand) return;
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
+    if (!brandName || !modelName) return;
+
+    setLoadingTrims(true);
+    try {
+      const data = await vehicleTaxonomyApi.getTrims(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, trans);
+      const rawTrims = data.map((item) => item.value);
+      const cleanTrims = rawTrims.filter((t: string) => {
+        if (!t) return false;
+        const lower = t.toLowerCase().trim();
+        return !['bilmiyorum', 'seçiniz veya bilmiyorum', 'boş bırak', 'genel', 'farketmez', 'yok', 'none', 'null'].includes(lower);
+      });
+
+      setTrims(cleanTrims);
+      if (cleanTrims.length === 1) {
+        handleTrimChange(cleanTrims[0], trans, currentFuel, currentEngine, currentBody, currentYear, currentModelId, true);
+      } else if (cleanTrims.length === 0) {
+        setNoTrimFound(true);
+        matchVariant(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, trans, "");
+      }
+    } catch {
+      setNoTrimFound(true);
+      matchVariant(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, trans, "");
+    } finally {
+      setLoadingTrims(false);
+    }
+  };
+
+  // 8. Trim Change & Variant Match
+  const handleTrimChange = async (
+    trim: string,
+    currentTrans = selectedTransmission,
+    currentFuel = selectedFuelType,
+    currentEngine = selectedEngine,
+    currentBody = selectedBodyType,
+    currentYear = selectedYear,
+    currentModelId = selectedModel,
+    autoSelected = false
+  ) => {
+    setSelectedTrim(trim);
+    setIsTrimAutoSelected(autoSelected);
+    setMatchedVariantId(null);
+
+    const brandName = getBrandName(selectedBrand);
+    const modelName = getModelName(currentModelId);
+    if (!brandName || !modelName) return;
+
+    matchVariant(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, currentTrans, trim);
+  };
+
+  // Final Match Variant helper
+  const matchVariant = async (
+    brandName: string,
+    modelName: string,
+    year: string,
+    bodyType: string,
+    engine: string,
+    fuelType: string,
+    transmission: string,
+    trim: string
+  ) => {
     setLoadingMatch(true);
-    vehicleTaxonomyApi.matchVariant({
-      brand: brandName,
-      model: modelName,
-      year: selectedYear,
-      bodyType: selectedBodyType,
-      engine: selectedEngine,
-      fuelType: selectedFuelType,
-      transmission: selectedTransmission,
-      trim: selectedTrim,
-    })
-      .then(res => {
-        if (res.success && res.variantId) {
-          setMatchedVariantId(res.variantId);
-        }
-        setLoadingMatch(false);
-      })
-      .catch(() => setLoadingMatch(false));
-  }, [selectedTrim, selectedTransmission, selectedFuelType, selectedEngine, selectedBodyType, selectedYear, selectedBrand, selectedModel, brands, models]);
+    try {
+      const res = await vehicleTaxonomyApi.matchVariant({
+        brand: brandName,
+        model: modelName,
+        year,
+        bodyType,
+        engine,
+        fuelType,
+        transmission,
+        trim,
+      });
+      if (res.success && res.variantId) {
+        setMatchedVariantId(res.variantId);
+      }
+    } catch {
+      setMatchedVariantId(null);
+    } finally {
+      setLoadingMatch(false);
+    }
+  };
 
   const applyAlternative = (v: any) => {
     const brandObj = brands.find(b => b.name === v.brand.name);
@@ -470,33 +602,6 @@ export default function Home() {
     router.push(`/vehicle/${matchedVariantId}`);
   };
 
-  const displayFuelType = (fuel: string) => {
-    switch (fuel) {
-      case "PETROL": return "Benzin";
-      case "DIESEL": return "Dizel";
-      case "LPG": return "LPG";
-      case "HYBRID": return "Hibrit";
-      case "PLUG_IN_HYBRID": return "Plug-in Hibrit";
-      case "ELECTRIC": return "Elektrik";
-      default: return fuel || "Diğer";
-    }
-  };
-
-  const displayBodyType = (body: string) => {
-    switch (body) {
-      case "SEDAN": return "Sedan";
-      case "HATCHBACK": return "Hatchback";
-      case "CONVERTIBLE": return "Cabrio";
-      case "COUPE": return "Coupe";
-      case "SUV": return "SUV";
-      case "WAGON": return "Station Wagon";
-      case "PICKUP": return "Pickup";
-      case "VAN": return "Van";
-      case "MINIVAN": return "Minivan";
-      default: return body || "Diğer";
-    }
-  };
-
   // Helper conversion functions
   const getFuelTypeEnums = (tr: string): string[] => {
     const clean = tr.toLowerCase().trim();
@@ -506,18 +611,6 @@ export default function Home() {
     if (clean === "elektrik") return ["ELECTRIC"];
     if (clean === "lpg & benzin" || clean === "lpg") return ["LPG"];
     return ["PETROL"];
-  };
-
-  const getTransmissionTr = (name: string): string => {
-    if (!name) return "Otomatik";
-    const lower = name.toLowerCase().trim();
-    if (lower.includes("manuel") || lower.includes("düz") || lower.includes("manual")) {
-      return "Manuel";
-    }
-    if (lower.includes("dsg") || lower.includes("edc") || lower.includes("powershift") || lower.includes("dct") || lower.includes("çift kavrama")) {
-      return "Yarı Otomatik";
-    }
-    return "Otomatik";
   };
 
   // Validation Checks
@@ -536,7 +629,7 @@ export default function Home() {
     selectedEngine &&
     selectedFuelType &&
     selectedTransmission &&
-    selectedTrim
+    (selectedTrim || noTrimFound)
   );
 
   return (
@@ -669,18 +762,18 @@ export default function Home() {
 
             {/* Year Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
+                {isYearAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(e.target.value);
-                  setSelectedBodyType("");
-                  setSelectedEngine("");
-                  setSelectedFuelType("");
-                  setSelectedTransmission("");
-                  setSelectedTrim("");
-                }}
-                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition"
+                onChange={(e) => handleYearChange(e.target.value)}
+                className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedModel || loadingYears || years.length === 0}
               >
                 <option value="">{loadingYears ? "Yükleniyor..." : "Seçiniz..."}</option>
@@ -694,16 +787,17 @@ export default function Home() {
 
             {/* Body Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+                {isBodyTypeAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedBodyType}
-                onChange={(e) => {
-                  setSelectedBodyType(e.target.value);
-                  setSelectedEngine("");
-                  setSelectedFuelType("");
-                  setSelectedTransmission("");
-                  setSelectedTrim("");
-                }}
+                onChange={(e) => handleBodyTypeChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
               >
@@ -721,15 +815,17 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Engine Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
+                {isEngineAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedEngine}
-                onChange={(e) => {
-                  setSelectedEngine(e.target.value);
-                  setSelectedFuelType("");
-                  setSelectedTransmission("");
-                  setSelectedTrim("");
-                }}
+                onChange={(e) => handleEngineChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedBodyType || loadingEngines || engines.length === 0}
               >
@@ -744,14 +840,17 @@ export default function Home() {
 
             {/* Fuel Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+                {isFuelTypeAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedFuelType}
-                onChange={(e) => {
-                  setSelectedFuelType(e.target.value);
-                  setSelectedTransmission("");
-                  setSelectedTrim("");
-                }}
+                onChange={(e) => handleFuelTypeChange(e.target.value)}
                 className={`bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm outline-none transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isFuelTypeAutoSelected ? "text-slate-400 border-white/5 cursor-not-allowed opacity-80" : "text-slate-200 focus:border-orange-500"
                 }`}
@@ -768,13 +867,17 @@ export default function Home() {
 
             {/* Transmission Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+                {isTransmissionAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedTransmission}
-                onChange={(e) => {
-                  setSelectedTransmission(e.target.value);
-                  setSelectedTrim("");
-                }}
+                onChange={(e) => handleTransmissionChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
               >
@@ -789,10 +892,17 @@ export default function Home() {
 
             {/* Trim Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+                {isTrimAutoSelected && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                    Otomatik
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedTrim}
-                onChange={(e) => setSelectedTrim(e.target.value)}
+                onChange={(e) => handleTrimChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!selectedTransmission || loadingTrims || trims.length === 0}
               >

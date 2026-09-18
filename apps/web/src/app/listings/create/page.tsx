@@ -186,6 +186,13 @@ export default function CreateListing() {
   const [selectedTrim, setSelectedTrim] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(""); // Exact vehicleVariantId
 
+  const [isYearAutoSelected, setIsYearAutoSelected] = useState(false);
+  const [isBodyTypeAutoSelected, setIsBodyTypeAutoSelected] = useState(false);
+  const [isEngineAutoSelected, setIsEngineAutoSelected] = useState(false);
+  const [isFuelTypeAutoSelected, setIsFuelTypeAutoSelected] = useState(false);
+  const [isTransmissionAutoSelected, setIsTransmissionAutoSelected] = useState(false);
+  const [isTrimAutoSelected, setIsTrimAutoSelected] = useState(false);
+
   // Technical Specs Enrichment States (cc & HP)
   const [loadingTechSpecs, setLoadingTechSpecs] = useState(false);
   const [techSpecsVerified, setTechSpecsVerified] = useState(false);
@@ -303,6 +310,13 @@ export default function CreateListing() {
     setSelectedTrim("");
     setSelectedVariant("");
 
+    setIsYearAutoSelected(false);
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
     setModels([]);
     setYears([]);
     setBodyTypes([]);
@@ -331,6 +345,13 @@ export default function CreateListing() {
     setSelectedTrim("");
     setSelectedVariant("");
 
+    setIsYearAutoSelected(false);
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
     setYears([]);
     setBodyTypes([]);
     setEngines([]);
@@ -344,21 +365,29 @@ export default function CreateListing() {
       const data = await vehicleTaxonomyApi.getYears(selectedBrand, model);
       setYears(data);
       if (data.length === 1) {
-        handleYearChange(data[0].value, model);
+        handleYearChange(data[0].value, model, true);
       }
     } finally {
       setLoadingYears(false);
     }
   };
 
-  const handleYearChange = async (year: string, currentModel = selectedModel) => {
+  const handleYearChange = async (year: string, currentModel = selectedModel, autoSelected = false) => {
     setSelectedYear(year);
+    setIsYearAutoSelected(autoSelected);
+
     setSelectedBodyType("");
     setSelectedEngine("");
     setSelectedFuelType("");
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
 
     setBodyTypes([]);
     setEngines([]);
@@ -372,20 +401,27 @@ export default function CreateListing() {
       const data = await vehicleTaxonomyApi.getBodyTypes(selectedBrand, currentModel, year);
       setBodyTypes(data);
       if (data.length === 1) {
-        handleBodyTypeChange(data[0].value, year, currentModel);
+        handleBodyTypeChange(data[0].value, year, currentModel, true);
       }
     } finally {
       setLoadingBodyTypes(false);
     }
   };
 
-  const handleBodyTypeChange = async (body: string, currentYear = selectedYear, currentModel = selectedModel) => {
+  const handleBodyTypeChange = async (body: string, currentYear = selectedYear, currentModel = selectedModel, autoSelected = false) => {
     setSelectedBodyType(body);
+    setIsBodyTypeAutoSelected(autoSelected);
+
     setSelectedEngine("");
     setSelectedFuelType("");
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
 
     setEngines([]);
     setFuelTypes([]);
@@ -398,19 +434,25 @@ export default function CreateListing() {
       const data = await vehicleTaxonomyApi.getEngines(selectedBrand, currentModel, currentYear, body);
       setEngines(data);
       if (data.length === 1) {
-        handleEngineChange(data[0].value, body, currentYear, currentModel);
+        handleEngineChange(data[0].value, body, currentYear, currentModel, true);
       }
     } finally {
       setLoadingEngines(false);
     }
   };
 
-  const handleEngineChange = async (engine: string, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+  const handleEngineChange = async (engine: string, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel, autoSelected = false) => {
     setSelectedEngine(engine);
+    setIsEngineAutoSelected(autoSelected);
+
     setSelectedFuelType("");
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
 
     setFuelTypes([]);
     setTransmissions([]);
@@ -422,18 +464,23 @@ export default function CreateListing() {
       const data = await vehicleTaxonomyApi.getFuelTypes(selectedBrand, currentModel, currentYear, currentBody, engine);
       setFuelTypes(data);
       if (data.length === 1) {
-        handleFuelTypeChange(data[0].value, engine, currentBody, currentYear, currentModel);
+        handleFuelTypeChange(data[0].value, engine, currentBody, currentYear, currentModel, true);
       }
     } finally {
       setLoadingFuels(false);
     }
   };
 
-  const handleFuelTypeChange = async (fuel: string, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+  const handleFuelTypeChange = async (fuel: string, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel, autoSelected = false) => {
     setSelectedFuelType(fuel);
+    setIsFuelTypeAutoSelected(autoSelected);
+
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
 
     setTransmissions([]);
     setTrims([]);
@@ -444,17 +491,20 @@ export default function CreateListing() {
       const data = await vehicleTaxonomyApi.getTransmissions(selectedBrand, currentModel, currentYear, currentBody, currentEngine, fuel);
       setTransmissions(data);
       if (data.length === 1) {
-        handleTransmissionChange(data[0].value, fuel, currentEngine, currentBody, currentYear, currentModel);
+        handleTransmissionChange(data[0].value, fuel, currentEngine, currentBody, currentYear, currentModel, true);
       }
     } finally {
       setLoadingTransmissions(false);
     }
   };
 
-  const handleTransmissionChange = async (trans: string, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+  const handleTransmissionChange = async (trans: string, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel, autoSelected = false) => {
     setSelectedTransmission(trans);
+    setIsTransmissionAutoSelected(autoSelected);
+
     setSelectedTrim("");
     setSelectedVariant("");
+    setIsTrimAutoSelected(false);
 
     setTrims([]);
 
@@ -462,17 +512,24 @@ export default function CreateListing() {
     setLoadingTrims(true);
     try {
       const data = await vehicleTaxonomyApi.getTrims(selectedBrand, currentModel, currentYear, currentBody, currentEngine, currentFuel, trans);
-      setTrims(data);
-      if (data.length === 1) {
-        handleTrimChange(data[0].value, trans, currentFuel, currentEngine, currentBody, currentYear, currentModel);
+      if (data.length === 0) {
+        const fallback = [{ label: "Standart / Baz", value: "Standart / Baz" }];
+        setTrims(fallback);
+        handleTrimChange(fallback[0].value, trans, currentFuel, currentEngine, currentBody, currentYear, currentModel, true);
+      } else {
+        setTrims(data);
+        if (data.length === 1) {
+          handleTrimChange(data[0].value, trans, currentFuel, currentEngine, currentBody, currentYear, currentModel, true);
+        }
       }
     } finally {
       setLoadingTrims(false);
     }
   };
 
-  const handleTrimChange = async (trim: string, currentTrans = selectedTransmission, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel) => {
+  const handleTrimChange = async (trim: string, currentTrans = selectedTransmission, currentFuel = selectedFuelType, currentEngine = selectedEngine, currentBody = selectedBodyType, currentYear = selectedYear, currentModel = selectedModel, autoSelected = false) => {
     setSelectedTrim(trim);
+    setIsTrimAutoSelected(autoSelected);
     setSelectedVariant("");
 
     if (!trim || !currentTrans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
@@ -1129,7 +1186,14 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
+                    {isYearAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedYear}
                     disabled={!selectedModel || loadingYears || years.length === 0}
@@ -1144,7 +1208,14 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
+                    {isBodyTypeAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedBodyType}
                     disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
@@ -1162,7 +1233,14 @@ export default function CreateListing() {
               {/* Row 2: Motor / Versiyon | Yakıt Türü | Şanzıman Tipi | Donanım Paketi */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
+                    {isEngineAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedEngine}
                     disabled={!selectedBodyType || loadingEngines || engines.length === 0}
@@ -1177,7 +1255,14 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
+                    {isFuelTypeAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedFuelType}
                     disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0}
@@ -1192,7 +1277,14 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
+                    {isTransmissionAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedTransmission}
                     disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
@@ -1207,7 +1299,14 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
+                    {isTrimAutoSelected && (
+                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
+                        Otomatik
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedTrim}
                     disabled={!selectedTransmission || loadingTrims || trims.length === 0}
