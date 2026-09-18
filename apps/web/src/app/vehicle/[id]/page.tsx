@@ -1133,7 +1133,7 @@ export default function VehicleDetail() {
           <SafeSection title="Bu Aracın İlanları">
             <VehicleExactListingsWidget
               variantId={variantId}
-              className="w-full"
+              className="w-full max-w-[320px] mx-auto lg:mx-0"
             />
           </SafeSection>
         </div>

@@ -123,12 +123,12 @@ export default function VehicleExactListingsWidget({
 
   return (
     <div
-      className={`glass rounded-2xl border border-white/10 flex flex-col shadow-xl transition-all duration-300 overflow-hidden font-sans h-[440px] ${className}`}
+      className={`glass rounded-2xl border border-white/10 flex flex-col shadow-xl transition-all duration-300 overflow-hidden font-sans w-full max-w-[320px] mx-auto lg:mx-0 ${isOpen ? 'h-[440px]' : 'h-auto'} ${className}`}
     >
       {/* 1. Header: Başlık ve Aç/Kapa Buton Barı */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-white/[0.02] transition select-none border-b border-white/5 shrink-0"
+        className={`p-3.5 sm:p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-white/[0.02] transition select-none ${isOpen ? 'border-b border-white/5' : ''} shrink-0`}
       >
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 shrink-0">
@@ -174,7 +174,7 @@ export default function VehicleExactListingsWidget({
               </div>
             ) : (
               items.map((item) => (
-                <CompactListingCard key={item.id} listing={item} />
+                <CompactListingCard key={item.id} listing={item} variant="sidebar" />
               ))
             )}
           </div>
