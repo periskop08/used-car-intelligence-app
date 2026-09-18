@@ -3,6 +3,8 @@ import {
   sanitizeTurkishDefectDescription,
   sanitizeTurkishDefectTitle,
   sanitizeTurkishInspectionInstruction,
+  formatVehicleAssessmentParagraphs,
+  formatVehicleAssessmentText,
 } from '@used-car-intelligence/shared';
 
 describe('sanitizeTurkishDefectReason', () => {
@@ -154,4 +156,42 @@ describe('sanitizeTurkishDefectReason', () => {
       );
     });
   });
+
+  describe('formatVehicleAssessmentParagraphs', () => {
+    it('strips numbered section titles and returns clean paragraphs', () => {
+      const raw =
+        "* **1. Motor ve Şanzıman Uyumu:** Ford'un 1.6 Ti-VCT motoru, 125 PS gücüyle şehir içi ve otoyol kullanımı için yeterli bir performans sunuyor. Yarı otomatik DCT şanzıman, vites geçişlerinde akıcı bir deneyim sağlarken, dur-kalk trafikte de rahat bir kullanım sunuyor. * **2. Donanım Seviyesi (Titanium):** Titanium donanım paketi, araca birçok konfor ve teknoloji unsuru ekliyor. Yüksek kaliteli iç mekan malzemeleri ve konforlu koltuklar uzun yolculuklarda keyifli bir deneyim sağlıyor. * **3. Sürüş Dinamikleri & Mekanik Karakter:** Ford Focus, süspansiyon sistemi sayesinde yol tutuşu ve sürüş dinamikleri açısından oldukça başarılı. * **4. Tüketim & Kullanım Maliyeti:** Katalog verilerine göre 6.1 L/100km yakıt tüketimi sunan Focus, gerçek dünyada ekonomiktir.";
+
+      const paragraphs = formatVehicleAssessmentParagraphs(raw);
+      expect(paragraphs.length).toBe(4);
+      expect(paragraphs[0]).not.toContain('**1.');
+      expect(paragraphs[0]).not.toContain('Motor ve Şanzıman Uyumu:');
+      expect(paragraphs[0]).toContain("Ford'un 1.6 Ti-VCT motoru, 125 PS");
+
+      expect(paragraphs[1]).not.toContain('**2.');
+      expect(paragraphs[1]).not.toContain('Donanım Seviyesi');
+      expect(paragraphs[1]).toContain('Titanium donanım paketi, araca birçok konfor');
+
+      expect(paragraphs[2]).not.toContain('**3.');
+      expect(paragraphs[2]).toContain('Ford Focus, süspansiyon sistemi');
+
+      expect(paragraphs[3]).not.toContain('**4.');
+      expect(paragraphs[3]).toContain('Katalog verilerine göre');
+
+      const text = formatVehicleAssessmentText(raw);
+      expect(text).not.toContain('* **1.');
+      expect(text).not.toContain('* **2.');
+      expect(text).not.toContain('* **3.');
+      expect(text).not.toContain('* **4.');
+    });
+
+    it('preserves already clean paragraph text', () => {
+      const cleanText =
+        '2016 model Fiat Egea 1.3 Multijet Easy Sedan, bütçe dostu bir aile otomobilidir. Düşük yakıt tüketimi sunar.';
+      const paragraphs = formatVehicleAssessmentParagraphs(cleanText);
+      expect(paragraphs.length).toBe(1);
+      expect(paragraphs[0]).toBe(cleanText);
+    });
+  });
 });
+

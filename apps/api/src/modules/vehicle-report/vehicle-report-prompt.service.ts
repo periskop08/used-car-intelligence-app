@@ -49,7 +49,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
   "expertDecisionSynthesis": {
     "vehicleCharacter": {
       "headline": "...",
-      "detailedAssessment": "Tıpkı uzman danışman gibi şu 4 alt başlıkta derin, samimi ve teknik otomotiv analizi yaz:\n* **1. Motor ve Şanzıman Uyumu:** (Motor mimarisi, şanzıman ailesi ve kavrama karakteri, vites geçiş hissiyatı ve mekanik uyumu)\n* **2. Donanım Seviyesi (Seçilen Paket):** (Seçilen donanım paketinin araca kattığı kilit konfor ve teknolojik aksamlar)\n* **3. Doğrulanmış Teknik Bulgular & Kronik Risk Uyarısı:** (Aracın bilinen kronik durumları, sızıntı/aşınma riski veya ekspertizde bakılacak kritik mekanik detaylar)\n* **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)",
+      "detailedAssessment": "Tıpkı kıdemli bir otomotiv test editörü gibi aracı anlatan akıcı bir paragraf tarzında derin, samimi ve teknik otomotiv analizi yaz. KESİNLİKLE numaralı başlık veya madde imi (1. Motor..., 2. Donanım...) kullanma; motor-şanzıman uyumunu, donanım paketini, sürüş dinamiklerini ve yakıt tüketimini doğal geçişlerle birbirine bağlanan akıcı paragraflarla anlat.",
       "supportingFactIds": []
     },
     "trimPackageComparison": {
@@ -287,11 +287,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
     - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
-    - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, şu 4 alt başlığı içeren, zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime):
-      * **1. Motor ve Şanzıman Uyumu:** (Motor mimarisi, gaz tepkisi, şanzıman kavrama karakteri, vites geçiş hissiyatı ve mekanik uyumu)
-      * **2. Donanım Seviyesi (${trim || 'Seçilen Paket'}):** (Bu paketin araca kattığı kilit konfor, teknolojik aksamlar ve kabin atmosferi)
-      * **3. Sürüş Dinamikleri & Mekanik Karakter:** (Aracın sürüş dinamikleri, süspansiyon darbe emişi, yol tutuşu ve ekspertizde bakılacak kritik mekanik detaylar)
-      * **4. Tüketim & Kullanım Maliyeti:** (Katalog fabrika tüketimi ile gerçek yol tüketim beklentisi farkı ve genel işletme maliyeti)
+    - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, aracı anlatan akıcı bir paragraf tarzında zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime).
+    - KESİNLİKLE madde imleri, asteriksler (*) veya "1. Motor ve Şanzıman Uyumu:", "2. Donanım Seviyesi:" gibi numaralı alt başlıklar KULLANMA! Başlık kullanmaksızın; motor mimarisi ve şanzıman kavrama karakterini, donanım paketinin (${trim || 'Seçilen Paket'}) kabin konforunu, süspansiyon ve sürüş dinamiklerini, tüketim beklentisini doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde anlat.
     - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
 12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK VE KALİTE KURALLARI:
     - **Tercih Etmek İçin Güçlü Nedenler ('strongestReasonsToChoose'):** En az 3-4 adet güçlü ve somut teknik/pratik neden yaz (Motor gücü/verimliliği, şanzıman akıcılığı, seçilen donanım paketinin öne çıkan özellikleri, ikinci el likiditesi). Asla 1-2 maddeyle geçiştirme!
@@ -306,7 +303,7 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "expertDecisionSynthesis": {
     "vehicleCharacter": { 
       "headline": "Çarpıcı ve araca/donanıma özel uzman başlığı", 
-      "detailedAssessment": "Şu 4 alt başlığı içeren zengin ve derin teknik analiz:\n* **1. Motor ve Şanzıman Uyumu:** ...\n* **2. Donanım Seviyesi (${trim || 'Paket'}):** ...\n* **3. Doğrulanmış Teknik Bulgular & Mekanik Karakter:** ...\n* **4. Tüketim & Kullanım Maliyeti:** ..." 
+      "detailedAssessment": "Numaralı alt başlık veya madde imi kullanmaksızın, doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde aracın motor-şanzıman uyumunu, donanım paketini (${trim || 'Paket'}), sürüş dinamiklerini ve tüketimini anlatan zengin teknik analiz." 
     },
     "trimPackageComparison": { "selectedTrimName": "${trim}", "comparisonNarrative": "...", "keyAddedFeatures": [...], "missingFeaturesInLowerTrim": [...] },
     "dailyUseAssessment": { 

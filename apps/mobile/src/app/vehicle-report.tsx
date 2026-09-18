@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -1103,7 +1103,11 @@ export default function VehicleReportScreen() {
                 <Text style={styles.characterHeadlineLight}>{synthesis.vehicleCharacter.headline}</Text>
               )}
               {Boolean(synthesis.vehicleCharacter.detailedAssessment) && (
-                <Text style={styles.bodyTextLight}>{synthesis.vehicleCharacter.detailedAssessment}</Text>
+                <View style={{ gap: 8 }}>
+                  {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
+                    <Text key={idx} style={styles.bodyTextLight}>{para}</Text>
+                  ))}
+                </View>
               )}
 
               {/* Daily Use Grid */}

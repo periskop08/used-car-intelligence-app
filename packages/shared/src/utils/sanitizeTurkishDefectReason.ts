@@ -472,3 +472,39 @@ export function sanitizeTurkishDefectTitle(
 
   return title;
 }
+
+/**
+ * Strips artificial section titles (e.g., "* **1. Motor ve Şanzıman Uyumu:**",
+ * "* **2. Donanım Seviyesi (Titanium):**", etc.) from vehicle character detailed assessment,
+ * transforming the analysis into clean, continuous, flowing paragraphs.
+ */
+export function formatVehicleAssessmentParagraphs(rawText?: string): string[] {
+  if (!rawText) return [];
+
+  // Match numbered or bold section titles
+  const generalHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*\d+\.\s*[^,.:\n*]{2,60}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
+  const knownHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*(?:\d+\.)?\s*(?:Motor\s*(?:ve|&)?\s*Şanzıman|Donanım\s*Seviyesi|Sürüş\s*Dinamikleri|Tüketim\s*(?:ve|&)?\s*Kullanım|Genel\s*Bakış|Yakıt\s*Tüketimi|Mekanik\s*Karakter|Teknik\s*Bulgular)[^,.:\n*]{0,40}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
+
+  let text = rawText;
+  let chunks = text.split(generalHeadingRegex).map((c) => c.trim()).filter(Boolean);
+
+  if (chunks.length <= 1) {
+    chunks = text.split(knownHeadingRegex).map((c) => c.trim()).filter(Boolean);
+  }
+
+  // Clean remaining markdown markers from each chunk
+  const paragraphs = chunks
+    .map((c) => c.replace(/^[*\-:\s]+/, '').trim())
+    .filter((c) => c.length > 10);
+
+  if (paragraphs.length === 0 && rawText.trim().length > 0) {
+    return [rawText.replace(/^[*\-:\s]+/, '').trim()];
+  }
+
+  return paragraphs;
+}
+
+export function formatVehicleAssessmentText(rawText?: string): string {
+  const paragraphs = formatVehicleAssessmentParagraphs(rawText);
+  return paragraphs.join('\n\n');
+}

@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { ExpertDecisionSynthesis, ReportSupportingFact, safeString } from "@used-car-intelligence/shared";
+import { 
+  ExpertDecisionSynthesis, 
+  ReportSupportingFact, 
+  safeString,
+  formatVehicleAssessmentParagraphs
+} from "@used-car-intelligence/shared";
 import { 
   Sparkles, 
   CheckCircle2, 
@@ -131,9 +136,13 @@ export default function VehicleReportExpertSynthesis({
           </div>
 
           <h4 className="text-base font-bold text-orange-400">{synthesis.vehicleCharacter.headline}</h4>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {cleanRangeText(synthesis.vehicleCharacter.detailedAssessment)}
-          </p>
+          <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+            {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
+              <p key={idx} className="leading-relaxed">
+                {cleanRangeText(para)}
+              </p>
+            ))}
+          </div>
 
           {/* Daily Use Assessment Details */}
           {synthesis.dailyUseAssessment && (
