@@ -1411,13 +1411,8 @@ export default function VehicleReportScreen() {
               </View>
 
               <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Yıllık MTV</Text>
+                <Text style={styles.techLabelLight}>MTV</Text>
                 <Text style={styles.techValLight}>{mtvResult ? mtvResult.displayInstallment : '—'}</Text>
-                {Boolean(mtvResult) && (
-                  <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '600', marginTop: 2 }}>
-                    Toplam {mtvResult?.displayAnnual}
-                  </Text>
-                )}
               </View>
 
               <View style={styles.techCardLight}>
