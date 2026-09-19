@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   ComprehensiveVehicleReport,
   formatCanonicalPowerDisplay,
+  calculateVehicleMtv,
 } from "@used-car-intelligence/shared";
 import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import VehicleReportScoreHero from "./VehicleReportScoreHero";
@@ -94,6 +95,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
   const trunkValue = report.performanceUsage?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
   const weightValue = report.performanceUsage?.curbWeightKg || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
+
+  // Motorlu Taşıtlar Vergisi (MTV) Hesaplama
+  const mtvResult = calculateVehicleMtv({
+    modelYear: report.vehicleIdentity?.modelYear,
+    engineDisplacement: effectiveDisplacement || report.vehicleIdentity?.engineDisplacementCc,
+    fuelType: report.vehicleIdentity?.fuelType,
+    horsepower: rawPower,
+  });
 
   return (
     <div className="w-full text-slate-100 font-sans space-y-6 pb-8">
@@ -189,7 +198,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           <span className="text-base">📋</span>
           <h2 className="text-sm font-black text-white uppercase tracking-wider">Teknik Özellikler</h2>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 text-xs">
           <div className="bg-slate-950/60 border border-orange-500/30 p-3 rounded-xl flex flex-col justify-center shadow-md">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
             <span className="font-extrabold text-orange-400 text-sm mt-0.5">{powerLabel || "—"}</span>
@@ -197,6 +206,13 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Hacmi</span>
             <span className="font-bold text-slate-200 text-sm mt-0.5">{displacementLabel || "—"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Yıllık MTV</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{mtvResult ? mtvResult.displayInstallment : "—"}</span>
+            {mtvResult && (
+              <span className="text-[10px] text-slate-400 font-medium">Toplam {mtvResult.displayAnnual}</span>
+            )}
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>

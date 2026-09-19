@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -968,6 +968,12 @@ export default function VehicleReportScreen() {
     ?? (report?.performanceUsage as any)?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.displacementCc;
   const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '—');
+  const mtvResult = calculateVehicleMtv({
+    modelYear: report?.vehicleIdentity?.modelYear,
+    engineDisplacement: rawDisplacement || report?.vehicleIdentity?.engineDisplacementCc,
+    fuelType: report?.vehicleIdentity?.fuelType,
+    horsepower: rawPower,
+  });
   const hpValue = report?.performanceUsage?.powerHp || report?.vehicleIdentity?.enginePowerHp;
   const torqueValue = report?.performanceUsage?.torqueNm;
   const topSpeedValue = report?.performanceUsage?.topSpeedKmh;
@@ -1402,6 +1408,16 @@ export default function VehicleReportScreen() {
               <View style={styles.techCardLight}>
                 <Text style={styles.techLabelLight}>Motor Hacmi</Text>
                 <Text style={styles.techValLight}>{displacementDisplay}</Text>
+              </View>
+
+              <View style={styles.techCardLight}>
+                <Text style={styles.techLabelLight}>Yıllık MTV</Text>
+                <Text style={styles.techValLight}>{mtvResult ? mtvResult.displayInstallment : '—'}</Text>
+                {Boolean(mtvResult) && (
+                  <Text style={{ fontSize: 9, color: '#64748b', fontWeight: '600', marginTop: 2 }}>
+                    Toplam {mtvResult?.displayAnnual}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.techCardLight}>

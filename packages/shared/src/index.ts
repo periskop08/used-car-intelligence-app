@@ -991,5 +991,6 @@ export * from './vehicleConditionAndColors';
 export * from './vehicleFilterRanges';
 export * from './utils/normalizeVehicleReportPayload';
 export * from './utils/sanitizeTurkishDefectReason';
+export * from './utils/calculateVehicleMtv';
 export * from './types/feed-contract';
 
