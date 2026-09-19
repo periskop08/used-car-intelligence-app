@@ -9,6 +9,7 @@ import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
 import { vehicleTaxonomyApi } from "@/services/vehicleTaxonomyApi";
 import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/common/VehicleSearchModeSelector";
+import { CANONICAL_MOTORCYCLE_TYPES } from "@/contracts/motorcycleTaxonomyContract";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -765,14 +766,19 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Kasa Tipi */}
+              {/* Tip / Kasa Tipi */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tip / Kasa Tipi</label>
                 <select
                   disabled
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
                 >
                   <option value="">Seçiniz...</option>
+                  {CANONICAL_MOTORCYCLE_TYPES.map((t) => (
+                    <option key={t.key} value={t.label}>
+                      {t.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -789,9 +795,9 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Yakıt Türü */}
+              {/* Yakıt / Güç Ünitesi */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt / Güç Ünitesi</label>
                 <select
                   disabled
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
@@ -800,9 +806,9 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Şanzıman Tipi */}
+              {/* Motor Hacmi */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor Hacmi</label>
                 <select
                   disabled
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
@@ -811,9 +817,9 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Donanım Paketi */}
+              {/* Vites Tipi */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vites Tipi</label>
                 <select
                   disabled
                   className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
