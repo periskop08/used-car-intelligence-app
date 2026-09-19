@@ -156,6 +156,35 @@ export class VehicleReportSemanticValidationService {
       return timingValidation;
     }
 
+    // Rule 1.9: Seller Questions Anti-Generic & Quality Guard
+    const rawSellerQuestions = report.sellerQuestions || (report as any).premiumChecklistQuestions;
+    if (Array.isArray(rawSellerQuestions) && rawSellerQuestions.length > 0) {
+      const genericQuestionPatterns = [
+        'yağ sızıntısı var mı',
+        'motor arızası veya sızıntı',
+        'fren sisteminin durumu',
+        'fren sisteminin son durumu',
+        'şanzıman geçişleri sorunsuz mu',
+        'şanzıman geçişleri ne kadar akıcı',
+        'bakımları zamanında yapıldı mı',
+        'herhangi bir arıza var mı',
+        'aracın bakımları tam mı',
+      ];
+
+      for (const q of rawSellerQuestions) {
+        const qText = (q.questionText || (typeof q === 'string' ? q : '')).toLowerCase();
+        for (const pattern of genericQuestionPatterns) {
+          if (qText.includes(pattern)) {
+            return {
+              isValid: false,
+              reason: `Satıcıya sorulacak sorularda jenerik ve yüzeysel kalıp tespit edildi ("${q.questionText}"). Araca, motora (${report.vehicleIdentity?.engineCode || ''}) ve şanzımana özgü (triger, mekatronik, şanzıman yağı, DPF vb.) derin teknik sorular üretilmelidir.`,
+              needsRepair: true,
+            };
+          }
+        }
+      }
+    }
+
     // Rule 2: Absolute claims
     if (reportStr.includes('araç kesinlikle kazasızdır') || reportStr.includes('kesinlikle orijinaldir')) {
       return {

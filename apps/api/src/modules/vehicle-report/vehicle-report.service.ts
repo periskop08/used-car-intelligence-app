@@ -293,11 +293,19 @@ export class VehicleReportService implements OnModuleInit {
           this.logger.warn(`Cache lookup warning: ${cacheErr}`);
         }
       } else {
-        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache and clearing old fallback records.`);
+        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache and archiving old records.`);
         try {
+          await this.prisma.generatedVehicleReport.updateMany({
+            where: {
+              variantId,
+              status: VehicleReportStatus.COMPLETED,
+            },
+            data: {
+              status: VehicleReportStatus.ARCHIVED,
+            },
+          });
           await this.prisma.generatedVehicleReport.deleteMany({
             where: {
-              userId,
               variantId,
               OR: [
                 { provider: 'DETERMINISTIC_FALLBACK' },
@@ -306,7 +314,7 @@ export class VehicleReportService implements OnModuleInit {
             },
           });
         } catch (cleanErr) {
-          this.logger.warn(`Notice clearing old fallback reports: ${cleanErr}`);
+          this.logger.warn(`Notice archiving old reports on forceRefresh: ${cleanErr}`);
         }
       }
 
