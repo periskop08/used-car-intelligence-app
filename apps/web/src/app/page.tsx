@@ -8,6 +8,7 @@ import ShowcaseBadge from "@/components/listings/ShowcaseBadge";
 import { formatCurrency } from "@/utils/formatters";
 import { formatImageUrl } from "@/utils/media";
 import { vehicleTaxonomyApi } from "@/services/vehicleTaxonomyApi";
+import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/common/VehicleSearchModeSelector";
 
 // TorqueScout Homepage - Selector Update
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -22,6 +23,7 @@ export default function Home() {
   const [variants, setVariants] = useState<any[]>([]);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [promoTab, setPromoTab] = useState<'vitrin' | 'acil'>('vitrin');
+  const [searchMode, setSearchMode] = useState<VehicleSearchMode>('AUTOMOBILE');
 
   // Dynamic chunking: 1 row of up to 10 items (1*10), 2 rows when >10 (2*10), 3 rows when >20 (3*10)
   const featuredRows = useMemo(() => {
@@ -717,11 +719,127 @@ export default function Home() {
 
       {/* Interactive Vehicle Selector */}
       <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-6">
-        <h2 className="text-xl font-extrabold text-slate-200 flex items-center gap-2">
-          🚗 Hızlı Araç Sorgulama
+        <VehicleSearchModeSelector
+          value={searchMode}
+          onChange={setSearchMode}
+        />
+
+        <h2 className="text-xl font-extrabold text-slate-100 tracking-tight">
+          Hızlı Araç Sorgulama
         </h2>
 
-        <div className="flex flex-col gap-5">
+        {searchMode === "MOTORCYCLE" ? (
+          <div className="flex flex-col gap-5">
+            {/* Disabled Motorcycle Shell */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Marka */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marka</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Model Ailesi */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Model Ailesi</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Yıl */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Kasa Tipi */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Motor / Versiyon */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Yakıt Türü */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Şanzıman Tipi */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+
+              {/* Donanım Paketi */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+                <select
+                  disabled
+                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
+                >
+                  <option value="">Seçiniz...</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Subtle Friendly Info */}
+            <div className="text-center text-xs text-slate-400 font-medium py-1">
+              Motosiklet verileri yakında aktif olacaktır.
+            </div>
+
+            {/* Disabled Action */}
+            <button
+              type="button"
+              disabled
+              className="w-full mt-4 bg-slate-800 text-slate-500 font-bold py-4 rounded-2xl shadow-xl shadow-orange-500/10 cursor-not-allowed text-center transition"
+            >
+              Aracı İncele & AI Raporu Al
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-5">
           {/* Row 1: Marka | Model Ailesi | Yıl | Kasa Tipi */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Brand Dropdown */}
@@ -923,6 +1041,8 @@ export default function Home() {
         >
           Aracı İncele & AI Raporu Al
         </button>
+          </>
+        )}
       </div>
 
       {/* Nasıl Çalışır section moved to bottom */}
