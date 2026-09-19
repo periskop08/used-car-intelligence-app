@@ -1400,9 +1400,9 @@ export default function VehicleReportScreen() {
             defaultOpen={true}
           >
             <View style={styles.techGridLight}>
-              <View style={[styles.techCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
+              <View style={styles.techCardLight}>
                 <Text style={styles.techLabelLight}>Motor Gücü</Text>
-                <Text style={[styles.techValLight, { color: '#ea580c' }]}>{hpDisplay}</Text>
+                <Text style={styles.techValLight}>{hpDisplay}</Text>
               </View>
 
               <View style={styles.techCardLight}>
@@ -1410,9 +1410,9 @@ export default function VehicleReportScreen() {
                 <Text style={styles.techValLight}>{displacementDisplay}</Text>
               </View>
 
-              <View style={styles.techCardLight}>
+              <View style={[styles.techCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
                 <Text style={styles.techLabelLight}>MTV</Text>
-                <Text style={styles.techValLight}>{mtvResult ? mtvResult.displayInstallment : '—'}</Text>
+                <Text style={[styles.techValLight, { color: '#ea580c' }]}>{mtvResult ? mtvResult.displayInstallment : '—'}</Text>
               </View>
 
               <View style={styles.techCardLight}>

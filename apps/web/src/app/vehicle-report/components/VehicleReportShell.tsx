@@ -199,17 +199,17 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           <h2 className="text-sm font-black text-white uppercase tracking-wider">Teknik Özellikler</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-xs">
-          <div className="bg-slate-950/60 border border-orange-500/30 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px] shadow-md">
+          <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
-            <span className="font-extrabold text-orange-400 text-base mt-0.5">{powerLabel || "—"}</span>
+            <span className="font-bold text-slate-100 text-base mt-0.5">{powerLabel || "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Hacmi</span>
             <span className="font-bold text-slate-100 text-base mt-0.5">{displacementLabel || "—"}</span>
           </div>
-          <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
+          <div className="bg-slate-950/60 border border-orange-500/30 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px] shadow-md">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">MTV</span>
-            <span className="font-bold text-slate-100 text-base mt-0.5">{mtvResult ? mtvResult.displayInstallment : "—"}</span>
+            <span className="font-extrabold text-orange-400 text-base mt-0.5">{mtvResult ? mtvResult.displayInstallment : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>
