@@ -1,12 +1,32 @@
 /**
- * TORQUESCOUT — MOTOSİKLET MODU FİLTRE & TAKSONOMİ SÖZLEŞMESİ (FUTURE CONTRACT SCAFFOLD)
+ * TORQUESCOUT — MOTOSİKLET MODU FİLTRE & TAKSONOMİ SÖZLEŞMESİ
+ * FINAL LOCKED CONTRACT & FUTURE INTEGRATION SCAFFOLD
  * 
- * Bu dosya motosiklet veri entegrasyonu için kanonik tip listesini,
- * taksonomi alias normalizasyonunu ve tekil seçenek akıllı basamaklı (cascading)
- * otomatik seçim / geçersiz kılma (invalidation) sözleşmelerini tanımlar.
+ * 🔒 KİLİTLİ KURALLAR (FROZEN RULES):
+ * 1. MOTOR / VERSİYON ≠ MOTOR HACMİ:
+ *    - "Motor / Versiyon" alanı motor hacmini tekrar göstermek için kullanılmaz (Örn: "249 cc" yazılamaz).
+ *    - Amacı: Gerçek ticari/teknik varyantları ayırmaktır (Örn: GV250i, EFI, ABS, SP, R, S, Touring, Factory).
+ *    - "Motor Hacmi" ayrı bir sınıflandırma alanıdır (Örn: 151–250 cc).
  * 
- * NOT: Bu sözleşme gelecekteki veri entegrasyonu içindir. Gerçek motosiklet verisi
- * bağlanana kadar üretim otomobil taksonomisine ve API'lerine müdahale etmez.
+ * 2. MOTOR / VERSİYON İÇİN ZORLA SAHTE VERİ ÜRETME:
+ *    - Ayrı bir ticari versiyon yoksa tek varyant olarak çözülür, "249 cc V-Twin" gibi sentetik etiket üretilmez.
+ *    - cc, silindir, soğutma, zamanlama gibi özellikler ayrı teknik alanlarda tutulur.
+ * 
+ * 3. SINGLE OPTION AUTO-SELECT (GLOBAL KURAL):
+ *    - Herhangi bir dependent motorcycle filtresinde validOptions.length === 1 ise SİSTEM OTOMATİK SEÇER.
+ *    - Kullanıcıya gereksiz ikinci tıklama yaptırılmaz.
+ *    - Model Ailesi -> Yıl -> Tip / Kasa Tipi -> Motor / Versiyon -> Yakıt / Güç Ünitesi -> Motor Hacmi -> Vites Tipi
+ *      tüm zincir boyunca geçerlidir.
+ * 
+ * 4. CASCADING AUTO-SELECT:
+ *    - Bir alan otomatik seçildiğinde bir sonraki dependent alan hemen resolve edilir.
+ *    - 1 seçenek kaldığı sürece zincirleme (cascading) otomatik seçim devam eder.
+ * 
+ * 5. UPSTREAM CHANGE INVALIDATION & SIFIR STALE SELECTION:
+ *    - Kullanıcı üst seviyedeki herhangi bir seçimi (Marka, Model, Yıl vb.) değiştirdiğinde,
+ *      yeni seçimle uyumsuz tüm alt seçimler DERHAL TEMİZLENİR (CLEAR).
+ *    - UI hiçbir zaman eski yıla ait motor veya hacim seçimini yeni yılda gösteremez (Stale selection = 0).
+ *    - Ardından yeni seçenek listesi hesaplanır ve tek kalanlar otomatik seçilir.
  */
 
 export interface MotorcycleTypeItem {
@@ -18,7 +38,7 @@ export interface MotorcycleTypeItem {
 /**
  * 1. TİP / KASA TİPİ — KANONİK 17 SEÇENEK
  * Sahibinden + Arabam.com gerçek pazar sınıflarından türetilmiştir.
- * Uydurma kategori (Cafe Racer, Scrambler vb.) kesinlikle eklenmez.
+ * Uydurma kategori (Cafe Racer, Scrambler, Adventure vb.) kesinlikle eklenmez.
  */
 export const CANONICAL_MOTORCYCLE_TYPES: readonly MotorcycleTypeItem[] = [
   { key: 'CHOPPER_CRUISER', label: 'Chopper / Cruiser', aliases: ['chopper', 'cruiser'] },
@@ -61,7 +81,8 @@ export function normalizeMotorcycleType(input: string): string | null {
 }
 
 /**
- * 3. MOTOR HACMİ — KANONİK ARALIK SÖZLEŞMESİ
+ * 3. MOTOR HACMİ — KANONİK ARALIK SÖZLEŞMESİ (14 KANONİK ARALIK)
+ * Motor / Versiyon alanından kesinlikle bağımsızdır.
  */
 export const MOTORCYCLE_DISPLACEMENT_RANGES = [
   '0 - 50 cc',
@@ -100,7 +121,7 @@ export const MOTORCYCLE_TRANSMISSION_OPTIONS = [
 ] as const;
 
 /**
- * 6. ARKA PLANDA TUTULACAK TEKNİK ALANLAR (ANA FORMA EKLENMEZ)
+ * 6. ARKA PLANDA TUTULACAK TEKNİK ALANLAR (ANA FORMA DROPDOWN OLARAK EKLENMEZ)
  * - Motor Gücü (hp aralıkları)
  * - Zamanlama Tipi (2 Zamanlı / 4 Zamanlı)
  * - Silindir Sayısı (Tek Silindir, Çift Silindir, 3, 4, 6+)
@@ -129,26 +150,45 @@ export const MOTORCYCLE_TECHNICAL_FIELDS = {
 
 /**
  * 7. MOTOSİKLET 8 ALANLI FİLTRE FORM DURUMU
+ * 
+ * SEMANTİK ROLLER (BİRBİRİNİN YERİNE KULLANILAMAZ):
+ * - MARKA: manufacturer identity
+ * - MODEL AİLESİ: commercial model family
+ * - YIL: model year
+ * - TİP / KASA TİPİ: motorcycle category (17 canonical options)
+ * - MOTOR / VERSİYON: real canonical commercial/technical variant distinction (Örn: EFI, ABS, SP)
+ * - YAKIT / GÜÇ ÜNİTESİ: powertrain type (Benzin / Elektrik)
+ * - MOTOR HACMİ: displacement range / canonical cc classification (Örn: 151-250 cc)
+ * - VİTES TİPİ: transmission type (Manuel, Yarı Otomatik, Otomatik)
  */
 export interface MotorcycleFilterState {
   brand: string;
   model: string;
   year: string;
   bodyType: string;        // Tip / Kasa Tipi
-  engineVersion: string;   // Motor / Versiyon
+  engineVersion: string;   // Motor / Versiyon (Asla cc ile doldurulmaz)
   powertrain: string;      // Yakıt / Güç Ünitesi
-  displacement: string;    // Motor Hacmi (cc)
+  displacement: string;    // Motor Hacmi (Ayrı cc aralığı)
   transmission: string;    // Vites Tipi
 }
+
+export const MOTORCYCLE_FILTER_KEYS: readonly (keyof MotorcycleFilterState)[] = [
+  'brand',
+  'model',
+  'year',
+  'bodyType',
+  'engineVersion',
+  'powertrain',
+  'displacement',
+  'transmission',
+] as const;
 
 /**
  * 8. SINGLE-OPTION AUTO-SELECT & CASCADING RECURSION CONTRACT
  * 
- * Gelecekte gerçek veri bağlandığında uygulanacak kural:
- * - Üst seçimlerden sonra bir alt alanda tek (1) geçerli seçenek kalmışsa
- *   kullanıcıya tekrar seçtirmeden otomatik olarak seçilir.
- * - Bu seçim bir sonraki alanı da tetikler ve zincirleme (cascading)
- *   olarak tek seçenekler otomatik çözülür.
+ * Gelecekte gerçek veri bağlandığında:
+ * - Bir alanda tek (1) geçerli seçenek kaldığında kullanıcıya tekrar seçtirmeden otomatik seçilir.
+ * - Bu seçim bir sonraki alanı da tetikler ve zincirleme (cascading) devam eder.
  */
 export function evaluateSingleOptionCascade<T extends Record<string, string>>(
   current: T,
@@ -168,33 +208,51 @@ export function evaluateSingleOptionCascade<T extends Record<string, string>>(
 }
 
 /**
- * 9. UPSTREAM INVALIDATION CONTRACT
+ * 9. UPSTREAM INVALIDATION CONTRACT (STALE SELECTION = 0)
  * 
- * Kullanıcı üst seviyedeki bir alanı (örn: Marka, Model veya Yıl) değiştirdiğinde,
- * yeni seçime uymayan bağımlı alt alanlar temizlenmeli (invalidation),
- * ardından yeni seçenek listesi hesaplanarak tek kalanlar otomatik seçilmelidir.
+ * Kullanıcı üst seviyedeki bir alanı değiştirdiğinde (örn: Yıl 2024 -> 2023):
+ * - Alt seviyedeki bağımlı seçimler derhal temizlenir.
+ * - Geçersiz eski değerlerin kalması kesinlikle engellenir.
  */
 export function invalidateDownstreamFields(
   state: MotorcycleFilterState,
   trigger: keyof MotorcycleFilterState
 ): MotorcycleFilterState {
-  const fieldsOrder: (keyof MotorcycleFilterState)[] = [
-    'brand',
-    'model',
-    'year',
-    'bodyType',
-    'engineVersion',
-    'powertrain',
-    'displacement',
-    'transmission',
-  ];
-
-  const triggerIndex = fieldsOrder.indexOf(trigger);
+  const triggerIndex = MOTORCYCLE_FILTER_KEYS.indexOf(trigger);
   if (triggerIndex === -1) return state;
 
   const nextState = { ...state };
-  for (let i = triggerIndex + 1; i < fieldsOrder.length; i++) {
-    nextState[fieldsOrder[i]] = '';
+  for (let i = triggerIndex + 1; i < MOTORCYCLE_FILTER_KEYS.length; i++) {
+    nextState[MOTORCYCLE_FILTER_KEYS[i]] = '';
   }
   return nextState;
+}
+
+/**
+ * 10. RECURSIVE CASCADING RESOLVER SPECIFICATION
+ * 
+ * Gelecekte gerçek veri bağlandığında kullanılacak referans zincir çözücü:
+ * Tek seçenekler tükenene veya birden fazla seçenek kalana kadar zincirleme seçer.
+ */
+export function resolveCascadingChain(
+  initialState: MotorcycleFilterState,
+  optionsProvider: (state: MotorcycleFilterState, key: keyof MotorcycleFilterState) => string[]
+): MotorcycleFilterState {
+  let currentState = { ...initialState };
+  let mutated = false;
+
+  for (const key of MOTORCYCLE_FILTER_KEYS) {
+    if (!currentState[key]) {
+      const options = optionsProvider(currentState, key);
+      if (options.length === 1) {
+        currentState[key] = options[0];
+        mutated = true;
+      } else {
+        // Birden fazla veya sıfır seçenek kaldığında zincir durur
+        break;
+      }
+    }
+  }
+
+  return currentState;
 }
