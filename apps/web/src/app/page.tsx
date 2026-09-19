@@ -762,14 +762,7 @@ export default function Home() {
 
             {/* Year Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
-                {isYearAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
               <select
                 value={selectedYear}
                 onChange={(e) => handleYearChange(e.target.value)}
@@ -787,14 +780,7 @@ export default function Home() {
 
             {/* Body Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
-                {isBodyTypeAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
               <select
                 value={selectedBodyType}
                 onChange={(e) => handleBodyTypeChange(e.target.value)}
@@ -815,14 +801,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Engine Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
-                {isEngineAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
               <select
                 value={selectedEngine}
                 onChange={(e) => handleEngineChange(e.target.value)}
@@ -840,14 +819,7 @@ export default function Home() {
 
             {/* Fuel Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
-                {isFuelTypeAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
               <select
                 value={selectedFuelType}
                 onChange={(e) => handleFuelTypeChange(e.target.value)}
@@ -867,14 +839,7 @@ export default function Home() {
 
             {/* Transmission Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
-                {isTransmissionAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
               <select
                 value={selectedTransmission}
                 onChange={(e) => handleTransmissionChange(e.target.value)}
@@ -892,14 +857,7 @@ export default function Home() {
 
             {/* Trim Dropdown */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
-                {isTrimAutoSelected && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                    Otomatik
-                  </span>
-                )}
-              </div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
               <select
                 value={selectedTrim}
                 onChange={(e) => handleTrimChange(e.target.value)}

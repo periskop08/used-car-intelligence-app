@@ -1186,14 +1186,7 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
-                    {isYearAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Model Yılı</label>
                   <select
                     value={selectedYear}
                     disabled={!selectedModel || loadingYears || years.length === 0}
@@ -1208,14 +1201,7 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
-                    {isBodyTypeAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
                   <select
                     value={selectedBodyType}
                     disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
@@ -1233,14 +1219,7 @@ export default function CreateListing() {
               {/* Row 2: Motor / Versiyon | Yakıt Türü | Şanzıman Tipi | Donanım Paketi */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
-                    {isEngineAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Motor / Versiyon</label>
                   <select
                     value={selectedEngine}
                     disabled={!selectedBodyType || loadingEngines || engines.length === 0}
@@ -1255,14 +1234,7 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
-                    {isFuelTypeAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
                   <select
                     value={selectedFuelType}
                     disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0}
@@ -1277,14 +1249,7 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
-                    {isTransmissionAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
                   <select
                     value={selectedTransmission}
                     disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
@@ -1299,14 +1264,7 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
-                    {isTrimAutoSelected && (
-                      <span className="text-[9px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded font-bold uppercase">
-                        Otomatik
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
                   <select
                     value={selectedTrim}
                     disabled={!selectedTransmission || loadingTrims || trims.length === 0}
