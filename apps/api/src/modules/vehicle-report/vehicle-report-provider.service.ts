@@ -325,6 +325,7 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         category: q.category || 'MEKANİK',
         questionText: typeof q === 'string' ? q : (q.questionText || q.question || JSON.stringify(q)),
         expectedAnswerHint: q.expectedAnswerHint || q.hint || undefined,
+        redFlagAnswerHint: q.redFlagAnswerHint || q.redFlag || undefined,
         supportingFactIds: ['AI_RESEARCH_ENGINE'],
       }));
     }

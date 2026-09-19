@@ -189,7 +189,19 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
      a) 'inspectionChecklist' içinde kesin/şartsız bir "AdBlue Sistemi ve Seviyesini Kontrol Et" vb. kontrol adımı KESİNLİKLE ÜRETİLEMEZ.
      b) 'sellerQuestions' içinde "AdBlue deposu ne zaman dolduruldu", "Hangi marka AdBlue kullanıldı" gibi araçta AdBlue deposu varmış gibi kesin sorular KESİNLİKLE ÜRETİLEMEZ.
      c) Araçta kesin bir AdBlue tankı veya SCR sistemi olduğu iddia edilemez.
-   - Yalnızca genel eğitici açıklamalarda şartlı dil korunabilir (örn. "SCR/AdBlue sistemi bulunan modellerde...").`;
+   - Yalnızca genel eğitici açıklamalarda şartlı dil korunabilir (örn. "SCR/AdBlue sistemi bulunan modellerde...").
+11. SATICIYA SORULACAK KRİTİK SORULAR (SELLER QUESTIONS) KALİTE VE DERİNLİK KURALI:
+    - 'sellerQuestions' (veya 'premiumChecklistQuestions') listesi, ikinci el araç alıcısını koruyan, satıcının aracına ne kadar iyi baktığını veya arızaları gizleyip gizlemediğini ortaya çıkaran tam 4 ila 6 adet derin teknik mülakat sorusundan oluşmalıdır.
+    - KESİNLİKLE YASAK OLAN JENERİK SORULAR: "Araçta herhangi bir motor arızası veya sızıntı var mı?", "Şanzıman geçişleri sorunsuz mu?", "Fren sisteminin durumu nedir?", "Bakımları zamanında yapıldı mı?" gibi her araca sorulabilecek yüzeysel, kalıp sorular KESİNLİKLE ÜRETİLEMEZ!
+    - ARACA VE GÜÇ AKTARMA ORGANLARINA ÖZEL ODAKLANMA:
+      * Motor mimarisinin ve motor kodunun bilinen hassas noktaları (Örn: Triger kayışı/zinciri son değişim km'si ve servis faturası, devirdaim/termostat gövdesi değişimi, subap erimesi/yağ yakma durumu, turbo revizyonu/enjektör geri dönüşleri, DPF temizliği/rejenerasyon sıklığı).
+      * Şanzıman türüne özgü bakım ve kritik parça ömrü (Örn: Çift kavrama DSG/EDC/Powershift'te mekatronik basınç tüpü/kartı veya kavrama seti değişti mi; ıslak kavrama veya tork konvertörlü otomatiklerde periyodik şanzıman yağı ve filtre değişim faturası mevcut mu; manuelde baskı-balata ve oynar göbekli volan durumu).
+      * Yürüyen aksam, süspansiyon ve araca özel donanımlar (Örn: Elektronik park freni motoru, sunroof tahliye kanalları/su alma geçmişi, adaptif amortisörler vb.).
+    - ZORUNLU ALANLAR (HER SORU İÇİN):
+      * 'questionText': Satıcıya yöneltilecek net, teknik ve nokta atışı soru.
+      * 'category': 'MEKANİK' | 'ŞANZIMAN' | 'BAKIM' | 'KRONİK_RİSK'
+      * 'expectedAnswerHint': Satıcıdan beklenen somut, faturalı ve güven veren ideal yanıt (Örn: "80.000 km'de yetkili serviste orijinal triger seti ve devirdaim pompası faturasıyla değişti.").
+      * 'redFlagAnswerHint': Alıcının şüphelenmesini gerektiren kaçamak, faturasız veya arıza gizlemeye yönelik kırmızı bayrak yanıtı (Örn: "'Usta baktı kayış iyi durumda gerek yok dedi' denmesi, şanzıman yağı değişim kaydının olmaması veya faturasız sanayi bakımı iddiası.").`;
   }
 
   buildUserPrompt(vehicleContext: any): string {
@@ -303,6 +315,11 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle (Örn. Yüksek otoyol ara hızlanması ve ani tork patlaması bekleyen performans odaklı sürücüler, geniş çocuk pusetleri ve 3 yetişkinle sürekli uzun yola çıkan kalabalık aileler). Her profili en az 2-3 cümleyle gerekçelendir. KESİNLİKLE "off-road yapanlar", "yarış pistine çıkanlar", "ağır yük çekenler" gibi binek araca uymayan absürt klişeler YAZMA!
     - **Hangi Şartlarda Değerlendirilebilir? ('purchaseConditions'):** En az 3 somut ekspertiz ve bakım koşulu belirt (Örn. Şanzıman kavrama ve geçiş basınç testi, triger seti ve subap zamanlaması kontrolü, düzenli yetkili/özel servis bakım kayıtları). Her koşulun teknik önemini en az 2 cümleyle açıkla.
     - **Hangi Durumda Satın Almaktan Vazgeçilmeli? ('walkAwayConditions'):** En az 3 kritik vazgeçme kriteri belirt (Örn. Taşıyıcı şasi, podye, direk veya airbag müdahalesi; şanzımanda kalkışta şiddetli titreme, silkeleme veya vitese geçmeme; motor bloğunda hararet kaynaklı deformasyon veya kompresyon kaybı). Neden vazgeçilmesi gerektiğini en az 2 cümleyle açıkla.
+13. SATICIYA SORULACAK KRİTİK SORULAR ('sellerQuestions') STANDARDI (JENERİK VE YÜZEYSEL SORULAR KESİNLİKLE YASAKTIR):
+    - KESİNLİKLE YASAK: "Araçta herhangi bir motor arızası veya sızıntı var mı?", "Şanzıman geçişleri sorunsuz mu?", "Fren sisteminin durumu nedir?", "Bakımları yapıldı mı?" gibi jenerik, standart sorular KESİNLİKLE ÜRETİLEMEZ!
+    - Tam 4 ila 6 adet bu aracın motor (${engine || 'Motor'}), şanzıman (${trans || 'Şanzıman'}) ve donanımına (${trim || 'Paket'}) doğrudan nokta atışı yapan derin teknik mülakat sorusu üret.
+    - Motorun spesifik mekanik hassasiyetlerini (triger kayışı/zinciri son değişim km'si ve faturası, devirdaim/soğutma sıvı kaçağı, turbo/enjektör durumu), şanzımanın özel bakım disiplinini (kuru/ıslak kavrama aşınması, şanzıman yağı değişim periyodu, mekatronik basınç geçmişi) ve araca özel donanımları hedef al.
+    - Her soru için hem satıcıdan beklenen somut, faturalı ideal cevabı ('expectedAnswerHint') hem de alıcının şüphelenmesi gereken kaçamak veya arıza gizleyici kırmızı bayrak cevabını ('redFlagAnswerHint') eksiksiz doldur.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
@@ -339,7 +356,14 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   },
   "executiveSummary": { "oneSentenceSummary": "...", "strongestAdvantage": "...", "biggestRisk": "..." },
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
-  "sellerQuestions": [ { "questionText": "...", "category": "MEKANİK" } ],
+  "sellerQuestions": [
+    {
+      "questionText": "Bu aracın motor ve şanzımanına (${engine || ''} ${trans || ''}) özgü kronik zayıflık veya ağır bakım geçmişini hedef alan teknik mülakat sorusu (örn: Triger kayışı/zinciri ve devirdaim pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?)...",
+      "category": "MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK",
+      "expectedAnswerHint": "Satıcıdan beklenen somut, servis faturalı ve güven veren ideal yanıt (örn: '85.000 km'de yetkili serviste faturasıyla değişti, faturası ve servis dökümü mevcut')...",
+      "redFlagAnswerHint": "Satıcının kaçamak, faturasız veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Usta baktı daha gider dedi, fatura yok' veya soruyu geçiştirme)..."
+    }
+  ],
   "technicalSpecifications": {
     "generation": "B8 / G20 / W205 vb.",
     "faceliftStatus": "Makyajlı Kasa | Makyaj Öncesi | Tek Kasa",
