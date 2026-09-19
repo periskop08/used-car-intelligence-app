@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleCharacterResearchService } from '../research/vehicle-character-research.service';
 import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
+import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -12,6 +13,9 @@ export class VehicleReportContextBuilderService {
     private prisma: PrismaService,
     private vehicleCharacterResearch: VehicleCharacterResearchService,
     @Optional() private powerEnrichmentService?: VehiclePowerEnrichmentService,
+    @Optional()
+    @Inject(forwardRef(() => VariantTechnicalFactsService))
+    private variantTechnicalFactsService?: VariantTechnicalFactsService,
   ) {}
 
   async buildVehicleContext(variantId: string) {
@@ -78,7 +82,24 @@ export class VehicleReportContextBuilderService {
     // ─────────────────────────────────────────────────────────────────────────
     const isHybridVariant = variant.fuelType === 'HYBRID' || (variant.engine?.fuelType || '').toUpperCase() === 'HYBRID';
     const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
-    const rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+    let rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+
+    if (!rawEngineCc && !isElectricVariant && this.variantTechnicalFactsService) {
+      try {
+        let facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(variantId);
+        if (!facts?.engineDisplacementCc && facts?.engineDisplacement?.status !== 'VERIFIED') {
+          facts = await this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(variantId);
+        }
+        if (facts?.engineDisplacementCc) {
+          rawEngineCc = facts.engineDisplacementCc;
+        } else if (facts?.engineDisplacement?.valueCc) {
+          rawEngineCc = facts.engineDisplacement.valueCc;
+        }
+      } catch (err: any) {
+        this.logger.warn(`[CONTEXT BUILDER] Technical facts displacement resolution skipped: ${err?.message}`);
+      }
+    }
+
     const engineCc = isElectricVariant ? null : rawEngineCc;
 
     const transName = variant.transmission?.name || null;

@@ -503,7 +503,11 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     if (isEv) {
       baseReport.vehicleIdentity.engineDisplacementCc = undefined;
     } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
-      baseReport.vehicleIdentity.engineDisplacementCc = specs.engineDisplacementCc;
+      baseReport.vehicleIdentity.engineDisplacementCc = Number(specs.engineDisplacementCc);
+    } else if (validationContext?.vehicleIdentity?.engineDisplacementCc) {
+      baseReport.vehicleIdentity.engineDisplacementCc = Number(validationContext.vehicleIdentity.engineDisplacementCc);
+    } else if (validationContext?.performanceData?.engineDisplacementCc) {
+      baseReport.vehicleIdentity.engineDisplacementCc = Number(validationContext.performanceData.engineDisplacementCc);
     }
     if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
     if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
@@ -609,11 +613,16 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null) ? currentPerf.combinedFuelL100km : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km),
       trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
       curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
+      engineDisplacementCc: isEv ? undefined : baseReport.vehicleIdentity.engineDisplacementCc,
       rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
         ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`
         : baseReport.performanceUsage?.rangeFactorsNote,
       supportingFactIds: (resolvedPowerSource === 'VEHICLE_DATABASE' || hasDbPerformance) ? ['VEHICLE_DATABASE'] : (resolvedPowerSource === 'VERIFIED_STAGE_1' ? ['AI_RESEARCH_ENGINE'] : ['AI_VERIFIED_TECHNICAL_SPECS']),
-    };
+    } as any;
+
+    if (baseReport.technicalSpecifications && baseReport.vehicleIdentity.engineDisplacementCc && !isEv) {
+      baseReport.technicalSpecifications.engineDisplacementCc = baseReport.vehicleIdentity.engineDisplacementCc;
+    }
   }
 
   private sanitizeIncompatibleReportFields(baseReport: ComprehensiveVehicleReport, contextJson: any): void {

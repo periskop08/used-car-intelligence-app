@@ -43,6 +43,9 @@ interface ComprehensiveReport {
     modelYear: number;
     engineCode?: string;
     enginePowerHp?: number;
+    engineDisplacementCc?: number;
+    sourcePowerValue?: number;
+    sourcePowerUnit?: string;
     transmissionName?: string;
     fuelType?: string;
   };
@@ -52,6 +55,10 @@ interface ComprehensiveReport {
   };
   performanceUsage: {
     powerHp?: number;
+    sourcePowerValue?: number;
+    sourcePowerUnit?: string;
+    powerSemantic?: string;
+    engineDisplacementCc?: number;
     torqueNm?: number;
     topSpeedKmh?: number;
     zeroToHundredSec?: number;
@@ -954,6 +961,13 @@ export default function VehicleReportScreen() {
   const powerSemantic = report?.performanceUsage?.powerSemantic 
     ?? (report?.vehicleIdentity as any)?.powerSemantic;
   const hpDisplay = formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
+  const isElectricVehicle = (report?.vehicleIdentity?.fuelType || '').toLowerCase().includes('elektrik');
+  const rawDisplacement = report?.vehicleIdentity?.engineDisplacementCc
+    ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.engineDisplacementCc
+    ?? (report as any)?.technicalSpecifications?.engineDisplacementCc
+    ?? (report?.performanceUsage as any)?.engineDisplacementCc
+    ?? (report?.performanceUsage as any)?.displacementCc;
+  const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '—');
   const hpValue = report?.performanceUsage?.powerHp || report?.vehicleIdentity?.enginePowerHp;
   const torqueValue = report?.performanceUsage?.torqueNm;
   const topSpeedValue = report?.performanceUsage?.topSpeedKmh;
@@ -1430,6 +1444,11 @@ export default function VehicleReportScreen() {
               <View style={[styles.techCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
                 <Text style={styles.techLabelLight}>Motor Gücü</Text>
                 <Text style={[styles.techValLight, { color: '#ea580c' }]}>{hpDisplay}</Text>
+              </View>
+
+              <View style={styles.techCardLight}>
+                <Text style={styles.techLabelLight}>Motor Hacmi</Text>
+                <Text style={styles.techValLight}>{displacementDisplay}</Text>
               </View>
 
               <View style={styles.techCardLight}>

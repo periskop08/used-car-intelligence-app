@@ -391,6 +391,7 @@ export class VehicleService {
       year: variant.year,
       bodyType: variant.generation.bodyType,
       engine: variant.engine.code,
+      engineDisplacement: variant.engine?.displacement || (variant.specs?.specs as any)?.engineDisplacementCc || null,
       fuelType: getFuelTypeTr(variant.engine?.fuelType || variant.fuelType),
       transmission: variant.transmission.name,
       trim: variant.trim.name,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   ComprehensiveVehicleReport,
   formatCanonicalPowerDisplay,
@@ -8,6 +9,7 @@ import {
   sanitizeTurkishInspectionInstruction,
 } from "@used-car-intelligence/shared";
 import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
+import { vehicleTaxonomyApi } from "../../../services/vehicleTaxonomyApi";
 import { 
   ShieldCheck, 
   AlertTriangle, 
@@ -81,6 +83,30 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const torqueUnit = (report.performanceUsage as any)?.torqueUnit || (report.vehicleIdentity as any)?.torqueUnit || 'Nm';
   const numericTorque = typeof rawTorque === 'number' ? rawTorque : (typeof rawTorque === 'string' ? parseInt(rawTorque.replace(/\D/g, ''), 10) : null);
 
+  // Motor Displacement (Engine CC) Resolution
+  const isEvFuel = formatFuelTypeTr(report.vehicleIdentity?.fuelType) === 'Elektrik';
+  const rawDisplacement = report.vehicleIdentity?.engineDisplacementCc 
+    ?? (report.expertDecisionSynthesis as any)?.technicalSpecifications?.engineDisplacementCc 
+    ?? (report as any).technicalSpecifications?.engineDisplacementCc 
+    ?? (report.performanceUsage as any)?.engineDisplacementCc 
+    ?? (report.performanceUsage as any)?.displacementCc;
+
+  const [asyncDisplacement, setAsyncDisplacement] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (rawDisplacement || isEvFuel || !report.variantId) return;
+    let isMounted = true;
+    vehicleTaxonomyApi.getTechnicalSpecs(report.variantId).then((specs) => {
+      if (!isMounted || !specs) return;
+      const cc = specs.engineDisplacementCc || specs.engineDisplacement?.valueCc || null;
+      if (cc) setAsyncDisplacement(cc);
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [report.variantId, rawDisplacement, isEvFuel]);
+
+  const effectiveDisplacement = rawDisplacement ?? asyncDisplacement;
+  const displacementLabel = isEvFuel ? 'Elektrik' : (effectiveDisplacement ? `${effectiveDisplacement} cc` : null);
+
   const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
   const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh;
   const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
@@ -109,6 +135,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
             {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} ` : ""}
+            {displacementLabel && !isEvFuel ? `${displacementLabel} ` : ""}
             {powerLabel ? `(${powerLabel}${numericTorque ? ` / ${numericTorque} ${torqueUnit}` : ""}) ` : ""}• 
             {report.vehicleIdentity.transmissionName} • {formatFuelTypeTr(report.vehicleIdentity.fuelType)}
             {combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : ""}
@@ -609,16 +636,20 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         </div>
       )}
 
-      {/* TEKNİK ÖZELLİKLER KARTLARI (HP, Hız, 0-100, Tüketim, Bagaj, Ağırlık) */}
+      {/* TEKNİK ÖZELLİKLER KARTLARI (HP, Hacim, Hız, 0-100, Tüketim, Bagaj, Ağırlık) */}
       <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
         <div className="flex items-center gap-2 border-b border-white/10 pb-3">
           <span className="text-base">📋</span>
           <h2 className="text-sm font-black text-white uppercase tracking-wider">Teknik Özellikler</h2>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
           <div className="bg-slate-950/60 border border-orange-500/30 p-3 rounded-xl flex flex-col justify-center shadow-md">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Gücü</span>
             <span className="font-extrabold text-orange-400 text-sm mt-0.5">{powerLabel || "—"}</span>
+          </div>
+          <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Motor Hacmi</span>
+            <span className="font-bold text-slate-200 text-sm mt-0.5">{displacementLabel || "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3 rounded-xl flex flex-col justify-center">
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Maksimum Hız</span>
