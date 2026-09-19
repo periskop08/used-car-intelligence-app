@@ -9,7 +9,6 @@ import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import VehicleReportScoreHero from "./VehicleReportScoreHero";
 import { vehicleTaxonomyApi } from "../../../services/vehicleTaxonomyApi";
 import { 
-  ShieldCheck, 
   Car, 
   RefreshCcw, 
   HelpCircle,
@@ -139,40 +138,6 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         </div>
       </div>
 
-      {/* SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-      {Array.isArray(report.prePurchaseChecks) && report.prePurchaseChecks.length > 0 && (
-        <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-            <ShieldCheck className="w-5 h-5 text-orange-400" />
-            <h2 className="text-sm font-black text-white uppercase tracking-wider">Satın Alma Öncesi Ekspertiz Kontrol Listesi</h2>
-          </div>
-          <div className="space-y-2.5 text-xs">
-            {report.prePurchaseChecks.map((chk, idx) => (
-              <div key={idx} className="p-3.5 bg-slate-950/60 border border-white/5 rounded-xl flex items-start gap-3">
-                <span className="text-lg shrink-0">🔍</span>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white">{chk.title}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                      chk.priority === 'KRİTİK' 
-                        ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' 
-                        : chk.priority === 'ÖNEMLİ' 
-                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
-                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                    }`}>
-                      {chk.priority} ÖNCELİK
-                    </span>
-                  </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">{chk.instruction}</p>
-                  {chk.targetComponent && (
-                    <span className="text-[10px] text-slate-400 block">Hedef Parça: {chk.targetComponent}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Legacy Schema Version Warning & Free Upgrade Banner */}
       {(!report.expertDecisionSynthesis || (report.schemaVersion || 1) < 2) && (

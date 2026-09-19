@@ -1382,53 +1382,6 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* 4. SATIN ALMA ÖNCESİ EKSPERTİZ KONTROL LİSTESİ */}
-          {Array.isArray(report.prePurchaseChecks) && report.prePurchaseChecks.length > 0 && (
-            <CollapsibleLightSection
-              title="Satın Alma Öncesi Ekspertiz Kontrol Listesi"
-              badgeText={`${report.prePurchaseChecks.length} Adım`}
-              iconName="clipboard-outline"
-              iconColor="#7c3aed"
-              iconBgColor="#f5f3ff"
-              borderColor="#ddd6fe"
-              titleColor="#6d28d9"
-              defaultOpen={true}
-            >
-              {(report.prePurchaseChecks || []).map((chk, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.8}
-                  style={styles.checkCardLight}
-                  onPress={() =>
-                    setActiveModalData({
-                      title: chk.title,
-                      subtitle: 'Ekspertiz Kontrol Adımı',
-                      type: 'purple',
-                      badge: `${chk.priority} ÖNCELİK`,
-                      content: chk.instruction,
-                      extraInfo: chk.targetComponent ? `Hedef Parça/Bölge: ${chk.targetComponent}` : undefined,
-                      icon: 'clipboard',
-                    })
-                  }
-                >
-                  <Text style={styles.checkIconLight}>🔍</Text>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={styles.checkTitleLight}>{chk.title}</Text>
-                      <View style={styles.priorityBadgeLight}>
-                        <Text style={styles.priorityBadgeTextLight}>{chk.priority} ÖNCELİK</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.checkDescLight} numberOfLines={2}>{chk.instruction}</Text>
-                    {Boolean(chk.targetComponent) && (
-                      <Text style={styles.targetCompLight}>Hedef Parça: {chk.targetComponent}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </CollapsibleLightSection>
-          )}
-
           {/* 5. TEKNİK ÖZELLİKLER */}
           <CollapsibleLightSection
             title="Teknik Özellikler"
