@@ -1648,13 +1648,29 @@ export class VehicleReliabilityResearchService {
     // DIMENSION 2: Engine Applicability (Fuel, Family, Displacement)
     // -------------------------------------------------------------
     const targetEngine = (input.engineCode || '').toLowerCase();
-    const isTargetDiesel = input.powertrainType === 'ICE_DIESEL' || /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bcrdi\b|\bcdti\b/i.test(targetEngine);
-    const isTargetPetrol = input.powertrainType === 'ICE_PETROL' || /benzin|petrol|\btce\b|\btsi\b|\btfsi\b|\bthp\b|\bpuretech\b/i.test(targetEngine);
-    const targetPowertrain = input.powertrainType || (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : (isTargetDiesel ? 'ICE_DIESEL' : isTargetPetrol ? 'ICE_PETROL' : undefined));
+    const isTargetDiesel =
+      input.powertrainType === 'ICE_DIESEL' ||
+      /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bbluehdi\b|\bcrdi\b|\bcdti\b|\bmultijet\b|\bjtd\b|\bcdi\b|\bd4d\b|\btdci\b|\becoblue\b|\bbluetec\b|\bi-dtec\b/i.test(
+        targetEngine,
+      );
+    const isTargetPetrol =
+      input.powertrainType === 'ICE_PETROL' ||
+      /benzin|petrol|\btce\b|\btsi\b|\btfsi\b|\bthp\b|\bpuretech\b|\becoboost\b|\bt-gdi\b|\bfirefly\b/i.test(
+        targetEngine,
+      );
+    const targetPowertrain =
+      input.powertrainType ||
+      (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : isTargetDiesel ? 'ICE_DIESEL' : isTargetPetrol ? 'ICE_PETROL' : undefined);
 
     // Fuel & Emissions Architecture Mismatch
-    const isDieselDefect = /(dizel|diesel|\btdi\b|\bhdi\b|\bcrdi\b|\bdci\b|\bcdi\b|\bd4d\b|\bb47\b|\bn47\b|\bea189\b|\bea288\b|dpf|partikül filtresi|adblue)/i.test(combinedContext);
-    const isPetrolDefect = /(benzin|petrol|gasoline|\btsi\b|\btfsi\b|\btce\b|\becoboost\b|\bb48\b|\bb58\b|\bn20\b|\bea888\b|\b2zr\b|buji|spark plug)/i.test(combinedContext);
+    const isDieselDefect =
+      /(dizel|diesel|\btdi\b|\bhdi\b|\bbluehdi\b|\bcrdi\b|\bdci\b|\bcdi\b|\bd4d\b|\bmultijet\b|\bjtd\b|\becoblue\b|\btdci\b|\bbluetec\b|\bb47\b|\bn47\b|\bea189\b|\bea288\b|dpf|partikül filtresi|adblue|kızdırma bujisi)/i.test(
+        combinedContext,
+      );
+    const isPetrolDefect =
+      /(benzin|petrol|gasoline|\btsi\b|\btfsi\b|\btce\b|\becoboost\b|\bpuretech\b|\bthp\b|\bt-gdi\b|\bb48\b|\bb58\b|\bn20\b|\bea888\b|\b2zr\b|buji|spark plug|ateşleme bobini|boğaz kelebeği)/i.test(
+        combinedContext,
+      );
     const isEvDefect = /(yüksek voltaj|high voltage|hv battery|çekiş bataryası|iccu|onboard charger|obc)/i.test(combinedContext);
 
     if (isDieselDefect && targetPowertrain && targetPowertrain !== 'ICE_DIESEL') {

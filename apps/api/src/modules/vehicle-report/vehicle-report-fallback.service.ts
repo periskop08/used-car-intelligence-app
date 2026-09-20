@@ -231,10 +231,17 @@ export class VehicleReportFallbackService {
         ? `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp} Toplam Sistem Gücü${torque ? ' / ' + torque + ' Benzinli Motor Torku' : ''})`.trim()
         : `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim());
     const isDualClutch = /dct|dsg|edc|s-tronic|powershift|çift kavrama|yarı otomatik/i.test(`${trans} ${vIdentity.transmissionCode || ''}`);
+    const isCvt = /cvt|multidrive|x-tronic/i.test(`${trans} ${vIdentity.transmissionCode || ''}`);
+    const isTorqueConverter = /tork konvert|tam otomatik|zf|eat8|eat6|tiptronic|steptronic|geartronic|g-tronic/i.test(`${trans} ${vIdentity.transmissionCode || ''}`);
+    const isSingleClutch = /dualogic|etg|auto6r|easytronic|robotize|tek kavrama/i.test(`${trans} ${vIdentity.transmissionCode || ''}`);
     const isManual = /manuel|manual|düz/i.test(`${trans} ${vIdentity.transmissionCode || ''}`);
     const transDisplayName = isDualClutch
       ? ((carTitle || '').toLowerCase().includes('renault') ? 'Çift Kavramalı Yarı Otomatik (EDC)' : 'Çift Kavramalı Yarı Otomatik')
-      : trans;
+      : (isCvt
+        ? 'Sürekli Değişken Oranlı Otomatik (CVT)'
+        : (isTorqueConverter
+          ? 'Tork Konvertörlü Tam Otomatik'
+          : trans));
 
     const formattedTransLabel = isElectric
       ? 'Doğrudan Tahrikli Tek Oranlı Redüktör'
@@ -260,19 +267,29 @@ export class VehicleReportFallbackService {
           ? 'Doğrudan tahrikli elektrik motoru mimarisi, dur-kalk şehir içi trafiğinde kesintisiz, sarsıntısız ve sessiz bir sürüş konforu sunar.'
           : (isDualClutch
             ? `${formattedTransLabel} şanzıman dur-kalk trafikte seri vites geçişleri sunar; ancak yoğun dur-kalk trafikte kuru kavramanın ısınma hassasiyeti ve düşük hız kararsızlığı dikkate alınmalıdır.`
-            : (isManual
-              ? 'Manuel vites kutusu ve debriyaj pedalı yoğun dur-kalk trafikte sürücü eforu gerektirir; debriyaj kavrama noktası ve baskı balata kondisyonu kontrol edilmelidir.'
-              : `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve konforlu kalkış imkanı sunar.`)),
+            : (isCvt
+              ? 'Sürekli değişken oranlı (CVT) şanzıman yapısı dur-kalk trafikte dişli geçiş hissi olmaksızın pürüzsüz ve sarsıntısız bir kalkış konforu sunar.'
+              : (isTorqueConverter
+                ? 'Tork konvertörlü tam otomatik şanzıman, hidrolik yapısı sayesinde dur-kalk trafikte debriyaj aşınması veya ısınma riski olmadan en pürüzsüz sürüş konforunu sağlar.'
+                : (isSingleClutch
+                  ? 'Tek kavramalı yarı otomatik şanzıman şehir içinde vites geçişlerinde hissedilen yığılma (baş hareketi) karakteristiğine sahiptir; yokuş kalkışlarda gaz tepkisine alışkanlık gerektirir.'
+                  : (isManual
+                    ? 'Manuel vites kutusu ve debriyaj pedalı yoğun dur-kalk trafikte sürücü eforu gerektirir; debriyaj kavrama noktası ve baskı balata kondisyonu kontrol edilmelidir.'
+                    : `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve konforlu kalkış imkanı sunar.`))))),
         highwayUse: isElectric
           ? `Sabit hız otoyol seyirlerinde ${hp} güç ve dengeli şasi yapısı konforlu bir seyir kararlılığı sunar; yüksek hızlarda elektrik tüketimi ve menzil eğrisi dikkate alınmalıdır.`
-          : `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,
+          : (isCvt
+            ? `Sabit hız otoyol sürüşlerinde ${hp} motor gücü akıcı bir seyir kararlılığı sunar; ani hızlanmalarda ise motor devrinin bağırması (rubber-band) karakteristiği gözlemlenebilir.`
+            : `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`),
         trafficBehavior: isElectric
           ? `Dur-kalk trafiğinde rejeneratif frenleme enerjisi geri kazanımı, batarya termal dengesi ve pürüzsüz kalkış tepkileri avantaj sağlar.`
           : (isEcvtOrHybrid
             ? `Dur-kalk kullanımında hibrit batarya şarj durumu ve elektrik-benzin motor geçiş pürüzsüzlüğü kontrol edilmelidir.`
             : (isDualClutch
               ? 'Yoğun trafikte aşırı ısınmayı önlemek adına aracı yarım kavramada bekletmemek ve dur-kalklarda tam fren uygulamak kavrama ömrünü korur.'
-              : `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`)),
+              : (isTorqueConverter
+                ? 'Hidrolik tork konvertörü dur-kalklarda şanzımanı mekanik sürtünme yıpranmasından korur; 60.000-80.000 km periyodik yağ ve filtre bakımı ömrü uzatır.'
+                : `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`))),
         comfortAssessment: `Sınıfı standartlarında günlük kullanım pratikliği ve kabin ergonomisi vadeder.`,
         supportingFactIds,
       },

@@ -246,6 +246,12 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     const batteryText = (perf.batteryCapacityKwh || identity.batteryCapacityKwh) ? `${perf.batteryCapacityKwh || identity.batteryCapacityKwh} kWh` : (isEv ? 'Gerçek Batarya Kapasitesiyle Tamamla' : null);
     const driveTypeText = perf.drivetrain || identity.drivetrain || 'Orijinal Çekiş Sistemi';
 
+    const powertrainType = identity.powertrainType || vehicleContext?.powertrainType || (isEv ? 'BEV' : 'ICE_PETROL');
+    const isDiesel = powertrainType === 'ICE_DIESEL' || fuel === 'Dizel' || fuel === 'DIESEL' || /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bbluehdi\b|\bcrdi\b|\bcdti\b|\bmultijet\b|\bjtd\b|\bcdi\b|\bd4d\b|\btdci\b|\becoblue\b|\bbluetec\b/i.test(`${engine} ${fullVehicleTitle}`);
+    const isHybrid = powertrainType === 'HEV' || fuel === 'Hibrit' || fuel === 'HYBRID' || (identity.fuelType || '').toLowerCase().includes('hibrit');
+    const timingSystem = identity.timingSystem || perf.timingSystem || (isEv ? 'NONE' : (isDiesel ? 'KAYIS' : 'ZINCIR'));
+    const timingSystemTr = identity.timingSystemTr || (timingSystem === 'KAYIS' ? 'Triger Kayışı' : (timingSystem === 'ZINCIR' ? 'Triger Zinciri' : (timingSystem === 'ISLAK_KAYIS' ? 'Yağ Banyolu Islak Triger Kayışı' : (timingSystem === 'KAYIS_VE_ZINCIR' ? 'Triger Kayışı ve Eksantrik Zinciri' : 'Triger Sistemi Bulunmaz'))));
+
     const equipmentHighlights = equipmentObj.highlights ? `\n• Veritabanı Donanım Öne Çıkanları: ${equipmentObj.highlights}` : '';
     const equipmentFeaturesText = (equipmentObj.features && equipmentObj.features.length > 0)
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
@@ -265,6 +271,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}
 • Motor Hacmi: ${ccText}
+• Triger Mimarisi: ${timingSystemTr} (${timingSystem})
 • Hızlanma (0-100 km/s): ${zeroHundredText}
 • Maksimum Hız: ${topSpeedText}
 • Bagaj Hacmi: ${trunkText}
@@ -293,10 +300,14 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
 5. KANIT TÜRÜ KORUMASI (EVIDENCE TYPE PRESERVATION):
    - Kullanıcı forum şikâyetlerini veya subjektif gözlemleri doğrudan "doğrulanmış fabrika komponent arızası" olarak yükseltme.
    - Reported complaint (kullanıcı bildirimi), known behavior (çalışma karakteristiği) ve verified failure (doğrulanmış kronik parça arızası / bülten) ayrımını koru.
-6. TRİGER MİMARİSİ KORUMASI (TIMING ARCHITECTURE GUARD):
-   - Triger sistemi KAYIŞ (BELT) ise zincir mekanizması dili (zincir sesi, zincir uzaması, zincir şakırtısı) KULLANMA.
-   - Triger sistemi ZİNCİR (CHAIN) ise triger kayışı kopması/liflenmesi dili KULLANMA.
-7. ELEKTRİKLİ (EV/BEV) VE HİBRİT ARAÇLARDA KESİN MİMARİ İZOLASYONU (ICE TERİMLERİ KESİNLİKLE YASAK):
+6. TRİGER MİMARİSİ VE SUBAP MEKANİZMASI KORUMASI (TIMING ARCHITECTURE GUARD):
+   - Aracın Doğrulanmış Triger Mimarisi: ${timingSystemTr} (${timingSystem})
+   - Triger sistemi KAYIŞ (BELT) ise: Zincir mekanizması dili (zincir sesi, zincir uzaması, zincir şakırtısı) KESİNLİKLE KULLANILAMAZ! Periyodik km/yıl triger kayışı ve devirdaim su pompası değişim disiplini esas alınmalıdır.
+   - Triger sistemi ZİNCİR (CHAIN) ise: Triger kayışı kopması/liflenmesi dili KESİNLİKLE KULLANILAMAZ! Soğuk ilk çalıştırma zincir şakırtısı, hidrolik gergi ve periyodik motor yağı viskozite disiplini esas alınmalıdır.
+   - Triger sistemi ISLAK_KAYIS (WET BELT - örn. 1.2 PureTech, 1.0 EcoBoost) ise: Kayışın motor yağı içinde çalıştığı, üretici onaylı spesifik motor yağı kullanımının hayati olduğu, kayış liflenerek yağ karter süzgecini tıkama ve yağ basıncı düşürme riski açıkça vurgulanmalıdır.
+   - Triger sistemi KAYIS_VE_ZINCIR (örn. 1.5 BlueHDi DV5) ise: Krank-eksantrik arası ana triger kayışlı iken, çift eksantrik milleri arasındaki zincirin gergi toleransına ve soğuk çalıştırma sesine dikkat edilmelidir.
+   - Elektrikli araçlarda (BEV) triger sistemi bulunmaz.
+7. ELEKTRİKLİ (EV/BEV) ARAÇLARDA KESİN MİMARİ İZOLASYONU (ICE TERİMLERİ KESİNLİKLE YASAK):
    - ${isEv ? `[DİKKAT: BU ARAÇ TAM ELEKTRİKLİDİR (BEV)]
    * İçten yanmalı motor terimleri (motor bloğu, hararet, conta yanması/deformasyonu, buji, enjektör, triger kayışı/zinciri, egzoz emisyonu, DPF, AdBlue, mekanik devirdaim/su pompası sızıntısı, debriyaj balatası, şanzıman mekatroniği, selenoid valf, çift kavrama, vites geçiş hissi, vites vuruntusu/silkeleme) KESİNLİKLE YASAKTIR VE KULLANILAMAZ!
    * 'engineDisplacementCc', 'catalogCombinedFuelL100km', 'realWorldFuelMinL100km' ve 'realWorldFuelMaxL100km' alanlarını KESİNLİKLE null bırak ('0 cc' veya '0 L' yazılmaz).
@@ -308,6 +319,14 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
      - Elektrik motoru invertör güç elektroniği ve tek oranlı redüktör (reduction gear) diferansiyel dişli yağı sızdırmazlığı,
      - Anlık tork ve 2+ ton batarya ağırlığı kaynaklı lastik omuz aşınması, alt salıncak burçları ve fren rejenerasyon disk korozyonu.` : `[BU ARAÇ İÇTEN YANMALI VEYA HİBRİTTİR]
    * Motor ve şanzıman mimarisine (${engine || 'Motor'}, ${trans || 'Şanzıman'}) uygun mekanik terimleri ve bakım disiplinini esas al.`}
+
+7B. İÇTEN YANMALI MOTORLARDA DİZEL VE BENZİN KESİN MİMARİ İZOLASYONU:
+   - ${isDiesel ? `[DİKKAT: BU ARAÇ DİZELDİR (${engine || 'Dizel Motor'})]
+   * Buji, ateşleme bujisi, ateşleme bobini, boğaz kelebeği kirliliği, benzin enjektörü veya LPG uyumu gibi BENZİNLİ MOTOR TERİMLERİ KESİNLİKLE YASAKTIR VE KULLANILAMAZ!
+   * Analiz, soru ve kontrollerde DAİMA dizel komponentlerini esas al: Kızdırma bujisi (ısıtma bujisi), Dizel Partikül Filtresi (DPF rejenerasyonu ve kurum doluluğu), SCR / AdBlue kristalleşmesi (araçta doğrulanmışsa), yüksek basınç mazot pompası (Common-Rail), turbo basıncı ve EGR valfi kurum birikimi.` : (isHybrid ? `[DİKKAT: BU ARAÇ HİBRİTTİR (${engine || 'Hibrit'})]
+   * Atkinson çevrimi benzinli motor, e-CVT veya elektrik motoru geçiş pürüzsüzlüğü, hibrit batarya şarj dengesi ve rejeneratif frenlemeyi esas al.` : `[DİKKAT: BU ARAÇ BENZİNLİDİR (${engine || 'Benzinli Motor'})]
+   * Dizel Partikül Filtresi (DPF - GPF hariç), AdBlue sıvısı/pompası, kızdırma bujisi veya mazot pompası terimleri KESİNLİKLE YASAKTIR VE KULLANILAMAZ!
+   * Buji, ateşleme bobini, boğaz kelebeği, direkt enjeksiyon kurum birikimi (GDI/TSI/TCe) ve yakıt buharlaştırma (kanister) sistemlerini esas al.`)}
 8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
@@ -325,7 +344,13 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
     - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
     - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, aracı anlatan akıcı bir paragraf tarzında zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime).
     - KESİNLİKLE madde imleri, asteriksler (*) veya "1. Motor ve Şanzıman Uyumu:", "2. Donanım Seviyesi:" gibi numaralı alt başlıklar KULLANMA! Başlık kullanmaksızın; güç ünitesi mimarisi ve tahrik karakterini, donanım paketinin (${trim || 'Seçilen Paket'}) kabin konforunu, süspansiyon ve sürüş dinamiklerini, tüketim/menzil beklentisini doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde anlat.
-    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla. Şehir içi ve trafikte vites geçişi yerine ${isEv ? 'elektrikli tek oranlı aktarmanın tek pedallı sürüş (one-pedal drive) ve rejeneratif frenleme dinamiklerini' : 'şanzıman kavrama ve dur-kalk karakterini'} anlat. Kuru tip çift kavramalı yarı otomatik (EDC, DSG, DCT) şanzımanlarda dur-kalk trafikte "sarsıntısız kalkış" gibi tork konvertörlü veya elektrikli ezberleri KULLANMA; seri vites geçiş avantajının yanı sıra kuru kavramanın yoğun trafikteki ısınma hassasiyetini ve düşük hız kararsızlığını dürüst ve dengeli bir otomotiv editörü gibi açıkla.
+    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
+    - Şanzıman ve Aktarma Realizmi:
+      * Kuru tip çift kavramalı yarı otomatik (EDC, DSG, DCT) şanzımanlarda: Dur-kalk trafikte "sarsıntısız kalkış" gibi tork konvertörlü ezberleri KULLANMA; seri vites geçiş avantajının yanı sıra kuru kavramanın yoğun dur-kalk trafikteki ısınma hassasiyetini ve düşük hız kararsızlığını dürüst ve dengeli bir otomotiv editörü gibi açıkla.
+      * CVT (Sürekli Değişken Oranlı - Multidrive S, X-Tronic vb.) şanzımanlarda: Dur-kalk trafikte dişli geçişi olmaksızın pürüzsüz ve sarsıntısız sürüş avantajını; buna karşılık ani dip gazda ve yüksek hızlı otoyol sürüşlerinde motor devrinin bağırması (rubber-band) karakterini ve şanzıman yağı termal hassasiyetini belirt.
+      * Tork Konvertörlü Tam Otomatik (ZF 8HP, EAT8/EAT6, Aisin, Mercedes 9G-Tronic vb.) şanzımanlarda: Hidrolik tork konvertörü sayesinde dur-kalk trafikte mekanik kavrama aşınması veya ısınma riski olmaksızın en üst düzey kalkış konforu sunduğunu teslim et; taviz ve bakım olarak ise 60.000-80.000 km periyodik şanzıman yağı ve filtre değişim disiplininin elektro-hidrolik valf gövdesi için şart olduğunu vurgula.
+      * Tek Kavramalı Yarı Otomatik (Dualogic, ETG/Auto6R, Easytronic) şanzımanlarda: Düşük yakıt tüketimi sunsa da vites geçişlerinde hissedilen yığılma (baş hareketi) ve robotize aktüatör/baskı-balata aşınma karakteristiğini açıkla.
+      * Manuel şanzımanlarda: Debriyaj pedalı ve vites geçişlerinin sürücü eforu gerektirdiğini, kavrama noktası ve baskı-balata kondisyonunun kontrol edilmesi gerektiğini açıkla.
 12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK, KALİTE VE NÜANSLI OTOMOTİV DANIŞMANI DİLİ:
     - **KESİNLİKLE YASAK OLAN KALIP BAŞLIKLAR:** "Motor Gücü ve Verimlilik Dengesi", "Donanım Paketi ve Kabin Kalitesi", "Şanzıman Akıcılığı ve Sürüş Hissi", "İkinci El Değer Koruması ve Talep", "Kompakt Sedan Arka Koltuk Yaşam Alanı", "Çift Kavrama Şanzımanın Trafik Karakteri", "Premium Servis ve Yedek Parça Maliyetleri" gibi jenerik, kopyala-yapıştır şablon başlıkları KESİNLİKLE KULLANMA!
     - **TEK BOYUTLU VE EZBERE ÇIKARIMLAR KESİNLİKLE YASAKTIR (ÇOK BOYUTLU ARAÇ DEĞERLENDİRMESİ):**
@@ -431,8 +456,8 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     "clutchType": ${isEv ? `"ELEKTRIKLI_TEK_ORANLI"` : `"KURU_CIFT_KAVRAMA"`},
     "transmissionTypeAndSpeeds": ${isEv ? `"Tek Kademeli Redüktör Şanzıman"` : `"7 İleri Kuru Çift Kavramalı DSG"`},
     "transmissionSpeeds": ${isEv ? `1` : `7`},
-    "timingSystem": ${isEv ? `null` : `"KAYIS"`},
-    "hasDpf": ${isEv ? `false` : `true`},
+    "timingSystem": ${isEv ? `null` : `"${timingSystem}"`},
+    "hasDpf": ${isEv ? `false` : (isDiesel ? `true` : `false`)},
     "hasAdBlue": false,
     "drivetrain": "${driveTypeText || (isEv ? 'Dört Tekerlekten Çekiş (AWD)' : 'Önden Çekiş (FWD)')}",
     "zeroToHundredKmh": ${(perf.zeroToHundredKmh || perf.zeroToHundredSec) || (isEv ? 3.9 : 7.5)},

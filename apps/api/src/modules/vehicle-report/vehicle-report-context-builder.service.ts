@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { VehicleCharacterResearchService } from '../research/vehicle-character-research.service';
 import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
+import { resolveAutomotiveEngineTaxonomy } from '@used-car-intelligence/shared';
 import * as crypto from 'crypto';
 import OpenAI from 'openai';
 
@@ -83,22 +84,47 @@ export class VehicleReportContextBuilderService {
     // ─────────────────────────────────────────────────────────────────────────
     const isHybridVariant = variant.fuelType === 'HYBRID' || (variant.engine?.fuelType || '').toUpperCase() === 'HYBRID';
     const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
-    const isDieselVariant = variant.fuelType === 'DIESEL' || (variant.engine?.fuelType || '').toUpperCase() === 'DIESEL' || /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bcrdi\b|\bcdti\b/i.test(`${variant.engine?.code || ''} ${variant.engine?.description || ''}`);
-    let rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
 
     const brandName = ((variant as any).brand?.name || (variant.model as any)?.brand?.name || '').toLowerCase();
     const modelName = (variant.model?.name || '').toLowerCase();
-    const engineIdentityStr = `${brandName} ${modelName} ${variant.engine?.code || ''} ${variant.engine?.description || ''}`.toLowerCase();
-    const isRenault15dCi = (brandName.includes('renault') || brandName.includes('dacia') || brandName.includes('nissan')) && (engineIdentityStr.includes('1.5') || engineIdentityStr.includes('k9k')) && (engineIdentityStr.includes('dci') || isDieselVariant);
 
-    if (isRenault15dCi) {
-      rawEngineCc = 1461;
+    // Canonical Engine Taxonomy Resolution (Exact Catalog cc & Timing Architecture)
+    const engineTaxonomy = resolveAutomotiveEngineTaxonomy({
+      brand: brandName,
+      model: modelName,
+      engineCode: variant.engine?.code,
+      engineDesc: variant.engine?.description,
+      modelYear: variant.year,
+      fuelType: variant.fuelType || variant.engine?.fuelType,
+      isElectric: isElectricVariant,
+      isHybrid: isHybridVariant,
+    });
+
+    const isDieselVariant =
+      variant.fuelType === 'DIESEL' ||
+      (variant.engine?.fuelType || '').toUpperCase() === 'DIESEL' ||
+      engineTaxonomy.canonicalFuelType === 'DIESEL' ||
+      /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bbluehdi\b|\bcrdi\b|\bcdti\b|\bmultijet\b|\bjtd\b|\bcdi\b|\bd4d\b|\btdci\b|\becoblue\b|\bbluetec\b/i.test(
+        `${variant.engine?.code || ''} ${variant.engine?.description || ''}`,
+      );
+
+    let rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
+
+    if (engineTaxonomy.catalogDisplacementCc) {
+      rawEngineCc = engineTaxonomy.catalogDisplacementCc;
     } else {
-      const isRoundedMarketingCc = rawEngineCc && (rawEngineCc % 100 === 0 && [1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000].includes(rawEngineCc));
+      const isRoundedMarketingCc =
+        rawEngineCc &&
+        rawEngineCc % 100 === 0 &&
+        [1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000].includes(rawEngineCc);
+
       if ((!rawEngineCc || isRoundedMarketingCc) && !isElectricVariant && this.variantTechnicalFactsService) {
         try {
           let facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(variantId);
-          if ((!facts?.engineDisplacementCc || facts.engineDisplacementCc % 100 === 0) && facts?.engineDisplacement?.status !== 'VERIFIED') {
+          if (
+            (!facts?.engineDisplacementCc || facts.engineDisplacementCc % 100 === 0) &&
+            facts?.engineDisplacement?.status !== 'VERIFIED'
+          ) {
             facts = await this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(variantId);
           }
           if (facts?.engineDisplacementCc) {
@@ -337,6 +363,7 @@ export class VehicleReportContextBuilderService {
       combinedFuelL100km: combinedFuelVal,
       electricRangeWltpKm: electricRangeVal,
       batteryCapacityKwh: batteryCapacityVal,
+      timingSystem: engineTaxonomy.timingSystem,
     };
 
     const contextObj = {
@@ -357,11 +384,15 @@ export class VehicleReportContextBuilderService {
         torqueSource: torqueSource,
         torqueSemantic: torqueSemantic,
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
+        engineFamily: engineTaxonomy.engineFamily,
         engineType: specsJson.engineType || null,
         fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
         isElectric: isElectricVariant,
         isHybrid: isHybridVariant,
         powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (isDieselVariant ? 'ICE_DIESEL' : 'ICE_PETROL'),
+        timingSystem: engineTaxonomy.timingSystem,
+        timingSystemTr: engineTaxonomy.timingSystemTr,
+        timingDescriptionTr: engineTaxonomy.timingDescriptionTr,
         electricRangeWltpKm: electricRangeVal,
         batteryCapacityKwh: batteryCapacityVal,
         transmissionName: isElectricVariant ? (transName || 'Tek Oranlı Redüktör') : (transName || 'Otomatik'),
