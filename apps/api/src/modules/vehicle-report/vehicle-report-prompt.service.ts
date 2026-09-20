@@ -236,7 +236,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `${rawTorqueVal} ${torqueUnit}${torqueSemantic === 'TOTAL_HYBRID_SYSTEM_TORQUE' ? ' (Doğrulanmış Hibrit Torku)' : ''}`
       : 'Gerçek Fabrika Verisiyle Tamamla';
 
-    const isEv = fuel === 'Elektrik' || fuel === 'ELECTRIC' || (identity.fuelType || '').toLowerCase().includes('elektrik');
+    const isEv = fuel === 'Elektrik' || fuel === 'ELECTRIC' || (identity.fuelType || '').toLowerCase().includes('elektrik') || identity.isElectric === true || identity.powertrainType === 'BEV';
     const ccText = isEv ? 'Elektrik Motoru (cc bulunmaz)' : (perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'Gerçek Hacim Verisiyle Tamamla');
     const zeroHundredText = (perf.zeroToHundredKmh || perf.zeroToHundredSec) ? `${perf.zeroToHundredKmh || perf.zeroToHundredSec} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
     const topSpeedText = perf.topSpeedKmh ? `${perf.topSpeedKmh} km/s` : 'Gerçek Veriyle Tamamla';
@@ -296,11 +296,18 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
 6. TRİGER MİMARİSİ KORUMASI (TIMING ARCHITECTURE GUARD):
    - Triger sistemi KAYIŞ (BELT) ise zincir mekanizması dili (zincir sesi, zincir uzaması, zincir şakırtısı) KULLANMA.
    - Triger sistemi ZİNCİR (CHAIN) ise triger kayışı kopması/liflenmesi dili KULLANMA.
-7. ELEKTRİKLİ (EV) ARAÇ VE MENZİL STANDARDI:
-   - Elektrikli (EV/BEV) araçlarda motor hacmi ('engineDisplacementCc') KESİNLİKLE null veya undefined bırakılmalıdır ('0 cc' gibi yanıltıcı bir değer girilmez). Egzoz, buji, DPF ve yakıt deposu terimleri kullanılmaz.
-   - Elektrikli araçlarda sıvı yakıt tüketimi ('catalogCombinedFuelL100km', 'realWorldFuelMinL100km', 'realWorldFuelMaxL100km') KESİNLİKLE null bırakılmalıdır.
-   - Elektrikli araçlarda en kritik teknik veri MENZİL ve BATARYA bilgisidir. Analiz edilen spesifik model ve donanım paketine ait üreticinin resmi WLTP karma menzilini (örneğin Togg T10F Uzun Menzil 600, BYD Seal Design RWD 570, BYD Seal Excellence AWD 520, Tesla Model Y LR 533 gibi doğrulanmış net fabrika değerini) 'technicalSpecifications.electricRangeWltpKm' alanına, kullanılabilir batarya kapasitesini (örneğin BYD Seal için 82.5, Togg için 88.5 gibi saf sayı olarak) 'technicalSpecifications.batteryCapacityKwh' alanına yaz. Şablondan rastgele sayı kopyalama, tam aracın üretici verisini esas al.
-   - Elektrikli araçlarda 0-100 km/s hızlanma, maksimum hız ve boş ağırlık (batarya ağırlığı dahil genelde 1800-2300 kg arası) değerleri de tam fabrika katalog değerleri olmalıdır.
+7. ELEKTRİKLİ (EV/BEV) VE HİBRİT ARAÇLARDA KESİN MİMARİ İZOLASYONU (ICE TERİMLERİ KESİNLİKLE YASAK):
+   - ${isEv ? `[DİKKAT: BU ARAÇ TAM ELEKTRİKLİDİR (BEV)]
+   * İçten yanmalı motor terimleri (motor bloğu, hararet, conta yanması/deformasyonu, buji, enjektör, triger kayışı/zinciri, egzoz emisyonu, DPF, AdBlue, mekanik devirdaim/su pompası sızıntısı, debriyaj balatası, şanzıman mekatroniği, selenoid valf, çift kavrama, vites geçiş hissi, vites vuruntusu/silkeleme) KESİNLİKLE YASAKTIR VE KULLANILAMAZ!
+   * 'engineDisplacementCc', 'catalogCombinedFuelL100km', 'realWorldFuelMinL100km' ve 'realWorldFuelMaxL100km' alanlarını KESİNLİKLE null bırak ('0 cc' veya '0 L' yazılmaz).
+   * Tüm analiz ve değerlendirmeler (özellikle 'dailyUseAssessment', 'compromisesAndLimitations', 'purchaseConditions', 'walkAwayConditions', 'sellerQuestions', 'inspectionChecklist') TAMAMEN ELEKTRİKLİ ARAÇ MİMARİSİNE odaklanmalıdır:
+     - Batarya Paketi SoH (Sağlık Yüzdesi) ve hücre voltaj dengesi,
+     - DC yüksek hızlı şarj (HPC) geçmişi, batarya termal yönetim sıvı devresi ve ısı pompası (heat pump) performansı,
+     - Yüksek Voltaj (HV) kablo tesisatı, piroteknik güvenlik sigortası ve gövde izolasyon direnci,
+     - Dahili AC şarj cihazı (OBC) ve CCS2 / Type-2 şarj soketi pin aşınması ve kilit mandalı sağlığı,
+     - Elektrik motoru invertör güç elektroniği ve tek oranlı redüktör (reduction gear) diferansiyel dişli yağı sızdırmazlığı,
+     - Anlık tork ve 2+ ton batarya ağırlığı kaynaklı lastik omuz aşınması, alt salıncak burçları ve fren rejenerasyon disk korozyonu.` : `[BU ARAÇ İÇTEN YANMALI VEYA HİBRİTTİR]
+   * Motor ve şanzıman mimarisine (${engine || 'Motor'}, ${trans || 'Şanzıman'}) uygun mekanik terimleri ve bakım disiplinini esas al.`}
 8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
@@ -313,28 +320,42 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
     - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} HP` : 'Verilmedi'}), teknik özelliklerde ve metinlerde 'HP' birimiyle aynen bu değeri kullan.
     - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
-11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV ANALİZİ KURALI:
+11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV DANIŞMANI ANALİZİ:
+    - HITAP DİLİ VE KİMLİK: TorqueScout Yapay Zeka Danışmanının kıdemli otomotiv test editörü ve bağımsız ekspertiz danışmanı kimliğini harfiyen koru. Standart, mekanik veya jenerik robotik kalıplardan uzak dur; sıcak, güven veren ve doğrudan otomobil tutkununa hitap eden akıcı danışman üslubunu sürdür.
     - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
     - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, aracı anlatan akıcı bir paragraf tarzında zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime).
-    - KESİNLİKLE madde imleri, asteriksler (*) veya "1. Motor ve Şanzıman Uyumu:", "2. Donanım Seviyesi:" gibi numaralı alt başlıklar KULLANMA! Başlık kullanmaksızın; motor mimarisi ve şanzıman kavrama karakterini, donanım paketinin (${trim || 'Seçilen Paket'}) kabin konforunu, süspansiyon ve sürüş dinamiklerini, tüketim beklentisini doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde anlat.
-    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla.
-12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK VE KALİTE KURALLARI (JENERİK VE TEK SATIRLIK METİNLER KESİNLİKLE YASAKTIR):
+    - KESİNLİKLE madde imleri, asteriksler (*) veya "1. Motor ve Şanzıman Uyumu:", "2. Donanım Seviyesi:" gibi numaralı alt başlıklar KULLANMA! Başlık kullanmaksızın; güç ünitesi mimarisi ve tahrik karakterini, donanım paketinin (${trim || 'Seçilen Paket'}) kabin konforunu, süspansiyon ve sürüş dinamiklerini, tüketim/menzil beklentisini doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde anlat.
+    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla. Şehir içi ve trafikte vites geçişi yerine ${isEv ? 'elektrikli tek oranlı aktarmanın tek pedallı sürüş (one-pedal drive) ve rejeneratif frenleme dinamiklerini' : 'şanzıman kavrama ve dur-kalk karakterini'} anlat.
+12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK, KALİTE VE NÜANSLI OTOMOTİV DANIŞMANI DİLİ:
     - **KESİNLİKLE YASAK OLAN KALIP BAŞLIKLAR:** "Motor Gücü ve Verimlilik Dengesi", "Donanım Paketi ve Kabin Kalitesi", "Şanzıman Akıcılığı ve Sürüş Hissi", "İkinci El Değer Koruması ve Talep", "Kompakt Sedan Arka Koltuk Yaşam Alanı", "Çift Kavrama Şanzımanın Trafik Karakteri", "Premium Servis ve Yedek Parça Maliyetleri" gibi jenerik, kopyala-yapıştır şablon başlıkları KESİNLİKLE KULLANMA!
+    - **TEK BOYUTLU VE EZBERE ÇIKARIMLAR KESİNLİKLE YASAKTIR (ÇOK BOYUTLU ARAÇ DEĞERLENDİRMESİ):**
+      * Sadece aks mesafesi, beygir gücü veya gövde tipi gibi tek bir veriye bakarak standart, ezbere sonuçlar üretme!
+      * Örneğin 2.9 metreyi aşan aks mesafesine sahip 5 metrelik lüks bir D/E segment sedanda tabandaki batarya paketi yüksekliği, tavanın fastback/coupe eğimi, baş ve diz mesafesi, koltuk minderinin uyluk desteği ve cam yüzey genişliği birlikte ele alınmalıdır; yüzeysel ezberle "arka diz mesafesi dardır" gibi absürt iddialar üretilemez.
+    - **AÇIK UÇLU VE NÜANSLI DANIŞMANLIK DİLİ (SERT VE KATI SİYAH-BEYAZ YARGILAR YASAKTIR):**
+      * Kullanıcı profillerinde ve kısıtlamalarda direkt "aile aracıdır" veya "aileye kesinlikle uygun değildir" gibi katı, keskin ve siyah-beyaz hükümler VERME!
+      * Bunun yerine gerçek bir uzman danışman gibi açık uçlu, yönlendirici ve nüanslı değerlendirmeler yap: Örn. "Geniş ve kalabalık aileler için bagajın dikey yükleme hacmi ve sedan bagaj kapağı açıklığı bebek arabası veya dikey valiz yerleşiminde pratikliği sınırlayabilir; ancak 4 kişilik çekirdek aileler için kabin içi diz mesafesi ve otoyol süspansiyon konforu oldukça lüks ve ferah bir uzun yol deneyimi sunar."
+    - **PERFORMANS VE TORK DOĞRULUK KURALI (GÜÇ İLE ÇELİŞKİ KESİNLİKLE YASAKTIR):**
+      * Aracın doğrulanmış beygir gücü (${rawHpVal ? `${rawHpVal} HP` : 'resmi katalog gücü'}) ve 0-100 km/s süresi (${zeroHundredText}) ile çelişen hiçbir cümle kurulamaz!
+      * 300+ veya 500+ HP gücünde, 3-4 saniyede 0-100'e çıkan çift motorlu veya yüksek performanslı bir araca "performans sürücüleri için ani tork patlaması yetersiz kalabilir" gibi mantıksız iddialar YAZILAMAZ! Performansın ani, kesintisiz ve yüksek olduğu teslim edilmeli; gerçek kısıt olarak ise yüksek otoyol hızlarında artan tüketim, menzil düşüşü, aşırı tork nedeniyle hızlı lastik aşınması veya 2+ tonluk batarya ağırlığının sert virajlardaki ataleti gibi gerçek mühendislik sınırları tartışılmalıdır.
     - **Tercih Etmek İçin Güçlü Nedenler ('strongestReasonsToChoose'):**
-      * Başlıklar doğrudan bu aracın motoruna, donanımına, sürüş karakterine ve mühendisliğine özgü olmalıdır (Örn: "Ti-VCT Atmosferik Motorun Kanıtlanmış Dayanıklılığı ve LPG Uyumu", "Sınıf Referansı Bağımsız Arka Süspansiyon ve Direksiyon Netliği", "Titanium Donanımın Zengin Konfor ve Yalıtım Seviyesi", "Yaygın Yedek Parça ve Hızlı İkinci El Likiditesi"). En az 3-4 adet güçlü madde yaz.
+      * Başlıklar doğrudan bu aracın güç ünitesine, donanımına, sürüş karakterine ve mühendisliğine özgü olmalıdır. En az 3-4 adet güçlü madde yaz.
       * AÇIKLAMA DERİNLİĞİ: Her maddenin 'explanation' alanı ASLA 1 satırlık yüzeysel bir cümle olamaz! Tıpkı kıdemli bir otomotiv editörü gibi, o avantajın teknik arka planını, sürücüye yaşattığı hissi ve uzun vadeli işletme faydasını anlatan en az 2-3 doyurucu ve teknik cümle yaz.
     - **Satın Almadan Önce Bilinecek Tavizler ('compromisesAndLimitations'):**
-      * Başlıklar doğrudan araca, şanzıman türüne ve gövde/segment dinamiklerine özgü olmalıdır (Örn: "Düşük Devir Tork Sınırlılığı ve Yokuşta Vites Küçültme İhtiyacı", "Powershift / Çift Kavramanın Dur-Kalk Trafikteki Isınma ve Aşınma Hassasiyeti", "Sert Arka Amortisör Karakteri ve Şehir İçi Engebe İletimi", "Arka Yaşam Alanı Diz Mesafesi Sınırları"). En az 3 adet gerçekçi taviz yaz.
+      * Başlıklar doğrudan araca, aktarma türüne ve gövde/segment dinamiklerine özgü olmalıdır. En az 3 adet gerçekçi taviz yaz.
       * AÇIKLAMA DERİNLİĞİ: Her maddenin 'explanation' alanı ASLA 1 satırlık yüzeysel bir cümle olamaz! Bu tavizin mühendislik sebebini, şehir içi veya otoyol kullanımındaki pratik yansımasını en az 2-3 doyurucu cümleyle açıkla.
       * KESİNLİKLE kronik arızaları (yağ kaçağı, su eksiltme vb.) taviz diye kopyalama; burası aracın fabrika çıkış mimari, tasarım ve kullanım sınırlarıdır!
-    - **Kimler İçin Mantıklı? ('suitableFor'):** En az 3 adet spesifik ve gerçekçi kullanıcı profili belirle (Örn. Şehir içi ve banliyö arasında ekonomik ve sorunsuz ulaşım arayanlar, mekanik sadelik ve yalın atmosferik motor sevenler). Her profili en az 2-3 cümleyle bu araç ve donanım özelinde gerekçelendir.
-    - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle (Örn. Yüksek otoyol ara hızlanması ve ani tork patlaması bekleyen performans odaklı sürücüler, geniş çocuk pusetleri ve 3 yetişkinle sürekli uzun yola çıkan kalabalık aileler). Her profili en az 2-3 cümleyle gerekçelendir. KESİNLİKLE "off-road yapanlar", "yarış pistine çıkanlar", "ağır yük çekenler" gibi binek araca uymayan absürt klişeler YAZMA!
-    - **Hangi Şartlarda Değerlendirilebilir? ('purchaseConditions'):** En az 3 somut ekspertiz ve bakım koşulu belirt (Örn. Şanzıman kavrama ve geçiş basınç testi, triger seti ve subap zamanlaması kontrolü, düzenli yetkili/özel servis bakım kayıtları). Her koşulun teknik önemini en az 2 cümleyle açıkla.
-    - **Hangi Durumda Satın Almaktan Vazgeçilmeli? ('walkAwayConditions'):** En az 3 kritik vazgeçme kriteri belirt (Örn. Taşıyıcı şasi, podye, direk veya airbag müdahalesi; şanzımanda kalkışta şiddetli titreme, silkeleme veya vitese geçmeme; motor bloğunda hararet kaynaklı deformasyon veya kompresyon kaybı). Neden vazgeçilmesi gerektiğini en az 2 cümleyle açıkla.
-13. SATICIYA SORULACAK KRİTİK SORULAR ('sellerQuestions') STANDARDI (JENERİK VE YÜZEYSEL SORULAR KESİNLİKLE YASAKTIR):
+    - **Kimler İçin Mantıklı? ('suitableFor'):** En az 3 adet spesifik ve gerçekçi kullanıcı profili belirle. Her profili en az 2-3 cümleyle bu araç ve donanım özelinde gerekçelendir.
+    - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle. Açık uçlu danışman diliyle hangi kullanım senaryolarında (örneğin dikey bagaj hacmi arayan geniş aileler, şarj altyapısı bulunmayan apartman sakinleri veya mekanik motor sesi arayan geleneksel sürücüler gibi) kısıtlar yaratacağını 2-3 cümleyle gerekçelendir. KESİNLİKLE "off-road yapanlar", "yarış pistine çıkanlar", "ağır yük çekenler" gibi binek araca uymayan absürt klişeler YAZMA!
+    - **Hangi Şartlarda Değerlendirilebilir? ('purchaseConditions'):** En az 3 somut ekspertiz ve bakım koşulu belirt (${isEv ? 'Örn. Yetkili servis onaylı Batarya SoH ve hücre dengesi raporu, AC/DC şarj soketi ve piroteknik sigorta izolasyon testi, redüktör dişli kutusu yağ sızdırmazlığı' : 'Örn. Şanzıman kavrama ve geçiş basınç testi, triger seti ve subap zamanlaması kontrolü, düzenli yetkili/özel servis bakım kayıtları'}). Her koşulun teknik önemini en az 2 cümleyle açıkla.
+    - **Hangi Durumda Satın Almaktan Vazgeçilmeli? ('walkAwayConditions'):** En az 3 kritik vazgeçme kriteri belirt (${isEv ? 'Örn. Taşıyıcı şasi, podye, direk veya batarya muhafaza gövdesinde yapısal hasar/çatlak; Batarya SoH sağlık oranının kritik seviyeye düşmesi veya hücre voltaj sapması; invertör ve yüksek voltaj izolasyon arızası' : 'Örn. Taşıyıcı şasi, podye, direk veya airbag müdahalesi; şanzımanda kalkışta şiddetli titreme, silkeleme veya vitese geçmeme; motor bloğunda hararet kaynaklı deformasyon veya kompresyon kaybı'}). Neden vazgeçilmesi gerektiğini en az 2 cümleyle açıkla.
+13. SATICIYA SORULACAK KRİTİK VE MİMARİYE ÖZEL TEKNİK SORULAR ('sellerQuestions') STANDARDI:
     - KESİNLİKLE YASAK: "Araçta herhangi bir motor arızası veya sızıntı var mı?", "Şanzıman geçişleri sorunsuz mu?", "Fren sisteminin durumu nedir?", "Bakımları yapıldı mı?" gibi jenerik, standart sorular KESİNLİKLE ÜRETİLEMEZ!
-    - Tam 4 ila 6 adet bu aracın motor (${engine || 'Motor'}), şanzıman (${trans || 'Şanzıman'}) ve donanımına (${trim || 'Paket'}) doğrudan nokta atışı yapan derin teknik mülakat sorusu üret.
-    - Motorun spesifik mekanik hassasiyetlerini (triger kayışı/zinciri son değişim km'si ve faturası, devirdaim/soğutma sıvı kaçağı, turbo/enjektör durumu), şanzımanın özel bakım disiplinini (kuru/ıslak kavrama aşınması, şanzıman yağı değişim periyodu, mekatronik basınç geçmişi) ve araca özel donanımları hedef al.
+    - ${isEv ? `Elektrikli araçta satıcıya ASLA vites geçişi, mekatronik, debriyaj, buji, motor yağı veya triger sorusu SORULAMAZ! Tam 4 ila 6 adet elektrikli mimariye (${engine || 'Elektrik Motoru'}, ${trim || 'Paket'}) özgü teknik mülakat sorusu üret:
+      1. Batarya SoH sağlık yüzdesi, serviste en son alınan batarya hücre voltaj sapma raporu ve batarya fabrika garantisi geçerlilik durumu.
+      2. Şarj alışkanlığı: Aracın ağırlıklı olarak ev tipi AC wallbox ile (%20-%80 arası) mi yoksa sürekli yüksek hızlı DC (HPC) istasyonlarda %100'e kadar mı şarj edildiği.
+      3. Isı pompası (heat pump) ve batarya termal yönetim sıvı devresinin yetkili servis periyodik kontrol geçmişi.
+      4. CCS2 / Type-2 şarj soketinde mandal kilit problemi veya soket tırnaklarında termal ark/kararma olup olmadığı.
+      5. Elektrikli tahrik motoru redüktör dişli kutusu ses düzeyi ve aks keçesi sızdırmazlığı.` : `Tam 4 ila 6 adet bu aracın motor (${engine || 'Motor'}), şanzıman (${trans || 'Şanzıman'}) ve donanımına (${trim || 'Paket'}) doğrudan nokta atışı yapan derin teknik mülakat sorusu üret. Motorun spesifik mekanik hassasiyetlerini (triger kayışı/zinciri son değişim km'si ve faturası, devirdaim/soğutma sıvı kaçağı, turbo/enjektör durumu), şanzımanın özel bakım disiplinini (kuru/ıslak kavrama aşınması, şanzıman yağı değişim periyodu, mekatronik basınç geçmişi) ve araca özel donanımları hedef al.`}
     - Her soru için hem satıcıdan beklenen somut, faturalı ideal cevabı ('expectedAnswerHint') hem de alıcının şüphelenmesi gereken kaçamak veya arıza gizleyici kırmızı bayrak cevabını ('redFlagAnswerHint') eksiksiz doldur.
 14. TEKNİK ÖZELLİKLER KARTLARI ASLA BOŞ (null) BIRAKILAMAZ:
     - 'zeroToHundredKmh', 'topSpeedKmh', 'trunkCapacityLiters' ve 'curbWeightKg' alanları kullanıcının ekranındaki 6 teknik kartın 4'ünü oluşturur. Bu alanlar KESİNLİKLE null veya undefined bırakılamaz!
@@ -378,41 +399,47 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
   "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
   "sellerQuestions": [
     {
-      "questionText": "Bu aracın motor ve şanzımanına (${engine || ''} ${trans || ''}) özgü kronik zayıflık veya ağır bakım geçmişini hedef alan teknik mülakat sorusu (örn: Triger kayışı/zinciri ve devirdaim pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?)...",
-      "category": "MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK",
-      "expectedAnswerHint": "Satıcıdan beklenen somut, servis faturalı ve güven veren ideal yanıt (örn: '85.000 km'de yetkili serviste faturasıyla değişti, faturası ve servis dökümü mevcut')...",
-      "redFlagAnswerHint": "Satıcının kaçamak, faturasız veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Usta baktı daha gider dedi, fatura yok' veya soruyu geçiştirme)..."
+      "questionText": ${isEv 
+        ? `"Bu elektrikli aracın batarya ve yüksek voltaj mimarisine (${trim || ''}) özgü kritik teknik mülakat sorusu (örn: Yetkili servisten alınmış güncel Batarya SoH / Sağlık Raporu mevcut mu ve araç ağırlıklı olarak ev tipi AC şarjla mı kullanıldı?)..."` 
+        : `"Bu aracın motor ve şanzımanına (${engine || ''} ${trans || ''}) özgü kronik zayıflık veya ağır bakım geçmişini hedef alan teknik mülakat sorusu (örn: Triger kayışı/zinciri ve devirdaim pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?)..."`},
+      "category": ${isEv ? `"BATARYA_SOH | SARJ_GECMISI | TERMAL_YONETIM | SURUS_AKTARMA"` : `"MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK"`},
+      "expectedAnswerHint": ${isEv
+        ? `"Satıcıdan beklenen somut, yetkili servis raporlu ve güven veren ideal yanıt (örn: 'Yetkili servis testinde batarya sağlığı %96 çıktı, raporu mevcut; araç daima ev tipi 11 kW AC şarjla %20-80 bandında dolduruldu')..."`
+        : `"Satıcıdan beklenen somut, servis faturalı ve güven veren ideal yanıt (örn: '85.000 km'de yetkili serviste faturasıyla değişti, faturası ve servis dökümü mevcut')..."`},
+      "redFlagAnswerHint": ${isEv
+        ? `"Satıcının kaçamak, raporsuz veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Bataryayı hiç ölçtürmedim ama menzili iyi gidiyor' veya soruyu geçiştirme)..."`
+        : `"Satıcının kaçamak, faturasız veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Usta baktı daha gider dedi, fatura yok' veya soruyu geçiştirme)..."`}
     }
   ],
   "technicalSpecifications": {
-    "generation": "B8 / G20 / W205 vb.",
+    "generation": ${isEv ? `"e-Platform 3.0 / Nesil Kodu vb."` : `"B8 / G20 / W205 vb."`},
     "faceliftStatus": "Makyajlı Kasa | Makyaj Öncesi | Tek Kasa",
-    "engineFamily": "EA288",
-    "engineCode": "CRKB",
-    "engineDisplacementCc": 1598,
-    "enginePowerHp": 120,
+    "engineFamily": ${isEv ? `null` : `"EA288"`},
+    "engineCode": ${isEv ? `null` : `"CRKB"`},
+    "engineDisplacementCc": ${isEv ? `null` : `1598`},
+    "enginePowerHp": ${rawHpVal || (isEv ? 517 : 120)},
     "powerUnit": "HP",
-    "engineTorqueNm": 250,
+    "engineTorqueNm": ${rawTorqueVal || (isEv ? 700 : 250)},
     "torqueUnit": "Nm",
-    "transmissionFamily": "DSG",
-    "transmissionCode": "DQ200",
-    "clutchType": "KURU_CIFT_KAVRAMA",
-    "transmissionTypeAndSpeeds": "7 İleri Kuru Çift Kavramalı DSG",
-    "transmissionSpeeds": 7,
-    "timingSystem": "KAYIS",
-    "hasDpf": true,
+    "transmissionFamily": ${isEv ? `"REDÜKTÖR"` : `"DSG"`},
+    "transmissionCode": ${isEv ? `null` : `"DQ200"`},
+    "clutchType": ${isEv ? `"ELEKTRIKLI_TEK_ORANLI"` : `"KURU_CIFT_KAVRAMA"`},
+    "transmissionTypeAndSpeeds": ${isEv ? `"Tek Kademeli Redüktör Şanzıman"` : `"7 İleri Kuru Çift Kavramalı DSG"`},
+    "transmissionSpeeds": ${isEv ? `1` : `7`},
+    "timingSystem": ${isEv ? `null` : `"KAYIS"`},
+    "hasDpf": ${isEv ? `false` : `true`},
     "hasAdBlue": false,
-    "drivetrain": "Önden Çekiş (FWD)",
-    "zeroToHundredKmh": 7.5,
-    "topSpeedKmh": 200,
-    "catalogCombinedFuelL100km": 5.2,
-    "realWorldFuelMinL100km": 6.0,
-    "realWorldFuelMaxL100km": 7.0,
-    "realWorldFuelBasis": "SOURCE_BASED",
-    "electricRangeWltpKm": null,
-    "batteryCapacityKwh": null,
-    "trunkCapacityLiters": 480,
-    "curbWeightKg": 1400
+    "drivetrain": "${driveTypeText || (isEv ? 'Dört Tekerlekten Çekiş (AWD)' : 'Önden Çekiş (FWD)')}",
+    "zeroToHundredKmh": ${(perf.zeroToHundredKmh || perf.zeroToHundredSec) || (isEv ? 3.9 : 7.5)},
+    "topSpeedKmh": ${perf.topSpeedKmh || (isEv ? 180 : 200)},
+    "catalogCombinedFuelL100km": ${isEv ? `null` : `5.2`},
+    "realWorldFuelMinL100km": ${isEv ? `null` : `6.0`},
+    "realWorldFuelMaxL100km": ${isEv ? `null` : `7.0`},
+    "realWorldFuelBasis": ${isEv ? `null` : `"SOURCE_BASED"`},
+    "electricRangeWltpKm": ${isEv ? ((perf.electricRangeWltpKm || identity.electricRangeWltpKm) || 521) : `null`},
+    "batteryCapacityKwh": ${isEv ? ((perf.batteryCapacityKwh || identity.batteryCapacityKwh) || 85.4) : `null`},
+    "trunkCapacityLiters": ${(perf.trunkCapacityLiters || perf.luggageCapacityL) || 480},
+    "curbWeightKg": ${(perf.curbWeightKg || perf.weightKg) || (isEv ? 2250 : 1400)}
   }
 }`;
   }
@@ -425,9 +452,11 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     const body = identity.bodyType || '';
     const trim = identity.trimName || '';
     const engine = identity.engineCode || '';
+    const fuel = identity.fuelType || '';
     const trans = identity.transmissionName || '';
 
-    const fullVehicleTitle = [year, brand, model, body, trim, engine, trans].filter(Boolean).join(' ');
+    const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
+    const isEv = fuel === 'Elektrik' || fuel === 'ELECTRIC' || (identity.fuelType || '').toLowerCase().includes('elektrik') || identity.isElectric === true || identity.powertrainType === 'BEV';
 
     return `Sen TorqueScout İnternet Otomotiv Araştırma Ajanısın (Web-Grounded Vehicle Research Agent).
 Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak 10 KİLİT TEKNİK PARAMETRE GRUBU, nesil/makyaj kimliği, donanım paketi detayları, 3 seviyeli servis bakım taksonomisi ve kronik arıza kayıtlarını araştırmak ve ham JSON formatında üretmektir.
@@ -436,8 +465,8 @@ Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kull
 • Araç: ${fullVehicleTitle}
 • Marka / Model: ${brand} ${model} (${year})
 • Kasa Tipi: ${body} | Donanım Paketi: ${trim}
-• Motor: ${engine} | Şanzıman: ${trans}
-• Pazar Önceliği: Türkiye Resmi Distribütör ve Katalog Verileri (Ticari isimlerde TR resmi motor varyantı önceliklidir; bulunamazsa güvenilir teknik kataloglar ve üretici mühendislik dokümanları)
+• Motor: ${engine} | Yakıt: ${fuel || (isEv ? 'Elektrik' : 'Benzin / Dizel')} | Şanzıman: ${trans}
+${isEv ? '• GÜÇ MİMARİSİ: TAM ELEKTRİKLİ (BEV). Buji, egzoz, triger, DPF, mekatronik gibi içten yanmalı motor terimleri KULLANILAMAZ. Batarya kapasitesi (kWh), WLTP menzili, DC şarj hızı ve e-motor verilerine odaklan.\n' : ''}• Pazar Önceliği: Türkiye Resmi Distribütör ve Katalog Verileri (Ticari isimlerde TR resmi motor varyantı önceliklidir; bulunamazsa güvenilir teknik kataloglar ve üretici mühendislik dokümanları)
 ${sectionFilter ? `• YALNIZCA ŞU EKSİK BÖLÜMLERİ ARAŞTIR: ${sectionFilter.join(', ')}` : ''}
 
 ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:

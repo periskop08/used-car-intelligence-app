@@ -12,6 +12,7 @@ export interface DefectSanitizationContext {
   title?: string;
   failureMode?: string;
   component?: string;
+  isElectric?: boolean;
 }
 
 const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
@@ -169,6 +170,29 @@ export function isEnglishOrForeignText(text?: string): boolean {
  */
 export function getStandardTurkishDefectExplanation(context: DefectSanitizationContext): string {
   const normKey = `${context.failureMode || ''} ${context.title || ''} ${context.component || ''}`.toUpperCase();
+
+  if (context.isElectric) {
+    if (
+      normKey.includes('COOLANT') ||
+      normKey.includes('THERMOSTAT') ||
+      normKey.includes('DEVIRDAIM') ||
+      normKey.includes('SOĞUTMA') ||
+      normKey.includes('WATER_PUMP') ||
+      normKey.includes('HARARET')
+    ) {
+      return 'Yüksek voltaj batarya paketi ve elektrik motoru sıvı termal yönetim devresinde soğutma sıvısı seviyesi ve sızdırmazlık durumu kontrol edilmelidir.';
+    }
+    if (
+      normKey.includes('MECHATRONIC') ||
+      normKey.includes('CLUTCH') ||
+      normKey.includes('ŞANZIMAN') ||
+      normKey.includes('TRANS') ||
+      normKey.includes('GEARBOX') ||
+      normKey.includes('REDÜKTÖR')
+    ) {
+      return 'Elektrikli tahrik ünitesi (EDU) ve doğrudan tahrikli tek oranlı redüktör dişli grubu çalışma kararlılığı yönünden incelenmelidir.';
+    }
+  }
 
   if (normKey.includes('WET_BELT') || /wet[\s_-]?belt/i.test(normKey) || normKey.includes('ISLAK TRİGER')) {
     return DOMAIN_FAILURE_EXPLANATIONS_TR.WET_BELT;
@@ -430,7 +454,9 @@ export function sanitizeTurkishDefectTitle(
 
   // Social media or clickbait titles
   if (/hararetin gizli sebebi|usta notu|on instagram|tiktok/i.test(title)) {
-    return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+    return (context.isElectric || context.domain === 'HV_BATTERY_SYSTEM')
+      ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi'
+      : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
   }
 
   // Water leak / coolant English patterns
@@ -438,15 +464,23 @@ export function sanitizeTurkishDefectTitle(
     /water\s*leak|coolant\s*leak|water\s*pump|most\s*common\s*water/i.test(title) ||
     /water\s*leak|coolant\s*leak|water\s*pump/i.test(context.failureMode || '')
   ) {
-    return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+    return (context.isElectric || context.domain === 'HV_BATTERY_SYSTEM')
+      ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi'
+      : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
   }
 
   // English or raw enum / slug titles
   if (isEnglishOrForeignText(title) || /^[A-Z0-9_-]{4,}$/.test(title)) {
     const normKey = `${context.failureMode || ''} ${title} ${context.component || ''}`.toUpperCase();
-    if (normKey.includes('WET_BELT') || /wet[\s_-]?belt/i.test(normKey)) return 'Islak Triger Kayışı Aşınması';
-    if (normKey.includes('MECHATRONIC')) return 'Mekatronik Hidrolik Basınç Kaybı';
-    if (normKey.includes('CLUTCH') || normKey.includes('KAVRAMA') || normKey.includes('DSG')) return 'Kuru Çift Kavrama Aşınması';
+    if (normKey.includes('WET_BELT') || /wet[\s_-]?belt/i.test(normKey)) {
+      return context.isElectric ? 'Batarya ve Güç Ünitesi Tesisatı' : 'Islak Triger Kayışı Aşınması';
+    }
+    if (normKey.includes('MECHATRONIC')) {
+      return context.isElectric ? 'Motor Kontrol Ünitesi (MCU) & İnverter' : 'Mekatronik Hidrolik Basınç Kaybı';
+    }
+    if (normKey.includes('CLUTCH') || normKey.includes('KAVRAMA') || normKey.includes('DSG')) {
+      return context.isElectric ? 'Elektrik Tahrik Redüktör Dişli Grubu' : 'Kuru Çift Kavrama Aşınması';
+    }
     if (
       normKey.includes('COOLANT') ||
       normKey.includes('THERMOSTAT') ||
@@ -454,7 +488,9 @@ export function sanitizeTurkishDefectTitle(
       normKey.includes('SU POMPA') ||
       normKey.includes('HARARET')
     ) {
-      return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+      return (context.isElectric || context.domain === 'HV_BATTERY_SYSTEM')
+        ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi'
+        : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
     }
     if (normKey.includes('CAMSHAFT') || normKey.includes('KAM MİLİ')) return 'Kam Mili Ayarlayıcı Cıvatasının Gevşemesi';
     if (normKey.includes('TIMING_CHAIN')) return 'Triger Zinciri Uzaması / Aşınması';

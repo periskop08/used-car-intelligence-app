@@ -225,10 +225,14 @@ export class VehicleReportFallbackService {
     // Motor: [EngineCode] ([HP] HP / [Torque] Nm)
     // Şanzıman: [TransName] ([TransType])
     // Yakıt: [FuelType] (Ort. [Fuel] lt/100km)
-    const formattedEngineLabel = isHybrid
-      ? `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp} Toplam Sistem Gücü${torque ? ' / ' + torque + ' Benzinli Motor Torku' : ''})`.trim()
-      : `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim();
-    const formattedTransLabel = `${trans}${vIdentity.transmissionCode ? ' (' + vIdentity.transmissionCode + ')' : ''}`;
+    const formattedEngineLabel = isElectric
+      ? `${engineCodeStr}(${hp}${torque ? ' / ' + torque : ''})`.trim()
+      : (isHybrid
+        ? `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp} Toplam Sistem Gücü${torque ? ' / ' + torque + ' Benzinli Motor Torku' : ''})`.trim()
+        : `${engineCodeStr}${cc ? cc + ' ' : ''}(${hp}${torque ? ' / ' + torque : ''})`.trim());
+    const formattedTransLabel = isElectric
+      ? 'Doğrudan Tahrikli Tek Oranlı Redüktör'
+      : `${trans}${vIdentity.transmissionCode && vIdentity.transmissionCode !== 'AUTOMATIC' && vIdentity.transmissionCode !== 'MANUAL' && vIdentity.transmissionCode !== 'SINGLE_SPEED_DIRECT' ? ' (' + vIdentity.transmissionCode + ')' : ''}`;
     const formattedFuelLabel = `${fuel}${avgFuel ? ' (' + avgFuel + ')' : ''}`;
 
     // Expert Decision Synthesis
@@ -246,11 +250,17 @@ export class VehicleReportFallbackService {
         missingFeaturesInLowerTrim: ['Üst Paket Konfor Elemanları'],
       },
       dailyUseAssessment: {
-        cityUse: `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
-        highwayUse: `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,
-        trafficBehavior: isEcvtOrHybrid
-          ? `Dur-kalk kullanımında hibrit batarya şarj durumu ve elektrik-benzin motor geçiş pürüzsüzlüğü kontrol edilmelidir.`
-          : `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`,
+        cityUse: isElectric
+          ? 'Doğrudan tahrikli elektrik motoru mimarisi, dur-kalk şehir içi trafiğinde kesintisiz, sarsıntısız ve sessiz bir sürüş konforu sunar.'
+          : `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve sarsıntısız kalkış imkanı sunar.`,
+        highwayUse: isElectric
+          ? `Sabit hız otoyol seyirlerinde ${hp} güç ve dengeli şasi yapısı konforlu bir seyir kararlılığı sunar; yüksek hızlarda elektrik tüketimi ve menzil eğrisi dikkate alınmalıdır.`
+          : `Sabit hız otoyol sürüşlerinde ${hp} motor gücü ve ${torque ? torque + ' tork ' : ''}dengesi makul seyir konforu sağlar.`,
+        trafficBehavior: isElectric
+          ? `Dur-kalk trafiğinde rejeneratif frenleme enerjisi geri kazanımı, batarya termal dengesi ve pürüzsüz kalkış tepkileri avantaj sağlar.`
+          : (isEcvtOrHybrid
+            ? `Dur-kalk kullanımında hibrit batarya şarj durumu ve elektrik-benzin motor geçiş pürüzsüzlüğü kontrol edilmelidir.`
+            : `Dur-kalk kullanımında şanzıman yağ sıcaklığı ve kavrama sağlığı periyodik olarak kontrol edilmelidir.`),
         comfortAssessment: `Sınıfı standartlarında günlük kullanım pratikliği ve kabin ergonomisi vadeder.`,
         supportingFactIds,
       },

@@ -1934,6 +1934,7 @@ export class VehicleReliabilityResearchService {
     evidences: NormalizedReliabilityEvidence[],
   ): CanonicalRiskDefect[] {
     const canonicalMap = new Map<string, CanonicalRiskDefect>();
+    const isElectric = Boolean(input.isElectric || input.powertrainType === 'BEV');
 
     for (const ev of evidences) {
       let normFail = ev.normalizedFailureMode;
@@ -2041,13 +2042,14 @@ export class VehicleReliabilityResearchService {
         domain: ev.domain,
         failureMode: normFail,
         component: ev.affectedComponent,
+        isElectric,
       });
       if (normFail === 'WET_BELT' || /wet[\s_-]?belt/i.test(ev.title)) {
         turkishTitle = 'Islak Triger Kayışı Aşınması';
       } else if (normFail.includes('MECHATRONIC') || /mekatronik/i.test(ev.title)) {
-        turkishTitle = 'Mekatronik Hidrolik Basınç Kaybı';
+        turkishTitle = isElectric ? 'Tahrik Ünitesi & İnverter Yazılım Bülteni' : 'Mekatronik Hidrolik Basınç Kaybı';
       } else if (normFail.includes('CLUTCH') || /kavrama/i.test(ev.title)) {
-        turkishTitle = 'Kuru Çift Kavrama Aşınması';
+        turkishTitle = isElectric ? 'Elektrikli Tahrik & Redüktör Dişli Grubu' : 'Kuru Çift Kavrama Aşınması';
       } else if (normFail.includes('INJECTOR') || /enjektör/i.test(ev.title)) {
         turkishTitle = 'Yakıt Enjektörü Kurum & Tıkanma';
       } else if (
@@ -2055,10 +2057,10 @@ export class VehicleReliabilityResearchService {
         normFail.includes('THERMOSTAT') ||
         /termostat|su pompası|devirdaim|water pump|hararet/i.test(ev.title)
       ) {
-        turkishTitle = 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+        turkishTitle = isElectric ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi' : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
       } else if (/recalled for|transmission fault|recalled|recall\b|safety recall/i.test(turkishTitle)) {
         if (normFail.includes('TRANS') || /transmission|şanzıman|gearbox/i.test(turkishTitle)) {
-          turkishTitle = 'Şanzıman / Mekatronik Yazılım Bülteni';
+          turkishTitle = isElectric ? 'Elektrikli Tahrik Ünitesi & Redüktör Bülteni' : 'Şanzıman / Mekatronik Yazılım Bülteni';
         } else if (/seat/i.test(turkishTitle) || normFail.includes('SEAT')) {
           turkishTitle = 'Koltuk Donanımı & Trim Kontrolü';
         } else {
@@ -2071,6 +2073,7 @@ export class VehicleReliabilityResearchService {
         failureMode: normFail,
         title: turkishTitle,
         component: ev.affectedComponent,
+        isElectric,
       });
 
       let inspectionInstruction: string | undefined;
@@ -2462,7 +2465,7 @@ export class VehicleReliabilityResearchService {
     }
 
     // Combustion-specific terms on BEV vehicle
-    const isCombustionSpecific = /(içten yanmalı|motor yağı|şanzıman yağı|subap|enjektör|egzoz|silindir kapağı|triger|v-kayış)/i.test(fullText);
+    const isCombustionSpecific = /(içten yanmalı|motor yağı|şanzıman yağı|subap|enjektör|egzoz|silindir kapağı|triger|v-kayış|termostat|devirdaim|su pompası|water pump|mekatronik|çift kavrama|dual[- ]clutch|şanzıman filtresi|hararet|buji|silindir)/i.test(fullText);
     if (isCombustionSpecific && vPowertrain === 'BEV') {
       return false;
     }
