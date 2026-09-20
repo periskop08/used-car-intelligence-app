@@ -28,4 +28,13 @@ This workspace corresponds to the **TorqueScout** (formerly Used Car Intelligenc
 * **Upstream Invalidation & Zero Stale Selections:** Whenever an upstream selection (Brand, Model, Year) is modified, any downstream selections that are no longer valid MUST be immediately cleared. Stale downstream selections are strictly prohibited. Recalculation and single-option auto-selection must execute immediately.
 * **Canonical 17 Type Taxonomy:** The 17 canonical types defined in `apps/web/src/contracts/motorcycleTaxonomyContract.ts` derived from market classifications are locked. Zero invented categories. Aliases (e.g. "Trike" -> `Üç Tekerlekli`, "Naked / Roadstar" -> `Naked / Roadster`) must be normalized through `normalizeMotorcycleType`.
 
+## 🔒 LOCKED PHYSICAL SPECIFICATIONS & ZERO-NULL CARDS CONTRACT (FROZEN - DO NOT ALTER)
+* **Zero-Null Card Guarantee (Rule 14 & UI Invariant):** The technical specification cards (`Motor Gücü`, `Motor Hacmi / Elektrik`, `MTV`, `Maksimum Hız`, `0-100 Hızlanma`, `Menzil (WLTP) / Ort. Tüketim`, `Bagaj Hacmi`, `Boş Ağırlık`) across Web (`VehicleReportShell.tsx`) and Mobile (`vehicle-report.tsx`) MUST NEVER display empty/null (`—`).
+* **3-Layer Defensive Architecture:**
+  1. **Layer 1 (Context Builder Proactive Extraction):** `VehicleReportContextBuilderService.researchPhysicalSpecsViaAi` automatically queries official catalog specs via OpenAI `gpt-4o-mini` (Gemini fallback) whenever a variant's physical specs are missing, upserting them immediately to Prisma `TechnicalSpec`.
+  2. **Layer 2 (Prompt Enforcement):** `VehicleReportPromptService` mandates Rule 14 and directly feeds acceleration, top speed, trunk, curb weight, WLTP range, and battery capacity into the prompt, strictly forbidding `null` output.
+  3. **Layer 3 (Reconciliation & Heuristic Fallback):** `VehicleReportProviderService.reconcileVariantIdentityInReport` guarantees non-null realistic physical fallback boundaries (by HP, body type, and EV status) and synchronizes both alias naming schemes (`zeroToHundredKmh` / `zeroToHundredSec`, `trunkCapacityLiters` / `luggageCapacityL`, `curbWeightKg` / `weightKg`).
+* **Electric Vehicle Statutory MTV Brackets (`calculateVehicleMtv.ts`):** EV power-to-equivalent displacement mappings strictly follow Turkey MTV Law Article 9 / General Communique No. 56, correctly handling high-power EV brackets (>240 kW / >4000 cc tavan dilimi at 25% statutory rate).
+
+
 
