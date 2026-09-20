@@ -152,7 +152,7 @@ export function calculateVehicleMtv(input: VehicleMtvInput): VehicleMtvResult | 
       }
     }
 
-    // Elektrikli araç eşdeğer CC eşlemesi
+    // Elektrikli araç eşdeğer CC eşlemesi (MTV Kanunu Md. 9 / Seri No: 56 Tebliği)
     let equivalentCc = 1300;
     if (kw) {
       if (kw <= 70) equivalentCc = 1300;
@@ -160,7 +160,10 @@ export function calculateVehicleMtv(input: VehicleMtvInput): VehicleMtvResult | 
       else if (kw <= 105) equivalentCc = 1800;
       else if (kw <= 120) equivalentCc = 2000;
       else if (kw <= 150) equivalentCc = 2500;
-      else equivalentCc = 3000;
+      else if (kw <= 180) equivalentCc = 3000;
+      else if (kw <= 210) equivalentCc = 3500;
+      else if (kw <= 240) equivalentCc = 4000;
+      else equivalentCc = 4500; // 4001 cm3 ve yukarısı
     }
 
     const table = modelYear < 2018 ? PRE_2018_TABLE : POST_2018_TABLE;

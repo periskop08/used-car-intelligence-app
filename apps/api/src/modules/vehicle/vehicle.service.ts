@@ -5,6 +5,7 @@ import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, 
 import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
 import { getFuelTypeTr } from './vehicle-filters.controller';
 import { resolveHorsepower } from '@used-car-intelligence/shared';
+import OpenAI from 'openai';
 
 
 
@@ -710,12 +711,38 @@ Paket: ${trimName}
   "acceleration0to100": number (0-100 hızlanma saniye cinsinden, örn: 9.2),
   "averageFuelConsumption": number (Ortalama yakıt tüketimi lt/100km cinsinden, örn: 6.4. Eğer elektrikli ise 0),
   "luggageCapacity": number (Bagaj hacmi litre cinsinden tam sayı, örn: 450),
-  "weight": number (Boş ağırlık kg cinsinden tam sayı, örn: 1380)
+  "weight": number (Boş ağırlık kg cinsinden tam sayı, örn: 1380),
+  "electricRangeWltpKm": number (Elektrikli ise WLTP menzili km, örn: 521),
+  "batteryCapacityKwh": number (Elektrikli ise batarya kapasitesi kWh, örn: 82.5)
 }
 
 Önemli:
 - Yalnızca bu JSON formatını döndür, açıklama veya markdown ekleme.
-- Eğer kesin değerleri bulamazsan, bu aracın motor gücü ve sınıfına göre en gerçekçi tahmini değerleri yaz (örneğin 1.6 atmosferik benzinli araç için bagajı 400-500, ağırlığı 1200-1300, 0-100'ü 10-12 saniye civarı yap).`;
+- Eğer kesin değerleri bulamazsan, bu aracın motor gücü ve sınıfına göre en gerçekçi tahmini değerleri yaz.`;
+
+    // 1. Try OpenAI gpt-4o-mini first
+    const openAiKey = process.env.OPENAI_API_KEY;
+    if (openAiKey) {
+      try {
+        const openai = new OpenAI({ apiKey: openAiKey });
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'You are an automotive technical catalog specification database. Return strict JSON only.' },
+            { role: 'user', content: userPrompt }
+          ]
+        });
+        const raw = completion.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.topSpeed === 'number' || typeof parsed.acceleration0to100 === 'number') {
+          return parsed;
+        }
+      } catch (e) {
+        // fallback to Gemini
+      }
+    }
 
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
 

@@ -236,9 +236,14 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
       ? `${rawTorqueVal} ${torqueUnit}${torqueSemantic === 'TOTAL_HYBRID_SYSTEM_TORQUE' ? ' (Doğrulanmış Hibrit Torku)' : ''}`
       : 'Gerçek Fabrika Verisiyle Tamamla';
 
-    const ccText = perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'Gerçek Hacim Verisiyle Tamamla';
-    const zeroHundredText = perf.zeroToHundredKmh ? `${perf.zeroToHundredKmh} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
+    const isEv = fuel === 'Elektrik' || fuel === 'ELECTRIC' || (identity.fuelType || '').toLowerCase().includes('elektrik');
+    const ccText = isEv ? 'Elektrik Motoru (cc bulunmaz)' : (perf.engineDisplacementCc ? `${perf.engineDisplacementCc} cc` : 'Gerçek Hacim Verisiyle Tamamla');
+    const zeroHundredText = (perf.zeroToHundredKmh || perf.zeroToHundredSec) ? `${perf.zeroToHundredKmh || perf.zeroToHundredSec} sn` : 'Aracın Gerçek Fabrika Verisiyle Tamamla';
     const topSpeedText = perf.topSpeedKmh ? `${perf.topSpeedKmh} km/s` : 'Gerçek Veriyle Tamamla';
+    const trunkText = (perf.trunkCapacityLiters || perf.luggageCapacityL) ? `${perf.trunkCapacityLiters || perf.luggageCapacityL} Litre` : 'Gerçek Fabrika Verisiyle Tamamla';
+    const weightText = (perf.curbWeightKg || perf.weightKg) ? `${perf.curbWeightKg || perf.weightKg} kg` : 'Gerçek Fabrika Verisiyle Tamamla';
+    const rangeText = (perf.electricRangeWltpKm || identity.electricRangeWltpKm) ? `${perf.electricRangeWltpKm || identity.electricRangeWltpKm} km (WLTP)` : (isEv ? 'Gerçek Fabrika WLTP Verisiyle Tamamla' : null);
+    const batteryText = (perf.batteryCapacityKwh || identity.batteryCapacityKwh) ? `${perf.batteryCapacityKwh || identity.batteryCapacityKwh} kWh` : (isEv ? 'Gerçek Batarya Kapasitesiyle Tamamla' : null);
     const driveTypeText = perf.drivetrain || identity.drivetrain || 'Orijinal Çekiş Sistemi';
 
     const equipmentHighlights = equipmentObj.highlights ? `\n• Veritabanı Donanım Öne Çıkanları: ${equipmentObj.highlights}` : '';
@@ -259,6 +264,12 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 7. Yakıt Türü: ${fuel}
 8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
 • Çekiş Sistemi: ${driveTypeText}
+• Motor Hacmi: ${ccText}
+• Hızlanma (0-100 km/s): ${zeroHundredText}
+• Maksimum Hız: ${topSpeedText}
+• Bagaj Hacmi: ${trunkText}
+• Boş Ağırlık: ${weightText}
+${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ? `• Batarya Kapasitesi: ${batteryText}\n` : ''}
 
 --- ÖNEMLİ TEKNİK VERİ VE KİLOMETRE İLKELERİ ---
 1. TİCARİ İSİM VE TÜRKİYE VARYANT ÇÖZÜMLEME:
@@ -325,6 +336,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     - Tam 4 ila 6 adet bu aracın motor (${engine || 'Motor'}), şanzıman (${trans || 'Şanzıman'}) ve donanımına (${trim || 'Paket'}) doğrudan nokta atışı yapan derin teknik mülakat sorusu üret.
     - Motorun spesifik mekanik hassasiyetlerini (triger kayışı/zinciri son değişim km'si ve faturası, devirdaim/soğutma sıvı kaçağı, turbo/enjektör durumu), şanzımanın özel bakım disiplinini (kuru/ıslak kavrama aşınması, şanzıman yağı değişim periyodu, mekatronik basınç geçmişi) ve araca özel donanımları hedef al.
     - Her soru için hem satıcıdan beklenen somut, faturalı ideal cevabı ('expectedAnswerHint') hem de alıcının şüphelenmesi gereken kaçamak veya arıza gizleyici kırmızı bayrak cevabını ('redFlagAnswerHint') eksiksiz doldur.
+14. TEKNİK ÖZELLİKLER KARTLARI ASLA BOŞ (null) BIRAKILAMAZ:
+    - 'zeroToHundredKmh', 'topSpeedKmh', 'trunkCapacityLiters' ve 'curbWeightKg' alanları kullanıcının ekranındaki 6 teknik kartın 4'ünü oluşturur. Bu alanlar KESİNLİKLE null veya undefined bırakılamaz!
+    - Eğer bağlamda doğrulanmış fabrika verisi verildiyse aynen koru; verilmediyse de bu spesifik araç kombinasyonunun (${brand} ${model} ${year} ${body}) üretici resmi fabrika katalog verilerini (0-100 km/s sn, azami hız km/s, bagaj litresi, boş ağırlık kg) saf sayı olarak eksiksiz doldur.
+    - Elektrikli araçlarda 'electricRangeWltpKm' (WLTP menzil) ve 'batteryCapacityKwh' alanları da resmi fabrika verisiyle saf sayı olarak doldurulmalıdır.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {

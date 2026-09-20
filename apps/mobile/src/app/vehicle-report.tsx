@@ -976,12 +976,31 @@ export default function VehicleReportScreen() {
   });
   const hpValue = report?.performanceUsage?.powerHp || report?.vehicleIdentity?.enginePowerHp;
   const torqueValue = report?.performanceUsage?.torqueNm;
-  const topSpeedValue = report?.performanceUsage?.topSpeedKmh;
-  const zeroToHundredValue = report?.performanceUsage?.zeroToHundredSec;
-  const combinedFuel = report?.performanceUsage?.combinedFuelL100km;
+  const topSpeedValue = report?.performanceUsage?.topSpeedKmh
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh
+    || (report as any)?.technicalSpecifications?.topSpeedKmh;
+  const zeroToHundredValue = report?.performanceUsage?.zeroToHundredSec
+    || report?.performanceUsage?.zeroToHundredKmh
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh
+    || (report as any)?.technicalSpecifications?.zeroToHundredSec
+    || (report as any)?.technicalSpecifications?.zeroToHundredKmh;
+  const combinedFuel = report?.performanceUsage?.combinedFuelL100km
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km
+    || (report as any)?.technicalSpecifications?.combinedFuelL100km;
   const electricRangeKm = resolveVehicleRangeKm(report);
-  const trunkValue = report?.performanceUsage?.luggageCapacityL;
-  const weightValue = report?.performanceUsage?.weightKg;
+  const trunkValue = report?.performanceUsage?.trunkCapacityLiters
+    || report?.performanceUsage?.luggageCapacityL
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL
+    || (report as any)?.technicalSpecifications?.trunkCapacityLiters
+    || (report as any)?.technicalSpecifications?.luggageCapacityL;
+  const weightValue = report?.performanceUsage?.curbWeightKg
+    || report?.performanceUsage?.weightKg
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg
+    || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.weightKg
+    || (report as any)?.technicalSpecifications?.curbWeightKg
+    || (report as any)?.technicalSpecifications?.weightKg;
 
   const rawBuyability = report?.scoring?.buyabilityScore?.value ?? 73;
   const rawRisk = report?.scoring?.technicalRiskScore?.value ?? 30;

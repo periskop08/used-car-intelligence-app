@@ -4,6 +4,7 @@ import { VehicleCharacterResearchService } from '../research/vehicle-character-r
 import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import * as crypto from 'crypto';
+import OpenAI from 'openai';
 
 @Injectable()
 export class VehicleReportContextBuilderService {
@@ -105,14 +106,16 @@ export class VehicleReportContextBuilderService {
     const transName = variant.transmission?.name || null;
     const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
     const driveType = specsJson.drivetrain || (variant as any).driveType || null;
-    const zeroToHundred = specsJson.acceleration0to100 ?? specsJson.zeroToHundredKmh ?? null;
-    const topSpeedVal = specsJson.topSpeed ?? specsJson.topSpeedKmh ?? null;
-    const weightVal = specsJson.weight ?? specsJson.curbWeightKg ?? null;
-    const trunkVal = specsJson.luggageCapacity ?? specsJson.trunkCapacityLiters ?? null;
+    let zeroToHundred = specsJson.acceleration0to100 ?? specsJson.zeroToHundredKmh ?? specsJson.zeroToHundredSec ?? null;
+    let topSpeedVal = specsJson.topSpeed ?? specsJson.topSpeedKmh ?? null;
+    let weightVal = specsJson.weight ?? specsJson.curbWeightKg ?? specsJson.weightKg ?? null;
+    let trunkVal = specsJson.luggageCapacity ?? specsJson.trunkCapacityLiters ?? specsJson.luggageCapacityL ?? null;
+    let electricRangeVal = specsJson.electricRangeWltpKm ?? specsJson.electricRangeKm ?? null;
+    let batteryCapacityVal = specsJson.batteryCapacityKwh ?? null;
     const fuelTankVal = specsJson.fuelTankCapacityLiters ?? specsJson.fuelTankLiters ?? null;
     const cityFuelVal = specsJson.cityFuelConsumption ?? specsJson.cityFuelL100km ?? null;
     const highwayFuelVal = specsJson.highwayFuelConsumption ?? specsJson.highwayFuelL100km ?? null;
-    const combinedFuelVal = specsJson.averageFuelConsumption ?? specsJson.combinedFuelL100km ?? null;
+    let combinedFuelVal = specsJson.averageFuelConsumption ?? specsJson.combinedFuelL100km ?? null;
 
     // ─────────────────────────────────────────────────────────────────────────
     // CANONICAL EXACT-VARIANT POWER RESOLUTION (NO HEURISTICS, ZERO PLACEHOLDERS)
@@ -213,6 +216,90 @@ export class VehicleReportContextBuilderService {
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // PHYSICAL CATALOG SPECIFICATION RESOLUTION (0-100, Top Speed, Trunk, Weight, EV Range)
+    // ─────────────────────────────────────────────────────────────────────────
+    const isPhysicalSpecsMissing = (
+      zeroToHundred === null ||
+      topSpeedVal === null ||
+      weightVal === null ||
+      trunkVal === null ||
+      (isElectricVariant && (electricRangeVal === null || batteryCapacityVal === null))
+    );
+
+    if (isPhysicalSpecsMissing) {
+      try {
+        const researched = await this.researchPhysicalSpecsViaAi(variant, engineHp);
+        if (researched) {
+          if (zeroToHundred === null && typeof researched.acceleration0to100 === 'number') {
+            zeroToHundred = researched.acceleration0to100;
+          }
+          if (topSpeedVal === null && typeof researched.topSpeed === 'number') {
+            topSpeedVal = researched.topSpeed;
+          }
+          if (weightVal === null && typeof researched.weight === 'number') {
+            weightVal = researched.weight;
+          }
+          if (trunkVal === null && typeof researched.luggageCapacity === 'number') {
+            trunkVal = researched.luggageCapacity;
+          }
+          if (isElectricVariant) {
+            if (electricRangeVal === null && typeof researched.electricRangeWltpKm === 'number') {
+              electricRangeVal = researched.electricRangeWltpKm;
+            }
+            if (batteryCapacityVal === null && typeof researched.batteryCapacityKwh === 'number') {
+              batteryCapacityVal = researched.batteryCapacityKwh;
+            }
+          }
+          if (combinedFuelVal === null && typeof researched.averageFuelConsumption === 'number') {
+            combinedFuelVal = researched.averageFuelConsumption;
+          }
+
+          // Cache researched specs to TechnicalSpec table in Prisma
+          const currentSpecsData = typeof variant.specs?.specs === 'object' && variant.specs?.specs !== null
+            ? (variant.specs.specs as Record<string, any>)
+            : {};
+          
+          await this.prisma.technicalSpec.upsert({
+            where: { variantId: variant.id },
+            create: {
+              variantId: variant.id,
+              specs: {
+                ...currentSpecsData,
+                ...researched,
+                topSpeedKmh: topSpeedVal,
+                zeroToHundredKmh: zeroToHundred,
+                zeroToHundredSec: zeroToHundred,
+                curbWeightKg: weightVal,
+                weightKg: weightVal,
+                trunkCapacityLiters: trunkVal,
+                luggageCapacityL: trunkVal,
+                electricRangeWltpKm: electricRangeVal,
+                batteryCapacityKwh: batteryCapacityVal,
+              },
+            },
+            update: {
+              specs: {
+                ...currentSpecsData,
+                ...researched,
+                topSpeedKmh: topSpeedVal,
+                zeroToHundredKmh: zeroToHundred,
+                zeroToHundredSec: zeroToHundred,
+                curbWeightKg: weightVal,
+                weightKg: weightVal,
+                trunkCapacityLiters: trunkVal,
+                luggageCapacityL: trunkVal,
+                electricRangeWltpKm: electricRangeVal,
+                batteryCapacityKwh: batteryCapacityVal,
+              },
+            },
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`[PHYSICAL SPECS RESOLUTION] AI catalog research skipped: ${err?.message}`);
+      }
+    }
+
     const performanceData: Record<string, any> = {
       enginePowerHp: engineHp,
       powerUnit: powerUnit,
@@ -227,13 +314,18 @@ export class VehicleReportContextBuilderService {
       transmissionSpeeds: null, // Let AI derive exact gear count (e.g. 6-speed for Kia Cerato, 5-speed for Civic)
       drivetrain: driveType,
       zeroToHundredKmh: zeroToHundred,
+      zeroToHundredSec: zeroToHundred,
       topSpeedKmh: topSpeedVal,
       curbWeightKg: weightVal,
+      weightKg: weightVal,
       trunkCapacityLiters: trunkVal,
+      luggageCapacityL: trunkVal,
       fuelTankCapacityLiters: fuelTankVal,
       cityFuelL100km: cityFuelVal,
       highwayFuelL100km: highwayFuelVal,
       combinedFuelL100km: combinedFuelVal,
+      electricRangeWltpKm: electricRangeVal,
+      batteryCapacityKwh: batteryCapacityVal,
     };
 
     const contextObj = {
@@ -256,6 +348,8 @@ export class VehicleReportContextBuilderService {
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineType: specsJson.engineType || null,
         fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
+        electricRangeWltpKm: electricRangeVal,
+        batteryCapacityKwh: batteryCapacityVal,
         transmissionName: transName || 'Otomatik',
         transmissionCode: variant.transmission?.type || 'AUTOMATIC',
         drivetrain: driveType,
@@ -382,6 +476,118 @@ export class VehicleReportContextBuilderService {
         global.gc();
       }
     }
+  }
+
+  /**
+   * Researches official manufacturer physical catalog specifications (0-100, top speed, luggage, curb weight, EV range)
+   * using OpenAI gpt-4o-mini with Gemini fallback, and caches the result directly to TechnicalSpec in DB.
+   */
+  private async researchPhysicalSpecsViaAi(variant: any, powerHp?: number | null): Promise<Record<string, any> | null> {
+    const brandName = variant.brand?.name || '';
+    const modelName = variant.model?.name || '';
+    const generationName = variant.generation?.name || '';
+    const bodyType = variant.generation?.bodyType || variant.bodyType || '';
+    const engineCode = variant.engine?.code || '';
+    const fuelType = variant.fuelType || variant.engine?.fuelType || '';
+    const transmissionName = variant.transmission?.name || '';
+    const trimName = variant.trim?.name || '';
+    const year = variant.year;
+    const isElectric = fuelType === 'ELECTRIC' || variant.engine?.isElectric || (fuelType || '').toUpperCase() === 'ELECTRIC';
+
+    const userPrompt = `Aşağıdaki araç kombinasyonunun üretici resmi katalog teknik verilerini (fiziksel performans, ağırlık ve boyut) JSON formatında döndür.
+Araç: ${year} ${brandName} ${modelName} (${generationName} - ${bodyType})
+Motor: ${engineCode} (${fuelType})${powerHp ? ` - Güç: ${powerHp} HP` : ''}
+Şanzıman: ${transmissionName}
+Paket: ${trimName}
+
+İstenen JSON formatı:
+{
+  "topSpeed": number (Maksimum hız km/s cinsinden tam sayı, örn: 200),
+  "acceleration0to100": number (0-100 hızlanma saniye cinsinden, örn: 3.9 veya 8.5),
+  "luggageCapacity": number (Bagaj hacmi litre cinsinden tam sayı, örn: 540 veya 480),
+  "weight": number (Boş ağırlık kg cinsinden tam sayı, örn: 2200 veya 1450),
+  "averageFuelConsumption": number (Ortalama yakıt tüketimi lt/100km, elektrikli ise null),
+  "electricRangeWltpKm": number (Elektrikli ise üretici resmi WLTP karma menzili km cinsinden tam sayı örn: 521, içten yanmalı ise null),
+  "batteryCapacityKwh": number (Elektrikli ise kullanılabilir batarya kapasitesi kWh cinsinden örn: 82.5, içten yanmalı ise null)
+}
+
+Önemli:
+- Yalnızca bu JSON formatını döndür, markdown veya ek metin ekleme.
+- Verilen spesifik model yılı, kasa tipi ve motora ait gerçek üretici fabrika katalog verilerini doldur.`;
+
+    // 1. Try OpenAI gpt-4o-mini
+    const openAiApiKey = process.env.OPENAI_API_KEY;
+    if (openAiApiKey) {
+      try {
+        const openai = new OpenAI({ apiKey: openAiApiKey });
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an official automotive manufacturer catalog database. Return accurate technical specifications in strict JSON.',
+            },
+            {
+              role: 'user',
+              content: userPrompt,
+            },
+          ],
+        });
+
+        const rawContent = completion.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(rawContent);
+        if (
+          typeof parsed.topSpeed === 'number' ||
+          typeof parsed.acceleration0to100 === 'number' ||
+          typeof parsed.luggageCapacity === 'number' ||
+          typeof parsed.weight === 'number'
+        ) {
+          this.logger.log(`[PHYSICAL SPECS AI] Successfully extracted catalog specs via OpenAI for ${brandName} ${modelName} ${year}`);
+          return parsed;
+        }
+      } catch (err: any) {
+        this.logger.warn(`[PHYSICAL SPECS AI] OpenAI catalog extraction failed: ${err?.message}`);
+      }
+    }
+
+    // 2. Fallback to Gemini
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
+      for (const mName of models) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${geminiApiKey}`;
+          const response = await global.fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: userPrompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          });
+          if (!response.ok) continue;
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+          const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanText);
+          if (
+            typeof parsed.topSpeed === 'number' ||
+            typeof parsed.acceleration0to100 === 'number' ||
+            typeof parsed.luggageCapacity === 'number' ||
+            typeof parsed.weight === 'number'
+          ) {
+            this.logger.log(`[PHYSICAL SPECS AI] Successfully extracted catalog specs via Gemini for ${brandName} ${modelName} ${year}`);
+            return parsed;
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    return null;
   }
 }
 
