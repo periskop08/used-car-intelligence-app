@@ -193,6 +193,33 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
       ((report.scoringV6 as any)?.unverifiedComplaintCount && (report.scoringV6 as any).unverifiedComplaintCount > 0)
     );
 
+    const getHarmonizedVerdict = () => {
+      if (isInsufficient) {
+        return "Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz.";
+      }
+      const numScore = typeof displayedScore === 'number' ? displayedScore : (decisionScore.score ?? 100);
+      const rawVerdict = report.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict;
+
+      if (numScore >= 90 || decisionScore.state === 'EXCELLENT') {
+        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması şartıyla') || rawVerdict.includes('Belirli kontrollerin')) {
+          return "Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.";
+        }
+      } else if (numScore >= 75 || decisionScore.state === 'GOOD') {
+        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması şartıyla')) {
+          return "Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.";
+        }
+      } else if (numScore >= 60 || decisionScore.state === 'CAUTION') {
+        if (!rawVerdict) {
+          return "Belirli kontrollerin sağlanması ve potansiyel aşınma noktalarının incelenmesi şartıyla değerlendirilebilir.";
+        }
+      } else if (numScore < 60 || decisionScore.state === 'HIGH_RISK' || decisionScore.state === 'AVOID') {
+        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması')) {
+          return "Yüksek riskli doğrulanmış kronik kusurlar veya ağır bakım gereksinimleri nedeniyle dikkatle yaklaşılmalıdır.";
+        }
+      }
+      return rawVerdict || report.executiveSummary?.oneSentenceSummary || "Doğrulanmış teknik kronik riskler ve bağımsız servis bültenleri incelenerek hesaplandı.";
+    };
+
     return (
       <div className="bg-[#090d1a] border border-white/10 rounded-2xl p-6 shadow-xl space-y-6">
         {/* Header Row: Score + State + Scope */}
@@ -214,11 +241,7 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">
-                {isInsufficient
-                  ? "Bu araç hakkında çeşitli arıza ve kullanıcı bildirimleri bulunabilir; ancak bunların sıklığını ve bu araç varyantına uygulanabilirliğini güvenilir şekilde doğrulayamadığımız için yanıltıcı bir puan vermiyoruz."
-                  : (report.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict 
-                     || report.executiveSummary?.oneSentenceSummary 
-                     || "Doğrulanmış teknik kronik riskler ve bağımsız servis bültenleri incelenerek hesaplandı.")}
+                {getHarmonizedVerdict()}
               </p>
               {isInsufficient && hasUnverifiedComplaints && (
                 <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-center gap-2">

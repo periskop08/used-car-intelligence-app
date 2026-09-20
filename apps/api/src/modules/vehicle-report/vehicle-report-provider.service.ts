@@ -281,6 +281,25 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
             baseReport.scoringV6 = v6Scores;
             if (v6Scores.decisionScoreV1) {
               baseReport.torqueScoutDecisionScoreV1 = v6Scores.decisionScoreV1;
+              const dScore = v6Scores.decisionScoreV1.score ?? 100;
+              const dState = v6Scores.decisionScoreV1.state;
+              if (baseReport.expertDecisionSynthesis) {
+                if (!baseReport.expertDecisionSynthesis.finalConditionalVerdict) {
+                  baseReport.expertDecisionSynthesis.finalConditionalVerdict = {} as any;
+                }
+                const curShort = baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict;
+                if (!curShort || curShort.includes('Belirli kontrollerin sağlanması şartıyla') || curShort.includes('Belirli kontrollerin') || curShort === '...') {
+                  if (dScore >= 90 || dState === 'EXCELLENT') {
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.';
+                  } else if (dScore >= 75 || dState === 'GOOD') {
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.';
+                  } else if (dScore >= 60 || dState === 'CAUTION') {
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Belirli kontrollerin sağlanması ve potansiyel aşınma noktalarının incelenmesi şartıyla değerlendirilebilir.';
+                  } else {
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Yüksek riskli doğrulanmış kronik kusurlar nedeniyle satın alımdan önce kapsamlı inceleme gerektirir.';
+                  }
+                }
+              }
             }
             this.logger.log(`[V6 SCORING] Calculated V6 Scores: Scope=${v6Scores.decisionScoreV1?.scope}, DecisionScore=${v6Scores.decisionScoreV1?.score}, State=${v6Scores.decisionScoreV1?.state}, Confidence=${v6Scores.confidenceScore}%, ModelRisk=${v6Scores.decisionScoreV1?.modelDecisionRisk}`);
           } catch (v6Err: any) {

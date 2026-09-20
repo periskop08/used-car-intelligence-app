@@ -337,7 +337,9 @@ export class VehicleReportFallbackService {
         },
       ],
       finalConditionalVerdict: {
-        shortVerdict: 'Belirli kontrollerin sağlanması şartıyla değerlendirilebilir.',
+        shortVerdict: problems.length === 0 
+          ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.' 
+          : 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.',
         detailedVerdict: `${carTitle}, periyodik bakımları belgelenmiş, ${isEcvtOrHybrid ? 'hibrit sistem ve güç aktarımı sorunsuz' : 'şanzıman geçişleri pürüzsüz'} ve lifte kaldırıldığında aktif sıvı kaçağı görülmeyen durumlarda satın alma yönünde değerlendirilebilir.`,
         confidence: 'HIGH',
         supportingFactIds,

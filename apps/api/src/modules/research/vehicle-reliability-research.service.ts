@@ -2080,11 +2080,15 @@ export class VehicleReliabilityResearchService {
       if (normFail === 'WET_BELT') {
         inspectionInstruction = 'Triger kayış genişliği ve karter/yağ pompası süzgecinde kauçuk partikülü kontrolü yapılmalıdır.';
       } else if (normFail.includes('MECHATRONIC') || normFail.includes('DSG') || normFail.includes('CLUTCH')) {
-        inspectionInstruction = 'Ekspertizde bilgisayarlı arıza tespit cihazı ile kavrama temas noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
+        inspectionInstruction = isElectric
+          ? 'Elektrikli tahrik motoru redüktör dişli kutusu ses düzeyi, tork tepkisi ve servis yazılım bültenleri kontrol edilmelidir.'
+          : 'Ekspertizde bilgisayarlı arıza tespit cihazı ile kavrama temas noktası ve mekatronik hidrolik basınç değerleri okunmalıdır.';
       } else if (normFail.includes('INJECTOR')) {
         inspectionInstruction = 'Bilgisayarlı arıza tespit cihazında enjektör püskürtme ve yakıt ray basınç değerleri test edilmelidir.';
       } else if (normFail.includes('COOLANT') || normFail.includes('THERMOSTAT')) {
-        inspectionInstruction = 'Termostat gövdesi ve devirdaim pompası çevresinde antifriz sızıntı izi kontrolü yapılmalıdır.';
+        inspectionInstruction = isElectric
+          ? 'Batarya/inverter elektrikli sirkülasyon pompaları, manifold dağıtım valfleri ve radyatör rekor bağlantılarında soğutma sıvısı sızıntı izi kontrolü yapılmalıdır.'
+          : 'Termostat gövdesi ve devirdaim pompası çevresinde antifriz sızıntı izi kontrolü yapılmalıdır.';
       }
 
       const canonicalSources: CanonicalRiskSource[] = ev.linkedSources.map((s) => ({
