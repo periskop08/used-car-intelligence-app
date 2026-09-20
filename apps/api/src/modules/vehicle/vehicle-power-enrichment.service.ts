@@ -255,8 +255,9 @@ export class VehiclePowerEnrichmentService {
       // ----------------------------------------------------
       // PHASE 1: TURKEY PRIMARY RESEARCH
       // ----------------------------------------------------
-      const trQuery = `${brandName} ${modelName} ${year} ${engineCode} ${trimName} hp bg kw motor gücü teknik özellikleri`.trim();
-      this.logger.log(`[TR_PRIMARY] Researching power for ${brandName} ${modelName} (${year}): "${trQuery}"`);
+      const bodyTypeLabel = bodyType ? bodyType.toLowerCase() : '';
+      const trQuery = `${brandName} ${modelName} ${bodyTypeLabel} ${year} ${engineCode} ${trimName} hp bg kw motor gücü teknik özellikleri`.replace(/\s+/g, ' ').trim();
+      this.logger.log(`[TR_PRIMARY] Researching power for ${brandName} ${modelName} ${bodyTypeLabel} (${year}): "${trQuery}"`);
 
       this.metrics.externalWebSearchCalls++;
       const trSearchResults = await this.webSearchProvider.search(trQuery, 'tr', 'tr');
@@ -319,8 +320,8 @@ export class VehiclePowerEnrichmentService {
       // ----------------------------------------------------
       // PHASE 2: EUROPE FALLBACK RESEARCH (Only if TR yielded 0)
       // ----------------------------------------------------
-      const euQuery = `${brandName} ${modelName} ${year} ${engineCode} specs kW PS HP europe`.trim();
-      this.logger.log(`[EU_FALLBACK] Researching power for ${brandName} ${modelName} (${year}): "${euQuery}"`);
+      const euQuery = `${brandName} ${modelName} ${bodyTypeLabel} ${year} ${engineCode} specs kW PS HP europe`.replace(/\s+/g, ' ').trim();
+      this.logger.log(`[EU_FALLBACK] Researching power for ${brandName} ${modelName} ${bodyTypeLabel} (${year}): "${euQuery}"`);
 
       this.metrics.externalWebSearchCalls++;
       const euSearchResults = await this.webSearchProvider.search(euQuery, 'en', 'eu');
@@ -559,9 +560,11 @@ export class VehiclePowerEnrichmentService {
 
         if (val >= 40 && val <= 1000) {
           // Physical passenger vehicle plausibility gate:
-          // A stock 1.0L - 1.6L passenger engine cannot produce 230+ HP (that belongs to high-performance 2.0L+ trims like VZ on the same page)
+          // A stock 1.0L - 1.6L passenger combustion engine cannot produce 230+ HP (that belongs to high-performance 2.0L+ trims like VZ on the same page).
+          // Electric vehicles (EV) are NEVER subject to combustion displacement limits!
+          const isEvVariant = (targetVariant?.fuelType || targetVariant?.engine?.fuelType || '').toUpperCase() === 'ELECTRIC' || targetVariant?.engine?.isElectric;
           const engineDisplacement = targetVariant?.engine?.displacement;
-          const isSmallEngine = engineDisplacement && engineDisplacement <= 1600;
+          const isSmallEngine = !isEvVariant && engineDisplacement && engineDisplacement <= 1600;
           if (isSmallEngine && val > 225) {
             continue; // Discard alien trim mentions like 300 HP or 325 HP
           }

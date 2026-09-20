@@ -662,25 +662,9 @@ export class VehicleService {
     let luggage: number;
     let wgt: number;
 
-    if (geminiSpecs) {
-      topSpd = geminiSpecs.topSpeed;
-      accel0to100 = geminiSpecs.acceleration0to100;
-      avgFuel = geminiSpecs.averageFuelConsumption;
-      luggage = geminiSpecs.luggageCapacity;
-      wgt = geminiSpecs.weight;
-    } else {
-      const engineCode = variant.engine.code;
-      const fuelType = variant.engine.fuelType;
-
-      const engineMatch = engineCode.match(/\b(\d\.\d)\b/);
-      const engineSize = engineMatch ? engineMatch[0] : '1.6';
-
-      const dispMultiplier = parseFloat(engineSize) || 1.6;
-      topSpd = Math.round(160 + dispMultiplier * 20);
-      accel0to100 = parseFloat((14 - dispMultiplier * 2).toFixed(1));
-      avgFuel = fuelType === FuelType.ELECTRIC ? 0 : parseFloat((8.5 - dispMultiplier * 1.5).toFixed(1));
-      luggage = 450;
-      wgt = 1350;
+    if (!geminiSpecs) {
+      // Do NOT fabricate synthetic fake numbers (192 km/h, 10.8 s, 1350 kg, 450 L).
+      return;
     }
 
     // Create Technical Specs
@@ -688,11 +672,11 @@ export class VehicleService {
       data: {
         variantId: variant.id,
         specs: {
-          topSpeed: topSpd,
-          acceleration0to100: accel0to100,
-          averageFuelConsumption: avgFuel,
-          luggageCapacity: luggage,
-          weight: wgt
+          topSpeed: geminiSpecs.topSpeed,
+          acceleration0to100: geminiSpecs.acceleration0to100,
+          averageFuelConsumption: geminiSpecs.averageFuelConsumption,
+          luggageCapacity: geminiSpecs.luggageCapacity,
+          weight: geminiSpecs.weight
         }
       }
     });

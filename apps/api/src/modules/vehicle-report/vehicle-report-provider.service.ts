@@ -607,19 +607,19 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       torqueUnit: resolvedTorqueUnit || 'Nm',
       torqueSource: resolvedTorqueSource,
       torqueSemantic: resolvedTorqueSemantic,
-      zeroToHundredKmh: (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null) ? currentPerf.zeroToHundredKmh : specs.zeroToHundredKmh,
-      topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
-      cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
-      highwayFuelL100km: (currentPerf.highwayFuelL100km !== undefined && currentPerf.highwayFuelL100km !== null) ? currentPerf.highwayFuelL100km : specs.highwayFuelL100km,
-      combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null && !isEv) ? currentPerf.combinedFuelL100km : (isEv ? undefined : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km)),
-      electricRangeWltpKm: (currentPerf.electricRangeWltpKm !== undefined && currentPerf.electricRangeWltpKm !== null)
-        ? currentPerf.electricRangeWltpKm
-        : (specs.electricRangeWltpKm || specs.electricRangeKm || specs.rangeKm),
-      batteryCapacityKwh: (currentPerf.batteryCapacityKwh !== undefined && currentPerf.batteryCapacityKwh !== null)
-        ? currentPerf.batteryCapacityKwh
-        : specs.batteryCapacityKwh,
-      trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
-      curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
+      zeroToHundredKmh: (specs.zeroToHundredKmh !== undefined && specs.zeroToHundredKmh !== null) ? specs.zeroToHundredKmh : currentPerf.zeroToHundredKmh,
+      topSpeedKmh: (specs.topSpeedKmh !== undefined && specs.topSpeedKmh !== null) ? specs.topSpeedKmh : currentPerf.topSpeedKmh,
+      cityFuelL100km: (isEv ? undefined : (specs.cityFuelL100km ?? currentPerf.cityFuelL100km)),
+      highwayFuelL100km: (isEv ? undefined : (specs.highwayFuelL100km ?? currentPerf.highwayFuelL100km)),
+      combinedFuelL100km: (isEv ? undefined : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km || currentPerf.combinedFuelL100km)),
+      electricRangeWltpKm: isEv
+        ? (specs.electricRangeWltpKm || specs.electricRangeKm || specs.rangeKm || currentPerf.electricRangeWltpKm)
+        : undefined,
+      batteryCapacityKwh: isEv
+        ? (specs.batteryCapacityKwh || currentPerf.batteryCapacityKwh)
+        : undefined,
+      trunkCapacityLiters: (specs.trunkCapacityLiters !== undefined && specs.trunkCapacityLiters !== null) ? specs.trunkCapacityLiters : currentPerf.trunkCapacityLiters,
+      curbWeightKg: (specs.curbWeightKg !== undefined && specs.curbWeightKg !== null) ? specs.curbWeightKg : currentPerf.curbWeightKg,
       engineDisplacementCc: isEv ? undefined : baseReport.vehicleIdentity.engineDisplacementCc,
       rangeFactorsNote: (specs.realWorldFuelMinL100km && specs.realWorldFuelMaxL100km)
         ? `Gerçek Yol Tüketim Beklentisi: ${specs.realWorldFuelMinL100km} - ${specs.realWorldFuelMaxL100km} L/100km`

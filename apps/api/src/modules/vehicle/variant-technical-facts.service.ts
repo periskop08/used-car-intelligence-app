@@ -151,26 +151,44 @@ export function deriveEvidenceQualityFromSource(
  * sourceTierAutomaticallyImpliesApplicationMatch = FALSE
  * officialDomainButWrongApplicationAccepted = FALSE
  */
+const SUBMODEL_COLLISION_SUFFIXES = [
+  'u', '06', '07', 'cross', 'aircross', 'crossback', 'active', 'sportsvan', 'allspace', 'plus'
+];
+
 export function isModelMentionedInText(text: string, modelName: string, engineCode?: string): boolean {
   if (!modelName) return true;
   const m = modelName.toLowerCase().trim();
-  if (text.includes(m)) return true;
+  const lowerText = text.toLowerCase();
+
+  // 1. Exact-boundary / compound sub-model exclusion check:
+  // e.g. If target is "Seal", do NOT match "Seal U" or "Seal 06".
+  // e.g. If target is "Corolla", do NOT match "Corolla Cross".
+  const activeExclusions = SUBMODEL_COLLISION_SUFFIXES.filter(s => !m.includes(s));
+  if (activeExclusions.length > 0) {
+    const escapedModel = m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escapedModel}\\b(?!\\s*(?:${activeExclusions.join('|')})\\b)`, 'i');
+    if (pattern.test(lowerText)) {
+      return true;
+    }
+  } else if (lowerText.includes(m)) {
+    return true;
+  }
 
   // Handle "X Serisi" -> "X Series", "Xer", "X-Class" or engineCode presence
   if (m.includes(' serisi')) {
     const seriesPrefix = m.replace(/\s*serisi/g, '').trim();
     if (
-      text.includes(`${seriesPrefix} series`) ||
-      text.includes(`${seriesPrefix}er`) ||
-      text.includes(`${seriesPrefix}-class`) ||
-      text.includes(`${seriesPrefix} serisi`)
+      lowerText.includes(`${seriesPrefix} series`) ||
+      lowerText.includes(`${seriesPrefix}er`) ||
+      lowerText.includes(`${seriesPrefix}-class`) ||
+      lowerText.includes(`${seriesPrefix} serisi`)
     ) {
       return true;
     }
     // If engineCode (e.g. 320i, 520i, C200, A180) is mentioned in text, it firmly identifies the model
     if (engineCode) {
       const eng = engineCode.toLowerCase().trim();
-      if (eng && text.includes(eng)) {
+      if (eng && lowerText.includes(eng)) {
         return true;
       }
     }
@@ -179,7 +197,7 @@ export function isModelMentionedInText(text: string, modelName: string, engineCo
   // Handle "X Class" / "X Sınıfı"
   if (m.includes(' class') || m.includes(' sınıfı')) {
     const classPrefix = m.replace(/\s*(class|sınıfı)/g, '').trim();
-    if (text.includes(`${classPrefix} serisi`) || text.includes(`${classPrefix}-class`)) {
+    if (lowerText.includes(`${classPrefix} serisi`) || lowerText.includes(`${classPrefix}-class`)) {
       return true;
     }
   }
@@ -192,6 +210,7 @@ export function verifyVehicleApplicationMatch(
     brand?: { name?: string };
     model?: { name?: string };
     year?: number;
+    bodyType?: string;
     trim?: { name?: string };
     engine?: { code?: string; displacement?: number };
     fuelType?: string;
@@ -204,15 +223,46 @@ export function verifyVehicleApplicationMatch(
   const model = (targetVariant.model?.name || '').toLowerCase().trim();
   const trim = (targetVariant.trim?.name || '').toLowerCase().trim();
   const engineCode = (targetVariant.engine?.code || '').toLowerCase().trim();
+  const bodyType = (targetVariant.bodyType || '').toLowerCase().trim();
 
-  // 1. Target brand & model must be respected
+  // 1. Target brand & model must be respected (with sub-model collision protection)
   if (brand && model && text.includes(brand)) {
     if (!isModelMentionedInText(text, model, engineCode)) {
-      return { match: false, reason: `Source discusses brand "${brand}" but omits target model "${model}"` };
+      return { match: false, reason: `Source discusses brand "${brand}" but omits target model "${model}" or references a different sub-model (e.g. Seal U / Cross)` };
     }
   }
 
-  // 2. Cross-trim / Cross-badge contradictory application check:
+  // 2. Body Type Contradiction Gate:
+  // User's selected body type MUST be respected. Reject sources that describe an incompatible body type.
+  if (bodyType) {
+    const isTargetSedan = bodyType.includes('sedan') || bodyType.includes('saloon');
+    const isTargetSuv = bodyType.includes('suv') || bodyType.includes('crossover');
+    const isTargetHatchback = bodyType.includes('hatchback') || bodyType === 'hb';
+    const isTargetWagon = bodyType.includes('station') || bodyType.includes('wagon') || bodyType.includes('sw') || bodyType.includes('touring');
+    const isTargetCoupe = bodyType.includes('coupe') || bodyType.includes('kupe');
+
+    if (isTargetSedan) {
+      const hasSuvMention = /\b(suv|crossover|4x2 suv|4x4 suv)\b/i.test(text);
+      const hasSedanMention = /\b(sedan|saloon|limousine)\b/i.test(text);
+      if (hasSuvMention && !hasSedanMention) {
+        return { match: false, reason: `Target body type is SEDAN, but source discusses SUV/Crossover` };
+      }
+    } else if (isTargetSuv) {
+      const hasSedanMention = /\b(sedan|saloon|limousine)\b/i.test(text);
+      const hasSuvMention = /\b(suv|crossover|cross)\b/i.test(text);
+      if (hasSedanMention && !hasSuvMention) {
+        return { match: false, reason: `Target body type is SUV, but source discusses SEDAN` };
+      }
+    } else if (isTargetHatchback) {
+      const hasSedanMention = /\b(sedan|saloon)\b/i.test(text);
+      const hasHbMention = /\b(hatchback|hb)\b/i.test(text);
+      if (hasSedanMention && !hasHbMention) {
+        return { match: false, reason: `Target body type is HATCHBACK, but source discusses SEDAN` };
+      }
+    }
+  }
+
+  // 3. Cross-trim / Cross-badge contradictory application check:
   // e.g. Target is Audi "35 TFSI", but source discusses "45 TFSI", "40 TDI", "S3", or "RS3"
   if (trim.includes('35 tfsi')) {
     if ((text.includes('45 tfsi') || text.includes('40 tfsi') || text.includes('s3') || text.includes('rs3')) && !text.includes('35 tfsi')) {
@@ -224,7 +274,7 @@ export function verifyVehicleApplicationMatch(
     }
   }
 
-  // 3. Market mismatch check:
+  // 4. Market mismatch check:
   // US-market official pages (e.g. audiusa.com) discussing 2.0L / 228 hp must NOT support EU/TR 35 TFSI (1.5L / 150 PS)
   const isUsMarketSource = text.includes('audiusa.com') || text.includes('audi usa') || text.includes('north american spec') || text.includes('us market');
   if (isUsMarketSource && (text.includes('2.0') || text.includes('228') || text.includes('45 tfsi')) && trim.includes('35 tfsi')) {

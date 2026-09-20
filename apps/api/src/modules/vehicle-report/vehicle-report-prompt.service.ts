@@ -37,16 +37,16 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "hasDpf": true,
     "hasAdBlue": false,
     "drivetrain": "Önden Çekiş (FWD) | Arkadan İtiş (RWD) | Dört Tekerlekten Çekiş (AWD / Quattro / xDrive / 4MATIC)",
-    "zeroToHundredKmh": 10.8,
-    "topSpeedKmh": 206,
-    "catalogCombinedFuelL100km": 4.2,
-    "realWorldFuelMinL100km": 5.8,
-    "realWorldFuelMaxL100km": 6.8,
+    "zeroToHundredKmh": 7.5,
+    "topSpeedKmh": 200,
+    "catalogCombinedFuelL100km": 5.2,
+    "realWorldFuelMinL100km": 6.0,
+    "realWorldFuelMaxL100km": 7.0,
     "realWorldFuelBasis": "SOURCE_BASED | ESTIMATED",
-    "electricRangeWltpKm": 523,
-    "batteryCapacityKwh": 88.5,
-    "trunkCapacityLiters": 586,
-    "curbWeightKg": 1430
+    "electricRangeWltpKm": null,
+    "batteryCapacityKwh": null,
+    "trunkCapacityLiters": 480,
+    "curbWeightKg": 1400
   },
   "expertDecisionSynthesis": {
     "vehicleCharacter": {
@@ -288,7 +288,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 7. ELEKTRİKLİ (EV) ARAÇ VE MENZİL STANDARDI:
    - Elektrikli (EV/BEV) araçlarda motor hacmi ('engineDisplacementCc') KESİNLİKLE null veya undefined bırakılmalıdır ('0 cc' gibi yanıltıcı bir değer girilmez). Egzoz, buji, DPF ve yakıt deposu terimleri kullanılmaz.
    - Elektrikli araçlarda sıvı yakıt tüketimi ('catalogCombinedFuelL100km', 'realWorldFuelMinL100km', 'realWorldFuelMaxL100km') KESİNLİKLE null bırakılmalıdır.
-   - Elektrikli araçlarda en kritik teknik veri MENZİL bilgisidir. Üreticinin resmi WLTP karma menzilini (örn: 523, 600, 460 vb. saf sayı/Number olarak) 'technicalSpecifications.electricRangeWltpKm' alanına, kullanılabilir batarya kapasitesini (örn: 88.5, 52.4 vb. saf sayı olarak) 'technicalSpecifications.batteryCapacityKwh' alanına yaz.
+   - Elektrikli araçlarda en kritik teknik veri MENZİL ve BATARYA bilgisidir. Analiz edilen spesifik model ve donanım paketine ait üreticinin resmi WLTP karma menzilini (örneğin Togg T10F Uzun Menzil 600, BYD Seal Design RWD 570, BYD Seal Excellence AWD 520, Tesla Model Y LR 533 gibi doğrulanmış net fabrika değerini) 'technicalSpecifications.electricRangeWltpKm' alanına, kullanılabilir batarya kapasitesini (örneğin BYD Seal için 82.5, Togg için 88.5 gibi saf sayı olarak) 'technicalSpecifications.batteryCapacityKwh' alanına yaz. Şablondan rastgele sayı kopyalama, tam aracın üretici verisini esas al.
+   - Elektrikli araçlarda 0-100 km/s hızlanma, maksimum hız ve boş ağırlık (batarya ağırlığı dahil genelde 1800-2300 kg arası) değerleri de tam fabrika katalog değerleri olmalıdır.
 8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
@@ -387,16 +388,16 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     "hasDpf": true,
     "hasAdBlue": false,
     "drivetrain": "Önden Çekiş (FWD)",
-    "zeroToHundredKmh": 10.8,
-    "topSpeedKmh": 206,
-    "catalogCombinedFuelL100km": 4.2,
-    "realWorldFuelMinL100km": 5.8,
-    "realWorldFuelMaxL100km": 6.8,
+    "zeroToHundredKmh": 7.5,
+    "topSpeedKmh": 200,
+    "catalogCombinedFuelL100km": 5.2,
+    "realWorldFuelMinL100km": 6.0,
+    "realWorldFuelMaxL100km": 7.0,
     "realWorldFuelBasis": "SOURCE_BASED",
-    "electricRangeWltpKm": 523,
-    "batteryCapacityKwh": 88.5,
-    "trunkCapacityLiters": 586,
-    "curbWeightKg": 1430
+    "electricRangeWltpKm": null,
+    "batteryCapacityKwh": null,
+    "trunkCapacityLiters": 480,
+    "curbWeightKg": 1400
   }
 }`;
   }

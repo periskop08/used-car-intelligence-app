@@ -65,7 +65,12 @@ export function resolveVehicleRangeKm(report: any): number | null {
   // BYD
   if (brand.includes('byd')) {
     if (model.includes('atto 3')) return 420;
-    if (model.includes('seal')) return 570;
+    if (model.includes('seal u')) {
+      return (trim.includes('design') || engine.includes('87')) ? 500 : 420;
+    }
+    if (model.includes('seal')) {
+      return (trim.includes('excellence') || engine.includes('awd') || engine.includes('390')) ? 520 : 570;
+    }
     if (model.includes('dolphin')) return 427;
   }
 
