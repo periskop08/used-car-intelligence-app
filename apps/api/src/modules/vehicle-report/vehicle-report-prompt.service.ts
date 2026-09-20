@@ -43,6 +43,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "realWorldFuelMinL100km": 5.8,
     "realWorldFuelMaxL100km": 6.8,
     "realWorldFuelBasis": "SOURCE_BASED | ESTIMATED",
+    "electricRangeWltpKm": 523,
+    "batteryCapacityKwh": 88.5,
     "trunkCapacityLiters": 586,
     "curbWeightKg": 1430
   },
@@ -283,8 +285,10 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 6. TRİGER MİMARİSİ KORUMASI (TIMING ARCHITECTURE GUARD):
    - Triger sistemi KAYIŞ (BELT) ise zincir mekanizması dili (zincir sesi, zincir uzaması, zincir şakırtısı) KULLANMA.
    - Triger sistemi ZİNCİR (CHAIN) ise triger kayışı kopması/liflenmesi dili KULLANMA.
-7. ELEKTRİKLİ (EV) ARAÇ STANDARDI:
+7. ELEKTRİKLİ (EV) ARAÇ VE MENZİL STANDARDI:
    - Elektrikli (EV/BEV) araçlarda motor hacmi ('engineDisplacementCc') KESİNLİKLE null veya undefined bırakılmalıdır ('0 cc' gibi yanıltıcı bir değer girilmez). Egzoz, buji, DPF ve yakıt deposu terimleri kullanılmaz.
+   - Elektrikli araçlarda sıvı yakıt tüketimi ('catalogCombinedFuelL100km', 'realWorldFuelMinL100km', 'realWorldFuelMaxL100km') KESİNLİKLE null bırakılmalıdır.
+   - Elektrikli araçlarda en kritik teknik veri MENZİL bilgisidir. Üreticinin resmi WLTP karma menzilini (örn: 523, 600, 460 vb. saf sayı/Number olarak) 'technicalSpecifications.electricRangeWltpKm' alanına, kullanılabilir batarya kapasitesini (örn: 88.5, 52.4 vb. saf sayı olarak) 'technicalSpecifications.batteryCapacityKwh' alanına yaz.
 8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
@@ -389,6 +393,8 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     "realWorldFuelMinL100km": 5.8,
     "realWorldFuelMaxL100km": 6.8,
     "realWorldFuelBasis": "SOURCE_BASED",
+    "electricRangeWltpKm": 523,
+    "batteryCapacityKwh": 88.5,
     "trunkCapacityLiters": 586,
     "curbWeightKg": 1430
   }

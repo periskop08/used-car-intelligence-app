@@ -611,7 +611,13 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       topSpeedKmh: (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null) ? currentPerf.topSpeedKmh : specs.topSpeedKmh,
       cityFuelL100km: (currentPerf.cityFuelL100km !== undefined && currentPerf.cityFuelL100km !== null) ? currentPerf.cityFuelL100km : specs.cityFuelL100km,
       highwayFuelL100km: (currentPerf.highwayFuelL100km !== undefined && currentPerf.highwayFuelL100km !== null) ? currentPerf.highwayFuelL100km : specs.highwayFuelL100km,
-      combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null) ? currentPerf.combinedFuelL100km : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km),
+      combinedFuelL100km: (currentPerf.combinedFuelL100km !== undefined && currentPerf.combinedFuelL100km !== null && !isEv) ? currentPerf.combinedFuelL100km : (isEv ? undefined : (specs.catalogCombinedFuelL100km || specs.combinedFuelL100km)),
+      electricRangeWltpKm: (currentPerf.electricRangeWltpKm !== undefined && currentPerf.electricRangeWltpKm !== null)
+        ? currentPerf.electricRangeWltpKm
+        : (specs.electricRangeWltpKm || specs.electricRangeKm || specs.rangeKm),
+      batteryCapacityKwh: (currentPerf.batteryCapacityKwh !== undefined && currentPerf.batteryCapacityKwh !== null)
+        ? currentPerf.batteryCapacityKwh
+        : specs.batteryCapacityKwh,
       trunkCapacityLiters: (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null) ? currentPerf.trunkCapacityLiters : specs.trunkCapacityLiters,
       curbWeightKg: (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null) ? currentPerf.curbWeightKg : specs.curbWeightKg,
       engineDisplacementCc: isEv ? undefined : baseReport.vehicleIdentity.engineDisplacementCc,
@@ -621,8 +627,16 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       supportingFactIds: (resolvedPowerSource === 'VEHICLE_DATABASE' || hasDbPerformance) ? ['VEHICLE_DATABASE'] : (resolvedPowerSource === 'VERIFIED_STAGE_1' ? ['AI_RESEARCH_ENGINE'] : ['AI_VERIFIED_TECHNICAL_SPECS']),
     } as any;
 
-    if (baseReport.technicalSpecifications && baseReport.vehicleIdentity.engineDisplacementCc && !isEv) {
-      baseReport.technicalSpecifications.engineDisplacementCc = baseReport.vehicleIdentity.engineDisplacementCc;
+    if (baseReport.technicalSpecifications) {
+      if (baseReport.vehicleIdentity.engineDisplacementCc && !isEv) {
+        baseReport.technicalSpecifications.engineDisplacementCc = baseReport.vehicleIdentity.engineDisplacementCc;
+      }
+      if (specs.electricRangeWltpKm) {
+        (baseReport.technicalSpecifications as any).electricRangeWltpKm = specs.electricRangeWltpKm;
+      }
+      if (specs.batteryCapacityKwh) {
+        (baseReport.technicalSpecifications as any).batteryCapacityKwh = specs.batteryCapacityKwh;
+      }
     }
   }
 
@@ -636,6 +650,11 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     if (isElectric) {
       if (baseReport.vehicleIdentity) {
         baseReport.vehicleIdentity.engineDisplacementCc = undefined;
+      }
+      if (baseReport.performanceUsage) {
+        baseReport.performanceUsage.combinedFuelL100km = undefined;
+        baseReport.performanceUsage.cityFuelL100km = undefined;
+        baseReport.performanceUsage.highwayFuelL100km = undefined;
       }
       if (Array.isArray(baseReport.prePurchaseChecks)) {
         baseReport.prePurchaseChecks = baseReport.prePurchaseChecks.filter(item => {

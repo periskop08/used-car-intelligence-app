@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv, resolveVehicleRangeKm } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -979,6 +979,7 @@ export default function VehicleReportScreen() {
   const topSpeedValue = report?.performanceUsage?.topSpeedKmh;
   const zeroToHundredValue = report?.performanceUsage?.zeroToHundredSec;
   const combinedFuel = report?.performanceUsage?.combinedFuelL100km;
+  const electricRangeKm = resolveVehicleRangeKm(report);
   const trunkValue = report?.performanceUsage?.luggageCapacityL;
   const weightValue = report?.performanceUsage?.weightKg;
 
@@ -1426,8 +1427,12 @@ export default function VehicleReportScreen() {
               </View>
 
               <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Ort. Tüketim</Text>
-                <Text style={styles.techValLight}>{combinedFuel ? `${combinedFuel} lt/100km` : '—'}</Text>
+                <Text style={styles.techLabelLight}>{isElectricVehicle ? 'Menzil (WLTP)' : 'Ort. Tüketim'}</Text>
+                <Text style={styles.techValLight}>
+                  {isElectricVehicle
+                    ? (electricRangeKm ? `${electricRangeKm} km` : '—')
+                    : (combinedFuel ? `${combinedFuel} lt/100km` : '—')}
+                </Text>
               </View>
 
               <View style={styles.techCardLight}>

@@ -5,6 +5,7 @@ import {
   ComprehensiveVehicleReport,
   formatCanonicalPowerDisplay,
   calculateVehicleMtv,
+  resolveVehicleRangeKm,
 } from "@used-car-intelligence/shared";
 import VehicleReportExpertSynthesis from "./VehicleReportExpertSynthesis";
 import VehicleReportScoreHero from "./VehicleReportScoreHero";
@@ -93,6 +94,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
   const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh;
   const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
+  const electricRangeKm = resolveVehicleRangeKm(report);
   const trunkValue = report.performanceUsage?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
   const weightValue = report.performanceUsage?.curbWeightKg || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
 
@@ -129,7 +131,9 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             {displacementLabel && !isEvFuel ? `${displacementLabel} ` : ""}
             {powerLabel ? `(${powerLabel}${numericTorque ? ` / ${numericTorque} ${torqueUnit}` : ""}) ` : ""}• 
             {report.vehicleIdentity.transmissionName} • {formatFuelTypeTr(report.vehicleIdentity.fuelType)}
-            {combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : ""}
+            {isEvFuel
+              ? (electricRangeKm ? ` • ${electricRangeKm} km Menzil` : "")
+              : (combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : "")}
           </p>
         </div>
 
@@ -220,8 +224,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             <span className="font-bold text-slate-100 text-base mt-0.5">{zeroToHundredValue ? `${zeroToHundredValue} sn` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Ort. Tüketim</span>
-            <span className="font-bold text-slate-100 text-base mt-0.5">{combinedFuel ? `${combinedFuel} lt/100km` : "—"}</span>
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+              {isEvFuel ? "Menzil (WLTP)" : "Ort. Tüketim"}
+            </span>
+            <span className="font-bold text-slate-100 text-base mt-0.5">
+              {isEvFuel 
+                ? (electricRangeKm ? `${electricRangeKm} km` : "—")
+                : (combinedFuel ? `${combinedFuel} lt/100km` : "—")}
+            </span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Bagaj Hacmi</span>
