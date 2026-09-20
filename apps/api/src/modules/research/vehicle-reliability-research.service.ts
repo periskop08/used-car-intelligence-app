@@ -1648,7 +1648,9 @@ export class VehicleReliabilityResearchService {
     // DIMENSION 2: Engine Applicability (Fuel, Family, Displacement)
     // -------------------------------------------------------------
     const targetEngine = (input.engineCode || '').toLowerCase();
-    const targetPowertrain = input.powertrainType || (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : undefined);
+    const isTargetDiesel = input.powertrainType === 'ICE_DIESEL' || /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bcrdi\b|\bcdti\b/i.test(targetEngine);
+    const isTargetPetrol = input.powertrainType === 'ICE_PETROL' || /benzin|petrol|\btce\b|\btsi\b|\btfsi\b|\bthp\b|\bpuretech\b/i.test(targetEngine);
+    const targetPowertrain = input.powertrainType || (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : (isTargetDiesel ? 'ICE_DIESEL' : isTargetPetrol ? 'ICE_PETROL' : undefined));
 
     // Fuel & Emissions Architecture Mismatch
     const isDieselDefect = /(dizel|diesel|\btdi\b|\bhdi\b|\bcrdi\b|\bdci\b|\bcdi\b|\bd4d\b|\bb47\b|\bn47\b|\bea189\b|\bea288\b|dpf|partikül filtresi|adblue)/i.test(combinedContext);
@@ -1662,10 +1664,10 @@ export class VehicleReliabilityResearchService {
         isEligible: false,
       };
     }
-    if (isPetrolDefect && (targetPowertrain === 'ICE_DIESEL' || targetPowertrain === 'BEV')) {
+    if (isPetrolDefect && (targetPowertrain === 'ICE_DIESEL' || isTargetDiesel || targetPowertrain === 'BEV')) {
       return {
         applicabilityState: 'INCOMPATIBLE',
-        applicabilityEvidence: `Powertrain mismatch: Petrol architecture defect does not apply to ${targetPowertrain} vehicle.`,
+        applicabilityEvidence: `Powertrain mismatch: Petrol architecture defect does not apply to diesel (${targetPowertrain || 'ICE_DIESEL'}) vehicle.`,
         isEligible: false,
       };
     }
@@ -1684,6 +1686,20 @@ export class VehicleReliabilityResearchService {
     const targetIsEP6 = /ep6|1\.6\s*thp|thp\s*156|thp\s*165|thp\s*200/i.test(targetEngine);
     const targetIsB48 = /b48|b48b20|b48b16/i.test(targetEngine);
     const targetIsB58 = /b58|b58b30/i.test(targetEngine);
+
+    // Renault K9K (1.5 dCi) vs TCe Petrol Engine Guard
+    const targetIsRenault15dCi = /k9k|1\.5\s*dci|1\.5\s*blue\s*dci/i.test(targetEngine) || (isTargetDiesel && /1\.5/i.test(targetEngine) && /renault|megane|clio|captur|dacia|duster/i.test(`${input.brand || ''} ${input.model || ''}`));
+    if (targetIsRenault15dCi) {
+      const mentionsTCe = /\b(1\.3[\s-]?tce|tce|h5ht|h5f|1\.2[\s-]?tce|1\.0[\s-]?tce)\b/i.test(combinedContext);
+      const mentionsDCi = /\b(1\.5[\s-]?dci|dci|k9k|blue[\s-]?dci)\b/i.test(combinedContext);
+      if (mentionsTCe && !mentionsDCi) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Engine family mismatch: defect applies to petrol TCe, while target vehicle is equipped with 1.5 dCi diesel (K9K).`,
+          isEligible: false,
+        };
+      }
+    }
 
     if (targetIsEA211) {
       const mentionsEA888 = /\b(ea888|1\.8[\s-]?t(?:si)?|2\.0[\s-]?t(?:si)?|gti)\b/i.test(combinedContext);
@@ -1725,7 +1741,7 @@ export class VehicleReliabilityResearchService {
     const targetDispMatch = targetEngine.match(/\b(1\.\d|2\.\d|3\.\d)\b/);
     if (targetDispMatch) {
       const targetDisp = targetDispMatch[1];
-      const dispRegex = /\b(1\.[0-9]|2\.[0-9]|3\.[0-9])[\s-]?(?:l|liter|litre|tsi|tdi|thp)\b/gi;
+      const dispRegex = /\b(1\.[0-9]|2\.[0-9]|3\.[0-9])[\s-]?(?:l|liter|litre|tsi|tdi|thp|tce|dci|hdi|cdti|puretech|ecoboost)\b/gi;
       const foundDisplacements = Array.from(new Set(Array.from(combinedContext.matchAll(dispRegex)).map(m => m[1])));
       if (foundDisplacements.length > 0 && !foundDisplacements.includes(targetDisp) && !combinedContext.includes('all engine') && !combinedContext.includes('tüm motor')) {
         if (ev.domain === 'POWERTRAIN_ENGINE' || ev.domain === 'SAFETY_RECALL' || ev.domain === 'THERMAL_COOLING' || ev.domain === 'EMISSIONS_EXHAUST') {
@@ -1975,7 +1991,7 @@ export class VehicleReliabilityResearchService {
       const isOnlyTier3 = ev.linkedSources.length > 0 && ev.linkedSources.every((s) => s.sourceTier === 'TIER_3' || (s as any).tier === 'TIER_3' || (s as any).tier === 3);
 
       let verificationState: RiskVerificationState = 'UNVERIFIED';
-      if (ev.numericEligibility === 'REJECTED' && isOnlyTier3) {
+      if (isOnlyTier3) {
         verificationState = 'TIER3_COMMUNITY_ONLY';
       } else if (hasTier1) {
         verificationState = 'TIER1_OFFICIAL';

@@ -201,23 +201,14 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
       const rawVerdict = report.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict;
 
       if (numScore >= 90 || decisionScore.state === 'EXCELLENT') {
-        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması şartıyla') || rawVerdict.includes('Belirli kontrollerin')) {
-          return "Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.";
-        }
-      } else if (numScore >= 75 || decisionScore.state === 'GOOD') {
-        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması şartıyla')) {
-          return "Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.";
-        }
-      } else if (numScore >= 60 || decisionScore.state === 'CAUTION') {
-        if (!rawVerdict) {
-          return "Belirli kontrollerin sağlanması ve potansiyel aşınma noktalarının incelenmesi şartıyla değerlendirilebilir.";
-        }
-      } else if (numScore < 60 || decisionScore.state === 'HIGH_RISK' || decisionScore.state === 'AVOID') {
-        if (!rawVerdict || rawVerdict.includes('Belirli kontrollerin sağlanması')) {
-          return "Yüksek riskli doğrulanmış kronik kusurlar veya ağır bakım gereksinimleri nedeniyle dikkatle yaklaşılmalıdır.";
-        }
+        return "Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.";
+      } else if (numScore >= 70 || decisionScore.state === 'GOOD') {
+        return "Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.";
+      } else if (numScore >= 50 || decisionScore.state === 'CAUTION') {
+        return "Riskli kondisyonda, kapsamlı ekspertiz ve mekanik kontroller sağlanmadan karar verilmemelidir.";
+      } else {
+        return "Ağır riskli kondisyonda, yüksek maliyetli kronik arıza riskleri nedeniyle uzak durulması önerilir.";
       }
-      return rawVerdict || report.executiveSummary?.oneSentenceSummary || "Doğrulanmış teknik kronik riskler ve bağımsız servis bültenleri incelenerek hesaplandı.";
     };
 
     return (

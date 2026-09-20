@@ -17,48 +17,48 @@ export interface DefectSanitizationContext {
 
 const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
   DUAL_CLUTCH:
-    'Kuru tip çift kavramalı otomatik şanzımanlarda yoğun dur-kalk trafikte kavrama balatasında aşınma, kalkışta titreme veya vites geçiş kararsızlığı görülebilmektedir.',
+    'Kuru tip çift kavramalı otomatik şanzımanlarda yoğun dur-kalk trafikte kavrama balatasında aşınma, kalkışta titreme ve vites geçiş kararsızlığı riski.',
   MECHATRONIC:
-    'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç tüpü ve valf gövdesinde basınç kaybı veya yazılım kararsızlığı yönünden kontrol edilmelidir.',
+    'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç tüpü ve valf gövdesinde basınç kaybı ve vites geçiş kararsızlığı riski.',
   COOLANT_LEAK:
-    'Motor soğutma devresinde devirdaim su pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı görülebilmektedir. Hararet dengesi ve soğutma sıvısı seviyesi periyodik olarak kontrol edilmelidir.',
+    'Motor soğutma devresinde devirdaim su pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı riski.',
   CAMSHAFT_ADJUSTER:
-    'Kam mili ayarlayıcı cıvatası, kasnak ve eksantrik dişlilerinde gevşeme veya aşınma riski motor zamanlaması ve performansı yönünden incelenmelidir.',
+    'Kam mili ayarlayıcı cıvatası, kasnak ve eksantrik dişlilerinde gevşeme ve mekanik aşınma riski.',
   WET_BELT:
-    'Motor yağı içerisinde çalışan ıslak triger kayışında kimyasal aşınma ve kopan kauçuk parçacıklarının karter/yağ pompası süzgecini tıkama riski kontrol edilmelidir.',
+    'Motor yağı içerisinde çalışan ıslak triger kayışında kimyasal aşınma ve kopan kauçuk parçacıklarının yağ pompasını tıkama riski.',
   TIMING_CHAIN:
-    'Triger zincirinde periyodik bakım veya yağlama kalitesine bağlı uzama, ilk çalıştırmada zincir sesi ve zamanlama hatası riski incelenmelidir.',
+    'Triger zincirinde periyodik bakım veya yağlama kalitesine bağlı uzama, ilk çalıştırmada zincir sesi ve zamanlama sapması riski.',
   OIL_LEAK:
-    'Motor yağ soğutucusu contaları, filtre kütüğü ve külbütör kapağında ısıl döngülere bağlı sızdırmazlık durumu periyodik bakım kapsamında kontrol edilmelidir.',
+    'Motor yağ soğutucusu contaları, filtre kütüğü ve külbütör kapağında ısıl döngülere bağlı sızdırmazlık kaybı ve yağ sızıntısı riski.',
   INJECTOR:
-    'Yüksek basınçlı yakıt enjektörlerinde kurum birikmesi veya püskürtme dengesizliği bilgisayarlı arıza tespit cihazıyla kontrol edilmelidir.',
+    'Yüksek basınçlı yakıt enjektörlerinde kurum birikmesi ve püskürtme dengesizliği riski.',
   TURBO:
-    'Turboşarj mili boşluğu, tahliye kapağı (wastegate) ayarı ve hava soğutucu boru bağlantılarında yağ kaçağı kontrol edilmelidir.',
+    'Turboşarj mili boşluğu, tahliye kapağı (wastegate) ayarı ve hava soğutucu boru bağlantılarında yağ kaçağı riski.',
   EGR_DPF:
-    'EGR valfi kurum birikimi ve Dizel Partikül Filtresi (DPF) doluluk oranı arıza tespit cihazıyla incelenmelidir.',
+    'EGR valfi kurum birikimi ve Dizel Partikül Filtresi (DPF) gözeneklerinde tıkanma riski.',
   BRAKE_VACUUM:
-    'Fren hidrolik devresi, mekanik vakum pompası ve fren disk/balata aşınma seviyesi kontrol edilmelidir.',
+    'Fren hidrolik devresi, mekanik vakum pompası ve fren disk/balata bileşenlerinde aşınma riski.',
   STEERING:
-    'Elektrik destekli direksiyon kutusu, mafsal boşluğu ve tork sensörü kalibrasyonu kontrol edilmelidir.',
+    'Elektrik destekli direksiyon kutusu, mafsal boşluğu ve tork sensörü kalibrasyon bozulması riski.',
   BATTERY_DRAIN:
-    '12V yardımcı akü şarj kapasitesi ve araç uyku modunda kaçak akım tüketimi kontrol edilmelidir.',
+    '12V yardımcı akü şarj kapasitesi ve araç uyku modunda aşırı parazit akım tüketimi riski.',
   ICCU:
-    'Entegre şarj kontrol ünitesi (ICCU) yazılım versiyonu ve yüksek voltaj bağlantıları incelenmelidir.',
+    'Entegre şarj kontrol ünitesi (ICCU) iç devre hasarı ve yüksek voltaj şarj kesintisi riski.',
 };
 
 const DOMAIN_FALLBACK_EXPLANATIONS_TR: Record<string, string> = {
   POWERTRAIN_TRANS:
-    'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı yönünden kontrol edilmelidir.',
+    'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı riski.',
   THERMAL_COOLING:
-    'Soğutma sistemi devirdaim su pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı kontrol edilmelidir.',
+    'Soğutma sistemi devirdaim su pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı riski.',
   POWERTRAIN_ENGINE:
-    'Motor mekaniği, zamanlama parçaları ve yağ soğutucusu bağlantı contalarında sızdırmazlık durumu periyodik bakım kapsamında incelenmelidir.',
+    'Motor mekaniği, zamanlama parçaları ve yağ soğutucusu bağlantı contalarında sızdırmazlık kaybı ve aşınma riski.',
   CHASSIS_BRAKES:
-    'Yürüyen aksam, süspansiyon geometrisi, direksiyon kutusu ve fren sistemi fiziki olarak kontrol edilmelidir.',
+    'Yürüyen aksam, süspansiyon geometrisi, direksiyon kutusu ve fren sistemi bileşenlerinde aşınma ve boşluk riski.',
   ELECTRICAL_BODY:
-    'Araç elektronik kontrol modülleri, tesisat soketleri ve konfor donanımı fonksiyonel testten geçirilmelidir.',
+    'Araç elektronik kontrol modülleri, tesisat soketleri ve konfor donanımı bileşenlerinde işlevsel aksaklık riski.',
   DEFAULT:
-    'Yetkili servis teknik bültenleri ve ekspertiz kontrol standartları kapsamında ilgili bileşen fiziki olarak kontrol edilmelidir.',
+    'Yetkili servis teknik bültenleri ve ekspertiz standartları kapsamında ilgili mekanik bileşende aşınma veya işlev kaybı riski.',
 };
 
 /**
@@ -315,10 +315,11 @@ export function sanitizeTurkishDefectDescription(
 
   let text = rawReason.trim();
 
-  // 1. Remove raw debug tokens or social media / marketing junk
+  // 1. Remove raw debug tokens, conversational forum slang, or social media / marketing junk
   const isDebugOrJunk =
     text.toUpperCase() === 'UNRESOLVED' ||
     /usta notu|dm'den|instagram|tiktok|facebook|takip edin|abone olun/i.test(text) ||
+    /\b(hocam|ustam|ustaya|servise götürdüm|baktırdım|benim araçta da|arkadaşlar|merhaba arkadaşlar|aynı sorun bende de|göbekten kaçırıyor|kaçırıyor hocam)\b/i.test(text) ||
     text.length < 15;
 
   if (isDebugOrJunk) {
@@ -500,7 +501,7 @@ export function sanitizeTurkishDefectTitle(
     if (normKey.includes('BRAKE')) return 'Fren Vakum Pompası Kontrolü';
     if (normKey.includes('STEERING')) return 'Direksiyon Kutusu Kontrolü';
 
-    if (context.domain === 'POWERTRAIN_TRANS') return 'Otomatik Şanzıman / Mekatronik Kontrolü';
+    if (context.domain === 'POWERTRAIN_TRANS') return 'Otomatik Şanzıman & Mekatronik Aşınma Riski';
     if (context.domain === 'THERMAL_COOLING') return 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
     if (context.domain === 'POWERTRAIN_ENGINE') return 'Motor Mekaniği & Zamanlama Kontrolü';
     return 'Teknik Servis Bülteni';

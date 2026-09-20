@@ -83,21 +83,32 @@ export class VehicleReportContextBuilderService {
     // ─────────────────────────────────────────────────────────────────────────
     const isHybridVariant = variant.fuelType === 'HYBRID' || (variant.engine?.fuelType || '').toUpperCase() === 'HYBRID';
     const isElectricVariant = variant.fuelType === 'ELECTRIC' || variant.engine?.isElectric || (variant.engine?.fuelType || '').toUpperCase() === 'ELECTRIC';
+    const isDieselVariant = variant.fuelType === 'DIESEL' || (variant.engine?.fuelType || '').toUpperCase() === 'DIESEL' || /dizel|diesel|\bdci\b|\btdi\b|\bhdi\b|\bcrdi\b|\bcdti\b/i.test(`${variant.engine?.code || ''} ${variant.engine?.description || ''}`);
     let rawEngineCc = specsJson.engineDisplacementCc || variant.engine?.displacement || null;
 
-    if (!rawEngineCc && !isElectricVariant && this.variantTechnicalFactsService) {
-      try {
-        let facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(variantId);
-        if (!facts?.engineDisplacementCc && facts?.engineDisplacement?.status !== 'VERIFIED') {
-          facts = await this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(variantId);
+    const brandName = ((variant as any).brand?.name || (variant.model as any)?.brand?.name || '').toLowerCase();
+    const modelName = (variant.model?.name || '').toLowerCase();
+    const engineIdentityStr = `${brandName} ${modelName} ${variant.engine?.code || ''} ${variant.engine?.description || ''}`.toLowerCase();
+    const isRenault15dCi = (brandName.includes('renault') || brandName.includes('dacia') || brandName.includes('nissan')) && (engineIdentityStr.includes('1.5') || engineIdentityStr.includes('k9k')) && (engineIdentityStr.includes('dci') || isDieselVariant);
+
+    if (isRenault15dCi) {
+      rawEngineCc = 1461;
+    } else {
+      const isRoundedMarketingCc = rawEngineCc && (rawEngineCc % 100 === 0 && [1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000].includes(rawEngineCc));
+      if ((!rawEngineCc || isRoundedMarketingCc) && !isElectricVariant && this.variantTechnicalFactsService) {
+        try {
+          let facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(variantId);
+          if ((!facts?.engineDisplacementCc || facts.engineDisplacementCc % 100 === 0) && facts?.engineDisplacement?.status !== 'VERIFIED') {
+            facts = await this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(variantId);
+          }
+          if (facts?.engineDisplacementCc) {
+            rawEngineCc = facts.engineDisplacementCc;
+          } else if (facts?.engineDisplacement?.valueCc) {
+            rawEngineCc = facts.engineDisplacement.valueCc;
+          }
+        } catch (err: any) {
+          this.logger.warn(`[CONTEXT BUILDER] Technical facts displacement resolution skipped: ${err?.message}`);
         }
-        if (facts?.engineDisplacementCc) {
-          rawEngineCc = facts.engineDisplacementCc;
-        } else if (facts?.engineDisplacement?.valueCc) {
-          rawEngineCc = facts.engineDisplacement.valueCc;
-        }
-      } catch (err: any) {
-        this.logger.warn(`[CONTEXT BUILDER] Technical facts displacement resolution skipped: ${err?.message}`);
       }
     }
 
@@ -350,7 +361,7 @@ export class VehicleReportContextBuilderService {
         fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
         isElectric: isElectricVariant,
         isHybrid: isHybridVariant,
-        powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (variant.fuelType === 'DIESEL' ? 'ICE_DIESEL' : 'ICE_PETROL'),
+        powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (isDieselVariant ? 'ICE_DIESEL' : 'ICE_PETROL'),
         electricRangeWltpKm: electricRangeVal,
         batteryCapacityKwh: batteryCapacityVal,
         transmissionName: isElectricVariant ? (transName || 'Tek Oranlı Redüktör') : (transName || 'Otomatik'),
@@ -362,7 +373,7 @@ export class VehicleReportContextBuilderService {
       },
       isElectric: isElectricVariant,
       isHybrid: isHybridVariant,
-      powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (variant.fuelType === 'DIESEL' ? 'ICE_DIESEL' : 'ICE_PETROL'),
+      powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (isDieselVariant ? 'ICE_DIESEL' : 'ICE_PETROL'),
       performanceSpecs: performanceData,
       verifiedDatabaseVehicleReport: {
         summary: reportCache?.summary || null,

@@ -110,7 +110,7 @@ export class VehicleReportProviderService {
           bodyType: vehicleContext?.vehicleIdentity?.bodyType,
           engineCode: vehicleContext?.vehicleIdentity?.engineCode,
           transmissionCode: vehicleContext?.vehicleIdentity?.transmissionCode,
-          powertrainType: vehicleContext?.vehicleIdentity?.isElectric ? 'BEV' : vehicleContext?.vehicleIdentity?.isHybrid ? 'HEV' : 'ICE_PETROL',
+          powertrainType: vehicleContext?.powertrainType || (vehicleContext?.vehicleIdentity?.isElectric ? 'BEV' : vehicleContext?.vehicleIdentity?.isHybrid ? 'HEV' : (vehicleContext?.vehicleIdentity?.fuelType === 'Dizel' || vehicleContext?.vehicleIdentity?.fuelType === 'DIESEL' || /dci|tdi|hdi|crdi|cdti/i.test(vehicleContext?.vehicleIdentity?.engineCode || '') ? 'ICE_DIESEL' : 'ICE_PETROL')),
           isElectric: vehicleContext?.vehicleIdentity?.isElectric,
           isHybrid: vehicleContext?.vehicleIdentity?.isHybrid,
           existingDbProblems: vehicleContext?.verifiedDatabaseVehicleReport?.knownDatabaseProblems,
@@ -288,15 +288,22 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
                   baseReport.expertDecisionSynthesis.finalConditionalVerdict = {} as any;
                 }
                 const curShort = baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict;
-                if (!curShort || curShort.includes('Belirli kontrollerin sağlanması şartıyla') || curShort.includes('Belirli kontrollerin') || curShort === '...') {
+                const shouldOverrideVerdict =
+                  !curShort ||
+                  curShort.includes('Belirli kontrollerin') ||
+                  curShort.includes('Sınıfında referans') ||
+                  curShort === '...' ||
+                  (dScore < 90 && curShort.includes('referans'));
+
+                if (shouldOverrideVerdict) {
                   if (dScore >= 90 || dState === 'EXCELLENT') {
                     baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.';
-                  } else if (dScore >= 75 || dState === 'GOOD') {
+                  } else if (dScore >= 70 || dState === 'GOOD') {
                     baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.';
-                  } else if (dScore >= 60 || dState === 'CAUTION') {
-                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Belirli kontrollerin sağlanması ve potansiyel aşınma noktalarının incelenmesi şartıyla değerlendirilebilir.';
+                  } else if (dScore >= 50 || dState === 'CAUTION') {
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Riskli kondisyonda, kapsamlı ekspertiz ve mekanik kontroller sağlanmadan karar verilmemelidir.';
                   } else {
-                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Yüksek riskli doğrulanmış kronik kusurlar nedeniyle satın alımdan önce kapsamlı inceleme gerektirir.';
+                    baseReport.expertDecisionSynthesis.finalConditionalVerdict.shortVerdict = 'Ağır riskli kondisyonda, yüksek maliyetli kronik arıza riskleri nedeniyle uzak durulması önerilir.';
                   }
                 }
               }
@@ -614,27 +621,58 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null
     );
 
-    let finalZeroToHundred = (specs.zeroToHundredKmh !== undefined && specs.zeroToHundredKmh !== null && specs.zeroToHundredKmh > 0)
-      ? specs.zeroToHundredKmh
-      : (specs.zeroToHundredSec !== undefined && specs.zeroToHundredSec !== null && specs.zeroToHundredSec > 0)
-        ? specs.zeroToHundredSec
-        : (currentPerf.zeroToHundredKmh || currentPerf.zeroToHundredSec || null);
+    // DB-grounded specs must take precedence over AI hallucinated specs
+    const dbZeroToHundred = (currentPerf.zeroToHundredKmh !== undefined && currentPerf.zeroToHundredKmh !== null && currentPerf.zeroToHundredKmh > 0)
+      ? currentPerf.zeroToHundredKmh
+      : (currentPerf.zeroToHundredSec !== undefined && currentPerf.zeroToHundredSec !== null && currentPerf.zeroToHundredSec > 0)
+        ? currentPerf.zeroToHundredSec
+        : (validationContext?.performanceData?.zeroToHundredKmh || null);
 
-    let finalTopSpeed = (specs.topSpeedKmh !== undefined && specs.topSpeedKmh !== null && specs.topSpeedKmh > 0)
-      ? specs.topSpeedKmh
-      : (currentPerf.topSpeedKmh || null);
+    const dbTopSpeed = (currentPerf.topSpeedKmh !== undefined && currentPerf.topSpeedKmh !== null && currentPerf.topSpeedKmh > 0)
+      ? currentPerf.topSpeedKmh
+      : (validationContext?.performanceData?.topSpeedKmh || null);
 
-    let finalTrunk = (specs.trunkCapacityLiters !== undefined && specs.trunkCapacityLiters !== null && specs.trunkCapacityLiters > 0)
-      ? specs.trunkCapacityLiters
-      : (specs.luggageCapacityL !== undefined && specs.luggageCapacityL !== null && specs.luggageCapacityL > 0)
-        ? specs.luggageCapacityL
-        : (currentPerf.trunkCapacityLiters || currentPerf.luggageCapacityL || null);
+    const dbTrunk = (currentPerf.trunkCapacityLiters !== undefined && currentPerf.trunkCapacityLiters !== null && currentPerf.trunkCapacityLiters > 0)
+      ? currentPerf.trunkCapacityLiters
+      : (currentPerf.luggageCapacityL !== undefined && currentPerf.luggageCapacityL !== null && currentPerf.luggageCapacityL > 0)
+        ? currentPerf.luggageCapacityL
+        : (validationContext?.performanceData?.trunkCapacityLiters || null);
 
-    let finalWeight = (specs.curbWeightKg !== undefined && specs.curbWeightKg !== null && specs.curbWeightKg > 0)
-      ? specs.curbWeightKg
-      : (specs.weightKg !== undefined && specs.weightKg !== null && specs.weightKg > 0)
-        ? specs.weightKg
-        : (currentPerf.curbWeightKg || currentPerf.weightKg || null);
+    const dbWeight = (currentPerf.curbWeightKg !== undefined && currentPerf.curbWeightKg !== null && currentPerf.curbWeightKg > 0)
+      ? currentPerf.curbWeightKg
+      : (currentPerf.weightKg !== undefined && currentPerf.weightKg !== null && currentPerf.weightKg > 0)
+        ? currentPerf.weightKg
+        : (validationContext?.performanceData?.curbWeightKg || null);
+
+    let finalZeroToHundred = dbZeroToHundred
+      ? dbZeroToHundred
+      : (specs.zeroToHundredKmh !== undefined && specs.zeroToHundredKmh !== null && specs.zeroToHundredKmh > 0)
+        ? specs.zeroToHundredKmh
+        : (specs.zeroToHundredSec !== undefined && specs.zeroToHundredSec !== null && specs.zeroToHundredSec > 0)
+          ? specs.zeroToHundredSec
+          : null;
+
+    let finalTopSpeed = dbTopSpeed
+      ? dbTopSpeed
+      : (specs.topSpeedKmh !== undefined && specs.topSpeedKmh !== null && specs.topSpeedKmh > 0)
+        ? specs.topSpeedKmh
+        : null;
+
+    let finalTrunk = dbTrunk
+      ? dbTrunk
+      : (specs.trunkCapacityLiters !== undefined && specs.trunkCapacityLiters !== null && specs.trunkCapacityLiters > 0)
+        ? specs.trunkCapacityLiters
+        : (specs.luggageCapacityL !== undefined && specs.luggageCapacityL !== null && specs.luggageCapacityL > 0)
+          ? specs.luggageCapacityL
+          : null;
+
+    let finalWeight = dbWeight
+      ? dbWeight
+      : (specs.curbWeightKg !== undefined && specs.curbWeightKg !== null && specs.curbWeightKg > 0)
+        ? specs.curbWeightKg
+        : (specs.weightKg !== undefined && specs.weightKg !== null && specs.weightKg > 0)
+          ? specs.weightKg
+          : null;
 
     let finalElectricRange = isEv
       ? (specs.electricRangeWltpKm || specs.electricRangeKm || specs.rangeKm || currentPerf.electricRangeWltpKm || null)

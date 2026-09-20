@@ -64,7 +64,7 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "dailyUseAssessment": {
       "cityUse": "Şehir içi sürüş, manevra kabiliyeti, şanzıman tepkileri ve dur-kalk tüketim dengesi...",
       "highwayUse": "Otoyol seyri, yüksek hız stabilitesi, rüzgar/yol izolasyonu ve uzun yol konforu...",
-      "trafficBehavior": "Dur-kalk trafikte sarsıntısız kalkış, şanzıman ısınma davranışı ve düşük devir torku...",
+      "trafficBehavior": "Dur-kalk trafikte şanzıman kavrama karakteri, ısınma eğilimi ve düşük devir tork dengesi...",
       "comfortAssessment": "Süspansiyon darbe emişi, kabin sessizliği ve donanım paketinin konfora katkısı...",
       "supportingFactIds": []
     },
@@ -325,7 +325,7 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
     - 'vehicleCharacter.detailedAssessment' alanında ASLA 1-2 cümlelik sığ veya jenerik pazarlama özeti yazma!
     - Tıpkı kıdemli bir otomotiv test editörü ve ekspertiz danışmanı gibi, aracı anlatan akıcı bir paragraf tarzında zengin, samimi ve teknik otomotiv analizi yaz (en az 250-350 kelime).
     - KESİNLİKLE madde imleri, asteriksler (*) veya "1. Motor ve Şanzıman Uyumu:", "2. Donanım Seviyesi:" gibi numaralı alt başlıklar KULLANMA! Başlık kullanmaksızın; güç ünitesi mimarisi ve tahrik karakterini, donanım paketinin (${trim || 'Seçilen Paket'}) kabin konforunu, süspansiyon ve sürüş dinamiklerini, tüketim/menzil beklentisini doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde anlat.
-    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla. Şehir içi ve trafikte vites geçişi yerine ${isEv ? 'elektrikli tek oranlı aktarmanın tek pedallı sürüş (one-pedal drive) ve rejeneratif frenleme dinamiklerini' : 'şanzıman kavrama ve dur-kalk karakterini'} anlat.
+    - 'dailyUseAssessment' (cityUse, highwayUse, trafficBehavior, comfortAssessment) alanlarını da 1 cümlelik klişelerle geçme; her birinde araca özgü sürüş, yalıtım ve konfor detaylarını en az 2-3 doyurucu cümleyle açıkla. Şehir içi ve trafikte vites geçişi yerine ${isEv ? 'elektrikli tek oranlı aktarmanın tek pedallı sürüş (one-pedal drive) ve rejeneratif frenleme dinamiklerini' : 'şanzıman kavrama ve dur-kalk karakterini'} anlat. Kuru tip çift kavramalı yarı otomatik (EDC, DSG, DCT) şanzımanlarda dur-kalk trafikte "sarsıntısız kalkış" gibi tork konvertörlü veya elektrikli ezberleri KULLANMA; seri vites geçiş avantajının yanı sıra kuru kavramanın yoğun trafikteki ısınma hassasiyetini ve düşük hız kararsızlığını dürüst ve dengeli bir otomotiv editörü gibi açıkla.
 12. KARAR VE DEĞERLENDİRME KARTLARI DERİNLİK, KALİTE VE NÜANSLI OTOMOTİV DANIŞMANI DİLİ:
     - **KESİNLİKLE YASAK OLAN KALIP BAŞLIKLAR:** "Motor Gücü ve Verimlilik Dengesi", "Donanım Paketi ve Kabin Kalitesi", "Şanzıman Akıcılığı ve Sürüş Hissi", "İkinci El Değer Koruması ve Talep", "Kompakt Sedan Arka Koltuk Yaşam Alanı", "Çift Kavrama Şanzımanın Trafik Karakteri", "Premium Servis ve Yedek Parça Maliyetleri" gibi jenerik, kopyala-yapıştır şablon başlıkları KESİNLİKLE KULLANMA!
     - **TEK BOYUTLU VE EZBERE ÇIKARIMLAR KESİNLİKLE YASAKTIR (ÇOK BOYUTLU ARAÇ DEĞERLENDİRMESİ):**
