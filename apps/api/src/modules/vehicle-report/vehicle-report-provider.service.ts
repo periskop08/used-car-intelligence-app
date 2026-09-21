@@ -401,18 +401,52 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     };
 
     // 4. Map Expert Decision Synthesis
-    if (contentObj.expertDecisionSynthesis) {
+    if (contentObj.expertDecisionSynthesis || contentObj.reasonsToBuy || contentObj['Tercih Etmek İçin Güçlü Nedenler']) {
       const existingSynth = baseReport.expertDecisionSynthesis || {} as any;
       const newSynth = contentObj.expertDecisionSynthesis || {};
+
+      const incomingReasons = (
+        (Array.isArray(newSynth.strongestReasonsToChoose) && newSynth.strongestReasonsToChoose.length > 0) ? newSynth.strongestReasonsToChoose :
+        (Array.isArray(newSynth.reasonsToBuy) && newSynth.reasonsToBuy.length > 0) ? newSynth.reasonsToBuy :
+        (Array.isArray(contentObj.strongestReasonsToChoose) && contentObj.strongestReasonsToChoose.length > 0) ? contentObj.strongestReasonsToChoose :
+        (Array.isArray(contentObj.reasonsToBuy) && contentObj.reasonsToBuy.length > 0) ? contentObj.reasonsToBuy :
+        (Array.isArray(contentObj['Tercih Etmek İçin Güçlü Nedenler']) && contentObj['Tercih Etmek İçin Güçlü Nedenler'].length > 0) ? contentObj['Tercih Etmek İçin Güçlü Nedenler'] :
+        existingSynth.strongestReasonsToChoose
+      ) || [];
+
+      const incomingSuitable = (
+        (Array.isArray(newSynth.suitableFor) && newSynth.suitableFor.length > 0) ? newSynth.suitableFor :
+        (Array.isArray(newSynth.idealFor) && newSynth.idealFor.length > 0) ? newSynth.idealFor :
+        (Array.isArray(contentObj.suitableFor) && contentObj.suitableFor.length > 0) ? contentObj.suitableFor :
+        (Array.isArray(contentObj.idealFor) && contentObj.idealFor.length > 0) ? contentObj.idealFor :
+        (Array.isArray(contentObj['Kimler İçin Mantıklı?']) && contentObj['Kimler İçin Mantıklı?'].length > 0) ? contentObj['Kimler İçin Mantıklı?'] :
+        existingSynth.suitableFor
+      ) || [];
+
+      const incomingCompromises = (
+        (Array.isArray(newSynth.compromisesAndLimitations) && newSynth.compromisesAndLimitations.length > 0) ? newSynth.compromisesAndLimitations :
+        (Array.isArray(contentObj.compromisesAndLimitations) && contentObj.compromisesAndLimitations.length > 0) ? contentObj.compromisesAndLimitations :
+        (Array.isArray(contentObj['Satın Almadan Önce Bilinecek Tavizler']) && contentObj['Satın Almadan Önce Bilinecek Tavizler'].length > 0) ? contentObj['Satın Almadan Önce Bilinecek Tavizler'] :
+        existingSynth.compromisesAndLimitations
+      ) || [];
+
+      const incomingNotSuitable = (
+        (Array.isArray(newSynth.notSuitableFor) && newSynth.notSuitableFor.length > 0) ? newSynth.notSuitableFor :
+        (Array.isArray(newSynth.notIdealFor) && newSynth.notIdealFor.length > 0) ? newSynth.notIdealFor :
+        (Array.isArray(contentObj.notSuitableFor) && contentObj.notSuitableFor.length > 0) ? contentObj.notSuitableFor :
+        (Array.isArray(contentObj.notIdealFor) && contentObj.notIdealFor.length > 0) ? contentObj.notIdealFor :
+        (Array.isArray(contentObj['Kimler İçin Uygun Olmayabilir?']) && contentObj['Kimler İçin Uygun Olmayabilir?'].length > 0) ? contentObj['Kimler İçin Uygun Olmayabilir?'] :
+        existingSynth.notSuitableFor
+      ) || [];
 
       baseReport.expertDecisionSynthesis = {
         ...existingSynth,
         ...newSynth,
         vehicleCharacter: newSynth.vehicleCharacter || existingSynth.vehicleCharacter,
-        strongestReasonsToChoose: (newSynth.strongestReasonsToChoose?.length ? newSynth.strongestReasonsToChoose : existingSynth.strongestReasonsToChoose) || [],
-        compromisesAndLimitations: (newSynth.compromisesAndLimitations?.length ? newSynth.compromisesAndLimitations : existingSynth.compromisesAndLimitations) || [],
-        suitableFor: (newSynth.suitableFor?.length ? newSynth.suitableFor : existingSynth.suitableFor) || [],
-        notSuitableFor: (newSynth.notSuitableFor?.length ? newSynth.notSuitableFor : existingSynth.notSuitableFor) || [],
+        strongestReasonsToChoose: incomingReasons,
+        compromisesAndLimitations: incomingCompromises,
+        suitableFor: incomingSuitable,
+        notSuitableFor: incomingNotSuitable,
         purchaseConditions: (newSynth.purchaseConditions?.length ? newSynth.purchaseConditions : existingSynth.purchaseConditions) || [],
         walkAwayConditions: (newSynth.walkAwayConditions?.length ? newSynth.walkAwayConditions : existingSynth.walkAwayConditions) || [],
         primaryTechnicalRisk: newSynth.primaryTechnicalRisk || existingSynth.primaryTechnicalRisk || originalRisks.primaryTechnicalRisk,

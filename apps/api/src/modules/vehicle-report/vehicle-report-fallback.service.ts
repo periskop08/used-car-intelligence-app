@@ -248,34 +248,30 @@ export class VehicleReportFallbackService {
       : transDisplayName;
     const formattedFuelLabel = `${fuel}${avgFuel ? ' (' + avgFuel + ')' : ''}`;
 
+    const isAwd = /awd|4wd|4x4|dört teker|quattro|xdrive|4motion|allgrip|symmetrical/i.test(`${(vIdentity as any).drivetrain || ''} ${(vIdentity as any).driveType || ''} ${carTitle || ''}`);
+
     // Expert Decision Synthesis
     const expertDecisionSynthesis: ExpertDecisionSynthesis = {
       vehicleCharacter: {
         headline: `${carTitle} — Teknik Karakter ve Fabrika Sentezi`,
-        detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} aktarma kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Doğrulanmış veritabanı kayıtlarına göre periyodik bakımları düzenli yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
+        detailedAssessment: `${carTitle}, ${formattedEngineLabel} motor ünitesi ve ${formattedTransLabel} aktarma kombinasyonuyla günlük şehir içi sürüş pratikliğini otoyol stabilitesiyle birleştirir. ${accel ? `0-100 km/s hızlanmasını ${accel} sürede tamamlayan ` : ''}araç, ${avgFuel ? `${avgFuel} fabrika tüketim verisi ` : ''}ve öngörülebilir sürüş dengesine odaklanan bir mühendislik yapısına sahiptir. Periyodik bakımları aksatılmadığı ve mekanik sıvı kontrolleri zamanında yapıldığı takdirde motor ve şanzıman sağlığı uzun yıllar korunur.`,
         supportingFactIds,
       },
       trimPackageComparison: {
         selectedTrimName: vIdentity.trimName || 'Seçilen Paket',
         lowerOrAlternativeTrimName: 'Alt / Standart Paket',
-        comparisonNarrative: `${vIdentity.trimName || 'Seçilen Paket'} donanım paketi, aracın baz donanım paketlerine kıyasla kilit konfor ve estetik unsurlar sunar. Ek donanım seviyeleri ekspertiz sırasında kontrol edilmelidir.`,
-        keyAddedFeatures: ['Donanım Paketine Özel Konfor Aksamları', 'Gelişmiş Kabin / Donanım Özellikleri'],
-        missingFeaturesInLowerTrim: ['Üst Paket Konfor Elemanları'],
+        comparisonNarrative: `${vIdentity.trimName || 'Mevcut'} donanım seviyesi, temel model versiyonlarına kıyasla güvenlik ve konfor odaklı fonksiyonel donanımları bünyesinde barındırır.`,
+        keyAddedFeatures: ['Fonksiyonel Kabin Donanımları', 'Gelişmiş Güvenlik ve Sürüş Destekleri'],
+        missingFeaturesInLowerTrim: ['Temel Standart Donanım'],
       },
       dailyUseAssessment: {
         cityUse: isElectric
-          ? 'Doğrudan tahrikli elektrik motoru mimarisi, dur-kalk şehir içi trafiğinde kesintisiz, sarsıntısız ve sessiz bir sürüş konforu sunar.'
+          ? `Şehir içi dar sokak manevralarında anlık elektrik torku ve sessiz sürüş pratikliği sunar.`
           : (isDualClutch
-            ? `${formattedTransLabel} şanzıman dur-kalk trafikte seri vites geçişleri sunar; ancak yoğun dur-kalk trafikte kuru kavramanın ısınma hassasiyeti ve düşük hız kararsızlığı dikkate alınmalıdır.`
+            ? `Şehir içi kullanımda seri vites geçişleri sunar; yoğun sıkışık trafikte kavramayı korumak adına tam duruşlarda frene kararlı basılması önerilir.`
             : (isCvt
-              ? 'Sürekli değişken oranlı (CVT) şanzıman yapısı dur-kalk trafikte dişli geçiş hissi olmaksızın pürüzsüz ve sarsıntısız bir kalkış konforu sunar.'
-              : (isTorqueConverter
-                ? 'Tork konvertörlü tam otomatik şanzıman, hidrolik yapısı sayesinde dur-kalk trafikte debriyaj aşınması veya ısınma riski olmadan en pürüzsüz sürüş konforunu sağlar.'
-                : (isSingleClutch
-                  ? 'Tek kavramalı yarı otomatik şanzıman şehir içinde vites geçişlerinde hissedilen yığılma (baş hareketi) karakteristiğine sahiptir; yokuş kalkışlarda gaz tepkisine alışkanlık gerektirir.'
-                  : (isManual
-                    ? 'Manuel vites kutusu ve debriyaj pedalı yoğun dur-kalk trafikte sürücü eforu gerektirir; debriyaj kavrama noktası ve baskı balata kondisyonu kontrol edilmelidir.'
-                    : `${formattedTransLabel} dur-kalk şehir içi trafiğinde kullanım kolaylığı ve konforlu kalkış imkanı sunar.`))))),
+              ? `Şehir içi trafikte sarsıntısız ve doğrusal bir hızlanma sağlar.`
+              : `Şehir içi dur-kalk trafiğinde ${formattedTransLabel} rahatlığı ile öngörülebilir bir sürüş karakteri sunar.`)),
         highwayUse: isElectric
           ? `Sabit hız otoyol seyirlerinde ${hp} güç ve dengeli şasi yapısı konforlu bir seyir kararlılığı sunar; yüksek hızlarda elektrik tüketimi ve menzil eğrisi dikkate alınmalıdır.`
           : (isCvt
@@ -300,9 +296,11 @@ export class VehicleReportFallbackService {
           supportingFactIds: ['ENGINE_POWER', 'TRANSMISSION_TYPE'],
         },
         {
-          title: 'Doğrulanmış Veritabanı Şeffaflığı',
-          explanation: `Araç teknik verileri ve kronik arıza kayıtları TorqueScout veritabanı ile eşleştirilerek tarafsızca değerlendirilmiştir.`,
-          supportingFactIds: ['KNOWN_PROBLEMS_COUNT'],
+          title: isAwd ? 'Dört Tekerlekten Çekiş ve Tutunma Güvenliği' : 'Dengeli Şasi ve Sürüş Kararlılığı',
+          explanation: isAwd
+            ? 'Dört tekerlekten çekiş mimarisi, ıslak ve zorlu yol zeminlerinde dengeli tutunma ve viraj güvenliği sağlar.'
+            : 'Sınıfına uygun gövde rijitliği ve dengeli süspansiyon geometrisi, otoyol seyirlerinde öngörülebilir bir sürüş kararlılığı sunar.',
+          supportingFactIds: ['CHASSIS_BALANCE'],
         },
       ],
       compromisesAndLimitations: [
@@ -315,7 +313,7 @@ export class VehicleReportFallbackService {
       suitableFor: [
         {
           profile: 'Şehir İçi Günlük Kullanıcılar',
-          explanation: `${formattedTransLabel} rahatlığı ve ${formattedFuelLabel} yapısı yoğun şehir trafiğinde konfor sağlar.`,
+          explanation: `${formattedTransLabel} yapısı dur-kalk trafikte yüksek kullanım kolaylığı vadeder; şehir içi pratikliği ve kabin ergonomisi günlük rutinde konfor sağlar.`,
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
         {

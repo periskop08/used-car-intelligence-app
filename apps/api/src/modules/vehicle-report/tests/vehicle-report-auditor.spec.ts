@@ -65,10 +65,20 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
               explanation: 'Sadece 2.0 motor ile sunulması performans arayanlar için kısıtlama.',
             },
           ],
+          strongestReasonsToChoose: [
+            {
+              title: 'Doğrulanmış Veritabanı Şeffaflığı',
+              explanation: 'Araç teknik verileri ve kronik arıza kayıtları TorqueScout veritabanı ile eşleştirilerek tarafsızca değerlendirilmiştir.',
+            },
+          ],
           suitableFor: [
             {
               profile: 'Şehir İçi Günlük Kullanıcılar',
               explanation: 'Tork konvertörlü tam otomatik rahatlığı ve Benzin (Ort. 8.9 lt/100km) yapısı yoğun şehir trafiğinde yakıt konforu sağlar.',
+            },
+            {
+              profile: 'Sakin ve Öngörülebilir Sürüş İsteyenler',
+              explanation: 'Sarsıntısız hızlanma ve Ort. 8.9 lt/100km arayan sürücüler için uygundur.',
             },
           ],
           notSuitableFor: [
@@ -99,6 +109,18 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(result.auditResult.tieBreakerApplied).toBe(true);
       expect(result.report.expertDecisionSynthesis.vehicleCharacter.headline).toContain('Dengeli Sürüş Karakteri ve Güvenilirlik');
       expect(result.report.expertDecisionSynthesis.notSuitableFor[0].explanation).toContain('160 HP atmosferik boxer motor');
+
+      // 5. Platform self-promotion ("Veritabanı Şeffaflığı") should be replaced with real automotive merit
+      const reasonTitle = result.report.expertDecisionSynthesis.strongestReasonsToChoose[0].title;
+      expect(reasonTitle).not.toContain('Veritabanı');
+      expect(reasonTitle).not.toContain('TorqueScout');
+      expect(reasonTitle).toContain('Dengeli Şasi');
+
+      // 6. Robotic consumption query ("Ort. 8.9 lt/100km arayan sürücüler") should be cleaned up
+      const secondSuitExpl = result.report.expertDecisionSynthesis.suitableFor[1].explanation;
+      expect(secondSuitExpl).not.toContain('arayan sürücüler');
+      expect(secondSuitExpl).not.toContain('Ort. 8.9');
+      expect(secondSuitExpl).toContain('sarsıntısız vites geçişleri');
     });
   });
 });

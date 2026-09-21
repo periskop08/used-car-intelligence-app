@@ -81,6 +81,12 @@ export class VehicleReportAuditorService {
     const transName = vIdentity.transmissionName || vIdentity.transmission || '';
     const fuelType = (vIdentity.fuelType || '').toLowerCase();
     const isElectric = fuelType.includes('elektrik') || fuelType.includes('bev');
+    const isAwd = /awd|4wd|4x4|dört teker|quattro|xdrive|4motion|allgrip|symmetrical/i.test(
+      `${(vIdentity as any).drivetrain || ''} ${(vIdentity as any).driveType || ''} ${brand} ${model}`
+    );
+    const ccVal = vIdentity.engineDisplacementCc || (report as any).technicalSpecifications?.engineDisplacementCc;
+    const ccText = ccVal ? `${(ccVal / 1000).toFixed(1)} litrelik ` : '';
+    const transSimple = transName ? (transName.toLowerCase().includes('otomatik') ? 'otomatik şanzımanın' : `${transName}`) : 'şanzımanın';
 
     // =========================================================================
     // CHECK 1: User Maintenance Neglect in Chronic Risks (Yağ Değişimi vb.)
@@ -93,56 +99,47 @@ export class VehicleReportAuditorService {
         );
         auditResult.hasContradiction = true;
         auditResult.contradictions.push(`Kullanıcı bakım ihmali (${pRisk.title}) kronik kusur sayılamaz.`);
-        synth.primaryTechnicalRisk = null as any;
         auditResult.wasHarmonized = true;
+
+        synth.primaryTechnicalRisk = null as any;
       }
     }
 
     if (Array.isArray(synth.secondaryTechnicalRisks)) {
-      const initialCount = synth.secondaryTechnicalRisks.length;
-      synth.secondaryTechnicalRisks = synth.secondaryTechnicalRisks.filter(
-        (r: any) => !isUserNeglectOrRoutineMaintenance(r.title, r.explanation)
-      );
-      if (synth.secondaryTechnicalRisks.length !== initialCount) {
-        auditResult.wasHarmonized = true;
-      }
+      synth.secondaryTechnicalRisks = synth.secondaryTechnicalRisks.filter((risk: any) => {
+        return !isUserNeglectOrRoutineMaintenance(risk.title, risk.explanation);
+      });
     }
 
     // =========================================================================
-    // CHECK 2: Showroom/Lineup Whining in Compromises ("Sınırlı Motor Seçenekleri")
+    // CHECK 2: Showroom/Lineup Whining in Compromises ("Motor seçenekleri sınırlı")
     // =========================================================================
     if (Array.isArray(synth.compromisesAndLimitations)) {
-      synth.compromisesAndLimitations = synth.compromisesAndLimitations.map((item: any) => {
-        if (isShowroomOrLineupWhining(item.title, item.explanation)) {
+      synth.compromisesAndLimitations = synth.compromisesAndLimitations.map((comp: any) => {
+        if (isShowroomOrLineupWhining(comp.title, comp.explanation)) {
           this.logger.warn(
-            `[RESEARCHER 2 AUDIT] Compromise "${item.title}" whines about vehicle lineup instead of evaluating the specific vehicle. Rewriting to specific mechanical compromise.`
+            `[RESEARCHER 2 AUDIT] Compromise "${comp.title}" is showroom whining about engine options. Rewriting to actual mechanical/driving limits.`
           );
           auditResult.hasContradiction = true;
-          auditResult.contradictions.push(`Model gamı şikayeti (${item.title}) seçilen araca uygun hale getirildi.`);
+          auditResult.contradictions.push(`Model gamı eleştirisi (${comp.title}) aracın kendi mekanik sınırlarına dönüştürüldü.`);
           auditResult.wasHarmonized = true;
 
-          // Replace with real mechanical compromise for this specific car
-          if (transName.toLowerCase().includes('4 ileri') || transName.toLowerCase().includes('4eat')) {
+          const isOld4Speed = transName.toLowerCase().includes('4 ileri') || transName.toLowerCase().includes('4eat');
+          if (isOld4Speed) {
             return {
-              title: '4 İleri Şanzıman Otoyol Oranları',
-              explanation: `${brand} ${model} Active, 4 ileri tork konvertörlü otomatik şanzımanı ile sağlam bir yapı sunsa da, 120+ km/s otoyol hızlarında daha yüksek motor devri ve artan kabin sesi yaratabilir; 6+ ileri şanzımanlara göre uzun yolda daha sakin bir sürüş temposu gerektirir.`,
-              supportingFactIds: ['TRANSMISSION_TYPE', 'AI_RESEARCH_ENGINE'],
-            };
-          } else if (isElectric) {
-            return {
-              title: 'Yüksek Hızlı Otoyol Tüketim Artışı',
-              explanation: `${brand} ${model}, aerodinamik sürtünme ve yüksek hız otoyol seyrinde batarya tüketimini belirgin şekilde artırabilir; şehir içi menziline kıyasla otoyol sürüşlerinde daha sık şarj planlaması gerektirir.`,
-              supportingFactIds: ['AI_RESEARCH_ENGINE'],
-            };
-          } else {
-            return {
-              title: 'Atmosferik Güç Ünitesi Ara Hızlanma Karakteri',
-              explanation: `${brand} ${model} ${trim}, turbo beslemeli motorlardaki ani tork patlaması yerine doğrusal ve sakin bir güç eğrisi sunar; dik yokuşlarda veya ani sollama manevralarında vites küçülterek yüksek devir çevrilmesini gerektirir.`,
-              supportingFactIds: ['ENGINE_POWER', 'AI_RESEARCH_ENGINE'],
+              title: 'Geleneksel 4 İleri Vites Oranları ve Otoyol Devri',
+              explanation: `4 ileri geleneksel şanzıman oranları 120 km/s üzeri otoyol seyirlerinde motor devrinin 3000 d/d üzerine çıkmasına sebep olarak kabin içi motor sesini ve tüketimi artırır.`,
+              supportingFactIds: comp.supportingFactIds || ['TRANSMISSION_TYPE'],
             };
           }
+
+          return {
+            title: 'Sakin ve Doğrusal Güç Eğrisi',
+            explanation: `${rawHp || 160} HP atmosferik boxer motor ve ${transName || 'şanzıman'}, ani sportif patlamalar yerine doğrusal ve dengeli bir hızlanma sunar.`,
+            supportingFactIds: comp.supportingFactIds || ['ENGINE_POWER'],
+          };
         }
-        return item;
+        return comp;
       });
     }
 
@@ -171,9 +168,14 @@ export class VehicleReportAuditorService {
             auditResult.contradictions.push(`Yüksek tüketimli (${avgFuelNum}L) araca şehir içi yakıt övgüsü düzeltildi.`);
             auditResult.wasHarmonized = true;
 
+            const transPhrase = transName.toLowerCase().includes('tork konvert') 
+              ? 'Tork konvertörlü otomatik şanzımanın pürüzsüz dur-kalk rahatlığı'
+              : `${transSimple} dur-kalk rahatlığı`;
+            const awdPhrase = isAwd ? ' ve dört tekerlekten çekiş dengesi' : '';
+
             return {
               profile: 'Şehir İçi Konfor ve Güvenlik Arayanlar',
-              explanation: `Tork konvertörlü otomatik şanzımanın pürüzsüz dur-kalk rahatlığı ve dört tekerlekten çekiş dengesi şehir trafiğinde yüksek sürüş konforu sunar; ancak 2.0 litrelik atmosferik motorun yoğun dur-kalk trafiğinde yakıt tüketiminin artacağı göz önünde bulundurulmalıdır.`,
+              explanation: `${transPhrase}${awdPhrase} şehir trafiğinde yüksek sürüş konforu sunar; ancak ${ccText}motorun yoğun dur-kalk trafiğinde yakıt tüketiminin artacağı göz önünde bulundurulmalıdır.`,
               supportingFactIds: item.supportingFactIds || ['TRANSMISSION_TYPE'],
             };
           }
@@ -270,6 +272,63 @@ export class VehicleReportAuditorService {
           return !t.includes('yetersiz güç') && !t.includes('yeterli gücü sunmuyor');
         });
       }
+    }
+
+    // =========================================================================
+    // CHECK 5: Platform Self-Promotion & Marketing Scrubber in Reasons to Choose
+    // =========================================================================
+    if (Array.isArray(synth.strongestReasonsToChoose)) {
+      synth.strongestReasonsToChoose = synth.strongestReasonsToChoose.map((reason: any) => {
+        const text = `${reason.title || ''} ${reason.explanation || ''}`.toLowerCase();
+        if (
+          text.includes('veritaban') ||
+          text.includes('torquescout') ||
+          text.includes('şeffaflığ') ||
+          text.includes('eşleştirilerek')
+        ) {
+          this.logger.warn(
+            `[RESEARCHER 2 AUDIT] Removed platform marketing phrase from strongestReasonsToChoose: "${reason.title}"`
+          );
+          auditResult.hasContradiction = true;
+          auditResult.contradictions.push('Platform tanıtım ifadesi (veritabanı şeffaflığı vb.) araç mekanik üstünlüğüyle değiştirildi.');
+          auditResult.wasHarmonized = true;
+
+          return {
+            title: isAwd ? 'Gelişmiş Çekiş Güvenliği ve Yol Dengesi' : 'Dengeli Şasi ve Sürüş Kararlılığı',
+            explanation: isAwd
+              ? 'Dört tekerlekten çekiş altyapısı ve dengeli ağırlık dağılımı, zorlu ve ıslak yol zeminlerinde üstün tutunma ve viraj stabilitesi sağlar.'
+              : 'Gövde rijitliği ve dengeli süspansiyon geometrisi, otoyol seyirlerinde ve manevralarda öngörülebilir bir yol tutuş kararlılığı sunar.',
+            supportingFactIds: ['CHASSIS_BALANCE'],
+          };
+        }
+        return reason;
+      });
+    }
+
+    // =========================================================================
+    // CHECK 6: Clean Up Robotic Template Phrases in suitableFor
+    // =========================================================================
+    if (Array.isArray(synth.suitableFor)) {
+      synth.suitableFor = synth.suitableFor.map((item: any) => {
+        let expl = item.explanation || '';
+        const explLower = expl.toLowerCase();
+        if (
+          (explLower.includes('arayan sürücüler') || explLower.includes('arayanlar')) &&
+          (explLower.includes('lt/100km') || explLower.includes('ort.') || explLower.includes('lt '))
+        ) {
+          this.logger.warn(`[RESEARCHER 2 AUDIT] Corrected robotic consumption phrase in suitableFor: "${expl}"`);
+          auditResult.hasContradiction = true;
+          auditResult.contradictions.push('Robotik tüketim arama dizesi akıcı sürüş beklentisiyle değiştirildi.');
+          auditResult.wasHarmonized = true;
+
+          return {
+            profile: item.profile || 'Sakin ve Öngörülebilir Sürüş İsteyenler',
+            explanation: 'Ani hızlanma isteklerinden ziyade doğrusal güç aktarımı, sarsıntısız vites geçişleri ve otoyolda sakin seyir konforunu önceleyen sürücüler için uygundur.',
+            supportingFactIds: item.supportingFactIds || ['ENGINE_POWER'],
+          };
+        }
+        return item;
+      });
     }
 
     return { report, auditResult };

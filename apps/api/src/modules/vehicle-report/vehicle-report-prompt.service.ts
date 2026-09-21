@@ -419,6 +419,9 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
 18. BAŞLIK, ANLATI VE KULLANICI PROFİLLERİ ARASINDA %100 TON VE PERFORMANS TUTARLILIĞI:
     - Başlıkta "Güçlü Performans" yazıp "notSuitableFor" kısmında "Yüksek Performans Arayanlar: Bu araç yeterli güç sunmuyor" denilerek rapor kendi kendini yalanlayamaz!
     - Araç safkan bir spor araba değilse (örn. 160 HP atmosferik sedan), başlık "Dengeli Sürüş Karakteri ve Güvenilirlik" gibi ölçülü olmalı; "notSuitableFor" kısmında ise "Safkan Sportif Hızlanma Arayanlar: Atmosferik motor ve 4 ileri şanzıman ani ara hızlanmalarda sakin bir karaktere sahiptir" şeklinde tutarlı ve dengeli gerekçeler sunulmalıdır.
+19. PLATFORM PAZARLAMASI VE ŞABLON DİZELERİ KESİNLİKLE YASAKTIR:
+    - 'strongestReasonsToChoose' alanında KESİNLİKLE "Doğrulanmış Veritabanı Şeffaflığı", "TorqueScout veritabanı ile eşleştirilerek", "veri şeffaflığı" gibi platformun kendi yazılımını öven maddeler YAZILAMAZ! Yalnızca bu fiziksel aracın aktarma organı, şasisi, sürüş dinamiği veya mekanik dayanıklılığı yazılmalıdır.
+    - 'suitableFor' alanında KESİNLİKLE "Ort. X lt/100km arayan sürücüler" gibi anlamsız veri dizesi şablonları YAZILAMAZ! Sürücü profilleri, gerçek sürüş beklentileri (örn. sarsıntısız kalkış isteyenler, sakin otoyol seyri arayanlar) üzerinden doğal danışman diliyle ifade edilmelidir.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
@@ -427,37 +430,42 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
       "headline": "Çarpıcı ve araca/donanıma özel uzman başlığı", 
       "detailedAssessment": "Numaralı alt başlık veya madde imi kullanmaksızın, doğal geçişlerle birbirine bağlanan akıcı paragraflar halinde aracın motor-şanzıman uyumunu, donanım paketini (${trim || 'Paket'}), sürüş dinamiklerini ve tüketimini anlatan zengin teknik analiz." 
     },
-    "trimPackageComparison": { "selectedTrimName": "${trim}", "comparisonNarrative": "...", "keyAddedFeatures": [...], "missingFeaturesInLowerTrim": [...] },
+    "trimPackageComparison": { 
+      "selectedTrimName": "${trim}", 
+      "comparisonNarrative": "...", 
+      "keyAddedFeatures": ["..."], 
+      "missingFeaturesInLowerTrim": ["..."] 
+    },
     "dailyUseAssessment": { 
       "cityUse": "Şehir içi manevra, dar sokak pratikliği, süspansiyon darbe sönümleme ve dur-kalk şanzıman tepkileri...", 
       "highwayUse": "Otoyol seyir kararlılığı, yüksek hız izolasyonu, ara hızlanma ve kabin sessizliği...", 
       "trafficBehavior": "Yoğun dur-kalk trafikte kavrama/vites davranışı, düşük devir torku ve kalkış dinamikleri...", 
       "comfortAssessment": "Koltuk ergonomisi, uzun yol yorgunluğu, kabin izolasyonu ve süspansiyon konforu..." 
-    "vehicleCharacter": {
-      "detailedAssessment": "Araç kimliği, motor-şanzıman uyumu ve karakter analizi..."
     },
-    "dailyUseAssessment": {
-      "cityDriving": "Şehir içi sürüş...",
-      "highwayCruising": "Uzun yol ve otoyol...",
-      "parkingAndManeuver": "Park ve manevra...",
-      "cabinComfortAndNVH": "Yalıtım ve konfor..."
+    "strongestReasonsToChoose": [
+      { "title": "Araca Özel Güçlü Neden 1", "explanation": "Bu avantajın teknik arka planını, hissettirdiği karakteri ve uzun vadeli faydasını anlatan en az 2-3 doyurucu cümle. Asla genel veri dizesi veya veritabanı şeffaflığı gibi platform tanıtımı yazma!", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "compromisesAndLimitations": [
+      { "title": "Araca Özel Taviz/Kısıt 1", "explanation": "Bu tavizin mühendislik sebebini ve günlük kullanımdaki pratik yansımasını anlatan en az 2-3 doyurucu cümle...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "suitableFor": [
+      { "profile": "Kullanıcı Profili 1", "explanation": "Bu profili en az 2-3 cümleyle bu araç ve donanım özelinde gerekçelendiren analiz. Asla 'Ort. X lt/100km arayan' gibi yapay şablon dizesi uydurma!", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "notSuitableFor": [
+      { "profile": "Uygun Olmayan Profil 1", "explanation": "Hangi kullanım senaryolarında kısıt yaratacağını 2-3 cümleyle açıklayan açık uçlu danışman gerekçesi...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "purchaseConditions": [
+      { "condition": "Ekspertiz ve Bakım Koşulu 1", "reason": "Neden kritik olduğunu açıklayan en az 2 cümle...", "priority": "ÖNEMLİ", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "walkAwayConditions": [
+      { "condition": "Satın Almaktan Vazgeçme Kriteri 1", "reason": "Neden vazgeçilmesi gerektiğini açıklayan en az 2 cümle...", "priority": "KRİTİK", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+    ],
+    "finalConditionalVerdict": {
+      "shortVerdict": "100 puanlık skora uygun tek cümlelik nihai karar özeti",
+      "detailedVerdict": "Nihai satın alma kararı ve dikkat edilecek hususların detaylı özeti...",
+      "confidence": "HIGH"
     }
   },
-  "reasonsToBuy": [
-    { "title": "Güçlü Neden 1", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
-  ],
-  "compromisesAndLimitations": [
-    { "title": "Taviz/Kısıt 1", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
-  ],
-  "notSuitableFor": [
-    { "profile": "Kullanıcı Profili", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
-  ],
-  "purchaseConditions": [
-    { "condition": "Koşul Başlığı", "reason": "Açıklama...", "priority": "ÖNEMLİ", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
-  ],
-  "walkAwayConditions": [
-    { "condition": "Vazgeçme Koşulu", "reason": "Açıklama...", "priority": "KRİTİK", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
-  ],
   "inspectionChecklist": [
     { "category": "MOTOR / TRANSMISSION", "item": "Kontrol Kalemi", "importance": "CRITICAL", "whatToLookFor": "Nasıl kontrol edilir..." }
   ],
