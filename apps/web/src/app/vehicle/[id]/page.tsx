@@ -259,7 +259,15 @@ export default function VehicleDetail() {
   const fetchStructuredReport = async (force = false) => {
     if (!variantId) return;
 
-    if (!force && typeof window !== "undefined") {
+    if (force) {
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem(`ts_rep_${variantId}`);
+        } catch {}
+      }
+      setStructuredReport(null);
+      setCountdown(30);
+    } else if (typeof window !== "undefined") {
       try {
         const cachedRep = sessionStorage.getItem(`ts_rep_${variantId}`);
         if (cachedRep) {
@@ -302,6 +310,16 @@ export default function VehicleDetail() {
             return;
           }
         }
+
+        // Veritabanında tamamlanmış güncel rapor bulunamadıysa veya silinmişse:
+        // Stale client sessionStorage önbelleğini temizle ve hazırlanıyor geri sayım ekranını başlat
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(`ts_rep_${variantId}`);
+          } catch {}
+        }
+        setStructuredReport(null);
+        setCountdown(30);
       }
 
       const genRes = await fetch(`${API_URL}/vehicle-reports`, {
@@ -356,14 +374,6 @@ export default function VehicleDetail() {
   useEffect(() => {
     if (variantId) {
       fetchVehicleDetails(variantId);
-      try {
-        const cachedRep = typeof window !== 'undefined' ? sessionStorage.getItem(`ts_rep_${variantId}`) : null;
-        if (!cachedRep) {
-          setCountdown(30);
-        }
-      } catch {
-        setCountdown(30);
-      }
       fetchStructuredReport(false);
     }
   }, [variantId]);
