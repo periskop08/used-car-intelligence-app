@@ -36,6 +36,8 @@ export interface TransmissionTaxonomyLookupInput {
   fuelType?: string | null;
   transmissionName?: string | null;
   transmissionType?: string | null;
+  speeds?: number | null;
+  hasTurbo?: boolean | null;
   isElectric?: boolean | null;
   isHybrid?: boolean | null;
 }
@@ -49,6 +51,8 @@ interface TransmissionTaxonomyRule {
     year: number;
     fuel: string;
     trans: string;
+    speeds?: number;
+    hasTurbo?: boolean;
     isElectric: boolean;
     isHybrid: boolean;
     isManual: boolean;
@@ -129,6 +133,21 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
     code: 'AL1000 / ZF 8HP',
     maintenanceTr: 'Yüksek tork dayanımlı tork konvertörlü otomatik şanzıman; her 60.000-80.000 km aralığında şanzıman yağı ve karter filtresi yenilenmelidir.',
   },
+  // Audi Boyuna Yerleşimli Islak Çift Kavrama (A4, A5, A6, A7, Q5 - DL382)
+  {
+    family: 'S-TRONIC',
+    matcher: ({ brand, engine, model }) => {
+      if (!brand.includes('audi')) return false;
+      return /a4|a5|a6|a7|q5|q7/i.test(model) || 
+             engine.includes('40 tdi') || engine.includes('45 tfsi') || engine.includes('50 tdi') ||
+             (engine.includes('2.0') && !model.includes('a3') && !model.includes('q2') && !model.includes('q3'));
+    },
+    clutchType: 'ISLAK_CIFT_KAVRAMA',
+    typeAndSpeeds: '7 İleri Islak Çift Kavramalı S-Tronic (DL382)',
+    speeds: 7,
+    code: 'Audi DL382',
+    maintenanceTr: 'Audi boyuna yerleşimli ıslak çift kavrama S-Tronic; 60.000 km aralıklarla şanzıman mekatronik ve kavrama yağı yenilenmelidir.',
+  },
   // VAG Yüksek Güç/Hacim Islak Çift Kavrama (2.0 TDI, 2.0 TSI)
   {
     family: 'DSG',
@@ -154,9 +173,29 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   },
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 3. RENAULT & DACIA - EDC / X-Tronic
+  // 3. RENAULT, DACIA & NISSAN - EDC / X-Tronic / E-Tech
   // ─────────────────────────────────────────────────────────────────────────
-  // Dacia Duster / Sandero X-Tronic (CVT)
+  // Renault E-Tech Çok Modlu Hibrit (Austral, Arkana, Clio, Captur E-Tech)
+  {
+    family: 'E-TECH',
+    matcher: ({ brand, engine, isHybrid }) => (brand.includes('renault') || brand.includes('dacia')) && (engine.includes('e-tech') || isHybrid),
+    clutchType: 'ELEKTRONIK_PLANET_HIBRIT',
+    typeAndSpeeds: 'E-Tech Akıllı Çok Modlu Otomatik Şanzıman',
+    speeds: 1,
+    code: 'Renault DB35 E-Tech Multi-mode',
+    maintenanceTr: 'Debriyajsız, senkromeçsiz Formula 1 teknolojisi köpek dişli çok modlu hibrit şanzıman; yüksek sistem verimliliği sağlar.',
+  },
+  // Nissan Qashqai, Juke, X-Trail, Micra X-Tronic (CVT)
+  {
+    family: 'X-TRONIC',
+    matcher: ({ brand, isManual }) => brand.includes('nissan') && !isManual,
+    clutchType: 'CVT',
+    typeAndSpeeds: 'Kademesiz Değişken Oranlı X-Tronic (CVT)',
+    speeds: 1,
+    code: 'Jatco CVT',
+    maintenanceTr: 'Jatco çelik kayışlı kademesiz CVT mimarisi; akıcı hızlanma sağlar. 60.000 km periyotlarla NS-3 CVT yağı kontrol edilmelidir.',
+  },
+  // Dacia Duster / Sandero / Renault 1.0 TCe X-Tronic (CVT)
   {
     family: 'X-TRONIC',
     matcher: ({ brand, engine, year }) => (brand.includes('dacia') || brand.includes('renault')) && (engine.includes('1.0') && year >= 2021),
@@ -263,13 +302,14 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   // ─────────────────────────────────────────────────────────────────────────
   // 6. MERCEDES-BENZ - 7G-DCT, 8G-DCT, 7G-Tronic, 9G-Tronic
   // ─────────────────────────────────────────────────────────────────────────
-  // Kompakt Sınıf (A, B, CLA, GLA) - Çift Kavrama
+  // Kompakt Sınıf (A, B, CLA, GLA, GLB) - Çift Kavrama
   {
     family: '8G-DCT',
-    matcher: ({ brand, model, year, engine }) => {
+    matcher: ({ brand, model, engine, trans, speeds }) => {
       const isMbenz = brand.includes('mercedes');
-      const isCompact = /a serisi|a-class|b serisi|b-class|cla|gla/i.test(model);
-      return isMbenz && isCompact && (year >= 2019 || engine.includes('200d') || engine.includes('2.0'));
+      const isCompact = /\b(a|b|cla|gla|glb)\b|a serisi|a-class|b serisi|b-class/i.test(model);
+      if (speeds === 8 || trans.includes('8g') || trans.includes('8 ileri')) return isMbenz && isCompact;
+      return isMbenz && isCompact && (engine.includes('200d') || engine.includes('220d') || (engine.includes('2.0') && !engine.includes('1.3')));
     },
     clutchType: 'ISLAK_CIFT_KAVRAMA',
     typeAndSpeeds: '8 İleri Islak Çift Kavramalı 8G-DCT',
@@ -281,7 +321,7 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
     family: '7G-DCT',
     matcher: ({ brand, model }) => {
       const isMbenz = brand.includes('mercedes');
-      return isMbenz && /a serisi|a-class|b serisi|b-class|cla|gla/i.test(model);
+      return isMbenz && (/\b(a|b|cla|gla|glb)\b|a serisi|a-class|b serisi|b-class/i.test(model));
     },
     clutchType: 'ISLAK_CIFT_KAVRAMA',
     typeAndSpeeds: '7 İleri Islak Çift Kavramalı 7G-DCT',
@@ -441,12 +481,28 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   // ─────────────────────────────────────────────────────────────────────────
   // 11. HYUNDAI & KIA - 7DCT & 6AT
   // ─────────────────────────────────────────────────────────────────────────
+  // 1.0 MPI / 1.2 MPI AMT (Hyundai i10 / Kia Picanto 2020+)
+  {
+    family: 'AMT',
+    matcher: ({ brand, model, speeds, year, trans }) => {
+      const isHk = brand.includes('hyundai') || brand.includes('kia');
+      if (!isHk) return false;
+      const isCityCar = model.includes('i10') || model.includes('picanto');
+      return isCityCar && (speeds === 5 || trans.includes('yarı') || trans.includes('amt') || year >= 2020);
+    },
+    clutchType: 'ROBOTIZE_TEK_KAVRAMA',
+    typeAndSpeeds: '5 İleri Otomatikleştirilmiş Manuel (AMT)',
+    speeds: 5,
+    code: 'Hyundai-Kia AMT',
+    maintenanceTr: 'Tek kavramalı otomatikleştirilmiş manuel AMT şanzıman; debriyaj aktüatörü ve baskı-balata durumu periyodik olarak kontrol edilmelidir.',
+  },
   // 1.4 MPI / 1.6 MPI 6AT (Hyundai A6GF1 / A6LF1)
   {
     family: 'HYUNDAI 6-AT',
-    matcher: ({ brand, engine, trans }) => {
+    matcher: ({ brand, model, engine, trans, speeds }) => {
       const isHk = brand.includes('hyundai') || brand.includes('kia');
       if (!isHk) return false;
+      if (model.includes('i10') || model.includes('picanto') || speeds === 5) return false;
       if (trans.includes('dct') || trans.includes('çift kavrama') || engine.includes('crdi') || engine.includes('t-gdi')) {
         return false;
       }
@@ -526,6 +582,9 @@ export function lookupAutomotiveTransmissionTaxonomy(
     normTrans.includes('düz') || 
     normTrans.includes('manual');
 
+  const inputSpeeds = input.speeds ? Number(input.speeds) : undefined;
+  const inputHasTurbo = input.hasTurbo !== undefined && input.hasTurbo !== null ? Boolean(input.hasTurbo) : undefined;
+
   const matcherPayload = {
     brand: normBrand,
     model: normModel,
@@ -533,6 +592,8 @@ export function lookupAutomotiveTransmissionTaxonomy(
     year: modelYear,
     fuel: normFuel,
     trans: normTrans,
+    speeds: inputSpeeds,
+    hasTurbo: inputHasTurbo,
     isElectric,
     isHybrid,
     isManual,
@@ -540,6 +601,14 @@ export function lookupAutomotiveTransmissionTaxonomy(
 
   // 1. Check exact catalog rules
   for (const rule of TRANSMISSION_TAXONOMY_RULES) {
+    // Ground truth guard: If explicit gearbox speed count is provided (>1), candidate rule must match speed count
+    if (inputSpeeds && inputSpeeds > 1 && rule.speeds > 1 && rule.speeds !== inputSpeeds) {
+      continue;
+    }
+    // Ground truth guard: Atmospheric engine cannot match dry dual-clutch turbo rules for Hyundai/Kia
+    if (inputHasTurbo === false && rule.family === '7DCT' && (normBrand.includes('hyundai') || normBrand.includes('kia'))) {
+      continue;
+    }
     if (rule.matcher(matcherPayload)) {
       return {
         transmissionFamily: rule.family,
@@ -556,24 +625,26 @@ export function lookupAutomotiveTransmissionTaxonomy(
 
   // 2. Fallback heuristic
   if (isManual) {
+    const spd = inputSpeeds && inputSpeeds >= 4 && inputSpeeds <= 7 ? inputSpeeds : 6;
     return {
       transmissionFamily: 'MANUEL',
       clutchType: 'MANUEL',
       clutchTypeTr: CLUTCH_TYPE_NAMES_TR.MANUEL,
-      transmissionTypeAndSpeeds: '6 İleri Manuel',
-      transmissionSpeeds: 6,
-      transmissionCode: 'MANUAL_6SPD',
+      transmissionTypeAndSpeeds: `${spd} İleri Manuel`,
+      transmissionSpeeds: spd,
+      transmissionCode: `MANUAL_${spd}SPD`,
       maintenanceDescriptionTr: 'Klasik debriyaj baskı, balata ve bilye kontrolü yapılmalıdır.',
       confidence: 'CANONICAL_FAMILY',
     };
   }
 
+  const spd = inputSpeeds && inputSpeeds >= 4 && inputSpeeds <= 10 ? inputSpeeds : 6;
   return {
     transmissionFamily: 'OTOMATİK',
     clutchType: 'TORK_KONVERTORLU',
     clutchTypeTr: CLUTCH_TYPE_NAMES_TR.TORK_KONVERTORLU,
-    transmissionTypeAndSpeeds: 'Otomatik Şanzıman',
-    transmissionSpeeds: 6,
+    transmissionTypeAndSpeeds: inputSpeeds ? `${spd} İleri Otomatik` : 'Otomatik Şanzıman',
+    transmissionSpeeds: spd,
     transmissionCode: null,
     maintenanceDescriptionTr: 'Otomatik şanzıman yağı seviyesi ve vites geçiş akıcılığı periyodik olarak kontrol edilmelidir.',
     confidence: 'FALLBACK',
@@ -593,34 +664,43 @@ export function formatCleanTransmissionName(trans?: string | null): string {
   if (!trans) return 'Otomatik';
   const t = trans.trim();
 
-  // 1. Specific canonical clean mappings
-  if (/7.*kuru.*(dct|çift)/i.test(t) || /hyundai 7dct/i.test(t)) return '7 İleri DCT';
-  if (/7.*ıslak.*(dct|çift)/i.test(t)) return '7 İleri Islak DCT';
-  if (/6.*kuru.*powershift/i.test(t) || /6dct250/i.test(t)) return '6 İleri Powershift';
+  // 1. Direct specific canonical brand/system names first (highest specificity)
   if (/7.*(dsg|dq200|dq381|dq500)/i.test(t)) return '7 İleri DSG';
   if (/6.*(dsg|dq250)/i.test(t)) return '6 İleri DSG';
-  if (/7.*edc/i.test(t)) return '7 İleri EDC';
-  if (/6.*edc/i.test(t)) return '6 İleri EDC';
-  if (/8.*eat8/i.test(t)) return '8 İleri Otomatik (EAT8)';
-  if (/6.*eat6/i.test(t)) return '6 İleri Otomatik (EAT6)';
+  if (/7.*s-?tronic/i.test(t)) return '7 İleri S-Tronic';
+  if (/6.*s-?tronic/i.test(t)) return '6 İleri S-Tronic';
+  if (/8.*8g-?dct/i.test(t)) return '8 İleri 8G-DCT';
+  if (/7.*7g-?dct/i.test(t)) return '7 İleri 7G-DCT';
   if (/9.*9g-?tronic/i.test(t)) return '9G-Tronic Otomatik';
   if (/7.*7g-?tronic/i.test(t)) return '7G-Tronic Otomatik';
+  if (/7.*edc|7dct300/i.test(t)) return '7 İleri EDC';
+  if (/6.*edc|dc4/i.test(t)) return '6 İleri EDC';
+  if (/8.*eat8/i.test(t)) return '8 İleri Otomatik (EAT8)';
+  if (/6.*eat6/i.test(t)) return '6 İleri Otomatik (EAT6)';
   if (/8.*zf/i.test(t)) return '8 İleri Otomatik (ZF)';
   if (/9.*zf/i.test(t)) return '9 İleri Otomatik (ZF)';
+  if (/powershift|6dct250/i.test(t)) return '6 İleri Powershift';
   if (/e-cvt/i.test(t)) return 'e-CVT';
   if (/multidrive/i.test(t)) return 'Multidrive S (CVT)';
   if (/x-tronic/i.test(t)) return 'X-Tronic (CVT)';
   if (/lineartronic/i.test(t)) return 'Lineartronic (CVT)';
+  if (/e-tech/i.test(t)) return 'E-Tech Akıllı Çok Modlu Otomatik';
+  if (/honda cvt/i.test(t)) return 'Kademesiz Otomatik (CVT)';
   if (/auto6r|etg6/i.test(t)) return '6 İleri Auto6R / ETG';
+  if (/amt/i.test(t)) {
+    const spd = t.match(/(\d+)\s*İleri/i);
+    return spd ? `${spd[1]} İleri AMT Robotize` : 'AMT Robotize';
+  }
+  if (/7.*kuru.*(dct|çift)/i.test(t) || /hyundai 7dct/i.test(t) || /d7uf/i.test(t)) return '7 İleri DCT';
+  if (/7.*ıslak.*(dct|çift)/i.test(t)) return '7 İleri Islak DCT';
+  if (/6.*kuru.*(dct|çift|c635|ddct)/i.test(t)) return '6 İleri Kuru Çift Kavrama';
+  if (/tek kademeli|redüktör|direct drive/i.test(t)) return 'Doğrudan Tahrikli (Tek Vites)';
   if (/tork konvert/i.test(t)) {
     const speedMatch = t.match(/(\d+)\s*İleri/i);
     return speedMatch ? `${speedMatch[1]} İleri Otomatik` : 'Tam Otomatik';
   }
-  if (/tek kademeli|redüktör|direct drive/i.test(t)) {
-    return 'Doğrudan Tahrikli (Tek Vites)';
-  }
 
   // 2. Clean parenthetical engineering codes e.g. (Hyundai 7DCT), (Getrag DC4)
-  const cleaned = t.replace(/\s*\([^)]*(?:hyundai|getrag|aisin|zf|dq\d+|d7uf|a6gf|c635|8f35)[^)]*\)/gi, '').trim();
+  const cleaned = t.replace(/\s*\([^)]*(?:hyundai|getrag|aisin|zf\s*8hp|zf\s*9hp|dq\d+|d7uf|a6gf|c635|8f35)[^)]*\)/gi, '').trim();
   return cleaned || t;
 }

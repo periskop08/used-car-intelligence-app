@@ -355,6 +355,8 @@ export class VehicleReportContextBuilderService {
       fuelType: variant.fuelType,
       transmissionName: transName,
       transmissionType: variant.transmission?.type,
+      speeds: transSpeeds,
+      hasTurbo: variant.engine?.hasTurbo,
       isElectric: isElectricVariant,
       isHybrid: isHybridVariant,
     });
@@ -412,7 +414,7 @@ export class VehicleReportContextBuilderService {
         torqueSemantic: torqueSemantic,
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineFamily: engineTaxonomy.engineFamily,
-        engineType: specsJson.engineType || null,
+        engineType: specsJson.engineType || (isElectricVariant ? 'Elektrik Motoru' : isDieselVariant ? 'Turbo Dizel' : (variant.engine?.hasTurbo === false || /mpi|vtec|atmosferik|n\/a|puretech 82|1\.4 fire|1\.0 sce|1\.2 dualjet/i.test(`${variant.engine?.code || ''} ${variant.engine?.description || ''} ${variant.model?.name || ''}`) ? 'Atmosferik Benzinli' : 'Turbo Benzinli')),
         fuelType: resolvedFuelType,
         isElectric: isElectricVariant,
         isHybrid: isHybridVariant,

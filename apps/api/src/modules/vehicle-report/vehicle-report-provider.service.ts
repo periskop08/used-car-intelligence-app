@@ -581,10 +581,10 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
 
     if (isEv) {
       baseReport.vehicleIdentity.engineDisplacementCc = undefined;
-    } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
-      baseReport.vehicleIdentity.engineDisplacementCc = Number(specs.engineDisplacementCc);
     } else if (validationContext?.vehicleIdentity?.engineDisplacementCc) {
       baseReport.vehicleIdentity.engineDisplacementCc = Number(validationContext.vehicleIdentity.engineDisplacementCc);
+    } else if (specs.engineDisplacementCc && Number(specs.engineDisplacementCc) > 0) {
+      baseReport.vehicleIdentity.engineDisplacementCc = Number(specs.engineDisplacementCc);
     } else if (validationContext?.performanceData?.engineDisplacementCc) {
       baseReport.vehicleIdentity.engineDisplacementCc = Number(validationContext.performanceData.engineDisplacementCc);
     }
@@ -600,21 +600,21 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     if (isEv) {
       baseReport.vehicleIdentity.transmissionName = validationContext?.vehicleIdentity?.transmissionName || 'Tek Kademeli Redüktör';
       baseReport.vehicleIdentity.transmissionCode = validationContext?.vehicleIdentity?.transmissionCode || 'DIRECT_DRIVE_REDUCTION';
+    } else if (validationContext?.vehicleIdentity?.transmissionName) {
+      // 8-Filter Mutlak Otoritesi: Ground truth verified database/taxonomy transmission is immutable
+      baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
+      baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode || specs.transmissionCode || null;
     } else if (isManualSelected) {
       // Vehicle is Manual: Strictly reject dual clutch / torque converter / automatic hallucinations
       const aiTransStr = (specs.transmissionTypeAndSpeeds || '').toLowerCase();
       const aiHallucinatedAuto = /otomatik|dsg|edc|dct|cvt|tork|powershift|eat[68]|9g|8hp|steptronic|stronic|tiptronic/i.test(aiTransStr);
       if (specs.transmissionTypeAndSpeeds && !aiHallucinatedAuto) {
         baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
-      } else if (validationContext?.vehicleIdentity?.transmissionName) {
-        baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
-      } else if (!baseReport.vehicleIdentity.transmissionName || baseReport.vehicleIdentity.transmissionName.toLowerCase().includes('otomatik')) {
+      } else {
         baseReport.vehicleIdentity.transmissionName = 'Düz (Manuel)';
       }
       if (specs.transmissionCode && !aiHallucinatedAuto) {
         baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
-      } else if (validationContext?.vehicleIdentity?.transmissionCode) {
-        baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
       }
     } else if (isAutomaticSelected) {
       // Vehicle is Automatic: Strictly reject manual hallucinations
@@ -622,21 +622,15 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       const aiHallucinatedManual = /(^|\b)(manuel|düz vites|duz vites)($|\b)/i.test(aiTransStr);
       if (specs.transmissionTypeAndSpeeds && !aiHallucinatedManual) {
         baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
-      } else if (validationContext?.vehicleIdentity?.transmissionName) {
-        baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
-      } else if (!baseReport.vehicleIdentity.transmissionName || baseReport.vehicleIdentity.transmissionName.toLowerCase().includes('manuel')) {
+      } else {
         baseReport.vehicleIdentity.transmissionName = 'Otomatik';
       }
       if (specs.transmissionCode && !aiHallucinatedManual) {
         baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
-      } else if (validationContext?.vehicleIdentity?.transmissionCode) {
-        baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
       }
     } else {
       if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
-      else if (validationContext?.vehicleIdentity?.transmissionName) baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
       if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
-      else if (validationContext?.vehicleIdentity?.transmissionCode) baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
     }
 
     if (validationContext?.vehicleIdentity?.transmissionFamily) {
@@ -647,6 +641,21 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     }
     if (validationContext?.vehicleIdentity?.clutchTypeTr) {
       (baseReport.vehicleIdentity as any).clutchTypeTr = validationContext.vehicleIdentity.clutchTypeTr;
+    }
+
+    // 8-Filter Mutlak Otoritesi: Synchronize immutable ground-truth vehicle identity fields
+    if (validationContext?.vehicleIdentity) {
+      const vId = validationContext.vehicleIdentity;
+      if (vId.brand) baseReport.vehicleIdentity.brand = vId.brand;
+      if (vId.model) baseReport.vehicleIdentity.model = vId.model;
+      if (vId.generation) baseReport.vehicleIdentity.generation = vId.generation;
+      if (vId.bodyType) baseReport.vehicleIdentity.bodyType = vId.bodyType;
+      if (vId.modelYear) baseReport.vehicleIdentity.modelYear = vId.modelYear;
+      if (vId.fuelType) baseReport.vehicleIdentity.fuelType = vId.fuelType;
+      if (vId.engineCode) baseReport.vehicleIdentity.engineCode = vId.engineCode;
+      if (vId.engineType) baseReport.vehicleIdentity.engineType = vId.engineType;
+      if (vId.transmissionSpeeds) (baseReport.vehicleIdentity as any).transmissionSpeeds = vId.transmissionSpeeds;
+      if (vId.selected8Filters) (baseReport.vehicleIdentity as any).selected8Filters = vId.selected8Filters;
     }
     if (validationContext?.vehicleIdentity?.selected8Filters) {
       (baseReport.vehicleIdentity as any).selected8Filters = validationContext.vehicleIdentity.selected8Filters;
