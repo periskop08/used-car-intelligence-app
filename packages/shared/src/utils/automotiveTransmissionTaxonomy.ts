@@ -441,28 +441,37 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   // ─────────────────────────────────────────────────────────────────────────
   // 11. HYUNDAI & KIA - 7DCT & 6AT
   // ─────────────────────────────────────────────────────────────────────────
-  // 1.6 CRDi / 1.6 T-GDI 7DCT
+  // 1.4 MPI / 1.6 MPI 6AT (Hyundai A6GF1 / A6LF1)
+  {
+    family: 'HYUNDAI 6-AT',
+    matcher: ({ brand, engine, trans }) => {
+      const isHk = brand.includes('hyundai') || brand.includes('kia');
+      if (!isHk) return false;
+      if (trans.includes('dct') || trans.includes('çift kavrama') || engine.includes('crdi') || engine.includes('t-gdi')) {
+        return false;
+      }
+      return engine.includes('mpi') || engine.includes('atmosferik') || engine.includes('d-cvvt') || (!engine.includes('turbo') && !engine.includes('t-gdi') && !engine.includes('crdi'));
+    },
+    clutchType: 'TORK_KONVERTORLU',
+    typeAndSpeeds: '6 İleri Tork Konvertörlü Tam Otomatik',
+    speeds: 6,
+    code: 'Hyundai A6GF1',
+    maintenanceTr: 'Geleneksel tork konvertörlü otomatik şanzıman; son derece dayanıklıdır ve sarsıntısız vites geçişleri sunar.',
+  },
+  // 1.0 T-GDI / 1.5 T-GDI / 1.6 T-GDI / 1.6 CRDi 7DCT (Hyundai D7UF1)
   {
     family: '7DCT',
-    matcher: ({ brand, engine }) => {
+    matcher: ({ brand, engine, trans }) => {
       const isHk = brand.includes('hyundai') || brand.includes('kia');
-      return isHk && (engine.includes('crdi') || engine.includes('t-gdi') || engine.includes('1.6'));
+      if (!isHk) return false;
+      if (engine.includes('mpi') || engine.includes('atmosferik')) return false;
+      return engine.includes('crdi') || engine.includes('t-gdi') || trans.includes('dct') || trans.includes('çift kavrama');
     },
     clutchType: 'KURU_CIFT_KAVRAMA',
     typeAndSpeeds: '7 İleri Kuru Çift Kavramalı DCT (Hyundai 7DCT)',
     speeds: 7,
     code: 'Hyundai D7UF1',
     maintenanceTr: 'Kuru çift kavrama mimarisi; dur-kalk trafiğinde ısınma uyarısı, vites geçiş gecikmesi ve kavrama balata boşluğu kontrol edilmelidir.',
-  },
-  // 1.4 MPI / 1.6 MPI 6AT
-  {
-    family: 'HYUNDAI 6-AT',
-    matcher: ({ brand }) => brand.includes('hyundai') || brand.includes('kia'),
-    clutchType: 'TORK_KONVERTORLU',
-    typeAndSpeeds: '6 İleri Tork Konvertörlü Tam Otomatik',
-    speeds: 6,
-    code: 'Hyundai A6GF1',
-    maintenanceTr: 'Geleneksel tork konvertörlü otomatik şanzıman; son derece dayanıklıdır ve sarsıntısız vites geçişleri sunar.',
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -569,4 +578,49 @@ export function lookupAutomotiveTransmissionTaxonomy(
     maintenanceDescriptionTr: 'Otomatik şanzıman yağı seviyesi ve vites geçiş akıcılığı periyodik olarak kontrol edilmelidir.',
     confidence: 'FALLBACK',
   };
+}
+
+/**
+ * Strips internal manufacturer engineering part codes from transmission strings
+ * and produces a clean, human-readable automotive title display.
+ * E.g.:
+ * '6 İleri Tork Konvertörlü Tam Otomatik' -> '6 İleri Otomatik'
+ * '7 İleri Kuru Çift Kavramalı DCT (Hyundai 7DCT)' -> '7 İleri DCT'
+ * '8 İleri Tork Konvertörlü Tam Otomatik (EAT8 - Aisin)' -> '8 İleri Otomatik (EAT8)'
+ * '8 İleri Tork Konvertörlü Otomatik (ZF 8HP)' -> '8 İleri Otomatik (ZF)'
+ */
+export function formatCleanTransmissionName(trans?: string | null): string {
+  if (!trans) return 'Otomatik';
+  const t = trans.trim();
+
+  // 1. Specific canonical clean mappings
+  if (/7.*kuru.*(dct|çift)/i.test(t) || /hyundai 7dct/i.test(t)) return '7 İleri DCT';
+  if (/7.*ıslak.*(dct|çift)/i.test(t)) return '7 İleri Islak DCT';
+  if (/6.*kuru.*powershift/i.test(t) || /6dct250/i.test(t)) return '6 İleri Powershift';
+  if (/7.*(dsg|dq200|dq381|dq500)/i.test(t)) return '7 İleri DSG';
+  if (/6.*(dsg|dq250)/i.test(t)) return '6 İleri DSG';
+  if (/7.*edc/i.test(t)) return '7 İleri EDC';
+  if (/6.*edc/i.test(t)) return '6 İleri EDC';
+  if (/8.*eat8/i.test(t)) return '8 İleri Otomatik (EAT8)';
+  if (/6.*eat6/i.test(t)) return '6 İleri Otomatik (EAT6)';
+  if (/9.*9g-?tronic/i.test(t)) return '9G-Tronic Otomatik';
+  if (/7.*7g-?tronic/i.test(t)) return '7G-Tronic Otomatik';
+  if (/8.*zf/i.test(t)) return '8 İleri Otomatik (ZF)';
+  if (/9.*zf/i.test(t)) return '9 İleri Otomatik (ZF)';
+  if (/e-cvt/i.test(t)) return 'e-CVT';
+  if (/multidrive/i.test(t)) return 'Multidrive S (CVT)';
+  if (/x-tronic/i.test(t)) return 'X-Tronic (CVT)';
+  if (/lineartronic/i.test(t)) return 'Lineartronic (CVT)';
+  if (/auto6r|etg6/i.test(t)) return '6 İleri Auto6R / ETG';
+  if (/tork konvert/i.test(t)) {
+    const speedMatch = t.match(/(\d+)\s*İleri/i);
+    return speedMatch ? `${speedMatch[1]} İleri Otomatik` : 'Tam Otomatik';
+  }
+  if (/tek kademeli|redüktör|direct drive/i.test(t)) {
+    return 'Doğrudan Tahrikli (Tek Vites)';
+  }
+
+  // 2. Clean parenthetical engineering codes e.g. (Hyundai 7DCT), (Getrag DC4)
+  const cleaned = t.replace(/\s*\([^)]*(?:hyundai|getrag|aisin|zf|dq\d+|d7uf|a6gf|c635|8f35)[^)]*\)/gi, '').trim();
+  return cleaned || t;
 }

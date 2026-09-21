@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   ComprehensiveVehicleReport,
   formatCanonicalPowerDisplay,
+  formatCleanTransmissionName,
   calculateVehicleMtv,
   resolveVehicleRangeKm,
 } from "@used-car-intelligence/shared";
@@ -126,15 +127,35 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
             {report.vehicleIdentity.modelYear} {report.vehicleIdentity.brand} {report.vehicleIdentity.model}
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {report.vehicleIdentity.engineCode ? `${report.vehicleIdentity.engineCode} ` : ""}
-            {displacementLabel && !isEvFuel ? `${displacementLabel} ` : ""}
-            {powerLabel ? `(${powerLabel}${numericTorque ? ` / ${numericTorque} ${torqueUnit}` : ""}) ` : ""}• 
-            {report.vehicleIdentity.transmissionName} • {formatFuelTypeTr(report.vehicleIdentity.fuelType)}
-            {isEvFuel
-              ? (electricRangeKm ? ` • ${electricRangeKm} km Menzil` : "")
-              : (combinedFuel ? ` (Ort. ${combinedFuel} lt/100km)` : "")}
-          </p>
+          {(() => {
+            const rawEngineCode = (report.vehicleIdentity.engineCode || "").trim();
+            const hasCcInEngine = /\b\d\.\d\b|\b\d{3,4}\s?cc\b/i.test(rawEngineCode);
+            const engineLabel = rawEngineCode
+              ? (hasCcInEngine ? rawEngineCode : `${displacementLabel && !isEvFuel ? `${displacementLabel} ` : ""}${rawEngineCode}`.trim())
+              : (!isEvFuel ? (displacementLabel || "") : "");
+
+            const powerStr = powerLabel ? `(${powerLabel}${numericTorque ? ` / ${numericTorque} ${torqueUnit}` : ""})` : "";
+            const engineAndPower = [engineLabel, powerStr].filter(Boolean).join(" ");
+
+            const cleanTrans = formatCleanTransmissionName(report.vehicleIdentity.transmissionName);
+            const fuelDisplay = formatFuelTypeTr(report.vehicleIdentity.fuelType);
+            const consumptionOrRange = isEvFuel
+              ? (electricRangeKm ? `${electricRangeKm} km Menzil` : null)
+              : (combinedFuel ? `Ort. ${combinedFuel} lt/100km` : null);
+
+            const parts = [engineAndPower, cleanTrans, fuelDisplay, consumptionOrRange].filter(Boolean);
+
+            return (
+              <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                {parts.map((part, idx) => (
+                  <span key={idx} className="flex items-center gap-2">
+                    {idx > 0 && <span className="text-slate-600 font-bold select-none">•</span>}
+                    <span className={idx === 0 ? "text-slate-200 font-medium" : ""}>{part}</span>
+                  </span>
+                ))}
+              </p>
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">

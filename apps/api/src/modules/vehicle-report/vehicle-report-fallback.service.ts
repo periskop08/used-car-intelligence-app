@@ -423,7 +423,7 @@ export class VehicleReportFallbackService {
         torqueSource: vIdentity.torqueSource || (perfSpecs.engineTorqueNm ? 'VEHICLE_DATABASE' : undefined),
         torqueSemantic: vIdentity.torqueSemantic,
         engineCode: vIdentity.engineCode,
-        engineType: vIdentity.engineType || (isElectric ? 'Elektrik Motoru' : 'Turbo Benzinli'),
+        engineType: vIdentity.engineType || (isElectric ? 'Elektrik Motoru' : ((fuel || '').toUpperCase().includes('DIZEL') || (fuel || '').toUpperCase().includes('DIESEL') ? 'Turbo Dizel' : (/mpi|vtec|atmosferik/i.test(`${vIdentity.engineCode || ''} ${vIdentity.model || ''}`) ? 'Atmosferik Benzinli' : 'Turbo Benzinli'))),
         enginePowerRpm: vIdentity.enginePowerHp ? `${vIdentity.enginePowerHp} ${vIdentity.powerUnit || 'HP'} @ 5500 d/dk` : undefined,
         engineTorqueRpm: perfSpecs.engineTorqueNm ? `${perfSpecs.engineTorqueNm} ${perfSpecs.torqueUnit || 'Nm'} @ 1750-4000 d/dk` : undefined,
         fuelType: fuel,

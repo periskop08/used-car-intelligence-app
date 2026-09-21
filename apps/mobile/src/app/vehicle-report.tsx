@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv, resolveVehicleRangeKm } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, formatCleanTransmissionName, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv, resolveVehicleRangeKm } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -1170,7 +1170,7 @@ export default function VehicleReportScreen() {
                 </Text>
 
                 <Text style={styles.heroSubTextLight} numberOfLines={1}>
-                  {report.vehicleIdentity.engineCode || ''} {params.trim ? `• ${params.trim}` : ''} {report.vehicleIdentity.transmissionName ? `• ${report.vehicleIdentity.transmissionName}` : ''}
+                  {report.vehicleIdentity.engineCode || ''} {params.trim ? `• ${params.trim}` : ''} {report.vehicleIdentity.transmissionName ? `• ${formatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}
                 </Text>
               </View>
             </View>
@@ -1189,7 +1189,7 @@ export default function VehicleReportScreen() {
 
               <View style={styles.specChipLight}>
                 <Ionicons name="options-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{report.vehicleIdentity.transmissionName || 'Otomatik'}</Text>
+                <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
               </View>
 
               <View style={styles.specChipLight}>
