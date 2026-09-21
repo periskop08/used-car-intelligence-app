@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { VehicleReportMode } from '@prisma/client';
 
-export const CURRENT_REPORT_VERSION = 'v5.6_AUTOMOTIVE_ENGINE_TAXONOMY_EXACT_CC_AND_TIMING_SYSTEM';
+export const CURRENT_REPORT_VERSION = 'v5.7_GROUND_TRUTH_8_FILTERS_AND_CLEAN_HEADER';
 
 @Injectable()
 export class VehicleReportCacheService {
