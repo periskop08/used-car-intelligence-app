@@ -769,6 +769,26 @@ const TAXONOMY_RULES: TaxonomyRule[] = [
     fuel: 'PETROL',
     descTr: '1.4 Turbo (A14NET/B14NET) — 1364 cc, triger zincirli.',
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 12. SUBARU BOXER ENGINES
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    family: 'Subaru EE20 (2.0D Boxer Diesel)',
+    matcher: ({ brand, engine, fuel }) => brand.includes('subaru') && (fuel.includes('dizel') || fuel.includes('diesel') || /ee20|2\.0d|boxer\s*diesel/i.test(engine)),
+    cc: 1998,
+    timing: 'ZINCIR',
+    fuel: 'DIESEL',
+    descTr: 'Subaru EE20 Boxer Diesel — 1998 cc, triger zincirli, DOHC Boxer 4 silindir.',
+  },
+  {
+    family: 'Subaru EJ204 (2.0R Boxer 16V AVCS)',
+    matcher: ({ brand, engine, model }) => brand.includes('subaru') && (engine.includes('2.0') || /ej20|impreza|forester|legacy/i.test(`${model} ${engine}`)) && !/dizel|diesel|ee20/i.test(engine),
+    cc: 1994,
+    timing: 'KAYIS',
+    fuel: 'PETROL',
+    descTr: 'Subaru EJ204 Boxer (2.0R 16V AVCS) — 1994 cc, 160 PS / 160 HP, triger kayışlı, DOHC Boxer 4 silindir.',
+  },
 ];
 
 /**

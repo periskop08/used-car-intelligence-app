@@ -464,6 +464,28 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
     code: 'Hyundai A6GF1',
     maintenanceTr: 'Geleneksel tork konvertörlü otomatik şanzıman; son derece dayanıklıdır ve sarsıntısız vites geçişleri sunar.',
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 14. SUBARU - 4EAT & Lineartronic CVT
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    family: 'SUBARU 4EAT',
+    matcher: ({ brand, year, isManual }) => brand.includes('subaru') && !isManual && year <= 2008,
+    clutchType: 'TORK_KONVERTORLU',
+    typeAndSpeeds: '4 İleri Tork Konvertörlü Otomatik (Subaru 4EAT)',
+    speeds: 4,
+    code: 'Subaru 4EAT (Active Torque Split)',
+    maintenanceTr: 'Subaru 4EAT tork konvertörlü otomatik şanzıman ve Aktif Tork Dağılımlı Symmetrical AWD aktarma sistemi; son derece dayanıklı ve sorunsuzdur. 60.000 km periyotla ATF şanzıman yağı ve diferansiyel dişli yağları yenilenmelidir.',
+  },
+  {
+    family: 'LINEARTRONIC CVT',
+    matcher: ({ brand, isManual }) => brand.includes('subaru') && !isManual,
+    clutchType: 'CVT',
+    typeAndSpeeds: 'Kademesiz Zincirli Otomatik (Lineartronic CVT)',
+    speeds: 1,
+    code: 'Subaru Lineartronic CVT',
+    maintenanceTr: 'Subaru yüksek torklu çelik zincirli Lineartronic CVT; sarsıntısız güç aktarımı sağlar. 60.000 km aralıkla Subaru onaylı High Torque CVT sıvısı değiştirilmelidir.',
+  },
 ];
 
 /**

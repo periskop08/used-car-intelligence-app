@@ -313,6 +313,13 @@ export class VehicleReportService implements OnModuleInit {
               ],
             },
           });
+          await this.prisma.vehicleVariant.update({
+            where: { id: variantId },
+            data: {
+              characterResearchCache: null,
+              characterResearchedAt: null,
+            } as any,
+          });
         } catch (cleanErr) {
           this.logger.warn(`Notice archiving old reports on forceRefresh: ${cleanErr}`);
         }

@@ -1,4 +1,4 @@
-import { resolveAutomotiveEngineTaxonomy } from '@used-car-intelligence/shared';
+import { resolveAutomotiveEngineTaxonomy, lookupAutomotiveTransmissionTaxonomy } from '@used-car-intelligence/shared';
 
 describe('Automotive Engine Taxonomy & Specification Catalog', () => {
   describe('Renault / Dacia / Nissan / Mercedes', () => {
@@ -279,6 +279,35 @@ describe('Automotive Engine Taxonomy & Specification Catalog', () => {
       expect(match.catalogDisplacementCc).toBe(1498);
       expect(match.timingSystem).toBe('ZINCIR');
       expect(match.canonicalFuelType).toBe('PETROL');
+    });
+  });
+
+  describe('Subaru Boxer Engines & Symmetrical AWD Powertrain', () => {
+    it('resolves Subaru Impreza 2.0 to 1994 cc EJ204, KAYIS, PETROL', () => {
+      const match = resolveAutomotiveEngineTaxonomy({
+        brand: 'Subaru',
+        model: 'Impreza',
+        engineCode: '2.0 Active',
+        engineDesc: '2.0R Boxer 16V',
+        modelYear: 2006,
+        fuelType: 'Benzin',
+      });
+      expect(match.catalogDisplacementCc).toBe(1994);
+      expect(match.timingSystem).toBe('KAYIS');
+      expect(match.canonicalFuelType).toBe('PETROL');
+      expect(match.engineFamily).toContain('Subaru EJ204');
+    });
+
+    it('resolves Subaru 2006 4EAT automatic to 4-speed TORK_KONVERTORLU', () => {
+      const trans = lookupAutomotiveTransmissionTaxonomy({
+        brand: 'Subaru',
+        model: 'Impreza',
+        modelYear: 2006,
+        transmissionName: 'Otomatik',
+      });
+      expect(trans.clutchType).toBe('TORK_KONVERTORLU');
+      expect(trans.transmissionSpeeds).toBe(4);
+      expect(trans.transmissionFamily).toBe('SUBARU 4EAT');
     });
   });
 

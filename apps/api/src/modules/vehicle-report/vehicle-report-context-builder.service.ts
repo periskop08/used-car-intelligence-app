@@ -67,6 +67,15 @@ export class VehicleReportContextBuilderService {
     // If characterResearchCache is null, launch research asynchronously in background
     // so the HTTP report request finishes instantly without locking memory or hitting OOM.
     let characterResearchCache = (variant as any).characterResearchCache || null;
+    const researchedAt = (variant as any).characterResearchedAt ? new Date((variant as any).characterResearchedAt).getTime() : 0;
+    const isCacheExpired = researchedAt > 0 && Date.now() - researchedAt > 14 * 24 * 60 * 60 * 1000;
+
+    if (isCacheExpired && characterResearchCache) {
+      this.logger.log(
+        `characterResearchCache expired for variant ${variantId} (>14 days) — invalidating stale cache`,
+      );
+      characterResearchCache = null;
+    }
 
     if (!characterResearchCache) {
       this.logger.log(

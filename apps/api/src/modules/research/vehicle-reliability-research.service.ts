@@ -25,6 +25,7 @@ import {
   CanonicalRiskDefect,
   sanitizeTurkishDefectDescription,
   sanitizeTurkishDefectTitle,
+  lookupAutomotiveTransmissionTaxonomy,
 } from '@used-car-intelligence/shared';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { SearchResult } from './providers/search-provider.interface';
@@ -1092,6 +1093,51 @@ export class VehicleReliabilityResearchService {
   }
 
   /**
+   * Filters out search results that originate from dedicated forums or pages of other automotive brands
+   * when researching a specific target brand (e.g. rejecting skodaturkey.com or Toyota Avensis posts when researching Subaru).
+   */
+  public isCrossBrandContamination(
+    targetBrand: string | undefined,
+    url: string,
+    domain: string,
+    title: string,
+    snippet: string,
+  ): boolean {
+    if (!targetBrand || targetBrand.length < 2) return false;
+    const normTarget = targetBrand.toLowerCase().trim();
+    const combinedText = `${url} ${domain} ${title} ${snippet}`.toLowerCase();
+
+    // If target brand is explicitly mentioned in URL, domain, title, or snippet, it's legitimate
+    if (combinedText.includes(normTarget)) {
+      return false;
+    }
+
+    // Known distinct automobile manufacturer brand keywords in Turkish/EU markets
+    const knownBrands = [
+      'subaru', 'skoda', 'toyota', 'volkswagen', 'vw', 'renault', 'fiat', 'ford',
+      'opel', 'peugeot', 'citroen', 'bmw', 'mercedes', 'audi', 'seat', 'cupra',
+      'honda', 'hyundai', 'kia', 'nissan', 'volvo', 'mazda', 'mitsubishi',
+      'dacia', 'alfa romeo', 'alfa', 'jeep', 'suzuki', 'chevrolet', 'land rover',
+      'porsche', 'mini', 'chery', 'byd', 'tesla', 'mg'
+    ];
+
+    // Check if domain is specifically a foreign brand forum/domain (e.g. skodaturkey.com, toyotaclubtr, etc.)
+    const foreignBrandInDomain = knownBrands.find(b => b !== normTarget && domain.toLowerCase().includes(b));
+    if (foreignBrandInDomain) {
+      return true;
+    }
+
+    // If title specifically mentions another brand and does not mention target brand
+    const titleLower = title.toLowerCase();
+    const foreignBrandInTitle = knownBrands.find(b => b !== normTarget && new RegExp(`\\b${b}\\b`, 'i').test(titleLower));
+    if (foreignBrandInTitle) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Executes a single query plan (for initial search or targeted recovery).
    */
   async executeSingleQuery(
@@ -1134,6 +1180,11 @@ export class VehicleReliabilityResearchService {
 
         // Filter out social media posts, repair shop reels/shorts, and marketing posts
         if (isSocialMediaOrMarketingContent(res.url, res.title, snippetText)) {
+          return;
+        }
+
+        // Filter out cross-brand contamination (e.g. Skoda/Toyota forum threads when researching for Subaru)
+        if (this.isCrossBrandContamination(input.brand, res.url, res.domain || '', res.title || '', snippetText)) {
           return;
         }
 
@@ -1621,6 +1672,17 @@ export class VehicleReliabilityResearchService {
     const combinedContext = `${fullText} ${urlsAndSources}`;
 
     // -------------------------------------------------------------
+    // DIMENSION 0: Brand & Manufacturer Exclusivity Guard
+    // -------------------------------------------------------------
+    if (this.isCrossBrandContamination(input.brand, urlsAndSources, '', ev.title || '', combinedContext)) {
+      return {
+        applicabilityState: 'INCOMPATIBLE',
+        applicabilityEvidence: `Brand mismatch: defect or source explicitly discusses a different vehicle manufacturer and does not apply to ${input.brand}.`,
+        isEligible: false,
+      };
+    }
+
+    // -------------------------------------------------------------
     // DIMENSION 4: Production Applicability (Model Year Range & VIN/Plant)
     // -------------------------------------------------------------
     const inputYear = input.modelYear;
@@ -1658,45 +1720,50 @@ export class VehicleReliabilityResearchService {
       /benzin|petrol|\btce\b|\btsi\b|\btfsi\b|\bthp\b|\bpuretech\b|\becoboost\b|\bt-gdi\b|\bfirefly\b/i.test(
         targetEngine,
       );
-    const targetPowertrain =
-      input.powertrainType ||
-      (input.isElectric ? 'BEV' : input.isHybrid ? 'HEV' : isTargetDiesel ? 'ICE_DIESEL' : isTargetPetrol ? 'ICE_PETROL' : undefined);
 
-    // Fuel & Emissions Architecture Mismatch
-    const isDieselDefect =
-      /(dizel|diesel|\btdi\b|\bhdi\b|\bbluehdi\b|\bcrdi\b|\bdci\b|\bcdi\b|\bd4d\b|\bmultijet\b|\bjtd\b|\becoblue\b|\btdci\b|\bbluetec\b|\bb47\b|\bn47\b|\bea189\b|\bea288\b|dpf|partikül filtresi|adblue|kızdırma bujisi)/i.test(
-        combinedContext,
-      );
-    const isPetrolDefect =
-      /(benzin|petrol|gasoline|\btsi\b|\btfsi\b|\btce\b|\becoboost\b|\bpuretech\b|\bthp\b|\bt-gdi\b|\bb48\b|\bb58\b|\bn20\b|\bea888\b|\b2zr\b|buji|spark plug|ateşleme bobini|boğaz kelebeği)/i.test(
-        combinedContext,
-      );
-    const isEvDefect = /(yüksek voltaj|high voltage|hv battery|çekiş bataryası|iccu|onboard charger|obc)/i.test(combinedContext);
-
-    if (isDieselDefect && targetPowertrain && targetPowertrain !== 'ICE_DIESEL') {
-      return {
-        applicabilityState: 'INCOMPATIBLE',
-        applicabilityEvidence: `Powertrain mismatch: Diesel architecture defect does not apply to non-diesel (${targetPowertrain || 'ICE_PETROL'}) vehicle.`,
-        isEligible: false,
-      };
-    }
-    if (isPetrolDefect && (targetPowertrain === 'ICE_DIESEL' || isTargetDiesel || targetPowertrain === 'BEV')) {
-      return {
-        applicabilityState: 'INCOMPATIBLE',
-        applicabilityEvidence: `Powertrain mismatch: Petrol architecture defect does not apply to diesel (${targetPowertrain || 'ICE_DIESEL'}) vehicle.`,
-        isEligible: false,
-      };
-    }
-    if (isEvDefect && (targetPowertrain === 'ICE_PETROL' || targetPowertrain === 'ICE_DIESEL')) {
-      return {
-        applicabilityState: 'INCOMPATIBLE',
-        applicabilityEvidence: `Powertrain mismatch: EV/traction battery defect does not apply to ICE vehicle.`,
-        isEligible: false,
-      };
+    // Strict EV (BEV) Combustion Defect Isolation
+    if (input.isElectric || input.powertrainType === 'BEV') {
+      const isCombustionDefect = /(motor yağı|buji|enjektör|dpf|egr|egzoz|silindir|triger|devirdaim|şanzıman|kavrama|mekatronik|termostat|benzin|dizel|oil leak|timing chain|head gasket)/i.test(combinedContext);
+      if (isCombustionDefect && (ev.domain === 'POWERTRAIN_ENGINE' || ev.domain === 'POWERTRAIN_TRANS' || ev.domain === 'EMISSIONS_EXHAUST' || ev.domain === 'THERMAL_COOLING')) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `EV isolation: internal combustion defect does not apply to all-electric (BEV) vehicle.`,
+          isEligible: false,
+        };
+      }
     }
 
-    // Engine Code / Family Incompatibility Checks
-    const targetIsEA211 = /ea211|1\.4\s*tsi|1\.2\s*tsi|1\.5\s*tsi|czca|cpxa|chpa|czda/i.test(targetEngine);
+    // Strict Cross-Powertrain Incompatibility (Petrol vs Diesel)
+    if (isTargetDiesel && isTargetPetrol) {
+      // Degraded / ambiguous input: skip binary fuel exclusion
+    } else if (isTargetDiesel) {
+      const isPetrolOnlyDefect =
+        /\b(tsi|tfsi|tce|thp|puretech|ecoboost|buji|spark\s*plug|ateşleme\s*bobini|ignition\s*coil)\b/i.test(
+          combinedContext,
+        );
+      if (isPetrolOnlyDefect && (ev.domain === 'POWERTRAIN_ENGINE' || ev.domain === 'THERMAL_COOLING')) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Powertrain mismatch: spark-ignition / petrol-specific defect does not apply to diesel powertrain.`,
+          isEligible: false,
+        };
+      }
+    } else if (isTargetPetrol) {
+      const isDieselOnlyDefect =
+        /\b(dci|tdi|hdi|bluehdi|crdi|cdti|multijet|dpf|dizel\s*partikül|glow\s*plug|kızdırma\s*bujisi|adblue|scr)\b/i.test(
+          combinedContext,
+        );
+      if (isDieselOnlyDefect && (ev.domain === 'POWERTRAIN_ENGINE' || ev.domain === 'EMISSIONS_EXHAUST')) {
+        return {
+          applicabilityState: 'INCOMPATIBLE',
+          applicabilityEvidence: `Powertrain mismatch: diesel-specific emissions / glow-plug defect does not apply to petrol powertrain.`,
+          isEligible: false,
+        };
+      }
+    }
+
+    // Engine Family Incompatibilities
+    const targetIsEA211 = /ea211|1\.4\s*tsi|1\.2\s*tsi|1\.0\s*tsi|1\.5\s*tsi|czca|cpxa|chpa|cmba/i.test(targetEngine);
     const targetIsEA888 = /ea888|1\.8\s*tsi|2\.0\s*tsi|2\.0\s*tfsi|cjpa|chhb|cpla/i.test(targetEngine);
     const targetIsEB2 = /eb2|puretech\s*1\.2|1\.2\s*puretech|hns|hnz|hnw|hmt/i.test(targetEngine);
     const targetIsEP6 = /ep6|1\.6\s*thp|thp\s*156|thp\s*165|thp\s*200/i.test(targetEngine);
@@ -1771,31 +1838,74 @@ export class VehicleReliabilityResearchService {
     }
 
     // -------------------------------------------------------------
-    // DIMENSION 3: Transmission Applicability
+    // DIMENSION 3: Transmission Applicability & Architecture Isolation
     // -------------------------------------------------------------
     const targetTransmission = (input.transmissionName || input.transmissionCode || '').toLowerCase();
-    const isTargetAutoOrDsg = /dsg|edc|s-tronic|powershift|eat8|eat6|automatic|otomatik|zf|dct/i.test(targetTransmission);
     const isTargetManual = /manual|manuel|düz/i.test(targetTransmission);
+    const isTargetAutoOrDsg = !isTargetManual && /dsg|edc|s-tronic|powershift|eat8|eat6|automatic|otomatik|zf|dct/i.test(targetTransmission);
 
-    if (isTargetManual) {
-      const isAutoOnlyDefect = /(mechatronic|mekatronik|dual clutch|çift kavrama|valve body|tcu|dsg|dq200|dq250|torque converter|tork konvertör)/i.test(combinedContext);
+    const txTaxonomy = lookupAutomotiveTransmissionTaxonomy({
+      brand: input.brand,
+      model: input.model,
+      engineCode: input.engineCode,
+      modelYear: input.modelYear,
+      transmissionName: input.transmissionName,
+      transmissionType: input.transmissionCode,
+      isElectric: input.isElectric,
+      isHybrid: input.isHybrid,
+    });
+
+    if (isTargetManual || txTaxonomy.clutchType === 'MANUEL') {
+      const isAutoOnlyDefect = /(mechatronic|mekatronik|dual clutch|çift kavrama|valve body|tcu|dsg|dq200|dq250|torque converter|tork konvertör|cvt|lineartronic)/i.test(combinedContext);
       if (isAutoOnlyDefect && ev.domain === 'POWERTRAIN_TRANS') {
         return {
           applicabilityState: 'INCOMPATIBLE',
-          applicabilityEvidence: `Transmission mismatch: automatic/dual-clutch defect does not apply to manual transmission vehicle.`,
+          applicabilityEvidence: `Transmission mismatch: automatic/dual-clutch/CVT defect does not apply to manual transmission vehicle.`,
           isEligible: false,
         };
       }
     }
 
-    if (isTargetAutoOrDsg) {
-      const isManualPedalLinkageDefect = /(clutch pedal linkage|manuel debriyaj pedali|manual shifter linkage)/i.test(combinedContext);
+    if (!isTargetManual && txTaxonomy.clutchType !== 'MANUEL') {
+      const isManualPedalLinkageDefect = /(clutch pedal linkage|manuel debriyaj pedali|manual shifter linkage|baskı balata|debriyaj teli)/i.test(combinedContext);
       if (isManualPedalLinkageDefect && ev.domain === 'POWERTRAIN_TRANS') {
         return {
           applicabilityState: 'INCOMPATIBLE',
-          applicabilityEvidence: `Transmission mismatch: manual clutch pedal defect does not apply to automatic/dual-clutch vehicle.`,
+          applicabilityEvidence: `Transmission mismatch: manual clutch pedal defect does not apply to automatic (${txTaxonomy.transmissionTypeAndSpeeds}) vehicle.`,
           isEligible: false,
         };
+      }
+
+      // Torque converter vehicle vs Dual-Clutch / DSG / Mechatronic defects
+      if (txTaxonomy.clutchType === 'TORK_KONVERTORLU') {
+        const isDualClutchDefect = /(dual[- ]?clutch|çift[- ]?kavrama|dsg|dq200|dq250|dq381|dq500|edc|powershift|kuru[- ]?kavrama|dry[- ]?clutch|mekatronik|mechatronic)/i.test(combinedContext);
+        if (isDualClutchDefect && ev.domain === 'POWERTRAIN_TRANS') {
+          return {
+            applicabilityState: 'INCOMPATIBLE',
+            applicabilityEvidence: `Transmission architecture mismatch: dual-clutch / mechatronic defect does not apply to torque converter (${txTaxonomy.transmissionTypeAndSpeeds}) vehicle.`,
+            isEligible: false,
+          };
+        }
+        const isCvtDefect = /(kademesiz|lineartronic|multidrive s|variator)/i.test(combinedContext);
+        if (isCvtDefect && ev.domain === 'POWERTRAIN_TRANS') {
+          return {
+            applicabilityState: 'INCOMPATIBLE',
+            applicabilityEvidence: `Transmission architecture mismatch: CVT defect does not apply to torque converter (${txTaxonomy.transmissionTypeAndSpeeds}) vehicle.`,
+            isEligible: false,
+          };
+        }
+      }
+
+      // CVT vehicle vs Dual-Clutch / DSG / Mechatronic defects
+      if (txTaxonomy.clutchType === 'CVT') {
+        const isDualClutchDefect = /(dual[- ]?clutch|çift[- ]?kavrama|dsg|dq200|dq250|dq381|dq500|edc|powershift|kuru[- ]?kavrama|dry[- ]?clutch|mekatronik|mechatronic)/i.test(combinedContext);
+        if (isDualClutchDefect && ev.domain === 'POWERTRAIN_TRANS') {
+          return {
+            applicabilityState: 'INCOMPATIBLE',
+            applicabilityEvidence: `Transmission architecture mismatch: dual-clutch / mechatronic defect does not apply to CVT (${txTaxonomy.transmissionTypeAndSpeeds}) vehicle.`,
+            isEligible: false,
+          };
+        }
       }
     }
 
@@ -2942,7 +3052,7 @@ export class VehicleReliabilityResearchService {
 
     // 4. DRIVABILITY (5): Performance loss, vibration, shudder, minor leak, overheat without seizure, battery drain, injector deposits
     if (
-      /\b(?:coolant leak|water pump leak|su eksilt|termostat|thermostat|overheat(?:ing)?|hararet|parasitic draw|battery drain|12v battery|akü boşal|titreme|silkeleme|shudder(?:ing)?|judder|vibration|drivability|limp mode|hesitation|poor acceleration|clogged injector|faulty injector|enjektör arıza|enjektör tıkan|check engine light|oil leak|yağ kaçağı|misfire|cylinder misfire|sarsıntı|vuruntu)\b/i.test(c)
+      /\b(?:coolant leak|water pump leak|su eksilt|termostat|thermostat|overheat(?:ing)?|hararet|parasitic draw|battery drain|12v battery|akü boşal|titreme|silkeleme|shudder(?:ing)?|judder|vibration|drivability|limp mode|hesitation|poor acceleration|clogged injector|faulty injector|injektor\w*|zundspule\w*|zündspule\w*|ausfall\w*|enjektör arıza|enjektör tıkan|check engine light|oil leak|yağ kaçağı|misfire|cylinder misfire|sarsıntı|vuruntu)\b/i.test(c)
     ) {
       return 'DRIVABILITY';
     }
@@ -2991,7 +3101,7 @@ export class VehicleReliabilityResearchService {
   hasTechnicalConsequenceEvidence(text?: string): boolean {
     if (!text || text.length < 15) return false;
     const lower = text.toLowerCase();
-    return /\b(?:damage|fail(?:ure|s|ed)?|break(?:down)?|hazard|risk|seiz(?:ure|ed)?|crack|rupture|clog|block(?:age)?|loss|leak|warning|light|wear|deteriorat(?:ion|e)|skip|slip|stopp(?:ed)?|bent|broken|overheat|stall|starvation|pickup|strainer|arıza|hasar|kırıl|kopma|tıkan|aşın|kayıp|kaçak|uyarı|hararet|stop|kilitlen|yağsız)\b/i.test(lower);
+    return /\b(?:damage|fail(?:ure|s|ed)?|break(?:down)?|hazard|risk|seiz(?:ure|ed)?|crack|rupture|clog|block(?:age)?|loss|leak|warning|light|wear|deteriorat(?:ion|e)|skip|slip|stopp(?:ed)?|bent|broken|overheat|stall|starvation|pickup|strainer|ausfall(?:rate)?|panne(?:n)?|defekt|arıza|hasar|kırıl|kopma|tıkan|aşın|kayıp|kaçak|uyarı|hararet|stop|kilitlen|yağsız)\b/i.test(lower);
   }
 
   /**

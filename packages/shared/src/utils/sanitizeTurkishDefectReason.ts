@@ -48,7 +48,7 @@ const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
 
 const DOMAIN_FALLBACK_EXPLANATIONS_TR: Record<string, string> = {
   POWERTRAIN_TRANS:
-    'Çift kavramalı otomatik şanzıman mekatronik hidrolik kontrol ünitesi basınç düşümü ve vites geçiş kararsızlığı riski.',
+    'Şanzıman mekaniği, hidrolik aktarma devresi ve vites geçiş senkronizasyonunda aşınma veya işlev kaybı riski.',
   THERMAL_COOLING:
     'Soğutma sistemi devirdaim su pompası ve termostat gövdesinde sızdırmazlık kaybı veya antifriz kaçağı riski.',
   POWERTRAIN_ENGINE:
@@ -319,7 +319,7 @@ export function sanitizeTurkishDefectDescription(
   const isDebugOrJunk =
     text.toUpperCase() === 'UNRESOLVED' ||
     /usta notu|dm'den|instagram|tiktok|facebook|takip edin|abone olun/i.test(text) ||
-    /\b(hocam|ustam|ustaya|servise götürdüm|baktırdım|benim araçta da|arkadaşlar|merhaba arkadaşlar|aynı sorun bende de|göbekten kaçırıyor|kaçırıyor hocam)\b/i.test(text) ||
+    /\b(hocam|ustam|ustaya|servise götürdüm|baktırdım|benim araçta da|arkadaşlar|merhaba arkadaşlar|aynı sorun bende de|göbekten kaçırıyor|kaçırıyor hocam|demişsiniz|demişsin|bence|arkadaşım|sizce|teşekkürler|kolay gelsin)\b/i.test(text) ||
     text.length < 15;
 
   if (isDebugOrJunk) {
@@ -356,7 +356,7 @@ export function sanitizeTurkishDefectDescription(
       if (normKey.includes('COOLANT') || normKey.includes('THERMOSTAT') || normKey.includes('DEVIRDAIM') || normKey.includes('HARARET')) {
         return `${completeSentences} Radyatör, su hortumları, devirdaim pompası ve termostat gövdesinde sızdırmazlık kontrolü yapılmalıdır.`;
       } else if (normKey.includes('TRANS') || normKey.includes('CLUTCH') || normKey.includes('MECHATRONIC')) {
-        return `${completeSentences} Mekatronik hidrolik basıncı ve kavrama aşınma toleransları periyodik olarak kontrol edilmelidir.`;
+        return `${completeSentences} Şanzıman hidrolik basıncı, mekanik dişli ve aktarma toleransları periyodik olarak kontrol edilmelidir.`;
       }
       return completeSentences;
     }
