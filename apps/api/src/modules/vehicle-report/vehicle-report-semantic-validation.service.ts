@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ComprehensiveVehicleReport } from '@used-car-intelligence/shared';
+import { isUserNeglectOrRoutineMaintenance, isShowroomOrLineupWhining } from './vehicle-report-auditor.service';
 
 export interface NarrativeQualityBreakdown {
   vehicleSpecificity: number;       // 0-20
@@ -189,6 +190,59 @@ export class VehicleReportSemanticValidationService {
     const filter8Validation = this.validate8FilterContractFidelity(report, contextJson);
     if (!filter8Validation.isValid) {
       return filter8Validation;
+    }
+
+    // Rule 1.11: Showroom Whining Guard in Compromises
+    if (Array.isArray(report.expertDecisionSynthesis?.compromisesAndLimitations)) {
+      for (const comp of report.expertDecisionSynthesis.compromisesAndLimitations) {
+        if (isShowroomOrLineupWhining(comp.title, comp.explanation)) {
+          return {
+            isValid: false,
+            reason: `Tavizler bölümünde model gamı veya motor seçenekleri kısıtlılığı şikayeti tespit edildi ("${comp.title}"). İncelenen aracın kendi mekanik/kullanım sınırlarına odaklanılmalıdır.`,
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    // Rule 1.12: User Neglect in Primary Risk Guard
+    if (report.expertDecisionSynthesis?.primaryTechnicalRisk) {
+      const pRisk = report.expertDecisionSynthesis.primaryTechnicalRisk as any;
+      if (isUserNeglectOrRoutineMaintenance(pRisk.title, pRisk.explanation)) {
+        return {
+          isValid: false,
+          reason: `Ana teknik risk alanında rutin kullanıcı bakım işlemi/ihmali tespit edildi ("${pRisk.title}"). Yalnızca aracın kronik mekanik/elektronik arızaları risk olarak gösterilebilir.`,
+          needsRepair: true,
+        };
+      }
+    }
+
+    // Rule 1.13: Platform Marketing & Self-Promotion Guard
+    if (Array.isArray(report.expertDecisionSynthesis?.strongestReasonsToChoose)) {
+      for (const reason of report.expertDecisionSynthesis.strongestReasonsToChoose) {
+        const text = `${reason.title || ''} ${reason.explanation || ''}`.toLowerCase();
+        if (text.includes('veritaban') || text.includes('torquescout') || text.includes('şeffaflığ') || text.includes('eşleştirilerek')) {
+          return {
+            isValid: false,
+            reason: `Güçlü nedenler bölümünde platform tanıtımı veya veritabanı şeffaflığı gibi otomotiv dışı pazarlama ifadeleri tespit edildi ("${reason.title}").`,
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    // Rule 1.14: Robotic Template Phrases Guard
+    if (Array.isArray(report.expertDecisionSynthesis?.suitableFor)) {
+      for (const item of report.expertDecisionSynthesis.suitableFor) {
+        const expl = (item.explanation || '').toLowerCase();
+        if ((expl.includes('arayan sürücüler') || expl.includes('arayanlar')) && (expl.includes('lt/100km') || expl.includes('ort.'))) {
+          return {
+            isValid: false,
+            reason: `Kullanıcı profilleri bölümünde robotik tüketim arama dizesi tespit edildi ("${item.explanation}").`,
+            needsRepair: true,
+          };
+        }
+      }
     }
 
     // Rule 2: Absolute claims

@@ -4,6 +4,7 @@ import { VehicleCharacterResearchService } from '../research/vehicle-character-r
 import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import { resolveAutomotiveEngineTaxonomy, lookupAutomotiveTransmissionTaxonomy } from '@used-car-intelligence/shared';
+import { isUserNeglectOrRoutineMaintenance } from './vehicle-report-auditor.service';
 import * as crypto from 'crypto';
 import OpenAI from 'openai';
 
@@ -452,51 +453,45 @@ export class VehicleReportContextBuilderService {
         summary: reportCache?.summary || null,
         riskScore: reportCache?.riskScore ?? null,
         buyabilityScore: reportCache?.buyabilityScore ?? null,
-        knownDatabaseProblems: variant.problems.map((p) => {
-          const rawType = String((p as any).problemType || '').toUpperCase();
-          const pStatus = String((p as any).status || '').toUpperCase();
-          const pTitleRaw = p.title || 'Mekanik Gözlem';
-          const pDescRaw = p.description || '';
-          const isUserNeglect = 
-            pTitleRaw.toLowerCase().includes('yağ değişim zamanlaması') ||
-            pTitleRaw.toLowerCase().includes('zamanında değiştirilmemesi') ||
-            pTitleRaw.toLowerCase().includes('bakım aksatılması') ||
-            pDescRaw.toLowerCase().includes('zamanında değiştirilmemesi') ||
-            pDescRaw.toLowerCase().includes('bakım aksatılması');
+        knownDatabaseProblems: variant.problems
+          .filter((p) => !isUserNeglectOrRoutineMaintenance(p.title, p.description))
+          .map((p) => {
+            const rawType = String((p as any).problemType || '').toUpperCase();
+            const pStatus = String((p as any).status || '').toUpperCase();
+            const pTitleRaw = p.title || 'Mekanik Gözlem';
 
-          const isVerified =
-            !isUserNeglect &&
-            (rawType === 'VERIFIED_FAILURE' ||
-            rawType === 'COMMON_PROBLEM' ||
-            rawType === 'CHRONIC' ||
-            rawType === 'RECALL' ||
-            rawType === 'TSB' ||
-            pStatus === 'APPROVED');
+            const isVerified =
+              rawType === 'VERIFIED_FAILURE' ||
+              rawType === 'COMMON_PROBLEM' ||
+              rawType === 'CHRONIC' ||
+              rawType === 'RECALL' ||
+              rawType === 'TSB' ||
+              pStatus === 'APPROVED';
 
-          const pType = isVerified
-            ? 'VERIFIED_FAILURE'
-            : (rawType === 'OBSERVED_BEHAVIOR' ? 'OBSERVED_BEHAVIOR' : 'REPORTED_COMPLAINT');
+            const pType = isVerified
+              ? 'VERIFIED_FAILURE'
+              : (rawType === 'OBSERVED_BEHAVIOR' ? 'OBSERVED_BEHAVIOR' : 'REPORTED_COMPLAINT');
 
-          let pTitle = pTitleRaw;
-          if (pType === 'REPORTED_COMPLAINT') {
-            if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
-              pTitle = 'Otomatik Silecek Performansı Şikâyetleri';
-            } else if (pTitle.endsWith('Arızası')) {
-              pTitle = pTitle.replace(/Arızası$/, 'Şikâyetleri');
+            let pTitle = pTitleRaw;
+            if (pType === 'REPORTED_COMPLAINT') {
+              if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
+                pTitle = 'Otomatik Silecek Performansı Şikâyetleri';
+              } else if (pTitle.endsWith('Arızası')) {
+                pTitle = pTitle.replace(/Arızası$/, 'Şikâyetleri');
+              }
             }
-          }
 
-          return {
-            id: p.id,
-            title: pTitle,
-            description: p.description,
-            riskLevel: p.riskLevel,
-            symptoms: (p as any).symptoms || null,
-            checkRecommendation: (p as any).checkRecommendation || null,
-            category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
-            problemType: pType,
-          };
-        }),
+            return {
+              id: p.id,
+              title: pTitle,
+              description: p.description,
+              riskLevel: p.riskLevel,
+              symptoms: (p as any).symptoms || null,
+              checkRecommendation: (p as any).checkRecommendation || null,
+              category: (p as any).affectedEngine || (p as any).affectedTransmission || 'Mekanik',
+              problemType: pType,
+            };
+          }),
         inspectionChecklist: (variant.checklists || []).map((c) => ({
           id: c.id,
           category: c.category,

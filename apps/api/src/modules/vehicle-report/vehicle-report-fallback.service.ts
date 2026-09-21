@@ -318,7 +318,7 @@ export class VehicleReportFallbackService {
         },
         {
           profile: 'Sakin ve Öngörülebilir Sürüş İsteyenler',
-          explanation: `Sarsıntısız hızlanma ve ${avgFuel || 'makul tüketim'} arayan sürücüler için uygundur.`,
+          explanation: 'Ani güç patlamalarından ziyade doğrusal hızlanma karakterini, sarsıntısız aktarmayı ve otoyolda sakin seyir konforunu önceleyen sürücüler için idealdir.',
           supportingFactIds: ['ENGINE_POWER'],
         },
       ],
@@ -339,26 +339,38 @@ export class VehicleReportFallbackService {
           supportingFactIds: ['TRANSMISSION_TYPE'],
         },
         {
-          condition: isEcvtOrHybrid ? 'Hibrit Sistem ve Sıvı Kaçak Kontrolü' : 'Ekspertizde Şanzıman ve Sıvı Kaçak Kontrolü',
-          reason: 'Liftte fiziki alt muhafaza incelemesi yapılarak aktif sızıntı bulunmadığını görmek.',
+          condition: isElectric
+            ? 'Yetkili Servis Onaylı Batarya Sağlık (SoH) Raporu'
+            : (isEcvtOrHybrid ? 'Hibrit Sistem ve Sıvı Kaçak Kontrolü' : 'Ekspertizde Şanzıman ve Sıvı Kaçak Kontrolü'),
+          reason: isElectric
+            ? 'Batarya hücre dengesi ve kapasite sağlığının resmi diagnostik testiyle doğrulanması gerekir.'
+            : 'Liftte fiziki alt muhafaza incelemesi yapılarak aktif sızıntı bulunmadığını görmek.',
           priority: 'IMPORTANT',
           supportingFactIds: ['ENGINE_POWER'],
         },
       ],
       walkAwayConditions: [
         {
-          condition: isEcvtOrHybrid
-            ? 'Hibrit Transaks / İnvertör Sisteminde Anormal Uğultu veya Güç Kesintisi'
-            : 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı',
-          reason: isEcvtOrHybrid
-            ? 'Hibrit planet dişli transaks ve elektrik motoru (MG1/MG2) onarım maliyetlerini engellemek için ekspertizde hibrit sistem diagnostik testi yapılmalıdır.'
-            : 'Yüksek tamir ve revizyon masrafları doğurabileceğinden, satın alım öncesinde ekspertiz kontrolünde mekatronik ve kavrama sağlığı detaylıca teyit edilmelidir.',
+          condition: isElectric
+            ? 'Batarya Hücre Voltaj Sapması veya Yüksek Voltaj İzolasyon Arızası'
+            : (isEcvtOrHybrid
+              ? 'Hibrit Transaks / İnvertör Sisteminde Anormal Uğultu veya Güç Kesintisi'
+              : 'Şanzımanda Belirgin Titreme, Vuruntu veya Isınma Uyarısı'),
+          reason: isElectric
+            ? 'Batarya paketi ve yüksek voltaj sistemi yüksek maliyet doğurabileceğinden, yetkili servis onaylı batarya sağlık testi (SoH) ve arıza taraması olmadan araç değerlendirilmemelidir.'
+            : (isEcvtOrHybrid
+              ? 'Hibrit planet dişli transaks ve elektrik motoru (MG1/MG2) onarım maliyetlerini engellemek için ekspertizde hibrit sistem diagnostik testi yapılmalıdır.'
+              : 'Yüksek tamir ve revizyon masrafları doğurabileceğinden, satın alım öncesinde ekspertiz kontrolünde mekatronik ve kavrama sağlığı detaylıca teyit edilmelidir.'),
           priority: 'CRITICAL',
-          supportingFactIds: ['TRANSMISSION_TYPE'],
+          supportingFactIds: [isElectric ? 'BATTERY_CAPACITY' : 'TRANSMISSION_TYPE'],
         },
         {
-          condition: 'Motor Altında Aktif Yağ Kaçağı ve Hararet Geçmişi',
-          reason: 'Ciddi kapak ve blok masrafı riskine karşı uzman eksper incelemesi ve kompresyon testiyle sızıntı kaynağı netleştirilmelidir.',
+          condition: isElectric
+            ? 'Taşıyıcı Gövde ve Batarya Muhafaza Kutusunda Yapısal Hasar veya Ezilme'
+            : 'Motor Altında Aktif Sıvı Kaçağı ve Hararet Geçmişi',
+          reason: isElectric
+            ? 'Batarya muhafazası veya podye/direk gibi ana taşıyıcı elemanlardaki darbeler batarya güvenliğini tehlikeye sokabileceğinden uzak durulmalıdır.'
+            : 'Ciddi kapak ve blok masrafı riskine karşı uzman eksper incelemesi ve kompresyon testiyle sızıntı kaynağı netleştirilmelidir.',
           priority: 'CRITICAL',
           supportingFactIds: ['ENGINE_POWER'],
         },
@@ -367,7 +379,7 @@ export class VehicleReportFallbackService {
         shortVerdict: (problems.length === 0 && secondaryRisks.length === 0)
           ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.' 
           : 'Dengeli kondisyonda, belirli kontrollerin sağlanması ve ekspertiz teyidi şartıyla değerlendirilebilir.',
-        detailedVerdict: `${carTitle}, periyodik bakımları belgelenmiş, ${isEcvtOrHybrid ? 'hibrit sistem ve güç aktarımı sorunsuz' : 'şanzıman geçişleri pürüzsüz'} ve lifte kaldırıldığında aktif sıvı kaçağı görülmeyen durumlarda satın alma yönünde değerlendirilebilir.`,
+        detailedVerdict: `${carTitle}, periyodik bakımları belgelenmiş, ${isElectric ? 'batarya SoH sağlığı doğrulanmış' : (isEcvtOrHybrid ? 'hibrit sistem ve güç aktarımı sorunsuz' : 'şanzıman geçişleri pürüzsüz')} ve lifte kaldırıldığında aktif sıvı kaçağı görülmeyen durumlarda satın alma yönünde değerlendirilebilir.`,
         confidence: 'HIGH',
         supportingFactIds,
       },
@@ -429,10 +441,10 @@ export class VehicleReportFallbackService {
         title: `${carTitle} Özeti`,
         oneSentenceSummary: `${carTitle}, ${trans} şanzıman ve ${hp} motor kombinasyonuyla günlük kullanıma uygun bir karakter sunar.`,
         strongestAdvantage: `${trans} şanzıman ve motor uyumu`,
-        biggestRisk: problems.length > 0 ? problems[0].title : 'Düzenli bakım hassasiyeti',
+        biggestRisk: problems.length > 0 ? problems[0].title : (isElectric ? 'Batarya SoH sağlık takibi' : 'Periyodik sıvı seviyesi kontrolleri'),
         bestFor: ['Şehir içi günlük kullanıcılar', 'Sakin sürüş tercih edenler'],
         notIdealFor: ['Sportif hızlanma arayanlar'],
-        keyWarnings: ['Ekspertizde şanzıman ve karter kaçağı kontrolü yapılmalıdır.'],
+        keyWarnings: [isElectric ? 'Ekspertizde batarya SoH testi ve alt muhafaza kontrolü yapılmalıdır.' : 'Ekspertizde şanzıman ve mekanik sıvı kaçağı kontrolü yapılmalıdır.'],
       },
 
       engineTransmission: {
