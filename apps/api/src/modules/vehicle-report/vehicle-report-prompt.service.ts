@@ -252,6 +252,15 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     const timingSystem = identity.timingSystem || perf.timingSystem || (isEv ? 'NONE' : (isDiesel ? 'KAYIS' : 'ZINCIR'));
     const timingSystemTr = identity.timingSystemTr || (timingSystem === 'KAYIS' ? 'Triger Kayışı' : (timingSystem === 'ZINCIR' ? 'Triger Zinciri' : (timingSystem === 'ISLAK_KAYIS' ? 'Yağ Banyolu Islak Triger Kayışı' : (timingSystem === 'KAYIS_VE_ZINCIR' ? 'Triger Kayışı ve Eksantrik Zinciri' : 'Triger Sistemi Bulunmaz'))));
 
+    const isManual = (trans || '').toLowerCase().includes('manuel') || (trans || '').toLowerCase().includes('düz') || (trans || '').toLowerCase().includes('manual');
+    const transFamily = identity.transmissionFamily || (isEv ? 'REDÜKTÖR' : (isManual ? 'MANUEL' : 'OTOMATİK'));
+    const clutchType = identity.clutchType || (isEv ? 'ELEKTRIKLI_TEK_ORANLI' : (isManual ? 'MANUEL' : 'TORK_KONVERTORLU'));
+    const clutchTypeTr = identity.clutchTypeTr || (isEv ? 'Tek Oranlı Redüktör' : (isManual ? 'Manuel Debriyaj (Baskı-Balata)' : 'Tork Konvertörlü'));
+    const transTypeAndSpeeds = identity.transmissionName || (isEv ? 'Tek Kademeli Redüktör Şanzıman' : (isManual ? '6 İleri Manuel' : 'Otomatik Şanzıman'));
+    const transSpeeds = Number(identity.transmissionSpeeds) || (isEv ? 1 : 6);
+    const transCode = identity.transmissionCode || (isEv ? null : (isManual ? 'MANUAL' : null));
+    const transMaintenanceTr = identity.transmissionMaintenanceTr || '';
+
     const equipmentHighlights = equipmentObj.highlights ? `\n• Veritabanı Donanım Öne Çıkanları: ${equipmentObj.highlights}` : '';
     const equipmentFeaturesText = (equipmentObj.features && equipmentObj.features.length > 0)
       ? `\n• Paket Donanım Özellikleri: ${equipmentObj.features.map((f: any) => `${f.featureName} (${f.status || 'Standart'})`).slice(0, 15).join(', ')}`
@@ -268,8 +277,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
 5. Donanım Paketi Seviyesi: ${trim}${equipmentHighlights}${equipmentFeaturesText}
 6. Motor / Versiyon Kitle Kodu: ${engine}${rawHpVal ? ` (Doğrulanmış Motor Gücü: ${hpText})` : ''}${rawTorqueVal ? ` (Doğrulanmış Tork: ${torqueText})` : ''}
 7. Yakıt Türü: ${fuel}
-8. Şanzıman Tipi: ${trans || 'Orijinal Şanzıman Tipi'}
-• Çekiş Sistemi: ${driveTypeText}
+8. Şanzıman Tipi: ${transTypeAndSpeeds} (Mimari: ${clutchTypeTr}, Kod: ${transCode || 'Doğrulanmış Kod'}, Aile: ${transFamily})
+${transMaintenanceTr ? `• Şanzıman Bakım Prensibi: ${transMaintenanceTr}\n` : ''}• Çekiş Sistemi: ${driveTypeText}
 • Motor Hacmi: ${ccText}
 • Triger Mimarisi: ${timingSystemTr} (${timingSystem})
 • Hızlanma (0-100 km/s): ${zeroHundredText}
@@ -327,6 +336,12 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
    * Atkinson çevrimi benzinli motor, e-CVT veya elektrik motoru geçiş pürüzsüzlüğü, hibrit batarya şarj dengesi ve rejeneratif frenlemeyi esas al.` : `[DİKKAT: BU ARAÇ BENZİNLİDİR (${engine || 'Benzinli Motor'})]
    * Dizel Partikül Filtresi (DPF - GPF hariç), AdBlue sıvısı/pompası, kızdırma bujisi veya mazot pompası terimleri KESİNLİKLE YASAKTIR VE KULLANILAMAZ!
    * Buji, ateşleme bobini, boğaz kelebeği, direkt enjeksiyon kurum birikimi (GDI/TSI/TCe) ve yakıt buharlaştırma (kanister) sistemlerini esas al.`)}
+
+7C. SEÇİLEN 8 FİLTRE DEĞİŞTİRİLEMEZ TEMEL GERÇEKTİR (8-FILTER BOUNDARY & SIFIR UYDURMA):
+   - Kullanıcının seçtiği 8 filtre (1. Marka: ${brand}, 2. Model: ${model}, 3. Yıl: ${year}, 4. Kasa Tipi: ${body}, 5. Donanım: ${trim}, 6. Motor: ${engine}, 7. Yakıt: ${fuel}, 8. Şanzıman: ${transTypeAndSpeeds}) KESİN VE DEĞİŞTİRİLEMEZ SINIRLARDIR.
+   - Kafandan bu aracın şanzımanını, motorunu, yakıtını, gövdesini veya donanımını DEĞİŞTİREMEZSİN.
+   - ${isManual ? `⚠️ ARAÇ MANUELDİR: Çift kavrama, DSG, EDC, mekatronik, tork konvertörü veya otomatik vites geçişi yazmak KESİNLİKLE YASAKTIR. Manuel debriyaj baskı-balata, kavrama noktası ve senkromeçleri değerlendireceksin.` : `⚠️ ARAÇ OTOMATİKTİR (${transFamily} / ${clutchTypeTr}): Aracın gerçek şanzıman mimarisine sadık kalacaksın. Tork konvertörlü veya CVT araca DSG mekatronik arızası YAZAMAZSIN.`}
+
 8. ŞASİ VE GÜVENLİK DİLİ:
    - 🟡 Lokal podye ucu / hafif düzeltme: Pazarlık ve tolerans kontrolü.
    - 🟠 Taşıyıcı direkte boya/işlem: SRS/airbag sisteminin diagnostik ve fiziksel kontrolü şart.
@@ -405,38 +420,45 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
       "highwayUse": "Otoyol seyir kararlılığı, yüksek hız izolasyonu, ara hızlanma ve kabin sessizliği...", 
       "trafficBehavior": "Yoğun dur-kalk trafikte kavrama/vites davranışı, düşük devir torku ve kalkış dinamikleri...", 
       "comfortAssessment": "Koltuk ergonomisi, uzun yol yorgunluğu, kabin izolasyonu ve süspansiyon konforu..." 
+    "vehicleCharacter": {
+      "detailedAssessment": "Araç kimliği, motor-şanzıman uyumu ve karakter analizi..."
     },
-    "strongestReasonsToChoose": [
-      { "title": "Araca ve motora özgü somut güçlü yön başlığı", "explanation": "Bu avantajın teknik arka planını, sürücüye ve işletme bütçesine sunduğu faydayı araca özgü detaylarla anlatan en az 2-3 doyurucu ve teknik cümle..." }
-    ],
-    "compromisesAndLimitations": [
-      { "title": "Araca, şanzımana ve segmente özgü gerçekçi taviz başlığı", "explanation": "Bu tasarım veya kullanım tavizinin günlük sürüşteki somut yansımasını anlatan en az 2-3 doyurucu cümle..." }
-    ],
-    "suitableFor": [
-      { "profile": "Araca ve donanıma tam uyan spesifik kullanıcı profili", "explanation": "Bu kullanıcının beklentilerinin bu araçla neden örtüştüğünü anlatan 2-3 doyurucu cümle..." }
-    ],
-    "notSuitableFor": [
-      { "profile": "Aracın dinamiklerine veya alanına uymayan profil", "explanation": "Bu profilin bu araçta neden aradığını bulamayacağını anlatan 2-3 doyurucu cümle..." }
-    ],
-    "purchaseConditions": [
-      { "condition": "Somut mekanik bakım veya ekspertiz kabul şartı", "reason": "Bu şartın neden kritik olduğunu ve teknik önemini anlatan en az 2 cümle...", "priority": "ÖNEMLİ" }
-    ],
-    "walkAwayConditions": [
-      { "condition": "Satın almaktan kesin vazgeçme kriteri", "reason": "Bu durumun yol açacağı ağır mekanik maliyet veya yapısal güvenlik riskini anlatan en az 2 cümle...", "priority": "KRİTİK" }
-    ]
+    "dailyUseAssessment": {
+      "cityDriving": "Şehir içi sürüş...",
+      "highwayCruising": "Uzun yol ve otoyol...",
+      "parkingAndManeuver": "Park ve manevra...",
+      "cabinComfortAndNVH": "Yalıtım ve konfor..."
+    }
   },
-  "executiveSummary": { "oneSentenceSummary": "...", "strongestAdvantage": "...", "biggestRisk": "..." },
-  "inspectionChecklist": [ { "title": "...", "instruction": "...", "priority": "ÖNEMLİ" } ],
+  "reasonsToBuy": [
+    { "title": "Güçlü Neden 1", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+  ],
+  "compromisesAndLimitations": [
+    { "title": "Taviz/Kısıt 1", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+  ],
+  "notSuitableFor": [
+    { "profile": "Kullanıcı Profili", "explanation": "Açıklama...", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+  ],
+  "purchaseConditions": [
+    { "condition": "Koşul Başlığı", "reason": "Açıklama...", "priority": "ÖNEMLİ", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+  ],
+  "walkAwayConditions": [
+    { "condition": "Vazgeçme Koşulu", "reason": "Açıklama...", "priority": "KRİTİK", "supportingFactIds": ["AI_RESEARCH_ENGINE"] }
+  ],
+  "inspectionChecklist": [
+    { "category": "MOTOR / TRANSMISSION", "item": "Kontrol Kalemi", "importance": "CRITICAL", "whatToLookFor": "Nasıl kontrol edilir..." }
+  ],
   "sellerQuestions": [
     {
+      "category": ${isEv ? `"BATARYA_SOH | SARJ_GECMISI | TERMAL_YONETIM | SURUS_AKTARMA"` : `"MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK"`},
       "questionText": ${isEv 
         ? `"Bu elektrikli aracın batarya ve yüksek voltaj mimarisine (${trim || ''}) özgü kritik teknik mülakat sorusu (örn: Yetkili servisten alınmış güncel Batarya SoH / Sağlık Raporu mevcut mu ve araç ağırlıklı olarak ev tipi AC şarjla mı kullanıldı?)..."` 
         : `"Bu aracın motor ve şanzımanına (${engine || ''} ${trans || ''}) özgü kronik zayıflık veya ağır bakım geçmişini hedef alan teknik mülakat sorusu (örn: Triger kayışı/zinciri ve devirdaim pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?)..."`},
-      "category": ${isEv ? `"BATARYA_SOH | SARJ_GECMISI | TERMAL_YONETIM | SURUS_AKTARMA"` : `"MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK"`},
-      "expectedAnswerHint": ${isEv
+      "whyItMatters": "Neden önemli olduğu...",
+      "expectedIdealAnswer": ${isEv
         ? `"Satıcıdan beklenen somut, yetkili servis raporlu ve güven veren ideal yanıt (örn: 'Yetkili servis testinde batarya sağlığı %96 çıktı, raporu mevcut; araç daima ev tipi 11 kW AC şarjla %20-80 bandında dolduruldu')..."`
         : `"Satıcıdan beklenen somut, servis faturalı ve güven veren ideal yanıt (örn: '85.000 km'de yetkili serviste faturasıyla değişti, faturası ve servis dökümü mevcut')..."`},
-      "redFlagAnswerHint": ${isEv
+      "redFlagAnswer": ${isEv
         ? `"Satıcının kaçamak, raporsuz veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Bataryayı hiç ölçtürmedim ama menzili iyi gidiyor' veya soruyu geçiştirme)..."`
         : `"Satıcının kaçamak, faturasız veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Usta baktı daha gider dedi, fatura yok' veya soruyu geçiştirme)..."`}
     }
@@ -451,11 +473,11 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     "powerUnit": "HP",
     "engineTorqueNm": ${rawTorqueVal || (isEv ? 700 : 250)},
     "torqueUnit": "Nm",
-    "transmissionFamily": ${isEv ? `"REDÜKTÖR"` : `"DSG"`},
-    "transmissionCode": ${isEv ? `null` : `"DQ200"`},
-    "clutchType": ${isEv ? `"ELEKTRIKLI_TEK_ORANLI"` : `"KURU_CIFT_KAVRAMA"`},
-    "transmissionTypeAndSpeeds": ${isEv ? `"Tek Kademeli Redüktör Şanzıman"` : `"7 İleri Kuru Çift Kavramalı DSG"`},
-    "transmissionSpeeds": ${isEv ? `1` : `7`},
+    "transmissionFamily": "${transFamily}",
+    "transmissionCode": ${transCode ? `"${transCode}"` : `null`},
+    "clutchType": "${clutchType}",
+    "transmissionTypeAndSpeeds": "${transTypeAndSpeeds}",
+    "transmissionSpeeds": ${transSpeeds},
     "timingSystem": ${isEv ? `null` : `"${timingSystem}"`},
     "hasDpf": ${isEv ? `false` : (isDiesel ? `true` : `false`)},
     "hasAdBlue": false,
@@ -487,6 +509,11 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
 
     const fullVehicleTitle = [year, brand, model, body, trim, engine, fuel, trans].filter(Boolean).join(' ');
     const isEv = fuel === 'Elektrik' || fuel === 'ELECTRIC' || (identity.fuelType || '').toLowerCase().includes('elektrik') || identity.isElectric === true || identity.powertrainType === 'BEV';
+    const isManual = (trans || '').toLowerCase().includes('manuel') || (trans || '').toLowerCase().includes('düz') || (trans || '').toLowerCase().includes('manual');
+    const transFamily = identity.transmissionFamily || (isEv ? 'REDÜKTÖR' : (isManual ? 'MANUEL' : 'OTOMATİK'));
+    const clutchType = identity.clutchType || (isEv ? 'ELEKTRIKLI_TEK_ORANLI' : (isManual ? 'MANUEL' : 'TORK_KONVERTORLU'));
+    const transSpeeds = Number(identity.transmissionSpeeds) || (isEv ? 1 : 6);
+    const transCode = identity.transmissionCode || (isEv ? null : (isManual ? 'MANUAL' : null));
 
     return `Sen TorqueScout İnternet Otomotiv Araştırma Ajanısın (Web-Grounded Vehicle Research Agent).
 Görevin, aşağıdaki araç varyantı için canlı web arama araçlarını kullanarak 10 KİLİT TEKNİK PARAMETRE GRUBU, nesil/makyaj kimliği, donanım paketi detayları, 3 seviyeli servis bakım taksonomisi ve kronik arıza kayıtlarını araştırmak ve ham JSON formatında üretmektir.
@@ -528,10 +555,10 @@ ARAŞTIRILACAK 10 TEKNİK PARAMETRE GRUBU:
     "displacementCc": 1598,
     "powerHp": 120,
     "torqueNm": 250,
-    "transmissionFamily": "DSG",
-    "transmissionCode": "DQ200",
-    "clutchType": "KURU_CIFT_KAVRAMA",
-    "transmissionSpeeds": 7,
+    "transmissionFamily": "${transFamily}",
+    "transmissionCode": ${transCode ? `"${transCode}"` : `null`},
+    "clutchType": "${clutchType}",
+    "transmissionSpeeds": ${transSpeeds},
     "timingSystem": "KAYIS",
     "hasDpf": true,
     "hasAdBlue": false,

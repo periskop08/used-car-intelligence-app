@@ -185,6 +185,12 @@ export class VehicleReportSemanticValidationService {
       }
     }
 
+    // Rule 1.10: 8-Filter Immutable Contract Fidelity Guard
+    const filter8Validation = this.validate8FilterContractFidelity(report, contextJson);
+    if (!filter8Validation.isValid) {
+      return filter8Validation;
+    }
+
     // Rule 2: Absolute claims
     if (reportStr.includes('araç kesinlikle kazasızdır') || reportStr.includes('kesinlikle orijinaldir')) {
       return {
@@ -943,6 +949,154 @@ export class VehicleReportSemanticValidationService {
           reason: 'Araç triger sistemi ZİNCİR (CHAIN) olarak doğrulanmışken raporda triger kayışı terimleri kullanıldı.',
           needsRepair: true,
         };
+      }
+    }
+
+    return { isValid: true };
+  }
+
+  private validate8FilterContractFidelity(report: ComprehensiveVehicleReport, contextJson: any): { isValid: boolean; reason?: string; needsRepair?: boolean } {
+    const vehicleCtx = contextJson?.vehicleIdentity || {};
+    const selected8 = vehicleCtx.selected8Filters || {};
+    const reportStr = JSON.stringify(report).toLowerCase();
+
+    // 1. Marka & Model Fidelity
+    const targetBrand = (selected8.brand || vehicleCtx.brand || '').toLowerCase().trim();
+    const targetModel = (selected8.model || vehicleCtx.model || '').toLowerCase().trim();
+    if (targetBrand && report.vehicleIdentity?.brand) {
+      const repBrand = report.vehicleIdentity.brand.toLowerCase().trim();
+      if (!repBrand.includes(targetBrand) && !targetBrand.includes(repBrand)) {
+        return {
+          isValid: false,
+          reason: `Raporlanan marka (${report.vehicleIdentity.brand}) seçilen filtre ile (${targetBrand}) uyuşmuyor.`,
+          needsRepair: true,
+        };
+      }
+    }
+
+    // 2. Kasa Tipi Fidelity (Sedan vs Hatchback vs SUV)
+    const targetBody = (selected8.bodyType || vehicleCtx.bodyType || '').toLowerCase().trim();
+    if (targetBody && report.vehicleIdentity?.bodyType) {
+      const repBody = report.vehicleIdentity.bodyType.toLowerCase().trim();
+      if ((targetBody.includes('sedan') && repBody.includes('hatchback')) || (targetBody.includes('hatchback') && repBody.includes('sedan'))) {
+        return {
+          isValid: false,
+          reason: `Kasa tipi seçilen filtreyle (${targetBody}) çelişiyor (${repBody}).`,
+          needsRepair: true,
+        };
+      }
+    }
+
+    // 3. Yakıt Türü Fidelity (Dizel vs Benzin vs Elektrik)
+    const targetFuel = (selected8.fuelType || vehicleCtx.fuelType || '').toLowerCase().trim();
+    if (targetFuel) {
+      const isTargetDiesel = targetFuel.includes('dizel') || targetFuel.includes('diesel');
+      const isTargetElectric = targetFuel.includes('elektrik') || targetFuel.includes('electric') || targetFuel.includes('bev');
+      const isTargetHybrid = targetFuel.includes('hibrit') || targetFuel.includes('hybrid');
+      const isTargetPetrol = !isTargetDiesel && !isTargetElectric && !isTargetHybrid;
+
+      if (report.vehicleIdentity?.fuelType) {
+        const repFuel = report.vehicleIdentity.fuelType.toLowerCase().trim();
+        const isRepDiesel = repFuel.includes('dizel') || repFuel.includes('diesel');
+        const isRepElectric = repFuel.includes('elektrik') || repFuel.includes('electric') || repFuel.includes('bev');
+        const isRepHybrid = repFuel.includes('hibrit') || repFuel.includes('hybrid');
+        const isRepPetrol = !isRepDiesel && !isRepElectric && !isRepHybrid;
+
+        if ((isTargetDiesel && !isRepDiesel) || (isTargetElectric && !isRepElectric) || (isTargetPetrol && !isRepPetrol) || (isTargetHybrid && !isRepHybrid)) {
+          return {
+            isValid: false,
+            reason: `Raporlanan yakıt türü (${report.vehicleIdentity.fuelType}) seçilen filtre (${targetFuel}) ile uyuşmuyor.`,
+            needsRepair: true,
+          };
+        }
+      }
+
+      if (isTargetDiesel) {
+        if (reportStr.includes('ateşleme bujisi') || reportStr.includes('buji değişimi') || reportStr.includes('ateşleme bobini')) {
+          return {
+            isValid: false,
+            reason: 'Dizel olarak seçilen araçta benzinli motor komponentleri (ateşleme bujisi / bobini) iddia edildi.',
+            needsRepair: true,
+          };
+        }
+      } else if (isTargetPetrol) {
+        if (reportStr.includes('dizel partikül filtresi') || reportStr.includes('dpf rejenerasyonu') || reportStr.includes('kızdırma bujisi') || reportStr.includes('mazot filtresi')) {
+          return {
+            isValid: false,
+            reason: 'Benzinli olarak seçilen araçta dizel motor komponentleri (DPF / kızdırma bujisi / mazot filtresi) iddia edildi.',
+            needsRepair: true,
+          };
+        }
+      }
+    }
+
+    // 4. Şanzıman Tipi Fidelity (Manuel vs Otomatik & Çift Kavrama)
+    const targetTrans = (selected8.transmission || vehicleCtx.transmissionName || '').toLowerCase().trim();
+    if (targetTrans) {
+      const isTargetManual = targetTrans.includes('manuel') || targetTrans.includes('düz') || targetTrans.includes('manual');
+      const targetClutchType = selected8.clutchType || vehicleCtx.clutchType;
+      const repTrans = (report.vehicleIdentity?.transmissionName || '').toLowerCase().trim();
+
+      if (isTargetManual) {
+        if (repTrans && (repTrans.includes('otomatik') || repTrans.includes('dsg') || repTrans.includes('edc') || repTrans.includes('dct') || repTrans.includes('cvt') || repTrans.includes('powershift'))) {
+          return {
+            isValid: false,
+            reason: `Şanzıman filtresi ("${selected8.transmission || 'Manuel'}") ile üretilen şanzıman ("${report.vehicleIdentity.transmissionName}") çelişiyor. Manuel seçilen araçta otomatik şanzıman verilemez.`,
+            needsRepair: true,
+          };
+        }
+
+        const repClutch = (report.technicalSpecifications as any)?.clutchType;
+        if (repClutch && repClutch !== 'MANUEL') {
+          return {
+            isValid: false,
+            reason: `Araç MANUEL olarak seçildiği halde yapay zeka şanzıman kavrama tipini '${repClutch}' olarak belirledi. Manuel araçta clutchType 'MANUEL' olmalıdır.`,
+            needsRepair: true,
+          };
+        }
+
+        const manualViolations = 
+          reportStr.includes('mekatronik arızası') || 
+          reportStr.includes('mekatronik basınç') || 
+          reportStr.includes('çift kavrama titremesi') || 
+          reportStr.includes('dsg kavrama') ||
+          reportStr.includes('tork konvertörü arızası');
+        
+        if (manualViolations) {
+          return {
+            isValid: false,
+            reason: `Araç MANUEL vites olarak seçildiği halde raporda mekatronik, çift kavrama titremesi veya tork konvertörü iddia edildi. Manuel araçta debriyaj baskı-balata ve vites geçişleri değerlendirilmelidir.`,
+            needsRepair: true,
+          };
+        }
+      } else {
+        // Araç Otomatik veya Yarı Otomatik
+        if (repTrans && (repTrans.includes('manuel') || repTrans.includes('düz vites') || repTrans.includes('duz vites'))) {
+          return {
+            isValid: false,
+            reason: `Şanzıman filtresi ("${selected8.transmission || 'Otomatik'}") ile üretilen şanzıman ("${report.vehicleIdentity?.transmissionName}") çelişiyor. Otomatik seçilen araçta manuel şanzıman verilemez.`,
+            needsRepair: true,
+          };
+        }
+
+        const isTorqueConverter = targetClutchType === 'TORK_KONVERTORLU';
+        const isCvt = targetClutchType === 'CVT';
+        const isEcvt = targetClutchType === 'ELEKTRONIK_PLANET_HIBRIT';
+
+        if (isTorqueConverter || isCvt || isEcvt) {
+          const hasDsgOrDctHallucination = 
+            reportStr.includes('kuru çift kavrama') || 
+            reportStr.includes('dsg mekatronik') || 
+            reportStr.includes('mekatronik basınç tüpü') ||
+            reportStr.includes('kuru kavrama balata aşınması');
+          if (hasDsgOrDctHallucination) {
+            return {
+              isValid: false,
+              reason: `Aracın doğrulanmış şanzıman mimarisi (${targetTrans} - ${targetClutchType}) tork konvertörlü veya CVT olduğu halde raporda DSG / Kuru çift kavrama mekatronik arızası iddia edildi.`,
+              needsRepair: true,
+            };
+          }
+        }
       }
     }
 

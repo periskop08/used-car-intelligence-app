@@ -40,7 +40,7 @@ export class ResearchEvidenceValidationService {
       rawResearch.groundingSources.forEach(addSource);
     }
 
-    const questionContainer = rawResearch?.questions || rawResearch?.vehicleCharacterResearch?.questions || (rawResearch?.vehicleCharacterResearch && typeof rawResearch.vehicleCharacterResearch === 'object' && !rawResearch.vehicleCharacterResearch.questions ? rawResearch.vehicleCharacterResearch : null);
+    const questionContainer = rawResearch?.questions || rawResearch?.vehicleCharacterResearch?.questions || rawResearch?.answers || (rawResearch?.vehicleCharacterResearch && typeof rawResearch.vehicleCharacterResearch === 'object' && !rawResearch.vehicleCharacterResearch.questions ? rawResearch.vehicleCharacterResearch : null);
     if (questionContainer && typeof questionContainer === 'object') {
       Object.values(questionContainer).forEach((q: any) => {
         if (Array.isArray(q?.sources)) {
@@ -251,7 +251,9 @@ export class ResearchEvidenceValidationService {
           questionContainer.engine_character?.synthesisedAnswer ||
           questionContainer.engineTransmissionFit?.synthesisedAnswer ||
           questionContainer.engineTransmissionFit?.summary ||
-          rawResearch?.engineTransmissionFit?.summary;
+          rawResearch?.engineTransmissionFit?.summary ||
+          questionContainer.Q2?.answerText ||
+          (Object.values(questionContainer).find((q: any) => typeof q?.answerText === 'string') as any)?.answerText;
         if (engineAnswer && typeof engineAnswer === 'string') {
           const hpMatch = engineAnswer.match(/(\d+)\s*(HP|PS|kW|bg|beygir)\b/i);
           if (hpMatch) {

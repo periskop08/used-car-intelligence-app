@@ -994,5 +994,6 @@ export * from './utils/sanitizeTurkishDefectReason';
 export * from './utils/calculateVehicleMtv';
 export * from './utils/resolveVehicleRange';
 export * from './utils/automotiveEngineTaxonomy';
+export * from './utils/automotiveTransmissionTaxonomy';
 export * from './types/feed-contract';
 

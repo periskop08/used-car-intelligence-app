@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { VehicleCharacterResearchService } from '../research/vehicle-character-research.service';
 import { VehiclePowerEnrichmentService } from '../vehicle/vehicle-power-enrichment.service';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
-import { resolveAutomotiveEngineTaxonomy } from '@used-car-intelligence/shared';
+import { resolveAutomotiveEngineTaxonomy, lookupAutomotiveTransmissionTaxonomy } from '@used-car-intelligence/shared';
 import * as crypto from 'crypto';
 import OpenAI from 'openai';
 
@@ -337,6 +337,18 @@ export class VehicleReportContextBuilderService {
       }
     }
 
+    const transTaxonomy = lookupAutomotiveTransmissionTaxonomy({
+      brand: variant.brand?.name,
+      model: variant.model?.name,
+      engineCode: variant.engine?.code,
+      modelYear: variant.year,
+      fuelType: variant.fuelType,
+      transmissionName: transName,
+      transmissionType: variant.transmission?.type,
+      isElectric: isElectricVariant,
+      isHybrid: isHybridVariant,
+    });
+
     const performanceData: Record<string, any> = {
       enginePowerHp: engineHp,
       powerUnit: powerUnit,
@@ -347,8 +359,11 @@ export class VehicleReportContextBuilderService {
       torqueSource: torqueSource,
       torqueSemantic: torqueSemantic,
       engineDisplacementCc: engineCc,
-      transmissionName: transName || null,
-      transmissionSpeeds: null, // Let AI derive exact gear count (e.g. 6-speed for Kia Cerato, 5-speed for Civic)
+      transmissionName: transTaxonomy.transmissionTypeAndSpeeds || transName || null,
+      transmissionSpeeds: transTaxonomy.transmissionSpeeds || null,
+      clutchType: transTaxonomy.clutchType,
+      clutchTypeTr: transTaxonomy.clutchTypeTr,
+      transmissionFamily: transTaxonomy.transmissionFamily,
       drivetrain: driveType,
       zeroToHundredKmh: zeroToHundred,
       zeroToHundredSec: zeroToHundred,
@@ -365,6 +380,8 @@ export class VehicleReportContextBuilderService {
       batteryCapacityKwh: batteryCapacityVal,
       timingSystem: engineTaxonomy.timingSystem,
     };
+
+    const resolvedFuelType = variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin';
 
     const contextObj = {
       vehicleIdentity: {
@@ -386,7 +403,7 @@ export class VehicleReportContextBuilderService {
         engineCode: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
         engineFamily: engineTaxonomy.engineFamily,
         engineType: specsJson.engineType || null,
-        fuelType: variant.fuelType === 'PETROL' ? 'Benzin' : variant.fuelType === 'DIESEL' ? 'Dizel' : variant.fuelType === 'HYBRID' ? 'Hibrit' : variant.fuelType === 'ELECTRIC' ? 'Elektrik' : variant.fuelType === 'LPG' ? 'LPG & Benzin' : 'Benzin',
+        fuelType: resolvedFuelType,
         isElectric: isElectricVariant,
         isHybrid: isHybridVariant,
         powertrainType: isElectricVariant ? 'BEV' : isHybridVariant ? 'HEV' : (isDieselVariant ? 'ICE_DIESEL' : 'ICE_PETROL'),
@@ -395,8 +412,24 @@ export class VehicleReportContextBuilderService {
         timingDescriptionTr: engineTaxonomy.timingDescriptionTr,
         electricRangeWltpKm: electricRangeVal,
         batteryCapacityKwh: batteryCapacityVal,
-        transmissionName: isElectricVariant ? (transName || 'Tek Oranlı Redüktör') : (transName || 'Otomatik'),
-        transmissionCode: isElectricVariant ? 'SINGLE_SPEED_DIRECT' : (variant.transmission?.type || 'AUTOMATIC'),
+        transmissionName: transTaxonomy.transmissionTypeAndSpeeds || (isElectricVariant ? 'Tek Oranlı Redüktör' : (transName || 'Otomatik')),
+        transmissionFamily: transTaxonomy.transmissionFamily,
+        clutchType: transTaxonomy.clutchType,
+        clutchTypeTr: transTaxonomy.clutchTypeTr,
+        transmissionSpeeds: transTaxonomy.transmissionSpeeds,
+        transmissionCode: transTaxonomy.transmissionCode || (isElectricVariant ? 'SINGLE_SPEED_DIRECT' : (variant.transmission?.type || 'AUTOMATIC')),
+        transmissionMaintenanceTr: transTaxonomy.maintenanceDescriptionTr,
+        selected8Filters: {
+          brand: variant.brand?.name || 'Belirtilmemiş',
+          model: variant.model?.name || 'Belirtilmemiş',
+          year: variant.year,
+          bodyType: variant.bodyType || 'Sedan',
+          engine: variant.engine?.code || variant.engine?.description || 'Orijinal Motor',
+          fuelType: resolvedFuelType,
+          transmission: transTaxonomy.transmissionTypeAndSpeeds || transName || 'Otomatik',
+          clutchType: transTaxonomy.clutchType,
+          trim: variant.trim?.name || 'Standart Donanım',
+        },
         drivetrain: driveType,
         trimName: variant.trim?.name || 'Standart Donanım',
         marketRegion: variant.marketRegion || 'TR',

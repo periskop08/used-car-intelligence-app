@@ -536,8 +536,70 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     } else if (validationContext?.performanceData?.engineDisplacementCc) {
       baseReport.vehicleIdentity.engineDisplacementCc = Number(validationContext.performanceData.engineDisplacementCc);
     }
-    if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
-    if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+    // --- TRANSMISSION RESOLUTION & FIDELITY GUARD ---
+    const chosenTransFilter = (validationContext?.vehicleIdentity?.selected8Filters?.transmission || '').toLowerCase();
+    const taxonomyClutch = validationContext?.vehicleIdentity?.clutchType;
+    const isManualSelected = taxonomyClutch === 'MANUEL' || chosenTransFilter.includes('manuel') || chosenTransFilter.includes('düz');
+    const isAutomaticSelected = !isManualSelected && !isEv && (
+      chosenTransFilter.includes('otomatik') || 
+      (taxonomyClutch && taxonomyClutch !== 'MANUEL')
+    );
+
+    if (isEv) {
+      baseReport.vehicleIdentity.transmissionName = validationContext?.vehicleIdentity?.transmissionName || 'Tek Kademeli Redüktör';
+      baseReport.vehicleIdentity.transmissionCode = validationContext?.vehicleIdentity?.transmissionCode || 'DIRECT_DRIVE_REDUCTION';
+    } else if (isManualSelected) {
+      // Vehicle is Manual: Strictly reject dual clutch / torque converter / automatic hallucinations
+      const aiTransStr = (specs.transmissionTypeAndSpeeds || '').toLowerCase();
+      const aiHallucinatedAuto = /otomatik|dsg|edc|dct|cvt|tork|powershift|eat[68]|9g|8hp|steptronic|stronic|tiptronic/i.test(aiTransStr);
+      if (specs.transmissionTypeAndSpeeds && !aiHallucinatedAuto) {
+        baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+      } else if (validationContext?.vehicleIdentity?.transmissionName) {
+        baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
+      } else if (!baseReport.vehicleIdentity.transmissionName || baseReport.vehicleIdentity.transmissionName.toLowerCase().includes('otomatik')) {
+        baseReport.vehicleIdentity.transmissionName = 'Düz (Manuel)';
+      }
+      if (specs.transmissionCode && !aiHallucinatedAuto) {
+        baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+      } else if (validationContext?.vehicleIdentity?.transmissionCode) {
+        baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
+      }
+    } else if (isAutomaticSelected) {
+      // Vehicle is Automatic: Strictly reject manual hallucinations
+      const aiTransStr = (specs.transmissionTypeAndSpeeds || '').toLowerCase();
+      const aiHallucinatedManual = /(^|\b)(manuel|düz vites|duz vites)($|\b)/i.test(aiTransStr);
+      if (specs.transmissionTypeAndSpeeds && !aiHallucinatedManual) {
+        baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+      } else if (validationContext?.vehicleIdentity?.transmissionName) {
+        baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
+      } else if (!baseReport.vehicleIdentity.transmissionName || baseReport.vehicleIdentity.transmissionName.toLowerCase().includes('manuel')) {
+        baseReport.vehicleIdentity.transmissionName = 'Otomatik';
+      }
+      if (specs.transmissionCode && !aiHallucinatedManual) {
+        baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+      } else if (validationContext?.vehicleIdentity?.transmissionCode) {
+        baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
+      }
+    } else {
+      if (specs.transmissionTypeAndSpeeds) baseReport.vehicleIdentity.transmissionName = specs.transmissionTypeAndSpeeds;
+      else if (validationContext?.vehicleIdentity?.transmissionName) baseReport.vehicleIdentity.transmissionName = validationContext.vehicleIdentity.transmissionName;
+      if (specs.transmissionCode) baseReport.vehicleIdentity.transmissionCode = specs.transmissionCode;
+      else if (validationContext?.vehicleIdentity?.transmissionCode) baseReport.vehicleIdentity.transmissionCode = validationContext.vehicleIdentity.transmissionCode;
+    }
+
+    if (validationContext?.vehicleIdentity?.transmissionFamily) {
+      (baseReport.vehicleIdentity as any).transmissionFamily = validationContext.vehicleIdentity.transmissionFamily;
+    }
+    if (validationContext?.vehicleIdentity?.clutchType) {
+      (baseReport.vehicleIdentity as any).clutchType = validationContext.vehicleIdentity.clutchType;
+    }
+    if (validationContext?.vehicleIdentity?.clutchTypeTr) {
+      (baseReport.vehicleIdentity as any).clutchTypeTr = validationContext.vehicleIdentity.clutchTypeTr;
+    }
+    if (validationContext?.vehicleIdentity?.selected8Filters) {
+      (baseReport.vehicleIdentity as any).selected8Filters = validationContext.vehicleIdentity.selected8Filters;
+    }
+
     if (specs.engineCode && !baseReport.vehicleIdentity.engineCode) baseReport.vehicleIdentity.engineCode = specs.engineCode;
     if (specs.drivetrain) baseReport.vehicleIdentity.drivetrain = specs.drivetrain;
 
@@ -775,6 +837,18 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       }
       if (finalBatteryCapacity) {
         (baseReport.technicalSpecifications as any).batteryCapacityKwh = finalBatteryCapacity;
+      }
+      if (baseReport.vehicleIdentity.transmissionName) {
+        (baseReport.technicalSpecifications as any).transmissionTypeAndSpeeds = baseReport.vehicleIdentity.transmissionName;
+      }
+      if (baseReport.vehicleIdentity.transmissionCode) {
+        (baseReport.technicalSpecifications as any).transmissionCode = baseReport.vehicleIdentity.transmissionCode;
+      }
+      if (baseReport.vehicleIdentity.engineCode) {
+        (baseReport.technicalSpecifications as any).engineCode = baseReport.vehicleIdentity.engineCode;
+      }
+      if (baseReport.vehicleIdentity.drivetrain) {
+        (baseReport.technicalSpecifications as any).drivetrain = baseReport.vehicleIdentity.drivetrain;
       }
     }
   }

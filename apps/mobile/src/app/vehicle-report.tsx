@@ -62,9 +62,12 @@ interface ComprehensiveReport {
     torqueNm?: number;
     topSpeedKmh?: number;
     zeroToHundredSec?: number;
+    zeroToHundredKmh?: number;
     combinedFuelL100km?: number;
     luggageCapacityL?: number;
+    trunkCapacityLiters?: number;
     weightKg?: number;
+    curbWeightKg?: number;
   };
   expertDecisionSynthesis?: {
     vehicleCharacter?: {

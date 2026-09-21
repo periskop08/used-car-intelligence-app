@@ -593,6 +593,8 @@ export class VehicleFiltersController {
       }
     }
 
+    const transFilterClause = targetTrans ? getTransmissionWhereClause(targetTrans) : {};
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
@@ -603,15 +605,44 @@ export class VehicleFiltersController {
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...(targetTrim && targetTrim !== 'Standart / Baz' ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
+        ...transFilterClause,
       },
       include: { transmission: true, trim: true, engine: true },
-      take: 20,
+      take: 50,
     });
 
     if (variants.length > 0) {
-      const matched = targetTrans
-        ? variants.find(v => getTransmissionTr(v.transmission?.name || '').toLowerCase() === targetTrans.toLowerCase() || (v.transmission?.name || '').toLowerCase().includes(targetTrans.toLowerCase()))
+      let matched = targetTrans
+        ? variants.find(v => {
+            const vTrans = getTransmissionTr(v.transmission?.name || '').toLowerCase();
+            const target = targetTrans.toLowerCase();
+            if (target.includes('manuel') || target.includes('düz')) {
+              return vTrans.includes('manuel') || vTrans.includes('düz') || v.transmission?.type === 'MANUAL';
+            }
+            if (target.includes('yarı')) {
+              return vTrans.includes('yarı') || v.transmission?.type === 'DCT';
+            }
+            return !vTrans.includes('manuel') && !vTrans.includes('düz') && v.transmission?.type !== 'MANUAL';
+          })
         : variants[0];
+
+      if (targetTrim && targetTrim !== 'Standart / Baz') {
+        const trimMatches = variants.filter(v => (v.trim?.name || '').toLowerCase() === targetTrim.toLowerCase());
+        if (trimMatches.length > 0) {
+          const transAndTrim = targetTrans
+            ? trimMatches.find(v => {
+                const vTrans = getTransmissionTr(v.transmission?.name || '').toLowerCase();
+                const target = targetTrans.toLowerCase();
+                if (target.includes('manuel') || target.includes('düz')) {
+                  return vTrans.includes('manuel') || vTrans.includes('düz') || v.transmission?.type === 'MANUAL';
+                }
+                return !vTrans.includes('manuel') && !vTrans.includes('düz') && v.transmission?.type !== 'MANUAL';
+              })
+            : trimMatches[0];
+          if (transAndTrim) matched = transAndTrim;
+        }
+      }
+
       return {
         success: true,
         variantId: matched ? matched.id : variants[0].id,
@@ -625,6 +656,7 @@ export class VehicleFiltersController {
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         year: Number(year),
+        ...transFilterClause, // Never cross-contaminate transmission even in fallback!
       },
       include: { transmission: true, trim: true, engine: true },
       take: 50,
@@ -642,16 +674,28 @@ export class VehicleFiltersController {
       const vEngineCode = (v.engine?.code || '').toLowerCase();
       const vTrimName = (v.trim?.name || '').toLowerCase();
 
-      // Fuel match (highest priority: never swap Diesel for Hybrid/Petrol)
-      if (targetFuel && vFuelTr === targetFuel.toLowerCase()) {
-        score += 50;
+      // Fuel match (highest priority: NEVER swap Diesel for Hybrid/Petrol)
+      if (targetFuel) {
+        if (vFuelTr === targetFuel.toLowerCase()) {
+          score += 100;
+        } else {
+          score -= 500;
+        }
       }
 
-      // Transmission match
+      // Transmission match (NEVER swap Manuel for Automatic)
       if (targetTrans) {
         const transTarget = targetTrans.toLowerCase();
-        if (vTransTr === transTarget || (v.transmission?.name || '').toLowerCase().includes(transTarget)) {
-          score += 40;
+        const isTargetManual = transTarget.includes('manuel') || transTarget.includes('düz');
+        const isVManual = vTransTr.includes('manuel') || vTransTr.includes('düz') || v.transmission?.type === 'MANUAL';
+
+        if (isTargetManual === isVManual) {
+          score += 80;
+          if (vTransTr === transTarget || (v.transmission?.name || '').toLowerCase().includes(transTarget)) {
+            score += 20;
+          }
+        } else {
+          score -= 500;
         }
       }
 
@@ -660,21 +704,21 @@ export class VehicleFiltersController {
         const engTarget = targetEngine.toLowerCase();
         const dispMatch = engTarget.match(/(\d+\.\d+)/);
         if (dispMatch && vEngineCode.includes(dispMatch[1])) {
-          score += 30;
+          score += 40;
         }
         if (vEngineCode.includes(engTarget) || engTarget.includes(vEngineCode)) {
-          score += 15;
+          score += 20;
         }
       }
 
       // Trim match
       if (targetTrim && (vTrimName.includes(targetTrim.toLowerCase()) || targetTrim.toLowerCase().includes(vTrimName))) {
-        score += 20;
+        score += 30;
       }
 
       // BodyType match
       if (targetBodyType && v.bodyType === getBodyTypeEnum(targetBodyType)) {
-        score += 10;
+        score += 20;
       }
 
       return { variant: v, score };
