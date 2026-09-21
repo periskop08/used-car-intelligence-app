@@ -18,6 +18,7 @@ import { VehicleReportQuotaService } from './vehicle-report-quota.service';
 import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.service';
 import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
+import { VehicleReportAuditorService } from './vehicle-report-auditor.service';
 import { AuthModule } from '../auth/auth.module';
 import { ResearchModule } from '../research/research.module';
 import { ListingAiModule } from '../listing-ai/listing-ai.module';
@@ -38,6 +39,7 @@ import { VehicleModule } from '../vehicle/vehicle.module';
     VehicleReportContradictionService,
     VehicleReportPromptService,
     VehicleReportProviderService,
+    VehicleReportAuditorService,
     VehicleReportSemanticValidationService,
     VehicleReportNarrativeQualityService,
     ResearchEvidenceValidationService,
@@ -46,6 +48,6 @@ import { VehicleModule } from '../vehicle/vehicle.module';
     VehicleReportQuotaService,
     VehicleReportJobWorkerService,
   ],
-  exports: [VehicleReportService, VehicleReportScoringV6Service, TorqueScoutDecisionScoreService],
+  exports: [VehicleReportService, VehicleReportScoringV6Service, TorqueScoutDecisionScoreService, VehicleReportAuditorService],
 })
 export class VehicleReportModule {}

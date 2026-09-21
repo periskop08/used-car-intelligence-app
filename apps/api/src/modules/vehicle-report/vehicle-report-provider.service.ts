@@ -5,6 +5,7 @@ import { ResearchEvidenceValidationService } from './research-evidence-validatio
 import { VehicleReportSemanticValidationService } from './vehicle-report-semantic-validation.service';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
 import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
+import { VehicleReportAuditorService, isUserNeglectOrRoutineMaintenance } from './vehicle-report-auditor.service';
 import { VehicleReliabilityResearchService } from '../research/vehicle-reliability-research.service';
 import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
@@ -22,12 +23,16 @@ export class VehicleReportProviderService {
     private orchestratorProvider: ListingAiProviderService,
     @Optional() private scoringV6Service?: VehicleReportScoringV6Service,
     @Optional() private reliabilityResearchService?: VehicleReliabilityResearchService,
+    @Optional() private auditorService?: VehicleReportAuditorService,
   ) {
     if (!this.scoringV6Service) {
       this.scoringV6Service = new VehicleReportScoringV6Service();
     }
     if (!this.reliabilityResearchService) {
       this.reliabilityResearchService = new VehicleReliabilityResearchService();
+    }
+    if (!this.auditorService) {
+      this.auditorService = new VehicleReportAuditorService(this.orchestratorProvider);
     }
   }
 
@@ -189,6 +194,19 @@ export class VehicleReportProviderService {
             this.logger.warn(`[STAGE 4.1 NORMALIZATION] Normalized ${normInitial.warnings.length} initial shape deviation(s): ${JSON.stringify(normInitial.warnings)}`);
           }
           baseReport = normInitial.data;
+
+          // STAGE 4.15: Researcher 2 (Adversarial Reverse Auditor) & 3-Way Tie-Breaker Arbiter
+          if (this.auditorService) {
+            try {
+              const audited = await this.auditorService.auditAndHarmonizeReport(baseReport, validationContext);
+              baseReport = audited.report;
+              if (audited.auditResult.wasHarmonized) {
+                this.logger.log(`[STAGE 4.15 AUDITOR] Harmonized report: ${audited.auditResult.contradictions.join('; ')}. TieBreaker=${audited.auditResult.tieBreakerApplied}`);
+              }
+            } catch (auditErr: any) {
+              this.logger.warn(`[STAGE 4.15 AUDITOR NOTICE] Auditor pass skipped: ${auditErr?.message}`);
+            }
+          }
 
           // STAGE 4.2: Production Semantic Validation & Consistency Check
           let validation = this.semanticValidationService.validate(baseReport, validationContext);
@@ -944,11 +962,12 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     }
 
     // 4. Canonical Risk Grounding Sanitization
-    const canonicalRisks: any[] =
+    const canonicalRisks: any[] = (
       baseReport.reliabilityResearchShadow?.canonicalRisks ||
       contextJson?.reliabilityResearchShadow?.canonicalRisks ||
       contextJson?.canonicalRisks ||
-      [];
+      []
+    ).filter((r: any) => !isUserNeglectOrRoutineMaintenance(r.title, r.description || r.normalizedFailureMode));
     const verifiedScoringRisks = canonicalRisks.filter((r: any) => r.scoringEligible);
     const verifiedAnyRisks = canonicalRisks.filter(
       (r: any) =>
@@ -967,19 +986,23 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       const topRisk = groundingPool[0];
       if (baseReport.expertDecisionSynthesis?.primaryTechnicalRisk) {
         const pRisk = baseReport.expertDecisionSynthesis.primaryTechnicalRisk as any;
-        const matchesGrounding = groundingPool.some(
-          (vr: any) =>
-            vr.normalizedFailureMode === pRisk.normalizedFailureMode ||
-            vr.title?.toLowerCase().includes((pRisk.title || '').toLowerCase()) ||
-            (pRisk.title || '').toLowerCase().includes(vr.title?.toLowerCase()),
-        );
-        if (!matchesGrounding) {
-          pRisk.title = topRisk.title;
-          pRisk.riskTitle = topRisk.title;
-          pRisk.normalizedFailureMode = topRisk.normalizedFailureMode;
-          pRisk.explanation = topRisk.description || topRisk.severityBasis;
-          if (topRisk.inspectionInstruction) {
-            pRisk.inspectionInstructions = [topRisk.inspectionInstruction];
+        if (isUserNeglectOrRoutineMaintenance(pRisk.title, pRisk.explanation)) {
+          baseReport.expertDecisionSynthesis.primaryTechnicalRisk = null as any;
+        } else {
+          const matchesGrounding = groundingPool.some(
+            (vr: any) =>
+              vr.normalizedFailureMode === pRisk.normalizedFailureMode ||
+              vr.title?.toLowerCase().includes((pRisk.title || '').toLowerCase()) ||
+              (pRisk.title || '').toLowerCase().includes(vr.title?.toLowerCase()),
+          );
+          if (!matchesGrounding) {
+            pRisk.title = topRisk.title;
+            pRisk.riskTitle = topRisk.title;
+            pRisk.normalizedFailureMode = topRisk.normalizedFailureMode;
+            pRisk.explanation = topRisk.description || topRisk.severityBasis;
+            if (topRisk.inspectionInstruction) {
+              pRisk.inspectionInstructions = [topRisk.inspectionInstruction];
+            }
           }
         }
       }

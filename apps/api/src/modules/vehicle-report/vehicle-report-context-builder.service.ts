@@ -455,19 +455,29 @@ export class VehicleReportContextBuilderService {
         knownDatabaseProblems: variant.problems.map((p) => {
           const rawType = String((p as any).problemType || '').toUpperCase();
           const pStatus = String((p as any).status || '').toUpperCase();
+          const pTitleRaw = p.title || 'Mekanik Gözlem';
+          const pDescRaw = p.description || '';
+          const isUserNeglect = 
+            pTitleRaw.toLowerCase().includes('yağ değişim zamanlaması') ||
+            pTitleRaw.toLowerCase().includes('zamanında değiştirilmemesi') ||
+            pTitleRaw.toLowerCase().includes('bakım aksatılması') ||
+            pDescRaw.toLowerCase().includes('zamanında değiştirilmemesi') ||
+            pDescRaw.toLowerCase().includes('bakım aksatılması');
+
           const isVerified =
-            rawType === 'VERIFIED_FAILURE' ||
+            !isUserNeglect &&
+            (rawType === 'VERIFIED_FAILURE' ||
             rawType === 'COMMON_PROBLEM' ||
             rawType === 'CHRONIC' ||
             rawType === 'RECALL' ||
             rawType === 'TSB' ||
-            pStatus === 'APPROVED';
+            pStatus === 'APPROVED');
 
           const pType = isVerified
             ? 'VERIFIED_FAILURE'
             : (rawType === 'OBSERVED_BEHAVIOR' ? 'OBSERVED_BEHAVIOR' : 'REPORTED_COMPLAINT');
 
-          let pTitle = p.title || 'Mekanik Gözlem';
+          let pTitle = pTitleRaw;
           if (pType === 'REPORTED_COMPLAINT') {
             if (pTitle.toLowerCase().includes('silecek motoru arızası') || (pTitle.toLowerCase().includes('silecek') && pTitle.toLowerCase().includes('arızası'))) {
               pTitle = 'Otomatik Silecek Performansı Şikâyetleri';

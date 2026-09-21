@@ -406,6 +406,19 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
     - 'zeroToHundredKmh', 'topSpeedKmh', 'trunkCapacityLiters' ve 'curbWeightKg' alanları kullanıcının ekranındaki 6 teknik kartın 4'ünü oluşturur. Bu alanlar KESİNLİKLE null veya undefined bırakılamaz!
     - Eğer bağlamda doğrulanmış fabrika verisi verildiyse aynen koru; verilmediyse de bu spesifik araç kombinasyonunun (${brand} ${model} ${year} ${body}) üretici resmi fabrika katalog verilerini (0-100 km/s sn, azami hız km/s, bagaj litresi, boş ağırlık kg) saf sayı olarak eksiksiz doldur.
     - Elektrikli araçlarda 'electricRangeWltpKm' (WLTP menzil) ve 'batteryCapacityKwh' alanları da resmi fabrika verisiyle saf sayı olarak doldurulmalıdır.
+15. MODEL GAMI VE SHOWROOM KARŞILAŞTIRMASI KESİNLİKLE YASAKTIR (YALNIZCA SEÇİLEN ARACA ODAKLANMA):
+    - Rapor incelenen spesifik motor ve donanım kombinasyonunu (${brand} ${model} ${year} ${engine} ${trans} ${trim}) değerlendirir.
+    - KESİNLİKLE "motor seçenekleri sınırlıdır", "sadece 2.0 motor ile sunulması kısıtlamadır", "daha güçlü motor alternatifleri sınırlı kalıyor", "başka motor seçeneği yok" gibi showroom veya model gamı şikayetleri YAZILAMAZ!
+    - Kullanıcı zaten bu spesifik aracı satın almayı değerlendirmektedir. 'compromisesAndLimitations' alanı yalnızca seçilen bu aracın kendi mekanik oranları (örn. 4 ileri oranlar), şasi yapısı, tüketimi ve kullanım sınırları üzerinden açıklanmalıdır.
+16. KULLANICI KAYNAKLI BAKIM İHMALLERİ VE RUTİN BAKIMLAR KRONİK ARIZA SAYILAMAZ:
+    - Şanzıman yağı değişimi, motor yağı/filtre periyodu, triger kayışı km'si gibi kullanıcının periyodik olarak yaptırması gereken rutin servis işlemleri KESİNLİKLE 'primaryTechnicalRisk' veya kronik fabrika arızası olarak listelenemez!
+    - Yağın zamanında değiştirilmemesi aracın kronik kusuru değil, kullanıcının bakım ihmalidir. Kronik riskler; mekatronik kart arızası, diferansiyel uğultusu, conta kaçağı gibi doğrudan mekanik/elektronik tasarım ve parça kusurları olmalıdır.
+17. ŞEHİR İÇİ TÜKETİM VE KULLANIM DÜRÜSTLÜĞÜ:
+    - 8.0 L/100km veya üzeri karma fabrika tüketimine sahip içten yanmalı araçlar şehir içi dur-kalk trafiğinde KESİNLİKLE "yakıt konforu sağlar / tasarrufludur" şeklinde övülemez.
+    - Şehir içi için tork konvertörünün sarsıntısız kalkış rahatlığı övülebilir; ancak yoğun trafikte tüketimin belirgin şekilde artacağı dürüstçe belirtilmelidir.
+18. BAŞLIK, ANLATI VE KULLANICI PROFİLLERİ ARASINDA %100 TON VE PERFORMANS TUTARLILIĞI:
+    - Başlıkta "Güçlü Performans" yazıp "notSuitableFor" kısmında "Yüksek Performans Arayanlar: Bu araç yeterli güç sunmuyor" denilerek rapor kendi kendini yalanlayamaz!
+    - Araç safkan bir spor araba değilse (örn. 160 HP atmosferik sedan), başlık "Dengeli Sürüş Karakteri ve Güvenilirlik" gibi ölçülü olmalı; "notSuitableFor" kısmında ise "Safkan Sportif Hızlanma Arayanlar: Atmosferik motor ve 4 ileri şanzıman ani ara hızlanmalarda sakin bir karaktere sahiptir" şeklinde tutarlı ve dengeli gerekçeler sunulmalıdır.
 
 YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSON NESNESİ ÜRET (BAŞKA ANAHTAR İSMİ UYDURMA):
 {
