@@ -844,6 +844,30 @@ describe('50+ Popular Turkish Market Vehicle 8-Filter Ground Truth Matrix', () =
       expectedFamily: 'REDÜKTÖR',
       expectedCleanName: 'Doğrudan Tahrikli (Tek Vites)',
     },
+    {
+      brand: 'Subaru',
+      model: 'Impreza',
+      engineCode: '2.0',
+      modelYear: 2006,
+      fuelType: 'Benzin',
+      transmissionName: 'Otomatik',
+      expectedClutchType: 'TORK_KONVERTORLU',
+      expectedSpeeds: 4,
+      expectedFamily: 'SUBARU 4EAT',
+      expectedCleanName: '4 İleri Otomatik',
+    },
+    {
+      brand: 'Subaru',
+      model: 'Impreza',
+      engineCode: '2.0',
+      modelYear: 2012,
+      fuelType: 'Benzin',
+      transmissionName: 'Otomatik',
+      expectedClutchType: 'CVT',
+      expectedSpeeds: 1,
+      expectedFamily: 'LINEARTRONIC CVT',
+      expectedCleanName: 'Lineartronic (CVT)',
+    },
   ];
 
   it('contains at least 50 comprehensive vehicle test cases', () => {

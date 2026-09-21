@@ -151,7 +151,7 @@ export class VehicleReportContextBuilderService {
     const engineCc = isElectricVariant ? null : rawEngineCc;
 
     const transName = variant.transmission?.name || null;
-    const transSpeeds = specsJson.transmissionSpeeds || variant.transmission?.speeds || null;
+    const transSpeeds = specsJson.transmissionSpeeds || null;
     const driveType = specsJson.drivetrain || (variant as any).driveType || null;
     let zeroToHundred = specsJson.acceleration0to100 ?? specsJson.zeroToHundredKmh ?? specsJson.zeroToHundredSec ?? null;
     let topSpeedVal = specsJson.topSpeed ?? specsJson.topSpeedKmh ?? null;

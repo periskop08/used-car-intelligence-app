@@ -235,9 +235,11 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   // EAT8 (2018+ Aisin 8 İleri Tork Konvertörlü)
   {
     family: 'EAT8',
-    matcher: ({ brand, year, engine }) => {
+    matcher: ({ brand, year, engine, speeds, trans }) => {
       const isPsa = /peugeot|citroen|opel|ds/i.test(brand);
-      return isPsa && (year >= 2018 || engine.includes('1.5 bluehdi') || engine.includes('1.6 puretech'));
+      if (!isPsa) return false;
+      if (speeds === 6 || trans.includes('eat6') || trans.includes('6 ileri')) return false;
+      return (year >= 2018 || engine.includes('1.5 bluehdi') || engine.includes('1.6 puretech'));
     },
     clutchType: 'TORK_KONVERTORLU',
     typeAndSpeeds: '8 İleri Tork Konvertörlü Tam Otomatik (EAT8 - Aisin)',
@@ -535,7 +537,7 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     family: 'SUBARU 4EAT',
-    matcher: ({ brand, year, isManual }) => brand.includes('subaru') && !isManual && year <= 2008,
+    matcher: ({ brand, year, isManual }) => brand.includes('subaru') && !isManual && year <= 2009,
     clutchType: 'TORK_KONVERTORLU',
     typeAndSpeeds: '4 İleri Tork Konvertörlü Otomatik (Subaru 4EAT)',
     speeds: 4,
@@ -544,7 +546,7 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
   },
   {
     family: 'LINEARTRONIC CVT',
-    matcher: ({ brand, isManual }) => brand.includes('subaru') && !isManual,
+    matcher: ({ brand, year, isManual }) => brand.includes('subaru') && !isManual && year >= 2010,
     clutchType: 'CVT',
     typeAndSpeeds: 'Kademesiz Zincirli Otomatik (Lineartronic CVT)',
     speeds: 1,
@@ -601,10 +603,6 @@ export function lookupAutomotiveTransmissionTaxonomy(
 
   // 1. Check exact catalog rules
   for (const rule of TRANSMISSION_TAXONOMY_RULES) {
-    // Ground truth guard: If explicit gearbox speed count is provided (>1), candidate rule must match speed count
-    if (inputSpeeds && inputSpeeds > 1 && rule.speeds > 1 && rule.speeds !== inputSpeeds) {
-      continue;
-    }
     // Ground truth guard: Atmospheric engine cannot match dry dual-clutch turbo rules for Hyundai/Kia
     if (inputHasTurbo === false && rule.family === '7DCT' && (normBrand.includes('hyundai') || normBrand.includes('kia'))) {
       continue;
@@ -694,6 +692,7 @@ export function formatCleanTransmissionName(trans?: string | null): string {
   if (/7.*kuru.*(dct|çift)/i.test(t) || /hyundai 7dct/i.test(t) || /d7uf/i.test(t)) return '7 İleri DCT';
   if (/7.*ıslak.*(dct|çift)/i.test(t)) return '7 İleri Islak DCT';
   if (/6.*kuru.*(dct|çift|c635|ddct)/i.test(t)) return '6 İleri Kuru Çift Kavrama';
+  if (/subaru 4eat/i.test(t)) return '4 İleri Otomatik';
   if (/tek kademeli|redüktör|direct drive/i.test(t)) return 'Doğrudan Tahrikli (Tek Vites)';
   if (/tork konvert/i.test(t)) {
     const speedMatch = t.match(/(\d+)\s*İleri/i);
