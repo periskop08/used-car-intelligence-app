@@ -44,23 +44,26 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
                    (report.vehicleIdentity?.transmissionName || '').toLowerCase().includes('e-cvt') ||
                    report.performanceUsage?.powerSemantic === 'TOTAL_HYBRID_SYSTEM_POWER' ||
                    (report.vehicleIdentity as any)?.powerSemantic === 'TOTAL_HYBRID_SYSTEM_POWER';
-  const rawPower = report.performanceUsage?.sourcePowerValue 
+  let rawPower = report.performanceUsage?.sourcePowerValue 
     ?? report.vehicleIdentity?.sourcePowerValue 
     ?? report.performanceUsage?.powerHp 
     ?? (report.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp 
     ?? (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp 
     ?? (report as any).technicalSpecifications?.enginePowerHp
     ?? (report as any).technicalSpecifications?.powerHp
-    ?? report.vehicleIdentity?.enginePowerHp;
-  const powerUnit = report.performanceUsage?.sourcePowerUnit 
-    ?? report.vehicleIdentity?.sourcePowerUnit 
-    ?? (report.performanceUsage as any)?.powerUnit 
-    ?? (report.vehicleIdentity as any)?.powerUnit 
-    ?? ((report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerUnit) 
-    ?? 'HP';
-  const powerSemantic = report.performanceUsage?.powerSemantic 
-    ?? (report.vehicleIdentity as any)?.powerSemantic 
-    ?? (isHybrid ? 'TOTAL_HYBRID_SYSTEM_POWER' : undefined);
+    ?? report.vehicleIdentity?.enginePowerHp
+    ?? (report.vehicleIdentity as any)?.powerHp
+    ?? (report.performanceUsage as any)?.hp
+    ?? report.performanceUsage?.canonicalDisplayPowerHp
+    ?? report.vehicleIdentity?.canonicalDisplayPowerHp;
+
+  if (!rawPower) {
+    const fullNarrative = `${report.expertDecisionSynthesis?.vehicleCharacter?.headline || ''} ${report.expertDecisionSynthesis?.vehicleCharacter?.detailedAssessment || ''} ${report.performanceUsage?.rangeFactorsNote || ''}`;
+    const match = fullNarrative.match(/\b(\d{2,4})\s*(?:hp|bg|beygir|ps)\b/i);
+    if (match) {
+      rawPower = parseInt(match[1], 10);
+    }
+  }
 
   const powerLabel = rawPower !== null && rawPower !== undefined
     ? formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic)

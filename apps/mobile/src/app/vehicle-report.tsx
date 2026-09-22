@@ -986,14 +986,26 @@ export default function VehicleReportScreen() {
   }
 
   const synthesis = report?.expertDecisionSynthesis;
-  const rawPower = report?.performanceUsage?.sourcePowerValue 
+  let rawPower = report?.performanceUsage?.sourcePowerValue 
     ?? report?.vehicleIdentity?.sourcePowerValue 
     ?? report?.performanceUsage?.powerHp 
     ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp 
     ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp 
     ?? (report as any)?.technicalSpecifications?.enginePowerHp
     ?? (report as any)?.technicalSpecifications?.powerHp
-    ?? report?.vehicleIdentity?.enginePowerHp;
+    ?? report?.vehicleIdentity?.enginePowerHp
+    ?? (report?.vehicleIdentity as any)?.powerHp
+    ?? (report?.performanceUsage as any)?.hp
+    ?? report?.performanceUsage?.canonicalDisplayPowerHp
+    ?? report?.vehicleIdentity?.canonicalDisplayPowerHp;
+
+  if (!rawPower) {
+    const fullNarrative = `${report?.expertDecisionSynthesis?.vehicleCharacter?.headline || ''} ${report?.expertDecisionSynthesis?.vehicleCharacter?.detailedAssessment || ''} ${report?.performanceUsage?.rangeFactorsNote || ''}`;
+    const match = fullNarrative.match(/\b(\d{2,4})\s*(?:hp|bg|beygir|ps)\b/i);
+    if (match) {
+      rawPower = parseInt(match[1], 10);
+    }
+  }
   const powerUnit = report?.performanceUsage?.sourcePowerUnit 
     ?? report?.vehicleIdentity?.sourcePowerUnit 
     ?? (report?.performanceUsage as any)?.powerUnit 

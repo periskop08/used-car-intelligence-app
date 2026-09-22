@@ -886,6 +886,11 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       if (baseReport.vehicleIdentity.engineDisplacementCc && !isEv) {
         baseReport.technicalSpecifications.engineDisplacementCc = baseReport.vehicleIdentity.engineDisplacementCc;
       }
+      if (resolvedPowerHp) {
+        baseReport.technicalSpecifications.enginePowerHp = resolvedPowerHp;
+        (baseReport.technicalSpecifications as any).powerHp = resolvedPowerHp;
+        (baseReport.technicalSpecifications as any).powerUnit = resolvedPowerUnit || 'HP';
+      }
       baseReport.technicalSpecifications.zeroToHundredKmh = finalZeroToHundred;
       (baseReport.technicalSpecifications as any).zeroToHundredSec = finalZeroToHundred;
       baseReport.technicalSpecifications.topSpeedKmh = finalTopSpeed;
