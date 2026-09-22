@@ -12,7 +12,19 @@ export class AppController {
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
+      providers: {
+        hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
+        hasGeminiKey: Boolean(
+          process.env.GEMINI_API_KEY ||
+          process.env.GOOGLE_AI_KEY ||
+          process.env.GOOGLE_AI_API_KEY
+        ),
+        primaryProvider: (
+          process.env.LISTING_AI_PRIMARY_PROVIDER ||
+          (process.env.OPENAI_API_KEY ? 'openai' : 'gemini')
+        ).toLowerCase(),
+      },
     };
   }
 }

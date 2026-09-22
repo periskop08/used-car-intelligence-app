@@ -32,7 +32,10 @@ TEMEL DAYANAKLARIN & KURALLARIN:
     userMessage: string,
     contextJson: any,
   ): Promise<{ answer: string; mode: 'AI' | 'SAFE_FALLBACK'; providerName: string }> {
-    const primaryProviderName = (process.env.LISTING_AI_PRIMARY_PROVIDER || 'gemini').toLowerCase();
+    const primaryProviderName = (
+      process.env.LISTING_AI_PRIMARY_PROVIDER ||
+      (process.env.OPENAI_API_KEY ? 'openai' : 'gemini')
+    ).toLowerCase();
     
     const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
     const systemPrompt = isReportIntent 

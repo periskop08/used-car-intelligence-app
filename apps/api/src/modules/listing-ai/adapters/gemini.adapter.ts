@@ -67,6 +67,10 @@ export class GeminiAdapter implements AiProviderAdapter {
           } else {
             const errText = await response.text();
             this.logger.warn(`Gemini model ${model} HTTP Error ${response.status}: ${errText}`);
+            if (response.status === 402 || response.status === 429) {
+              this.logger.warn(`Gemini quota/billing exhausted (${response.status}). Skipping remaining Gemini models.`);
+              break;
+            }
           }
         } catch (err: any) {
           this.logger.warn(`Gemini model ${model} call failed: ${err?.message || err}`);
@@ -108,6 +112,9 @@ export class GeminiAdapter implements AiProviderAdapter {
               tokenCount: data?.usage?.total_tokens || 0,
             };
           }
+        } else {
+          const errText = await response.text();
+          this.logger.error(`OpenAI fallback in GeminiAdapter HTTP Error ${response.status}: ${errText}`);
         }
       } catch (e: any) {
         this.logger.warn(`OpenAI fallback in GeminiAdapter failed: ${e?.message || e}`);

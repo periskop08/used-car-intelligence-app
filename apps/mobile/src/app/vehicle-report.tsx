@@ -46,6 +46,7 @@ interface ComprehensiveReport {
     engineDisplacementCc?: number;
     sourcePowerValue?: number;
     sourcePowerUnit?: string;
+    canonicalDisplayPowerHp?: number;
     transmissionName?: string;
     fuelType?: string;
   };
@@ -57,7 +58,9 @@ interface ComprehensiveReport {
     powerHp?: number;
     sourcePowerValue?: number;
     sourcePowerUnit?: string;
+    canonicalDisplayPowerHp?: number;
     powerSemantic?: string;
+    rangeFactorsNote?: string;
     engineDisplacementCc?: number;
     torqueNm?: number;
     topSpeedKmh?: number;
@@ -380,6 +383,10 @@ function normalizeReport(data: any): ComprehensiveReport {
       modelYear: identity.modelYear || 2020,
       engineCode: identity.engineCode,
       enginePowerHp: identity.enginePowerHp || perf.powerHp,
+      engineDisplacementCc: identity.engineDisplacementCc ?? (rep as any).technicalSpecifications?.engineDisplacementCc,
+      sourcePowerValue: identity.sourcePowerValue ?? perf.sourcePowerValue,
+      sourcePowerUnit: identity.sourcePowerUnit ?? perf.sourcePowerUnit,
+      canonicalDisplayPowerHp: identity.canonicalDisplayPowerHp ?? perf.canonicalDisplayPowerHp,
       transmissionName: identity.transmissionName || 'Otomatik',
       fuelType: identity.fuelType || 'Benzin',
     },
@@ -397,12 +404,20 @@ function normalizeReport(data: any): ComprehensiveReport {
     finalVerdict: rep.finalVerdict || null,
     performanceUsage: {
       powerHp: perf.powerHp || identity.enginePowerHp,
+      sourcePowerValue: perf.sourcePowerValue ?? identity.sourcePowerValue,
+      sourcePowerUnit: perf.sourcePowerUnit ?? identity.sourcePowerUnit,
+      canonicalDisplayPowerHp: perf.canonicalDisplayPowerHp ?? identity.canonicalDisplayPowerHp,
+      powerSemantic: perf.powerSemantic ?? identity.powerSemantic,
+      rangeFactorsNote: perf.rangeFactorsNote,
+      engineDisplacementCc: perf.engineDisplacementCc ?? identity.engineDisplacementCc,
       torqueNm: perf.torqueNm,
       topSpeedKmh: perf.topSpeedKmh,
       zeroToHundredSec: perf.zeroToHundredSec || perf.zeroToHundredKmh,
       combinedFuelL100km: perf.combinedFuelL100km,
       luggageCapacityL: perf.luggageCapacityL || perf.trunkCapacityLiters,
+      trunkCapacityLiters: perf.trunkCapacityLiters || perf.luggageCapacityL,
       weightKg: perf.weightKg || perf.curbWeightKg,
+      curbWeightKg: perf.curbWeightKg || perf.weightKg,
     },
     expertDecisionSynthesis: rep.expertDecisionSynthesis || {
       vehicleCharacter: {
