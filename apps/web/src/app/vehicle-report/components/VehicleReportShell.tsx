@@ -49,6 +49,8 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     ?? report.performanceUsage?.powerHp 
     ?? (report.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp 
     ?? (report.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp 
+    ?? (report as any).technicalSpecifications?.enginePowerHp
+    ?? (report as any).technicalSpecifications?.powerHp
     ?? report.vehicleIdentity?.enginePowerHp;
   const powerUnit = report.performanceUsage?.sourcePowerUnit 
     ?? report.vehicleIdentity?.sourcePowerUnit 

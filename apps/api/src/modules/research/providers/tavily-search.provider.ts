@@ -12,6 +12,7 @@ import { ISearchProvider, SearchResponse, SearchResultItem } from './search-prov
 export class TavilySearchProvider implements ISearchProvider {
   name = 'tavily';
   private readonly logger = new Logger(TavilySearchProvider.name);
+  private static exhaustedUntil = 0;
 
   async search(query: string, options?: { searchDepth?: 'basic' | 'advanced'; maxResults?: number }): Promise<SearchResponse> {
     const apiKey = process.env.TAVILY_API_KEY;
@@ -20,10 +21,15 @@ export class TavilySearchProvider implements ISearchProvider {
       return { provider: 'tavily', query, results: [] };
     }
 
+    if (Date.now() < TavilySearchProvider.exhaustedUntil) {
+      return { provider: 'tavily', query, results: [] };
+    }
+
     try {
       const response = await fetch('https://api.tavily.com/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           api_key: apiKey,
           query,
@@ -35,6 +41,10 @@ export class TavilySearchProvider implements ISearchProvider {
       });
 
       if (!response.ok) {
+        if (response.status === 432 || response.status === 402 || response.status === 429) {
+          TavilySearchProvider.exhaustedUntil = Date.now() + 10 * 60 * 1000;
+          this.logger.warn(`Tavily quota exhausted (${response.status}). Setting 10-minute fail-fast circuit breaker.`);
+        }
         throw new Error(`Tavily HTTP error ${response.status}: ${await response.text()}`);
       }
 

@@ -989,6 +989,10 @@ export default function VehicleReportScreen() {
   const rawPower = report?.performanceUsage?.sourcePowerValue 
     ?? report?.vehicleIdentity?.sourcePowerValue 
     ?? report?.performanceUsage?.powerHp 
+    ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.enginePowerHp 
+    ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.powerHp 
+    ?? (report as any)?.technicalSpecifications?.enginePowerHp
+    ?? (report as any)?.technicalSpecifications?.powerHp
     ?? report?.vehicleIdentity?.enginePowerHp;
   const powerUnit = report?.performanceUsage?.sourcePowerUnit 
     ?? report?.vehicleIdentity?.sourcePowerUnit 

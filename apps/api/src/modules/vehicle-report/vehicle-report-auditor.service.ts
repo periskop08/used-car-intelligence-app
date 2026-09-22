@@ -300,6 +300,82 @@ export class VehicleReportAuditorService {
     }
 
     // =========================================================================
+    // CHECK 0.5: ENGINE POWER (HP) ADVERSARIAL AUDIT & HARMONIZATION
+    // "Bu Araç Nasıl Bir Otomobil?" anlatısı ile teknik özellik kartları arasındaki HP uyumu
+    // =========================================================================
+    const charHeadline = synth.vehicleCharacter?.headline || '';
+    const charAssessment = synth.vehicleCharacter?.detailedAssessment || (synth.vehicleCharacter as any)?.explanation || '';
+    const charFullText = `${charHeadline} ${charAssessment}`;
+
+    // Extract explicitly declared horsepower in narrative (e.g. "128 HP", "160 HP", "136 bg", "150 beygir")
+    const narrativeHpMatch = charFullText.match(/\b(\d{2,4})\s*(?:hp|bg|beygir|ps)\b/i);
+    const narrativeHp = narrativeHpMatch ? parseInt(narrativeHpMatch[1], 10) : null;
+
+    const cardHp = Number(
+      report.performanceUsage?.sourcePowerValue 
+      ?? report.vehicleIdentity?.sourcePowerValue 
+      ?? report.performanceUsage?.powerHp 
+      ?? (report as any).technicalSpecifications?.enginePowerHp
+      ?? report.vehicleIdentity?.enginePowerHp
+      ?? 0
+    );
+
+    if (narrativeHp && narrativeHp >= 30 && narrativeHp <= 1500) {
+      if (!cardHp || Math.abs(cardHp - narrativeHp) > 0) {
+        this.logger.warn(
+          `[RESEARCHER 2 AUDIT] HP Contradiction Detected: Narrative claims ${narrativeHp} HP but technical card shows ${cardHp || 'none'}. Arbiter harmonizing technical specification cards.`
+        );
+        auditResult.hasContradiction = true;
+        auditResult.contradictions.push(
+          `Motor gücü çelişkisi: 'Bu Araç Nasıl Bir Otomobil?' bölümünde ${narrativeHp} HP belirtilirken, teknik özellik kartında ${cardHp || 'belirtilmemiş'} yer alıyor.`
+        );
+
+        // Arbiter harmonizes technical cards to authoritative narrative HP
+        vIdentity.enginePowerHp = narrativeHp;
+        vIdentity.canonicalDisplayPowerHp = narrativeHp;
+        vIdentity.sourcePowerValue = narrativeHp;
+        vIdentity.sourcePowerUnit = 'HP';
+        (vIdentity as any).powerSource = 'VERIFIED_STAGE_1';
+        (vIdentity as any).powerUnit = 'HP';
+
+        if (!report.performanceUsage) {
+          report.performanceUsage = {} as any;
+        }
+        report.performanceUsage.powerHp = narrativeHp;
+        report.performanceUsage.sourcePowerValue = narrativeHp;
+        report.performanceUsage.canonicalDisplayPowerHp = narrativeHp;
+        report.performanceUsage.powerUnit = 'HP';
+        (report.performanceUsage as any).powerSource = 'VERIFIED_STAGE_1';
+
+        if ((report as any).technicalSpecifications) {
+          (report as any).technicalSpecifications.enginePowerHp = narrativeHp;
+          (report as any).technicalSpecifications.powerHp = narrativeHp;
+          (report as any).technicalSpecifications.powerUnit = 'HP';
+        }
+        if ((synth as any).technicalSpecifications) {
+          (synth as any).technicalSpecifications.enginePowerHp = narrativeHp;
+          (synth as any).technicalSpecifications.powerHp = narrativeHp;
+          (synth as any).technicalSpecifications.powerUnit = 'HP';
+        }
+        auditResult.wasHarmonized = true;
+      }
+    } else if (cardHp && cardHp >= 30 && cardHp <= 1500) {
+      // Sync technical specs if missing in performanceUsage or technicalSpecifications
+      if (!report.performanceUsage?.powerHp || !report.performanceUsage?.sourcePowerValue) {
+        if (!report.performanceUsage) report.performanceUsage = {} as any;
+        report.performanceUsage.powerHp = cardHp;
+        report.performanceUsage.sourcePowerValue = cardHp;
+        report.performanceUsage.canonicalDisplayPowerHp = cardHp;
+        report.performanceUsage.powerUnit = 'HP';
+      }
+      if ((report as any).technicalSpecifications && !(report as any).technicalSpecifications.enginePowerHp) {
+        (report as any).technicalSpecifications.enginePowerHp = cardHp;
+        (report as any).technicalSpecifications.powerHp = cardHp;
+        (report as any).technicalSpecifications.powerUnit = 'HP';
+      }
+    }
+
+    // =========================================================================
     // CHECK 1: User Maintenance Neglect in Chronic Risks (Yağ Değişimi vb.)
     // =========================================================================
     if (synth.primaryTechnicalRisk) {

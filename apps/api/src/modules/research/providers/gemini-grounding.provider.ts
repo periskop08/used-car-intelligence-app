@@ -11,6 +11,7 @@ import { ISearchProvider, SearchResponse, SearchResultItem } from './search-prov
 export class GeminiGroundingProvider implements ISearchProvider {
   name = 'gemini';
   private readonly logger = new Logger(GeminiGroundingProvider.name);
+  private static exhaustedUntil = 0;
 
   async search(query: string, options?: { searchDepth?: 'basic' | 'advanced'; maxResults?: number }): Promise<SearchResponse> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -19,20 +20,29 @@ export class GeminiGroundingProvider implements ISearchProvider {
       return { provider: 'gemini', query, results: [] };
     }
 
+    if (Date.now() < GeminiGroundingProvider.exhaustedUntil) {
+      return { provider: 'gemini', query, results: [] };
+    }
+
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           contents: [{
             parts: [{ text: `Aşağıdaki otomotiv konusu için internetteki teknik verileri araştır ve özetle:\n"${query}"` }]
           }],
-          tools: [{ google_search_retrieval: {} }]
+          tools: [{ googleSearch: {} }]
         })
       });
 
       if (!response.ok) {
+        if (response.status === 402 || response.status === 404 || response.status === 429) {
+          GeminiGroundingProvider.exhaustedUntil = Date.now() + 10 * 60 * 1000;
+          this.logger.warn(`Gemini Grounding unavailable (${response.status}). Setting 10-minute fail-fast breaker.`);
+        }
         throw new Error(`Gemini Grounding HTTP error ${response.status}: ${await response.text()}`);
       }
 

@@ -259,5 +259,49 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(audited.report.vehicleIdentity.transmissionName).toContain('Redüktör');
       expect((audited.report.vehicleIdentity as any).clutchType).toBe('ELEKTRIKLI_TEK_ORANLI');
     });
+
+    it('should harmonize horsepower when "Bu Araç Nasıl Bir Otomobil?" narrative claims 128 HP but technical card is contradictory or missing', async () => {
+      const mockReport: any = {
+        vehicleIdentity: {
+          brand: 'Kia',
+          model: 'Cerato',
+          modelYear: 2022,
+          enginePowerHp: 90, // Wrong / stale DB card HP
+          transmissionName: '6 İleri Tork Konvertörlü Otomatik',
+          transmissionCode: 'A6GF1',
+          engineCode: 'G4FG',
+        },
+        performanceUsage: {
+          powerHp: 90,
+          sourcePowerValue: 90,
+        },
+        technicalSpecifications: {
+          enginePowerHp: null,
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: '2022 Kia Cerato: Şehir İçi Konfor ve Ekonomi',
+            detailedAssessment: 'Kia Cerato 2022 modeli, atmosferik 1.6 MPI motoru ve 128 HP gücüyle öne çıkıyor. Günlük kullanımda yeterli performans sunar.',
+          },
+          suitableFor: [],
+          notSuitableFor: [],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(mockReport, {});
+
+      // 1. Contradiction detected and harmonized
+      expect(audited.auditResult.hasContradiction).toBe(true);
+      expect(audited.auditResult.wasHarmonized).toBe(true);
+
+      // 2. Technical specification cards harmonized to narrative's 128 HP
+      expect(audited.report.vehicleIdentity.enginePowerHp).toBe(128);
+      expect(audited.report.vehicleIdentity.canonicalDisplayPowerHp).toBe(128);
+      expect(audited.report.performanceUsage.powerHp).toBe(128);
+      expect(audited.report.performanceUsage.sourcePowerValue).toBe(128);
+      expect((audited.report as any).technicalSpecifications.enginePowerHp).toBe(128);
+    });
   });
 });

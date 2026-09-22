@@ -944,6 +944,56 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       }
     }
 
+    // 2.1 Seller Questions Generic Pattern Sanitization
+    if (Array.isArray(baseReport.sellerQuestions)) {
+      const genericQuestionPatterns = [
+        'yağ sızıntısı var mı',
+        'motor arızası veya sızıntı',
+        'fren sisteminin durumu',
+        'fren sisteminin son durumu',
+        'şanzıman geçişleri sorunsuz mu',
+        'şanzıman geçişleri ne kadar akıcı',
+        'bakımları zamanında yapıldı mı',
+        'herhangi bir arıza var mı',
+        'aracın bakımları tam mı',
+      ];
+
+      baseReport.sellerQuestions = baseReport.sellerQuestions.map((q) => {
+        const qText = (q.questionText || (typeof q === 'string' ? q : '')).toLowerCase();
+        for (const pattern of genericQuestionPatterns) {
+          if (qText.includes(pattern)) {
+            if (pattern.includes('fren')) {
+              return {
+                ...q,
+                questionText: 'Fren balata ve disk kalınlıkları son periyodik bakımda ölçüldü mü, hidrolik sıvısı ve balatalar yenilendi mi?',
+                expectedAnswerHint: q.expectedAnswerHint || 'Son bakımda balata ve disk kalınlıkları ölçüldü, aşınma sınırları dahilinde ve hidrolik seviyesi tam.',
+              };
+            }
+            if (pattern.includes('şanzıman')) {
+              return {
+                ...q,
+                questionText: 'Şanzıman yağı ve filtre bakımı üretici periyoduna uygun yapıldı mı, vites geçişlerinde vuruntu veya kaçırma var mı?',
+                expectedAnswerHint: q.expectedAnswerHint || 'Şanzıman bakımları zamanında yapıldı, geçişler pürüzsüz ve vuruntu bulunmuyor.',
+              };
+            }
+            if (pattern.includes('yağ') || pattern.includes('motor')) {
+              return {
+                ...q,
+                questionText: 'Motor yağı eksiltme durumu takip edildi mi, külbütör kapağı veya karter çevresinde terleme/kaçak mevcut mu?',
+                expectedAnswerHint: q.expectedAnswerHint || 'Düzenli yağ kontrolleri yapıldı, eksiltme veya kaçak bulunmuyor.',
+              };
+            }
+            return {
+              ...q,
+              questionText: 'Aracın periyodik bakım kayıtları, triger/tahrik sistemi kontrolü ve yetkili/uzman servis faturaları mevcut mu?',
+              expectedAnswerHint: q.expectedAnswerHint || 'Yetkili veya uzman özel servis faturaları ve bakım defteri eksiksiz mevcuttur.',
+            };
+          }
+        }
+        return q;
+      });
+    }
+
     const synth = baseReport.expertDecisionSynthesis;
     if (synth?.primaryTechnicalRisk) {
       const risk = synth.primaryTechnicalRisk as any;

@@ -12,11 +12,16 @@ import { ISearchProvider, SearchResponse, SearchResultItem } from './search-prov
 export class FirecrawlExtractProvider implements ISearchProvider {
   name = 'firecrawl';
   private readonly logger = new Logger(FirecrawlExtractProvider.name);
+  private static exhaustedUntil = 0;
 
   async search(query: string, options?: { searchDepth?: 'basic' | 'advanced'; maxResults?: number }): Promise<SearchResponse> {
     const apiKey = process.env.FIRECRAWL_API_KEY;
     if (!apiKey) {
       this.logger.warn('FIRECRAWL_API_KEY not configured. Skipping Firecrawl search.');
+      return { provider: 'firecrawl', query, results: [] };
+    }
+
+    if (Date.now() < FirecrawlExtractProvider.exhaustedUntil) {
       return { provider: 'firecrawl', query, results: [] };
     }
 
@@ -27,6 +32,7 @@ export class FirecrawlExtractProvider implements ISearchProvider {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           query,
           limit: options?.maxResults || 5,
@@ -35,6 +41,10 @@ export class FirecrawlExtractProvider implements ISearchProvider {
       });
 
       if (!response.ok) {
+        if (response.status === 402 || response.status === 429) {
+          FirecrawlExtractProvider.exhaustedUntil = Date.now() + 10 * 60 * 1000;
+          this.logger.warn(`Firecrawl quota exhausted (${response.status}). Setting 10-minute fail-fast circuit breaker.`);
+        }
         throw new Error(`Firecrawl HTTP error ${response.status}: ${await response.text()}`);
       }
 

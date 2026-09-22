@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 @Injectable()
 export class WebSearchProvider implements SearchProvider {
   private readonly logger = new Logger(WebSearchProvider.name);
+  private static tavilyExhaustedUntil = 0;
 
   // Authenticity contract invariants:
   // An LLM is NEVER a search provider. Synthetic search fallback is permanently disabled.
@@ -17,14 +18,14 @@ export class WebSearchProvider implements SearchProvider {
     const serperKey = process.env.SERPER_API_KEY;
     const geminiApiKey = process.env.GEMINI_API_KEY;
 
-    // 1. Try authentic Tavily Web Search API first if key is present
-    if (tavilyKey) {
+    // 1. Try authentic Tavily Web Search API first if key is present and not exhausted
+    if (tavilyKey && Date.now() >= WebSearchProvider.tavilyExhaustedUntil) {
       this.logger.log(`Using Tavily Live Search for query: "${query}"`);
       try {
         const response = await fetch('https://api.tavily.com/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             api_key: tavilyKey,
             query,
@@ -69,6 +70,9 @@ export class WebSearchProvider implements SearchProvider {
             });
           }
         } else {
+          if (response.status === 432 || response.status === 402 || response.status === 429) {
+            WebSearchProvider.tavilyExhaustedUntil = Date.now() + 10 * 60 * 1000;
+          }
           this.logger.warn(`Tavily search returned status ${response.status}. Falling back to next search provider...`);
         }
       } catch (error: any) {
