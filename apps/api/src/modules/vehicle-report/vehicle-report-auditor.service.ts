@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ComprehensiveVehicleReport } from '@used-car-intelligence/shared';
+import {
+  ComprehensiveVehicleReport,
+  lookupAutomotiveTransmissionTaxonomy,
+  formatCleanTransmissionName,
+} from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
 export interface AuditResult {
@@ -87,6 +91,213 @@ export class VehicleReportAuditorService {
     const ccVal = vIdentity.engineDisplacementCc || (report as any).technicalSpecifications?.engineDisplacementCc;
     const ccText = ccVal ? `${(ccVal / 1000).toFixed(1)} litrelik ` : '';
     const transSimple = transName ? (transName.toLowerCase().includes('otomatik') ? 'otomatik şanzımanın' : `${transName}`) : 'şanzımanın';
+
+    // =========================================================================
+    // CHECK 0: ADVERSARIAL REVERSE AUDITOR & ARBITER (Şanzıman ve Güç Ünitesi Mimari Doğrulaması)
+    // =========================================================================
+    const txTaxonomy = lookupAutomotiveTransmissionTaxonomy({
+      brand,
+      model,
+      engineCode: vIdentity.engineCode || vIdentity.engine,
+      modelYear: Number(year) || undefined,
+      fuelType: vIdentity.fuelType,
+      transmissionName: transName,
+      isElectric,
+      isHybrid: (vIdentity as any).isHybrid || false,
+    });
+
+    const isCanonicalCvt = txTaxonomy.clutchType === 'CVT';
+    const isCanonicalDualClutch = txTaxonomy.clutchType === 'KURU_CIFT_KAVRAMA' || txTaxonomy.clutchType === 'ISLAK_CIFT_KAVRAMA';
+    const isCanonicalTorqueConverter = txTaxonomy.clutchType === 'TORK_KONVERTORLU';
+    const isCanonicalManual = txTaxonomy.clutchType === 'MANUEL';
+    const isCanonicalEv = txTaxonomy.clutchType === 'ELEKTRIKLI_TEK_ORANLI' || isElectric;
+
+    // Build comprehensive text corpus from report
+    const fullTextCorpus = [
+      vIdentity.transmissionName || '',
+      vIdentity.selected8Filters?.transmission || '',
+      synth.vehicleCharacter?.headline || '',
+      synth.vehicleCharacter?.detailedAssessment || (synth.vehicleCharacter as any)?.explanation || '',
+      synth.dailyUseAssessment?.cityUse || '',
+      synth.dailyUseAssessment?.highwayUse || '',
+      ...(synth.suitableFor || []).map((s: any) => `${s.profile || ''} ${s.explanation || ''}`),
+      ...(synth.notSuitableFor || []).map((s: any) => `${s.profile || ''} ${s.explanation || ''}`),
+      ...(synth.purchaseConditions || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
+      ...(synth.walkAwayConditions || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
+    ].join(' ').toLowerCase();
+
+    const claimsCvt = /\b(lineartronic|kademesiz|cvt|çelik zincirli|çelik kayışlı|kademesiz zincirli|multidrive|x-tronic)\b/i.test(fullTextCorpus);
+    const claimsDualClutch = /\b(çift kavrama|çift kavramalı|dsg|dq200|dq250|dq381|dq500|edc|powershift|s-tronic|7g-dct|8g-dct|ddct)\b/i.test(fullTextCorpus);
+    const claimsTorqueConverter = /\b(tork konvertör|tork konvertörlü|eat8|eat6|zf 8hp|zf 9hp|4eat)\b/i.test(fullTextCorpus);
+    const claimsManual = /\b(manuel vites|debriyaj pedalı|düz vites)\b/i.test(fullTextCorpus);
+    const isCanonicalRobotized = txTaxonomy.clutchType === 'ROBOTIZE_TEK_KAVRAMA';
+
+    const reportedTrans = (vIdentity.transmissionName || '').toLowerCase();
+    const reportedMatchesCanonical =
+      reportedTrans.includes(txTaxonomy.transmissionFamily.toLowerCase()) ||
+      (isCanonicalTorqueConverter && (reportedTrans.includes('tork konvert') || reportedTrans.includes('otomatik'))) ||
+      (isCanonicalCvt && (reportedTrans.includes('cvt') || reportedTrans.includes('kademesiz'))) ||
+      (isCanonicalDualClutch && (reportedTrans.includes('dct') || reportedTrans.includes('dsg') || reportedTrans.includes('edc') || reportedTrans.includes('çift kavrama'))) ||
+      (isCanonicalRobotized && (reportedTrans.includes('auto6r') || reportedTrans.includes('etg') || reportedTrans.includes('amt') || reportedTrans.includes('robotize'))) ||
+      (isCanonicalManual && reportedTrans.includes('manuel')) ||
+      (isCanonicalEv && (reportedTrans.includes('redüktör') || reportedTrans.includes('doğrudan tahrik') || reportedTrans.includes('tek kademeli') || reportedTrans.includes('tek vites')));
+
+    const isGenericTransmissionOption =
+      reportedTrans === 'otomatik' ||
+      reportedTrans === 'yarı otomatik' ||
+      reportedTrans === 'otomatik şanzıman' ||
+      reportedTrans === 'manuel' ||
+      reportedTrans === 'düz (manuel)';
+
+    let transmissionContradictionDetected = false;
+    let contradictionReason = '';
+
+    if (!isCanonicalCvt && claimsCvt) {
+      transmissionContradictionDetected = true;
+      contradictionReason = `${year} ${brand} ${model} aracı CVT şanzımana sahip olmamasına rağmen raporda CVT / Lineartronic iddiaları yer alıyor (Gerçek: ${txTaxonomy.transmissionTypeAndSpeeds}).`;
+    } else if (!isCanonicalDualClutch && claimsDualClutch) {
+      transmissionContradictionDetected = true;
+      contradictionReason = `${year} ${brand} ${model} aracı çift kavramalı şanzımana sahip olmamasına rağmen raporda DSG / EDC / Çift Kavrama iddiaları yer alıyor (Gerçek: ${txTaxonomy.transmissionTypeAndSpeeds}).`;
+    } else if ((isCanonicalCvt || isCanonicalDualClutch || isCanonicalEv || isCanonicalRobotized) && claimsTorqueConverter && !fullTextCorpus.includes('geleneksel tork')) {
+      transmissionContradictionDetected = true;
+      contradictionReason = `${year} ${brand} ${model} aracı tork konvertörlü şanzımana sahip olmamasına rağmen raporda tork konvertörü iddiaları yer alıyor (Gerçek: ${txTaxonomy.transmissionTypeAndSpeeds}).`;
+    } else if (!isCanonicalManual && claimsManual) {
+      transmissionContradictionDetected = true;
+      contradictionReason = `${year} ${brand} ${model} aracı otomatik/CVT olmasına rağmen raporda manuel vites iddiaları yer alıyor (Gerçek: ${txTaxonomy.transmissionTypeAndSpeeds}).`;
+    } else if (!reportedMatchesCanonical && !isGenericTransmissionOption && reportedTrans) {
+      transmissionContradictionDetected = true;
+      contradictionReason = `${year} ${brand} ${model} aracının şanzımanı ("${vIdentity.transmissionName}") resmi otomotiv kataloğu ile çelişiyor (Doğrulanmış Gerçek: ${txTaxonomy.transmissionTypeAndSpeeds}).`;
+    }
+
+    if (transmissionContradictionDetected) {
+      this.logger.warn(`[RESEARCHER 2 AUDIT & ARBITER] ${contradictionReason} Invoking Arbiter to harmonize report...`);
+      auditResult.hasContradiction = true;
+      auditResult.contradictions.push(contradictionReason);
+      auditResult.wasHarmonized = true;
+      auditResult.tieBreakerApplied = true;
+
+      // 1. Overwrite canonical identity
+      vIdentity.transmissionName = txTaxonomy.transmissionTypeAndSpeeds;
+      vIdentity.transmissionFamily = txTaxonomy.transmissionFamily;
+      vIdentity.clutchType = txTaxonomy.clutchType;
+      vIdentity.clutchTypeTr = txTaxonomy.clutchTypeTr;
+      vIdentity.transmissionCode = txTaxonomy.transmissionCode;
+      vIdentity.transmissionSpeeds = txTaxonomy.transmissionSpeeds;
+      if (vIdentity.selected8Filters) {
+        vIdentity.selected8Filters.transmission = txTaxonomy.transmissionTypeAndSpeeds;
+        vIdentity.selected8Filters.clutchType = txTaxonomy.clutchType;
+      }
+      if ((report as any).technicalSpecifications) {
+        (report as any).technicalSpecifications.transmission = txTaxonomy.transmissionTypeAndSpeeds;
+        (report as any).technicalSpecifications.transmissionSpeeds = txTaxonomy.transmissionSpeeds;
+        (report as any).technicalSpecifications.clutchType = txTaxonomy.clutchTypeTr;
+      }
+
+      // 2. Harmonize Text Across Report Sections
+      const cleanTransName = formatCleanTransmissionName(txTaxonomy.transmissionTypeAndSpeeds);
+
+      const harmonizeText = (text?: string): string => {
+        if (!text) return '';
+        let t = text;
+
+        // Fix concatenated sentence typo (e.g. "...öne çıkıyor.Konforlu Sürüş" -> "...öne çıkıyor. Konforlu Sürüş")
+        t = t.replace(/([a-zğüşıöç0-9])\.([A-ZĞÜŞİÖÇ])/g, '$1. $2');
+
+        if (isCanonicalTorqueConverter) {
+          t = t.replace(/(?:kademesiz zincirli otomatik|kademesiz değişken oranlı|kademesiz otomatik)\s*\((?:lineartronic|multidrive s|x-tronic)?\s*cvt\)/gi, txTaxonomy.transmissionTypeAndSpeeds);
+          t = t.replace(/lineartronic\s*\(?cvt\)?/gi, cleanTransName);
+          t = t.replace(/lineartronic/gi, cleanTransName);
+          t = t.replace(/kademesiz zincirli otomatik/gi, txTaxonomy.transmissionTypeAndSpeeds);
+          t = t.replace(/kademesiz cvt/gi, cleanTransName);
+          t = t.replace(/kademesiz otomatik/gi, cleanTransName);
+          t = t.replace(/cvt şanzımanın sunduğu sarsıntısız geçişler/gi, `${cleanTransName} şanzımanın pürüzsüz ve dayanıklı geçişleri`);
+          t = t.replace(/cvt şanzımanın/gi, `${cleanTransName} şanzımanın`);
+          t = t.replace(/cvt şanzıman/gi, `${cleanTransName} şanzıman`);
+          t = t.replace(/cvt'nin/gi, `${cleanTransName} şanzımanın`);
+          t = t.replace(/cvt'ye/gi, `${cleanTransName} şanzımana`);
+          t = t.replace(/\bcvt\b/gi, 'otomatik');
+          t = t.replace(/çift kavramalı şanzıman/gi, 'tork konvertörlü tam otomatik şanzıman');
+          t = t.replace(/çift kavrama/gi, 'tam otomatik');
+        } else if (isCanonicalCvt) {
+          t = t.replace(/çift kavramalı/gi, 'kademesiz CVT');
+          t = t.replace(/çift kavrama/gi, 'kademesiz oranlı');
+          t = t.replace(/tork konvertörlü tam otomatik/gi, 'kademesiz CVT');
+        } else if (isCanonicalDualClutch) {
+          t = t.replace(/kademesiz zincirli otomatik/gi, txTaxonomy.transmissionTypeAndSpeeds);
+          t = t.replace(/lineartronic/gi, cleanTransName);
+          t = t.replace(/kademesiz cvt/gi, cleanTransName);
+          t = t.replace(/tork konvertörlü/gi, 'çift kavramalı');
+        } else if (isCanonicalRobotized) {
+          t = t.replace(/(?:8|7|6)\s*ileri\s*tork\s*konvertörlü\s*tam\s*otomatik\s*(?:\([^)]*\))?/gi, txTaxonomy.transmissionTypeAndSpeeds);
+          t = t.replace(/\beat8\b/gi, cleanTransName);
+          t = t.replace(/\beat6\b/gi, cleanTransName);
+          t = t.replace(/tam otomatik şanzıman/gi, `${cleanTransName} şanzıman`);
+        }
+
+        return t;
+      };
+
+      if (synth.vehicleCharacter) {
+        if (synth.vehicleCharacter.headline) {
+          synth.vehicleCharacter.headline = harmonizeText(synth.vehicleCharacter.headline);
+        }
+        if (synth.vehicleCharacter.detailedAssessment) {
+          synth.vehicleCharacter.detailedAssessment = harmonizeText(synth.vehicleCharacter.detailedAssessment);
+        }
+        if ((synth.vehicleCharacter as any).explanation) {
+          (synth.vehicleCharacter as any).explanation = harmonizeText((synth.vehicleCharacter as any).explanation);
+        }
+      }
+
+      if (synth.dailyUseAssessment) {
+        if (synth.dailyUseAssessment.cityUse) {
+          if (!isCanonicalCvt && claimsCvt && synth.dailyUseAssessment.cityUse.toLowerCase().includes('cvt')) {
+            if (isCanonicalTorqueConverter) {
+              synth.dailyUseAssessment.cityUse = `${txTaxonomy.transmissionTypeAndSpeeds} şanzıman, şehir içi dur-kalk trafikte sarsıntısız ve mekanik olarak son derece dayanıklı bir sürüş sunar. Geleneksel tork konvertörlü hidrolik aktarma kavrama aşınması yaşatmaz; ancak oran yapısı yoğun dur-kalk trafiğinde yakıt tüketimini bir miktar artırabilir.`;
+            } else {
+              synth.dailyUseAssessment.cityUse = harmonizeText(synth.dailyUseAssessment.cityUse);
+            }
+          } else {
+            synth.dailyUseAssessment.cityUse = harmonizeText(synth.dailyUseAssessment.cityUse);
+          }
+        }
+        if (synth.dailyUseAssessment.highwayUse) {
+          synth.dailyUseAssessment.highwayUse = harmonizeText(synth.dailyUseAssessment.highwayUse);
+        }
+      }
+
+      if (Array.isArray(synth.suitableFor)) {
+        synth.suitableFor = synth.suitableFor.map((item: any) => ({
+          ...item,
+          profile: harmonizeText(item.profile),
+          explanation: harmonizeText(item.explanation),
+        }));
+      }
+
+      if (Array.isArray(synth.notSuitableFor)) {
+        synth.notSuitableFor = synth.notSuitableFor.map((item: any) => ({
+          ...item,
+          profile: harmonizeText(item.profile),
+          explanation: harmonizeText(item.explanation),
+        }));
+      }
+
+      if (Array.isArray(synth.purchaseConditions)) {
+        synth.purchaseConditions = synth.purchaseConditions.map((item: any) => ({
+          ...item,
+          title: harmonizeText(item.title),
+          explanation: harmonizeText(item.explanation),
+        }));
+      }
+
+      if (Array.isArray(synth.walkAwayConditions)) {
+        synth.walkAwayConditions = synth.walkAwayConditions.map((item: any) => ({
+          ...item,
+          title: harmonizeText(item.title),
+          explanation: harmonizeText(item.explanation),
+        }));
+      }
+    }
 
     // =========================================================================
     // CHECK 1: User Maintenance Neglect in Chronic Risks (Yağ Değişimi vb.)

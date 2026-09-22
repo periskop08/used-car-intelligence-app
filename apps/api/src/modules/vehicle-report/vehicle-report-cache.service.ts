@@ -16,9 +16,9 @@ export class VehicleReportCacheService {
     variantId?: string,
     listingId?: string,
   ) {
-    if (!variantId) return null;
-
-    // 1. Direct variantId lookup
+    // 🔒 USER DIRECTIVE: İkinci bir emire kadar önbellekten okuma ve kayıt kesinlikle kapalıdır.
+    // Her rapor canlı üretilir, eski kayıtlar okunmaz ve önbellekten beslenilmez.
+    return null;
     let cached = await this.prisma.generatedVehicleReport.findFirst({
       where: {
         variantId,

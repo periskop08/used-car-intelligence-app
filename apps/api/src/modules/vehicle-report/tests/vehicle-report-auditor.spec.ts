@@ -122,5 +122,142 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(secondSuitExpl).not.toContain('Ort. 8.9');
       expect(secondSuitExpl).toContain('sarsıntısız vites geçişleri');
     });
+
+    it('should detect and harmonize 2006 Subaru Impreza Lineartronic CVT hallucination to 4EAT via Reverse Auditor & Arbiter', async () => {
+      const hallucinatedSubaruReport: any = {
+        vehicleIdentity: {
+          brand: 'Subaru',
+          model: 'Impreza',
+          modelYear: 2006,
+          enginePowerHp: 160,
+          engineCode: '2.0',
+          transmissionName: 'Kademesiz Zincirli Otomatik (Lineartronic CVT)',
+          clutchType: 'CVT',
+          averageFuelConsumption: 8.9,
+          selected8Filters: {
+            transmission: 'Kademesiz Zincirli Otomatik (Lineartronic CVT)',
+          },
+        },
+        technicalSpecifications: {
+          transmission: 'Kademesiz Zincirli Otomatik (Lineartronic CVT)',
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Subaru Impreza 2006: Güvenilirlik ve Konforun Buluştuğu Nokta',
+            detailedAssessment: 'Subaru Impreza 2006 modeli, atmosferik 2.0 litrelik motoru ve Kademesiz Zincirli Otomatik (Lineartronic CVT) şanzımanıyla dikkat çekiyor. CVT şanzımanın sunduğu sarsıntısız geçişler dur-kalk trafikte avantaj sağlıyor. Genel olarak ideal bir sedan olarak öne çıkıyor.Konforlu Sürüş Deneyimi',
+          },
+          dailyUseAssessment: {
+            cityUse: 'Kademesiz Zincirli Otomatik (Lineartronic CVT) şanzıman, sürüş sırasında pürüzsüz geçişler sağlayarak konforu artırıyor.',
+            highwayUse: 'CVT şanzıman otoyol sürüşlerinde sessiz bir seyir sağlar.',
+          },
+          suitableFor: [
+            {
+              profile: 'Konfor Odaklı Kullanıcılar',
+              explanation: 'Lineartronic CVT şanzıman akıcı hızlanma sunar.',
+            },
+          ],
+          notSuitableFor: [],
+          purchaseConditions: [
+            {
+              title: 'CVT Zincir Aşınması',
+              explanation: 'Lineartronic çelik zincirin durumu yetkili serviste kontrol edilmelidir.',
+            },
+          ],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(hallucinatedSubaruReport, {});
+
+      // 1. Contradiction must be detected
+      expect(audited.auditResult.hasContradiction).toBe(true);
+      expect(audited.auditResult.wasHarmonized).toBe(true);
+      expect(audited.auditResult.contradictions.some((c) => c.includes('CVT / Lineartronic iddiaları'))).toBe(true);
+
+      // 2. Identity must be updated to Subaru 4EAT
+      expect(audited.report.vehicleIdentity.transmissionName).toBe('4 İleri Tork Konvertörlü Otomatik (Subaru 4EAT)');
+      expect((audited.report.vehicleIdentity as any).clutchType).toBe('TORK_KONVERTORLU');
+      expect((audited.report.vehicleIdentity as any).transmissionFamily).toBe('SUBARU 4EAT');
+      expect((audited.report as any).technicalSpecifications.transmission).toBe('4 İleri Tork Konvertörlü Otomatik (Subaru 4EAT)');
+
+      // 3. All CVT / Lineartronic claims must be scrubbed from text
+      const assessment = audited.report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment;
+      expect(assessment).not.toContain('Lineartronic');
+      expect(assessment).not.toContain('CVT');
+      expect(assessment).toContain('4 İleri Tork Konvertörlü Otomatik (Subaru 4EAT)');
+
+      // 4. Concatenated sentence typo (.Konforlu -> . Konforlu) must be cleaned
+      expect(assessment).not.toContain('öne çıkıyor.Konforlu');
+      expect(assessment).toContain('öne çıkıyor. Konforlu');
+
+      // 5. City use must be rewritten for 4EAT torque converter
+      const cityText = audited.report.expertDecisionSynthesis.dailyUseAssessment.cityUse;
+      expect(cityText).not.toContain('Lineartronic');
+      expect(cityText).not.toContain('CVT');
+      expect(cityText).toContain('4 İleri Tork Konvertörlü Otomatik');
+      expect(cityText).toContain('tork konvertörlü hidrolik aktarma');
+    });
+
+    it('should detect and harmonize 2012 Peugeot 308 hallucinating EAT8 to Auto6R/ETG6', async () => {
+      const hallucinatedPeugeotReport: any = {
+        vehicleIdentity: {
+          brand: 'Peugeot',
+          model: '308',
+          modelYear: 2012,
+          enginePowerHp: 112,
+          engineCode: '1.6 e-HDi',
+          transmissionName: '8 İleri Tork Konvertörlü Tam Otomatik (EAT8 - Aisin)',
+          clutchType: 'TORK_KONVERTORLU',
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Peugeot 308 2012: EAT8 Konforu',
+            detailedAssessment: '1.6 e-HDi motor ve 8 İleri Tork Konvertörlü Tam Otomatik (EAT8) şanzıman mükemmel bir uyum sunar.',
+          },
+          dailyUseAssessment: {
+            cityUse: 'EAT8 tam otomatik şanzıman sarsıntısız geçişler sağlar.',
+          },
+          suitableFor: [],
+          notSuitableFor: [],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(hallucinatedPeugeotReport, {});
+      expect(audited.report.vehicleIdentity.transmissionName).not.toContain('EAT8');
+      expect(audited.report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment).not.toContain('EAT8');
+    });
+
+    it('should detect and harmonize BEV (Tesla Model 3) hallucinating dual-clutch / transmission oil', async () => {
+      const hallucinatedTeslaReport: any = {
+        vehicleIdentity: {
+          brand: 'Tesla',
+          model: 'Model 3',
+          modelYear: 2023,
+          enginePowerHp: 325,
+          fuelType: 'Elektrik',
+          transmissionName: '7 İleri Kuru Çift Kavramalı DSG',
+          clutchType: 'KURU_CIFT_KAVRAMA',
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Tesla Model 3: Elektrikli Hızlanma',
+            detailedAssessment: 'Çift kavramalı şanzıman ve motor yağı düzenli kontrol edilmelidir.',
+          },
+          dailyUseAssessment: {
+            cityUse: 'Vites geçişlerinde kavrama ısınmasına dikkat edilmelidir.',
+          },
+          suitableFor: [],
+          notSuitableFor: [],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(hallucinatedTeslaReport, {});
+      expect(audited.report.vehicleIdentity.transmissionName).toContain('Redüktör');
+      expect((audited.report.vehicleIdentity as any).clutchType).toBe('ELEKTRIKLI_TEK_ORANLI');
+    });
   });
 });

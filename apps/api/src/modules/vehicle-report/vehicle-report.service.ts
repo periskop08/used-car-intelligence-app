@@ -28,6 +28,10 @@ export class VehicleReportService implements OnModuleInit {
     private variantTechnicalFactsService: VariantTechnicalFactsService,
   ) {}
 
+  // 🔒 USER DIRECTIVE: İkinci bir emire kadar üretilen raporlar veritabanına kaydedilmez.
+  // Canlı ve geçici olarak in-memory map'te tutulur.
+  public static ephemeralReports = new Map<string, { report: any; createdAt: number }>();
+
   async onModuleInit() {
     try {
       const statements = [
@@ -270,59 +274,21 @@ export class VehicleReportService implements OnModuleInit {
       const vehicleContext = vRes.vehicleContext;
       const vehicleContextHash = vRes.vehicleContextHash;
 
-      // 3. Check Cache (user-scoped variant cache - bypassed if forceRefresh is true)
-      if (!dto.forceRefresh) {
-        try {
-          const cached = await this.cacheService.getCachedReport(
-            userId,
-            'TORQUE_SCOUT_VEHICLE_REPORT',
-            vehicleContextHash,
-            CURRENT_REPORT_VERSION,
-            variantId,
-          );
-
-          if (cached) {
-            return {
-              reportId: cached.id,
-              mode: cached.mode,
-              status: cached.status,
-              cached: true,
-            };
-          }
-        } catch (cacheErr) {
-          this.logger.warn(`Cache lookup warning: ${cacheErr}`);
-        }
-      } else {
-        this.logger.log(`forceRefresh requested for variant ${variantId}. Bypassing cache and archiving old records.`);
-        try {
-          await this.prisma.generatedVehicleReport.updateMany({
-            where: {
-              variantId,
-              status: VehicleReportStatus.COMPLETED,
-            },
-            data: {
-              status: VehicleReportStatus.ARCHIVED,
-            },
-          });
-          await this.prisma.generatedVehicleReport.deleteMany({
-            where: {
-              variantId,
-              OR: [
-                { provider: 'DETERMINISTIC_FALLBACK' },
-                { status: 'SAFE_FALLBACK' },
-              ],
-            },
-          });
-          await this.prisma.vehicleVariant.update({
-            where: { id: variantId },
-            data: {
-              characterResearchCache: null,
-              characterResearchedAt: null,
-            } as any,
-          });
-        } catch (cleanErr) {
-          this.logger.warn(`Notice archiving old reports on forceRefresh: ${cleanErr}`);
-        }
+      // 🔒 USER DIRECTIVE: İkinci bir emire kadar önbellek (cache) ve eski kayıt okuma tamamen devre dışı.
+      // Her rapor canlı üretilir, eski kayıtlar saklanmaz ve önbellekten beslenilmez.
+      try {
+        await this.prisma.generatedVehicleReport.deleteMany({
+          where: { variantId },
+        });
+        await this.prisma.vehicleVariant.update({
+          where: { id: variantId },
+          data: {
+            characterResearchCache: null,
+            characterResearchedAt: null,
+          } as any,
+        });
+      } catch (cleanErr) {
+        this.logger.warn(`Notice wiping old records: ${cleanErr}`);
       }
 
       // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
@@ -366,32 +332,41 @@ export class VehicleReportService implements OnModuleInit {
         vehicleContext,
       );
 
-      // 7. Save Report in DB
-      const report = await this.prisma.generatedVehicleReport.create({
-        data: {
-          userId,
-          mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
-          variantId,
-          listingId: listingId || null,
-          contextHash: vehicleContextHash,
-          vehicleContextHash,
-          reportVersion: CURRENT_REPORT_VERSION,
-          schemaVersion: 1,
-          status: providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED,
-          idempotencyKey: dto.idempotencyKey,
-          quotaUsageId,
-          reportData: providerRes.report as any,
-          provider: providerRes.provider,
-          modelName: providerRes.modelName,
-          qualityScore: providerRes.qualityScore,
-          repairAttempted: providerRes.repairAttempted,
-          fallbackReason: providerRes.fallbackReason,
-          completedAt: new Date(),
-        },
+      // 7. Ephemeral In-Memory Delivery (🔒 USER DIRECTIVE: İkinci bir emire kadar DB kaydı ve önbellek kapalı)
+      const ephemeralReportId = `rep_live_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const reportStatus = providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED;
+
+      const ephemeralRecord: any = {
+        id: ephemeralReportId,
+        userId,
+        mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+        variantId,
+        listingId: listingId || null,
+        contextHash: vehicleContextHash,
+        vehicleContextHash,
+        reportVersion: CURRENT_REPORT_VERSION,
+        schemaVersion: 1,
+        status: reportStatus,
+        idempotencyKey: dto.idempotencyKey,
+        quotaUsageId,
+        reportData: providerRes.report as any,
+        provider: providerRes.provider,
+        modelName: providerRes.modelName,
+        qualityScore: providerRes.qualityScore,
+        repairAttempted: providerRes.repairAttempted,
+        fallbackReason: providerRes.fallbackReason,
+        completedAt: new Date(),
+        generatedAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      VehicleReportService.ephemeralReports.set(ephemeralReportId, {
+        report: ephemeralRecord,
+        createdAt: Date.now(),
       });
 
       // Opportunistically feed canonical technical facts store from accepted exact report facts
-      if (variantId && report.status === VehicleReportStatus.COMPLETED) {
+      if (variantId && reportStatus === VehicleReportStatus.COMPLETED) {
         this.variantTechnicalFactsService
           .reconcileFactsFromCompletedReport(variantId, providerRes.report)
           .catch((e) => this.logger.warn(`Failed to reconcile technical facts from report for variant ${variantId}: ${e.message}`));
@@ -403,9 +378,9 @@ export class VehicleReportService implements OnModuleInit {
       }
 
       return {
-        reportId: report.id,
-        mode: report.mode,
-        status: report.status,
+        reportId: ephemeralReportId,
+        mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+        status: reportStatus,
         cached: false,
       };
     } catch (error: any) {
@@ -436,6 +411,11 @@ export class VehicleReportService implements OnModuleInit {
 
   async getReportById(userId: string, reportId: string) {
     try {
+      const ephemeral = VehicleReportService.ephemeralReports.get(reportId);
+      if (ephemeral) {
+        return this.ensureSafeReportPayload(ephemeral.report);
+      }
+
       const report = await this.prisma.generatedVehicleReport.findUnique({
         where: { id: reportId },
       });
@@ -452,43 +432,13 @@ export class VehicleReportService implements OnModuleInit {
   }
 
   async getCurrentVariantReport(userId: string, variantId: string) {
-    try {
-      const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId);
-      const cached = await this.cacheService.getCachedReport(
-        userId,
-        'TORQUE_SCOUT_VEHICLE_REPORT',
-        vRes.vehicleContextHash,
-        CURRENT_REPORT_VERSION,
-        variantId,
-      );
-      return this.ensureSafeReportPayload(cached);
-    } catch (e: any) {
-      return null;
-    }
+    // 🔒 USER DIRECTIVE: İkinci bir emire kadar önbellekten okuma ve eski rapor sunumu tamamen kapalıdır.
+    return null;
   }
 
   async getCurrentListingReport(userId: string, listingId: string) {
-    try {
-      const lRes = await this.listingContextBuilder.buildListingContext(listingId);
-      if (!lRes.variantId) return null;
-      const vRes = await this.vehicleContextBuilder.buildVehicleContext(lRes.variantId);
-      const fullHash = crypto
-        .createHash('sha256')
-        .update(`${vRes.vehicleContextHash}_${lRes.listingContextHash}`)
-        .digest('hex');
-
-      const cached = await this.cacheService.getCachedReport(
-        userId,
-        'LISTING_REPORT',
-        fullHash,
-        CURRENT_REPORT_VERSION,
-        lRes.variantId,
-        listingId,
-      );
-      return this.ensureSafeReportPayload(cached);
-    } catch (e: any) {
-      return null;
-    }
+    // 🔒 USER DIRECTIVE: İkinci bir emire kadar önbellekten okuma ve eski rapor sunumu tamamen kapalıdır.
+    return null;
   }
 
   async upgradeReportVersion(userId: string, reportId: string) {
