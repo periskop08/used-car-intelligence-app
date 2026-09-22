@@ -5,7 +5,7 @@ import { ResearchEvidenceValidationService } from './research-evidence-validatio
 import { VehicleReportSemanticValidationService } from './vehicle-report-semantic-validation.service';
 import { VehicleReportScoringService } from './vehicle-report-scoring.service';
 import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
-import { VehicleReportAuditorService, isUserNeglectOrRoutineMaintenance } from './vehicle-report-auditor.service';
+import { VehicleReportAuditorService, isUserNeglectOrRoutineMaintenance, isShowroomOrLineupWhining } from './vehicle-report-auditor.service';
 import { VehicleReliabilityResearchService } from '../research/vehicle-reliability-research.service';
 import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
@@ -1033,6 +1033,20 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
           }
         }
       }
+    }
+
+    // Showroom Whining Guard in Compromises (Rule 1.11 defense)
+    if (Array.isArray(baseReport.expertDecisionSynthesis?.compromisesAndLimitations)) {
+      baseReport.expertDecisionSynthesis.compromisesAndLimitations = baseReport.expertDecisionSynthesis.compromisesAndLimitations.map(comp => {
+        if (isShowroomOrLineupWhining(comp.title, comp.explanation)) {
+          return {
+            ...comp,
+            title: 'Atmosferik Motor ve Yüksek Devir Esneklik Sınırı',
+            explanation: 'Atmosferik beslemeli 1.6 MPI motor yüksek devirlerde güç üretir; ara hızlanmalarda ve dik rampalarda turbo motorlara kıyasla vites küçültme ihtiyacı duyar.',
+          };
+        }
+        return comp;
+      });
     }
 
     // Cleanse timing chain wording if engine is timing belt (KAYIŞ)
