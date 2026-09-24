@@ -65,6 +65,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     }
   }
 
+  const powerUnit = report.performanceUsage?.sourcePowerUnit 
+    ?? report.vehicleIdentity?.sourcePowerUnit 
+    ?? (report.performanceUsage as any)?.powerUnit 
+    ?? (report.vehicleIdentity as any)?.powerUnit 
+    ?? 'HP';
+  const powerSemantic = report.performanceUsage?.powerSemantic 
+    ?? (report.vehicleIdentity as any)?.powerSemantic;
+
   const powerLabel = rawPower !== null && rawPower !== undefined
     ? formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic)
     : null;
