@@ -19,6 +19,9 @@ import { VehicleReportJobWorkerService } from './vehicle-report-job-worker.servi
 import { VehicleReportNarrativeQualityService } from './vehicle-report-narrative-quality.service';
 import { ResearchEvidenceValidationService } from './research-evidence-validation.service';
 import { VehicleReportAuditorService } from './vehicle-report-auditor.service';
+import { AdminVehicleReportsController } from '../admin/admin-vehicle-reports.controller';
+import { AdminVehicleReportsService } from '../admin/admin-vehicle-reports.service';
+import { AdminAuditLogService } from '../admin/admin-audit-log.service';
 import { AuthModule } from '../auth/auth.module';
 import { ResearchModule } from '../research/research.module';
 import { ListingAiModule } from '../listing-ai/listing-ai.module';
@@ -26,7 +29,7 @@ import { VehicleModule } from '../vehicle/vehicle.module';
 
 @Module({
   imports: [AuthModule, ResearchModule, ListingAiModule, forwardRef(() => VehicleModule)],
-  controllers: [VehicleReportController],
+  controllers: [VehicleReportController, AdminVehicleReportsController],
   providers: [
     PrismaService,
     VehicleReportService,
@@ -47,7 +50,10 @@ import { VehicleModule } from '../vehicle/vehicle.module';
     VehicleReportCacheService,
     VehicleReportQuotaService,
     VehicleReportJobWorkerService,
+    AdminVehicleReportsController,
+    AdminVehicleReportsService,
+    AdminAuditLogService,
   ],
-  exports: [VehicleReportService, VehicleReportScoringV6Service, TorqueScoutDecisionScoreService, VehicleReportAuditorService],
+  exports: [VehicleReportService, VehicleReportScoringV6Service, TorqueScoutDecisionScoreService, VehicleReportAuditorService, AdminVehicleReportsService],
 })
 export class VehicleReportModule {}

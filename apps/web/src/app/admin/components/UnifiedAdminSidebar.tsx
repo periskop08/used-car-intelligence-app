@@ -109,6 +109,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     icon: Database,
     children: [
       { key: 'VARIANT_DB', label: 'Araç Varyant Veritabanı', href: '/admin/vehicle-data/variants' },
+      { key: 'VEHICLE_REPORTS', label: 'Araç Raporları', href: '/admin/vehicle-data/reports' },
       { key: 'VEHICLE_GUIDE', label: 'Araç Rehberi Yönetimi', href: '/admin/vehicle-data/guide' },
       { key: 'VEHICLE_GUIDE_COMMENTS', label: 'Araç Rehberi Yorumları', href: '/admin/vehicle-data/guide/comments' },
       { key: 'RESEARCH_COMMENTS', label: 'Araç Sorgula Yorumları', href: '/admin/vehicle-data/research-comments' },

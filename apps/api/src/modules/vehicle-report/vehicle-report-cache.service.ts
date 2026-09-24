@@ -16,14 +16,11 @@ export class VehicleReportCacheService {
     variantId?: string,
     listingId?: string,
   ) {
-    // 🔒 USER DIRECTIVE: İkinci bir emire kadar önbellekten okuma ve kayıt kesinlikle kapalıdır.
-    // Her rapor canlı üretilir, eski kayıtlar okunmaz ve önbellekten beslenilmez.
-    return null;
     let cached = await this.prisma.generatedVehicleReport.findFirst({
       where: {
         variantId,
-        reportVersion,
-        mode: { in: ['TORQUE_SCOUT_VEHICLE_REPORT', 'VEHICLE_REPORT', 'LISTING_REPORT'] },
+        isCurrentPublished: true,
+        isDraft: false,
         status: 'COMPLETED',
         provider: { not: 'DETERMINISTIC_FALLBACK' },
       },

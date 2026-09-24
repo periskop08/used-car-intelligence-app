@@ -2683,6 +2683,13 @@ model GeneratedVehicleReport {
   updatedAt          DateTime                @updatedAt
   archivedAt         DateTime?
 
+  versionNumber      Int                     @default(1)
+  isCurrentPublished Boolean                 @default(true)
+  isDraft            Boolean                 @default(false)
+  sourceType         String                  @default("AI_GENERATED")
+  changeNote         String?
+  editedByAdminId    String?
+
   user               User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   job                VehicleReportResearchJob?
 
@@ -2691,6 +2698,8 @@ model GeneratedVehicleReport {
   @@index([userId, variantId, vehicleContextHash, reportVersion])
   @@index([userId, listingId, contextHash, reportVersion])
   @@index([userId, mode, variantId, contextHash, status])
+  @@index([variantId, isCurrentPublished, isDraft])
+  @@index([isCurrentPublished, status])
 }
 
 model VehicleReportResearchJob {
