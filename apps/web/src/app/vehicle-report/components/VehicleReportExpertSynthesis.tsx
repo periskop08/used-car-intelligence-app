@@ -9,7 +9,6 @@ import {
   replacePsWithHp
 } from "@used-car-intelligence/shared";
 import { 
-  Sparkles, 
   CheckCircle2, 
   AlertTriangle, 
   UserCheck, 
@@ -112,19 +111,6 @@ export default function VehicleReportExpertSynthesis({
 
   return (
     <div className="w-full space-y-6 animate-fade-in">
-      {/* SECTION HEADER */}
-      <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-slate-900 border border-orange-500/30 shadow-xl">
-        <div className="p-3 bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-xl shadow-md">
-          <Sparkles className="w-6 h-6" />
-        </div>
-        <div>
-          <h2 className="text-lg font-black text-white tracking-tight">TorqueScout Uzman Karar Sentezi</h2>
-          <p className="text-xs text-slate-300">
-            Doğrulanmış veriler ve araç karakterinin kullanıcı açısından derin otomotiv analizi.
-          </p>
-        </div>
-      </div>
-
       {/* 1. BU ARAÇ NASIL BİR OTOMOBİL? (Vehicle Character) */}
       {synthesis.vehicleCharacter && (
         <div className="bg-[#090d1a] border border-white/10 p-6 rounded-2xl space-y-3 shadow-xl relative overflow-hidden">
