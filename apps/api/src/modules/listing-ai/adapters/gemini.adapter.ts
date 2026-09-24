@@ -23,7 +23,7 @@ export class GeminiAdapter implements AiProviderAdapter {
       2,
     )}\n\n--- KULLANICI MESAJI ---\n${userMessage}`;
 
-    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
+    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') || userMessage.includes('[INTENT: VEHICLE_REPORT_REPAIR]');
 
     if (apiKey) {
       // Models to try in sequence (Updated to active 2.5 series models)

@@ -25,7 +25,7 @@ export class OpenAiAdapter implements AiProviderAdapter {
 
     const url = 'https://api.openai.com/v1/chat/completions';
 
-    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]');
+    const isReportIntent = userMessage.includes('[INTENT: VEHICLE_FULL_REPORT]') || userMessage.includes('[INTENT: VEHICLE_REPORT_REPAIR]');
 
     const response = await fetch(url, {
       method: 'POST',

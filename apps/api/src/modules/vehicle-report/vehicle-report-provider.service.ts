@@ -208,6 +208,11 @@ export class VehicleReportProviderService {
             }
           }
 
+          // STAGE 4.18: Pre-validation Deterministic Compatibility Sanitization
+          this.sanitizeIncompatibleReportFields(baseReport, validationContext);
+          const normSanitizedPre = normalizeVehicleReportPayload(baseReport);
+          baseReport = normSanitizedPre.data;
+
           // STAGE 4.2: Production Semantic Validation & Consistency Check
           let validation = this.semanticValidationService.validate(baseReport, validationContext);
           let repairAttempted = false;
@@ -916,6 +921,10 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       if (baseReport.vehicleIdentity.drivetrain) {
         (baseReport.technicalSpecifications as any).drivetrain = baseReport.vehicleIdentity.drivetrain;
       }
+      const targetClutchType = (baseReport.vehicleIdentity as any)?.clutchType || validationContext?.vehicleIdentity?.clutchType || (validationContext?.vehicleIdentity?.selected8Filters as any)?.clutchType;
+      if (targetClutchType) {
+        (baseReport.technicalSpecifications as any).clutchType = targetClutchType;
+      }
     }
   }
 
@@ -1071,6 +1080,114 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
           return !t.includes('zincir');
         });
       }
+    }
+
+    // 3. Transmission Architecture Deterministic Sanitization
+    const transName = (baseReport.vehicleIdentity?.transmissionName || vehicleCtx.transmissionName || '').toLowerCase();
+    const transArch = String(researchIdentity?.transmissionFamily || researchIdentity?.clutchType || (baseReport.vehicleIdentity as any)?.clutchType || vehicleCtx.clutchType || transName).toLowerCase();
+    const isTorqueConverterOrCVTOrManual = transArch.includes('tork_konvertorlu') || transArch.includes('tork konvertörlü') || transArch.includes('tam otomatik') || transArch.includes('eat8') || transArch.includes('zf 8hp') || transArch.includes('cvt') || transArch.includes('multitronic') || transArch.includes('manuel');
+    const isEcvtOrToyotaHybrid = transArch.includes('e-cvt') || transArch.includes('ecvt') || transName.includes('e-cvt') || ((fuelType.includes('hibrit') || fuelType.includes('hybrid')) && (transArch.includes('cvt') || transName.includes('otomatik')));
+    const isTargetManual = transName.includes('manuel') || transName.includes('düz') || transName.includes('manual') || transArch.includes('manuel');
+    const isDualClutch = transArch.includes('dsg') || transArch.includes('edc') || transArch.includes('dct') || transArch.includes('powershift') || transArch.includes('s tronic') || transArch.includes('çift kavrama') || transArch.includes('cift kavrama');
+
+    const replaceStringsInObject = (obj: any, replacements: [RegExp, string][]): void => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        const val = obj[key];
+        if (typeof val === 'string') {
+          let updated = val;
+          for (const [pattern, replacement] of replacements) {
+            if (pattern.test(updated)) {
+              updated = updated.replace(pattern, replacement);
+            }
+          }
+          obj[key] = updated;
+        } else if (typeof val === 'object' && val !== null) {
+          replaceStringsInObject(val, replacements);
+        }
+      }
+    };
+
+    const transmissionReplacements: [RegExp, string][] = [];
+
+    if (isEcvtOrToyotaHybrid) {
+      transmissionReplacements.push(
+        [/vites geçişlerinde vuruntu/gi, 'hızlanma esnasında aktarma sarsıntısı'],
+        [/vites vuruntusu/gi, 'aktarma organı titreşimi'],
+        [/vites kaçırma/gi, 'güç aktarım kaybı'],
+        [/kavrama aşınması/gi, 'transaks mekanik aşınması'],
+        [/mekatronik arızası/gi, 'hibrit inverter ünitesi arızası'],
+        [/mekatronik basınç tüpü/gi, 'inverter hidrolik soğutma devresi'],
+        [/mekatronik basınç/gi, 'inverter hidrolik soğutma basıncı'],
+        [/kuru kavrama/gi, 'planet dişli aktarım grubu'],
+      );
+    } else if (isTargetManual) {
+      transmissionReplacements.push(
+        [/mekatronik arızası/gi, 'debriyaj hidrolik merkez arızası'],
+        [/mekatronik basınç tüpü/gi, 'debriyaj hidrolik merkezi'],
+        [/mekatronik basınç/gi, 'debriyaj hidrolik basıncı'],
+        [/mekatronik/gi, 'debriyaj hidrolik sistemi'],
+        [/kuru çift kavrama/gi, 'debriyaj baskı balatası'],
+        [/kuru kavrama balata aşınması/gi, 'debriyaj baskı balata aşınması'],
+        [/kuru kavrama balata/gi, 'debriyaj balatası'],
+        [/çift kavrama titremesi/gi, 'debriyaj kalkış titremesi'],
+        [/dsg kavrama titremesi/gi, 'debriyaj kalkış titremesi'],
+        [/dsg kavrama/gi, 'debriyaj balatası'],
+        [/dsg mekatronik/gi, 'debriyaj hidrolik merkezi'],
+        [/tork konvertörü arızası/gi, 'debriyaj baskı balata aşınması'],
+      );
+    } else if (isTorqueConverterOrCVTOrManual && !isDualClutch) {
+      const isCvt = transArch.includes('cvt') || transName.includes('cvt');
+      const clutchReplacement = isCvt ? 'varyatör kasnak ve çelik itme kayışı' : 'tork konvertörü kilit balatası';
+      const mechatronicReplacement = isCvt ? 'CVT hidrolik kontrol valf gövdesi' : 'şanzıman hidrolik valf gövdesi ve selenoidleri';
+
+      transmissionReplacements.push(
+        [/kuru çift kavrama/gi, clutchReplacement],
+        [/kuru kavrama balata aşınması/gi, isCvt ? 'çelik kayış ve kasnak aşınması' : 'tork konvertör balata aşınması'],
+        [/kuru kavrama balata/gi, clutchReplacement],
+        [/kuru kavrama/gi, isCvt ? 'varyatör grubu' : 'tork konvertör kavraması'],
+        [/mekatronik basınç tüpü/gi, mechatronicReplacement],
+        [/mekatronik arızası/gi, isCvt ? 'CVT valf gövdesi arızası' : 'şanzıman hidrolik valf gövdesi arızası'],
+        [/mekatronik basınç/gi, 'hidrolik hat basıncı'],
+        [/dsg mekatronik/gi, isCvt ? 'CVT hidrolik kontrol ünitesi' : 'şanzıman hidrolik kontrol ünitesi'],
+        [/dsg kavrama titremesi/gi, isCvt ? 'varyatör kasnak sarsıntısı' : 'tork konvertör kilitlenme sarsıntısı'],
+        [/dsg kavrama/gi, clutchReplacement],
+        [/çift kavrama titremesi/gi, isCvt ? 'varyatör sarsıntısı' : 'tork konvertör kilitlenme titreşimi'],
+        [/çift kavrama/gi, isCvt ? 'CVT şanzıman' : 'tork konvertörlü otomatik şanzıman'],
+      );
+    }
+
+    if (transmissionReplacements.length > 0) {
+      replaceStringsInObject(baseReport, transmissionReplacements);
+    }
+
+    // 3.1 Fuel Component Deterministic Sanitization
+    const fuelReplacements: [RegExp, string][] = [];
+    const isTargetDiesel = fuelType.includes('dizel') || fuelType.includes('diesel');
+    const isTargetPetrol = !isTargetDiesel && !isElectric && !fuelType.includes('hibrit') && !fuelType.includes('hybrid');
+
+    if (isTargetPetrol) {
+      fuelReplacements.push(
+        [/dizel partikül filtresi/gi, 'katalitik konvertör'],
+        [/dpf rejenerasyonu/gi, 'katalizör temizliği'],
+        [/kızdırma bujisi/gi, 'ateşleme bujisi'],
+        [/mazot filtresi/gi, 'benzin yakıt filtresi'],
+      );
+    } else if (isTargetDiesel) {
+      fuelReplacements.push(
+        [/ateşleme bujisi/gi, 'kızdırma bujisi'],
+        [/ateşleme bobini/gi, 'yakıt enjektörü'],
+      );
+    }
+
+    if (fuelReplacements.length > 0) {
+      replaceStringsInObject(baseReport, fuelReplacements);
+    }
+
+    // Synchronize canonical clutchType to technicalSpecifications
+    const canonicalClutchType = (baseReport.vehicleIdentity as any)?.clutchType || vehicleCtx.clutchType || (vehicleCtx.selected8Filters as any)?.clutchType;
+    if (canonicalClutchType && baseReport.technicalSpecifications) {
+      (baseReport.technicalSpecifications as any).clutchType = canonicalClutchType;
     }
 
     // 4. Canonical Risk Grounding Sanitization
