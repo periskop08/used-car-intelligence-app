@@ -17,7 +17,6 @@ import {
   FileCheck, 
   XCircle, 
   HelpCircle, 
-  Info, 
   ChevronRight,
   ShieldCheck
 } from "lucide-react";
@@ -55,59 +54,8 @@ const toArray = <T,>(val: T[] | T | null | undefined): T[] => {
 
 export default function VehicleReportExpertSynthesis({
   synthesis,
-  supportingFacts = [],
 }: VehicleReportExpertSynthesisProps) {
   if (!synthesis) return null;
-
-  const factMap = new Map<string, ReportSupportingFact>();
-  supportingFacts.forEach((f) => factMap.set(f.factKey, f));
-
-  const renderSourceBadge = (factIds?: string[]) => {
-    if (!factIds || factIds.length === 0) return null;
-    const firstFact = factMap.get(factIds[0]);
-
-    let label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
-    let colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-
-    if (firstFact) {
-      if (firstFact.source === "SELLER_DECLARATION") {
-        label = "Kaynak: Satıcı Beyanı — Doğrulanmamış";
-        colorClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      } else if (
-        firstFact.label?.includes("Kullanıcı Geri Bildirimi") || 
-        firstFact.label?.includes("Şikâyet") || 
-        firstFact.factKey === "COMMUNITY_COMPLAINTS_COUNT"
-      ) {
-        label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
-        colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
-      } else if (
-        firstFact.label?.includes("Gözlemlenen") || 
-        firstFact.label?.includes("Davranış")
-      ) {
-        label = "Kaynak: Gözlemlenen Saha / Karakteristik Davranış";
-        colorClass = "bg-sky-500/10 text-sky-400 border-sky-500/20";
-      } else if (firstFact.source === "VEHICLE_DATABASE" && firstFact.confidence === "HIGH") {
-        label = "Kaynak: Doğrulanmış Teknik Veri";
-        colorClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
-      }
-    } else if (factIds.some(id => id.includes("COMPLAINT") || id.includes("COMMUNITY"))) {
-      label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
-      colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    } else if (factIds.some(id => id.startsWith("FACT_PROB_"))) {
-      label = "Kaynak: Kullanıcı Geri Bildirimi / Bildirilen Şikâyet";
-      colorClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    } else if (factIds.includes("AI_RESEARCH_ENGINE") || factIds.includes("AI_VERIFIED_TECHNICAL_SPECS")) {
-      label = "Kaynak: TorqueScout Yapay Zeka Danışmanı";
-      colorClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-    }
-
-    return (
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${colorClass} inline-flex items-center gap-1 shrink-0`}>
-        <Info className="w-3 h-3" />
-        <span>{label}</span>
-      </span>
-    );
-  };
 
   return (
     <div className="w-full space-y-6 animate-fade-in">
@@ -119,7 +67,6 @@ export default function VehicleReportExpertSynthesis({
               <span className="w-2.5 h-2.5 rounded-full bg-orange-400 block" />
               <span>Bu Araç Nasıl Bir Otomobil?</span>
             </h3>
-            {renderSourceBadge(synthesis.vehicleCharacter.supportingFactIds)}
           </div>
 
           <h4 className="text-base font-bold text-orange-400">{replacePsWithHp(synthesis.vehicleCharacter.headline)}</h4>
@@ -287,16 +234,9 @@ export default function VehicleReportExpertSynthesis({
                   <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest block">Öncelikli Teknik Risk</span>
                   <h4 className="text-sm font-extrabold text-white">{synthesis.primaryTechnicalRisk.title}</h4>
                 </div>
-                {renderSourceBadge(synthesis.primaryTechnicalRisk.supportingFactIds)}
               </div>
 
               <p className="text-xs text-slate-300 leading-relaxed">{synthesis.primaryTechnicalRisk.explanation}</p>
-
-              {synthesis.primaryTechnicalRisk.riskMeaning && (
-                <div className="p-2.5 bg-slate-950/80 rounded-lg text-xs text-amber-300 font-medium border border-amber-500/20">
-                  💡 {synthesis.primaryTechnicalRisk.riskMeaning}
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
                 {toArray(synthesis.primaryTechnicalRisk.symptoms).length > 0 && (
@@ -358,9 +298,6 @@ export default function VehicleReportExpertSynthesis({
                     <ChevronRight className="w-3.5 h-3.5 text-emerald-400" />
                     {replacePsWithHp(cond.condition)}
                   </span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
-                    {cond.priority}
-                  </span>
                 </div>
                 <p className="text-xs text-slate-300 ml-5">{cleanRangeText(cond.reason)}</p>
               </div>
@@ -382,9 +319,6 @@ export default function VehicleReportExpertSynthesis({
                   <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
                     <ChevronRight className="w-3.5 h-3.5 text-rose-400" />
                     {replacePsWithHp(cond.condition)}
-                  </span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
-                    {cond.priority}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 ml-5">{cleanRangeText(cond.reason)}</p>

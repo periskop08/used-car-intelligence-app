@@ -227,9 +227,6 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${stateCfg.badge}`}>
                   {stateCfg.label}
                 </span>
-                <span className="text-xs text-slate-400">
-                  {decisionScore.scope === 'VEHICLE' ? '🚗 İlan Özel Değerlendirme' : '📋 Model Varyant Değerlendirmesi'}
-                </span>
               </div>
               <p className="text-xs text-slate-300 mt-1.5 max-w-xl leading-relaxed">
                 {getHarmonizedVerdict()}
