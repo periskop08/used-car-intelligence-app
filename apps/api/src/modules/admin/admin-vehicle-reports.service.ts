@@ -41,12 +41,24 @@ export class AdminVehicleReportsService {
 
     const where: any = {};
 
-    if (dto.status) {
-      where.status = dto.status;
+    const activeTab = dto.tab || 'active'; // Default to active published reports to prevent archive clutter
+
+    if (activeTab === 'active') {
+      where.isCurrentPublished = true;
+      where.isDraft = false;
+    } else if (activeTab === 'archived') {
+      where.isCurrentPublished = false;
+      where.isDraft = false;
+    } else if (activeTab === 'drafts') {
+      where.isDraft = true;
+    } else if (activeTab === 'all') {
+      if (dto.isDraft !== undefined) {
+        where.isDraft = Boolean(dto.isDraft);
+      }
     }
 
-    if (dto.isDraft !== undefined) {
-      where.isDraft = Boolean(dto.isDraft);
+    if (dto.status) {
+      where.status = dto.status;
     }
 
     if (dto.isEdited !== undefined) {
@@ -105,8 +117,8 @@ export class AdminVehicleReportsService {
       }
     }
 
-    // Count and find summary records
-    const [total, reports] = await Promise.all([
+    // Count and find summary records + tab counts
+    const [total, reports, activeCount, draftsCount, archivedCount] = await Promise.all([
       this.prisma.generatedVehicleReport.count({ where }),
       this.prisma.generatedVehicleReport.findMany({
         where,
@@ -132,6 +144,15 @@ export class AdminVehicleReportsService {
         orderBy: [{ isCurrentPublished: 'desc' }, { updatedAt: 'desc' }],
         skip,
         take: limit,
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: { isCurrentPublished: true, isDraft: false },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: { isDraft: true },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: { isCurrentPublished: false, isDraft: false },
       }),
     ]);
 
@@ -225,6 +246,12 @@ export class AdminVehicleReportsService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      counts: {
+        active: activeCount,
+        drafts: draftsCount,
+        archived: archivedCount,
+        all: activeCount + draftsCount + archivedCount,
+      },
     };
   }
 

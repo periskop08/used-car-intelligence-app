@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  Archive,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -64,6 +65,15 @@ export default function AdminVehicleReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Tabs: 'active' (Yayında) | 'drafts' (Taslaklar) | 'archived' (Arşiv) | 'all' (Tümü)
+  const [activeTab, setActiveTab] = useState<'active' | 'drafts' | 'archived' | 'all'>('active');
+  const [counts, setCounts] = useState<{ active: number; drafts: number; archived: number; all: number }>({
+    active: 0,
+    drafts: 0,
+    archived: 0,
+    all: 0,
+  });
+
   // Filters & Search
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
@@ -86,6 +96,7 @@ export default function AdminVehicleReportsPage() {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
       const params = new URLSearchParams();
 
+      params.append('tab', activeTab);
       if (search.trim()) params.append('search', search.trim());
       if (brandFilter.trim()) params.append('brand', brandFilter.trim());
       if (modelFilter.trim()) params.append('model', modelFilter.trim());
@@ -116,12 +127,15 @@ export default function AdminVehicleReportsPage() {
       setReports(data.reports || []);
       setTotalReports(data.total || 0);
       setTotalPages(data.totalPages || 1);
+      if (data.counts) {
+        setCounts(data.counts);
+      }
     } catch (err: any) {
       setError(err.message || 'Rapor listesi alınırken beklenmeyen bir hata oluştu.');
     } finally {
       setLoading(false);
     }
-  }, [search, brandFilter, modelFilter, yearFilter, statusFilter, onlyEdited, onlyWithFeedback, onlyDraft, page]);
+  }, [activeTab, search, brandFilter, modelFilter, yearFilter, statusFilter, onlyEdited, onlyWithFeedback, onlyDraft, page]);
 
   useEffect(() => {
     fetchReports();
@@ -212,6 +226,85 @@ export default function AdminVehicleReportsPage() {
             <span>Yenile</span>
           </button>
         </div>
+      </div>
+
+      {/* TABS: Yayındaki Raporlar, Taslaklar, Arşiv, Tümü */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('active');
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'active'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>Yayındaki Güncel Raporlar</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 font-mono text-emerald-400 border border-emerald-500/30">
+            {counts.active}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('drafts');
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'drafts'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Clock className="w-4 h-4 text-amber-400" />
+          <span>Taslaklar</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 font-mono text-amber-400 border border-amber-500/30">
+            {counts.drafts}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('archived');
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'archived'
+              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Archive className="w-4 h-4 text-blue-400" />
+          <span>Arşiv (Eski Versiyonlar)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 font-mono text-blue-400 border border-blue-500/30">
+            {counts.archived}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('all');
+            setPage(1);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'all'
+              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-purple-400" />
+          <span>Tüm Raporlar</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-950 font-mono text-purple-400 border border-purple-500/30">
+            {counts.all}
+          </span>
+        </button>
       </div>
 
       {/* Filter & Search Bar */}
@@ -370,9 +463,17 @@ export default function AdminVehicleReportsPage() {
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-400 space-y-2">
                     <FileText className="w-8 h-8 mx-auto text-slate-600" />
-                    <p className="font-semibold text-slate-300">Kayıtlı Araç Raporu Bulunamadı</p>
+                    <p className="font-semibold text-slate-300">
+                      {activeTab === 'archived'
+                        ? 'Arşivlenmiş Eski Rapor Bulunamadı'
+                        : activeTab === 'drafts'
+                        ? 'Kayıtlı Taslak Rapor Bulunamadı'
+                        : activeTab === 'active'
+                        ? 'Yayında Güncel Araç Raporu Bulunamadı'
+                        : 'Kayıtlı Araç Raporu Bulunamadı'}
+                    </p>
                     <p className="text-slate-500 text-[11px]">
-                      Arama kriterlerinizi değiştirebilir veya filtreleri sıfırlayabilirsiniz.
+                      Arama kriterlerinizi değiştirebilir veya diğer sekmeleri inceleyebilirsiniz.
                     </p>
                   </td>
                 </tr>
