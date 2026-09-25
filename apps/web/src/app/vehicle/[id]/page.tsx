@@ -8,8 +8,51 @@ import IsiCepteListingRecommendationWidget from "@/app/listings/components/IsiCe
 import VehicleExactListingsWidget from "@/app/listings/components/VehicleExactListingsWidget";
 import SafeSection from "@/components/SafeSection";
 import { ComprehensiveVehicleReport } from "@used-car-intelligence/shared";
+import {
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  FileCheck,
+  Search,
+  ShieldCheck,
+  Database,
+  Sparkles,
+} from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+const REPORT_PIPELINE_STEPS = [
+  {
+    id: 1,
+    title: "1. Teknik Veri ve Katalog Doğrulaması",
+    desc: "Motor, şanzıman, güç (HP), tork ve donanım paketleri resmi üretici kataloglarıyla eşleştiriliyor.",
+    icon: Database,
+  },
+  {
+    id: 2,
+    title: "2. Kronik Arıza & Mekanik Risk Analizi",
+    desc: "Motor bloğu, şanzıman mekatroniği, yakıt sistemi, yürüyen aksam ve elektronik arıza kayıtları taranıyor.",
+    icon: Search,
+  },
+  {
+    id: 3,
+    title: "3. Global Geri Çağırma (Recall) Bültenleri",
+    desc: "Üretici servis aksiyonları, bültenler ve küresel güvenlik geri çağırmaları inceleniyor.",
+    icon: ShieldCheck,
+  },
+  {
+    id: 4,
+    title: "4. Türkiye Pazarı ve İşletme Maliyeti",
+    desc: "Resmi MTV dilimi, gerçek tüketim ortalamaları ve periyodik parça/bakım projeksiyonu hesaplanıyor.",
+    icon: FileCheck,
+  },
+  {
+    id: 5,
+    title: "5. AI Uzman Karar Sentezi & Ekspertiz Rehberi",
+    desc: "Satın alma tavsiyeleri, ekspertiz öncelikli kontrol noktaları ve nihai rapor üretiliyor.",
+    icon: Sparkles,
+  },
+];
 
 const categoryMap: Record<string, { label: string; desc: string }> = {
   ENGINE: { label: 'Motor', desc: 'Aracın çalışmasını ve çekiş gücünü sağlayan ana motor ünitesi.' },
@@ -81,7 +124,7 @@ export default function VehicleDetail() {
   // AI report generation states
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState("");
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<number>(1);
   
   // Auth state
   const [user, setUser] = useState<any>(null);
@@ -271,7 +314,7 @@ export default function VehicleDetail() {
         } catch {}
       }
       setStructuredReport(null);
-      setCountdown(30);
+      setPipelineStep(1);
     } else if (typeof window !== "undefined") {
       try {
         const cachedRep = sessionStorage.getItem(`ts_rep_${variantId}`);
@@ -279,7 +322,6 @@ export default function VehicleDetail() {
           const parsedCached = JSON.parse(cachedRep);
           if (parsedCached) {
             setStructuredReport(parsedCached);
-            setCountdown(null);
           }
         }
       } catch {}
@@ -310,21 +352,20 @@ export default function VehicleDetail() {
               } catch {}
             }
             setLoadingStructuredReport(false);
-            setCountdown(null);
             setReportError("");
             return;
           }
         }
 
-        // Veritabanında tamamlanmış güncel rapor bulunamadıysa veya silinmişse:
-        // Stale client sessionStorage önbelleğini temizle ve hazırlanıyor geri sayım ekranını başlat
+        // Veritabanında tamamlanmış güncel rapor bulunamadıysa:
+        // Stale client sessionStorage önbelleğini temizle ve analizi başlat
         if (typeof window !== "undefined") {
           try {
             sessionStorage.removeItem(`ts_rep_${variantId}`);
           } catch {}
         }
         setStructuredReport(null);
-        setCountdown(30);
+        setPipelineStep(1);
       }
 
       const genRes = await fetch(`${API_URL}/vehicle-reports`, {
@@ -356,7 +397,6 @@ export default function VehicleDetail() {
                   sessionStorage.setItem(`ts_rep_${variantId}`, JSON.stringify(parsedDetail));
                 } catch {}
               }
-              setCountdown(null);
               setLoadingStructuredReport(false);
               setReportError("");
               return;
@@ -394,7 +434,6 @@ export default function VehicleDetail() {
         const parsed = extractReportData(data);
         if (parsed) {
           setStructuredReport(parsed);
-          setCountdown(null);
           setLoadingStructuredReport(false);
           setReportError("");
         }
@@ -402,23 +441,25 @@ export default function VehicleDetail() {
     } catch (e) {}
   };
 
+  // Advance pipeline step while report is loading (giving confidence to user)
   useEffect(() => {
-    if (countdown === null) return;
-    if (countdown === 0) {
-      setCountdown(null);
-      checkReportStatusSilently();
-      return;
-    }
+    if (structuredReport) return;
+    const stepTimer = setInterval(() => {
+      setPipelineStep((prev) => (prev < 5 ? prev + 1 : 5));
+    }, 3200);
+    return () => clearInterval(stepTimer);
+  }, [structuredReport]);
 
-    if (countdown > 0 && countdown % 3 === 0) {
-      checkReportStatusSilently();
-    }
+  // Poll report status silently while waiting
+  useEffect(() => {
+    if (structuredReport || !variantId) return;
 
-    const timer = setTimeout(() => {
-      setCountdown(countdown - 1);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [countdown, structuredReport]);
+    const pollTimer = setInterval(() => {
+      checkReportStatusSilently();
+    }, 2800);
+
+    return () => clearInterval(pollTimer);
+  }, [variantId, structuredReport]);
 
   // Toggle Favorite
   const handleToggleFavorite = () => {
@@ -486,13 +527,9 @@ export default function VehicleDetail() {
         setGeneratingReport(false);
         if (data.finalDecision === 'INSUFFICIENT_DATA') {
           if (!force) {
-            if (countdown === null) {
-              setCountdown(30);
-            }
             handleGenerateReport(true); // immediately trigger background research
           }
         } else {
-          setCountdown(null); // Stop countdown if loaded successfully
           fetchVehicleDetails(variantId);
         }
       })
@@ -602,39 +639,15 @@ export default function VehicleDetail() {
       });
   };
 
-  const isPageLoading = loading || (countdown !== null && (!aiReport || aiReport.finalDecision === 'INSUFFICIENT_DATA'));
+  const isPageLoading = loading;
 
   if (isPageLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center py-24 text-center gap-6 min-h-[60vh]">
-        <div className="relative flex items-center justify-center animate-in fade-in duration-500">
-          <div className="animate-spin rounded-full h-20 w-20 border-t-2 border-b-2 border-orange-500"></div>
-          <div className="absolute text-xl font-black text-orange-500">{countdown || 30}</div>
+      <div className="flex-1 flex flex-col items-center justify-center py-24 text-center gap-4 min-h-[50vh]">
+        <div className="relative flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
         </div>
-        <div className="flex flex-col gap-2 max-w-md px-6 animate-pulse">
-          <h3 className="text-sm font-bold text-slate-200">Yapay Zeka Analizi Hazırlanıyor...</h3>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            Araç özellikleri yükleniyor ve yapay zeka analizi başlatılıyor. Raporunuz hazırlanıyor, lütfen bekleyin...
-          </p>
-        </div>
-        {/* Road and Driving Car Animation */}
-        <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
-          <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
-              style={{ width: `${((30 - (countdown || 30)) / 30) * 100}%` }}
-            ></div>
-          </div>
-          <div 
-            className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
-            style={{ 
-              left: `calc(${((30 - (countdown || 30)) / 30) * 100}% - 14px)`,
-              transform: 'scaleX(-1)'
-            }}
-          >
-            🚗
-          </div>
-        </div>
+        <p className="text-xs text-slate-400">Araç özellikleri yükleniyor...</p>
       </div>
     );
   }
@@ -724,56 +737,151 @@ export default function VehicleDetail() {
             {structuredReport ? (
               <VehicleReportShell 
                 report={structuredReport} 
-                onRefresh={() => fetchStructuredReport(true)} 
-                isRefreshing={loadingStructuredReport} 
               />
             ) : (
-              <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-slate-900/40 border border-orange-500/20 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-5 shadow-2xl relative overflow-hidden">
+              <div className="bg-gradient-to-b from-slate-900/90 via-slate-900/70 to-slate-950/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md space-y-6">
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-500 to-transparent"></div>
-                
-                <div className="relative flex items-center justify-center my-2">
-                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
-                  <div className="absolute text-lg font-black text-orange-500">
-                    {countdown !== null ? countdown : "..."}
+
+                {/* Header & Status */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-2.5 w-2.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500"></span>
+                      </span>
+                      <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">
+                        TorqueScout Araç İstihbarat Motoru
+                      </span>
+                    </div>
+                    <h3 className="text-base font-extrabold text-white">
+                      Detaylı Uzman Raporu Hazırlanıyor...
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Seçilen model ve motor kombinasyonuna ait tüm veriler resmi ve bağımsız kaynaklardan taranıyor.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 px-3.5 py-2 rounded-2xl shrink-0 self-start sm:self-center">
+                    <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+                    <span className="text-xs font-bold text-slate-300">
+                      Adım {pipelineStep} / 5
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 max-w-md">
-                  <h3 className="text-sm font-bold text-slate-200 animate-pulse">
-                    TorqueScout AI Uzman Raporu Hazırlanıyor...
-                  </h3>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Aracın motor-şanzıman kombinasyonu, kronik arıza veritabanı kayıtları ve geri çağırma listeleri taranıyor. Lütfen bekleyin...
-                  </p>
+                {/* Progress Bar & Animated Car */}
+                <div className="space-y-2 py-1">
+                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-400">
+                    <span>Analiz İlerlemesi</span>
+                    <span className="text-orange-400 font-bold">%{Math.min(98, pipelineStep * 20 - 2)}</span>
+                  </div>
+                  <div className="w-full relative h-7 flex items-end">
+                    <div className="w-full h-1.5 bg-slate-800/90 rounded-full relative overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-orange-600 via-amber-500 to-emerald-400 h-full rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${Math.min(98, pipelineStep * 20 - 2)}%` }}
+                      />
+                    </div>
+                    <div
+                      className="absolute bottom-1 text-xl transition-all duration-700 ease-out"
+                      style={{
+                        left: `calc(${Math.min(98, pipelineStep * 20 - 2)}% - 12px)`,
+                        transform: "scaleX(-1)",
+                      }}
+                    >
+                      🚗
+                    </div>
+                  </div>
                 </div>
 
-                {/* Road and Driving Car Animation */}
-                <div className="w-full max-w-xs relative h-8 flex items-end mt-2">
-                  <div className="w-full h-1 bg-slate-800 rounded-full relative overflow-hidden">
-                    <div 
-                      className="bg-gradient-to-r from-orange-600 to-amber-500 h-full rounded-full transition-all duration-1000 ease-linear"
-                      style={{ width: `${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}%` }}
-                    ></div>
-                  </div>
-                  <div 
-                    className="absolute bottom-1 text-2xl transition-all duration-1000 ease-linear"
-                    style={{ 
-                      left: `calc(${countdown !== null ? ((30 - countdown) / 30) * 100 : 50}% - 14px)`,
-                      transform: 'scaleX(-1)'
-                    }}
-                  >
-                    🚗
-                  </div>
+                {/* Pipeline Steps (with green checkmarks!) */}
+                <div className="space-y-3 pt-2">
+                  {REPORT_PIPELINE_STEPS.map((step) => {
+                    const isDone = pipelineStep > step.id;
+                    const isCurrent = pipelineStep === step.id;
+
+                    return (
+                      <div
+                        key={step.id}
+                        className={`flex items-start gap-3.5 p-3.5 rounded-2xl border transition-all duration-500 ${
+                          isDone
+                            ? "bg-emerald-950/20 border-emerald-500/25"
+                            : isCurrent
+                            ? "bg-orange-950/25 border-orange-500/40 shadow-lg shadow-orange-950/30"
+                            : "bg-slate-950/40 border-slate-800/50 opacity-60"
+                        }`}
+                      >
+                        {/* Step State Icon */}
+                        <div className="mt-0.5 shrink-0">
+                          {isDone ? (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400 animate-in zoom-in-50 duration-300" />
+                          ) : isCurrent ? (
+                            <div className="relative flex items-center justify-center">
+                              <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border border-slate-700 bg-slate-900 flex items-center justify-center text-[10px] text-slate-500 font-bold">
+                              {step.id}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Step Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`text-xs font-bold ${
+                                isDone
+                                  ? "text-emerald-300"
+                                  : isCurrent
+                                  ? "text-white"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {step.title}
+                            </span>
+                            {isDone ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+                                <span>✓</span>
+                                <span>Tamamlandı</span>
+                              </span>
+                            ) : isCurrent ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-400 bg-orange-500/15 border border-orange-500/30 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
+                                <span>İnceleniyor...</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+                                Sırada
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className={`text-[11px] mt-0.5 leading-relaxed ${
+                              isDone
+                                ? "text-emerald-400/70"
+                                : isCurrent
+                                ? "text-slate-300"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {step.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {reportError && (
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-4 rounded-2xl font-semibold mt-3 flex flex-col items-center gap-3 max-w-md mx-auto">
+                  <div className="bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs p-4 rounded-2xl font-semibold mt-3 flex flex-col items-center gap-3 max-w-md mx-auto">
                     <div className="flex items-center gap-2 text-center">
-                      <span>⚠️ {reportError}</span>
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>{reportError}</span>
                     </div>
                     <a
                       href="/dashboard/support/feedback?category=VEHICLE_QUERY_AI_REPORT"
-                      className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 active:scale-95"
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95"
                     >
                       <span>💬 Geri Bildirim Gönder</span>
                     </a>
