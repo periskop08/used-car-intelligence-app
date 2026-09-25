@@ -28,11 +28,11 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     "powerUnit": "HP | kW",
     "engineTorqueNm": 250,
     "torqueUnit": "Nm",
-    "transmissionFamily": "DSG / ZF 8HP / EDC vb.",
-    "transmissionCode": "DQ200 / 0CW vb. (Doğrulandıysa)",
-    "clutchType": "KURU_CIFT_KAVRAMA | ISLAK_CIFT_KAVRAMA | TORK_KONVERTORLU | CVT | MANUEL",
-    "transmissionTypeAndSpeeds": "7 İleri Kuru Çift Kavramalı DSG",
-    "transmissionSpeeds": 7,
+    "transmissionFamily": "Spesifik Aile (Tiptronic / S-Tronic / DSG / ZF 8HP / EDC / Manuel vb.)",
+    "transmissionCode": "Üretici Kodu (Aisin 09G / DQ200 / DQ250 / ZF 8HP50 vb.)",
+    "clutchType": "KURU_CIFT_KAVRAMA | ISLAK_CIFT_KAVRAMA | TORK_KONVERTORLU | CVT | MANUEL | ELEKTRIKLI_TEK_ORANLI",
+    "transmissionTypeAndSpeeds": "Resmi İsim ve Vites Sayısı (Örn: 6 İleri Tiptronic, 7 İleri S-Tronic, 8 İleri Otomatik, 6 İleri Manuel)",
+    "transmissionSpeeds": 6,
     "timingSystem": "KAYIS | ZINCIR | BELIRTILMEDI",
     "hasDpf": true,
     "hasAdBlue": false,
@@ -390,7 +390,11 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
         Lityum bataryalarda sıcaklık etkileri yazılırken elektro-kimyasal gerçekliğe tam uyulmalıdır:
         - Aşırı kış soğuklarında batarya hücresi kimyasal yavaşlaması nedeniyle geçici menzil kaybı (%15-30) yaşanabilir.
         - Aşırı yaz sıcaklarında ise motor çekiş gücü/performansı DÜŞMEZ! Bunun yerine batarya aktif sıvı soğutma devresinin ve kabin klima kompresörünün sürekli yüksek güçte çalışması sebebiyle tüketim artar ve menzil düşer.
-        - KESİNLİKLE 'yüksek sıcaklıkta batarya performansı/gücü düşer' gibi hatalı, kaba tabirler KULLANILAMAZ! Vurgu daima kış soğuklarındaki kimyasal menzil kaybı veya yaz sıcaklarındaki yüksek iklimlendirme/soğutma yükü ve tüketim artışı olmalıdır.` : `İÇTEN YANMALI VE HİBRİT TAVİZ KURALI: Şanzıman kavrama ısınması, düşük devir turbo gecikmesi veya şehir içi dur-kalk yakıt tüketimi gibi gerçekçi mekanik kullanım tavizlerini işle.`}
+        - KESİNLİKLE 'yüksek sıcaklıkta batarya performansı/gücü düşer' gibi hatalı, kaba tabirler KULLANILAMAZ! Vurgu daima kış soğuklarındaki kimyasal menzil kaybı veya yaz sıcaklarındaki yüksek iklimlendirme/soğutma yükü ve tüketim artışı olmalıdır.` : `İÇTEN YANMALI VE HİBRİT TAVİZ KURALI:
+        * ŞANZIMAN MİMARİSİNE UYGUNLUK:
+          - Şanzıman tork konvertörlü tam otomatik (${clutchType === 'TORK_KONVERTORLU' || (transTypeAndSpeeds || '').includes('Tiptronic') ? 'EVET, TORK KONVERTÖRLÜ' : 'HAYIR'}) ise KESİNLİKLE "kavrama ısınması", "çift kavrama ısınması" veya "mekatronik basınç tüpü" gibi çift kavramaya özgü arızaları taviz diye YAZMA! Tork konvertörlü şanzımanlarda dur-kalkta kavrama ısınması bulunmaz. Bunun yerine hidrolik tork konvertörü kayması, vites oranlarının uzunluğu veya dur-kalktaki yakıt tüketimi gibi gerçekçi mekanik tavizleri yaz.
+          - Yalnızca kuru çift kavramalı (DQ200 vb.) araçlarda dur-kalk trafikte kavrama ısınması veya mekatronik basınç hassasiyeti taviz olarak belirtilebilir.
+          - MARKA KURALI (AUDI): Audi marka araçlarda KESİNLİKLE "DSG" kelimesi KULLANILAMAZ! Çift kavrama ise "S tronic", tork konvertörlü ise "Tiptronic" yazılmalıdır.`}
     - **Kimler İçin Mantıklı? ('suitableFor'):** En az 3 adet spesifik ve gerçekçi kullanıcı profili belirle. Her profili en az 2-3 cümleyle bu araç ve donanım özelinde gerekçelendir.
     - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle. Açık uçlu danışman diliyle hangi kullanım senaryolarında kısıtlar yaratacağını 2-3 cümleyle gerekçelendir:
       ${!isOffroadOrSuv ? `* KASA TİPİ VE YOL ŞARTLARI KURALI (BİNEK ARAÇ - ${body || 'Sedan / Hatchback / Coupe / Station Wagon'}):

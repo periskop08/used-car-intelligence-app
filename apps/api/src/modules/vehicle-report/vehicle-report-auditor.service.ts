@@ -203,6 +203,12 @@ export class VehicleReportAuditorService {
         // Fix concatenated sentence typo (e.g. "...öne çıkıyor.Konforlu Sürüş" -> "...öne çıkıyor. Konforlu Sürüş")
         t = t.replace(/([a-zğüşıöç0-9])\.([A-ZĞÜŞİÖÇ])/g, '$1. $2');
 
+        // Audi Brand rule: Audi never uses DSG commercially
+        if (brand.toLowerCase().includes('audi')) {
+          t = t.replace(/\bdsg\s*şanzıman\b/gi, isCanonicalTorqueConverter ? 'Tiptronic şanzıman' : 'S tronic şanzıman');
+          t = t.replace(/\bdsg\b/gi, isCanonicalTorqueConverter ? 'Tiptronic' : 'S tronic');
+        }
+
         if (isCanonicalTorqueConverter) {
           t = t.replace(/(?:kademesiz zincirli otomatik|kademesiz değişken oranlı|kademesiz otomatik)\s*\((?:lineartronic|multidrive s|x-tronic)?\s*cvt\)/gi, txTaxonomy.transmissionTypeAndSpeeds);
           t = t.replace(/lineartronic\s*\(?cvt\)?/gi, cleanTransName);
@@ -216,7 +222,13 @@ export class VehicleReportAuditorService {
           t = t.replace(/cvt'nin/gi, `${cleanTransName} şanzımanın`);
           t = t.replace(/cvt'ye/gi, `${cleanTransName} şanzımana`);
           t = t.replace(/\bcvt\b/gi, 'otomatik');
-          t = t.replace(/çift kavramalı şanzıman/gi, 'tork konvertörlü tam otomatik şanzıman');
+          t = t.replace(/7\s*ileri\s*kuru\s*çift\s*kavramalı\s*(?:dsg|s-tronic)?\s*şanzıman/gi, `${cleanTransName} şanzıman`);
+          t = t.replace(/7\s*ileri\s*kuru\s*çift\s*kavramalı/gi, cleanTransName);
+          t = t.replace(/kuru\s*çift\s*kavramalı\s*(?:dsg|s-tronic)?/gi, cleanTransName);
+          t = t.replace(/dur-kalk\s*trafikte(?:ki)?\s*ısınma\s*hassasiyeti/gi, 'dur-kalk trafikteki sarsıntısız ve konforlu aktarımı');
+          t = t.replace(/dur-kalk\s*trafikte(?:ki)?\s*kavrama\s*ısınması/gi, 'yoğun trafikteki yakıt tüketim dengesi');
+          t = t.replace(/kavrama\s*ısınması/gi, 'şanzıman hidrolik kayması');
+          t = t.replace(/çift kavramalı şanzıman/gi, `${cleanTransName} şanzıman`);
           t = t.replace(/çift kavrama/gi, 'tam otomatik');
         } else if (isCanonicalCvt) {
           t = t.replace(/çift kavramalı/gi, 'kademesiz CVT');

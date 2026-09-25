@@ -271,13 +271,17 @@ export class VehicleReportContextBuilderService {
       topSpeedVal === null ||
       weightVal === null ||
       trunkVal === null ||
+      typeof specsJson?.transmissionSpeeds !== 'number' ||
+      !specsJson?.transmissionTypeAndSpeeds ||
       (isElectricVariant && (electricRangeVal === null || batteryCapacityVal === null))
     );
 
+    let researchedData: Record<string, any> | null = null;
     if (isPhysicalSpecsMissing) {
       try {
         const researched = await this.researchPhysicalSpecsViaAi(variant, engineHp);
         if (researched) {
+          researchedData = researched;
           if (zeroToHundred === null && typeof researched.acceleration0to100 === 'number') {
             zeroToHundred = researched.acceleration0to100;
           }
@@ -323,6 +327,10 @@ export class VehicleReportContextBuilderService {
                 luggageCapacityL: trunkVal,
                 electricRangeWltpKm: electricRangeVal,
                 batteryCapacityKwh: batteryCapacityVal,
+                transmissionTypeAndSpeeds: researched.transmissionTypeAndSpeeds || currentSpecsData.transmissionTypeAndSpeeds || null,
+                transmissionSpeeds: typeof researched.transmissionSpeeds === 'number' ? researched.transmissionSpeeds : (typeof currentSpecsData.transmissionSpeeds === 'number' ? currentSpecsData.transmissionSpeeds : null),
+                transmissionCode: researched.transmissionCode || currentSpecsData.transmissionCode || null,
+                clutchType: researched.clutchType || currentSpecsData.clutchType || null,
               },
             },
             update: {
@@ -338,6 +346,10 @@ export class VehicleReportContextBuilderService {
                 luggageCapacityL: trunkVal,
                 electricRangeWltpKm: electricRangeVal,
                 batteryCapacityKwh: batteryCapacityVal,
+                transmissionTypeAndSpeeds: researched.transmissionTypeAndSpeeds || currentSpecsData.transmissionTypeAndSpeeds || null,
+                transmissionSpeeds: typeof researched.transmissionSpeeds === 'number' ? researched.transmissionSpeeds : (typeof currentSpecsData.transmissionSpeeds === 'number' ? currentSpecsData.transmissionSpeeds : null),
+                transmissionCode: researched.transmissionCode || currentSpecsData.transmissionCode || null,
+                clutchType: researched.clutchType || currentSpecsData.clutchType || null,
               },
             },
           });
@@ -347,7 +359,11 @@ export class VehicleReportContextBuilderService {
       }
     }
 
-    const transTaxonomy = lookupAutomotiveTransmissionTaxonomy({
+    const researchedTrans = (researchedData && typeof researchedData.transmissionSpeeds === 'number' && researchedData.transmissionTypeAndSpeeds)
+      ? researchedData
+      : ((typeof specsJson?.transmissionSpeeds === 'number' && specsJson?.transmissionTypeAndSpeeds) ? specsJson : null);
+
+    const fallbackTaxonomy = lookupAutomotiveTransmissionTaxonomy({
       brand: variant.brand?.name,
       model: variant.model?.name,
       engineCode: variant.engine?.code,
@@ -360,6 +376,20 @@ export class VehicleReportContextBuilderService {
       isElectric: isElectricVariant,
       isHybrid: isHybridVariant,
     });
+
+    const isAudiBrand = (variant.brand?.name || '').toLowerCase().includes('audi');
+    const transTaxonomy = researchedTrans
+      ? {
+          transmissionFamily: researchedTrans.clutchType === 'TORK_KONVERTORLU' ? (isAudiBrand ? 'TIPTRONIC' : 'TORK KONVERTÖRLÜ') : (researchedTrans.clutchType === 'KURU_CIFT_KAVRAMA' ? (isAudiBrand ? 'S-TRONIC' : 'DSG') : researchedTrans.clutchType),
+          clutchType: researchedTrans.clutchType || fallbackTaxonomy.clutchType,
+          clutchTypeTr: researchedTrans.clutchTypeTr || fallbackTaxonomy.clutchTypeTr,
+          transmissionTypeAndSpeeds: researchedTrans.transmissionTypeAndSpeeds || fallbackTaxonomy.transmissionTypeAndSpeeds,
+          transmissionSpeeds: researchedTrans.transmissionSpeeds || fallbackTaxonomy.transmissionSpeeds,
+          transmissionCode: researchedTrans.transmissionCode || fallbackTaxonomy.transmissionCode,
+          maintenanceDescriptionTr: researchedTrans.maintenanceDescriptionTr || fallbackTaxonomy.maintenanceDescriptionTr,
+          confidence: 'AI_CATALOG_RESEARCHED',
+        }
+      : fallbackTaxonomy;
 
     const performanceData: Record<string, any> = {
       enginePowerHp: engineHp,
@@ -605,12 +635,17 @@ Paket: ${trimName}
   "weight": number (Boş ağırlık kg cinsinden tam sayı, örn: 2200 veya 1450),
   "averageFuelConsumption": number (Ortalama yakıt tüketimi lt/100km, elektrikli ise null),
   "electricRangeWltpKm": number (Elektrikli ise üretici resmi WLTP karma menzili km cinsinden tam sayı örn: 521, içten yanmalı ise null),
-  "batteryCapacityKwh": number (Elektrikli ise kullanılabilir batarya kapasitesi kWh cinsinden örn: 82.5, içten yanmalı ise null)
+  "batteryCapacityKwh": number (Elektrikli ise kullanılabilir batarya kapasitesi kWh cinsinden örn: 82.5, içten yanmalı ise null),
+  "transmissionTypeAndSpeeds": string (Üretici resmi şanzıman ticari adı ve vites sayısı, örn: "6 İleri Tiptronic", "7 İleri S-Tronic", "8 İleri Steptronic", "5 İleri Manuel"),
+  "transmissionSpeeds": number (İleri vites kademe sayısı tam sayı, örn: 5, 6, 7, 8),
+  "transmissionCode": string (Üretici şanzıman kodu, örn: "Aisin 09G / TF-60SN", "DQ200", "ZF 8HP50", "DQ250"),
+  "clutchType": string ("TORK_KONVERTORLU" | "KURU_CIFT_KAVRAMA" | "ISLAK_CIFT_KAVRAMA" | "CVT" | "MANUEL" | "ELEKTRIKLI_TEK_ORANLI" | "ROBOTIZE_TEK_KAVRAMA")
 }
 
 Önemli:
 - Yalnızca bu JSON formatını döndür, markdown veya ek metin ekleme.
-- Verilen spesifik model yılı, kasa tipi ve motora ait gerçek üretici fabrika katalog verilerini doldur.`;
+- Verilen spesifik model yılı, kasa tipi ve motora ait gerçek üretici fabrika katalog verilerini doldur.
+- Şanzıman verilerini belirtilen spesifik model yılı (${year}) ve motor için resmi üretici fabrika verisinden doldur (Örn: 2005 Audi A3 1.6 için 6 ileri Tiptronic tork konvertörlü Aisin 09G; kuru çift kavrama DQ200 2008 öncesinde bulunmaz; Audi modellerinde DSG yerine Tiptronic veya S-Tronic adlandırması kullanılır).`;
 
     // 1. Try OpenAI gpt-4o-mini
     const openAiApiKey = process.env.OPENAI_API_KEY;

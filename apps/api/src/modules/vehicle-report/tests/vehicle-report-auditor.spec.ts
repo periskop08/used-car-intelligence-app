@@ -355,5 +355,43 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       const auditedSuv = await auditor.auditAndHarmonizeReport(mockSuvReport, {});
       expect(auditedSuv.report.expertDecisionSynthesis.notSuitableFor[0].profile).toBe('Ağır Off-Road Tutkunları');
     });
+
+    it('should detect and harmonize 2005 Audi A3 1.6 hallucinating 7-speed DSG into 6-speed Tiptronic without dry clutch overheating', async () => {
+      const mockAudiReport: any = {
+        vehicleIdentity: {
+          brand: 'Audi',
+          model: 'A3 Sportback',
+          year: 2005,
+          bodyType: 'HATCHBACK',
+          engineCode: '1.6',
+          transmissionName: 'Otomatik',
+          selected8Filters: {
+            brand: 'Audi',
+            model: 'A3 Sportback',
+            year: '2005',
+            engine: '1.6',
+            transmission: 'Otomatik',
+          },
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Audi A3 Sportback: Dinamik Sürüş ve Konforun Mükemmel Dengesi',
+            detailedAssessment: '7 ileri kuru çift kavramalı DSG şanzıman, vites geçişlerinde hızlı ve akıcı bir deneyim sağlarken, dur-kalk trafikteki ısınma hassasiyeti ile dikkat çeker.',
+          },
+          suitableFor: [],
+          notSuitableFor: [],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(mockAudiReport, {});
+      expect(audited.auditResult.wasHarmonized).toBe(true);
+      const text = audited.report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment;
+      expect(text).not.toContain('7 ileri kuru çift kavramalı DSG');
+      expect(text).not.toContain('dur-kalk trafikteki ısınma hassasiyeti');
+      expect(text).toContain('Tiptronic');
+      expect(text).toContain('6 İleri Tiptronic');
+    });
   });
 });

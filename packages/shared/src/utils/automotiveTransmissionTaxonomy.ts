@@ -148,12 +148,43 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
     code: 'Audi DL382',
     maintenanceTr: 'Audi boyuna yerleşimli ıslak çift kavrama S-Tronic; 60.000 km aralıklarla şanzıman mekatronik ve kavrama yağı yenilenmelidir.',
   },
-  // VAG Yüksek Güç/Hacim Islak Çift Kavrama (2.0 TDI, 2.0 TSI)
+  // VAG 2003-2008 Erken Dönem Atmosferik / FSI Tork Konvertörlü Otomatik (A3 8P, Golf 5, Jetta, Leon, Touran)
+  {
+    family: 'TIPTRONIC',
+    matcher: ({ brand, engine, year }) => {
+      const isVag = /volkswagen|audi|seat|skoda/i.test(brand);
+      if (!isVag) return false;
+      const isPreFacelift = year < 2008;
+      const isAtmosphericOrFsi = engine.includes('1.6') || engine.includes('fsi') || engine.includes('mpi') || engine.includes('bse') || engine.includes('bgu') || engine.includes('bkg');
+      return isPreFacelift && isAtmosphericOrFsi;
+    },
+    clutchType: 'TORK_KONVERTORLU',
+    typeAndSpeeds: '6 İleri Tiptronic (Aisin 09G)',
+    speeds: 6,
+    code: 'Aisin 09G / TF-60SN',
+    maintenanceTr: 'Aisin üretimi 6 ileri tork konvertörlü tam otomatik şanzıman; her 60.000-80.000 km aralığında ATF şanzıman yağı ve karter süzgeci yenilenmelidir. Kuru çift kavrama aşınması veya mekatronik basınç tüpü arızası bulunmaz.',
+  },
+  // VAG Erken Dönem 6 İleri Islak Çift Kavrama (2003-2008 2.0 TDI / 2.0 TFSI DQ250)
   {
     family: 'DSG',
-    matcher: ({ brand, engine }) => {
+    matcher: ({ brand, engine, year }) => {
       const isVag = /volkswagen|audi|seat|skoda/i.test(brand);
-      return isVag && (engine.includes('2.0') || engine.includes('2.5') || engine.includes('3.0'));
+      if (!isVag) return false;
+      const isPre2008 = year < 2008;
+      return isPre2008 && (engine.includes('2.0') || engine.includes('3.2') || engine.includes('vr6'));
+    },
+    clutchType: 'ISLAK_CIFT_KAVRAMA',
+    typeAndSpeeds: '6 İleri Islak Çift Kavramalı DSG / S-Tronic (DQ250)',
+    speeds: 6,
+    code: 'DQ250 / 02E',
+    maintenanceTr: 'Yağ banyolu ıslak çift kavrama mimarisi; 60.000 km periyotlarla şanzıman yağı ve basınç filtresi değişimi aksatılmamalıdır.',
+  },
+  // VAG Yüksek Güç/Hacim Islak Çift Kavrama (2.0 TDI, 2.0 TSI DQ381/DQ500)
+  {
+    family: 'DSG',
+    matcher: ({ brand, engine, year }) => {
+      const isVag = /volkswagen|audi|seat|skoda/i.test(brand);
+      return isVag && (year >= 2008) && (engine.includes('2.0') || engine.includes('2.5') || engine.includes('3.0'));
     },
     clutchType: 'ISLAK_CIFT_KAVRAMA',
     typeAndSpeeds: '7 İleri Islak Çift Kavramalı DSG (DQ381 / DQ500)',
@@ -161,10 +192,20 @@ const TRANSMISSION_TAXONOMY_RULES: TransmissionTaxonomyRule[] = [
     code: 'DQ381',
     maintenanceTr: 'Yağ banyolu ıslak çift kavrama mimarisi; 60.000 km periyotlarla DSG şanzıman yağı ve basınç filtresi değişimi aksatılmamalıdır.',
   },
-  // VAG Standart Kuru Çift Kavrama (1.0 TSI, 1.2 TSI, 1.4 TSI, 1.5 TSI, 1.6 TDI)
+  // Audi Standart Kuru Çift Kavrama (2008+ 1.0, 1.2, 1.4, 1.5 TFSI / 1.6 TDI)
+  {
+    family: 'S-TRONIC',
+    matcher: ({ brand, year }) => brand.includes('audi') && year >= 2008,
+    clutchType: 'KURU_CIFT_KAVRAMA',
+    typeAndSpeeds: '7 İleri Kuru Çift Kavramalı S-Tronic (DQ200)',
+    speeds: 7,
+    code: 'DQ200 / 0CW',
+    maintenanceTr: 'Kuru çift kavrama ve elektrohidrolik mekatronik ünitesi; dur-kalk trafikte kavrama ısınması, 1-2 vites titreşimi ve mekatronik basınç tüpü denetlenmelidir.',
+  },
+  // VAG Standart Kuru Çift Kavrama (VW, Seat, Skoda 2008+)
   {
     family: 'DSG',
-    matcher: ({ brand }) => /volkswagen|audi|seat|skoda/i.test(brand),
+    matcher: ({ brand, year }) => /volkswagen|seat|skoda/i.test(brand) && year >= 2008,
     clutchType: 'KURU_CIFT_KAVRAMA',
     typeAndSpeeds: '7 İleri Kuru Çift Kavramalı DSG (DQ200)',
     speeds: 7,
