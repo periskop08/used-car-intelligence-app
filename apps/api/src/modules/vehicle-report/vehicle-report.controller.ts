@@ -44,4 +44,14 @@ export class VehicleReportController {
   async upgradeReportVersion(@Request() req: any, @Param('reportId') reportId: string) {
     return this.reportService.upgradeReportVersion(this.getUserId(req), reportId);
   }
+
+  @Post(':reportId/vote')
+  async voteReport(
+    @Request() req: any,
+    @Param('reportId') reportId: string,
+    @Body() body: { vote: 'LIKE' | 'DISLIKE'; voterToken?: string },
+  ) {
+    const voterToken = body.voterToken || this.getUserId(req) || 'guest';
+    return this.reportService.voteReport(reportId, voterToken, body.vote);
+  }
 }

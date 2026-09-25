@@ -316,4 +316,54 @@ describe('Admin Vehicle Reports Management Center Test Suite (Rules 65-74)', () 
     // Admin with permission
     expect(verifyAccess('ADMIN', [AdminPermission.VEHICLE_DATA_WRITE])).toBe(true);
   });
+
+  // RULE 75: TEST — REPORT DELETION
+  it('Rule 75: Admin report deletion removes report and promotes previous completed version if current was deleted', () => {
+    const v1 = { id: 'rep_v1', variantId: 'v_subaru', versionNumber: 1, isCurrentPublished: false, status: 'COMPLETED' };
+    const v2 = { id: 'rep_v2', variantId: 'v_subaru', versionNumber: 2, isCurrentPublished: true, status: 'COMPLETED' };
+    let reports = [v1, v2];
+
+    const deleteReport = (reportId: string) => {
+      const idx = reports.findIndex((r) => r.id === reportId);
+      if (idx === -1) throw new NotFoundException('Rapor bulunamadı.');
+      const [deleted] = reports.splice(idx, 1);
+      if (deleted.isCurrentPublished) {
+        const prev = reports
+          .filter((r) => r.variantId === deleted.variantId && r.status === 'COMPLETED')
+          .sort((a, b) => b.versionNumber - a.versionNumber)[0];
+        if (prev) prev.isCurrentPublished = true;
+      }
+      return { success: true };
+    };
+
+    deleteReport('rep_v2');
+    expect(reports.find((r) => r.id === 'rep_v2')).toBeUndefined();
+    expect(v1.isCurrentPublished).toBe(true);
+  });
+
+  // RULE 76: TEST — REPORT VOTING
+  it('Rule 76: Public report voting updates like and dislike counts', () => {
+    const report = { id: 'rep_v1', likeCount: 0, dislikeCount: 0 };
+    const votes: Record<string, 'LIKE' | 'DISLIKE'> = {};
+
+    const vote = (voterToken: string, type: 'LIKE' | 'DISLIKE') => {
+      votes[voterToken] = type;
+      report.likeCount = Object.values(votes).filter((v) => v === 'LIKE').length;
+      report.dislikeCount = Object.values(votes).filter((v) => v === 'DISLIKE').length;
+      return { likeCount: report.likeCount, dislikeCount: report.dislikeCount };
+    };
+
+    vote('user_1', 'LIKE');
+    expect(report.likeCount).toBe(1);
+    expect(report.dislikeCount).toBe(0);
+
+    vote('user_2', 'DISLIKE');
+    expect(report.likeCount).toBe(1);
+    expect(report.dislikeCount).toBe(1);
+
+    // user_1 changes vote to DISLIKE
+    vote('user_1', 'DISLIKE');
+    expect(report.likeCount).toBe(0);
+    expect(report.dislikeCount).toBe(2);
+  });
 });

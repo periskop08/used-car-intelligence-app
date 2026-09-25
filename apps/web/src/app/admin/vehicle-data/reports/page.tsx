@@ -55,6 +55,8 @@ interface ReportSummary {
   completedAt: string | null;
   updatedAt: string;
   pendingIssueCount: number;
+  likeCount: number;
+  dislikeCount: number;
   vehicleIdentity: VehicleIdentity | null;
 }
 
@@ -569,16 +571,31 @@ export default function AdminVehicleReportsPage() {
                         </div>
                       </td>
 
-                      {/* User Feedback Count */}
+                      {/* User Feedback & Votes */}
                       <td className="py-4 px-3">
-                        {report.pendingIssueCount > 0 ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            <span>{report.pendingIssueCount} Bildirim</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 text-xs">Sorun yok</span>
-                        )}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2.5 text-xs">
+                            <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold" title="Beğeni sayısı">
+                              <span>👍</span>
+                              <span>{report.likeCount ?? 0}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-rose-400 font-semibold" title="Beğenmeme sayısı">
+                              <span>👎</span>
+                              <span>{report.dislikeCount ?? 0}</span>
+                            </span>
+                          </div>
+
+                          {report.pendingIssueCount > 0 ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                              <ShieldAlert className="w-3 h-3" />
+                              <span>{report.pendingIssueCount} Bildirim</span>
+                            </span>
+                          ) : (
+                            (!report.likeCount && !report.dislikeCount) ? (
+                              <span className="text-slate-500 text-[11px] block">Sorun yok</span>
+                            ) : null
+                          )}
+                        </div>
                       </td>
 
                       {/* Dates */}

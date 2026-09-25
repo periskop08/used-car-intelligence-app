@@ -544,4 +544,35 @@ export class VehicleReportService implements OnModuleInit {
 
     return updated;
   }
+
+  async voteReport(reportId: string, voterToken: string, voteType: 'LIKE' | 'DISLIKE') {
+    const report = await this.prisma.generatedVehicleReport.findUnique({
+      where: { id: reportId },
+      select: { id: true, likeCount: true, dislikeCount: true },
+    });
+    if (!report) throw new NotFoundException('Rapor bulunamadı.');
+
+    // Upsert vote
+    await this.prisma.vehicleReportVote.upsert({
+      where: {
+        reportId_voterToken: { reportId, voterToken },
+      },
+      create: { reportId, voterToken, voteType },
+      update: { voteType },
+    });
+
+    // Count total likes & dislikes
+    const [likes, dislikes] = await Promise.all([
+      this.prisma.vehicleReportVote.count({ where: { reportId, voteType: 'LIKE' } }),
+      this.prisma.vehicleReportVote.count({ where: { reportId, voteType: 'DISLIKE' } }),
+    ]);
+
+    // Update counts on GeneratedVehicleReport
+    await this.prisma.generatedVehicleReport.update({
+      where: { id: reportId },
+      data: { likeCount: likes, dislikeCount: dislikes },
+    });
+
+    return { success: true, likeCount: likes, dislikeCount: dislikes, userVote: voteType };
+  }
 }

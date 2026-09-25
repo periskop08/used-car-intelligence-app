@@ -16,8 +16,11 @@ import {
   RefreshCcw, 
   HelpCircle,
   AlertCircle,
-  Wrench
+  Wrench,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
+import { API_BASE_URL } from "@/utils/apiConfig";
 
 interface VehicleReportShellProps {
   report: ComprehensiveVehicleReport;
@@ -27,6 +30,77 @@ interface VehicleReportShellProps {
 
 export default function VehicleReportShell({ report, onRefresh, isRefreshing }: VehicleReportShellProps) {
   const isListingMode = report.mode === "LISTING_REPORT";
+
+  // User Like / Dislike Feedback State
+  const currentReportId = (report as any).reportId || (report as any).id;
+  const [likes, setLikes] = useState<number>((report as any).likeCount ?? 0);
+  const [dislikes, setDislikes] = useState<number>((report as any).dislikeCount ?? 0);
+  const [userVote, setUserVote] = useState<"LIKE" | "DISLIKE" | null>(null);
+  const [isVoting, setIsVoting] = useState(false);
+
+  useEffect(() => {
+    setLikes((report as any).likeCount ?? 0);
+    setDislikes((report as any).dislikeCount ?? 0);
+  }, [(report as any).likeCount, (report as any).dislikeCount]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && currentReportId) {
+      const stored = localStorage.getItem(`report_vote_${currentReportId}`);
+      if (stored === "LIKE" || stored === "DISLIKE") {
+        setUserVote(stored);
+      }
+    }
+  }, [currentReportId]);
+
+  const handleVote = async (type: "LIKE" | "DISLIKE") => {
+    if (!currentReportId || isVoting) return;
+    if (userVote === type) return;
+
+    setIsVoting(true);
+    const prevVote = userVote;
+    const prevLikes = likes;
+    const prevDislikes = dislikes;
+
+    if (type === "LIKE") {
+      setLikes((l) => l + 1);
+      if (prevVote === "DISLIKE") setDislikes((d) => Math.max(0, d - 1));
+    } else {
+      setDislikes((d) => d + 1);
+      if (prevVote === "LIKE") setLikes((l) => Math.max(0, l - 1));
+    }
+    setUserVote(type);
+
+    try {
+      let voterToken = localStorage.getItem("ts_voter_token");
+      if (!voterToken) {
+        voterToken = "vt_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        localStorage.setItem("ts_voter_token", voterToken);
+      }
+
+      const res = await fetch(`${API_BASE_URL}/vehicle-reports/${currentReportId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vote: type, voterToken }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setLikes(data.likeCount ?? 0);
+        setDislikes(data.dislikeCount ?? 0);
+        localStorage.setItem(`report_vote_${currentReportId}`, type);
+      } else {
+        setLikes(prevLikes);
+        setDislikes(prevDislikes);
+        setUserVote(prevVote);
+      }
+    } catch {
+      setLikes(prevLikes);
+      setDislikes(prevDislikes);
+      setUserVote(prevVote);
+    } finally {
+      setIsVoting(false);
+    }
+  };
 
   const formatFuelTypeTr = (fuel?: string): string => {
     if (!fuel) return "Benzin";
@@ -171,17 +245,41 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
           })()}
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          {onRefresh && (
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+          {/* Subtle Like / Dislike Voting Widget */}
+          <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 rounded-xl px-2 py-1 shadow-sm">
             <button
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-all shadow-md disabled:opacity-50"
+              type="button"
+              onClick={() => handleVote("LIKE")}
+              disabled={isVoting || !currentReportId}
+              title="Bu raporu faydalı buldum"
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                userVote === "LIKE"
+                  ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
             >
-              <RefreshCcw className={`w-3.5 h-3.5 text-orange-400 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span>Raporu Yenile</span>
+              <ThumbsUp className={`w-3.5 h-3.5 ${userVote === "LIKE" ? "text-emerald-400 fill-emerald-400/20" : ""}`} />
+              <span className="text-[11px]">{likes}</span>
             </button>
-          )}
+
+            <span className="w-[1px] h-3 bg-slate-800" />
+
+            <button
+              type="button"
+              onClick={() => handleVote("DISLIKE")}
+              disabled={isVoting || !currentReportId}
+              title="Bu raporda eksik veya hatalı bilgi var"
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                userVote === "DISLIKE"
+                  ? "bg-rose-500/20 text-rose-300 font-semibold"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
+            >
+              <ThumbsDown className={`w-3.5 h-3.5 ${userVote === "DISLIKE" ? "text-rose-400 fill-rose-400/20" : ""}`} />
+              <span className="text-[11px]">{dislikes}</span>
+            </button>
+          </div>
         </div>
       </div>
 

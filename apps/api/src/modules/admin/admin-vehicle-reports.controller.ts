@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -112,5 +113,13 @@ export class AdminVehicleReportsController {
   ) {
     const admin = this.getAdminUser(req);
     return this.service.resolveFeedback(feedbackId, admin.id, admin.email, dto);
+  }
+
+  @Delete(':id')
+  @RequirePermissions(AdminPermission.VEHICLE_DATA_WRITE)
+  @ApiOperation({ summary: 'Delete a vehicle report and its associated revisions/votes' })
+  async deleteReport(@Request() req: any, @Param('id') id: string) {
+    const admin = this.getAdminUser(req);
+    return this.service.deleteReport(id, admin.id, admin.email);
   }
 }

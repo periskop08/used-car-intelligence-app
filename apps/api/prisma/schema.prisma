@@ -2690,6 +2690,9 @@ model GeneratedVehicleReport {
   changeNote         String?
   editedByAdminId    String?
 
+  likeCount          Int                     @default(0)
+  dislikeCount       Int                     @default(0)
+
   user               User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   job                VehicleReportResearchJob?
 
@@ -2700,6 +2703,17 @@ model GeneratedVehicleReport {
   @@index([userId, mode, variantId, contextHash, status])
   @@index([variantId, isCurrentPublished, isDraft])
   @@index([isCurrentPublished, status])
+}
+
+model VehicleReportVote {
+  id         String   @id @default(cuid())
+  reportId   String
+  voterToken String
+  voteType   String   // "LIKE" | "DISLIKE"
+  createdAt  DateTime @default(now())
+
+  @@unique([reportId, voterToken])
+  @@index([reportId])
 }
 
 model VehicleReportResearchJob {

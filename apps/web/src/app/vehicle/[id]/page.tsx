@@ -251,7 +251,12 @@ export default function VehicleDetail() {
       }
     }
     if (payload && typeof payload === "object" && (payload.executiveSummary || payload.vehicleIdentity || payload.finalVerdict)) {
-      return payload as ComprehensiveVehicleReport;
+      return {
+        ...payload,
+        reportId: data.id || payload.reportId || payload.id,
+        likeCount: data.likeCount ?? payload.likeCount ?? 0,
+        dislikeCount: data.dislikeCount ?? payload.dislikeCount ?? 0,
+      } as ComprehensiveVehicleReport;
     }
     return null;
   };

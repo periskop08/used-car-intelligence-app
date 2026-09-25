@@ -137,6 +137,8 @@ export class AdminVehicleReportsService {
           qualityScore: true,
           provider: true,
           modelName: true,
+          likeCount: true,
+          dislikeCount: true,
           generatedAt: true,
           completedAt: true,
           updatedAt: true,
@@ -215,6 +217,8 @@ export class AdminVehicleReportsService {
         generatedAt: report.generatedAt,
         completedAt: report.completedAt,
         updatedAt: report.updatedAt,
+        likeCount: (report as any).likeCount || 0,
+        dislikeCount: (report as any).dislikeCount || 0,
         pendingIssueCount: totalPendingIssues,
         vehicleIdentity: variant
           ? {
@@ -771,5 +775,56 @@ export class AdminVehicleReportsService {
     }).catch((e) => this.logger.warn(`Audit log warning: ${e.message}`));
 
     return updated;
+  }
+
+  /**
+   * 9. DELETE VEHICLE REPORT
+   */
+  async deleteReport(id: string, adminUserId: string, adminEmail: string) {
+    const report = await this.prisma.generatedVehicleReport.findUnique({
+      where: { id },
+    });
+
+    if (!report) {
+      throw new NotFoundException(`Silinecek rapor bulunamadı: ${id}`);
+    }
+
+    const variantId = report.variantId;
+    const wasCurrent = report.isCurrentPublished;
+
+    // Delete associated votes, jobs, and the report record
+    await this.prisma.vehicleReportVote.deleteMany({ where: { reportId: id } });
+    await this.prisma.vehicleReportResearchJob.deleteMany({ where: { reportId: id } });
+    await this.prisma.generatedVehicleReport.delete({ where: { id } });
+
+    // If deleted report was the current published one, promote previous completed version if one exists
+    if (wasCurrent && variantId) {
+      const latestPrevious = await this.prisma.generatedVehicleReport.findFirst({
+        where: { variantId, isDraft: false, status: 'COMPLETED' },
+        orderBy: { versionNumber: 'desc' },
+      });
+      if (latestPrevious) {
+        await this.prisma.generatedVehicleReport.update({
+          where: { id: latestPrevious.id },
+          data: { isCurrentPublished: true },
+        });
+      }
+    }
+
+    // Clear from ephemeral cache
+    VehicleReportService.ephemeralReports.delete(id);
+
+    // Audit log
+    await this.auditLogService.logAction({
+      adminUserId,
+      adminEmail,
+      action: 'VEHICLE_REPORT_DELETE',
+      entityType: 'GeneratedVehicleReport',
+      entityId: id,
+      changedFields: ['deleted'],
+      afterState: { variantId, wasCurrent, versionNumber: report.versionNumber },
+    }).catch(() => {});
+
+    return { success: true, message: 'Rapor başarıyla silindi.' };
   }
 }

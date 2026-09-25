@@ -49,7 +49,7 @@ export default function AdminVehicleReportDetailPage() {
   // Working editable copy of reportData
   const [editedReportData, setEditedReportData] = useState<any | null>(null);
   const [changeNote, setChangeNote] = useState('');
-  const [savingAction, setSavingAction] = useState<'draft' | 'publish' | 'refresh' | null>(null);
+  const [savingAction, setSavingAction] = useState<'draft' | 'publish' | 'refresh' | 'delete' | null>(null);
 
   // Modals
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -199,6 +199,35 @@ export default function AdminVehicleReportDetailPage() {
     }
   };
 
+  // Handle Delete Report
+  const handleDeleteReport = async () => {
+    const confirm = window.confirm(
+      'DİKKAT: Bu araç raporunu kalıcı olarak silmek istediğinize emin misiniz?\n\n' +
+      'Rapor silindiğinde bu versiyona ait tüm kayıtlar ve oylar kaldırılır.',
+    );
+    if (!confirm) return;
+
+    setSavingAction('delete');
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API_BASE_URL}/admin/vehicle-reports/${reportRecord.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Rapor silinemedi.');
+      }
+
+      showToast('Rapor başarıyla silindi.', 'success');
+      router.push('/admin/vehicle-data/reports');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+      setSavingAction(null);
+    }
+  };
+
   // Handle Research Refresh (Rule 25, 27, 28: creates DRAFT, does not auto-publish)
   const handleResearchRefresh = async () => {
     const confirm = window.confirm(
@@ -318,7 +347,15 @@ export default function AdminVehicleReportDetailPage() {
   }
 
   const isPublished = reportRecord.isCurrentPublished && !reportRecord.isDraft;
-  const currentReportData = mode === 'edit' ? editedReportData : reportRecord.reportData;
+  const rawReportData = mode === 'edit' ? editedReportData : reportRecord.reportData;
+  const currentReportData = rawReportData
+    ? {
+        ...rawReportData,
+        reportId: reportRecord.id,
+        likeCount: reportRecord.likeCount ?? 0,
+        dislikeCount: reportRecord.dislikeCount ?? 0,
+      }
+    : null;
   const pendingFeedbacks = feedbacks.filter((f) => f.status !== 'RESOLVED' && f.status !== 'REJECTED');
 
   // Technical conflict detection (Rule 31)
@@ -451,6 +488,16 @@ export default function AdminVehicleReportDetailPage() {
                 className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
               >
                 İptal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteReport}
+                disabled={savingAction !== null}
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-bold transition disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{savingAction === 'delete' ? 'Siliniyor...' : 'Raporu Sil'}</span>
               </button>
 
               <button
