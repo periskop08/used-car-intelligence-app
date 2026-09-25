@@ -388,12 +388,36 @@ export function sanitizeTurkishDefectDescription(
   text = text.replace(/\s*hakkında\s+bilgi\s+(?:alın|edinin)\.?/gi, ' kontrol edilmelidir.');
   text = text.replace(/\s*(?:tıklayın|okuyun|inceleyin|takip edin)\.?/gi, '.');
 
-  // Audi brand normalization: DSG -> S tronic (DQ200) or S tronic
-  if (context.brand && /audi/i.test(context.brand)) {
-    text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'S tronic (DQ200)');
-    text = text.replace(/\bDSG\s*7\b/gi, 'S tronic (DQ200)');
-    text = text.replace(/\bDSG\s*6\b/gi, 'S tronic');
-    text = text.replace(/\bDSG\b/g, 'S tronic');
+  // Brand-specific transmission normalization (fixing internet snippets that colloquially call every dual-clutch "DSG"):
+  if (context.brand) {
+    const brandLower = context.brand.toLowerCase();
+    if (brandLower.includes('audi')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'S tronic (DQ200)');
+      text = text.replace(/\bDSG\s*7\b/gi, 'S tronic (DQ200)');
+      text = text.replace(/\bDSG\s*6\b/gi, 'S tronic');
+      text = text.replace(/\bDSG\b/g, 'S tronic');
+    } else if (brandLower.includes('renault') || brandLower.includes('dacia')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'EDC');
+      text = text.replace(/\bDSG\b/gi, 'EDC');
+    } else if (brandLower.includes('ford')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'Powershift');
+      text = text.replace(/\bDSG\b/gi, 'Powershift');
+    } else if (brandLower.includes('hyundai') || brandLower.includes('kia')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'DCT');
+      text = text.replace(/\bDSG\b/gi, 'DCT');
+    } else if (brandLower.includes('mercedes')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, '7G-DCT');
+      text = text.replace(/\bDSG\b/gi, '7G-DCT');
+    } else if (brandLower.includes('bmw')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'Steptronic');
+      text = text.replace(/\bDSG\b/gi, 'Steptronic');
+    } else if (brandLower.includes('fiat')) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'DDCT');
+      text = text.replace(/\bDSG\b/gi, 'DDCT');
+    } else if (/peugeot|citroen|opel/i.test(brandLower)) {
+      text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'EAT8');
+      text = text.replace(/\bDSG\b/gi, 'EAT');
+    }
   }
 
   text = text.replace(/\s{2,}/g, ' ').trim();
