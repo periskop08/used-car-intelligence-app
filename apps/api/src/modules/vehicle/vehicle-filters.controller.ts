@@ -104,6 +104,32 @@ export function getTransmissionWhereClause(targetTrans?: string): any {
   };
 }
 
+export function getCategoryVariantWhere(category?: string): any {
+  if (!category) return {};
+  const cat = category.toUpperCase().trim();
+  if (cat === 'CAR' || cat === 'AUTOMOBILE') {
+    return {
+      bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] },
+    };
+  }
+  if (cat === 'SUV_PICKUP' || cat === 'SUV' || cat === 'PICKUP') {
+    return {
+      bodyType: { in: ['SUV', 'PICKUP'] },
+    };
+  }
+  if (cat === 'ELECTRIC' || cat === 'EV') {
+    return {
+      fuelType: 'ELECTRIC',
+    };
+  }
+  if (cat === 'COMMERCIAL' || cat === 'MINIVAN' || cat === 'VAN') {
+    return {
+      bodyType: { in: ['MINIVAN', 'VAN'] },
+    };
+  }
+  return {};
+}
+
 import { VariantTechnicalFactsService } from './variant-technical-facts.service';
 
 @ApiTags('Vehicle Filters')
@@ -127,10 +153,12 @@ export class VehicleFiltersController {
 
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
-  async getBrands() {
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
+  async getBrands(@Query('category') category?: string) {
+    const categoryWhere = getCategoryVariantWhere(category);
     const brands = await this.prisma.brand.findMany({
       where: {
-        variants: { some: { status: 'APPROVED' } },
+        variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       orderBy: { name: 'asc' },
       select: { name: true },
@@ -144,14 +172,19 @@ export class VehicleFiltersController {
   @Get('models')
   @ApiOperation({ summary: 'Seçilen Markaya Ait Modeller' })
   @ApiQuery({ name: 'brand', required: true })
-  async getModels(@Query('brand') brand: string) {
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
+  async getModels(
+    @Query('brand') brand: string,
+    @Query('category') category?: string,
+  ) {
     if (!brand) {
       throw new BadRequestException('brand query parametresi gereklidir.');
     }
+    const categoryWhere = getCategoryVariantWhere(category);
     const models = await this.prisma.model.findMany({
       where: {
         brand: { name: { equals: brand, mode: 'insensitive' } },
-        variants: { some: { status: 'APPROVED' } },
+        variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       select: { name: true },
       orderBy: { name: 'asc' },
@@ -169,15 +202,19 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'brand', required: true })
   @ApiQuery({ name: 'modelFamily', required: false })
   @ApiQuery({ name: 'model', required: false })
+  @ApiQuery({ name: 'category', required: false })
   async getYears(
     @Query('brand') brand: string,
     @Query('modelFamily') modelFamily?: string,
     @Query('model') model?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     if (!brand || !targetModel) {
       throw new BadRequestException('brand ve modelFamily query parametreleri gereklidir.');
     }
+
+    const categoryWhere = getCategoryVariantWhere(category);
 
     const modelRecord = await this.prisma.model.findFirst({
       where: {
@@ -203,6 +240,7 @@ export class VehicleFiltersController {
         year: yearWhere,
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
+        ...categoryWhere,
       },
       select: { year: true },
     });
@@ -220,11 +258,13 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'modelFamily', required: false })
   @ApiQuery({ name: 'model', required: false })
   @ApiQuery({ name: 'year', required: true })
+  @ApiQuery({ name: 'category', required: false })
   async getBodyTypes(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
     @Query('modelFamily') modelFamily?: string,
     @Query('model') model?: string,
+    @Query('category') category?: string,
   ) {
     try {
       const targetModel = model || modelFamily;
@@ -232,12 +272,14 @@ export class VehicleFiltersController {
       if (!brand || !targetModel || isNaN(parsedYear)) {
         return { success: true, data: [] };
       }
+      const categoryWhere = getCategoryVariantWhere(category);
       const variants = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
           brand: { name: { equals: brand, mode: 'insensitive' } },
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           year: parsedYear,
+          ...categoryWhere,
         },
         select: { bodyType: true },
       });

@@ -1,4 +1,4 @@
-import { VehicleFiltersController, getTransmissionTr, getTransmissionWhereClause } from '../vehicle-filters.controller';
+import { VehicleFiltersController, getTransmissionTr, getTransmissionWhereClause, getCategoryVariantWhere } from '../vehicle-filters.controller';
 import { CanonicalDisplayService } from '../canonical-display.service';
 
 describe('Vehicle Filters Relational Filtering & Transmission SQL Level Guard', () => {
@@ -143,5 +143,82 @@ describe('Vehicle Filters Relational Filtering & Transmission SQL Level Guard', 
       ]);
     });
   });
+
+  describe('getCategoryVariantWhere helper & category filter guards', () => {
+    it('should build correct where clauses for all vehicle categories', () => {
+      expect(getCategoryVariantWhere('AUTOMOBILE')).toEqual({
+        bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] },
+      });
+      expect(getCategoryVariantWhere('CAR')).toEqual({
+        bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] },
+      });
+      expect(getCategoryVariantWhere('SUV_PICKUP')).toEqual({
+        bodyType: { in: ['SUV', 'PICKUP'] },
+      });
+      expect(getCategoryVariantWhere('ELECTRIC')).toEqual({
+        fuelType: 'ELECTRIC',
+      });
+      expect(getCategoryVariantWhere('COMMERCIAL')).toEqual({
+        bodyType: { in: ['MINIVAN', 'VAN'] },
+      });
+      expect(getCategoryVariantWhere(undefined)).toEqual({});
+    });
+
+    it('should pass category where clause into getBrands Prisma findMany', async () => {
+      mockPrisma.brand = {
+        findMany: jest.fn().mockResolvedValue([{ name: 'Dacia' }, { name: 'Jeep' }]),
+      };
+
+      const res = await controller.getBrands('SUV_PICKUP');
+
+      expect(mockPrisma.brand.findMany).toHaveBeenCalledWith({
+        where: {
+          variants: {
+            some: {
+              status: 'APPROVED',
+              bodyType: { in: ['SUV', 'PICKUP'] },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+        select: { name: true },
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.data).toEqual([
+        { label: 'Dacia', value: 'Dacia' },
+        { label: 'Jeep', value: 'Jeep' },
+      ]);
+    });
+
+    it('should pass category where clause into getModels Prisma findMany', async () => {
+      mockPrisma.model = {
+        findMany: jest.fn().mockResolvedValue([{ name: 'Duster' }, { name: 'Jogger' }]),
+      };
+
+      const res = await controller.getModels('Dacia', 'SUV_PICKUP');
+
+      expect(mockPrisma.model.findMany).toHaveBeenCalledWith({
+        where: {
+          brand: { name: { equals: 'Dacia', mode: 'insensitive' } },
+          variants: {
+            some: {
+              status: 'APPROVED',
+              bodyType: { in: ['SUV', 'PICKUP'] },
+            },
+          },
+        },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.data).toEqual([
+        { label: 'Duster', value: 'Duster' },
+        { label: 'Jogger', value: 'Jogger' },
+      ]);
+    });
+  });
 });
+
 

@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
 import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
-import { getFuelTypeTr } from './vehicle-filters.controller';
+import { getFuelTypeTr, getCategoryVariantWhere } from './vehicle-filters.controller';
 import { resolveHorsepower } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
@@ -43,16 +43,29 @@ export class VehicleService {
     private subscriptionService: SubscriptionService,
   ) {}
 
-  async getBrands() {
+  async getBrands(category?: string) {
+    const categoryWhere = getCategoryVariantWhere(category);
     return this.prisma.brand.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        ...(Object.keys(categoryWhere).length > 0
+          ? { variants: { some: { status: 'APPROVED', ...categoryWhere } } }
+          : {}),
+      },
       orderBy: { name: 'asc' },
     });
   }
 
-  async getModels(brandId: string) {
+  async getModels(brandId: string, category?: string) {
+    const categoryWhere = getCategoryVariantWhere(category);
     return this.prisma.model.findMany({
-      where: { brandId, isActive: true },
+      where: {
+        brandId,
+        isActive: true,
+        ...(Object.keys(categoryWhere).length > 0
+          ? { variants: { some: { status: 'APPROVED', ...categoryWhere } } }
+          : {}),
+      },
       orderBy: { name: 'asc' },
     });
   }

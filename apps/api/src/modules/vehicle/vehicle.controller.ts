@@ -22,19 +22,24 @@ export class VehicleController {
 
   @Get('brands')
   @ApiOperation({ summary: 'Markaların Listesini Al' })
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
   @ApiResponse({ status: 200, description: 'Aktif araç markalarının listesi.' })
-  getBrands() {
-    return this.vehicleService.getBrands();
+  getBrands(@Query('category') category?: string) {
+    return this.vehicleService.getBrands(category);
   }
 
   @Get('models')
   @ApiOperation({ summary: 'Markaya Ait Modelleri Al' })
   @ApiQuery({ name: 'brandId', required: true, description: 'Marka UUIDsi' })
-  getModels(@Query('brandId') brandId: string) {
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
+  getModels(
+    @Query('brandId') brandId: string,
+    @Query('category') category?: string,
+  ) {
     if (!brandId) {
       throw new BadRequestException('brandId query parametresi gereklidir.');
     }
-    return this.vehicleService.getModels(brandId);
+    return this.vehicleService.getModels(brandId, category);
   }
 
   @Get('engines')

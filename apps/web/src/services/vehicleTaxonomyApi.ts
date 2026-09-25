@@ -17,33 +17,42 @@ export interface MatchVariantParams {
 }
 
 export const vehicleTaxonomyApi = {
-  async getBrands(): Promise<TaxonomyOption[]> {
-    const res = await fetch(`${API_URL}/vehicle-filters/brands`);
+  async getBrands(category?: string): Promise<TaxonomyOption[]> {
+    const url = category
+      ? `${API_URL}/vehicle-filters/brands?category=${encodeURIComponent(category)}`
+      : `${API_URL}/vehicle-filters/brands`;
+    const res = await fetch(url);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async getModels(brand: string): Promise<TaxonomyOption[]> {
+  async getModels(brand: string, category?: string): Promise<TaxonomyOption[]> {
     if (!brand) return [];
-    const res = await fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brand)}`);
+    const query = new URLSearchParams({ brand });
+    if (category) query.set('category', category);
+    const res = await fetch(`${API_URL}/vehicle-filters/models?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async getYears(brand: string, model: string): Promise<TaxonomyOption[]> {
+  async getYears(brand: string, model: string, category?: string): Promise<TaxonomyOption[]> {
     if (!brand || !model) return [];
-    const res = await fetch(
-      `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brand)}&modelFamily=${encodeURIComponent(model)}`
-    );
+    const query = new URLSearchParams({ brand, modelFamily: model });
+    if (category) query.set('category', category);
+    const res = await fetch(`${API_URL}/vehicle-filters/years?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async getBodyTypes(brand: string, model: string, year: string | number): Promise<TaxonomyOption[]> {
+  async getBodyTypes(brand: string, model: string, year: string | number, category?: string): Promise<TaxonomyOption[]> {
     if (!brand || !model || !year) return [];
-    const res = await fetch(
-      `${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brand)}&modelFamily=${encodeURIComponent(model)}&year=${encodeURIComponent(String(year))}`
-    );
+    const query = new URLSearchParams({
+      brand,
+      modelFamily: model,
+      year: String(year),
+    });
+    if (category) query.set('category', category);
+    const res = await fetch(`${API_URL}/vehicle-filters/body-types?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   },

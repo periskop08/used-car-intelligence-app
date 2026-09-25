@@ -135,17 +135,18 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [featuredListings, featuredRows]);
 
-  // Fetch Brands on Load
+  // Fetch Brands on Load & Category Change
   useEffect(() => {
+    if (searchMode === 'MOTORCYCLE') return;
     setLoadingBrands(true);
-    fetch(`${API_URL}/vehicles/brands`)
+    fetch(`${API_URL}/vehicles/brands?category=${searchMode}`)
       .then((res) => res.json())
       .then((data) => {
         setBrands(Array.isArray(data) ? data : []);
         setLoadingBrands(false);
       })
       .catch(() => setLoadingBrands(false));
-  }, []);
+  }, [searchMode]);
 
   // Display & formatting helpers
   const displayFuelType = (fuel: string) => {
@@ -190,6 +191,30 @@ export default function Home() {
   const getBrandName = (brandId = selectedBrand) => brands.find(b => b.id === brandId)?.name || "";
   const getModelName = (modelId = selectedModel) => models.find(m => m.id === modelId)?.name || "";
 
+  const handleSearchModeChange = (newMode: VehicleSearchMode) => {
+    if (newMode === searchMode) return;
+    setSearchMode(newMode);
+    setSelectedBrand("");
+    setSelectedModel("");
+    setSelectedYear("");
+    setSelectedBodyType("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    setMatchedVariantId(null);
+    setAllVariants([]);
+    setNoTrimFound(false);
+    setBrands([]);
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+  };
+
   // 1. Brand Change
   const handleBrandChange = (brandId: string) => {
     setSelectedBrand(brandId);
@@ -222,7 +247,7 @@ export default function Home() {
     if (!brandId) return;
 
     setLoadingModels(true);
-    fetch(`${API_URL}/vehicles/models?brandId=${brandId}`)
+    fetch(`${API_URL}/vehicles/models?brandId=${brandId}&category=${searchMode}`)
       .then((res) => res.json())
       .then((data) => {
         setModels(Array.isArray(data) ? data : []);
@@ -275,7 +300,7 @@ export default function Home() {
     if (!brandName || !modelName) return;
 
     setLoadingYears(true);
-    vehicleTaxonomyApi.getYears(brandName, modelName)
+    vehicleTaxonomyApi.getYears(brandName, modelName, searchMode)
       .then((data) => {
         const list = data.map((item) => parseInt(item.value, 10));
         setYears(list);
@@ -320,7 +345,7 @@ export default function Home() {
 
     setLoadingBodyTypes(true);
     try {
-      const data = await vehicleTaxonomyApi.getBodyTypes(brandName, modelName, year);
+      const data = await vehicleTaxonomyApi.getBodyTypes(brandName, modelName, year, searchMode);
       const list = data.map((item) => item.value.toUpperCase());
       setBodyTypes(list);
       if (list.length === 1) {
@@ -722,7 +747,7 @@ export default function Home() {
       <div className="w-full max-w-5xl glass p-8 rounded-3xl flex flex-col gap-6 shadow-2xl shadow-orange-500/5 -mt-6">
         <VehicleSearchModeSelector
           value={searchMode}
-          onChange={setSearchMode}
+          onChange={handleSearchModeChange}
         />
 
         <h2 className="text-xl font-extrabold text-slate-100 tracking-tight">
