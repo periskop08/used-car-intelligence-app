@@ -303,5 +303,57 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(audited.report.performanceUsage.sourcePowerValue).toBe(128);
       expect((audited.report as any).technicalSpecifications.enginePowerHp).toBe(128);
     });
+
+    it('should sanitize inappropriate "Off-Road" personas for Sedan/Hatchback into uneven Turkish road conditions, while preserving it for genuine SUVs', async () => {
+      // 1. Sedan car test
+      const mockSedanReport: any = {
+        vehicleIdentity: {
+          brand: 'Audi',
+          model: 'A3 Sedan',
+          year: 2020,
+          bodyType: 'SEDAN',
+          selected8Filters: { bodyType: 'Sedan' },
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: { headline: 'Audi A3 Sedan', detailedAssessment: 'Konforlu premium sedan.' },
+          suitableFor: [],
+          notSuitableFor: [
+            {
+              profile: 'Off-Road Kullanıcıları',
+              explanation: 'Aracın 4x4 sistemi bulunmamakta olup ağır araziye uygun değildir.',
+            },
+          ],
+        },
+      };
+
+      const auditedSedan = await auditor.auditAndHarmonizeReport(mockSedanReport, {});
+      expect(auditedSedan.auditResult.wasHarmonized).toBe(true);
+      expect(auditedSedan.report.expertDecisionSynthesis.notSuitableFor[0].profile).toBe('Bozuk Zemin ve Engebeli Yol Şartları');
+      expect(auditedSedan.report.expertDecisionSynthesis.notSuitableFor[0].explanation).toContain('Alçak taban mesafesi');
+
+      // 2. Genuine SUV test (should preserve off-road persona)
+      const mockSuvReport: any = {
+        vehicleIdentity: {
+          brand: 'Dacia',
+          model: 'Duster',
+          year: 2022,
+          bodyType: 'SUV',
+          selected8Filters: { bodyType: 'SUV' },
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: { headline: 'Dacia Duster', detailedAssessment: 'Kompakt SUV.' },
+          suitableFor: [],
+          notSuitableFor: [
+            {
+              profile: 'Ağır Off-Road Tutkunları',
+              explanation: 'Araç 4x2 önden çekişli olup ağır çamur ve kaya zeminlerine uygun değildir.',
+            },
+          ],
+        },
+      };
+
+      const auditedSuv = await auditor.auditAndHarmonizeReport(mockSuvReport, {});
+      expect(auditedSuv.report.expertDecisionSynthesis.notSuitableFor[0].profile).toBe('Ağır Off-Road Tutkunları');
+    });
   });
 });

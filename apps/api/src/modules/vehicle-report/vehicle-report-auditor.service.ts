@@ -642,6 +642,55 @@ export class VehicleReportAuditorService {
       });
     }
 
+    // =========================================================================
+    // CHECK 7: Road Condition & Body Type Harmonization for notSuitableFor
+    // Non-SUV/Non-Pickup (Sedan, Hatchback, Wagon, Coupe, Convertible) must NEVER
+    // display "Off-Road" clichés; harmonize to Turkish uneven road conditions.
+    // =========================================================================
+    const rawBodyType = (
+      vIdentity.selected8Filters?.bodyType ||
+      vIdentity.bodyType ||
+      (report as any)?.vehicleIdentity?.bodyType ||
+      (report as any)?.technicalSpecifications?.bodyType ||
+      ''
+    ).toString().toUpperCase();
+    const isSuvOrPickupOrOffroad =
+      /SUV|CROSSOVER|PICKUP|ARAZİ|4X4/i.test(rawBodyType) ||
+      /SUV|CROSSOVER|PICKUP/i.test(model);
+
+    if (!isSuvOrPickupOrOffroad && Array.isArray(synth.notSuitableFor)) {
+      synth.notSuitableFor = synth.notSuitableFor.map((item: any) => {
+        const prof = (item.profile || '').toString();
+        const expl = (item.explanation || '').toString();
+        const combined = `${prof} ${expl}`.toLowerCase();
+
+        const isOffroadMention =
+          combined.includes('off-road') ||
+          combined.includes('offroad') ||
+          combined.includes('ağır arazi') ||
+          combined.includes('arazi tutkun') ||
+          combined.includes('arazi şartlar') ||
+          combined.includes('arazi sürüc') ||
+          combined.includes('arazi merak') ||
+          combined.includes('zorlu arazi');
+
+        if (isOffroadMention) {
+          this.logger.warn(`[RESEARCHER 2 AUDIT] Sanitized inappropriate "off-road" persona for non-SUV (${rawBodyType || 'Binek'}): "${prof}"`);
+          auditResult.hasContradiction = true;
+          auditResult.contradictions.push('Binek araca uygun olmayan Off-Road profili, engebeli Türkiye yol şartları ile harmonize edildi.');
+          auditResult.wasHarmonized = true;
+
+          return {
+            ...item,
+            profile: 'Bozuk Zemin ve Engebeli Yol Şartları',
+            explanation: 'Alçak taban mesafesi, binek süspansiyon geometrisi ve şehir odaklı yaklaşma açıları sebebiyle derin çukurlu köy/yayla yollarında, dik kaldırım rampalarında alt sürtme hassasiyeti taşır; pürüzsüz asfalt ve şehir/otoyol sürüşüne odaklanmıştır.',
+            supportingFactIds: item.supportingFactIds || ['CHASSIS_BALANCE'],
+          };
+        }
+        return item;
+      });
+    }
+
     return { report, auditResult };
   }
 

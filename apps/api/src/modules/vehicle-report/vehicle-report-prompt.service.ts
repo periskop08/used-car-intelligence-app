@@ -215,6 +215,8 @@ Aşağıdaki JSON yapısını eksiksiz doldur. Metinlerde asla jenerik veya sı�
     const model = identity.model || '';
     const year = identity.modelYear || '';
     const body = identity.bodyType || '';
+    const bodyNorm = (body || '').toUpperCase();
+    const isOffroadOrSuv = /SUV|CROSSOVER|PICKUP|ARAZİ/i.test(bodyNorm) || /SUV|CROSSOVER|PICKUP/i.test(model);
     const trim = identity.trimName || '';
     const engine = identity.engineCode || '';
     const fuel = identity.fuelType || '';
@@ -390,7 +392,12 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
         - Aşırı yaz sıcaklarında ise motor çekiş gücü/performansı DÜŞMEZ! Bunun yerine batarya aktif sıvı soğutma devresinin ve kabin klima kompresörünün sürekli yüksek güçte çalışması sebebiyle tüketim artar ve menzil düşer.
         - KESİNLİKLE 'yüksek sıcaklıkta batarya performansı/gücü düşer' gibi hatalı, kaba tabirler KULLANILAMAZ! Vurgu daima kış soğuklarındaki kimyasal menzil kaybı veya yaz sıcaklarındaki yüksek iklimlendirme/soğutma yükü ve tüketim artışı olmalıdır.` : `İÇTEN YANMALI VE HİBRİT TAVİZ KURALI: Şanzıman kavrama ısınması, düşük devir turbo gecikmesi veya şehir içi dur-kalk yakıt tüketimi gibi gerçekçi mekanik kullanım tavizlerini işle.`}
     - **Kimler İçin Mantıklı? ('suitableFor'):** En az 3 adet spesifik ve gerçekçi kullanıcı profili belirle. Her profili en az 2-3 cümleyle bu araç ve donanım özelinde gerekçelendir.
-    - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle. Açık uçlu danışman diliyle hangi kullanım senaryolarında (örneğin dikey bagaj hacmi arayan geniş aileler, şarj altyapısı bulunmayan apartman sakinleri veya mekanik motor sesi arayan geleneksel sürücüler gibi) kısıtlar yaratacağını 2-3 cümleyle gerekçelendir. KESİNLİKLE "off-road yapanlar", "yarış pistine çıkanlar", "ağır yük çekenler" gibi binek araca uymayan absürt klişeler YAZMA!
+    - **Kimler İçin Uygun Olmayabilir? ('notSuitableFor'):** En az 3 adet gerçekçi profil belirle. Açık uçlu danışman diliyle hangi kullanım senaryolarında kısıtlar yaratacağını 2-3 cümleyle gerekçelendir:
+      ${!isOffroadOrSuv ? `* KASA TİPİ VE YOL ŞARTLARI KURALI (BİNEK ARAÇ - ${body || 'Sedan / Hatchback / Coupe / Station Wagon'}):
+        - KESİNLİKLE "Off-Road Yapanlar", "Arazi Tutkunları", "Yarış Pistine Çıkanlar", "Ağır Yük Çekenler" gibi binek araca uymayan absürt klişeler YAZILAMAZ!
+        - Zemin kısıtı belirtilecekse doğrudan Türkiye yol şartlarını hedef al: Profil adı kesinlikle **"Bozuk Zemin ve Engebeli Yol Şartları"** (veya "Bozuk Zemin ve Köy/Yayla Yolları") olmalı; açıklamada alçak karoser tabanı, tampon yaklaşma açısı kısıtı ve derin çukurlu yollarda alt sürtme hassasiyeti gerekçelendirilmelidir.
+        - Diğer profiller: "Dikey Yükleme ve Hacim Arayan Geniş Aileler", "Sert/Sportif Süspansiyon Karakterinden Kaçınanlar", "Şehir İçi Dar Park Alanı Arayanlar" gibi gerçekçi profiller olmalıdır.` : `* ARAZİ / SUV / PICKUP KURALI:
+        - "Ağır Off-Road ve Zorlu Arazi Tutkunları" profili YALNIZCA bu grupta kullanılabilir. Özellikle araç 4x2 (önden veya arkadan çekişli) bir şehir SUV/Crossover'ı ise, ağır arazi takviyesi ve mekanik diferansiyel kilidi bulunmadığı, aracın hafif patika dışındaki ağır çamur/kaya zeminlerine uygun olmadığı gerekçelendirilmelidir.`}
     - **Hangi Şartlarda Değerlendirilebilir? ('purchaseConditions'):** En az 3 somut ekspertiz ve bakım koşulu belirt (${isEv ? 'Örn. Yetkili servis onaylı Batarya SoH ve hücre dengesi raporu, AC/DC şarj soketi ve piroteknik sigorta izolasyon testi, redüktör dişli kutusu yağ sızdırmazlığı' : 'Örn. Şanzıman kavrama ve geçiş basınç testi, triger seti ve subap zamanlaması kontrolü, düzenli yetkili/özel servis bakım kayıtları'}). Her koşulun teknik önemini en az 2 cümleyle açıkla.
     - **Hangi Durumda Satın Almaktan Vazgeçilmeli? ('walkAwayConditions'):** En az 3 kritik vazgeçme kriteri belirt (${isEv ? 'Örn. Taşıyıcı şasi, podye, direk veya batarya muhafaza gövdesinde yapısal hasar/çatlak; Batarya SoH sağlık oranının kritik seviyeye düşmesi veya hücre voltaj sapması; invertör ve yüksek voltaj izolasyon arızası' : 'Örn. Taşıyıcı şasi, podye, direk veya airbag müdahalesi; şanzımanda kalkışta şiddetli titreme, silkeleme veya vitese geçmeme; motor bloğunda hararet kaynaklı deformasyon veya kompresyon kaybı'}). Neden vazgeçilmesi gerektiğini en az 2 cümleyle açıkla.
 13. SATICIYA SORULACAK KRİTİK VE MİMARİYE ÖZEL TEKNİK SORULAR ('sellerQuestions') STANDARDI:
