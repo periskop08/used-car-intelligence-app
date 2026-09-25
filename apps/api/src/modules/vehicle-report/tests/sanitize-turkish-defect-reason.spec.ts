@@ -135,6 +135,26 @@ describe('sanitizeTurkishDefectReason', () => {
           domain: 'THERMAL_COOLING',
         }),
       ).toBe('Devirdaim & Termostat Soğutma Sıvısı Sızıntısı');
+      expect(
+        sanitizeTurkishDefectTitle('Araba Neden Su Eksiltir 9 Nedeni? Sizde Arabam Neden ...', {
+          domain: 'THERMAL_COOLING',
+        }),
+      ).toBe('Devirdaim & Termostat Soğutma Sıvısı Sızıntısı');
+      expect(
+        sanitizeTurkishDefectTitle('DSG Şanzıman Arızası Nasıl Anlaşılır?', {
+          domain: 'POWERTRAIN_TRANS',
+        }),
+      ).toBe('Kuru Çift Kavrama Aşınması');
+    });
+
+    it('cleans blog call-to-action endings from defect description', () => {
+      const raw =
+        'DSG 6 ve DSG 7 şanzımanlarda karşılaşılan kavrama, mekatronik, yazılım problemlerini öğrenin.';
+      const cleaned = sanitizeTurkishDefectDescription(raw, { domain: 'POWERTRAIN_TRANS' });
+      expect(cleaned).toBe(
+        'DSG 6 ve DSG 7 şanzımanlarda karşılaşılan kavrama, mekatronik, yazılım problemleri gözlemlenebilir.',
+      );
+      expect(cleaned).not.toContain('öğrenin');
     });
   });
 

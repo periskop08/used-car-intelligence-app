@@ -13,6 +13,7 @@ export interface DefectSanitizationContext {
   failureMode?: string;
   component?: string;
   isElectric?: boolean;
+  brand?: string;
 }
 
 const DOMAIN_FAILURE_EXPLANATIONS_TR: Record<string, string> = {
@@ -375,6 +376,26 @@ export function sanitizeTurkishDefectDescription(
   // Clean kavrama kavrama typo
   text = text.replace(/kavrama kavrama noktas[ıi]/gi, 'kavrama temas noktası');
   text = text.replace(/kavrama kavrama/gi, 'kavrama');
+
+  // Clean blog / SEO call-to-action endings (e.g. "...problemlerini öğrenin", "...bilgi edinin", "...tıklayın")
+  text = text.replace(/problemlerini\s+öğrenin\.?/gi, 'problemleri gözlemlenebilir.');
+  text = text.replace(/arızalarını\s+öğrenin\.?/gi, 'arızaları gözlemlenebilir.');
+  text = text.replace(/sorunlarını\s+öğrenin\.?/gi, 'sorunları gözlemlenebilir.');
+  text = text.replace(/kusurlarını\s+öğrenin\.?/gi, 'kusurları gözlemlenebilir.');
+  text = text.replace(/risklerini\s+öğrenin\.?/gi, 'riskleri gözlemlenebilir.');
+  text = text.replace(/\s+öğrenin\.?/gi, ' gözlemlenebilir.');
+  text = text.replace(/\s+öğrenmek\s+için\s+[^.]*\./gi, '.');
+  text = text.replace(/\s*hakkında\s+bilgi\s+(?:alın|edinin)\.?/gi, ' kontrol edilmelidir.');
+  text = text.replace(/\s*(?:tıklayın|okuyun|inceleyin|takip edin)\.?/gi, '.');
+
+  // Audi brand normalization: DSG -> S tronic (DQ200) or S tronic
+  if (context.brand && /audi/i.test(context.brand)) {
+    text = text.replace(/\bDSG\s*6\s*ve\s*DSG\s*7\b/gi, 'S tronic (DQ200)');
+    text = text.replace(/\bDSG\s*7\b/gi, 'S tronic (DQ200)');
+    text = text.replace(/\bDSG\s*6\b/gi, 'S tronic');
+    text = text.replace(/\bDSG\b/g, 'S tronic');
+  }
+
   text = text.replace(/\s{2,}/g, ' ').trim();
 
   // 5. Ensure proper punctuation finish
@@ -453,11 +474,101 @@ export function sanitizeTurkishDefectTitle(
 
   let title = rawTitle.trim();
 
-  // Social media or clickbait titles
-  if (/hararetin gizli sebebi|usta notu|on instagram|tiktok/i.test(title)) {
-    return (context.isElectric || context.domain === 'HV_BATTERY_SYSTEM')
-      ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi'
-      : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+  // 1. Social media, clickbait, question or SEO forum article titles
+  // e.g. "Araba Neden Su Eksiltir 9 Nedeni? Sizde Arabam Neden ...", "Arabam Neden Yağ Yakar?", "DSG Arızası Nasıl Anlaşılır?"
+  const isClickbaitOrQuestion =
+    /\?|\.{2,}$/i.test(title) ||
+    /hararetin gizli sebebi|usta notu|on instagram|tiktok|facebook|youtube/i.test(title) ||
+    /\b(?:neden|nedir|nas[ıi]l|ka[çc]\s*neden|belirtiler|ar[ıi]zas[ıi]\s*nas[ıi]l|sizde\s*araba|arabam\s*neden)\b/i.test(title);
+
+  if (isClickbaitOrQuestion) {
+    const combinedKey = `${title} ${context.failureMode || ''} ${context.component || ''} ${context.domain || ''}`.toUpperCase();
+
+    if (
+      combinedKey.includes('SU EKSİLT') ||
+      combinedKey.includes('SU EKSİLTİR') ||
+      combinedKey.includes('COOLANT') ||
+      combinedKey.includes('THERMOSTAT') ||
+      combinedKey.includes('TERMOSTAT') ||
+      combinedKey.includes('DEVİRDAİM') ||
+      combinedKey.includes('DEVIRDAIM') ||
+      combinedKey.includes('WATER') ||
+      combinedKey.includes('HARARET') ||
+      context.domain === 'THERMAL_COOLING'
+    ) {
+      return (context.isElectric || context.domain === 'HV_BATTERY_SYSTEM')
+        ? 'Batarya & Güç Elektroniği Sıvı Soğutma Devresi'
+        : 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı';
+    }
+
+    if (
+      combinedKey.includes('YAĞ SOĞUTUCU') ||
+      combinedKey.includes('YAG SOGUTUCU') ||
+      combinedKey.includes('OIL COOLER')
+    ) {
+      return 'Yağ Soğutucusu Sızıntısı';
+    }
+
+    if (
+      combinedKey.includes('YAĞ YAK') ||
+      combinedKey.includes('YAG YAK') ||
+      combinedKey.includes('YAĞ EKSİLT') ||
+      combinedKey.includes('SEGMAN') ||
+      combinedKey.includes('SUPAP')
+    ) {
+      return 'Supap Lastikleri & Segman Yağ Tüketimi';
+    }
+
+    if (
+      combinedKey.includes('MECHATRONIC') ||
+      combinedKey.includes('MEKATRONİK') ||
+      combinedKey.includes('BASINÇ') ||
+      combinedKey.includes('BASINC')
+    ) {
+      return context.isElectric ? 'Motor Kontrol Ünitesi (MCU) & İnverter' : 'Mekatronik Hidrolik Basınç Kaybı';
+    }
+
+    if (
+      combinedKey.includes('CLUTCH') ||
+      combinedKey.includes('KAVRAMA') ||
+      combinedKey.includes('DSG') ||
+      combinedKey.includes('S TRONIC') ||
+      combinedKey.includes('STRONIC') ||
+      combinedKey.includes('EDC')
+    ) {
+      return context.isElectric ? 'Elektrik Tahrik Redüktör Dişli Grubu' : 'Kuru Çift Kavrama Aşınması';
+    }
+
+    if (
+      combinedKey.includes('ZİNCİR') ||
+      combinedKey.includes('ZINCIR') ||
+      combinedKey.includes('TIMING_CHAIN')
+    ) {
+      return 'Triger Zinciri Uzaması / Aşınması';
+    }
+
+    if (
+      combinedKey.includes('ENJEKTÖR') ||
+      combinedKey.includes('ENJEKTOR') ||
+      combinedKey.includes('INJECTOR')
+    ) {
+      return 'Yakıt Enjektörü Kurum & Basınç Sapması';
+    }
+
+    if (
+      combinedKey.includes('TURBO') ||
+      combinedKey.includes('WASTEGATE')
+    ) {
+      return 'Turboşarj ve Wastegate Boşluğu';
+    }
+
+    if (context.domain === 'POWERTRAIN_TRANS') return 'Otomatik Şanzıman & Mekatronik Aşınma Riski';
+    if (context.domain === 'THERMAL_COOLING') return 'Termostat Gövdesi & Devirdaim Su Pompası Kaçağı';
+    if (context.domain === 'POWERTRAIN_ENGINE') return 'Motor Mekaniği & Zamanlama Kontrolü';
+    if (context.domain === 'CHASSIS_BRAKES') return 'Alt Takım & Yürüyen Aksam Kontrolü';
+    if (context.domain === 'ELECTRICAL_BODY') return 'Elektronik Donanım & Tesisat Kontrolü';
+
+    return 'Doğrulanmış Teknik Kusur Tespiti';
   }
 
   // Water leak / coolant English patterns
