@@ -178,10 +178,29 @@ export class VehicleFiltersController {
     if (!brand || !targetModel) {
       throw new BadRequestException('brand ve modelFamily query parametreleri gereklidir.');
     }
+
+    const modelRecord = await this.prisma.model.findFirst({
+      where: {
+        name: { equals: targetModel, mode: 'insensitive' },
+        brand: { name: { equals: brand, mode: 'insensitive' } },
+      },
+      select: { id: true, startYear: true, endYear: true },
+    });
+
+    const yearWhere: any = {};
+    if (modelRecord?.startYear) {
+      yearWhere.gte = Math.max(2000, modelRecord.startYear);
+    } else {
+      yearWhere.gte = 2000;
+    }
+    if (modelRecord?.endYear) {
+      yearWhere.lte = modelRecord.endYear;
+    }
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
-        year: { gte: 2000 },
+        year: yearWhere,
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
       },

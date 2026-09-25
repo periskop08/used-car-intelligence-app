@@ -98,4 +98,50 @@ describe('Vehicle Filters Relational Filtering & Transmission SQL Level Guard', 
       expect(getTransmissionTr('8 İleri Tiptronik')).toBe('Otomatik');
     });
   });
+
+  describe('getYears Model Production Boundaries Guard', () => {
+    it('should enforce startYear and endYear bounds from Model on VehicleVariant query', async () => {
+      mockPrisma.model = {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'model-cerato',
+          startYear: 2004,
+          endYear: 2024,
+        }),
+      };
+
+      mockPrisma.vehicleVariant.findMany.mockResolvedValue([
+        { year: 2024 },
+        { year: 2023 },
+        { year: 2020 },
+      ]);
+
+      const res = await controller.getYears('Kia', 'Cerato');
+
+      expect(mockPrisma.model.findFirst).toHaveBeenCalledWith({
+        where: {
+          name: { equals: 'Cerato', mode: 'insensitive' },
+          brand: { name: { equals: 'Kia', mode: 'insensitive' } },
+        },
+        select: { id: true, startYear: true, endYear: true },
+      });
+
+      expect(mockPrisma.vehicleVariant.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'APPROVED',
+          year: { gte: 2004, lte: 2024 },
+          brand: { name: { equals: 'Kia', mode: 'insensitive' } },
+          model: { name: { equals: 'Cerato', mode: 'insensitive' } },
+        },
+        select: { year: true },
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.data).toEqual([
+        { label: '2024', value: '2024' },
+        { label: '2023', value: '2023' },
+        { label: '2020', value: '2020' },
+      ]);
+    });
+  });
 });
+
