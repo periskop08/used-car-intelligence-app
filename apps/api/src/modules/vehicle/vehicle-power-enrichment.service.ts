@@ -682,8 +682,15 @@ export class VehiclePowerEnrichmentService {
       }
     }
 
-    // Sort clusters by evidence count descending
-    clusters.sort((a, b) => b.count - a.count);
+    // Sort clusters: Tier 1 (OEM Manufacturer Official) presence takes absolute precedence, then evidence count
+    clusters.sort((a, b) => {
+      const aHasTier1 = a.items.some((i) => i.tier === TechnicalSourceTier.TIER_1_MANUFACTURER);
+      const bHasTier1 = b.items.some((i) => i.tier === TechnicalSourceTier.TIER_1_MANUFACTURER);
+      if (aHasTier1 && !bHasTier1) return -1;
+      if (!aHasTier1 && bHasTier1) return 1;
+
+      return b.count - a.count;
+    });
     const topCluster = clusters[0];
 
     // Identify candidate factory powers (distinct clusters separated by > 10 HP with support)
@@ -695,11 +702,14 @@ export class VehiclePowerEnrichmentService {
       .sort((a, b) => a - b);
 
     // Genuine conflict check:
-    // Conflict only occurs if there is a competing cluster with significant support (>= 2 authoritative sources and >= 40% of top cluster count)
-    // that differs by > 15 HP.
+    // If top cluster has Tier 1 OEM official evidence, only another cluster with Tier 1 evidence can trigger conflict
     const runnerUp = clusters[1];
+    const topHasTier1 = topCluster.items.some((i) => i.tier === TechnicalSourceTier.TIER_1_MANUFACTURER);
+    const runnerUpHasTier1 = runnerUp?.items.some((i) => i.tier === TechnicalSourceTier.TIER_1_MANUFACTURER);
+
     if (
       runnerUp &&
+      (!topHasTier1 || runnerUpHasTier1) &&
       runnerUp.count >= 2 &&
       runnerUp.count >= topCluster.count * 0.4 &&
       Math.abs(topCluster.representativeHp - runnerUp.representativeHp) > 15
