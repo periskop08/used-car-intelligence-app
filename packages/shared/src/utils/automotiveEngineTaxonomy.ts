@@ -491,11 +491,15 @@ const TAXONOMY_RULES: TaxonomyRule[] = [
   },
   {
     family: 'Hyundai / Kia Kappa (1.0 T-GDI)',
-    matcher: ({ engine }) => /1\.0\s*t-gdi/i.test(engine),
+    matcher: ({ engine, brand, model }) =>
+      /1\.0\s*t-gdi/i.test(engine) ||
+      ((brand.includes('kia') || brand.includes('hyundai')) &&
+        (model.includes('ceed') || model.includes('i30') || model.includes('bayon') || model.includes('stonic') || model.includes('kona') || model.includes('xceed')) &&
+        /\b1\.0\b/i.test(engine) && !/mpi/i.test(engine)),
     cc: 998,
     timing: 'ZINCIR',
     fuel: 'PETROL',
-    descTr: '1.0 T-GDI — 998 cc, triger zincirli.',
+    descTr: '1.0 T-GDI — 998 cc, 3 silindirli turbo benzinli, triger zincirli.',
   },
   {
     family: 'Hyundai / Kia Kappa (1.4 T-GDI)',
