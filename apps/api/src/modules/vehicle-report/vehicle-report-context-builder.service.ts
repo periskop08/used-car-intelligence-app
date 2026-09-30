@@ -15,7 +15,9 @@ export class VehicleReportContextBuilderService {
   constructor(
     private prisma: PrismaService,
     private vehicleCharacterResearch: VehicleCharacterResearchService,
-    @Optional() private powerEnrichmentService?: VehiclePowerEnrichmentService,
+    @Optional()
+    @Inject(forwardRef(() => VehiclePowerEnrichmentService))
+    private powerEnrichmentService?: VehiclePowerEnrichmentService,
     @Optional()
     @Inject(forwardRef(() => VariantTechnicalFactsService))
     private variantTechnicalFactsService?: VariantTechnicalFactsService,
@@ -240,6 +242,22 @@ export class VehicleReportContextBuilderService {
       }
     }
 
+    // Candidate Power Resolution (e.g. In case of multi-output engine variants like 180 HP vs 211 HP)
+    if (!engineHp && powerEnrichment && Array.isArray((powerEnrichment as any).candidatePowers) && (powerEnrichment as any).candidatePowers.length > 0) {
+      const validCandidates = (powerEnrichment as any).candidatePowers
+        .filter((p: any) => typeof p === 'number' && p >= 30 && p <= 1500)
+        .sort((a: number, b: number) => a - b);
+      if (validCandidates.length > 0) {
+        const isPerformanceOrQuattro = /quattro|4motion|xdrive|awd|4x4|s-line|amg|m sport|cupra|gti|rs|vrs/i.test(
+          `${variant.trim?.name || ''} ${variant.model?.name || ''} ${variant.engine?.code || ''} ${variant.engine?.description || ''} ${variant.bodyType || ''}`
+        );
+        engineHp = isPerformanceOrQuattro ? validCandidates[validCandidates.length - 1] : validCandidates[0];
+        powerUnit = (powerEnrichment.sourceReportedUnit as any) || 'HP';
+        powerSource = 'VEHICLE_DATABASE';
+        powerSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+      }
+    }
+
     // Torque Resolution
     let engineTorque: number | null = null;
     let torqueUnit: string | undefined = undefined;
@@ -264,9 +282,10 @@ export class VehicleReportContextBuilderService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PHYSICAL CATALOG SPECIFICATION RESOLUTION (0-100, Top Speed, Trunk, Weight, EV Range)
+    // PHYSICAL CATALOG SPECIFICATION RESOLUTION (Power, 0-100, Top Speed, Trunk, Weight, EV Range)
     // ─────────────────────────────────────────────────────────────────────────
     const isPhysicalSpecsMissing = (
+      engineHp === null ||
       zeroToHundred === null ||
       topSpeedVal === null ||
       weightVal === null ||
@@ -282,6 +301,18 @@ export class VehicleReportContextBuilderService {
         const researched = await this.researchPhysicalSpecsViaAi(variant, engineHp);
         if (researched) {
           researchedData = researched;
+          if (engineHp === null && typeof researched.enginePowerHp === 'number' && researched.enginePowerHp >= 30 && researched.enginePowerHp <= 1500) {
+            engineHp = researched.enginePowerHp;
+            powerUnit = 'HP';
+            powerSource = 'VEHICLE_DATABASE';
+            powerSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_POWER' : 'STANDARD_POWER';
+          }
+          if (engineTorque === null && typeof researched.engineTorqueNm === 'number' && researched.engineTorqueNm >= 30 && researched.engineTorqueNm <= 2500) {
+            engineTorque = researched.engineTorqueNm;
+            torqueUnit = 'Nm';
+            torqueSource = 'VEHICLE_DATABASE';
+            torqueSemantic = isHybridVariant ? 'TOTAL_HYBRID_SYSTEM_TORQUE' : 'STANDARD_TORQUE';
+          }
           if (zeroToHundred === null && typeof researched.acceleration0to100 === 'number') {
             zeroToHundred = researched.acceleration0to100;
           }
@@ -318,6 +349,10 @@ export class VehicleReportContextBuilderService {
               specs: {
                 ...currentSpecsData,
                 ...researched,
+                enginePowerHp: engineHp,
+                engineTorqueNm: engineTorque,
+                powerUnit: powerUnit || 'HP',
+                torqueUnit: torqueUnit || 'Nm',
                 topSpeedKmh: topSpeedVal,
                 zeroToHundredKmh: zeroToHundred,
                 zeroToHundredSec: zeroToHundred,
@@ -337,6 +372,10 @@ export class VehicleReportContextBuilderService {
               specs: {
                 ...currentSpecsData,
                 ...researched,
+                enginePowerHp: engineHp,
+                engineTorqueNm: engineTorque,
+                powerUnit: powerUnit || 'HP',
+                torqueUnit: torqueUnit || 'Nm',
                 topSpeedKmh: topSpeedVal,
                 zeroToHundredKmh: zeroToHundred,
                 zeroToHundredSec: zeroToHundred,
@@ -353,6 +392,31 @@ export class VehicleReportContextBuilderService {
               },
             },
           });
+
+          if (engineHp) {
+            try {
+              await this.prisma.vehiclePowerEnrichment.upsert({
+                where: { vehicleVariantId: variant.id },
+                create: {
+                  vehicleVariantId: variant.id,
+                  powerHp: engineHp,
+                  sourceReportedUnit: powerUnit || 'HP',
+                  verificationStatus: 'VERIFIED',
+                  confidenceScore: 0.95,
+                  verifiedAt: new Date(),
+                },
+                update: {
+                  powerHp: engineHp,
+                  sourceReportedUnit: powerUnit || 'HP',
+                  verificationStatus: 'VERIFIED',
+                  confidenceScore: 0.95,
+                  verifiedAt: new Date(),
+                },
+              });
+            } catch (err: any) {
+              this.logger.warn(`Failed to persist verified powerEnrichment: ${err?.message}`);
+            }
+          }
         }
       } catch (err: any) {
         this.logger.warn(`[PHYSICAL SPECS RESOLUTION] AI catalog research skipped: ${err?.message}`);
@@ -621,7 +685,7 @@ export class VehicleReportContextBuilderService {
     const year = variant.year;
     const isElectric = fuelType === 'ELECTRIC' || variant.engine?.isElectric || (fuelType || '').toUpperCase() === 'ELECTRIC';
 
-    const userPrompt = `Aşağıdaki araç kombinasyonunun üretici resmi katalog teknik verilerini (fiziksel performans, ağırlık ve boyut) JSON formatında döndür.
+    const userPrompt = `Aşağıdaki araç kombinasyonunun üretici resmi katalog teknik verilerini (motor gücü, tork, fiziksel performans, ağırlık ve boyut) JSON formatında döndür.
 Araç: ${year} ${brandName} ${modelName} (${generationName} - ${bodyType})
 Motor: ${engineCode} (${fuelType})${powerHp ? ` - Güç: ${powerHp} HP` : ''}
 Şanzıman: ${transmissionName}
@@ -629,6 +693,8 @@ Paket: ${trimName}
 
 İstenen JSON formatı:
 {
+  "enginePowerHp": number (Motor üretici resmi katalog gücü HP / Beygir cinsinden tam sayı, örn: 211 veya 180 veya 150),
+  "engineTorqueNm": number (Motor üretici resmi katalog torku Nm cinsinden tam sayı, örn: 350 veya 320 veya 250),
   "topSpeed": number (Maksimum hız km/s cinsinden tam sayı, örn: 200),
   "acceleration0to100": number (0-100 hızlanma saniye cinsinden, örn: 3.9 veya 8.5),
   "luggageCapacity": number (Bagaj hacmi litre cinsinden tam sayı, örn: 540 veya 480),
@@ -644,7 +710,7 @@ Paket: ${trimName}
 
 Önemli:
 - Yalnızca bu JSON formatını döndür, markdown veya ek metin ekleme.
-- Verilen spesifik model yılı, kasa tipi ve motora ait gerçek üretici fabrika katalog verilerini doldur.
+- Verilen spesifik model yılı (${year}), kasa tipi, motor (${engineCode}) ve aktarma için gerçek üretici fabrika katalog beygir gücünü ("enginePowerHp"), torkunu ("engineTorqueNm") ve fiziksel verilerini doldur.
 - Şanzıman verilerini belirtilen spesifik model yılı (${year}) ve motor için resmi üretici fabrika verisinden doldur (Örn: 2005 Audi A3 1.6 için 6 ileri Tiptronic tork konvertörlü Aisin 09G; kuru çift kavrama DQ200 2008 öncesinde bulunmaz; Audi modellerinde DSG yerine Tiptronic veya S-Tronic adlandırması kullanılır).`;
 
     // 1. Try OpenAI gpt-4o-mini
@@ -671,6 +737,7 @@ Paket: ${trimName}
         const rawContent = completion.choices?.[0]?.message?.content || '{}';
         const parsed = JSON.parse(rawContent);
         if (
+          typeof parsed.enginePowerHp === 'number' ||
           typeof parsed.topSpeed === 'number' ||
           typeof parsed.acceleration0to100 === 'number' ||
           typeof parsed.luggageCapacity === 'number' ||
@@ -705,6 +772,7 @@ Paket: ${trimName}
           const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanText);
           if (
+            typeof parsed.enginePowerHp === 'number' ||
             typeof parsed.topSpeed === 'number' ||
             typeof parsed.acceleration0to100 === 'number' ||
             typeof parsed.luggageCapacity === 'number' ||

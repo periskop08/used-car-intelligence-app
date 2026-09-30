@@ -351,10 +351,10 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
 9. TÜKETİM AYRIMI:
    - Katalog tüketimi (örn. 4.2 L/100km) ile kullanıcı gerçek yol beklentisini (örn. 5.8 - 6.8 L/100km aralığı) iki ayrı veri olarak işle.
 10. MOTOR GÜCÜ VE TORK DOĞRULUK KURALI (KESİNLİKLE 'HP' KULLAN, 'PS' YASAK):
-    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) veya doğrulanmadıysa null gir. Güç birimini 'powerUnit' ('HP' | 'kW') alanında belirt.
+    - 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına metin/semantik etiket YAZMA; her zaman SAF SAYI (Number) olarak gir. Güç birimini 'powerUnit' ('HP' | 'kW') alanında belirt.
     - KESİNLİKLE 'PS' BİRİMİ VEYA TERİMİ KULLANMA! Türkiye otomotiv pazarında güç birimi her zaman 'HP' (Beygir Gücü) olarak adlandırılır. Açıklamalarda, analiz paragraflarında, başlıklarda ve teknik kartlarda '125 PS' yerine DAİMA '125 HP' yaz.
-    - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} HP` : 'Verilmedi'}), teknik özelliklerde ve metinlerde 'HP' birimiyle aynen bu değeri kullan.
-    - Eğer motor gücü veya tork doğrulanmamışsa (null ise), 'technicalSpecifications.enginePowerHp' ve 'engineTorqueNm' alanlarına KESİNLİKLE TAHMİNİ RAKAM YAZMA (null bırak) ve metinlerde de tahmini beygir gücü uydurma.
+    - Doğrulanmış motor gücü ve tork verildiyse (${rawHpVal ? `${rawHpVal} HP` : 'resmi katalog beygir gücü'}), teknik özelliklerde ve metinlerde 'HP' birimiyle aynen bu değeri kullan.
+    - 'vehicleCharacter.detailedAssessment' analiz metninde motor gücünden (${rawHpVal ? `${rawHpVal} HP` : 'resmi katalog gücü'}) mutlaka açıkça bahset; güç ve tork üretiminin aracın ağırlığı ve kullanım amacına göre nasıl bir sürüş sunduğunu değerlendir.
     - Planet dişli e-CVT sistemlerinde vites geçişi, vites vuruntusu, mekatronik ve kuru kavrama dili KULLANMA.
 11. "BU ARAÇ NASIL BİR OTOMOBİL?" VE DERİN OTOMOTİV DANIŞMANI ANALİZİ:
     - HITAP DİLİ VE KİMLİK: TorqueScout Yapay Zeka Danışmanının kıdemli otomotiv test editörü ve bağımsız ekspertiz danışmanı kimliğini harfiyen koru. Standart, mekanik veya jenerik robotik kalıplardan uzak dur; sıcak, güven veren ve doğrudan otomobil tutkununa hitap eden akıcı danışman üslubunu sürdür.

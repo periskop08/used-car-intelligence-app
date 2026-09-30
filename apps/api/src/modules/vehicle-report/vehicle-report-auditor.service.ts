@@ -344,15 +344,19 @@ export class VehicleReportAuditorService {
       ? detectedHp
       : (cardHp && cardHp >= 30 && cardHp <= 1500)
         ? cardHp
-        : (vehicleContext?.engine?.horsepower && vehicleContext.engine.horsepower >= 30)
-          ? vehicleContext.engine.horsepower
-          : (vehicleContext?.vehicleIdentity?.enginePowerHp && vehicleContext.vehicleIdentity.enginePowerHp >= 30)
-            ? vehicleContext.vehicleIdentity.enginePowerHp
+        : (typeof report.performanceUsage?.powerHp === 'number' && report.performanceUsage.powerHp >= 30)
+          ? report.performanceUsage.powerHp
+          : (typeof vIdentity?.enginePowerHp === 'number' && vIdentity.enginePowerHp >= 30)
+            ? vIdentity.enginePowerHp
             : (vehicleContext?.performanceData?.enginePowerHp && vehicleContext.performanceData.enginePowerHp >= 30)
               ? vehicleContext.performanceData.enginePowerHp
-              : (vIdentity.engineCode?.toLowerCase().includes('1.5 dci') && (transName.toLowerCase().includes('edc') || transName.toLowerCase().includes('otomatik')))
-                ? 110
-                : null;
+              : (vehicleContext?.vehicleIdentity?.enginePowerHp && vehicleContext.vehicleIdentity.enginePowerHp >= 30)
+                ? vehicleContext.vehicleIdentity.enginePowerHp
+                : (vehicleContext?.engine?.horsepower && vehicleContext.engine.horsepower >= 30 && !(vehicleContext.engine.horsepower === 110 && vehicleContext.engine.torque === 143) && !(vehicleContext.engine.horsepower === 100 && vehicleContext.engine.torque === 200))
+                  ? vehicleContext.engine.horsepower
+                  : (vIdentity.engineCode?.toLowerCase().includes('1.5 dci') && (transName.toLowerCase().includes('edc') || transName.toLowerCase().includes('otomatik')))
+                    ? 110
+                    : null;
 
     if (targetHp && targetHp >= 30 && targetHp <= 1500) {
       if (!cardHp || Math.abs(cardHp - targetHp) > 0) {
@@ -408,6 +412,17 @@ export class VehicleReportAuditorService {
         if (!report.technicalSpecifications.enginePowerHp) report.technicalSpecifications.enginePowerHp = targetHp;
         (report.technicalSpecifications as any).powerHp = targetHp;
         (report.technicalSpecifications as any).powerUnit = 'HP';
+      }
+
+      // Ensure narrative explicitly mentions engine power (HP) if omitted
+      if (!detectedHp && synth.vehicleCharacter?.detailedAssessment) {
+        const currentAssessment = synth.vehicleCharacter.detailedAssessment;
+        if (!/\b\d{2,4}\s*(?:hp|bg|beygir|ps)\b/i.test(currentAssessment)) {
+          const powerSentence = `${targetHp} HP güç üreten motor ünitesi, modelin dinamik karakteri ve sürüş dengesinde belirleyici bir rol oynamaktadır. `;
+          synth.vehicleCharacter.detailedAssessment = `${powerSentence}${currentAssessment}`;
+          auditResult.wasHarmonized = true;
+          this.logger.log(`[AUDITOR] Enriched detailedAssessment with ${targetHp} HP engine power statement.`);
+        }
       }
     }
 

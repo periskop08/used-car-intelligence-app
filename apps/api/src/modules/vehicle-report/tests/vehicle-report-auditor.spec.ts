@@ -393,5 +393,48 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(text).toContain('Tiptronic');
       expect(text).toContain('6 İleri Tiptronic');
     });
+
+    it('should guarantee horsepower is populated into both cards and narrative when AI omitted power', async () => {
+      const mockReportWithoutPower: any = {
+        vehicleIdentity: {
+          brand: 'Audi',
+          model: 'A5 Coupe',
+          year: 2013,
+          bodyType: 'Coupe',
+          engineCode: '2.0 TFSI QUATTRO',
+          enginePowerHp: undefined,
+          canonicalDisplayPowerHp: undefined,
+        },
+        performanceUsage: {
+          powerHp: undefined,
+          canonicalDisplayPowerHp: undefined,
+        },
+        technicalSpecifications: {},
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Audi A5 Coupe 2.0 TFSI Quattro İncelemesi',
+            detailedAssessment: 'Audi A5 Coupe, dinamik sürüş dinamikleri, quattro dört tekerlekten çekiş sistemi ve üst düzey şasi rijitliğiyle öne çıkan bir gran turismo modelidir.',
+          },
+          suitableFor: [],
+          notSuitableFor: [],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const mockVehicleContext: any = {
+        performanceData: {
+          enginePowerHp: 211,
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(mockReportWithoutPower, mockVehicleContext);
+
+      expect(audited.report.vehicleIdentity.enginePowerHp).toBe(211);
+      expect(audited.report.performanceUsage.powerHp).toBe(211);
+      expect(audited.report.performanceUsage.canonicalDisplayPowerHp).toBe(211);
+      expect(audited.report.technicalSpecifications.enginePowerHp).toBe(211);
+      expect(audited.report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment).toContain('211 HP');
+    });
   });
 });
