@@ -804,24 +804,67 @@ export default function ListingDetail() {
                 </div>
               </div>
 
-              {/* Seller Phone Number */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Telefon Numarası</label>
-                <div className="bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-slate-500" />
-                    <span>{listing.seller?.phone || "Telefon Belirtilmedi"}</span>
+              {/* Seller Phone Number(s) */}
+              {(() => {
+                const sellerPhones = [
+                  { label: "1. Telefon (Cep)", number: listing.seller?.phone },
+                  { label: "2. Telefon (Ofis / Sabit)", number: listing.seller?.phone2 },
+                  { label: "3. Telefon (Yetkili / Ortak)", number: listing.seller?.phone3 },
+                ].filter((p): p is { label: string; number: string } => Boolean(p.number && p.number.trim().length > 0));
+
+                if (sellerPhones.length <= 1) {
+                  const singlePhone = sellerPhones[0]?.number || listing.seller?.phone;
+                  return (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Telefon Numarası</label>
+                      <div className="bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{singlePhone || "Telefon Belirtilmedi"}</span>
+                        </div>
+                        {singlePhone && (
+                          <a
+                            href={`tel:${singlePhone}`}
+                            className="text-[10px] text-orange-400 hover:underline font-semibold"
+                          >
+                            Ara
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Telefon Numaraları ({sellerPhones.length})
+                    </label>
+                    <div className="flex flex-col gap-2">
+                      {sellerPhones.map((phoneItem, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-slate-900/80 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-200 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[9px] font-medium text-slate-400">{phoneItem.label}</span>
+                              <span className="truncate">{phoneItem.number}</span>
+                            </div>
+                          </div>
+                          <a
+                            href={`tel:${phoneItem.number}`}
+                            className="text-[10px] text-orange-400 hover:underline font-semibold shrink-0 ml-2"
+                          >
+                            Ara
+                          </a>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  {listing.seller?.phone && (
-                    <a
-                      href={`tel:${listing.seller.phone}`}
-                      className="text-[10px] text-orange-400 hover:underline font-semibold"
-                    >
-                      Ara
-                    </a>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Send Message Button */}
               <button

@@ -63,6 +63,8 @@ export class UserService {
         lastName: true,
         phone: true,
         phoneVerifiedAt: true,
+        phone2: true,
+        phone3: true,
         emailVerifiedAt: true,
         profilePhotoUrl: true,
         displayNamePreference: true,
@@ -181,6 +183,16 @@ export class UserService {
         dataToUpdate.phone = null;
         dataToUpdate.phoneVerifiedAt = null;
       }
+    }
+
+    if (dto.phone2 !== undefined) {
+      const phone2 = dto.phone2 ? dto.phone2.trim() : null;
+      dataToUpdate.phone2 = phone2 || null;
+    }
+
+    if (dto.phone3 !== undefined) {
+      const phone3 = dto.phone3 ? dto.phone3.trim() : null;
+      dataToUpdate.phone3 = phone3 || null;
     }
 
     const updatedUser = await this.prisma.user.update({

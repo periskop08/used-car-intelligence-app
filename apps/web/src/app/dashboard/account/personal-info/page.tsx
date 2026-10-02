@@ -18,6 +18,8 @@ export default function PersonalInfoPage() {
   const [username, setUsername] = useState("");
   const [displayNamePreference, setDisplayNamePreference] = useState("FULL_NAME");
   const [phone, setPhone] = useState("");
+  const [phone2, setPhone2] = useState("");
+  const [phone3, setPhone3] = useState("");
 
   const fetchProfile = () => {
     const token = localStorage.getItem("accessToken");
@@ -37,6 +39,8 @@ export default function PersonalInfoPage() {
         setUsername(data.username || "");
         setDisplayNamePreference(data.displayNamePreference || "FULL_NAME");
         setPhone(data.phone || "");
+        setPhone2(data.phone2 || "");
+        setPhone3(data.phone3 || "");
         setLoading(false);
 
         // Update localstorage user
@@ -79,6 +83,8 @@ export default function PersonalInfoPage() {
         username: username || null,
         displayNamePreference,
         phone: phone || null,
+        phone2: phone2 || null,
+        phone3: phone3 || null,
       }),
     })
       .then(async (res) => {
@@ -237,7 +243,7 @@ export default function PersonalInfoPage() {
 
       {/* Main Profile Info Form */}
       <form onSubmit={handleSaveProfile} className="glass border border-white/5 rounded-3xl bg-[#090d1a]/45 backdrop-blur-md p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-400">Kullanıcı Adı</label>
             <input
@@ -247,27 +253,7 @@ export default function PersonalInfoPage() {
               placeholder="kullanici_adi"
               className="w-full bg-[#05070f] border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
             />
-            <p className="text-[10px] text-slate-500">Sadece küçük harf, rakam, nokta ve alt çizgi. (En az 3 karakter)</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-400">Telefon Numarası</label>
-            <input
-              type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+90 5xx xxx xx xx"
-              className="w-full bg-[#05070f] border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
-            />
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                profile?.phoneVerifiedAt 
-                  ? "bg-green-500/20 text-green-400" 
-                  : "bg-amber-500/20 text-amber-400"
-              }`}>
-                {profile?.phoneVerifiedAt ? "Doğrulandı" : "Doğrulanmadı"}
-              </span>
-            </div>
+            <p className="text-[10px] text-slate-500">Sadece küçük harf, rakam, nokta ve alt çizgi.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -290,6 +276,77 @@ export default function PersonalInfoPage() {
               placeholder="Soyadınız"
               className="w-full bg-[#05070f] border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
             />
+          </div>
+        </div>
+
+        {/* Contact Phone Numbers Section (Up to 3 phones) */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-200">İletişim & Telefon Numaraları</h3>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                Maksimum 3 Telefon
+              </span>
+            </div>
+            <p className="text-slate-400 text-xs mt-1">
+              İlanlarınızda ve satıcı kartınızda alıcıların size doğrudan ulaşabilmesi için en fazla 3 telefon numarası ekleyebilirsiniz (örn: cep telefonu, galeri/ofis sabit hattı veya şirket ortağı).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Telefon 1 */}
+            <div className="space-y-1.5 bg-[#05070f]/60 p-3.5 rounded-2xl border border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">1. Telefon (Birincil / Cep)</label>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                  profile?.phoneVerifiedAt 
+                    ? "bg-green-500/20 text-green-400" 
+                    : "bg-amber-500/20 text-amber-400"
+                }`}>
+                  {profile?.phoneVerifiedAt ? "Doğrulandı" : "Doğrulanmadı"}
+                </span>
+              </div>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+90 5xx xxx xx xx"
+                className="w-full bg-[#090d1a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
+              />
+              <p className="text-[10px] text-slate-500">Hesap ve birincil iletişim numaranız.</p>
+            </div>
+
+            {/* Telefon 2 */}
+            <div className="space-y-1.5 bg-[#05070f]/60 p-3.5 rounded-2xl border border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">2. Telefon (Ofis / Sabit / Yetkili)</label>
+                <span className="text-[9px] font-medium text-slate-500">Opsiyonel</span>
+              </div>
+              <input
+                type="text"
+                value={phone2}
+                onChange={(e) => setPhone2(e.target.value)}
+                placeholder="+90 2xx xxx xx xx veya +90 5xx..."
+                className="w-full bg-[#090d1a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
+              />
+              <p className="text-[10px] text-slate-500">Galeri/ofis sabit hattı veya 2. yetkili no.</p>
+            </div>
+
+            {/* Telefon 3 */}
+            <div className="space-y-1.5 bg-[#05070f]/60 p-3.5 rounded-2xl border border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300">3. Telefon (Ortak / Satış / Destek)</label>
+                <span className="text-[9px] font-medium text-slate-500">Opsiyonel</span>
+              </div>
+              <input
+                type="text"
+                value={phone3}
+                onChange={(e) => setPhone3(e.target.value)}
+                placeholder="+90 5xx xxx xx xx"
+                className="w-full bg-[#090d1a] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-200 focus:border-orange-500 focus:outline-none transition"
+              />
+              <p className="text-[10px] text-slate-500">Şirket ortağı veya 3. yetkili no.</p>
+            </div>
           </div>
         </div>
 

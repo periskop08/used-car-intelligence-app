@@ -25,6 +25,14 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  phone2?: string;
+
+  @IsOptional()
+  @IsString()
+  phone3?: string;
 }
 
 export class UpdatePasswordDto {

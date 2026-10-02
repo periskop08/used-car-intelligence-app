@@ -694,6 +694,8 @@ export class ListingController {
             firstName: true,
             lastName: true,
             phone: true,
+            phone2: true,
+            phone3: true,
             email: true,
             profilePhotoUrl: true,
             createdAt: true,

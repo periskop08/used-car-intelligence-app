@@ -208,6 +208,8 @@ model User {
   lastName               String?
   phone                  String?           @unique
   phoneVerifiedAt        DateTime?
+  phone2                 String?
+  phone3                 String?
   emailVerifiedAt        DateTime?
   profilePhotoUrl        String?
   displayNamePreference  DisplayNamePreference @default(FULL_NAME)
