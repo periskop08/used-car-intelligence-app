@@ -1,7 +1,7 @@
+/// <reference types="jest" />
 import { VehicleReportProviderService } from '../vehicle-report-provider.service';
 import { VehicleReportAuditorService } from '../vehicle-report-auditor.service';
 import { VehicleReportSemanticValidationService } from '../vehicle-report-semantic-validation.service';
-import { ComprehensiveVehicleReport } from '@used-car-intelligence/shared';
 
 describe('Final Gatekeeper Verification & Sanitization Board', () => {
   let providerService: VehicleReportProviderService;
