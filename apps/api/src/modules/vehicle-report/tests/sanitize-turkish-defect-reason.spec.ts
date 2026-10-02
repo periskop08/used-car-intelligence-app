@@ -120,6 +120,21 @@ describe('sanitizeTurkishDefectReason', () => {
       expect(fallbackCleaned).not.toContain('25 bin TL');
       expect(fallbackCleaned).toContain('çift kavramalı otomatik şanzıman');
     });
+
+    it('strips web scraping artifacts, markdown images, banner ads, and incomplete article endings', () => {
+      const scrapedJunk =
+        '5568.webp) ![](/uploads/media/b90b411f9cbfdb02.webp) ## 1.5 dCi Motorlarda Hararet Sorunu Nedir? İçten yanmalı motorlar çalışırken yüksek miktarda ısı üretir. Bu ısının güvenli şekilde kontrol edilmesi için; ![Aracını Oto Panorama Garajı\'na ekle](/img/banners/arac-ekle.webp) gibi birçok parça birlikte çalışır. Bu sistemlerden birinde meydana gelen arıza motor sıcaklığının normal seviyenin üzerine çıkmasına neden olabilir. ## Hararet Sorununun Belirtileri Hararet yükselmeye başladığında aşağıdaki belirtile.';
+      const cleaned = sanitizeTurkishDefectDescription(scrapedJunk, {
+        domain: 'THERMAL_COOLING',
+        failureMode: 'COOLANT_LEAK',
+        title: 'Devirdaim & Termostat Soğutma Sıvısı Sızıntısı',
+      });
+      expect(cleaned).not.toContain('webp');
+      expect(cleaned).not.toContain('Panorama Garajı');
+      expect(cleaned).not.toContain('belirtile');
+      expect(cleaned).not.toContain('##');
+      expect(cleaned).toContain('termostat');
+    });
   });
 
   describe('sanitizeTurkishDefectTitle', () => {

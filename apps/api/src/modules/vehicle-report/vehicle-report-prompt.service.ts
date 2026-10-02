@@ -413,6 +413,7 @@ ${rangeText ? `• Elektrikli WLTP Menzili: ${rangeText}\n` : ''}${batteryText ?
       4. CCS2 / Type-2 şarj soketinde mandal kilit problemi veya soket tırnaklarında termal ark/kararma olup olmadığı.
       5. Elektrikli tahrik motoru redüktör dişli kutusu ses düzeyi ve aks keçesi sızdırmazlığı.` : `Tam 4 ila 6 adet bu aracın motor (${engine || 'Motor'}), şanzıman (${trans || 'Şanzıman'}) ve donanımına (${trim || 'Paket'}) doğrudan nokta atışı yapan derin teknik mülakat sorusu üret. Motorun spesifik mekanik hassasiyetlerini (triger kayışı/zinciri son değişim km'si ve faturası, devirdaim/soğutma sıvı kaçağı, turbo/enjektör durumu), şanzımanın özel bakım disiplinini (kuru/ıslak kavrama aşınması, şanzıman yağı değişim periyodu, mekatronik basınç geçmişi) ve araca özel donanımları hedef al.`}
     - Her soru için hem satıcıdan beklenen somut, faturalı ideal cevabı ('expectedAnswerHint') hem de alıcının şüphelenmesi gereken kaçamak veya arıza gizleyici kırmızı bayrak cevabını ('redFlagAnswerHint') eksiksiz doldur.
+    - Satıcı sorularında KESİNLİKLE "(örn: ...)", "mülakat sorusu", "hedef alan teknik soru" gibi meta-yönerge veya şablon kalıpları yazılamaz! Doğrudan satıcıya yöneltilecek net bir soru cümlesi yazılmalıdır.
 14. TEKNİK ÖZELLİKLER KARTLARI ASLA BOŞ (null) BIRAKILAMAZ:
     - 'zeroToHundredKmh', 'topSpeedKmh', 'trunkCapacityLiters' ve 'curbWeightKg' alanları kullanıcının ekranındaki 6 teknik kartın 4'ünü oluşturur. Bu alanlar KESİNLİKLE null veya undefined bırakılamaz!
     - Eğer bağlamda doğrulanmış fabrika verisi verildiyse aynen koru; verilmediyse de bu spesifik araç kombinasyonunun (${brand} ${model} ${year} ${body}) üretici resmi fabrika katalog verilerini (0-100 km/s sn, azami hız km/s, bagaj litresi, boş ağırlık kg) saf sayı olarak eksiksiz doldur.
@@ -484,15 +485,17 @@ YALNIZCA AŞAĞIDAKİ ÜST DÜZEY JSON ANAHTARLARINI İÇEREN GEÇERLİ BİR JSO
     {
       "category": ${isEv ? `"BATARYA_SOH | SARJ_GECMISI | TERMAL_YONETIM | SURUS_AKTARMA"` : `"MEKANİK | ŞANZIMAN | BAKIM | KRONİK_RİSK"`},
       "questionText": ${isEv 
-        ? `"Bu elektrikli aracın batarya ve yüksek voltaj mimarisine (${trim || ''}) özgü kritik teknik mülakat sorusu (örn: Yetkili servisten alınmış güncel Batarya SoH / Sağlık Raporu mevcut mu ve araç ağırlıklı olarak ev tipi AC şarjla mı kullanıldı?)..."` 
-        : `"Bu aracın motor ve şanzımanına (${engine || ''} ${trans || ''}) özgü kronik zayıflık veya ağır bakım geçmişini hedef alan teknik mülakat sorusu (örn: Triger kayışı/zinciri ve devirdaim pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?)..."`},
-      "whyItMatters": "Neden önemli olduğu...",
+        ? `"Yetkili servisten alınmış güncel Batarya SoH (Sağlık) Raporu mevcut mu ve araç ağırlıklı olarak AC şarjla mı kullanıldı?"` 
+        : `"Triger seti ve devirdaim su pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?"`},
+      "whyItMatters": ${isEv
+        ? `"Yüksek voltaj bataryasının aşınma durumunu ve hücre dengesini doğrulamak."`
+        : `"Zamanlama kayışı veya devirdaim arızasında oluşacak ağır motor mekanik hasarını önlemek."`},
       "expectedIdealAnswer": ${isEv
-        ? `"Satıcıdan beklenen somut, yetkili servis raporlu ve güven veren ideal yanıt (örn: 'Yetkili servis testinde batarya sağlığı %96 çıktı, raporu mevcut; araç daima ev tipi 11 kW AC şarjla %20-80 bandında dolduruldu')..."`
-        : `"Satıcıdan beklenen somut, servis faturalı ve güven veren ideal yanıt (örn: '85.000 km'de yetkili serviste faturasıyla değişti, faturası ve servis dökümü mevcut')..."`},
+        ? `"Yetkili servis testinde batarya sağlığı %95 üzerinde çıktı, raporu mevcut; araç daima ev tipi 11 kW AC şarjla dolduruldu."`
+        : `"85.000 km'de yetkili serviste faturasıyla değişti, fatura ve servis bakım dökümü mevcuttur."`},
       "redFlagAnswer": ${isEv
-        ? `"Satıcının kaçamak, raporsuz veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Bataryayı hiç ölçtürmedim ama menzili iyi gidiyor' veya soruyu geçiştirme)..."`
-        : `"Satıcının kaçamak, faturasız veya şüphe uyandıran kırmızı bayrak yanıtı (örn: 'Usta baktı daha gider dedi, fatura yok' veya soruyu geçiştirme)..."`}
+        ? `"Batarya sağlığı hiç ölçtürülmedi veya yetkili servis raporu bulunmuyor cevabı."`
+        : `"Usta baktı daha gider dedi, fatura yok veya triger değişim geçmişi bilinmiyor cevabı."`}
     }
   ],
   "technicalSpecifications": {

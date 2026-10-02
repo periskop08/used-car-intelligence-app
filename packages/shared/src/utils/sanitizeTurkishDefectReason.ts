@@ -316,15 +316,35 @@ export function sanitizeTurkishDefectDescription(
 
   let text = rawReason.trim();
 
-  // 1. Remove raw debug tokens, conversational forum slang, or social media / marketing junk
+  // 0. Clean raw web scraping artifacts, markdown image tags, dangling file names, banners, headings and URLs
+  text = text.replace(/!\[.*?\](?:\(.*?\)|\[.*?\])/g, ' ');
+  text = text.replace(/\[.*?\]\([^\)]+\)/g, ' ');
+  text = text.replace(/(?:^|\s|\()[\w./-]+\.(?:webp|jpg|jpeg|png|gif|svg)\)?/gi, ' ');
+  text = text.replace(/#{1,6}\s+/g, ' ');
+  text = text.replace(/\b(?:https?:\/\/\S+|\/uploads\/\S+|\/img\/\S+)/gi, ' ');
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  // 1. Remove raw debug tokens, conversational forum slang, or social media / marketing / scraped article junk
   const isDebugOrJunk =
     text.toUpperCase() === 'UNRESOLVED' ||
     /usta notu|dm'den|instagram|tiktok|facebook|takip edin|abone olun/i.test(text) ||
+    /panorama|garajı|garaj|banner|reklam|kampanya|sitemiz|tıklayarak/i.test(text) ||
+    /hararet sorunu nedir\?|sorunu nedir\?|belirtileri nelerdir\?/i.test(text) ||
     /\b(hocam|ustam|ustaya|servise götürdüm|baktırdım|benim araçta da|arkadaşlar|merhaba arkadaşlar|aynı sorun bende de|göbekten kaçırıyor|kaçırıyor hocam|demişsiniz|demişsin|bence|arkadaşım|sizce|teşekkürler|kolay gelsin)\b/i.test(text) ||
     text.length < 15;
 
   if (isDebugOrJunk) {
     return getStandardTurkishDefectExplanation(context);
+  }
+
+  // Check for cut-off scraped listing sentence fragments (e.g. "aşağıdaki belirtile" or dangling colons)
+  if (/aşağıdaki\s+\w*$/i.test(text) || /belirtileri?\s*$/i.test(text) || /belirtile\.?$/i.test(text)) {
+    const validSentenceMatch = text.match(/(.*[.!?])\s*[^.!?]*$/);
+    if (validSentenceMatch && validSentenceMatch[1].trim().length >= 35) {
+      text = validSentenceMatch[1].trim();
+    } else {
+      return getStandardTurkishDefectExplanation(context);
+    }
   }
 
   // 2. Strict No-Price/Cost Policy: Strip any volatile repair costs, currencies, or price figures

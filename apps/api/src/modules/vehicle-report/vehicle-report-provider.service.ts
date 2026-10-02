@@ -1035,38 +1035,91 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
       ];
 
       baseReport.sellerQuestions = baseReport.sellerQuestions.map((q) => {
-        const qText = (q.questionText || (typeof q === 'string' ? q : '')).toLowerCase();
+        let qText = q.questionText || (typeof q === 'string' ? q : '');
+        let expectedHint = q.expectedAnswerHint || (q as any).expectedIdealAnswer || '';
+        let redFlagHint = q.redFlagAnswerHint || (q as any).redFlagAnswer || '';
+
+        // Clean any prompt template meta-leak in question text
+        if (
+          qText.includes('mülakat sorusu') ||
+          qText.includes('hedef alan') ||
+          qText.includes('özgü kronik zayıflık') ||
+          qText.includes('(örn:')
+        ) {
+          const ornMatch = qText.match(/\(örn:\s*([^)]+)\)/i);
+          if (ornMatch && ornMatch[1].trim().length >= 20) {
+            qText = ornMatch[1].trim().replace(/\.{3,}$/, '').trim();
+            if (!qText.endsWith('?')) qText += '?';
+          } else {
+            qText = isElectric
+              ? 'Yetkili servisten alınmış güncel Batarya Sağlık (SoH) ve hücre denge raporu mevcut mu?'
+              : 'Triger seti ve devirdaim su pompası en son hangi kilometrede ve yetkili/uzman serviste orijinal parçayla mı değişti?';
+          }
+        }
+
+        if (expectedHint.includes('(örn:') || expectedHint.includes('Satıcıdan beklenen')) {
+          const ornMatch = expectedHint.match(/\(örn:\s*['"]?([^'")]+)['"]?\)/i);
+          if (ornMatch && ornMatch[1].trim().length >= 15) {
+            expectedHint = ornMatch[1].trim().replace(/\.{3,}$/, '').trim();
+          } else {
+            expectedHint = isElectric
+              ? 'Yetkili servis testinde batarya sağlığı %95 üzerinde çıktı, servis test raporu mevcuttur.'
+              : 'Periyodik bakım kapsamında yetkili/uzman serviste faturasıyla ve orijinal parçalarla değiştirildi.';
+          }
+        }
+
+        if (redFlagHint.includes('(örn:') || redFlagHint.includes('Satıcının kaçamak')) {
+          const ornMatch = redFlagHint.match(/\(örn:\s*['"]?([^'")]+)['"]?\)/i);
+          if (ornMatch && ornMatch[1].trim().length >= 15) {
+            redFlagHint = ornMatch[1].trim().replace(/\.{3,}$/, '').trim();
+          } else {
+            redFlagHint = isElectric
+              ? 'Batarya sağlığı hiç ölçtürülmedi veya yetkili servis raporu sunulamıyor cevabı.'
+              : 'Değişim geçmişi veya servis faturası bulunmuyor cevabı.';
+          }
+        }
+
+        const qLower = qText.toLowerCase();
         for (const pattern of genericQuestionPatterns) {
-          if (qText.includes(pattern)) {
+          if (qLower.includes(pattern)) {
             if (pattern.includes('fren')) {
               return {
                 ...q,
                 questionText: 'Fren balata ve disk kalınlıkları son periyodik bakımda ölçüldü mü, hidrolik sıvısı ve balatalar yenilendi mi?',
-                expectedAnswerHint: q.expectedAnswerHint || 'Son bakımda balata ve disk kalınlıkları ölçüldü, aşınma sınırları dahilinde ve hidrolik seviyesi tam.',
+                expectedAnswerHint: expectedHint || 'Son bakımda balata ve disk kalınlıkları ölçüldü, aşınma sınırları dahilinde ve hidrolik seviyesi tam.',
+                redFlagAnswerHint: redFlagHint,
               };
             }
             if (pattern.includes('şanzıman')) {
               return {
                 ...q,
                 questionText: 'Şanzıman yağı ve filtre bakımı üretici periyoduna uygun yapıldı mı, vites geçişlerinde vuruntu veya kaçırma var mı?',
-                expectedAnswerHint: q.expectedAnswerHint || 'Şanzıman bakımları zamanında yapıldı, geçişler pürüzsüz ve vuruntu bulunmuyor.',
+                expectedAnswerHint: expectedHint || 'Şanzıman bakımları zamanında yapıldı, geçişler pürüzsüz ve vuruntu bulunmuyor.',
+                redFlagAnswerHint: redFlagHint,
               };
             }
             if (pattern.includes('yağ') || pattern.includes('motor')) {
               return {
                 ...q,
                 questionText: 'Motor yağı eksiltme durumu takip edildi mi, külbütör kapağı veya karter çevresinde terleme/kaçak mevcut mu?',
-                expectedAnswerHint: q.expectedAnswerHint || 'Düzenli yağ kontrolleri yapıldı, eksiltme veya kaçak bulunmuyor.',
+                expectedAnswerHint: expectedHint || 'Düzenli yağ kontrolleri yapıldı, eksiltme veya kaçak bulunmuyor.',
+                redFlagAnswerHint: redFlagHint,
               };
             }
             return {
               ...q,
               questionText: 'Aracın periyodik bakım kayıtları, triger/tahrik sistemi kontrolü ve yetkili/uzman servis faturaları mevcut mu?',
-              expectedAnswerHint: q.expectedAnswerHint || 'Yetkili veya uzman özel servis faturaları ve bakım defteri eksiksiz mevcuttur.',
+              expectedAnswerHint: expectedHint || 'Yetkili veya uzman özel servis faturaları ve bakım defteri eksiksiz mevcuttur.',
+              redFlagAnswerHint: redFlagHint,
             };
           }
         }
-        return q;
+        return {
+          ...q,
+          questionText: qText,
+          expectedAnswerHint: expectedHint,
+          redFlagAnswerHint: redFlagHint,
+        };
       });
     }
 
@@ -1217,6 +1270,19 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
         [/çift kavrama titremesi/gi, isCvt ? 'varyatör sarsıntısı' : 'tork konvertör kilitlenme titreşimi'],
         [/çift kavrama/gi, isCvt ? 'CVT şanzıman' : 'tork konvertörlü otomatik şanzıman'],
       );
+    } else if (isDualClutch && !isTorqueConverterOrCVTOrManual) {
+      const transClean = (baseReport.vehicleIdentity?.transmissionName || 'çift kavramalı otomatik').toLowerCase().includes('edc')
+        ? 'EDC çift kavramalı'
+        : (baseReport.vehicleIdentity?.transmissionName || 'çift kavramalı').toLowerCase().includes('dsg')
+          ? 'DSG çift kavramalı'
+          : 'çift kavramalı';
+
+      transmissionReplacements.push(
+        [/tork konvertörlü (?:tam )?otomatik şanzıman/gi, `${transClean} şanzıman`],
+        [/tork konvertörlü şanzıman/gi, `${transClean} şanzıman`],
+        [/tork konvertörlü/gi, 'çift kavramalı'],
+        [/tork konvertörü/gi, 'çift kavrama'],
+      );
     }
 
     if (transmissionReplacements.length > 0) {
@@ -1245,6 +1311,17 @@ Lütfen yalnızca bu hatayı düzelterek geçerli JSON formatında rapor içeri�
     if (fuelReplacements.length > 0) {
       replaceStringsInObject(baseReport, fuelReplacements);
     }
+
+    // 3.2 Global Cleanliness & Scraping Artifact Scrubber (Zero-Markdown-Artifacts & Zero-Prompt-Leak)
+    const cleanupReplacements: [RegExp, string][] = [
+      [/!\[.*?\](?:\(.*?\)|\[.*?\])/g, ' '],
+      [/\[.*?\]\([^\)]+\)/g, ' '],
+      [/(?:^|\s|\()[\w./-]+\.(?:webp|jpg|jpeg|png|gif|svg)\)?/gi, ' '],
+      [/panorama|garajı|garaj banner|oto panorama/gi, ' '],
+      [/\b(?:https?:\/\/\S+|\/uploads\/\S+|\/img\/\S+)/gi, ' '],
+      [/^0\s*\n+0\s*/g, ''],
+    ];
+    replaceStringsInObject(baseReport, cleanupReplacements);
 
     // Synchronize canonical clutchType to technicalSpecifications
     const canonicalClutchType = (baseReport.vehicleIdentity as any)?.clutchType || vehicleCtx.clutchType || (vehicleCtx.selected8Filters as any)?.clutchType;

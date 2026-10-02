@@ -436,5 +436,63 @@ describe('VehicleReportAuditorService (Researcher 2 & 3-Way Tie-Breaker)', () =>
       expect(audited.report.technicalSpecifications.enginePowerHp).toBe(211);
       expect(audited.report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment).toContain('211 HP');
     });
+
+    it('should harmonize Renault Fluence 1.5 dCi EDC hallucinating torque converter in strongestReasonsToChoose and sert arazi in notSuitableFor', async () => {
+      const mockFluenceReport: any = {
+        vehicleIdentity: {
+          brand: 'Renault',
+          model: 'Fluence',
+          year: 2016,
+          bodyType: 'Sedan',
+          transmissionName: '6 İleri EDC',
+          fuelType: 'Dizel',
+        },
+        expertDecisionSynthesis: {
+          vehicleCharacter: {
+            headline: 'Renault Fluence 1.5 dCi EDC İncelemesi',
+            detailedAssessment: 'Renault Fluence 1.5 dCi, 110 HP güç üreten verimli bir dizel sedan olarak öne çıkıyor.',
+          },
+          dailyUseAssessment: {
+            cityUse: 'Şehir içi manevra kabiliyeti oldukça iyi.',
+            highwayUse: 'Otoyol sürüşlerinde stabil.',
+          },
+          strongestReasonsToChoose: [
+            {
+              title: 'Konforlu Sürüş Dinamikleri',
+              explanation: 'Tork konvertörlü şanzıman, şehir içi ve otoyol sürüşlerinde pürüzsüz geçişler sağlarken konforlu bir deneyim sunuyor.',
+            },
+          ],
+          compromisesAndLimitations: [
+            {
+              title: 'Düşük Hızlarda Vites Geçişi',
+              explanation: 'Düşük hızlarda tork konvertörlü geçişler bazen hissedilebilir olabiliyor.',
+            },
+          ],
+          suitableFor: [],
+          notSuitableFor: [
+            {
+              profile: 'Sert Arazi Kullanıcıları',
+              explanation: 'Fluence, sedan kasa yapısı nedeniyle sert arazi koşullarında yetersiz kalabilir.',
+            },
+          ],
+          purchaseConditions: [],
+          walkAwayConditions: [],
+        },
+      };
+
+      const audited = await auditor.auditAndHarmonizeReport(mockFluenceReport, {});
+
+      expect(audited.auditResult.wasHarmonized).toBe(true);
+      const reasonExpl = audited.report.expertDecisionSynthesis.strongestReasonsToChoose[0].explanation;
+      expect(reasonExpl).not.toContain('Tork konvertörlü');
+      expect(reasonExpl).toContain('şanzıman');
+
+      const compromiseExpl = audited.report.expertDecisionSynthesis.compromisesAndLimitations[0].explanation;
+      expect(compromiseExpl).not.toContain('tork konvertörlü');
+
+      const notSuitable = audited.report.expertDecisionSynthesis.notSuitableFor[0];
+      expect(notSuitable.profile).toBe('Bozuk Zemin ve Engebeli Yol Şartları');
+      expect(notSuitable.explanation).not.toContain('sert arazi koşullarında yetersiz kalabilir');
+    });
   });
 });

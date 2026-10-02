@@ -120,16 +120,18 @@ export class VehicleReportAuditorService {
       synth.vehicleCharacter?.detailedAssessment || (synth.vehicleCharacter as any)?.explanation || '',
       synth.dailyUseAssessment?.cityUse || '',
       synth.dailyUseAssessment?.highwayUse || '',
+      ...(synth.strongestReasonsToChoose || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
+      ...(synth.compromisesAndLimitations || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
       ...(synth.suitableFor || []).map((s: any) => `${s.profile || ''} ${s.explanation || ''}`),
       ...(synth.notSuitableFor || []).map((s: any) => `${s.profile || ''} ${s.explanation || ''}`),
       ...(synth.purchaseConditions || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
       ...(synth.walkAwayConditions || []).map((s: any) => `${s.title || ''} ${s.explanation || ''}`),
     ].join(' ').toLowerCase();
 
-    const claimsCvt = /\b(lineartronic|kademesiz|cvt|çelik zincirli|çelik kayışlı|kademesiz zincirli|multidrive|x-tronic)\b/i.test(fullTextCorpus);
-    const claimsDualClutch = /\b(çift kavrama|çift kavramalı|dsg|dq200|dq250|dq381|dq500|edc|powershift|s-tronic|7g-dct|8g-dct|ddct)\b/i.test(fullTextCorpus);
-    const claimsTorqueConverter = /\b(tork konvertör|tork konvertörlü|eat8|eat6|zf 8hp|zf 9hp|4eat)\b/i.test(fullTextCorpus);
-    const claimsManual = /\b(manuel vites|debriyaj pedalı|düz vites)\b/i.test(fullTextCorpus);
+    const claimsCvt = /(?:^|[^a-z0-9ğüşıöç])(lineartronic|kademesiz|cvt|çelik zincirli|çelik kayışlı|kademesiz zincirli|multidrive|x-tronic)(?:[^a-z0-9ğüşıöç]|$)/i.test(fullTextCorpus);
+    const claimsDualClutch = /(?:^|[^a-z0-9ğüşıöç])(çift kavrama|çift kavramalı|dsg|dq200|dq250|dq381|dq500|edc|powershift|s-tronic|7g-dct|8g-dct|ddct)(?:[^a-z0-9ğüşıöç]|$)/i.test(fullTextCorpus);
+    const claimsTorqueConverter = /(?:^|[^a-z0-9ğüşıöç])(tork konvertör|tork konvertörü|tork konvertörlü|eat8|eat6|zf 8hp|zf 9hp|4eat)(?:[^a-z0-9ğüşıöç]|$)/i.test(fullTextCorpus);
+    const claimsManual = /(?:^|[^a-z0-9ğüşıöç])(manuel vites|debriyaj pedalı|düz vites)(?:[^a-z0-9ğüşıöç]|$)/i.test(fullTextCorpus);
     const isCanonicalRobotized = txTaxonomy.clutchType === 'ROBOTIZE_TEK_KAVRAMA';
 
     const reportedTrans = (vIdentity.transmissionName || '').toLowerCase();
@@ -238,7 +240,10 @@ export class VehicleReportAuditorService {
           t = t.replace(/kademesiz zincirli otomatik/gi, txTaxonomy.transmissionTypeAndSpeeds);
           t = t.replace(/lineartronic/gi, cleanTransName);
           t = t.replace(/kademesiz cvt/gi, cleanTransName);
+          t = t.replace(/tork konvertörlü (?:tam )?otomatik şanzıman/gi, `${cleanTransName} şanzıman`);
+          t = t.replace(/tork konvertörlü şanzıman/gi, `${cleanTransName} şanzıman`);
           t = t.replace(/tork konvertörlü/gi, 'çift kavramalı');
+          t = t.replace(/tork konvertörü/gi, 'çift kavrama');
         } else if (isCanonicalRobotized) {
           t = t.replace(/(?:8|7|6)\s*ileri\s*tork\s*konvertörlü\s*tam\s*otomatik\s*(?:\([^)]*\))?/gi, txTaxonomy.transmissionTypeAndSpeeds);
           t = t.replace(/\beat8\b/gi, cleanTransName);
@@ -276,6 +281,22 @@ export class VehicleReportAuditorService {
         if (synth.dailyUseAssessment.highwayUse) {
           synth.dailyUseAssessment.highwayUse = harmonizeText(synth.dailyUseAssessment.highwayUse);
         }
+      }
+
+      if (Array.isArray(synth.strongestReasonsToChoose)) {
+        synth.strongestReasonsToChoose = synth.strongestReasonsToChoose.map((item: any) => ({
+          ...item,
+          title: harmonizeText(item.title),
+          explanation: harmonizeText(item.explanation),
+        }));
+      }
+
+      if (Array.isArray(synth.compromisesAndLimitations)) {
+        synth.compromisesAndLimitations = synth.compromisesAndLimitations.map((item: any) => ({
+          ...item,
+          title: harmonizeText(item.title),
+          explanation: harmonizeText(item.explanation),
+        }));
       }
 
       if (Array.isArray(synth.suitableFor)) {
@@ -695,9 +716,12 @@ export class VehicleReportAuditorService {
           combined.includes('off-road') ||
           combined.includes('offroad') ||
           combined.includes('ağır arazi') ||
+          combined.includes('sert arazi') ||
           combined.includes('arazi tutkun') ||
           combined.includes('arazi şartlar') ||
+          combined.includes('arazi koşul') ||
           combined.includes('arazi sürüc') ||
+          combined.includes('arazi kullanıc') ||
           combined.includes('arazi merak') ||
           combined.includes('zorlu arazi');
 
