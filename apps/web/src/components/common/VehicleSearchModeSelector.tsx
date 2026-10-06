@@ -16,13 +16,13 @@ interface VehicleSearchModeSelectorProps {
   className?: string;
 }
 
-const MODES: { key: VehicleSearchMode; label: string; icon: string }[] = [
-  { key: 'AUTOMOBILE', label: 'Otomobil', icon: '🚗' },
-  { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup', icon: '🚙' },
-  { key: 'ELECTRIC', label: 'Elektrikli Araçlar', icon: '⚡' },
-  { key: 'COMMERCIAL', label: 'Minivan & Panelvan', icon: '🚐' },
-  { key: 'COMMERCIAL_VEHICLE', label: 'Ticari Araçlar', icon: '🚛' },
-  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: '🏍️' },
+const MODES: { key: VehicleSearchMode; label: string }[] = [
+  { key: 'AUTOMOBILE', label: 'Otomobil' },
+  { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup' },
+  { key: 'ELECTRIC', label: 'Elektrikli Araçlar' },
+  { key: 'COMMERCIAL', label: 'Minivan & Panelvan' },
+  { key: 'COMMERCIAL_VEHICLE', label: 'Ticari Araçlar' },
+  { key: 'MOTORCYCLE', label: 'Motosiklet' },
 ];
 
 export const VehicleSearchModeSelector: React.FC<VehicleSearchModeSelectorProps> = ({
@@ -34,7 +34,7 @@ export const VehicleSearchModeSelector: React.FC<VehicleSearchModeSelectorProps>
     <div
       role="group"
       aria-label="Taşıt Türü Seçimi"
-      className={`flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none flex-wrap ${className}`}
+      className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none flex-nowrap w-full ${className}`}
     >
       {MODES.map((mode) => {
         const isActive = value === mode.key;
@@ -45,13 +45,12 @@ export const VehicleSearchModeSelector: React.FC<VehicleSearchModeSelectorProps>
             role="button"
             aria-pressed={isActive}
             onClick={() => onChange(mode.key)}
-            className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 shrink-0 ${
+            className={`flex-1 min-w-fit flex items-center justify-center text-center px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 whitespace-nowrap shrink-0 ${
               isActive
                 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md shadow-orange-500/25 border border-amber-400/30 font-extrabold'
                 : 'bg-white/[0.04] text-slate-300 border border-white/10 hover:bg-white/[0.08] hover:text-white font-semibold'
             }`}
           >
-            <span>{mode.icon}</span>
             <span>{mode.label}</span>
           </button>
         );
