@@ -7,6 +7,7 @@ export type VehicleSearchMode =
   | 'SUV_PICKUP' 
   | 'ELECTRIC' 
   | 'COMMERCIAL' 
+  | 'COMMERCIAL_VEHICLE' 
   | 'MOTORCYCLE';
 
 interface VehicleSearchModeSelectorProps {
@@ -20,6 +21,7 @@ const MODES: { key: VehicleSearchMode; label: string; icon: string }[] = [
   { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup', icon: '🚙' },
   { key: 'ELECTRIC', label: 'Elektrikli Araçlar', icon: '⚡' },
   { key: 'COMMERCIAL', label: 'Minivan & Panelvan', icon: '🚐' },
+  { key: 'COMMERCIAL_VEHICLE', label: 'Ticari Araçlar', icon: '🚛' },
   { key: 'MOTORCYCLE', label: 'Motosiklet', icon: '🏍️' },
 ];
 

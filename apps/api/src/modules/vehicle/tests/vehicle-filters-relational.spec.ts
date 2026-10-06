@@ -161,6 +161,9 @@ describe('Vehicle Filters Relational Filtering & Transmission SQL Level Guard', 
       expect(getCategoryVariantWhere('COMMERCIAL')).toEqual({
         bodyType: { in: ['MINIVAN', 'VAN'] },
       });
+      expect(getCategoryVariantWhere('COMMERCIAL_VEHICLE')).toEqual({
+        bodyType: { in: ['VAN', 'OTHER'] },
+      });
       expect(getCategoryVariantWhere(undefined)).toEqual({});
     });
 

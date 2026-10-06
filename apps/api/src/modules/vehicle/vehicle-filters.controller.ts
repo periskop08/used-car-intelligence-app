@@ -127,6 +127,11 @@ export function getCategoryVariantWhere(category?: string): any {
       bodyType: { in: ['MINIVAN', 'VAN'] },
     };
   }
+  if (cat === 'COMMERCIAL_VEHICLE' || cat === 'HEAVY_COMMERCIAL' || cat === 'TICARI') {
+    return {
+      bodyType: { in: ['VAN', 'OTHER'] },
+    };
+  }
   return {};
 }
 
