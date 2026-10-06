@@ -2,7 +2,7 @@ export const formatImageUrl = (url?: string | null) => {
   if (!url) return "";
 
   // Idempotency safety: if already routed through media-proxy or is a local data URI, return as-is
-  if (url.includes("/listings/media-proxy/")) return url;
+  if (url.includes("/listings/media-proxy/") || url.includes("/vehicle-guide/media-proxy/")) return url;
   if (url.startsWith("/") || url.startsWith("data:")) return url;
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -27,7 +27,11 @@ export const formatImageUrl = (url?: string | null) => {
     }
 
     if (storageKey) {
-      if (storageKey.startsWith("guide-cards/")) {
+      if (
+        storageKey.startsWith("guide-cards/") ||
+        storageKey.startsWith("aracini-bul/") ||
+        storageKey.startsWith("discovery/")
+      ) {
         return `${API_URL}/vehicle-guide/media-proxy/${storageKey}`;
       }
       return `${API_URL}/listings/media-proxy/${storageKey}`;

@@ -10,6 +10,7 @@ import {
 import { API_BASE_URL, getAuthToken } from '@/utils/apiConfig';
 import VehicleGuideCardEditor from '@/components/VehicleGuideCardEditor';
 import { translateBodyType } from '@/components/VehicleGuideCardLayout';
+import { formatImageUrl } from '@/utils/media';
 
 export default function AdminVehicleGuidePage() {
   const [cards, setCards] = useState<any[]>([]);
@@ -230,7 +231,7 @@ export default function AdminVehicleGuidePage() {
                       <td className="py-3 px-4">
                         <div className="w-12 h-9 rounded-lg bg-slate-950 border border-white/10 overflow-hidden flex items-center justify-center">
                           {heroUrl && heroUrl.trim().length > 0 ? (
-                            <img src={heroUrl} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                            <img src={formatImageUrl(heroUrl)} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition" />
                           ) : (
                             <ImageIcon className="w-4 h-4 text-slate-600" />
                           )}

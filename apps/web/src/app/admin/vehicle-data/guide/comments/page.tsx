@@ -17,6 +17,7 @@ import {
   X,
   Check,
 } from "lucide-react";
+import { formatImageUrl } from "@/utils/media";
 
 export default function AdminGuideCommentsPage() {
   const [token, setToken] = useState("");
@@ -291,7 +292,7 @@ export default function AdminGuideCommentsPage() {
                     <td className="py-3 px-6">
                       <div className="w-16 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/10">
                         {c.heroImageUrl ? (
-                          <img src={c.heroImageUrl} alt={c.model} className="w-full h-full object-cover" />
+                          <img src={formatImageUrl(c.heroImageUrl)} alt={c.model} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-500 font-bold">
                             Görsel Yok
@@ -364,7 +365,7 @@ export default function AdminGuideCommentsPage() {
               <div className="flex items-center gap-3">
                 {selectedCard.heroImageUrl && (
                   <img
-                    src={selectedCard.heroImageUrl}
+                    src={formatImageUrl(selectedCard.heroImageUrl)}
                     alt={selectedCard.model}
                     className="w-14 h-10 rounded-xl object-cover border border-white/10"
                   />

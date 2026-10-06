@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { formatImageUrl } from "@/utils/media";
 
 interface CriticalInfoInput {
   title: string;
@@ -542,7 +543,7 @@ export default function VehicleProfileEditor({
               <div className="mt-2">
                 <span className="block text-[11px] text-slate-400 mb-1">Görsel Önizleme:</span>
                 <img
-                  src={heroImageUrl}
+                  src={formatImageUrl(heroImageUrl)}
                   alt="Önizleme"
                   className="w-full max-h-48 object-cover rounded-xl border border-white/10"
                 />

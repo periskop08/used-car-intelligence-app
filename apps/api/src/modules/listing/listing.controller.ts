@@ -337,8 +337,17 @@ export class ListingController {
 
     storageKey = decodeURIComponent(storageKey);
 
-    // Security: sanitize path, reject traversal and non-listing keys
-    if (storageKey.includes('..') || !storageKey.startsWith('listings/')) {
+    // Security: sanitize path, reject traversal and non-allowed bucket keys
+    const allowedPrefixes = [
+      'listings/',
+      'aracini-bul/',
+      'guide-cards/',
+      'discovery/',
+      'profiles/',
+      'avatars/',
+    ];
+    const isAllowed = allowedPrefixes.some((prefix) => storageKey.startsWith(prefix));
+    if (storageKey.includes('..') || !isAllowed) {
       throw new BadRequestException('Geçersiz görsel anahtarı.');
     }
 
