@@ -553,6 +553,7 @@ export default function MobileDashboard() {
   const [selectedFuelType, setSelectedFuelType] = useState<string>('');
   const [selectedTransmission, setSelectedTransmission] = useState<string>('');
   const [selectedTrim, setSelectedTrim] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE'>('AUTOMOBILE');
 
   // Loading States for Cascading Options
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -817,14 +818,39 @@ export default function MobileDashboard() {
   };
 
   // 1. Fetch All Brands
-  const fetchBrands = async () => {
+  const handleCategoryChange = (newCat: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE') => {
+    if (newCat === selectedCategory) return;
+    setSelectedCategory(newCat);
+    setSelectedBrand(null);
+    setSelectedModel(null);
+    setSelectedYear('');
+    setSelectedBodyType('');
+    setSelectedEngine('');
+    setSelectedFuelType('');
+    setSelectedTransmission('');
+    setSelectedTrim('');
+    setBrands([]);
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+    fetchBrands(newCat);
+  };
+
+  // 1. Fetch All Brands (Scoped by Category)
+  const fetchBrands = async (cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
-      const res = await fetch(`${API_URL}/vehicles/brands`);
+      const res = await fetch(`${API_URL}/vehicle-filters/brands?category=${cat}`);
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const sorted = json.data
+            .map((b: any) => ({ id: b.value || b.label || b.id, name: b.label || b.name || b.value }))
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr'));
           setBrands(sorted);
         }
       }
@@ -835,15 +861,18 @@ export default function MobileDashboard() {
     }
   };
 
-  // 2. Fetch Models for Brand
-  const fetchModelsForBrand = async (brandId: string) => {
+  // 2. Fetch Models for Brand (Scoped by Brand & Category)
+  const fetchModelsForBrand = async (brandId: string, brandName?: string, cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
-      const res = await fetch(`${API_URL}/vehicles/models?brandId=${brandId}`);
+      const bName = brandName || selectedBrand?.name || '';
+      const res = await fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(bName)}&category=${cat}`);
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const sorted = json.data
+            .map((m: any) => ({ id: m.value || m.label || m.id, name: m.label || m.name || m.value }))
+            .sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr'));
           setModels(sorted);
         }
       }
@@ -855,11 +884,11 @@ export default function MobileDashboard() {
   };
 
   // 3. Fetch Years for Model
-  const fetchYearsForModel = async (brandName: string, modelName: string) => {
+  const fetchYearsForModel = async (brandName: string, modelName: string, cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
       const res = await fetch(
-        `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`
+        `${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&category=${cat}`
       );
       if (res.ok) {
         const json = await res.json();
@@ -868,26 +897,25 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || String(item)
           );
           setYears(list);
-        } else {
-          setYears(Array.from({ length: 27 }, (_, i) => String(2026 - i)));
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
+            setSelectedYear(list[0]);
+            fetchBodyTypes(brandName, modelName, list[0], cat);
+          }
         }
-      } else {
-        setYears(Array.from({ length: 27 }, (_, i) => String(2026 - i)));
       }
     } catch (err) {
       console.error('Fetch years error:', err);
-      setYears(Array.from({ length: 27 }, (_, i) => String(2026 - i)));
     } finally {
       setLoadingOptions(false);
     }
   };
 
   // 4. Fetch Body Types (Kasa Tipi)
-  const fetchBodyTypes = async (brandName: string, modelName: string, year: string) => {
+  const fetchBodyTypes = async (brandName: string, modelName: string, year: string, cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
       const res = await fetch(
-        `${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${year}`
+        `${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&year=${year}&category=${cat}`
       );
       if (res.ok) {
         const json = await res.json();
@@ -896,25 +924,24 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setBodyTypes(list);
-        } else {
-          setBodyTypes(['Sedan', 'Hatchback', 'Station Wagon', 'Coupe', 'SUV', 'Cabrio']);
+          if (list.length === 1 && cat === 'MINIVAN_PANELVAN') {
+            setSelectedBodyType(list[0]);
+            fetchEngines(brandName, modelName, year, list[0], cat);
+          }
         }
-      } else {
-        setBodyTypes(['Sedan', 'Hatchback', 'Station Wagon', 'Coupe', 'SUV', 'Cabrio']);
       }
     } catch (err) {
       console.error('Fetch body types error:', err);
-      setBodyTypes(['Sedan', 'Hatchback', 'Station Wagon', 'Coupe', 'SUV', 'Cabrio']);
     } finally {
       setLoadingOptions(false);
     }
   };
 
   // 5. Fetch Engines (Motor / Versiyon)
-  const fetchEngines = async (brandName: string, modelName: string, year?: string, bodyType?: string) => {
+  const fetchEngines = async (brandName: string, modelName: string, year?: string, bodyType?: string, cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
-      let url = `${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`;
+      let url = `${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&category=${cat}`;
       if (year) url += `&year=${year}`;
       if (bodyType) url += `&bodyType=${encodeURIComponent(bodyType)}`;
 
@@ -926,25 +953,24 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setEngines(list);
-        } else {
-          setEngines(['320i', '320i xDrive', '330i', '330i xDrive', 'M340i xDrive', 'M3']);
+          if (list.length === 1 && cat === 'MINIVAN_PANELVAN') {
+            setSelectedEngine(list[0]);
+            fetchFuelTypes(brandName, modelName, year, bodyType, list[0], cat);
+          }
         }
-      } else {
-        setEngines(['320i', '320i xDrive', '330i', '330i xDrive', 'M340i xDrive', 'M3']);
       }
     } catch (err) {
       console.error('Fetch engines error:', err);
-      setEngines(['320i', '320i xDrive', '330i', '330i xDrive', 'M340i xDrive', 'M3']);
     } finally {
       setLoadingOptions(false);
     }
   };
 
-  // 6. Fetch Fuel Types (Yakıt) - DYNAMIC MOTOR-SPECIFIC MATCHING
-  const fetchFuelTypes = async (brandName: string, modelName: string, year?: string, bodyType?: string, engine?: string) => {
+  // 6. Fetch Fuel Types (Yakıt)
+  const fetchFuelTypes = async (brandName: string, modelName: string, year?: string, bodyType?: string, engine?: string, cat = selectedCategory) => {
     setLoadingOptions(true);
     try {
-      let url = `${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`;
+      let url = `${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&category=${cat}`;
       if (year) url += `&year=${year}`;
       if (bodyType) url += `&bodyType=${encodeURIComponent(bodyType)}`;
       if (engine) url += `&engine=${encodeURIComponent(engine)}`;
@@ -957,30 +983,18 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setFuelTypes(list);
+          if (list.length === 1 && cat === 'MINIVAN_PANELVAN') {
+            setSelectedFuelType(list[0]);
+            fetchTransmissions(brandName, modelName, year, bodyType, engine, list[0], cat);
+          }
           return;
         }
       }
 
-      // Auto-detect based on selected engine code if API falls back
-      if (engine) {
-        const engLower = engine.toLowerCase();
-        if (engLower.endsWith('d') || engLower.includes('tdi') || engLower.includes('dci') || engLower.includes('cdi') || engLower.includes('hdi') || engLower.includes('dizel')) {
-          setFuelTypes(['Dizel']);
-        } else if (engLower.endsWith('i') || engLower.includes('tsi') || engLower.includes('tce') || engLower.includes('tfsi') || engLower.includes('puretech') || engLower.includes('benzin')) {
-          setFuelTypes(['Benzin']);
-        } else if (engLower.includes('e-tron') || engLower.includes('ev') || engLower.includes('electric') || engLower.startsWith('i')) {
-          setFuelTypes(['Elektrik']);
-        } else if (engLower.includes('hybrid') || engLower.includes('phev')) {
-          setFuelTypes(['Hibrit', 'Plug-in Hybrid']);
-        } else {
-          setFuelTypes(['Benzin', 'Dizel', 'Hibrit', 'Plug-in Hybrid', 'Elektrik', 'LPG']);
-        }
-      } else {
-        setFuelTypes(['Benzin', 'Dizel', 'Hibrit', 'Plug-in Hybrid', 'Elektrik', 'LPG']);
-      }
+      setFuelTypes(['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG']);
     } catch (err) {
       console.error('Fetch fuel types error:', err);
-      setFuelTypes(['Benzin', 'Dizel', 'Hibrit', 'Plug-in Hybrid', 'Elektrik', 'LPG']);
+      setFuelTypes(['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG']);
     } finally {
       setLoadingOptions(false);
     }
@@ -993,11 +1007,12 @@ export default function MobileDashboard() {
     year?: string,
     bodyType?: string,
     engine?: string,
-    fuelType?: string
+    fuelType?: string,
+    cat = selectedCategory
   ) => {
     setLoadingOptions(true);
     try {
-      let url = `${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`;
+      let url = `${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&category=${cat}`;
       if (year) url += `&year=${year}`;
       if (bodyType) url += `&bodyType=${encodeURIComponent(bodyType)}`;
       if (engine) url += `&engine=${encodeURIComponent(engine)}`;
@@ -1011,15 +1026,14 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setTransmissions(list);
-        } else {
-          setTransmissions(['Otomatik', 'Manuel']);
+          if (list.length === 1 && cat === 'MINIVAN_PANELVAN') {
+            setSelectedTransmission(list[0]);
+            fetchTrims(brandName, modelName, year, bodyType, engine, fuelType, list[0], cat);
+          }
         }
-      } else {
-        setTransmissions(['Otomatik', 'Manuel']);
       }
     } catch (err) {
       console.error('Fetch transmissions error:', err);
-      setTransmissions(['Otomatik', 'Manuel']);
     } finally {
       setLoadingOptions(false);
     }
@@ -1033,11 +1047,12 @@ export default function MobileDashboard() {
     bodyType?: string,
     engine?: string,
     fuelType?: string,
-    transmission?: string
+    transmission?: string,
+    cat = selectedCategory
   ) => {
     setLoadingOptions(true);
     try {
-      let url = `${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}`;
+      let url = `${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brandName)}&modelFamily=${encodeURIComponent(modelName)}&category=${cat}`;
       if (year) url += `&year=${year}`;
       if (bodyType) url += `&bodyType=${encodeURIComponent(bodyType)}`;
       if (engine) url += `&engine=${encodeURIComponent(engine)}`;
@@ -1052,15 +1067,13 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setTrims(list);
-        } else {
-          setTrims(['M Sport', 'Sport Line', 'Luxury Line']);
+          if (list.length === 1 && cat === 'MINIVAN_PANELVAN') {
+            setSelectedTrim(list[0]);
+          }
         }
-      } else {
-        setTrims(['M Sport', 'Sport Line', 'Luxury Line']);
       }
     } catch (err) {
       console.error('Fetch trims error:', err);
-      setTrims(['M Sport', 'Sport Line', 'Luxury Line']);
     } finally {
       setLoadingOptions(false);
     }
@@ -1077,12 +1090,13 @@ export default function MobileDashboard() {
         params: {
           brand: selectedBrand.name,
           model: selectedModel.name,
-          year: selectedYear || '2020',
-          bodyType: selectedBodyType || 'Sedan',
-          engine: selectedEngine || '1.6',
-          fuel: selectedFuelType || 'Benzin',
-          transmission: selectedTransmission || 'Otomatik',
-          trim: selectedTrim || 'M Sport',
+          year: selectedYear || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Üretim Yılları' : '2020'),
+          bodyType: selectedBodyType || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Tipler' : 'Sedan'),
+          engine: selectedEngine || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Motor / Versiyonlar' : '1.6'),
+          fuel: selectedFuelType || (selectedCategory === 'MOTORCYCLE' ? 'Tümü' : 'Benzin'),
+          transmission: selectedTransmission || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Motor Hacimleri' : 'Otomatik'),
+          trim: selectedTrim || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Vites Tipleri' : 'M Sport'),
+          category: selectedCategory,
         },
       });
       setQueryModalVisible(false);
@@ -1116,7 +1130,7 @@ export default function MobileDashboard() {
     if (step === 'brand' && brands.length === 0) {
       fetchBrands();
     } else if (step === 'model' && curBrand) {
-      fetchModelsForBrand(curBrand.id);
+      fetchModelsForBrand(curBrand.id, curBrand.name);
     } else if (step === 'year' && curBrand && curModel) {
       fetchYearsForModel(curBrand.name, curModel.name);
     } else if (step === 'bodyType' && curBrand && curModel) {
@@ -1180,6 +1194,16 @@ export default function MobileDashboard() {
     } else if (activeStep === 'model') {
       const nextModel = itemObj;
       setSelectedModel(nextModel);
+      if (selectedCategory === 'MOTORCYCLE') {
+        setSelectedYear('Tüm Üretim Yılları');
+        setSelectedBodyType('Tüm Tipler');
+        setSelectedEngine('Tüm Motor / Versiyonlar');
+        setSelectedFuelType('Tümü');
+        setSelectedTransmission('Tüm Motor Hacimleri');
+        setSelectedTrim('Tüm Vites Tipleri');
+        setModalView('form');
+        return;
+      }
       setSelectedYear('');
       setSelectedBodyType('');
       setSelectedEngine('');
@@ -1733,6 +1757,31 @@ export default function MobileDashboard() {
             </Text>
           </View>
 
+          {/* Category Tabs */}
+          <View style={styles.categoryPillsContainer}>
+            {(
+              [
+                { id: 'AUTOMOBILE', label: 'Otomobil' },
+                { id: 'SUV_PICKUP', label: 'Arazi/SUV' },
+                { id: 'MINIVAN_PANELVAN', label: 'Minivan' },
+                { id: 'MOTORCYCLE', label: 'Motosiklet' },
+              ] as const
+            ).map((cat) => {
+              const isActive = selectedCategory === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                  onPress={() => handleCategoryChange(cat.id)}
+                >
+                  <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {/* Araç Bilgileri Card with 8 Rows */}
           <View style={styles.vehicleInfoCard}>
             <View style={styles.vehicleInfoCardHeader}>
@@ -1770,78 +1819,130 @@ export default function MobileDashboard() {
 
             {/* 3. Yıl */}
             <TouchableOpacity
-              style={[styles.filterRowItem, !selectedModel && styles.filterRowItemDisabled]}
-              onPress={() => selectedModel && openStepView('year')}
-              disabled={!selectedModel}
+              style={[
+                styles.filterRowItem,
+                (!selectedModel || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedModel && selectedCategory !== 'MOTORCYCLE' && openStepView('year')}
+              disabled={!selectedModel || selectedCategory === 'MOTORCYCLE'}
             >
               <Text style={styles.filterRowLabel}>Yıl</Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedYear ? selectedYear : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
 
             {/* 4. Kasa Tipi */}
             <TouchableOpacity
-              style={[styles.filterRowItem, !selectedYear && styles.filterRowItemDisabled]}
-              onPress={() => selectedYear && openStepView('bodyType')}
-              disabled={!selectedYear}
+              style={[
+                styles.filterRowItem,
+                (!selectedYear || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedYear && selectedCategory !== 'MOTORCYCLE' && openStepView('bodyType')}
+              disabled={!selectedYear || selectedCategory === 'MOTORCYCLE'}
             >
-              <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
+              <Text style={styles.filterRowLabel}>
+                {selectedCategory === 'MOTORCYCLE' ? 'Tip / Kasa Tipi' : 'Kasa Tipi'}
+              </Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
 
             {/* 5. Motor / Versiyon */}
-            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('engine')}>
+            <TouchableOpacity
+              style={[
+                styles.filterRowItem,
+                (!selectedBodyType || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedBodyType && selectedCategory !== 'MOTORCYCLE' && openStepView('engine')}
+              disabled={!selectedBodyType || selectedCategory === 'MOTORCYCLE'}
+            >
               <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedEngine ? selectedEngine : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
 
             {/* 6. Yakıt */}
-            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('fuelType')}>
-              <Text style={styles.filterRowLabel}>Yakıt</Text>
+            <TouchableOpacity
+              style={[
+                styles.filterRowItem,
+                (!selectedEngine || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedEngine && selectedCategory !== 'MOTORCYCLE' && openStepView('fuelType')}
+              disabled={!selectedEngine || selectedCategory === 'MOTORCYCLE'}
+            >
+              <Text style={styles.filterRowLabel}>
+                {selectedCategory === 'MOTORCYCLE' ? 'Yakıt / Güç Ünitesi' : 'Yakıt'}
+              </Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
 
             {/* 7. Şanzıman */}
-            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('transmission')}>
-              <Text style={styles.filterRowLabel}>Şanzıman</Text>
+            <TouchableOpacity
+              style={[
+                styles.filterRowItem,
+                (!selectedFuelType || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedFuelType && selectedCategory !== 'MOTORCYCLE' && openStepView('transmission')}
+              disabled={!selectedFuelType || selectedCategory === 'MOTORCYCLE'}
+            >
+              <Text style={styles.filterRowLabel}>
+                {selectedCategory === 'MOTORCYCLE' ? 'Motor Hacmi' : 'Şanzıman'}
+              </Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
 
             {/* 8. Donanım */}
             <TouchableOpacity
-              style={[styles.filterRowItem, { borderBottomWidth: 0 }]}
-              onPress={() => openStepView('trim')}
+              style={[
+                styles.filterRowItem,
+                { borderBottomWidth: 0 },
+                (!selectedTransmission || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedTransmission && selectedCategory !== 'MOTORCYCLE' && openStepView('trim')}
+              disabled={!selectedTransmission || selectedCategory === 'MOTORCYCLE'}
             >
-              <Text style={styles.filterRowLabel}>Donanım</Text>
+              <Text style={styles.filterRowLabel}>
+                {selectedCategory === 'MOTORCYCLE' ? 'Vites Tipi' : 'Donanım'}
+              </Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedTrim ? selectedTrim : 'Seçilmedi'}
                 </Text>
-                <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                {selectedCategory !== 'MOTORCYCLE' && (
+                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                )}
               </View>
             </TouchableOpacity>
           </View>
@@ -3580,5 +3681,39 @@ const styles = StyleSheet.create({
   alphabetJumperCharActive: {
     color: '#ea580c',
     fontWeight: '900',
+  },
+  categoryPillsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  categoryPill: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryPillActive: {
+    backgroundColor: '#0284c7',
+    shadowColor: '#0284c7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  categoryPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  categoryPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
   },
 });

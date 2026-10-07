@@ -137,7 +137,6 @@ export default function Home() {
 
   // Fetch Brands on Load & Category Change
   useEffect(() => {
-    if (searchMode === 'MOTORCYCLE') return;
     setLoadingBrands(true);
     fetch(`${API_URL}/vehicles/brands?category=${searchMode}`)
       .then((res) => res.json())
@@ -299,6 +298,23 @@ export default function Home() {
 
     if (!brandName || !modelName) return;
 
+    if (searchMode === 'MOTORCYCLE') {
+      setSelectedYear('Tüm Üretim Yılları');
+      setSelectedBodyType('Tüm Tipler');
+      setSelectedEngine('Tüm Motor / Versiyonlar');
+      setSelectedFuelType('Tümü');
+      setSelectedTransmission('Tüm Motor Hacimleri');
+      setSelectedTrim('Tüm Vites Tipleri');
+      setYears(['Tüm Üretim Yılları' as any]);
+      setBodyTypes(['Tüm Tipler']);
+      setEngines(['Tüm Motor / Versiyonlar']);
+      setFuelTypes(['Tümü']);
+      setTransmissions(['Tüm Motor Hacimleri']);
+      setTrims(['Tüm Vites Tipleri']);
+      matchVariant(brandName, modelName, 'Tüm Üretim Yılları', 'Tüm Tipler', 'Tüm Motor / Versiyonlar', 'Tümü', 'Tüm Motor Hacimleri', 'Tüm Vites Tipleri');
+      return;
+    }
+
     setLoadingYears(true);
     vehicleTaxonomyApi.getYears(brandName, modelName, searchMode)
       .then((data) => {
@@ -393,7 +409,7 @@ export default function Home() {
 
     setLoadingEngines(true);
     try {
-      const data = await vehicleTaxonomyApi.getEngines(brandName, modelName, currentYear, body);
+      const data = await vehicleTaxonomyApi.getEngines(brandName, modelName, currentYear, body, searchMode);
       const list = data.map((item) => item.value);
       setEngines(list);
       if (list.length === 1) {
@@ -439,7 +455,7 @@ export default function Home() {
 
     setLoadingFuels(true);
     try {
-      const data = await vehicleTaxonomyApi.getFuelTypes(brandName, modelName, currentYear, currentBody, engine);
+      const data = await vehicleTaxonomyApi.getFuelTypes(brandName, modelName, currentYear, currentBody, engine, searchMode);
       const list = data.map((item) => item.value);
       setFuelTypes(list);
       if (list.length === 1) {
@@ -483,7 +499,7 @@ export default function Home() {
 
     setLoadingTransmissions(true);
     try {
-      const data = await vehicleTaxonomyApi.getTransmissions(brandName, modelName, currentYear, currentBody, currentEngine, fuel);
+      const data = await vehicleTaxonomyApi.getTransmissions(brandName, modelName, currentYear, currentBody, currentEngine, fuel, searchMode);
       const list = data.map((item) => item.value);
       setTransmissions(list);
       if (list.length === 1) {
@@ -524,7 +540,7 @@ export default function Home() {
 
     setLoadingTrims(true);
     try {
-      const data = await vehicleTaxonomyApi.getTrims(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, trans);
+      const data = await vehicleTaxonomyApi.getTrims(brandName, modelName, currentYear, currentBody, currentEngine, currentFuel, trans, searchMode);
       const rawTrims = data.map((item) => item.value);
       const cleanTrims = rawTrims.filter((t: string) => {
         if (!t) return false;
@@ -591,9 +607,10 @@ export default function Home() {
         fuelType,
         transmission,
         trim,
+        category: searchMode,
       });
-      if (res.success && res.variantId) {
-        setMatchedVariantId(res.variantId);
+      if (res.success && (res.variantId || res.modelId)) {
+        setMatchedVariantId(res.variantId || res.modelId || null);
       }
     } catch {
       setMatchedVariantId(null);
@@ -754,123 +771,7 @@ export default function Home() {
           Hızlı Araç Sorgulama
         </h2>
 
-        {searchMode === "MOTORCYCLE" ? (
-          <div className="flex flex-col gap-5">
-            {/* Disabled Motorcycle Shell */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Marka */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Marka</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Model Ailesi */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Model Ailesi</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Yıl */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yıl</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Tip / Kasa Tipi */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tip / Kasa Tipi</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                  {CANONICAL_MOTORCYCLE_TYPES.map((t) => (
-                    <option key={t.key} value={t.label}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Motor / Versiyon */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor / Versiyon</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Yakıt / Güç Ünitesi */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt / Güç Ünitesi</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Motor Hacmi */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Motor Hacmi</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-
-              {/* Vites Tipi */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vites Tipi</label>
-                <select
-                  disabled
-                  className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-400 outline-none cursor-not-allowed opacity-80"
-                >
-                  <option value="">Seçiniz...</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Subtle Friendly Info */}
-            <div className="text-center text-xs text-slate-400 font-medium py-1">
-              Motosiklet verileri yakında aktif olacaktır.
-            </div>
-
-            {/* Disabled Action */}
-            <button
-              type="button"
-              disabled
-              className="w-full mt-4 bg-slate-800 text-slate-500 font-bold py-4 rounded-2xl shadow-xl shadow-orange-500/10 cursor-not-allowed text-center transition"
-            >
-              Aracı İncele & AI Raporu Al
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
           {/* Row 1: Marka | Model Ailesi | Yıl | Kasa Tipi */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Brand Dropdown */}
@@ -916,12 +817,12 @@ export default function Home() {
                 value={selectedYear}
                 onChange={(e) => handleYearChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedModel || loadingYears || years.length === 0}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedModel || loadingYears || years.length === 0}
               >
                 <option value="">{loadingYears ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
+                  <option key={String(y)} value={String(y)}>
+                    {String(y)}
                   </option>
                 ))}
               </select>
@@ -929,17 +830,19 @@ export default function Home() {
 
             {/* Body Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Kasa Tipi</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {searchMode === 'MOTORCYCLE' ? 'Tip / Kasa Tipi' : 'Kasa Tipi'}
+              </label>
               <select
                 value={selectedBodyType}
                 onChange={(e) => handleBodyTypeChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedYear || loadingBodyTypes || bodyTypes.length === 0}
               >
                 <option value="">{loadingBodyTypes ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {bodyTypes.map((body) => (
                   <option key={body} value={body}>
-                    {displayBodyType(body)}
+                    {searchMode === 'MOTORCYCLE' ? body : displayBodyType(body)}
                   </option>
                 ))}
               </select>
@@ -955,7 +858,7 @@ export default function Home() {
                 value={selectedEngine}
                 onChange={(e) => handleEngineChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedBodyType || loadingEngines || engines.length === 0}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedBodyType || loadingEngines || engines.length === 0}
               >
                 <option value="">{loadingEngines ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {engines.map((eng) => (
@@ -968,19 +871,21 @@ export default function Home() {
 
             {/* Fuel Type Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Yakıt Türü</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {searchMode === 'MOTORCYCLE' ? 'Yakıt / Güç Ünitesi' : 'Yakıt Türü'}
+              </label>
               <select
                 value={selectedFuelType}
                 onChange={(e) => handleFuelTypeChange(e.target.value)}
                 className={`bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm outline-none transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isFuelTypeAutoSelected ? "text-slate-400 border-white/5 cursor-not-allowed opacity-80" : "text-slate-200 focus:border-orange-500"
                 }`}
-                disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0 || isFuelTypeAutoSelected}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedEngine || loadingFuels || fuelTypes.length === 0 || isFuelTypeAutoSelected}
               >
                 <option value="">{loadingFuels ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {fuelTypes.map((fuel) => (
                   <option key={fuel} value={fuel}>
-                    {displayFuelType(fuel)}
+                    {searchMode === 'MOTORCYCLE' ? fuel : displayFuelType(fuel)}
                   </option>
                 ))}
               </select>
@@ -988,12 +893,14 @@ export default function Home() {
 
             {/* Transmission Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Şanzıman Tipi</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {searchMode === 'MOTORCYCLE' ? 'Motor Hacmi' : 'Şanzıman Tipi'}
+              </label>
               <select
                 value={selectedTransmission}
                 onChange={(e) => handleTransmissionChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedFuelType || loadingTransmissions || transmissions.length === 0}
               >
                 <option value="">{loadingTransmissions ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {transmissions.map((trans) => (
@@ -1006,12 +913,14 @@ export default function Home() {
 
             {/* Trim Dropdown */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Donanım Paketi</label>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                {searchMode === 'MOTORCYCLE' ? 'Vites Tipi' : 'Donanım Paketi'}
+              </label>
               <select
                 value={selectedTrim}
                 onChange={(e) => handleTrimChange(e.target.value)}
                 className="bg-slate-900 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-slate-200 outline-none focus:border-orange-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!selectedTransmission || loadingTrims || trims.length === 0}
+                disabled={searchMode === 'MOTORCYCLE' || !selectedTransmission || loadingTrims || trims.length === 0}
               >
                 <option value="">{loadingTrims ? "Yükleniyor..." : "Seçiniz..."}</option>
                 {trims.map((trimName) => (
@@ -1031,7 +940,7 @@ export default function Home() {
           </div>
         )}
 
-        {noTrimFound && (
+        {noTrimFound && searchMode !== 'MOTORCYCLE' && (
           <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex flex-col gap-1">
             <p className="font-bold">❌ Bu araç için donanım paketi verisi bulunamadı. Nokta atışı rapor oluşturmak için donanım paketi bilgisi gereklidir.</p>
           </div>
@@ -1044,7 +953,7 @@ export default function Home() {
         )}
 
         {/* Suggested Alternatives List */}
-        {suggestedAlternatives.length > 0 && (
+        {suggestedAlternatives.length > 0 && searchMode !== 'MOTORCYCLE' && (
           <div className="flex flex-col gap-3 p-4 bg-slate-900/60 border border-white/5 rounded-2xl mt-1">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">💡 Bu araca yakın bulunan seçenekler:</span>
             <div className="flex flex-col gap-2">
@@ -1072,8 +981,6 @@ export default function Home() {
         >
           Aracı İncele & AI Raporu Al
         </button>
-          </>
-        )}
       </div>
 
       {/* Nasıl Çalışır section moved to bottom */}

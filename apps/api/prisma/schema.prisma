@@ -432,6 +432,7 @@ model Model {
   startYear Int
   endYear   Int?
   isActive  Boolean  @default(true)
+  vehicleType String?  @default("AUTOMOBILE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -441,6 +442,8 @@ model Model {
   variants     VehicleVariant[]
 
   @@unique([brandId, name])
+  @@index([vehicleType])
+  @@index([brandId, vehicleType])
 }
 
 model ModelTranslation {
@@ -556,6 +559,7 @@ model VehicleVariant {
   rejectedReason          String?
   characterResearchCache  Json?          // Cached results of 7-question vehicle character web research
   characterResearchedAt   DateTime?      // Timestamp of last character research run
+  vehicleType             String?        @default("AUTOMOBILE")
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
 
@@ -599,7 +603,9 @@ model VehicleVariant {
   @@index([countryId])
   @@index([year])
   @@index([status])
+  @@index([vehicleType])
   @@index([brandId, modelId, countryId, year])
+  @@index([brandId, modelId, vehicleType])
 }
 
 model TechnicalSpec {

@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { ApprovalStatus, Role, TransmissionType, FuelType, BodyType, RiskLevel, VehicleInfoCategory } from '@prisma/client';
 import { AiGenerateVehicleDto, SuggestVehicleDto, AdminUpdateVariantDto } from './vehicle.dto';
-import { getFuelTypeTr, getCategoryVariantWhere } from './vehicle-filters.controller';
+import { getFuelTypeTr, getCategoryVariantWhere, normalizeVehicleType } from './vehicle-filters.controller';
 import { resolveHorsepower } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
@@ -44,27 +44,65 @@ export class VehicleService {
   ) {}
 
   async getBrands(category?: string) {
+    const norm = normalizeVehicleType(category);
+    if (norm === 'MOTORCYCLE') {
+      return this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          models: { some: { vehicleType: 'MOTORCYCLE', isActive: true } },
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
+    if (norm === 'MINIVAN_PANELVAN') {
+      return this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
     const categoryWhere = getCategoryVariantWhere(category);
     return this.prisma.brand.findMany({
       where: {
         isActive: true,
-        ...(Object.keys(categoryWhere).length > 0
-          ? { variants: { some: { status: 'APPROVED', ...categoryWhere } } }
-          : {}),
+        variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       orderBy: { name: 'asc' },
     });
   }
 
   async getModels(brandId: string, category?: string) {
+    const norm = normalizeVehicleType(category);
+    if (norm === 'MOTORCYCLE') {
+      return this.prisma.model.findMany({
+        where: {
+          brandId,
+          vehicleType: 'MOTORCYCLE',
+          isActive: true,
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
+    if (norm === 'MINIVAN_PANELVAN') {
+      return this.prisma.model.findMany({
+        where: {
+          brandId,
+          vehicleType: 'MINIVAN_PANELVAN',
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
     const categoryWhere = getCategoryVariantWhere(category);
     return this.prisma.model.findMany({
       where: {
         brandId,
+        vehicleType: 'AUTOMOBILE',
         isActive: true,
-        ...(Object.keys(categoryWhere).length > 0
-          ? { variants: { some: { status: 'APPROVED', ...categoryWhere } } }
-          : {}),
+        variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       orderBy: { name: 'asc' },
     });

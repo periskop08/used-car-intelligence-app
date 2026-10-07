@@ -14,6 +14,7 @@ export interface MatchVariantParams {
   fuelType: string;
   transmission: string;
   trim: string;
+  category?: string;
 }
 
 export const vehicleTaxonomyApi = {
@@ -57,13 +58,14 @@ export const vehicleTaxonomyApi = {
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async getEngines(brand: string, model: string, year: string | number, bodyType?: string): Promise<TaxonomyOption[]> {
+  async getEngines(brand: string, model: string, year: string | number, bodyType?: string, category?: string): Promise<TaxonomyOption[]> {
     if (!brand || !model || !year) return [];
     const query = new URLSearchParams({
       brand,
       modelFamily: model,
       year: String(year),
       ...(bodyType ? { bodyType } : {}),
+      ...(category ? { category } : {}),
     });
     const res = await fetch(`${API_URL}/vehicle-filters/engines?${query.toString()}`);
     const json = await res.json();
@@ -75,7 +77,8 @@ export const vehicleTaxonomyApi = {
     model: string,
     year: string | number,
     bodyType?: string,
-    engine?: string
+    engine?: string,
+    category?: string
   ): Promise<TaxonomyOption[]> {
     if (!brand || !model || !year) return [];
     const query = new URLSearchParams({
@@ -84,6 +87,7 @@ export const vehicleTaxonomyApi = {
       year: String(year),
       ...(bodyType ? { bodyType } : {}),
       ...(engine ? { engineVersion: engine } : {}),
+      ...(category ? { category } : {}),
     });
     const res = await fetch(`${API_URL}/vehicle-filters/fuel-types?${query.toString()}`);
     const json = await res.json();
@@ -96,7 +100,8 @@ export const vehicleTaxonomyApi = {
     year: string | number,
     bodyType?: string,
     engine?: string,
-    fuelType?: string
+    fuelType?: string,
+    category?: string
   ): Promise<TaxonomyOption[]> {
     if (!brand || !model || !year) return [];
     const query = new URLSearchParams({
@@ -106,6 +111,7 @@ export const vehicleTaxonomyApi = {
       ...(bodyType ? { bodyType } : {}),
       ...(engine ? { engineVersion: engine } : {}),
       ...(fuelType ? { fuelType } : {}),
+      ...(category ? { category } : {}),
     });
     const res = await fetch(`${API_URL}/vehicle-filters/transmissions?${query.toString()}`);
     const json = await res.json();
@@ -119,7 +125,8 @@ export const vehicleTaxonomyApi = {
     bodyType?: string,
     engine?: string,
     fuelType?: string,
-    transmission?: string
+    transmission?: string,
+    category?: string
   ): Promise<TaxonomyOption[]> {
     if (!brand || !model || !year) return [];
     const query = new URLSearchParams({
@@ -130,13 +137,14 @@ export const vehicleTaxonomyApi = {
       ...(engine ? { engineVersion: engine } : {}),
       ...(fuelType ? { fuelType } : {}),
       ...(transmission ? { transmissionType: transmission } : {}),
+      ...(category ? { category } : {}),
     });
     const res = await fetch(`${API_URL}/vehicle-filters/trims?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
   },
 
-  async matchVariant(params: MatchVariantParams): Promise<{ success: boolean; variantId: string | null }> {
+  async matchVariant(params: MatchVariantParams): Promise<{ success: boolean; variantId: string | null; modelId?: string | null; vehicleType?: string }> {
     const query = new URLSearchParams({
       brand: params.brand,
       modelFamily: params.model,
@@ -146,12 +154,15 @@ export const vehicleTaxonomyApi = {
       fuelType: params.fuelType,
       transmissionType: params.transmission,
       trimPackage: params.trim,
+      ...(params.category ? { category: params.category } : {}),
     });
     const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
     const json = await res.json();
     return {
-      success: !!json.success && !!json.variantId,
+      success: !!json.success && (!!json.variantId || !!json.modelId),
       variantId: json.variantId || null,
+      modelId: json.modelId || null,
+      vehicleType: json.vehicleType || undefined,
     };
   },
 

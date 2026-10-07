@@ -104,32 +104,38 @@ export function getTransmissionWhereClause(targetTrans?: string): any {
   };
 }
 
+export function normalizeVehicleType(category?: string): string {
+  if (!category) return 'AUTOMOBILE';
+  const clean = category.toUpperCase().trim();
+  if (clean === 'MOTORCYCLE' || clean === 'MOTOSIKLET' || clean === 'MOTO') return 'MOTORCYCLE';
+  if (clean === 'MINIVAN_PANELVAN' || clean === 'MINIVAN' || clean === 'COMMERCIAL' || clean === 'PANELVAN') return 'MINIVAN_PANELVAN';
+  if (clean === 'SUV_PICKUP' || clean === 'SUV' || clean === 'PICKUP') return 'SUV_PICKUP';
+  if (clean === 'ELECTRIC' || clean === 'EV') return 'ELECTRIC';
+  return 'AUTOMOBILE';
+}
+
 export function getCategoryVariantWhere(category?: string): any {
   if (!category) return {};
-  const cat = category.toUpperCase().trim();
-  if (cat === 'CAR' || cat === 'AUTOMOBILE') {
-    return {
-      bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] },
-    };
+  const norm = normalizeVehicleType(category);
+  if (norm === 'MINIVAN_PANELVAN') {
+    return { vehicleType: 'MINIVAN_PANELVAN' };
   }
-  if (cat === 'SUV_PICKUP' || cat === 'SUV' || cat === 'PICKUP') {
+  if (norm === 'SUV_PICKUP') {
     return {
+      vehicleType: 'AUTOMOBILE',
       bodyType: { in: ['SUV', 'PICKUP'] },
     };
   }
-  if (cat === 'ELECTRIC' || cat === 'EV') {
+  if (norm === 'ELECTRIC') {
     return {
+      vehicleType: 'AUTOMOBILE',
       fuelType: 'ELECTRIC',
     };
   }
-  if (cat === 'COMMERCIAL' || cat === 'MINIVAN' || cat === 'VAN') {
+  if (norm === 'AUTOMOBILE') {
     return {
-      bodyType: { in: ['MINIVAN', 'VAN'] },
-    };
-  }
-  if (cat === 'COMMERCIAL_VEHICLE' || cat === 'HEAVY_COMMERCIAL' || cat === 'TICARI') {
-    return {
-      bodyType: { in: ['VAN', 'OTHER'] },
+      vehicleType: 'AUTOMOBILE',
+      bodyType: { in: ['SEDAN', 'HATCHBACK', 'COUPE', 'CONVERTIBLE', 'WAGON'] },
     };
   }
   return {};
@@ -158,11 +164,45 @@ export class VehicleFiltersController {
 
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
-  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, MINIVAN_PANELVAN, MOTORCYCLE)' })
   async getBrands(@Query('category') category?: string) {
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      const brands = await this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          models: { some: { vehicleType: 'MOTORCYCLE', isActive: true } },
+        },
+        orderBy: { name: 'asc' },
+        select: { name: true },
+      });
+      return {
+        success: true,
+        data: brands.map(b => ({ label: b.name, value: b.name })),
+      };
+    }
+
+    if (norm === 'MINIVAN_PANELVAN') {
+      const brands = await this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        orderBy: { name: 'asc' },
+        select: { name: true },
+      });
+      return {
+        success: true,
+        data: brands.map(b => ({ label: b.name, value: b.name })),
+      };
+    }
+
+    // AUTOMOBILE / SUV_PICKUP / ELECTRIC
     const categoryWhere = getCategoryVariantWhere(category);
     const brands = await this.prisma.brand.findMany({
       where: {
+        isActive: true,
         variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       orderBy: { name: 'asc' },
@@ -177,7 +217,7 @@ export class VehicleFiltersController {
   @Get('models')
   @ApiOperation({ summary: 'Seçilen Markaya Ait Modeller' })
   @ApiQuery({ name: 'brand', required: true })
-  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, ELECTRIC, COMMERCIAL)' })
+  @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, MINIVAN_PANELVAN, MOTORCYCLE)' })
   async getModels(
     @Query('brand') brand: string,
     @Query('category') category?: string,
@@ -185,20 +225,57 @@ export class VehicleFiltersController {
     if (!brand) {
       throw new BadRequestException('brand query parametresi gereklidir.');
     }
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      const models = await this.prisma.model.findMany({
+        where: {
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          vehicleType: 'MOTORCYCLE',
+          isActive: true,
+        },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+      const modelsSet = new Set(models.map(m => m.name));
+      return {
+        success: true,
+        data: Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'tr')).map(name => ({ label: name, value: name })),
+      };
+    }
+
+    if (norm === 'MINIVAN_PANELVAN') {
+      const models = await this.prisma.model.findMany({
+        where: {
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          vehicleType: 'MINIVAN_PANELVAN',
+          variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+      const modelsSet = new Set(models.map(m => m.name));
+      return {
+        success: true,
+        data: Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'tr')).map(name => ({ label: name, value: name })),
+      };
+    }
+
+    // AUTOMOBILE / SUV_PICKUP / ELECTRIC
     const categoryWhere = getCategoryVariantWhere(category);
     const models = await this.prisma.model.findMany({
       where: {
         brand: { name: { equals: brand, mode: 'insensitive' } },
+        vehicleType: 'AUTOMOBILE',
         variants: { some: { status: 'APPROVED', ...categoryWhere } },
       },
       select: { name: true },
       orderBy: { name: 'asc' },
     });
     const modelsSet = new Set(models.map(m => m.name));
-    const sortedModels = Array.from(modelsSet).sort();
     return {
       success: true,
-      data: sortedModels.map(name => ({ label: name, value: name })),
+      data: Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'tr')).map(name => ({ label: name, value: name })),
     };
   }
 
@@ -219,30 +296,18 @@ export class VehicleFiltersController {
       throw new BadRequestException('brand ve modelFamily query parametreleri gereklidir.');
     }
 
+    const norm = normalizeVehicleType(category);
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tüm Üretim Yılları', value: 'Tüm Üretim Yılları' }],
+      };
+    }
+
     const categoryWhere = getCategoryVariantWhere(category);
-
-    const modelRecord = await this.prisma.model.findFirst({
-      where: {
-        name: { equals: targetModel, mode: 'insensitive' },
-        brand: { name: { equals: brand, mode: 'insensitive' } },
-      },
-      select: { id: true, startYear: true, endYear: true },
-    });
-
-    const yearWhere: any = {};
-    if (modelRecord?.startYear) {
-      yearWhere.gte = Math.max(2000, modelRecord.startYear);
-    } else {
-      yearWhere.gte = 2000;
-    }
-    if (modelRecord?.endYear) {
-      yearWhere.lte = modelRecord.endYear;
-    }
-
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
-        year: yearWhere,
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...categoryWhere,
@@ -271,6 +336,20 @@ export class VehicleFiltersController {
     @Query('model') model?: string,
     @Query('category') category?: string,
   ) {
+    const norm = normalizeVehicleType(category);
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tüm Tipler', value: 'Tüm Tipler' }],
+      };
+    }
+    if (norm === 'MINIVAN_PANELVAN') {
+      return {
+        success: true,
+        data: [{ label: 'Minivan & Panelvan', value: 'Minivan & Panelvan' }],
+      };
+    }
+
     try {
       const targetModel = model || modelFamily;
       const parsedYear = parseInt(String(year), 10);
@@ -309,6 +388,7 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'body_type', required: false })
   @ApiQuery({ name: 'fuelType', required: false })
   @ApiQuery({ name: 'fuel_type', required: false })
+  @ApiQuery({ name: 'category', required: false })
   async getEngines(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
@@ -318,22 +398,36 @@ export class VehicleFiltersController {
     @Query('body_type') bodyTypeLegacy?: string,
     @Query('fuelType') fuelType?: string,
     @Query('fuel_type') fuelTypeLegacy?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
     const targetFuel = fuelType || fuelTypeLegacy;
-    const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tüm Motor / Versiyonlar', value: 'Tüm Motor / Versiyonlar' }],
+      };
+    }
+
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
+
+    const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+    const categoryWhere = getCategoryVariantWhere(category);
+
     const variants = await this.prisma.vehicleVariant.findMany({
       where: {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
-        ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+        ...(norm !== 'MINIVAN_PANELVAN' && targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         ...(fuelEnums && fuelEnums.length > 0 ? { fuelType: { in: fuelEnums as any } } : {}),
         year: Number(year),
+        ...categoryWhere,
       },
       select: { id: true, engine: { select: { code: true } } },
     });
@@ -355,13 +449,15 @@ export class VehicleFiltersController {
       variants
         .map(v => {
           const rawCode = v.engine?.code;
-          if (!rawCode || NON_ENGINE_TOKENS.has(rawCode.trim().toUpperCase())) return null;
+          if (!rawCode) return null;
+          if (norm === 'MINIVAN_PANELVAN') return rawCode.trim();
+          if (NON_ENGINE_TOKENS.has(rawCode.trim().toUpperCase())) return null;
           return this.canonicalDisplayService.getProjectedEngineCode(v.id, rawCode);
         })
         .filter(Boolean) as string[],
     );
 
-    const sortedEngines = Array.from(enginesSet).sort();
+    const sortedEngines = Array.from(enginesSet).sort((a, b) => a.localeCompare(b, 'tr'));
     return {
       success: true,
       data: sortedEngines.map(code => ({ label: code, value: code })),
@@ -378,6 +474,7 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'body_type', required: false })
   @ApiQuery({ name: 'engineVersion', required: false })
   @ApiQuery({ name: 'engine', required: false })
+  @ApiQuery({ name: 'category', required: false })
   async getFuelTypes(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
@@ -387,28 +484,44 @@ export class VehicleFiltersController {
     @Query('body_type') bodyTypeLegacy?: string,
     @Query('engineVersion') engineVersion?: string,
     @Query('engine') engineLegacy?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
     const targetEngine = engineVersion || engineLegacy;
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tümü', value: 'Tümü' }],
+      };
+    }
+
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
 
+    const categoryWhere = getCategoryVariantWhere(category);
     let engineFilterClause: any = {};
     if (targetEngine) {
-      const candidates = await this.prisma.vehicleVariant.findMany({
-        where: {
-          status: 'APPROVED',
-          brand: { name: { equals: brand, mode: 'insensitive' } },
-          model: { name: { equals: targetModel, mode: 'insensitive' } },
-          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
-          year: Number(year),
-        },
-        select: { id: true, engine: { select: { code: true } } },
-      });
-      const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
-      engineFilterClause = { engine: { code: { in: rawCodes } } };
+      if (norm === 'MINIVAN_PANELVAN') {
+        engineFilterClause = { engine: { code: { equals: targetEngine, mode: 'insensitive' } } };
+      } else {
+        const candidates = await this.prisma.vehicleVariant.findMany({
+          where: {
+            status: 'APPROVED',
+            brand: { name: { equals: brand, mode: 'insensitive' } },
+            model: { name: { equals: targetModel, mode: 'insensitive' } },
+            ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+            year: Number(year),
+            ...categoryWhere,
+          },
+          select: { id: true, engine: { select: { code: true } } },
+        });
+        const rawCodes = this.canonicalDisplayService.getRawEngineCodesForTarget(targetEngine, candidates);
+        engineFilterClause = { engine: { code: { in: rawCodes } } };
+      }
     }
 
     const variants = await this.prisma.vehicleVariant.findMany({
@@ -416,9 +529,10 @@ export class VehicleFiltersController {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
-        ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
+        ...(norm !== 'MINIVAN_PANELVAN' && targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
         year: Number(year),
         ...engineFilterClause,
+        ...categoryWhere,
       },
       select: { fuelType: true },
     });
@@ -443,6 +557,7 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'engine', required: false })
   @ApiQuery({ name: 'fuelType', required: false })
   @ApiQuery({ name: 'fuel_type', required: false })
+  @ApiQuery({ name: 'category', required: false })
   async getTransmissions(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
@@ -454,15 +569,33 @@ export class VehicleFiltersController {
     @Query('engine') engineLegacy?: string,
     @Query('fuelType') fuelType?: string,
     @Query('fuel_type') fuelTypeLegacy?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
     const targetEngine = engineVersion || engineLegacy;
     const targetFuel = fuelType || fuelTypeLegacy;
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tüm Vites Tipleri', value: 'Tüm Vites Tipleri' }],
+      };
+    }
+
+    if (norm === 'MINIVAN_PANELVAN') {
+      return {
+        success: true,
+        data: [{ label: 'Manuel + Otomatik', value: 'Manuel + Otomatik' }],
+      };
+    }
+
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+    const categoryWhere = getCategoryVariantWhere(category);
 
     let engineFilterClause: any = {};
     if (targetEngine) {
@@ -473,6 +606,7 @@ export class VehicleFiltersController {
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
           year: Number(year),
+          ...categoryWhere,
         },
         select: { id: true, engine: { select: { code: true } } },
       });
@@ -489,6 +623,7 @@ export class VehicleFiltersController {
         year: Number(year),
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+        ...categoryWhere,
       },
       select: { transmission: { select: { name: true } } },
     });
@@ -516,6 +651,7 @@ export class VehicleFiltersController {
   @ApiQuery({ name: 'transmissionType', required: false })
   @ApiQuery({ name: 'transmission_type', required: false })
   @ApiQuery({ name: 'transmission', required: false })
+  @ApiQuery({ name: 'category', required: false })
   async getTrims(
     @Query('brand') brand?: string,
     @Query('year') year?: string,
@@ -530,16 +666,57 @@ export class VehicleFiltersController {
     @Query('transmissionType') transmissionType?: string,
     @Query('transmission_type') transmissionTypeLegacy?: string,
     @Query('transmission') transmissionDirect?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
     const targetEngine = engineVersion || engineLegacy;
     const targetFuel = fuelType || fuelTypeLegacy;
     const targetTrans = transmissionType || transmissionTypeLegacy || transmissionDirect;
+    const norm = normalizeVehicleType(category);
+
+    if (norm === 'MOTORCYCLE') {
+      return {
+        success: true,
+        data: [{ label: 'Tüm Donanımlar', value: 'Tüm Donanımlar' }],
+      };
+    }
+
     if (!brand || !targetModel || !year) {
       return { success: true, data: [] };
     }
+
+    if (norm === 'MINIVAN_PANELVAN') {
+      const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+      const variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          vehicleType: 'MINIVAN_PANELVAN',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          year: Number(year),
+          ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+          ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+        },
+        select: {
+          id: true,
+          trim: { select: { name: true } },
+        },
+      });
+
+      const trimsSet = new Set(variants.map(v => v.trim?.name).filter(Boolean) as string[]);
+      const sortedTrims = Array.from(trimsSet).sort((a, b) => a.localeCompare(b, 'tr'));
+
+      return {
+        success: true,
+        data: sortedTrims.map(name => ({ label: name, value: name })),
+        autoVariantId: variants[0]?.id || null,
+      };
+    }
+
+    // AUTOMOBILE logic
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+    const categoryWhere = getCategoryVariantWhere(category);
 
     let engineFilterClause: any = {};
     if (targetEngine) {
@@ -550,6 +727,7 @@ export class VehicleFiltersController {
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
           year: Number(year),
+          ...categoryWhere,
         },
         select: { id: true, engine: { select: { code: true } } },
       });
@@ -569,6 +747,7 @@ export class VehicleFiltersController {
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...transFilterClause,
+        ...categoryWhere,
       },
       select: {
         id: true,
@@ -626,6 +805,7 @@ export class VehicleFiltersController {
     @Query('transmissionType') transmissionType?: string,
     @Query('transmission') transmissionLegacy?: string,
     @Query('transmission_type') transmissionTypeLegacy?: string,
+    @Query('category') category?: string,
   ) {
     const targetModel = model || modelFamily;
     const targetBodyType = bodyType || bodyTypeLegacy;
@@ -633,12 +813,54 @@ export class VehicleFiltersController {
     const targetFuel = fuelType || fuelTypeLegacy;
     const targetTrim = trimPackage || trimLegacy;
     const targetTrans = transmissionType || transmissionLegacy || transmissionTypeLegacy;
+    const norm = normalizeVehicleType(category);
 
-    if (!brand || !targetModel || !year) {
+    if (!brand || !targetModel) {
       throw new BadRequestException('Gerekli query parametreleri eksik.');
     }
 
+    if (norm === 'MOTORCYCLE') {
+      const motoModel = await this.prisma.model.findFirst({
+        where: {
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          name: { equals: targetModel, mode: 'insensitive' },
+          vehicleType: 'MOTORCYCLE',
+        },
+        select: { id: true, name: true, brand: { select: { id: true, name: true } } },
+      });
+      return {
+        success: true,
+        variantId: null,
+        modelId: motoModel?.id || null,
+        vehicleType: 'MOTORCYCLE',
+      };
+    }
+
+    if (norm === 'MINIVAN_PANELVAN') {
+      const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+      const variants = await this.prisma.vehicleVariant.findMany({
+        where: {
+          status: 'APPROVED',
+          vehicleType: 'MINIVAN_PANELVAN',
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          model: { name: { equals: targetModel, mode: 'insensitive' } },
+          ...(year ? { year: Number(year) } : {}),
+          ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
+          ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
+          ...(targetTrim ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
+        },
+        select: { id: true },
+        take: 1,
+      });
+      return {
+        success: true,
+        variantId: variants[0]?.id || null,
+        vehicleType: 'MINIVAN_PANELVAN',
+      };
+    }
+
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
+    const categoryWhere = getCategoryVariantWhere(category);
 
     // 1. Try strict matching first
     let engineFilterClause: any = {};
@@ -650,6 +872,7 @@ export class VehicleFiltersController {
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
           year: Number(year),
+          ...categoryWhere,
         },
         select: { id: true, engine: { select: { code: true } } },
       });
@@ -672,6 +895,7 @@ export class VehicleFiltersController {
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...(targetTrim && targetTrim !== 'Standart / Baz' ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
         ...transFilterClause,
+        ...categoryWhere,
       },
       include: { transmission: true, trim: true, engine: true },
       take: 50,
