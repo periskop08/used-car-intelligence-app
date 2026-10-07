@@ -14,7 +14,6 @@ import { EvidenceRulesService } from './evidence-rules.service';
 import { ResearchWorkerService } from './research-worker.service';
 import { MultiVehicleAgentService } from './multi-vehicle-agent.service';
 import { VehicleModule } from '../vehicle/vehicle.module';
-import { ListingAiModule } from '../listing-ai/listing-ai.module';
 
 import { IdentityGateService } from './identity-gate.service';
 import { ResearchConfidenceService } from './research-confidence.service';
@@ -33,7 +32,7 @@ import { TrimComparisonService } from './equipment/trim-comparison.service';
 import { EquipmentResearchService } from './equipment/equipment-research.service';
 
 @Module({
-  imports: [forwardRef(() => VehicleModule), ListingAiModule],
+  imports: [forwardRef(() => VehicleModule)],
   controllers: [ResearchController, AdminApprovalController],
   providers: [
     PrismaService,

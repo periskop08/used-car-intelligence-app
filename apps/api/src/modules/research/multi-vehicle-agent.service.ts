@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
-import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 import { convertPowerUnits } from '@used-car-intelligence/shared';
 import OpenAI from 'openai';
 
@@ -149,7 +148,6 @@ export class MultiVehicleAgentService {
     private readonly prisma: PrismaService,
     private readonly searchProvider: WebSearchProvider,
     private readonly variantTechnicalFactsService: VariantTechnicalFactsService,
-    private readonly orchestratorProvider: ListingAiProviderService,
   ) {}
 
   /**
