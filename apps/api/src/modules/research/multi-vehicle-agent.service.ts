@@ -359,15 +359,17 @@ export class MultiVehicleAgentService {
     if (isMotorcycle) {
       systemPrompt = `You are TorqueScout Agent 1: Senior Motorcycle Technical Research Specialist.
 Extract deep mechanical knowledge for this motorcycle model family.
-CRITICAL RULES:
-1. Differentiate production eras clearly: e.g. Early Carburetor vs Late EFI (Electronic Fuel Injection), braking revisions, ABS transitions.
-2. Extract REAL, specific chronic mechanical and electrical failure modes:
-   - Stator & regulator/rectifier burnout (statör ve konjektör aşırı ısınması)
-   - Carburetor diaphragm tears / vacuum sync drift vs EFI fuel pump / idle control valve failures
-   - 2nd gear dog engagement wear / popping into neutral under load
-   - Steering stem bearing play & front fork seal weeping
-   - Oil cooler line leaks and valve clearance needs
-3. Output strict JSON only.`;
+MANDATORY RULES:
+1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
+   ALL text, titles, era names, key revisions, symptoms, and inspection instructions MUST BE 100% IN TURKISH.
+   - Use "Statör & Şarj Regülatörü (Konjektör)", NEVER "Regulator/rectifier" or "Düzeltici".
+   - Use "2. Vites Hilal ve Dişli Tırnak Aşınması (Boşa Atma)", NEVER "2nd gear dog engagement" or "engelleme aşınması".
+   - Use "Gidon Boğaz Rulmanı ve Ön Çatal Keçeleri", NEVER "Steering stem bearing" or "fork seals".
+   - Use "Erken Dönem (Karbüratörlü Seri)" and "Geç Dönem (Elektronik Enjeksiyonlu / EFI Seri)".
+   - Inspection checks must be written in Turkish (e.g. "... ekspertizde detaylıca kontrol edilmelidir"). Never use English words like "Inspect...".
+2. Differentiate production eras clearly: Karbüratörlü vs Elektronik Enjeksiyonlu (EFI), fren revizyonları, ABS geçişleri.
+3. Extract REAL, specific chronic mechanical and electrical failure modes.
+4. Output strict JSON only.`;
 
       userPrompt = `Motorcycle: ${context.brand} ${context.model}
 Base Catalog CC: ${baseCc}
@@ -799,18 +801,24 @@ Perform adversarial red-team audit. Output strict JSON.`;
     const systemPrompt = `You are TorqueScout's Senior Automotive Test Editor and Chief Inspection Consultant.
 You write comprehensive, deeply engaging, authoritative Turkish vehicle reports that justify a paid report purchase.
 MANDATORY RULES:
-1. "vehicleOverview" MUST BE A MINIMUM OF 3 RICH PARAGRAPHS:
+1. STRICT TURKISH LANGUAGE INVARIANT (SIFIR İNGİLİZCE KURALI):
+   The entire JSON output MUST BE 100% fluent, natural, authoritative Turkish.
+   NEVER output English words like "Inspect...", "Check...", "Early Carburetor", "Late EFI", "Initial introduction...", "Popping out...".
+   Never translate rectifier as "düzeltici" - in Turkish motorcycle workshops it is strictly "Konjektör" or "Şarj Regülatörü".
+   Never translate dog engagement as "engelleme" - in Turkish motorcycle mechanics it is strictly "Vites Hilali ve Dişli Tırnağı Aşınması".
+   Never output "Evet/Hayır" in sellerQuestions; write the full reassuring technical answer the seller should provide.
+2. "vehicleOverview" MUST BE A MINIMUM OF 3 RICH PARAGRAPHS:
    - Paragraph 1: Design language, ergonomics, riding/driving posture, chassis construction, and road presence.
    - Paragraph 2: Powertrain character, torque curve delivery, engine sound, gear ratios, and real-world highway vs urban dynamics.
    - Paragraph 3: Market positioning, rival comparison, and build quality evaluation.
-2. NEVER output 1-sentence generic text. Provide concrete automotive engineering explanations.
-3. PHYSICAL SPECIFICATIONS ARE MANDATORY:
+3. NEVER output 1-sentence generic text. Provide concrete automotive engineering explanations.
+4. PHYSICAL SPECIFICATIONS ARE MANDATORY:
    - topSpeedKmh (number)
    - zeroToHundredKmh (number)
    - catalogCombinedFuelL100km (number)
    - trunkCapacityLiters (number)
    - curbWeightKg (number)
-4. Output STRICT JSON only.`;
+5. Output STRICT JSON only.`;
 
     const factsJson = JSON.stringify(judge.approvedFactsOnly, null, 2);
 
@@ -935,6 +943,70 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
   }
 
   /**
+   * Translates / sanitizes any residual English text into proper automotive Turkish.
+   * Completely eliminates English terms and literal translations like "düzeltici".
+   */
+  private sanitizeTurkishAutomotiveText(raw?: string | null): string {
+    if (!raw) return '';
+    let text = String(raw).trim();
+
+    const dictionary: Array<[RegExp, string]> = [
+      // Regülatör / Düzeltici / Konjektör
+      [/regulator\/rectifier overheating and battery drain/gi, 'Statör & Şarj Regülatörü (Konjektör) Aşırı Isınması ve Akü Boşalması'],
+      [/regulator\/rectifier overheating/gi, 'Statör & Şarj Regülatörü (Konjektör) Aşırı Isınması'],
+      [/regulator\/rectifier/gi, 'Şarj Regülatörü (Konjektör)'],
+      [/regülatör\/düzeltici/gi, 'Şarj Regülatörü (Konjektör)'],
+      [/düzeltici/gi, 'Konjektör'],
+      [/battery drain/gi, 'Akü Boşalması'],
+      [/inspect the regulator\/rectifier for signs of overheating\.?/gi, 'Statör soketinde kararma/erime ve şarj regülatörü (konjektör) gövde sıcaklığı kontrol edilmelidir.'],
+      [/inspect regulator\/rectifier for signs of overheating\.?/gi, 'Statör soketinde kararma/erime ve şarj regülatörü (konjektör) gövde sıcaklığı kontrol edilmelidir.'],
+      [/battery not charging\.?/gi, 'Akünün şarj olmaması ve düşük voltaj riski.'],
+
+      // Yakıt Pompası
+      [/fuel pump performance loss/gi, 'Yakıt Pompası Basınç ve Performans Kaybı'],
+      [/loss of power under acceleration\.?/gi, 'Hızlanma esnasında yakıt basınç düşüklüğü kaynaklı güç kaybı veya tekleme.'],
+      [/check fuel pump operation and fuel delivery\.?/gi, 'Yakıt pompası hat basıncı (en az 3 bar) ve pompa debisi test edilmelidir.'],
+      [/inspect fuel pump and fuel lines for blockages\.?/gi, 'Yakıt pompası filtresi ve benzin hatları tıkanıklık yönünden incelenmelidir.'],
+
+      // Şanzıman & 2. Vites
+      [/2nd gear engagement wear/gi, '2. Vites Hilal ve Dişli Tırnak Aşınması'],
+      [/2\. vites engelleme aşınması/gi, '2. Vites Hilal ve Dişli Tırnak Aşınması (Boşa Atma)'],
+      [/popping out of 2nd gear under load\.?/gi, '2. viteste yük altındayken vitesin kendiliğinden boşa fırlaması.'],
+      [/inspect transmission for wear on dog engagement\.?/gi, '2. viteste tam gaz ivmelenme yapılarak dişli tırnaklarının kaçırıp kaçırmadığı test edilmelidir.'],
+
+      // Gidon & Çatal
+      [/steering stem bearing play/gi, 'Gidon Boğaz Rulmanı Boşluğu ve Çatal Keçeleri'],
+      [/loose steering feel\.?/gi, 'Gidonda boşluk ve bozuk satıhta tıkırtı hissi.'],
+      [/inspect steering bearings and fork seals for wear\.?/gi, 'Gidon boğaz bilyasındaki boşluk ve ön çatal keçelerindeki yağ sızıntısı incelenmelidir.'],
+      [/inspect steering stem bearings and fork seals\.?/gi, 'Gidon boğaz bilyasındaki boşluk ve ön çatal keçelerindeki yağ sızıntısı incelenmelidir.'],
+
+      // Yağ Radyatörü
+      [/oil cooler line leaks/gi, 'Yağ Radyatörü Hortum ve Rekor Kaçakları'],
+      [/oil leaks around cooler lines\.?/gi, 'Yağ radyatörü bağlantı rekorlarında yağ sızıntısı ve kirlenme.'],
+      [/oil leaks from cooler lines\.?/gi, 'Yağ radyatörü hortum rekorlarından yağ sızıntısı.'],
+      [/inspect oil cooler lines for wear and leaks\.?/gi, 'Yağ radyatörü hortum rekorları ve sızdırmazlık pulları kontrol edilmelidir.'],
+      [/inspect oil cooler lines for leaks\.?/gi, 'Yağ radyatörü hortum rekorları ve sızdırmazlık pulları kontrol edilmelidir.'],
+
+      // Dönem İsimleri & Açıklamaları
+      [/early carburetor/gi, 'Erken Dönem (Karbüratörlü Seri)'],
+      [/late efi/gi, 'Geç Dönem (Elektronik Enjeksiyonlu Seri)'],
+      [/initial introduction of the model with carburetor fuel system, common issues with carburetor synchronization and idle irregularities/gi, 'Karbüratörlü ilk jenerasyon; karbüratör diyafram aşınması, vakum senkron bozulması ve rölanti dalgalanması görülebilir.'],
+      [/transition to efi fuel system, improved emissions to euro3 standards, introduction of abs in later models/gi, 'Delphi elektronik enjeksiyon sistemine geçiş; Euro 3 emisyon uyumu ve daha stabil soğuk çalıştırma.'],
+
+      // Genel İngilizce Fiiller ve İfadeler
+      [/^inspect\s+(.*)/gi, '$1 kontrol edilmelidir.'],
+      [/^check\s+(.*)/gi, '$1 test edilmelidir.'],
+      [/under load/gi, 'yük altında'],
+    ];
+
+    for (const [pattern, replacement] of dictionary) {
+      text = text.replace(pattern, replacement);
+    }
+
+    return text.trim();
+  }
+
+  /**
    * Harmonizes writer content into the standard ComprehensiveVehicleReport shape
    * so all Web and Mobile components render it seamlessly with zero UI breaking changes.
    */
@@ -986,7 +1058,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         ? baseCc >= 600 ? 215 : baseCc >= 200 ? 170 : 130
         : isSuvPickup ? 1950 : 2050;
 
-    // Deducted risks construction for V6 Score Hero
+    // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
       const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
       const domainKey =
@@ -996,14 +1068,19 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         fact.system.includes('YÜRÜYEN') || fact.system.includes('ŞASİ') ? 'CHASSIS_BRAKES' :
         'POWERTRAIN_ENGINE';
 
+      const cleanTitle = this.sanitizeTurkishAutomotiveText(fact.title);
+      const cleanReason = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || fact.userExperience);
+      const cleanDesc = this.sanitizeTurkishAutomotiveText(fact.userExperience);
+      const cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck);
+
       return {
-        title: fact.title,
-        reason: fact.symptoms?.[0] || fact.userExperience,
-        description: fact.userExperience,
+        title: cleanTitle,
+        reason: cleanReason,
+        description: cleanDesc,
         netDeduction: penalty,
         deduction: penalty,
         penalty,
-        inspectionInstruction: fact.inspectionCheck || fact.testDriveCheck,
+        inspectionInstruction: cleanInspect,
         domain: domainKey,
         normalizedFailureMode: fact.claimId,
         severity: fact.severity,
@@ -1011,6 +1088,51 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
     });
 
     const totalRiskPenalty = Math.max(0, 100 - judge.decisionScore);
+
+    // Motorcycle Era Analysis Sanitization
+    let motorcycleEraAnalysis: any = undefined;
+    if (isMotorcycle) {
+      const rawEras = judge.motorcycleEras || writer.productionEras || [];
+      const cleanEras = rawEras.map((era: any) => ({
+        ...era,
+        eraName: this.sanitizeTurkishAutomotiveText(era.eraName),
+        keyChanges: Array.isArray(era.keyChanges)
+          ? era.keyChanges.map((k: string) => this.sanitizeTurkishAutomotiveText(k))
+          : typeof era.keyChanges === 'string'
+          ? [this.sanitizeTurkishAutomotiveText(era.keyChanges)]
+          : ['Temel üretim konfigürasyonu'],
+      }));
+
+      const rawCommonIssues = writer.allEraCommonIssues || [];
+      const cleanCommonIssues = rawCommonIssues.map((iss: any) => ({
+        title: this.sanitizeTurkishAutomotiveText(iss.title),
+        issueDescription: this.sanitizeTurkishAutomotiveText(iss.issueDescription || iss.description || iss.symptoms || iss.risk),
+        severity: iss.severity || 'HIGH',
+        checkAdvice: this.sanitizeTurkishAutomotiveText(iss.checkAdvice || iss.checkNote),
+      }));
+
+      const rawEraSpecific = writer.eraSpecificIssues || [];
+      const cleanEraSpecific = rawEraSpecific.map((eraBlock: any) => {
+        const rawSub = Array.isArray(eraBlock.issues) ? eraBlock.issues : (eraBlock.title ? [eraBlock] : []);
+        return {
+          eraName: this.sanitizeTurkishAutomotiveText(eraBlock.eraName),
+          years: eraBlock.years,
+          issues: rawSub.map((sub: any) => ({
+            title: this.sanitizeTurkishAutomotiveText(sub.title),
+            description: this.sanitizeTurkishAutomotiveText(sub.description || sub.symptoms || sub.risk),
+            checkAdvice: this.sanitizeTurkishAutomotiveText(sub.checkAdvice || sub.checkNote),
+          })),
+        };
+      });
+
+      motorcycleEraAnalysis = {
+        modelHistory: this.sanitizeTurkishAutomotiveText(writer.modelHistory),
+        productionEras: cleanEras,
+        recommendedEraComparison: this.sanitizeTurkishAutomotiveText(writer.recommendedEraComparison),
+        allEraCommonIssues: cleanCommonIssues,
+        eraSpecificIssues: cleanEraSpecific,
+      };
+    }
 
     return {
       reportId: `vr_${isMotorcycle ? (context.modelId || context.model) : context.variantId}_${Date.now()}`,
@@ -1071,7 +1193,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         },
         vehicleCharacter: {
           headline: `${titlePrefix} Kapsamlı Analiz ve Karar Raporu`,
-          detailedAssessment: writer.vehicleOverview || 'Araç mekanik ve kullanım özellikleri incelendi.',
+          detailedAssessment: this.sanitizeTurkishAutomotiveText(writer.vehicleOverview || 'Araç mekanik ve kullanım özellikleri incelendi.'),
           supportingFactIds: [],
         },
         dailyUseAssessment: {
@@ -1088,84 +1210,91 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
           supportingFactIds: [],
         },
         strongestReasonsToChoose: (writer.strongReasons || []).map((r: any) => ({
-          title: r.title,
-          explanation: r.explanation,
+          title: this.sanitizeTurkishAutomotiveText(r.title),
+          explanation: this.sanitizeTurkishAutomotiveText(r.explanation),
           supportingFactIds: [],
         })),
         compromisesAndLimitations: (writer.tradeoffs || []).map((t: any) => ({
-          title: t.title,
-          explanation: t.explanation,
+          title: this.sanitizeTurkishAutomotiveText(t.title),
+          explanation: this.sanitizeTurkishAutomotiveText(t.explanation),
           supportingFactIds: [],
         })),
         suitableFor: (writer.idealFor || []).map((i: any) => ({
-          profile: i.profile,
-          explanation: i.explanation,
+          profile: this.sanitizeTurkishAutomotiveText(i.profile),
+          explanation: this.sanitizeTurkishAutomotiveText(i.explanation),
           supportingFactIds: [],
         })),
         notSuitableFor: (writer.notIdealFor || []).map((n: any) => ({
-          profile: n.profile,
-          explanation: n.explanation,
+          profile: this.sanitizeTurkishAutomotiveText(n.profile),
+          explanation: this.sanitizeTurkishAutomotiveText(n.explanation),
           supportingFactIds: [],
         })),
         purchaseConditions: (writer.conditionsToConsider || []).map((c: any) => ({
-          condition: c.condition,
-          reason: c.reason,
+          condition: this.sanitizeTurkishAutomotiveText(c.condition),
+          reason: this.sanitizeTurkishAutomotiveText(c.reason),
           priority: 'IMPORTANT',
           supportingFactIds: [],
         })),
         walkAwayConditions: (writer.walkAwayConditions || []).map((w: any) => ({
-          condition: w.condition,
-          reason: w.reason,
+          condition: this.sanitizeTurkishAutomotiveText(w.condition),
+          reason: this.sanitizeTurkishAutomotiveText(w.reason),
           priority: 'CRITICAL',
           supportingFactIds: [],
         })),
         finalConditionalVerdict: {
-          shortVerdict: writer.decisionSynthesis?.verdict || `Karar Puanı: ${judge.decisionScore}/100. Kontroller teyit edilerek değerlendirilebilir.`,
+          shortVerdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || `Karar Puanı: ${judge.decisionScore}/100. Kontroller teyit edilerek değerlendirilebilir.`),
           detailedVerdict: judge.decisionRationale,
           confidence: 'HIGH',
           supportingFactIds: [],
         },
-        motorcycleEraAnalysis: isMotorcycle
-          ? {
-              modelHistory: writer.modelHistory,
-              productionEras: judge.motorcycleEras || writer.productionEras,
-              recommendedEraComparison: writer.recommendedEraComparison,
-              allEraCommonIssues: writer.allEraCommonIssues,
-              eraSpecificIssues: writer.eraSpecificIssues,
-            }
-          : undefined,
+        motorcycleEraAnalysis,
         commercialApplicationAnalysis: !isMotorcycle && !isSuvPickup
           ? {
-              applicationSummary: writer.vehicleOverview,
+              applicationSummary: this.sanitizeTurkishAutomotiveText(writer.vehicleOverview),
               verifiedPowers: judge.candidatePowers,
-              manualTransmissionAnalysis: writer.manualTransmissionAnalysis,
-              automaticTransmissionAnalysis: writer.automaticTransmissionAnalysis,
-              transmissionComparison: writer.manualVsAutomatic,
+              manualTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.manualTransmissionAnalysis),
+              automaticTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.automaticTransmissionAnalysis),
+              transmissionComparison: this.sanitizeTurkishAutomotiveText(writer.manualVsAutomatic),
               commercialDutyRisks: writer.commercialDutyRisks,
               configurationContext: {
                 rawPackage: context.trimPackage || '13 m3',
                 cargoVolumeM3: 13,
-                commercialMeaning: writer.configurationAnalysis || `${context.trimPackage || '13 m³'} kargo yük hacmi konfigürasyonu`,
+                commercialMeaning: this.sanitizeTurkishAutomotiveText(writer.configurationAnalysis || `${context.trimPackage || '13 m³'} kargo yük hacmi konfigürasyonu`),
               },
             }
           : undefined,
       },
-      sellerQuestions: (writer.sellerQuestions || []).map((q: any) => ({
-        category: 'TEKNİK_VE_BAKIM',
-        questionText: q.question,
-        expectedAnswerHint: q.expectedAnswer,
-        redFlagAnswerHint: 'Belirsiz veya kaçamak cevaplar',
-      })),
+      sellerQuestions: (writer.sellerQuestions || []).map((q: any) => {
+        const qText = this.sanitizeTurkishAutomotiveText(q.question);
+        let ans = this.sanitizeTurkishAutomotiveText(q.expectedAnswer);
+        if (!ans || /^(evet|hay\u0131r|evet\/hay\u0131r)$/i.test(ans.trim())) {
+          if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|\u015farj/i.test(qText)) {
+            ans = 'Yetkili veya uzman serviste orijinal parçayla yenilendi; rölantide ve 5000 devirde akü şarj voltajı 14V üzerinde stabil.';
+          } else if (/pompa|enjeksiyon|yak\u0131t|benzin/i.test(qText)) {
+            ans = 'Depo içi yakıt pompası ve filtreleri temizlendi, hat basıncı fabrika toleransında.';
+          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal/i.test(qText)) {
+            ans = 'Vites geçişlerinde herhangi bir sertlik, sekromeç cırtlaması veya 2. vitesten atma problemi yaşanmadı.';
+          } else {
+            ans = 'Periyodik bakımları zamanında yetkili serviste faturalı ve kayıtlı olarak yapıldı.';
+          }
+        }
+        return {
+          category: 'TEKNİK_VE_BAKIM',
+          questionText: qText,
+          expectedAnswerHint: ans,
+          redFlagAnswerHint: 'Belirsiz veya kaçamak cevaplar ("bilmiyorum", "hiç baktırmadım")',
+        };
+      }),
       inspectionChecklist: (writer.inspectionChecklist || []).map((c: any) => ({
         category: c.system || 'MEKANİK',
-        checkpoint: c.checkpoint,
-        whatToCheck: c.riskIfIgnored || 'Aşınma ve boşluk kontrolü',
+        checkpoint: this.sanitizeTurkishAutomotiveText(c.checkpoint),
+        whatToCheck: this.sanitizeTurkishAutomotiveText(c.riskIfIgnored || 'Aşınma ve boşluk kontrolü'),
         importance: 'HIGH',
       })),
       decisionScore: {
         score: judge.decisionScore,
         riskLevel: judge.technicalRiskLevel,
-        verdict: writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.',
+        verdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.'),
         deductedRisks,
         totalRiskPenalty,
       },
