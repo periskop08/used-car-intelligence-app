@@ -134,28 +134,34 @@ export default function VehicleReportExpertSynthesis({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {synthesis.motorcycleEraAnalysis.productionEras.map((era, idx) => (
-                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-cyan-300">{era.eraName}</td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">{era.startYear} – {era.endYear || 'Günümüz'}</td>
-                      <td className="py-2.5 px-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                          era.fuelSystem === 'EFI' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                        }`}>
-                          {era.fuelSystem}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap font-medium text-white">
-                        {era.displacementCc ? `${era.displacementCc} cc` : '—'} • {era.powerRange || (era.powerHp ? `${era.powerHp} HP` : '—')}
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px]">
-                        {era.hasAbs ? <span className="text-emerald-400 font-semibold">ABS Mevcut</span> : <span className="text-slate-400">{era.brakingSystem || 'Standart'}</span>}
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px] text-slate-400">
-                        {era.keyChanges && era.keyChanges.length > 0 ? era.keyChanges.join(', ') : 'Temel üretim konfigürasyonu'}
-                      </td>
-                    </tr>
-                  ))}
+                  {synthesis.motorcycleEraAnalysis.productionEras.map((era, idx) => {
+                    const eraTitle = era.eraName || `${era.startYear} – ${era.endYear || 'Günümüz'} Dönemi`;
+                    const keyChangesText = Array.isArray(era.keyChanges)
+                      ? era.keyChanges.join(', ')
+                      : (typeof (era.keyChanges as any) === 'string' && (era.keyChanges as any).trim() ? String(era.keyChanges) : 'Temel üretim konfigürasyonu');
+                    return (
+                      <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-cyan-300">{eraTitle}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{era.startYear} – {era.endYear || 'Günümüz'}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            era.fuelSystem === 'EFI' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {era.fuelSystem || 'Standart'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap font-medium text-white">
+                          {era.displacementCc ? `${era.displacementCc} cc` : '—'} • {era.powerRange || (era.powerHp ? `${era.powerHp} HP` : '—')}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px]">
+                          {era.hasAbs ? <span className="text-emerald-400 font-semibold">ABS Mevcut</span> : <span className="text-slate-400">{era.brakingSystem || 'Standart'}</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] text-slate-400">
+                          {keyChangesText}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

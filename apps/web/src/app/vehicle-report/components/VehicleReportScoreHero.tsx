@@ -30,7 +30,21 @@ const getScoreColor = (value: number | null, isRisk: boolean = false) => {
 };
 
 export default function VehicleReportScoreHero({ report }: VehicleReportScoreHeroProps) {
-  const decisionScore = report.torqueScoutDecisionScoreV1 || report.scoringV6?.decisionScoreV1;
+  const rawScoreObj = report.torqueScoutDecisionScoreV1 || report.scoringV6?.decisionScoreV1 || (report as any).decisionScore;
+  const decisionScore = rawScoreObj ? {
+    score: typeof rawScoreObj.score === 'number' ? rawScoreObj.score : (report.scoring?.buyabilityScore?.value ?? 80),
+    confidenceScore: typeof rawScoreObj.confidenceScore === 'number' ? rawScoreObj.confidenceScore : 90,
+    state: rawScoreObj.state || (
+      (rawScoreObj.score ?? 80) >= 85 ? 'EXCELLENT' :
+      (rawScoreObj.score ?? 80) >= 70 ? 'GOOD' :
+      (rawScoreObj.score ?? 80) >= 50 ? 'CAUTION' : 'HIGH_RISK'
+    ),
+    scope: rawScoreObj.scope || 'VEHICLE',
+    modelDecisionRisk: rawScoreObj.modelDecisionRisk ?? Math.max(0, 100 - (rawScoreObj.score ?? 80)),
+    explanation: rawScoreObj.explanation,
+    deductedRisks: Array.isArray(rawScoreObj.deductedRisks) ? rawScoreObj.deductedRisks : [],
+    conditionRiskUsed: rawScoreObj.conditionRiskUsed,
+  } : null;
 
   if (decisionScore) {
     const isInsufficient = decisionScore.confidenceScore < 40 || decisionScore.score === null || decisionScore.state === 'INSUFFICIENT_DATA';

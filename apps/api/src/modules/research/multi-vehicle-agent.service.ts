@@ -873,6 +873,17 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
         riskLevel: judge.technicalRiskLevel,
         verdict: writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.',
       },
+      torqueScoutDecisionScoreV1: {
+        score: judge.decisionScore,
+        state: judge.decisionScore >= 85 ? 'EXCELLENT' : judge.decisionScore >= 70 ? 'GOOD' : judge.decisionScore >= 50 ? 'CAUTION' : 'HIGH_RISK',
+        scope: 'VEHICLE',
+        modelDecisionRisk: Math.max(0, 100 - judge.decisionScore),
+        confidenceScore: 90,
+      },
+      scoring: {
+        buyabilityScore: { value: judge.decisionScore },
+        technicalRiskScore: { value: Math.max(0, 100 - judge.decisionScore) },
+      },
     };
   }
 

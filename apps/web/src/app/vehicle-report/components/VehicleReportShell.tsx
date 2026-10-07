@@ -212,7 +212,9 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             </span>
           </div>
           <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-            {report.vehicleIdentity.modelYear} {report.vehicleIdentity.brand} {report.vehicleIdentity.model}
+            {typeof report.vehicleIdentity?.modelYear === "number"
+              ? `${report.vehicleIdentity.modelYear} `
+              : ""}{report.vehicleIdentity?.brand} {report.vehicleIdentity?.model}
           </h1>
           {(() => {
             const rawEngineCode = (report.vehicleIdentity.engineCode || "").trim();
