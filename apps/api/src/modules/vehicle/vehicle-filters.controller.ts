@@ -162,6 +162,16 @@ export class VehicleFiltersController {
     };
   }
 
+  @Get('models/:id/technical-specs')
+  @ApiOperation({ summary: 'Modele Ait Doğrulanmış Motor Hacmi ve Gücü Verisini Al (Read-Only/Active Research)' })
+  async getModelTechnicalSpecs(@Param('id') id: string) {
+    const facts = await this.variantTechnicalFactsService.getModelTechnicalFacts(id);
+    return {
+      success: true,
+      data: facts,
+    };
+  }
+
   @Get('brands')
   @ApiOperation({ summary: 'Doğrulanmış Marka Listesi' })
   @ApiQuery({ name: 'category', required: false, description: 'Taşıt kategorisi (AUTOMOBILE, SUV_PICKUP, MINIVAN_PANELVAN, MOTORCYCLE)' })

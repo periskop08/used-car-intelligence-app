@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { TavilySearchProvider } from './providers/tavily-search.provider';
@@ -12,6 +12,9 @@ import { ResearchController } from './research.controller';
 import { AdminApprovalController } from './admin-approval.controller';
 import { EvidenceRulesService } from './evidence-rules.service';
 import { ResearchWorkerService } from './research-worker.service';
+import { MultiVehicleAgentService } from './multi-vehicle-agent.service';
+import { VehicleModule } from '../vehicle/vehicle.module';
+import { ListingAiModule } from '../listing-ai/listing-ai.module';
 
 import { IdentityGateService } from './identity-gate.service';
 import { ResearchConfidenceService } from './research-confidence.service';
@@ -30,7 +33,7 @@ import { TrimComparisonService } from './equipment/trim-comparison.service';
 import { EquipmentResearchService } from './equipment/equipment-research.service';
 
 @Module({
-  imports: [],
+  imports: [forwardRef(() => VehicleModule), ListingAiModule],
   controllers: [ResearchController, AdminApprovalController],
   providers: [
     PrismaService,
@@ -38,6 +41,7 @@ import { EquipmentResearchService } from './equipment/equipment-research.service
     TavilySearchProvider,
     GeminiGroundingProvider,
     FirecrawlExtractProvider,
+    MultiVehicleAgentService,
     IdentityGateService,
     ResearchConfidenceService,
     ClaimEvidenceService,
@@ -81,6 +85,7 @@ import { EquipmentResearchService } from './equipment/equipment-research.service
     EquipmentNormalizerService,
     EquipmentValidatorService,
     TrimComparisonService,
+    MultiVehicleAgentService,
   ],
 })
 export class ResearchModule {}

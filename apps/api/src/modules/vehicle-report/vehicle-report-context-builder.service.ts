@@ -618,6 +618,75 @@ export class VehicleReportContextBuilderService {
       vehicleCharacterResearch: characterResearchCache,
     };
 
+    if (variant.vehicleType === 'MINIVAN_PANELVAN') {
+      (contextObj as any).vehicleType = 'MINIVAN_PANELVAN';
+      (contextObj.vehicleIdentity as any).vehicleType = 'MINIVAN_PANELVAN';
+      (contextObj as any).commercialConfiguration = {
+        rawPackage: variant.trim?.name || (variant as any).trimPackage || '13 m3',
+        cargoVolumeM3: 13,
+        commercialMeaning: `${variant.trim?.name || (variant as any).trimPackage || '13 m³'} yük hacmi konfigürasyonu`,
+      };
+      (contextObj as any).transmissionScope = 'Manuel + Otomatik';
+    } else {
+      (contextObj as any).vehicleType = 'AUTOMOBILE';
+      (contextObj.vehicleIdentity as any).vehicleType = 'AUTOMOBILE';
+    }
+
+    const contextHash = crypto
+      .createHash('sha256')
+      .update(JSON.stringify(contextObj))
+      .digest('hex');
+
+    return {
+      vehicleContext: contextObj,
+      vehicleContextHash: contextHash,
+    };
+  }
+
+  async buildMotorcycleContext(modelId: string, searchScope?: any) {
+    const model = await this.prisma.model.findUnique({
+      where: { id: modelId },
+      include: { brand: true },
+    });
+
+    if (!model) {
+      throw new NotFoundException(`Motosiklet modeli bulunamadı: ${modelId}`);
+    }
+
+    let specs: any = null;
+    if (this.variantTechnicalFactsService) {
+      specs = await this.variantTechnicalFactsService.getModelTechnicalFacts(modelId);
+    }
+
+    const contextObj = {
+      vehicleType: 'MOTORCYCLE',
+      modelId,
+      vehicleIdentity: {
+        brand: model.brand?.name || '',
+        model: model.name,
+        modelYear: 'Tüm Üretim Yılları',
+        year: 'Tüm Üretim Yılları',
+        bodyType: 'Motosiklet',
+        vehicleType: 'MOTORCYCLE',
+        engineDisplacementCc: specs?.engineDisplacementCc || null,
+        enginePowerHp: specs?.enginePowerHp || null,
+        candidatePowers: specs?.candidatePowers || [],
+        powerRange: specs?.candidatePowers?.length > 1 ? `${Math.min(...specs.candidatePowers)}–${Math.max(...specs.candidatePowers)} HP` : null,
+      },
+      searchScope: searchScope || {
+        year: 'Tüm Üretim Yılları',
+        bodyType: 'Tüm Tipler',
+        engine: 'Tüm Motor / Versiyonlar',
+        fuel: 'Tümü',
+        transmission: 'Tüm Motor Hacimleri',
+        trim: 'Tüm Vites Tipleri',
+      },
+      technicalSpecifications: {
+        engineDisplacementCc: specs?.engineDisplacementCc || null,
+        enginePowerHp: specs?.enginePowerHp || null,
+      },
+    };
+
     const contextHash = crypto
       .createHash('sha256')
       .update(JSON.stringify(contextObj))

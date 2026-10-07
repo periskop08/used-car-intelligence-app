@@ -266,4 +266,34 @@ export const vehicleTaxonomyApi = {
       return null;
     }
   },
+
+  async getModelTechnicalSpecs(modelId: string): Promise<any> {
+    if (!modelId) return null;
+    try {
+      const res = await fetch(`${API_URL}/vehicle-filters/models/${modelId}/technical-specs`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data || json;
+    } catch {
+      return null;
+    }
+  },
+
+  async enrichModelTechnicalSpecs(modelId: string, token?: string): Promise<any> {
+    if (!modelId) return null;
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_URL}/vehicles/models/${modelId}/enrich-technical-specs`, {
+        method: "POST",
+        headers,
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
 };

@@ -322,6 +322,41 @@ export class VehicleService {
     });
 
     if (!variant) {
+      const model = await this.prisma.model.findUnique({
+        where: { id: variantId },
+        include: { brand: true },
+      });
+      if (model && model.vehicleType === 'MOTORCYCLE') {
+        const specs = (model.technicalSpecs as any) || {};
+        return {
+          id: model.id,
+          brand: model.brand?.name || '',
+          model: model.name,
+          year: 'Tüm Üretim Yılları',
+          bodyType: 'Motosiklet',
+          vehicleType: 'MOTORCYCLE',
+          engine: {
+            name: 'Standart / Çoklu Dönem',
+            displacement: specs.displacement || null,
+            horsepower: specs.powerHp || null,
+            fuelType: 'Benzin',
+          },
+          transmission: {
+            type: 'MANUAL',
+            name: 'Manuel / Çoklu Uygulama',
+          },
+          specs: {
+            displacement: specs.displacement || null,
+            horsepower: specs.powerHp || null,
+            powerHp: specs.powerHp || null,
+          },
+          problems: [],
+          recalls: [],
+          questions: [],
+          checklists: [],
+          reviews: [],
+        };
+      }
       throw new NotFoundException('Araç varyantı bulunamadı.');
     }
 

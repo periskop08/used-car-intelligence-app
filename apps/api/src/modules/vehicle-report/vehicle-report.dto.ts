@@ -9,12 +9,20 @@ export class CreateVehicleReportDto {
 
   @IsString()
   @IsOptional()
-  @ExactlyOneOf(['variantId', 'listingId'])
+  @ExactlyOneOf(['variantId', 'listingId', 'modelId'])
   variantId?: string;
 
   @IsString()
   @IsOptional()
   listingId?: string;
+
+  @IsString()
+  @IsOptional()
+  modelId?: string;
+
+  @IsString()
+  @IsOptional()
+  vehicleType?: 'AUTOMOBILE' | 'MOTORCYCLE' | 'MINIVAN_PANELVAN';
 
   @IsString()
   @IsOptional()

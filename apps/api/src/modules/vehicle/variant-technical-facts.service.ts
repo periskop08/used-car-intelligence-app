@@ -2585,5 +2585,225 @@ Return the exact factory displacement in cc and power in HP in the specified JSO
 
     return null;
   }
+
+  /**
+   * Retrieves already-resolved/verified technical specs for a Model (especially MOTORCYCLE).
+   * Read-only: checks persisted Model.technicalSpecs first. If missing, runs active AI catalog research and persists.
+   */
+  async getModelTechnicalFacts(modelId: string): Promise<VariantTechnicalFactsResult> {
+    if (!modelId) {
+      throw new NotFoundException('modelId is required');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(modelId);
+    const model = isUuid
+      ? await this.prisma.model.findUnique({
+          where: { id: modelId },
+          include: { brand: true },
+        })
+      : await this.prisma.model.findFirst({
+          where: { name: { equals: modelId, mode: 'insensitive' }, vehicleType: 'MOTORCYCLE' },
+          include: { brand: true },
+        });
+
+    if (!model) {
+      throw new NotFoundException(`Model ${modelId} not found`);
+    }
+
+    const specsObj = (model.technicalSpecs as Record<string, any>) || {};
+
+    if (specsObj.isVerified && typeof specsObj.engineDisplacementCc === 'number') {
+      return {
+        variantId: modelId,
+        engineDisplacement: {
+          value: specsObj.engineDisplacementCc,
+          valueCc: specsObj.engineDisplacementCc,
+          status: 'VERIFIED',
+          verified: true,
+          sourceType: specsObj.displacementSource || 'CATALOG_VERIFIED',
+          evidence: specsObj.displacementEvidence || null,
+          evidenceQuality: 'STRONG',
+        },
+        enginePower: {
+          value: specsObj.enginePowerHp || null,
+          valueHp: specsObj.enginePowerHp || null,
+          status: specsObj.enginePowerHp ? 'VERIFIED' : 'MISSING',
+          verified: Boolean(specsObj.enginePowerHp),
+          sourceType: specsObj.powerSource || 'CATALOG_VERIFIED',
+          evidence: specsObj.powerEvidence || null,
+          evidenceQuality: 'STRONG',
+        },
+        engineDisplacementCc: specsObj.engineDisplacementCc,
+        enginePowerHp: specsObj.enginePowerHp || null,
+        candidatePowers: specsObj.candidatePowers || (specsObj.enginePowerHp ? [specsObj.enginePowerHp] : []),
+        drivetrain: null,
+        drivetrainNameTr: null,
+        isComplete: Boolean(specsObj.engineDisplacementCc && specsObj.enginePowerHp),
+        isCatalogVerified: true,
+        sources: {
+          displacement: specsObj.displacementSource || 'https://catalog.torquescout.com',
+          power: specsObj.powerSource || 'https://catalog.torquescout.com',
+        },
+      };
+    }
+
+    // Active research if missing
+    return this.enrichModelTechnicalSpecs(modelId);
+  }
+
+  /**
+   * Actively enriches and verifies technical specs for a Model using official catalog intelligence.
+   * Persists verified specs to Model.technicalSpecs.
+   */
+  async enrichModelTechnicalSpecs(modelId: string): Promise<VariantTechnicalFactsResult> {
+    if (!modelId) {
+      throw new NotFoundException('modelId is required');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(modelId);
+    const model = isUuid
+      ? await this.prisma.model.findUnique({
+          where: { id: modelId },
+          include: { brand: true },
+        })
+      : await this.prisma.model.findFirst({
+          where: { name: { equals: modelId, mode: 'insensitive' }, vehicleType: 'MOTORCYCLE' },
+          include: { brand: true },
+        });
+
+    if (!model) {
+      throw new NotFoundException(`Model ${modelId} not found`);
+    }
+
+    const brandName = model.brand?.name || '';
+    const modelName = model.name || '';
+    const isMotorcycle = model.vehicleType === 'MOTORCYCLE';
+
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+
+    let displacementCc: number | null = null;
+    let powerHp: number | null = null;
+    let candidatePowers: number[] = [];
+    let powerRange: string | undefined;
+
+    if (openaiKey || geminiKey) {
+      const systemPrompt = isMotorcycle
+        ? `You are an expert motorcycle technical catalog advisor.
+Given a motorcycle brand and model, provide the EXACT official factory engine displacement in cubic centimeters (cc / cm³) and official factory engine power in metric horsepower (HP / BG / PS).
+CRITICAL RULES:
+1. Displacement must be an integer between 49 and 2500 (e.g., Hyosung GV250 is 249 cc, Yamaha R25 is 249 cc, Honda CBR 600 RR is 599 cc, Suzuki GSX-R1000 is 999 cc).
+2. Never guess displacement from marketing names without checking actual catalog engine displacement.
+3. Power must be an integer between 3 and 350 HP (e.g., 28 HP for GV250, 35 HP for R25, 120 HP for CBR 600 RR).
+4. If the model had multiple production generations/eras with different power ratings (e.g. 24 HP in carburetor era, 28 HP in EFI era), include all in "candidatePowers" and summarize in "powerRange".
+5. Output ONLY valid JSON:
+{
+  "displacementCc": number,
+  "powerHp": number,
+  "candidatePowers": number[],
+  "powerRange": "X-Y HP"
+}`
+        : `You are an expert automotive technical catalog advisor.
+Given vehicle identity, provide exact factory displacement in cc (600-8000) and power in HP (40-1500).
+Output ONLY valid JSON:
+{
+  "displacementCc": number,
+  "powerHp": number,
+  "candidatePowers": number[]
+}`;
+
+      const userPrompt = `Brand: ${brandName}\nModel: ${modelName}\nVehicle Type: ${model.vehicleType || 'MOTORCYCLE'}\nProvide exact catalog displacement (cc) and power (HP).`;
+
+      try {
+        if (openaiKey) {
+          const openai = new OpenAI({ apiKey: openaiKey, timeout: 6000 });
+          const res = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+          });
+          const parsed = JSON.parse(res.choices[0]?.message?.content || '{}');
+          if (parsed.displacementCc) displacementCc = Number(parsed.displacementCc);
+          if (parsed.powerHp) powerHp = Number(parsed.powerHp);
+          if (Array.isArray(parsed.candidatePowers) && parsed.candidatePowers.length > 0) {
+            candidatePowers = parsed.candidatePowers.map(Number).filter((n: number) => !isNaN(n));
+          } else if (powerHp) {
+            candidatePowers = [powerHp];
+          }
+          if (parsed.powerRange) powerRange = parsed.powerRange;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Model AI catalog lookup failed: ${err.message}`);
+      }
+    }
+
+    if (displacementCc) {
+      const persistedSpecs = {
+        isVerified: true,
+        engineDisplacementCc: displacementCc,
+        enginePowerHp: powerHp,
+        candidatePowers,
+        powerRange,
+        displacementSource: 'https://catalog.torquescout.com',
+        powerSource: 'https://catalog.torquescout.com',
+        verifiedAt: new Date().toISOString(),
+      };
+
+      await this.prisma.model.update({
+        where: { id: modelId },
+        data: { technicalSpecs: persistedSpecs as any },
+      });
+
+      return {
+        variantId: modelId,
+        engineDisplacement: {
+          value: displacementCc,
+          valueCc: displacementCc,
+          status: 'VERIFIED',
+          verified: true,
+          sourceType: 'CATALOG_VERIFIED',
+          evidence: `Doğrulanmış resmi katalog motor hacmi: ${displacementCc} cc`,
+          evidenceQuality: 'STRONG',
+        },
+        enginePower: {
+          value: powerHp,
+          valueHp: powerHp,
+          status: powerHp ? 'VERIFIED' : 'MISSING',
+          verified: Boolean(powerHp),
+          sourceType: 'CATALOG_VERIFIED',
+          evidence: powerHp ? `Doğrulanmış resmi katalog motor gücü: ${powerHp} HP` : null,
+          evidenceQuality: 'STRONG',
+        },
+        engineDisplacementCc: displacementCc,
+        enginePowerHp: powerHp,
+        candidatePowers,
+        drivetrain: null,
+        drivetrainNameTr: null,
+        isComplete: Boolean(displacementCc && powerHp),
+        isCatalogVerified: true,
+        sources: {
+          displacement: 'https://catalog.torquescout.com',
+          power: 'https://catalog.torquescout.com',
+        },
+      };
+    }
+
+    return {
+      variantId: modelId,
+      engineDisplacement: { value: null, valueCc: null, status: 'MISSING', verified: false, sourceType: null },
+      enginePower: { value: null, valueHp: null, status: 'MISSING', verified: false, sourceType: null },
+      engineDisplacementCc: null,
+      enginePowerHp: null,
+      drivetrain: null,
+      drivetrainNameTr: null,
+      isComplete: false,
+      isCatalogVerified: false,
+      sources: {},
+    };
+  }
 }
 

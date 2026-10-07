@@ -248,10 +248,12 @@ export class VehicleReportService implements OnModuleInit {
     try {
       const userId = await this.getValidUserId(userIdParam);
       let variantId = dto.variantId;
+      let modelId = dto.modelId;
       const listingId = dto.listingId;
+      const requestedVehicleType = dto.vehicleType;
 
       // 1. Resolve variantId if listingId is provided
-      if (listingId && !variantId) {
+      if (listingId && !variantId && !modelId) {
         const listingRes = await this.listingContextBuilder.buildListingContext(listingId);
         variantId = listingRes.variantId;
 
@@ -265,20 +267,46 @@ export class VehicleReportService implements OnModuleInit {
         }
       }
 
-      if (!variantId) {
-        throw new BadRequestException('Araç raporu oluşturulabilmesi için geçerli bir variantId gereklidir.');
+      // Check if variantId is actually a Model ID (e.g. from Motorcycle search)
+      if (variantId && !modelId) {
+        const maybeModel = await this.prisma.model.findUnique({
+          where: { id: variantId },
+          select: { id: true, vehicleType: true },
+        });
+        if (maybeModel && (maybeModel.vehicleType === 'MOTORCYCLE' || requestedVehicleType === 'MOTORCYCLE')) {
+          modelId = maybeModel.id;
+          variantId = undefined;
+        }
+      }
+
+      const isMotorcycle = Boolean(modelId) || requestedVehicleType === 'MOTORCYCLE';
+
+      if (!variantId && !modelId) {
+        throw new BadRequestException('Araç raporu oluşturulabilmesi için geçerli bir variantId veya modelId gereklidir.');
       }
 
       // 2. Build Vehicle Context
-      const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId);
-      const vehicleContext = vRes.vehicleContext;
-      const vehicleContextHash = vRes.vehicleContextHash;
+      let vehicleContext: any;
+      let vehicleContextHash: string;
 
-      // 1. Check existing CURRENT PUBLISHED report (Rule 36: Same vehicle reuse)
+      if (isMotorcycle && modelId) {
+        const mRes = await this.vehicleContextBuilder.buildMotorcycleContext(modelId);
+        vehicleContext = mRes.vehicleContext;
+        vehicleContextHash = mRes.vehicleContextHash;
+      } else {
+        const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!);
+        vehicleContext = vRes.vehicleContext;
+        vehicleContextHash = vRes.vehicleContextHash;
+      }
+
+      // 3. Check existing CURRENT PUBLISHED report (Rule 36: Same vehicle reuse)
       if (!dto.forceRefresh) {
         const existingCurrent = await this.prisma.generatedVehicleReport.findFirst({
           where: {
-            variantId,
+            OR: [
+              ...(variantId ? [{ variantId }] : []),
+              ...(modelId ? [{ modelId }] : []),
+            ],
             isCurrentPublished: true,
             isDraft: false,
             status: VehicleReportStatus.COMPLETED,
@@ -300,10 +328,11 @@ export class VehicleReportService implements OnModuleInit {
         }
       }
 
-      // 4. Unique Concurrency Lock SHA-256(userId + variantId + vehicleContextHash + reportVersion + schemaVersion)
+      // 4. Unique Concurrency Lock SHA-256(userId + targetId + vehicleContextHash + reportVersion + schemaVersion)
+      const targetEntityId = modelId || variantId || 'unknown';
       const lockKey = crypto
         .createHash('sha256')
-        .update(`${userId}_${variantId}_${vehicleContextHash}_v3.5_v1`)
+        .update(`${userId}_${targetEntityId}_${vehicleContextHash}_v3.5_v1`)
         .digest('hex');
 
       try {
@@ -328,7 +357,7 @@ export class VehicleReportService implements OnModuleInit {
           userId,
           dto.idempotencyKey,
           AiQuotaFeature.VEHICLE_REPORT,
-          variantId,
+          variantId || targetEntityId,
         );
         quotaUsageId = quotaRes.quotaUsageId;
       } catch (qErr: any) {
@@ -343,25 +372,40 @@ export class VehicleReportService implements OnModuleInit {
 
       // 7. Persist to GeneratedVehicleReport and manage versioning / published pointer
       const latestReport = await this.prisma.generatedVehicleReport.findFirst({
-        where: { variantId },
+        where: {
+          OR: [
+            ...(variantId ? [{ variantId }] : []),
+            ...(modelId ? [{ modelId }] : []),
+          ],
+        },
         orderBy: { versionNumber: 'desc' },
         select: { versionNumber: true },
       });
       const nextVersion = (latestReport?.versionNumber || 0) + 1;
 
-      // Invalidate old current published report for this variant
+      // Invalidate old current published report for this variant or model
       await this.prisma.generatedVehicleReport.updateMany({
-        where: { variantId, isCurrentPublished: true },
+        where: {
+          OR: [
+            ...(variantId ? [{ variantId }] : []),
+            ...(modelId ? [{ modelId }] : []),
+          ],
+          isCurrentPublished: true,
+        },
         data: { isCurrentPublished: false },
       });
 
       const reportStatus = providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED;
 
+      const vehicleTypePersist = isMotorcycle ? 'MOTORCYCLE' : (vehicleContext?.vehicleType === 'MINIVAN_PANELVAN' ? 'MINIVAN_PANELVAN' : 'AUTOMOBILE');
+
       const savedRecord = await this.prisma.generatedVehicleReport.create({
         data: {
           userId,
           mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
-          variantId,
+          variantId: variantId || null,
+          modelId: modelId || null,
+          vehicleType: vehicleTypePersist,
           listingId: listingId || null,
           contextHash: vehicleContextHash,
           vehicleContextHash,
@@ -459,7 +503,7 @@ export class VehicleReportService implements OnModuleInit {
   async getCurrentVariantReport(userId: string, variantId: string) {
     try {
       const ephemeral = Array.from(VehicleReportService.ephemeralReports.values()).find(
-        (e) => e.report.variantId === variantId && e.report.isCurrentPublished && !e.report.isDraft,
+        (e) => (e.report.variantId === variantId || e.report.modelId === variantId) && e.report.isCurrentPublished && !e.report.isDraft,
       );
       if (ephemeral) {
         return this.ensureSafeReportPayload(ephemeral.report);
@@ -467,7 +511,10 @@ export class VehicleReportService implements OnModuleInit {
 
       const report = await this.prisma.generatedVehicleReport.findFirst({
         where: {
-          variantId,
+          OR: [
+            { variantId },
+            { modelId: variantId },
+          ],
           isCurrentPublished: true,
           isDraft: false,
           status: VehicleReportStatus.COMPLETED,

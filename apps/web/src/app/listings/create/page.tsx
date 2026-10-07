@@ -360,6 +360,8 @@ export default function CreateListing() {
     setTrims([]);
 
     if (!model || !selectedBrand) return;
+    // Pre-resolve technical specs from model-level verified facts (for motorcycles & multi-era models)
+    resolveModelTechnicalSpecs(model);
     setLoadingYears(true);
     try {
       const data = await vehicleTaxonomyApi.getYears(selectedBrand, model);
@@ -369,6 +371,35 @@ export default function CreateListing() {
       }
     } finally {
       setLoadingYears(false);
+    }
+  };
+
+  const resolveModelTechnicalSpecs = async (modelName: string) => {
+    if (!modelName) return;
+    try {
+      const specs = await vehicleTaxonomyApi.getModelTechnicalSpecs(modelName);
+      if (specs) {
+        if (specs.engineDisplacement?.valueCc) {
+          setEngineDisplacement(String(specs.engineDisplacement.valueCc));
+          setDisplacementVerified(true);
+        }
+        if (specs.candidatePowers && specs.candidatePowers.length > 1) {
+          setCandidatePowers(specs.candidatePowers);
+          if (specs.enginePower?.valueHp && specs.candidatePowers.includes(specs.enginePower.valueHp)) {
+            setEnginePower(String(specs.enginePower.valueHp));
+            setPowerVerified(true);
+          } else {
+            setEnginePower("");
+            setPowerVerified(false);
+          }
+        } else if (specs.enginePower?.valueHp) {
+          setEnginePower(String(specs.enginePower.valueHp));
+          setPowerVerified(true);
+          setCandidatePowers([]);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch model technical specs:", e);
     }
   };
 

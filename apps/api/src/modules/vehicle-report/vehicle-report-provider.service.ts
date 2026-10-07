@@ -7,6 +7,7 @@ import { VehicleReportScoringService } from './vehicle-report-scoring.service';
 import { VehicleReportScoringV6Service } from './vehicle-report-scoring-v6.service';
 import { VehicleReportAuditorService, isUserNeglectOrRoutineMaintenance, isShowroomOrLineupWhining } from './vehicle-report-auditor.service';
 import { VehicleReliabilityResearchService } from '../research/vehicle-reliability-research.service';
+import { MultiVehicleAgentService } from '../research/multi-vehicle-agent.service';
 import { ComprehensiveVehicleReport, VehicleReportGeneratedContent, VehicleReportResearchData, getCanonicalDisplayPowerHp, normalizeVehicleReportPayload } from '@used-car-intelligence/shared';
 import { ListingAiProviderService } from '../listing-ai/listing-ai-provider.service';
 
@@ -24,6 +25,7 @@ export class VehicleReportProviderService {
     @Optional() private scoringV6Service?: VehicleReportScoringV6Service,
     @Optional() private reliabilityResearchService?: VehicleReliabilityResearchService,
     @Optional() private auditorService?: VehicleReportAuditorService,
+    @Optional() private multiVehicleAgentService?: MultiVehicleAgentService,
   ) {
     if (!this.scoringV6Service) {
       this.scoringV6Service = new VehicleReportScoringV6Service();
@@ -56,6 +58,37 @@ export class VehicleReportProviderService {
     fallbackReason?: string;
     verifiedResearch?: VehicleReportResearchData;
   }> {
+    // DISCRIMINATED MULTI-VEHICLE 3-AGENT PIPELINE (MOTORCYCLE / MINIVAN_PANELVAN)
+    if (vehicleContext?.vehicleType === 'MOTORCYCLE' || vehicleContext?.vehicleType === 'MINIVAN_PANELVAN') {
+      if (this.multiVehicleAgentService) {
+        try {
+          this.logger.log(`[DELEGATOR] Dispatching ${vehicleContext.vehicleType} to MultiVehicleAgentService (3-Agent Pipeline)...`);
+          const multiReport = await this.multiVehicleAgentService.executeMultiAgentPipeline({
+            vehicleType: vehicleContext.vehicleType,
+            brand: vehicleContext.vehicleIdentity?.brand,
+            model: vehicleContext.vehicleIdentity?.model,
+            year: Number(vehicleContext.vehicleIdentity?.modelYear || vehicleContext.vehicleIdentity?.year) || undefined,
+            engine: vehicleContext.vehicleIdentity?.engineCode || vehicleContext.vehicleIdentity?.engine,
+            fuel: vehicleContext.vehicleIdentity?.fuelType,
+            transmission: vehicleContext.vehicleIdentity?.transmissionName || vehicleContext.vehicleIdentity?.transmission,
+            trimPackage: vehicleContext.vehicleIdentity?.trim,
+            modelId: vehicleContext.modelId,
+            variantId: vehicleContext.variantId,
+          });
+
+          return {
+            report: multiReport,
+            provider: 'MULTI_AGENT_3_PHASE_PIPELINE',
+            modelName: 'gpt-4o-mini-multi-vehicle-agent',
+            qualityScore: multiReport.decisionScore?.score || 85,
+            repairAttempted: false,
+          };
+        } catch (mvErr: any) {
+          this.logger.error(`[MULTI_VEHICLE_PIPELINE] Multi-agent execution failed: ${mvErr?.message}. Falling back...`);
+        }
+      }
+    }
+
     let baseReport = this.fallbackService.generateFallbackReport(
       reportId,
       'TORQUE_SCOUT_VEHICLE_REPORT',

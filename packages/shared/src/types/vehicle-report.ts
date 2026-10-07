@@ -737,6 +737,48 @@ export interface ExpertDecisionSynthesis {
   };
 
   unavailableClaims?: UnavailableClaimItem[];
+
+  motorcycleEraAnalysis?: MotorcycleEraAnalysis;
+  commercialApplicationAnalysis?: CommercialApplicationAnalysis;
+}
+
+export interface MotorcycleProductionEraItem {
+  eraName: string;
+  startYear: number;
+  endYear: number | null;
+  fuelSystem: 'CARBURETOR' | 'EFI' | string;
+  engineLayout?: string;
+  displacementCc?: number;
+  powerHp?: number;
+  powerRange?: string;
+  cooling?: string;
+  transmission?: string;
+  brakingSystem?: string;
+  hasAbs?: boolean;
+  keyChanges?: string[];
+  sourceEvidence?: string;
+}
+
+export interface MotorcycleEraAnalysis {
+  modelHistory?: string;
+  productionEras?: MotorcycleProductionEraItem[];
+  recommendedEraComparison?: string;
+  allEraCommonIssues?: Array<{ title: string; symptoms: string; risk: string; checkNote?: string }>;
+  eraSpecificIssues?: Array<{ eraName: string; title: string; symptoms: string; risk: string; checkNote?: string }>;
+}
+
+export interface CommercialApplicationAnalysis {
+  applicationSummary?: string;
+  verifiedPowers?: number[];
+  manualTransmissionAnalysis?: string;
+  automaticTransmissionAnalysis?: string;
+  transmissionComparison?: string;
+  commercialDutyRisks?: Array<{ title: string; risk: string; checkRecommendation: string }>;
+  configurationContext?: {
+    rawPackage: string;
+    cargoVolumeM3?: number;
+    commercialMeaning: string;
+  };
 }
 
 export type VehicleReportIntent = 'CHAT_QUESTION' | 'VEHICLE_FULL_REPORT';

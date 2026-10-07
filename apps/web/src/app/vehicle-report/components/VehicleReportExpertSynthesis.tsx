@@ -18,7 +18,12 @@ import {
   XCircle, 
   HelpCircle, 
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Layers,
+  History,
+  Truck,
+  Wrench,
+  GitCompare
 } from "lucide-react";
 
 const cleanRangeText = (text?: string): string => {
@@ -93,6 +98,157 @@ export default function VehicleReportExpertSynthesis({
                   <span className="text-slate-300">{cleanRangeText(synthesis.dailyUseAssessment.highwayUse)}</span>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MOTORCYCLE: ÜRETİM DÖNEMLERİ & DÖNEM ANALİZİ */}
+      {synthesis.motorcycleEraAnalysis && (
+        <div className="bg-[#090d1a] border border-cyan-500/20 p-6 rounded-2xl space-y-5 shadow-xl relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
+            <h3 className="text-sm font-black text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+              <History className="w-4 h-4 shrink-0 text-cyan-400" />
+              <span>Model Geçmişi ve Üretim Dönemleri Haritası</span>
+            </h3>
+          </div>
+
+          {synthesis.motorcycleEraAnalysis.modelHistory && (
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              {cleanRangeText(synthesis.motorcycleEraAnalysis.modelHistory)}
+            </p>
+          )}
+
+          {/* Era Table */}
+          {synthesis.motorcycleEraAnalysis.productionEras && synthesis.motorcycleEraAnalysis.productionEras.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/70">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-white/5 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                  <tr>
+                    <th className="py-2.5 px-3">Dönem</th>
+                    <th className="py-2.5 px-3">Yıllar</th>
+                    <th className="py-2.5 px-3">Yakıt / Besleme</th>
+                    <th className="py-2.5 px-3">Hacim / Güç</th>
+                    <th className="py-2.5 px-3">Fren / ABS</th>
+                    <th className="py-2.5 px-3">Önemli Revizyonlar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {synthesis.motorcycleEraAnalysis.productionEras.map((era, idx) => (
+                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-cyan-300">{era.eraName}</td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">{era.startYear} – {era.endYear || 'Günümüz'}</td>
+                      <td className="py-2.5 px-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          era.fuelSystem === 'EFI' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {era.fuelSystem}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap font-medium text-white">
+                        {era.displacementCc ? `${era.displacementCc} cc` : '—'} • {era.powerRange || (era.powerHp ? `${era.powerHp} HP` : '—')}
+                      </td>
+                      <td className="py-2.5 px-3 text-[11px]">
+                        {era.hasAbs ? <span className="text-emerald-400 font-semibold">ABS Mevcut</span> : <span className="text-slate-400">{era.brakingSystem || 'Standart'}</span>}
+                      </td>
+                      <td className="py-2.5 px-3 text-[11px] text-slate-400">
+                        {era.keyChanges && era.keyChanges.length > 0 ? era.keyChanges.join(', ') : 'Temel üretim konfigürasyonu'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Hangi Dönem Daha Mantıklı? */}
+          {synthesis.motorcycleEraAnalysis.recommendedEraComparison && (
+            <div className="p-4 bg-cyan-950/20 border border-cyan-500/20 rounded-xl space-y-1.5">
+              <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <GitCompare className="w-3.5 h-3.5 text-cyan-400" />
+                Hangi Dönem Daha Mantıklı?
+              </span>
+              <p className="text-xs text-slate-300 leading-relaxed pl-5">
+                {cleanRangeText(synthesis.motorcycleEraAnalysis.recommendedEraComparison)}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MINIVAN / PANELVAN: TİCARİ UYGULAMA, ŞANZIMAN & YIPRANMA ANALİZİ */}
+      {synthesis.commercialApplicationAnalysis && (
+        <div className="bg-[#090d1a] border border-blue-500/20 p-6 rounded-2xl space-y-5 shadow-xl relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-blue-500/20 pb-3">
+            <h3 className="text-sm font-black text-blue-400 uppercase tracking-wider flex items-center gap-2">
+              <Truck className="w-4 h-4 shrink-0 text-blue-400" />
+              <span>Ticari Uygulama & Konfigürasyon Analizi</span>
+            </h3>
+            {synthesis.commercialApplicationAnalysis.configurationContext?.commercialMeaning && (
+              <span className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[11px] font-bold text-blue-300">
+                {synthesis.commercialApplicationAnalysis.configurationContext.commercialMeaning}
+              </span>
+            )}
+          </div>
+
+          {synthesis.commercialApplicationAnalysis.applicationSummary && (
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              {cleanRangeText(synthesis.commercialApplicationAnalysis.applicationSummary)}
+            </p>
+          )}
+
+          {/* Şanzıman Karşılaştırması: Manuel vs Otomatik */}
+          {(synthesis.commercialApplicationAnalysis.manualTransmissionAnalysis || 
+            synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis ||
+            synthesis.commercialApplicationAnalysis.transmissionComparison) && (
+            <div className="p-4 bg-slate-950/70 border border-white/10 rounded-xl space-y-3">
+              <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Wrench className="w-3.5 h-3.5 text-blue-400" />
+                Şanzıman Analizi: Manuel mi Otomatik mi?
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {synthesis.commercialApplicationAnalysis.manualTransmissionAnalysis && (
+                  <div className="p-3 bg-white/[0.02] border border-white/5 rounded-lg space-y-1">
+                    <span className="font-bold text-emerald-400 block">Manuel Şanzıman Uygulaması</span>
+                    <p className="text-slate-300">{cleanRangeText(synthesis.commercialApplicationAnalysis.manualTransmissionAnalysis)}</p>
+                  </div>
+                )}
+                {synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis && (
+                  <div className="p-3 bg-white/[0.02] border border-white/5 rounded-lg space-y-1">
+                    <span className="font-bold text-amber-400 block">Otomatik Şanzıman Uygulaması</span>
+                    <p className="text-slate-300">{cleanRangeText(synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis)}</p>
+                  </div>
+                )}
+              </div>
+              {synthesis.commercialApplicationAnalysis.transmissionComparison && (
+                <div className="pt-2 border-t border-white/5 text-xs text-slate-300">
+                  <span className="font-semibold text-blue-300">Uzman Değerlendirmesi: </span>
+                  {cleanRangeText(synthesis.commercialApplicationAnalysis.transmissionComparison)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Ticari Kullanım Kaynaklı Yıpranma Riskleri */}
+          {synthesis.commercialApplicationAnalysis.commercialDutyRisks && synthesis.commercialApplicationAnalysis.commercialDutyRisks.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                Ticari Kullanım Kaynaklı Riskler & Kontrol Noktaları
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {synthesis.commercialApplicationAnalysis.commercialDutyRisks.map((risk, idx) => (
+                  <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5 text-xs">
+                    <span className="font-bold text-amber-300 block">{risk.title}</span>
+                    <p className="text-slate-300 leading-relaxed">{cleanRangeText(risk.risk)}</p>
+                    {risk.checkRecommendation && (
+                      <span className="text-[11px] text-amber-200/80 block pt-1 border-t border-amber-500/10">
+                        🔍 Kontrol: {cleanRangeText(risk.checkRecommendation)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -368,16 +368,27 @@ export default function VehicleDetail() {
         setPipelineStep(1);
       }
 
+      const isMotorcycle = vehicle?.vehicleType === "MOTORCYCLE";
+      const reportPayload: any = {
+        mode: "TORQUE_SCOUT_VEHICLE_REPORT",
+        entryPoint: "VEHICLE_SEARCH",
+        idempotencyKey: `vr_${variantId}_${Date.now()}`,
+        forceRefresh: force,
+      };
+      if (isMotorcycle) {
+        reportPayload.modelId = variantId;
+        reportPayload.vehicleType = "MOTORCYCLE";
+      } else {
+        reportPayload.variantId = variantId;
+        if (vehicle?.vehicleType) {
+          reportPayload.vehicleType = vehicle.vehicleType;
+        }
+      }
+
       const genRes = await fetch(`${API_URL}/vehicle-reports`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          mode: "TORQUE_SCOUT_VEHICLE_REPORT",
-          variantId,
-          entryPoint: "VEHICLE_SEARCH",
-          idempotencyKey: `vr_${variantId}_${Date.now()}`,
-          forceRefresh: force,
-        }),
+        body: JSON.stringify(reportPayload),
       });
 
       if (genRes.ok) {

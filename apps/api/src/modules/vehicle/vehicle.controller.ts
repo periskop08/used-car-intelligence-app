@@ -100,12 +100,26 @@ export class VehicleController {
     return this.variantTechnicalFactsService.getVariantTechnicalFacts(id);
   }
 
+  @Get('models/:id/technical-specs')
+  @ApiOperation({ summary: 'Modele Ait Doğrulanmış Motor Hacmi ve Gücü Verisini Al (Read-Only)' })
+  getModelTechnicalSpecs(@Param('id') id: string) {
+    return this.variantTechnicalFactsService.getModelTechnicalFacts(id);
+  }
+
   @Post('variants/:id/enrich-technical-specs')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Eksikse Varyant Motor Hacmi ve Gücünü Hedefe Yönelik Araştır ve Doğrula (Yetkili)' })
   enrichVariantTechnicalSpecs(@Param('id') id: string, @GetUser() user: UserPayload) {
     return this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(id, user?.id);
+  }
+
+  @Post('models/:id/enrich-technical-specs')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Eksikse Model Motor Hacmi ve Gücünü Hedefe Yönelik Araştır ve Doğrula (Yetkili)' })
+  enrichModelTechnicalSpecs(@Param('id') id: string) {
+    return this.variantTechnicalFactsService.enrichModelTechnicalSpecs(id);
   }
 
   @Get('variants/:id/power-enrichment')

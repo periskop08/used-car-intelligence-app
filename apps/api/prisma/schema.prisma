@@ -433,6 +433,7 @@ model Model {
   endYear   Int?
   isActive  Boolean  @default(true)
   vehicleType String?  @default("AUTOMOBILE")
+  technicalSpecs Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2655,6 +2656,8 @@ model GeneratedVehicleReport {
   userId             String?
   mode               VehicleReportMode
   variantId          String?
+  modelId            String?
+  vehicleType        String?                 @default("AUTOMOBILE")
   listingId          String?
 
   contextHash        String
@@ -2710,6 +2713,8 @@ model GeneratedVehicleReport {
   @@index([userId, listingId, contextHash, reportVersion])
   @@index([userId, mode, variantId, contextHash, status])
   @@index([variantId, isCurrentPublished, isDraft])
+  @@index([modelId, isCurrentPublished, isDraft])
+  @@index([vehicleType])
   @@index([isCurrentPublished, status])
 }
 
