@@ -179,12 +179,15 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
   const effectiveDisplacement = rawDisplacement ?? asyncDisplacement;
   const displacementLabel = isEvFuel ? 'Elektrik' : (effectiveDisplacement ? `${effectiveDisplacement} cc` : null);
 
-  const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh;
-  const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh;
-  const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km;
+  const topSpeedValue = report.performanceUsage?.topSpeedKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh || (report as any)?.technicalSpecifications?.topSpeedKmh;
+  const zeroToHundredValue = (report.performanceUsage as any)?.zeroToHundredSec || report.performanceUsage?.zeroToHundredKmh || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh || (report as any)?.technicalSpecifications?.zeroToHundredSec || (report as any)?.technicalSpecifications?.zeroToHundredKmh;
+  const combinedFuel = report.performanceUsage?.combinedFuelL100km || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km || (report as any)?.technicalSpecifications?.combinedFuelL100km;
   const electricRangeKm = resolveVehicleRangeKm(report);
-  const trunkValue = report.performanceUsage?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL;
-  const weightValue = report.performanceUsage?.curbWeightKg || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg;
+  const trunkValue = report.performanceUsage?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL || (report.performanceUsage as any)?.luggageCapacityL || (report as any)?.technicalSpecifications?.trunkCapacityLiters;
+  const weightValue = report.performanceUsage?.curbWeightKg || (report.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg || (report.performanceUsage as any)?.weightKg || (report as any)?.technicalSpecifications?.curbWeightKg;
+
+  const resolvedVehicleType = ((report.vehicleIdentity as any)?.vehicleType || (report as any).vehicleType || '').toUpperCase();
+  const isMotorcycle = resolvedVehicleType === 'MOTORCYCLE' || !!(report as any).isMotorcycle;
 
   // Motorlu Taşıtlar Vergisi (MTV) Hesaplama
   const mtvResult = calculateVehicleMtv({
@@ -192,6 +195,8 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
     engineDisplacement: effectiveDisplacement || report.vehicleIdentity?.engineDisplacementCc,
     fuelType: report.vehicleIdentity?.fuelType,
     horsepower: rawPower,
+    vehicleType: resolvedVehicleType,
+    isMotorcycle,
   });
 
   return (
@@ -324,6 +329,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
         <VehicleReportExpertSynthesis 
           synthesis={report.expertDecisionSynthesis} 
           supportingFacts={report.dataQuality?.supportingFacts} 
+          vehicleType={resolvedVehicleType}
         />
       )}
 
@@ -368,8 +374,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             </span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Bagaj Hacmi</span>
-            <span className="font-bold text-slate-100 text-base mt-0.5">{trunkValue ? `${trunkValue} lt` : "—"}</span>
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+              {isMotorcycle ? "Depolama / Çanta" : "Bagaj Hacmi"}
+            </span>
+            <span className="font-bold text-slate-100 text-base mt-0.5">
+              {trunkValue && trunkValue > 0
+                ? `${trunkValue} lt`
+                : (isMotorcycle ? "Sele Altı / Çanta Uyumlu" : "—")}
+            </span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">Boş Ağırlık</span>

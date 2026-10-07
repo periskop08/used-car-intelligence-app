@@ -14,6 +14,8 @@ export interface VehicleMtvInput {
   horsepower?: number | string | null;
   powerKw?: number | string | null;
   currentYear?: number;
+  vehicleType?: string;
+  isMotorcycle?: boolean;
 }
 
 export interface VehicleMtvResult {
@@ -37,6 +39,17 @@ function getAgeBracket(age: number): AgeBracket {
   if (age <= 15) return '12-15';
   return '16+';
 }
+
+// RESMİ GİB II SAYILI TARİFE: MOTOSİKLETLER İÇİN MTV TARİFESİ (2026)
+const MOTORCYCLE_2026_TABLE: Array<{
+  maxCc: number;
+  rates: Record<AgeBracket, number>;
+}> = [
+  { maxCc: 250, rates: { '1-3': 1022, '4-6': 814, '7-11': 593, '12-15': 371, '16+': 144 } },
+  { maxCc: 650, rates: { '1-3': 2115, '4-6': 1604, '7-11': 1022, '12-15': 593, '16+': 371 } },
+  { maxCc: 1200, rates: { '1-3': 5460, '4-6': 3256, '7-11': 1604, '12-15': 1022, '16+': 593 } },
+  { maxCc: Infinity, rates: { '1-3': 13250, '4-6': 8784, '7-11': 5460, '12-15': 4135, '16+': 2012 } },
+];
 
 // 01/01/2018 ÖNCESİ TESCİL EDİLEN ARAÇLAR (I/A Sayılı Tarife - 2026)
 const PRE_2018_TABLE: Array<{
@@ -119,22 +132,56 @@ function parseHp(raw?: number | string | null): number | null {
  */
 export function calculateVehicleMtv(input: VehicleMtvInput): VehicleMtvResult | null {
   const currentYear = input.currentYear || new Date().getFullYear() || 2026;
-  const modelYear = typeof input.modelYear === 'number' ? input.modelYear : null;
+  const rawModelYear = typeof input.modelYear === 'number' ? input.modelYear : null;
+  const isMoto = !!input.isMotorcycle || (input.vehicleType || '').toUpperCase() === 'MOTORCYCLE';
 
-  // Model yılı yoksa vergi hesaplanamaz
-  if (!modelYear || modelYear > currentYear + 1 || modelYear < 1950) {
-    return null;
-  }
+  // Model yılı sayı değilse (örn. "Tüm Üretim Yılları" veya undefined) varsayılan 5 yaş (4-6 dilimi) kabul edilir
+  const effectiveModelYear = rawModelYear && rawModelYear >= 1950 && rawModelYear <= currentYear + 1
+    ? rawModelYear
+    : (currentYear - 5);
 
-  // Yaş Formülü: (Güncel Yıl - Model Yılı + 1)
-  const age = Math.max(1, currentYear - modelYear + 1);
+  const age = Math.max(1, currentYear - effectiveModelYear + 1);
   const ageBracket = getAgeBracket(age);
 
+  const displacementCc = parseDisplacementCc(input.engineDisplacement);
+
+  // 1. MOTOSİKLET KANUNİ TARİFESİ (GİB II Sayılı Tarife)
+  if (isMoto) {
+    const motoCc = displacementCc || 250;
+    // 0-100 cc arası motosikletler MTV'den muaftır (Kanun Md. 4)
+    if (motoCc <= 100) {
+      return {
+        annualTax: 0,
+        installment: 0,
+        displayInstallment: '0 ₺ (Muaf)',
+        displayAnnual: '0 ₺ (MTV Muafiyeti)',
+        age,
+        displacementCc: motoCc,
+        isElectric: false,
+        notes: '100 cc altı motosikletler MTV Kanunu gereğince vergiden muaftır.',
+      };
+    }
+
+    const bracket = MOTORCYCLE_2026_TABLE.find((b) => motoCc <= b.maxCc) || MOTORCYCLE_2026_TABLE[MOTORCYCLE_2026_TABLE.length - 1];
+    const annualTax = bracket.rates[ageBracket];
+    const installment = Math.round(annualTax / 2);
+
+    return {
+      annualTax,
+      installment,
+      displayInstallment: `${formatTurkishLira(installment)} x 2`,
+      displayAnnual: formatTurkishLira(annualTax),
+      age,
+      displacementCc: motoCc,
+      isElectric: false,
+      notes: 'GİB 2026 II Sayılı Motosiklet Tarifesi',
+    };
+  }
+
+  // 2. OTOMOBİL & TİCARİ ARAÇLAR
   // Yakıt kontrolü
   const fuel = (input.fuelType || '').toUpperCase().trim();
   const isElectric = fuel === 'ELEKTRIK' || fuel === 'ELECTRIC' || fuel === 'EV';
-
-  const displacementCc = parseDisplacementCc(input.engineDisplacement);
 
   let annualTax = 0;
 
@@ -166,7 +213,7 @@ export function calculateVehicleMtv(input: VehicleMtvInput): VehicleMtvResult | 
       else equivalentCc = 4500; // 4001 cm3 ve yukarısı
     }
 
-    const table = modelYear < 2018 ? PRE_2018_TABLE : POST_2018_TABLE;
+    const table = effectiveModelYear < 2018 ? PRE_2018_TABLE : POST_2018_TABLE;
     const bracket = table.find((b) => equivalentCc <= b.maxCc) || table[table.length - 1];
     const baseRate = bracket.rates[ageBracket];
     // Kanuni %25 oranı
@@ -177,7 +224,7 @@ export function calculateVehicleMtv(input: VehicleMtvInput): VehicleMtvResult | 
       return null;
     }
 
-    const table = modelYear < 2018 ? PRE_2018_TABLE : POST_2018_TABLE;
+    const table = effectiveModelYear < 2018 ? PRE_2018_TABLE : POST_2018_TABLE;
     const bracket = table.find((b) => displacementCc <= b.maxCc) || table[table.length - 1];
     annualTax = bracket.rates[ageBracket];
   }

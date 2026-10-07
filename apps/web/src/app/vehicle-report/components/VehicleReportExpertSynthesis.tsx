@@ -45,6 +45,7 @@ const cleanRangeText = (text?: string): string => {
 interface VehicleReportExpertSynthesisProps {
   synthesis: ExpertDecisionSynthesis;
   supportingFacts?: ReportSupportingFact[];
+  vehicleType?: string;
 }
 
 const toArray = <T,>(val: T[] | T | null | undefined): T[] => {
@@ -59,18 +60,28 @@ const toArray = <T,>(val: T[] | T | null | undefined): T[] => {
 
 export default function VehicleReportExpertSynthesis({
   synthesis,
+  vehicleType,
 }: VehicleReportExpertSynthesisProps) {
   if (!synthesis) return null;
 
+  const normalizedType = (vehicleType || '').toUpperCase();
+  const characterHeading = normalizedType === 'MOTORCYCLE'
+    ? 'Bu Araç Nasıl Bir Motosiklet?'
+    : (normalizedType === 'SUV_PICKUP' || normalizedType === 'SUV'
+      ? 'Bu Araç Nasıl Bir Arazi Aracı / SUV?'
+      : (normalizedType === 'MINIVAN_PANELVAN' || normalizedType === 'COMMERCIAL'
+        ? 'Bu Araç Nasıl Bir Ticari Araç?'
+        : 'Bu Araç Nasıl Bir Otomobil?'));
+
   return (
     <div className="w-full space-y-6 animate-fade-in">
-      {/* 1. BU ARAÇ NASIL BİR OTOMOBİL? (Vehicle Character) */}
+      {/* 1. BU ARAÇ NASIL BİR OTOMOBİL / MOTOSİKLET / TİCARİ ARAÇ? (Vehicle Character) */}
       {synthesis.vehicleCharacter && (
         <div className="bg-[#090d1a] border border-white/10 p-6 rounded-2xl space-y-3 shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-orange-400 block" />
-              <span>Bu Araç Nasıl Bir Otomobil?</span>
+              <span>{characterHeading}</span>
             </h3>
           </div>
 
@@ -177,6 +188,86 @@ export default function VehicleReportExpertSynthesis({
               <p className="text-xs text-slate-300 leading-relaxed pl-5">
                 {cleanRangeText(synthesis.motorcycleEraAnalysis.recommendedEraComparison)}
               </p>
+            </div>
+          )}
+
+          {/* Tüm Dönemler İçin Ortak Kronik Sorunlar & Zayıf Noktalar */}
+          {Array.isArray(synthesis.motorcycleEraAnalysis.allEraCommonIssues) && synthesis.motorcycleEraAnalysis.allEraCommonIssues.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                Motosiklet Geneli Ortak Kronik Noktalar & Fırsat/Riskler
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {synthesis.motorcycleEraAnalysis.allEraCommonIssues.map((issue: any, idx: number) => {
+                  const issueDesc = issue.issueDescription || issue.symptoms || issue.risk || '';
+                  const checkAdvice = issue.checkAdvice || issue.checkNote || '';
+                  const severity = issue.severity || issue.risk;
+                  return (
+                    <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-amber-300">{issue.title}</span>
+                        {severity && (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            severity === 'HIGH' || severity === 'CRITICAL'
+                              ? 'bg-rose-500/20 text-rose-300'
+                              : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {severity}
+                          </span>
+                        )}
+                      </div>
+                      {issueDesc && <p className="text-slate-300 leading-relaxed">{cleanRangeText(issueDesc)}</p>}
+                      {checkAdvice && (
+                        <p className="text-emerald-400 text-[11px] pt-1 border-t border-amber-500/10">
+                          🔍 <strong>Ekspertiz & Kontrol:</strong> {cleanRangeText(checkAdvice)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Döneme Özgü Özel Riskler & Ayrışmalar */}
+          {Array.isArray(synthesis.motorcycleEraAnalysis.eraSpecificIssues) && synthesis.motorcycleEraAnalysis.eraSpecificIssues.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+                Döneme Özgü Mekanik ve Elektronik Ayrışmalar
+              </h4>
+              <div className="space-y-3">
+                {synthesis.motorcycleEraAnalysis.eraSpecificIssues.map((eraBlock: any, idx: number) => {
+                  const subIssues = Array.isArray(eraBlock.issues) && eraBlock.issues.length > 0
+                    ? eraBlock.issues
+                    : eraBlock.title
+                    ? [{ title: eraBlock.title, description: eraBlock.description || eraBlock.symptoms || eraBlock.risk, checkAdvice: eraBlock.checkAdvice || eraBlock.checkNote }]
+                    : [];
+
+                  return (
+                    <div key={idx} className="p-3.5 bg-slate-950/60 border border-cyan-500/20 rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center gap-2 border-b border-cyan-500/10 pb-2">
+                        <span className="font-bold text-cyan-300">{eraBlock.eraName}</span>
+                        {eraBlock.years && <span className="text-[11px] text-slate-400">({eraBlock.years})</span>}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                        {subIssues.map((iss: any, iIdx: number) => (
+                          <div key={iIdx} className="p-2.5 bg-white/[0.02] border border-white/5 rounded-lg space-y-1">
+                            <span className="font-semibold text-slate-200 block">{iss.title}</span>
+                            {iss.description && (
+                              <p className="text-slate-400 text-[11px] leading-relaxed">{cleanRangeText(iss.description)}</p>
+                            )}
+                            {iss.checkAdvice && (
+                              <p className="text-emerald-400 text-[10px]">✔ {cleanRangeText(iss.checkAdvice)}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

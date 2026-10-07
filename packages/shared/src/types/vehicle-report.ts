@@ -763,8 +763,29 @@ export interface MotorcycleEraAnalysis {
   modelHistory?: string;
   productionEras?: MotorcycleProductionEraItem[];
   recommendedEraComparison?: string;
-  allEraCommonIssues?: Array<{ title: string; symptoms: string; risk: string; checkNote?: string }>;
-  eraSpecificIssues?: Array<{ eraName: string; title: string; symptoms: string; risk: string; checkNote?: string }>;
+  allEraCommonIssues?: Array<{
+    title: string;
+    symptoms?: string;
+    risk?: string;
+    checkNote?: string;
+    issueDescription?: string;
+    severity?: string;
+    checkAdvice?: string;
+  }>;
+  eraSpecificIssues?: Array<{
+    eraName: string;
+    years?: string;
+    title?: string;
+    symptoms?: string;
+    risk?: string;
+    checkNote?: string;
+    issues?: Array<{
+      title: string;
+      description?: string;
+      riskLevel?: string;
+      checkAdvice?: string;
+    }>;
+  }>;
 }
 
 export interface CommercialApplicationAnalysis {

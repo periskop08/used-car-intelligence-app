@@ -58,13 +58,15 @@ export class VehicleReportProviderService {
     fallbackReason?: string;
     verifiedResearch?: VehicleReportResearchData;
   }> {
-    // DISCRIMINATED MULTI-VEHICLE 3-AGENT PIPELINE (MOTORCYCLE / MINIVAN_PANELVAN)
-    if (vehicleContext?.vehicleType === 'MOTORCYCLE' || vehicleContext?.vehicleType === 'MINIVAN_PANELVAN') {
+    // DISCRIMINATED MULTI-VEHICLE 3-AGENT PIPELINE (MOTORCYCLE / MINIVAN_PANELVAN / SUV_PICKUP)
+    const normalizedType = (vehicleContext?.vehicleType || '').toUpperCase();
+    if (normalizedType === 'MOTORCYCLE' || normalizedType === 'MINIVAN_PANELVAN' || normalizedType === 'SUV_PICKUP' || normalizedType === 'SUV') {
       if (this.multiVehicleAgentService) {
         try {
-          this.logger.log(`[DELEGATOR] Dispatching ${vehicleContext.vehicleType} to MultiVehicleAgentService (3-Agent Pipeline)...`);
+          const targetVehicleType = normalizedType === 'SUV' ? 'SUV_PICKUP' : normalizedType;
+          this.logger.log(`[DELEGATOR] Dispatching ${targetVehicleType} to MultiVehicleAgentService (3-Agent Pipeline)...`);
           const multiReport = await this.multiVehicleAgentService.executeMultiAgentPipeline({
-            vehicleType: vehicleContext.vehicleType,
+            vehicleType: targetVehicleType as any,
             brand: vehicleContext.vehicleIdentity?.brand,
             model: vehicleContext.vehicleIdentity?.model,
             year: Number(vehicleContext.vehicleIdentity?.modelYear || vehicleContext.vehicleIdentity?.year) || undefined,
