@@ -59,6 +59,7 @@ import ListingPromotionCards, { PromotionSku } from "@/components/listings/Listi
 import UrgentListingPaymentRecovery from "@/components/listings/UrgentListingPaymentRecovery";
 import { formatImageUrl } from "@/utils/media";
 import { vehicleTaxonomyApi, TaxonomyOption } from "@/services/vehicleTaxonomyApi";
+import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/common/VehicleSearchModeSelector";
 
 const mapToBodyTypeEnum = (bt: string): string => {
   const clean = (bt || "").toLowerCase().trim();
@@ -175,6 +176,9 @@ export default function CreateListing() {
   const [loadingTrims, setLoadingTrims] = useState(false);
   const [matchingVariant, setMatchingVariant] = useState(false);
 
+  // Vehicle Category / Search Mode State
+  const [searchMode, setSearchMode] = useState<VehicleSearchMode>('AUTOMOBILE');
+
   // Selected Dimensions (Canonical strings)
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
@@ -185,6 +189,7 @@ export default function CreateListing() {
   const [selectedTransmission, setSelectedTransmission] = useState("");
   const [selectedTrim, setSelectedTrim] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(""); // Exact vehicleVariantId
+  const [selectedModelId, setSelectedModelId] = useState("");
 
   const [isYearAutoSelected, setIsYearAutoSelected] = useState(false);
   const [isBodyTypeAutoSelected, setIsBodyTypeAutoSelected] = useState(false);
@@ -275,7 +280,7 @@ export default function CreateListing() {
 
     // Fetch Brands via shared vehicleTaxonomyApi
     setLoadingBrands(true);
-    vehicleTaxonomyApi.getBrands()
+    vehicleTaxonomyApi.getBrands(searchMode)
       .then((data) => {
         setBrands(data);
         setLoadingBrands(false);
@@ -294,8 +299,50 @@ export default function CreateListing() {
 
   const clearSelectedVariant = () => {
     setSelectedVariant("");
+    setSelectedModelId("");
     activeVariantEnrichmentRef.current = "";
     lastPrefetchedVariantIdRef.current = "";
+  };
+
+  const handleSearchModeChange = (newMode: VehicleSearchMode) => {
+    if (newMode === searchMode) return;
+    setSearchMode(newMode);
+    setSelectedBrand("");
+    setSelectedModel("");
+    setSelectedYear("");
+    setSelectedBodyType("");
+    setSelectedEngine("");
+    setSelectedFuelType("");
+    setSelectedTransmission("");
+    setSelectedTrim("");
+    clearSelectedVariant();
+
+    setIsYearAutoSelected(false);
+    setIsBodyTypeAutoSelected(false);
+    setIsEngineAutoSelected(false);
+    setIsFuelTypeAutoSelected(false);
+    setIsTransmissionAutoSelected(false);
+    setIsTrimAutoSelected(false);
+
+    setBrands([]);
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    setLoadingBrands(true);
+    vehicleTaxonomyApi.getBrands(newMode)
+      .then((data) => {
+        setBrands(data);
+        setLoadingBrands(false);
+      })
+      .catch((e) => {
+        console.error("Error fetching brands for category:", e);
+        setLoadingBrands(false);
+      });
   };
 
   // Cascade Handlers for 8 Canonical Dimensions
@@ -309,6 +356,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsYearAutoSelected(false);
     setIsBodyTypeAutoSelected(false);
@@ -328,7 +376,7 @@ export default function CreateListing() {
     if (!brand) return;
     setLoadingModels(true);
     try {
-      const data = await vehicleTaxonomyApi.getModels(brand);
+      const data = await vehicleTaxonomyApi.getModels(brand, searchMode);
       setModels(data);
     } finally {
       setLoadingModels(false);
@@ -344,6 +392,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsYearAutoSelected(false);
     setIsBodyTypeAutoSelected(false);
@@ -364,10 +413,19 @@ export default function CreateListing() {
     resolveModelTechnicalSpecs(model);
     setLoadingYears(true);
     try {
-      const data = await vehicleTaxonomyApi.getYears(selectedBrand, model);
-      setYears(data);
-      if (data.length === 1) {
-        handleYearChange(data[0].value, model, true);
+      if (searchMode === 'MOTORCYCLE') {
+        const currentYearNum = new Date().getFullYear();
+        const motoYears = Array.from({ length: 37 }, (_, i) => {
+          const yr = String(currentYearNum + 1 - i);
+          return { label: yr, value: yr };
+        });
+        setYears(motoYears);
+      } else {
+        const data = await vehicleTaxonomyApi.getYears(selectedBrand, model, searchMode);
+        setYears(data);
+        if (data.length === 1) {
+          handleYearChange(data[0].value, model, true);
+        }
       }
     } finally {
       setLoadingYears(false);
@@ -413,6 +471,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsBodyTypeAutoSelected(false);
     setIsEngineAutoSelected(false);
@@ -429,7 +488,7 @@ export default function CreateListing() {
     if (!year || !currentModel || !selectedBrand) return;
     setLoadingBodyTypes(true);
     try {
-      const data = await vehicleTaxonomyApi.getBodyTypes(selectedBrand, currentModel, year);
+      const data = await vehicleTaxonomyApi.getBodyTypes(selectedBrand, currentModel, year, searchMode);
       setBodyTypes(data);
       if (data.length === 1) {
         handleBodyTypeChange(data[0].value, year, currentModel, true);
@@ -448,6 +507,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsEngineAutoSelected(false);
     setIsFuelTypeAutoSelected(false);
@@ -462,7 +522,7 @@ export default function CreateListing() {
     if (!body || !currentYear || !currentModel || !selectedBrand) return;
     setLoadingEngines(true);
     try {
-      const data = await vehicleTaxonomyApi.getEngines(selectedBrand, currentModel, currentYear, body);
+      const data = await vehicleTaxonomyApi.getEngines(selectedBrand, currentModel, currentYear, body, searchMode);
       setEngines(data);
       if (data.length === 1) {
         handleEngineChange(data[0].value, body, currentYear, currentModel, true);
@@ -480,6 +540,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsFuelTypeAutoSelected(false);
     setIsTransmissionAutoSelected(false);
@@ -492,7 +553,7 @@ export default function CreateListing() {
     if (!engine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
     setLoadingFuels(true);
     try {
-      const data = await vehicleTaxonomyApi.getFuelTypes(selectedBrand, currentModel, currentYear, currentBody, engine);
+      const data = await vehicleTaxonomyApi.getFuelTypes(selectedBrand, currentModel, currentYear, currentBody, engine, searchMode);
       setFuelTypes(data);
       if (data.length === 1) {
         handleFuelTypeChange(data[0].value, engine, currentBody, currentYear, currentModel, true);
@@ -509,6 +570,7 @@ export default function CreateListing() {
     setSelectedTransmission("");
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
 
     setIsTransmissionAutoSelected(false);
     setIsTrimAutoSelected(false);
@@ -519,7 +581,7 @@ export default function CreateListing() {
     if (!fuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
     setLoadingTransmissions(true);
     try {
-      const data = await vehicleTaxonomyApi.getTransmissions(selectedBrand, currentModel, currentYear, currentBody, currentEngine, fuel);
+      const data = await vehicleTaxonomyApi.getTransmissions(selectedBrand, currentModel, currentYear, currentBody, currentEngine, fuel, searchMode);
       setTransmissions(data);
       if (data.length === 1) {
         handleTransmissionChange(data[0].value, fuel, currentEngine, currentBody, currentYear, currentModel, true);
@@ -535,6 +597,7 @@ export default function CreateListing() {
 
     setSelectedTrim("");
     setSelectedVariant("");
+    setSelectedModelId("");
     setIsTrimAutoSelected(false);
 
     setTrims([]);
@@ -542,7 +605,7 @@ export default function CreateListing() {
     if (!trans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
     setLoadingTrims(true);
     try {
-      const data = await vehicleTaxonomyApi.getTrims(selectedBrand, currentModel, currentYear, currentBody, currentEngine, currentFuel, trans);
+      const data = await vehicleTaxonomyApi.getTrims(selectedBrand, currentModel, currentYear, currentBody, currentEngine, currentFuel, trans, searchMode);
       if (data.length === 0) {
         const fallback = [{ label: "Standart / Baz", value: "Standart / Baz" }];
         setTrims(fallback);
@@ -562,6 +625,7 @@ export default function CreateListing() {
     setSelectedTrim(trim);
     setIsTrimAutoSelected(autoSelected);
     setSelectedVariant("");
+    setSelectedModelId("");
 
     if (!trim || !currentTrans || !currentFuel || !currentEngine || !currentBody || !currentYear || !currentModel || !selectedBrand) return;
 
@@ -576,6 +640,7 @@ export default function CreateListing() {
         fuelType: currentFuel,
         transmission: currentTrans,
         trim,
+        category: searchMode,
       });
 
       if (res.success && res.variantId) {
@@ -590,13 +655,22 @@ export default function CreateListing() {
 
         // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP + Drivetrain)
         resolveTechnicalSpecs(res.variantId);
+      } else if (res.success && searchMode === 'MOTORCYCLE' && res.modelId) {
+        setSelectedModelId(res.modelId);
+        setBodyType("OTHER");
+        setFuelType("PETROL");
+        setTransmission("MANUAL");
+        setDrivetrain("RWD");
+        setTechSpecsVerified(true);
       } else {
         setSelectedVariant("");
+        setSelectedModelId("");
         setTechSpecsVerified(false);
       }
     } catch (e) {
       console.error("Error matching variant:", e);
       setSelectedVariant("");
+      setSelectedModelId("");
       setTechSpecsVerified(false);
     } finally {
       setMatchingVariant(false);
@@ -781,7 +855,10 @@ export default function CreateListing() {
       changedParts,
       localPaintedParts,
       maintenanceHistory,
-      vehicleVariantId: !useCustomVariant ? selectedVariant : null,
+      vehicleVariantId: !useCustomVariant ? (selectedVariant || null) : null,
+      customBrand: useCustomVariant ? customBrand : (!selectedVariant ? selectedBrand : undefined),
+      customModel: useCustomVariant ? customModel : (!selectedVariant ? selectedModel : undefined),
+      customYear: useCustomVariant ? parseInt(customYear, 10) : (!selectedVariant && selectedYear ? parseInt(selectedYear, 10) : undefined),
     };
 
     const res = await fetch(`${API_URL}/listings`, {
@@ -942,10 +1019,10 @@ export default function CreateListing() {
       changedParts,
       localPaintedParts,
       maintenanceHistory,
-      vehicleVariantId: !useCustomVariant ? selectedVariant : null,
-      customBrand: useCustomVariant ? customBrand : undefined,
-      customModel: useCustomVariant ? customModel : undefined,
-      customYear: useCustomVariant ? parseInt(customYear, 10) : undefined,
+      vehicleVariantId: !useCustomVariant ? (selectedVariant || null) : null,
+      customBrand: useCustomVariant ? customBrand : (!selectedVariant ? selectedBrand : undefined),
+      customModel: useCustomVariant ? customModel : (!selectedVariant ? selectedModel : undefined),
+      customYear: useCustomVariant ? parseInt(customYear, 10) : (!selectedVariant && selectedYear ? parseInt(selectedYear, 10) : undefined),
       urgentRequested: selectedPromotionSku === "URGENT_LISTING" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
       showcaseRequested: selectedPromotionSku === "SHOWCASE_FEED" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
     };
@@ -1161,8 +1238,19 @@ export default function CreateListing() {
       {/* STEP 1: Select Vehicle / Variant */}
       {step === 1 && (
         <div className="glass p-8 rounded-3xl flex flex-col gap-6">
-          <h2 className="text-lg font-bold text-slate-200">🚗 Adım 1: Araç Seçimi</h2>
-          <p className="text-xs text-slate-400">Aracınızın doğru teknik katalog verisine ve yapay zeka analizine bağlanabilmesi için aracınızı seçiniz.</p>
+          <VehicleSearchModeSelector
+            value={searchMode}
+            onChange={handleSearchModeChange}
+          />
+
+          <div>
+            <h2 className="text-lg font-bold text-slate-200">
+              {searchMode === 'MOTORCYCLE' ? '🏍️' : '🚗'} Adım 1: Araç Seçimi
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Aracınızın doğru teknik katalog verisine ve yapay zeka analizine bağlanabilmesi için aracınızı seçiniz.
+            </p>
+          </div>
 
           <div className="flex items-center gap-2 cursor-pointer bg-slate-900/40 p-4 rounded-xl border border-white/5">
             <input
@@ -1173,6 +1261,7 @@ export default function CreateListing() {
                 setUseCustomVariant(e.target.checked);
                 if (e.target.checked) {
                   setSelectedVariant("");
+                  setSelectedModelId("");
                 }
               }}
               className="accent-orange-500 rounded border-white/10"
@@ -1202,7 +1291,9 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Model</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {searchMode === 'MOTORCYCLE' ? 'Model Ailesi' : 'Model'}
+                  </label>
                   <select
                     value={selectedModel}
                     disabled={!selectedBrand || loadingModels}
@@ -1232,7 +1323,9 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Kasa Tipi</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {searchMode === 'MOTORCYCLE' ? 'Tip / Kasa Tipi' : 'Kasa Tipi'}
+                  </label>
                   <select
                     value={selectedBodyType}
                     disabled={!selectedYear || loadingBodyTypes || bodyTypes.length === 0}
@@ -1265,7 +1358,9 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Yakıt Türü</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {searchMode === 'MOTORCYCLE' ? 'Yakıt / Güç Ünitesi' : 'Yakıt Türü'}
+                  </label>
                   <select
                     value={selectedFuelType}
                     disabled={!selectedEngine || loadingFuels || fuelTypes.length === 0}
@@ -1280,7 +1375,9 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Şanzıman Tipi</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {searchMode === 'MOTORCYCLE' ? 'Motor Hacmi' : 'Şanzıman Tipi'}
+                  </label>
                   <select
                     value={selectedTransmission}
                     disabled={!selectedFuelType || loadingTransmissions || transmissions.length === 0}
@@ -1295,7 +1392,9 @@ export default function CreateListing() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Donanım Paketi</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    {searchMode === 'MOTORCYCLE' ? 'Vites Tipi' : 'Donanım Paketi'}
+                  </label>
                   <select
                     value={selectedTrim}
                     disabled={!selectedTransmission || loadingTrims || trims.length === 0}
@@ -1321,10 +1420,10 @@ export default function CreateListing() {
                   <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                   <span>Motor teknik bilgileri doğrulanıyor (cc ve HP)...</span>
                 </div>
-              ) : selectedVariant ? (
+              ) : selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear) ? (
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span>✅ Araç Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim} {engineDisplacement ? `• ${engineDisplacement} cc` : ""} {enginePower ? `• ${enginePower} HP` : ""} (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
+                  <span>✅ {searchMode === 'MOTORCYCLE' ? 'Motosiklet' : 'Araç'} Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' ? selectedTrim : ''} {engineDisplacement ? `• ${engineDisplacement} cc` : ""} {enginePower ? `• ${enginePower} HP` : ""} {selectedVariant ? `(Varyant ID: ${selectedVariant.slice(0, 8)}...)` : ''}</span>
                 </div>
               ) : (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine && selectedFuelType && selectedTransmission && selectedTrim) ? (
                 <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
@@ -1334,7 +1433,7 @@ export default function CreateListing() {
               ) : (
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                  <span>ℹ️ İlerlemeden önce lütfen aracın tüm özelliklerini (8 kriter) eksiksiz seçiniz.</span>
+                  <span>ℹ️ İlerlemeden önce lütfen aracın tüm özelliklerini ({searchMode === 'MOTORCYCLE' ? 'kriterleri' : '8 kriter'}) eksiksiz seçiniz.</span>
                 </div>
               )}
             </div>
@@ -1378,7 +1477,7 @@ export default function CreateListing() {
             onClick={() => {
               const currentVehicleIdentity = useCustomVariant
                 ? `custom:${customBrand}:${customModel}:${customYear}`
-                : `variant:${selectedVariant}`;
+                : `variant:${selectedVariant || selectedModelId}:${searchMode}`;
 
               if (lastCommittedVehicleRef.current && lastCommittedVehicleRef.current !== currentVehicleIdentity) {
                 // User changed to a different vehicle -> clear stale title
@@ -1387,7 +1486,11 @@ export default function CreateListing() {
               lastCommittedVehicleRef.current = currentVehicleIdentity;
               setStep(2);
             }}
-            disabled={!useCustomVariant ? (!selectedVariant) : (!customBrand || !customModel || !customYear)}
+            disabled={
+              !useCustomVariant
+                ? (!selectedVariant && !(searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear))
+                : (!customBrand || !customModel || !customYear)
+            }
             className="w-full mt-4 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
           >
             Devam Et
@@ -1402,13 +1505,21 @@ export default function CreateListing() {
 
           {!useCustomVariant ? (
             <div className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col gap-2">
-              <span className="text-xs font-bold text-orange-400">🚗 Seçilen Doğrulanmış Araç:</span>
+              <span className="text-xs font-bold text-orange-400">
+                {searchMode === 'MOTORCYCLE' ? '🏍️ Seçilen Doğrulanmış Motosiklet:' : '🚗 Seçilen Doğrulanmış Araç:'}
+              </span>
               <div className="text-sm font-bold text-slate-100">
-                {selectedBrand} {selectedModel} ({selectedYear}) • {selectedBodyType} • {selectedEngine} • {selectedFuelType} • {selectedTransmission} • <span className="text-orange-400">{selectedTrim}</span>
+                {selectedBrand} {selectedModel} ({selectedYear})
+                {searchMode !== 'MOTORCYCLE' && (
+                  <> • {selectedBodyType} • {selectedEngine} • {selectedFuelType} • {selectedTransmission} • <span className="text-orange-400">{selectedTrim}</span></>
+                )}
+                {searchMode === 'MOTORCYCLE' && selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' && (
+                  <> • <span className="text-orange-400">{selectedTrim}</span></>
+                )}
               </div>
               <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>TorqueScout Araç Kataloğu Eşleşmesi Doğrulandı (Varyant ID: {selectedVariant.slice(0, 8)}...)</span>
+                <span>TorqueScout Araç Kataloğu Eşleşmesi Doğrulandı {selectedVariant ? `(Varyant ID: ${selectedVariant.slice(0, 8)}...)` : ''}</span>
               </div>
             </div>
           ) : (
