@@ -316,14 +316,12 @@ export class MultiVehicleAgentService {
     let liveWebSnippets = '';
     try {
       let searchTerms: string[];
-      const filterYear = context.year && String(context.year) !== 'Tüm Üretim Yılları' ? String(context.year) : '';
-      const filterEngine = context.engine && context.engine !== 'Standart / Tüm Dönemler' && context.engine !== 'Tüm Motor / Versiyonlar' ? context.engine : '';
       if (isMotorcycle) {
         searchTerms = [
-          `${context.brand} ${context.model} ${filterYear} ${filterEngine} kronik sorunlar arızalar kullanıcı şikayetleri`.trim(),
-          `${context.brand} ${context.model} ${filterYear} motor şanzıman aktarma mekanik arızaları`.trim(),
-          `${context.brand} ${context.model} ${filterYear} elektrik tesisat statör konjektör gösterge şarj arızaları`.trim(),
-          `${context.brand} ${context.model} ${filterYear} üretim yılları karbüratör enjeksiyon teknik özellikleri`.trim(),
+          `${context.brand} ${context.model} üretim yılları kasaları dönemleri karbüratör enjeksiyon teknik özellikleri`,
+          `${context.brand} ${context.model} kronik sorunlar arızalar kullanıcı şikayetleri`,
+          `${context.brand} ${context.model} motor mekanik eksantrik zincir debriyaj şanzıman arızaları`,
+          `${context.brand} ${context.model} elektrik tesisat statör konjektör gösterge şarj arızaları`,
         ];
       } else if (isSuvPickup) {
         searchTerms = [
@@ -361,7 +359,7 @@ export class MultiVehicleAgentService {
 
     if (isMotorcycle) {
       systemPrompt = `You are TorqueScout Agent 1: Senior Motorcycle Technical Research Specialist.
-Extract deep mechanical knowledge for this motorcycle model family.
+Extract deep mechanical knowledge for this entire motorcycle model family across all its production eras.
 MANDATORY RULES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
    ALL text, titles, era names, key revisions, symptoms, and inspection instructions MUST BE 100% IN TURKISH.
@@ -385,8 +383,9 @@ MANDATORY RULES:
 5. Extract REAL, specific chronic mechanical and electrical failure modes for this exact model (e.g. eksantrik zincir gergisi, kafa grenajı rezonansı, statör/konjektör, 2. vites boşa atma).
 6. Output strict JSON only.`;
 
-      userPrompt = `Motorcycle: ${context.brand} ${context.model}
-Selected Filter Scope: Year=${context.year || 'Tüm Üretim Yılları'}, Engine=${context.engine || 'Standart'}, Fuel=${context.fuel || 'Benzin'}, Trans=${context.transmission || 'Manuel'}
+      userPrompt = `Motorcycle Model Family: ${context.brand} ${context.model}
+Scope: TÜM MODEL AİLESİ (Üretim başlangıcından günümüze tüm jenerasyon ve dönemler)
+DİKKAT: Motosiklet kullanıcıları tek bir yıl seçmez; tüm model ailesi incelenir. Bu modelin tarihsel TÜM üretim dönemlerini (örn. Karbüratörlü Klasik Seri vs EFI Elektronik Enjeksiyonlu Seri, veya Euro 3 / Euro 4 / Euro 5 geçişleri) eksiksiz haritalandır!
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -1203,9 +1202,16 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
 
       const cleanEras = rawEras.map((era: any) => {
         const startYr = Number(era.startYear) || 2000;
+        const endYr = era.endYear ? Number(era.endYear) : null;
         let isCarb = era.fuelSystem === 'CARBURETOR';
-        if (isKnownClassicCruiser && startYr < 2008) {
-          isCarb = true; // Honda Shadow / Dragstar pre-2008 was strictly carburetor
+
+        // Classic cruisers before 2008 (Shadow 750, Dragstar, GV250 early) had carburetor on their early eras
+        if (isKnownClassicCruiser && startYr < 2008 && endYr !== null && endYr <= 2008) {
+          isCarb = true;
+        } else if (era.fuelSystem === 'EFI' || String(era.keyChanges || '').toLowerCase().includes('enjeksiyon')) {
+          if (!isKnownClassicCruiser || startYr >= 2007 || endYr === null) {
+            isCarb = false;
+          }
         }
 
         const brakingLower = String(era.brakingSystem || '').toLowerCase();
@@ -1240,8 +1246,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         }
 
         let cleanEraName = this.sanitizeTurkishAutomotiveText(era.eraName);
-        if (isCarb && cleanEraName.toLowerCase().includes('efi')) {
-          cleanEraName = cleanEraName.replace(/efi/gi, 'Karbüratörlü').replace(/enjeksiyon/gi, 'Karbüratör');
+        if (isCarb && (cleanEraName.toLowerCase().includes('efi') || cleanEraName.toLowerCase().includes('enjeksiyon'))) {
+          cleanEraName = 'Karbüratörlü Klasik Seri';
         }
 
         return {

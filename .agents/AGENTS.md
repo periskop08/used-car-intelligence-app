@@ -58,7 +58,8 @@ This workspace corresponds to the **TorqueScout** (formerly Used Car Intelligenc
   - **Braking & Cylinders:** Models with drum brakes (Ön Disk Arka Kampana) CANNOT claim ABS. V-Twin / multi-cylinder engines CANNOT claim 3 spark plugs or single-cylinder characteristics.
   - **Dealbreaker Harmonization:** Carburetor models MUST NOT have "FI arıza lambası" in walkAway conditions; they must have genuine mechanical dealbreakers (e.g. krank yatak vuruntusu, karbüratör boğaz çatlağı).
 * **Filtre Garantisi & Context-Scoped Cache (`vehicleContextHash`):**
-  - User-selected search scope (Year, Engine, Fuel, Transmission, Trim) is directly passed to research, context building, and cache lookup.
-  - `GeneratedVehicleReport` lookup in `VehicleReportService` MUST include `contextHash: vehicleContextHash`. Under NO circumstances may a cached report for a different year or prior codebase version be served.
+  - **Motosiklet Kapsamı (Model Ailesi):** Motosiklette yıl seçimi YOKTUR; arama yalnızca Marka + Model bazında yapılır. Sistem tüm model ailesini (tüm üretim dönemleri, karbüratörden enjeksiyona geçiş haritası) bir bütün olarak inceler.
+  - **Otomobil, SUV & Ticari Kapsamı:** Kullanıcının seçtiği filtreler (Yıl, Kasa, Motor, Yakıt, Vites, Donanım) doğrudan araştırmaya ve `contextHash: vehicleContextHash` ile önbelleğe bağlanır.
+  - `GeneratedVehicleReport` sorgusu her zaman `contextHash` eşleşmesi arar. Asla önceki bir kod versiyonuna ait veya farklı kapsama sahip eski bir rapor önbellekten sunulamaz.
 * **Mandatory Warning & Gatekeeper Policy:**
   - Any proposed modification, refactoring, or external touch directly or indirectly affecting `MultiVehicleAgentService`, `VehicleReportService` cache lookup, or multi-vehicle context builder MUST trigger an explicit warning to the user before proceeding, requiring explicit confirmation.
