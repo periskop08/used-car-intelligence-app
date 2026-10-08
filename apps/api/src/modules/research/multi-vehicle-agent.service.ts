@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
+import { resolveCommercialVehicleDefaults, CommercialVehicleDefaults } from '../vehicle/commercial-vehicle-defaults';
 import OpenAI from 'openai';
 
 export type SupportedMultiVehicleType = 'MOTORCYCLE' | 'MINIVAN_PANELVAN' | 'SUV_PICKUP' | 'AUTOMOBILE';
@@ -261,28 +262,49 @@ export class MultiVehicleAgentService {
       candidatePowers = facts.candidatePowers || (resolvedHp ? [resolvedHp] : []);
     }
 
+    const commercialDefaults =
+      context.vehicleType === 'MINIVAN_PANELVAN'
+        ? resolveCommercialVehicleDefaults(
+            context.brand,
+            context.model,
+            context.engine,
+            context.trimPackage,
+            context.year,
+          )
+        : undefined;
+
     // Fallbacks if resolution didn't yield values
     if (!resolvedCc) {
-      resolvedCc = context.vehicleType === 'MOTORCYCLE' ? 249 : context.vehicleType === 'SUV_PICKUP' ? 1995 : 2299;
+      resolvedCc =
+        context.vehicleType === 'MOTORCYCLE'
+          ? 249
+          : context.vehicleType === 'SUV_PICKUP'
+          ? 1995
+          : commercialDefaults?.defaultCc || 1598;
     }
     if (!resolvedHp) {
-      resolvedHp = context.vehicleType === 'MOTORCYCLE' ? 29 : context.vehicleType === 'SUV_PICKUP' ? 150 : 125;
+      resolvedHp =
+        context.vehicleType === 'MOTORCYCLE'
+          ? 29
+          : context.vehicleType === 'SUV_PICKUP'
+          ? 150
+          : commercialDefaults?.defaultHp || 105;
     }
     if (candidatePowers.length === 0) {
-      candidatePowers = [resolvedHp];
+      candidatePowers = commercialDefaults?.candidatePowers || [resolvedHp];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 1: Primary Research Agent
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[AGENT 1] Executing Primary Research for ${context.brand} ${context.model}...`);
-    const agent1Output = await this.runAgent1PrimaryResearch(context, resolvedCc, resolvedHp, candidatePowers, powerRangeText);
+    const agent1Output = await this.runAgent1PrimaryResearch(context, resolvedCc, resolvedHp, candidatePowers, powerRangeText, commercialDefaults);
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 2: Reverse Validation / Red Team Agent
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[AGENT 2] Executing Reverse Validation / Red Team on ${agent1Output.claims.length} claims...`);
-    const agent2Output = await this.runAgent2RedTeam(context, agent1Output);
+    const agent2Output = await this.runAgent2RedTeam(context, agent1Output, commercialDefaults);
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 3: Judge / Final Fact Validation Agent
@@ -294,7 +316,7 @@ export class MultiVehicleAgentService {
     // CLOSED REPORT WRITER: Pure presenter with 0 internet access & 0 fact invention
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[REPORT WRITER] Generating closed presentation report from ${agent3Output.approvedFactsOnly.length} approved facts...`);
-    const finalReport = await this.runClosedReportWriter(context, agent3Output);
+    const finalReport = await this.runClosedReportWriter(context, agent3Output, commercialDefaults);
 
     return finalReport;
   }
@@ -308,6 +330,7 @@ export class MultiVehicleAgentService {
     baseHp: number,
     candidatePowers: number[],
     powerRangeText?: string,
+    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<Agent1Output> {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -331,11 +354,14 @@ export class MultiVehicleAgentService {
           `${context.brand} ${context.model} ${context.year || ''} yakıt tüketimi bagaj hacmi teknik verileri`,
         ];
       } else {
+        const commModelSearch = commercialDefaults?.hasWetTimingBelt
+          ? `${context.brand} ${context.model} 2.0 ecoblue yağ içinde çalışan triger kayışı yağ süzgeci tıkanması arızası`
+          : `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar kullanıcı şikayetleri`;
         searchTerms = [
           `${context.brand} ${context.model} ${context.year || ''} ${context.trimPackage || ''} ticari kullanım ağır yük aşınma`,
-          `${context.brand} ${context.model} ${context.year || ''} enjektör turbo dpf egr arızaları bakım maliyeti`,
-          `${context.brand} ${context.model} ${context.year || ''} sürgülü kapı rulman arka makas torsiyon çökme`,
-          `${context.brand} ${context.model} ${context.year || ''} otomatik şanzıman var mı manuel mi katalog verileri`,
+          commModelSearch,
+          `${context.brand} ${context.model} ${context.year || ''} sürgülü kapı kilit mekanizması süspansiyon burç arızaları`,
+          `${context.brand} ${context.model} ${context.year || ''} enjektör turbo debriyaj volan bakım maliyetleri`,
         ];
       }
 
@@ -449,18 +475,30 @@ ${liveWebSnippets}
 
 Extract strict JSON matching schema with candidatePowers, claims, and physical specs.`;
     } else {
+      const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
+      const liters = commercialDefaults?.trunkCapacityLiters || 3400;
+      const susp = commercialDefaults?.suspensionType || 'Süspansiyon Sistemi';
+      const leafRule = commercialDefaults?.hasLeafSprings
+        ? 'Parabolik makas (yaprak yay) aşınması ve burç boşluklarını incele.'
+        : 'Bu araçta arkada yaprak yay (makas) YOKTUR! Helezon yay veya Bi-Link bağımsız süspansiyon sistemidir; ASLA makas çökmesi uydurma!';
+      const wetBeltRule = commercialDefaults?.hasWetTimingBelt
+        ? 'DİKKAT: Ford 2.0 EcoBlue motorda yağ içinde çalışan ıslak triger kayışının (Belt-in-Oil / BIO) lif ayrışmasıyla karter yağ süzgecini tıkaması ve motor sarması en kritik arıza modudur.'
+        : '';
+
       systemPrompt = `You are TorqueScout Agent 1: Commercial Vehicle Application Technical Research Specialist.
-Map the exact commercial application, cargo volume (${context.trimPackage || '13 m³'}), payload capacity, gearbox availability (manual vs automatic), and commercial duty wear.
+Map the exact commercial vehicle class (${commercialDefaults?.segmentNameTr || 'Ticari Araç'}), authentic cargo volume (${vol} m³ / ${liters} Litre), payload capacity, gearbox availability (manual vs automatic), and heavy commercial duty wear.
 CRITICAL RULES:
-1. 13 m³ is a cargo volume / body configuration label, NOT a luxury equipment package!
-2. Validate whether automatic actually exists for this specific model or if it is strictly manual.
-3. Extract cargo sliding door roller wear, rear leaf spring/torsion axle sag, common rail injector leak-off, dual-mass flywheel wear, turbo soot.
-4. Output strict JSON only.`;
+1. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
+2. Rear suspension architecture: ${susp}. ${leafRule}
+3. Engine architecture: ${wetBeltRule || 'Extract authentic injector leak-off, turbo boost hose wear, EGR cooler and DPF soot issues.'}
+4. Validate whether automatic actually exists for this specific model or if it is strictly manual.
+5. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks.
+6. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
-Engine: ${context.engine || ''}
+Engine: ${context.engine || `${commercialDefaults?.defaultCc || baseCc} cc`}
 Fuel: ${context.fuel || 'Dizel'}
-Configuration: ${context.trimPackage || '13 m3'}
+Configuration: ${context.trimPackage || `${vol} m3`}
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -560,16 +598,12 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
         } catch (recErr: any) {
           this.logger.warn(`Recovery notice: ${recErr.message}`);
         }
-      } else {
-        const categoryRole = isSuvPickup
-          ? 'Master 4x4, SUV and Off-Road Diagnostic Specialist'
-          : 'Master Light Commercial Fleet and Cargo Van Diagnostic Specialist';
-        const focusAreas = isSuvPickup
-          ? 'transfer case actuator, differential locks, propeller shaft universal joint / center bearing, air suspension or heavy duty off-road dampers, cooling system under towing load, turbo/DPF'
-          : 'commercial sliding door rollers and track alignment, leaf spring / rear suspension sagging, cargo floor deformation, commercial clutch / dual-mass flywheel, turbo boost hose leaks, EGR / DPF soot';
+      } else if (isSuvPickup) {
+        const focusAreas =
+          'transfer case actuator, differential locks, propeller shaft universal joint / center bearing, air suspension or heavy duty off-road dampers, cooling system under towing load, turbo/DPF';
 
         this.logger.log(`[AGENT 1 RECOVERY] Extracting model-specific chronic failure modes for ${context.brand} ${context.model} (${context.vehicleType})...`);
-        const recoverySystemPrompt = `You are a ${categoryRole}.
+        const recoverySystemPrompt = `You are a Master 4x4, SUV and Off-Road Diagnostic Specialist.
 Extract exactly 3 to 4 documented, genuine chronic failure modes specifically for "${context.year || ''} ${context.brand} ${context.model}".
 CRITICAL DIRECTIVES:
 1. Ground your analysis in the ACTUAL mechanical engineering of this specific model (powertrain: ${context.engine || ''}, transmission: ${context.transmission || ''}, focus areas: ${focusAreas}).
@@ -580,6 +614,76 @@ CRITICAL DIRECTIVES:
 Type: ${context.vehicleType}
 Engine: ${context.engine || ''}
 Transmission: ${context.transmission || ''}
+Extract 3-4 genuine, authentic chronic failure modes for this exact model in strict JSON:
+{
+  "claims": [
+    {
+      "claimId": "CLM-001",
+      "title": "string (Modelin gerçek Türkçe arıza adı)",
+      "system": "string",
+      "scopeType": "ALL_ERA_COMMON | APPLICATION_SPECIFIC",
+      "symptoms": ["string"],
+      "userExperience": "string",
+      "testDriveCheck": "string",
+      "inspectionCheck": "string",
+      "sellerQuestion": "string",
+      "costRisk": "DUSUK | ORTA | YUKSEK | COK_YUKSEK",
+      "severity": "LOW | MODERATE | HIGH | CRITICAL",
+      "confidence": 0.92
+    }
+  ]
+}`;
+
+        try {
+          const recovered = await this.callAiJson(recoverySystemPrompt, recoveryUserPrompt, 2048, 20000);
+          if (Array.isArray(recovered?.claims) && recovered.claims.length >= 3) {
+            claims = recovered.claims.map((c: any, idx: number) => ({
+              claimId: c.claimId || `CLM-${String(idx + 1).padStart(3, '0')}`,
+              title: this.sanitizeTurkishAutomotiveText(c.title || 'Mekanik Aşınma Analizi'),
+              system: c.system || 'MEKANİK',
+              scopeType: c.scopeType || 'ALL_ERA_COMMON',
+              applicableEra: c.applicableEra,
+              symptoms: Array.isArray(c.symptoms) ? c.symptoms.map((s: string) => this.sanitizeTurkishAutomotiveText(s)) : [this.sanitizeTurkishAutomotiveText(c.symptoms || '')],
+              userExperience: this.sanitizeTurkishAutomotiveText(c.userExperience || ''),
+              testDriveCheck: this.sanitizeTurkishAutomotiveText(c.testDriveCheck || ''),
+              inspectionCheck: this.sanitizeTurkishAutomotiveText(c.inspectionCheck || ''),
+              sellerQuestion: this.sanitizeTurkishAutomotiveText(c.sellerQuestion || ''),
+              costRisk: c.costRisk || 'ORTA',
+              severity: c.severity || 'HIGH',
+              evidenceSources: [{ domain: 'catalog.torquescout.com', sourceKind: 'TECHNICAL_DATABASE' as const, excerpt: c.title || '', stance: 'SUPPORTS' as const }],
+              confidence: typeof c.confidence === 'number' ? c.confidence : 0.92,
+            }));
+          }
+        } catch (recErr: any) {
+          this.logger.warn(`Recovery notice: ${recErr.message}`);
+        }
+      } else {
+        // MINIVAN & PANELVAN COMMERCIAL RECOVERY
+        this.logger.log(`[AGENT 1 RECOVERY] Extracting model-specific commercial failure modes for ${context.brand} ${context.model} (${commercialDefaults?.segment || 'VAN'})...`);
+        const suspensionRule = commercialDefaults?.hasLeafSprings
+          ? 'Rear leaf spring (parabolik makas) sag, overload cracking, and center bolt wear under heavy payload.'
+          : `Rear suspension uses ${commercialDefaults?.suspensionType || 'coil springs'} (NO leaf springs / makas!). Focus on rear coil spring/damper and bushing fatigue.`;
+        const timingRule = commercialDefaults?.hasWetTimingBelt
+          ? 'Ford 2.0 EcoBlue Wet Timing Belt (Belt-in-Oil / BIO) rubber degradation contaminating engine oil, clogging the oil pump pickup strainer and causing oil pressure loss and catastrophic engine seizure.'
+          : '';
+
+        const recoverySystemPrompt = `You are a Master Commercial Fleet Diagnostic Specialist.
+Extract exactly 3 to 4 documented, authentic chronic failure modes specifically for "${context.year || ''} ${context.brand} ${context.model}".
+CRITICAL DIRECTIVES:
+1. Ground your analysis in the ACTUAL platform engineering of "${context.year || ''} ${context.brand} ${context.model}" (Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}, Suspension: ${commercialDefaults?.suspensionType}).
+2. Suspension Accuracy: ${suspensionRule}
+3. Engine Accuracy: ${timingRule || 'Analyze genuine common rail injector leak-off, turbo boost pressure hose cracking, EGR cooler and DPF soot accumulation.'}
+   - E.g. for Fiat Doblo: Independent Bi-Link rear suspension (helezon yay - NOT leaf spring/makas), 1.3/1.6 MultiJet EGR cooler cracking, swirl flap failure, sliding door lower guide bearing wear.
+   - E.g. for Ford Transit Custom 2.0 EcoBlue: Wet timing belt (Belt-in-Oil / BIO) rubber degradation contaminating oil and clogging oil pump strainer causing oil pressure loss and engine seizure; AdBlue injector crystallization; dual-mass flywheel shudder.
+   - E.g. for VW Transporter: Transporter rear trailing arm bushes, 2.0 TDI EGR cooler leak, DSG clutch wear.
+4. DO NOT use generic copy-paste text! Output 3-4 genuine, authentic chronic failure modes corresponding to its exact platform.
+5. Output strict JSON only matching CandidateClaim schema with claimId, title, system, symptoms, userExperience, testDriveCheck, inspectionCheck, sellerQuestion, costRisk, severity.`;
+
+        const recoveryUserPrompt = `Commercial Vehicle: ${context.year || ''} ${context.brand} ${context.model}
+Segment: ${commercialDefaults?.segmentNameTr}
+Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}
+Suspension: ${commercialDefaults?.suspensionType}
+Configuration: ${context.trimPackage || `${commercialDefaults?.cargoVolumeM3} m3`}
 Extract 3-4 genuine, authentic chronic failure modes for this exact model in strict JSON:
 {
   "claims": [
@@ -647,6 +751,7 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
   private async runAgent2RedTeam(
     context: MultiVehicleResearchContext,
     agent1: Agent1Output,
+    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<Agent2Output> {
     const systemPrompt = `You are TorqueScout Agent 2: Adversarial Red Team Technical Validator.
 Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1.
@@ -657,7 +762,10 @@ Investigate:
 4. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
 5. For commercial vehicles: was automatic transmission claimed when the selected application was strictly manual?
 6. For automatic / CVT scooters (such as Honda Forza, PCX, Yamaha XMAX, NMAX, Vespa): did Agent 1 hallucinate manual transmission, gear shift dogs (vites hilali / sekromeç / boşa atma), clutch plates or clutch cables? If so, immediately CONTRADICT with reason "Otomatik CVT scooter modelinde manuel şanzıman veya vites hilali/cırtlaması arızası iddia edilemez; varyatör bagaları ve kayış aktarması geçerlidir"!
-7. Are claims grounded in authentic automotive engineering reality?
+7. For commercial vehicles (Minivan/Panelvan):
+   - If the vehicle uses coil springs / independent suspension (such as Fiat Doblo with Bi-Link suspension, VW Transporter, Mercedes Vito), did Agent 1 claim rear leaf spring (makas / yaprak yay) fatigue or sag? If so, immediately CONTRADICT with reason "Bu modelde arkada makas (yaprak yay) değil, bağımsız Bi-Link / helezon yaylı süspansiyon sistemi mevcuttur; makas çökmesi arızası teknik olarak hatalıdır"!
+   - For Ford Transit / Transit Custom 2.0 EcoBlue: ensure wet timing belt (Belt-in-Oil) degradation is accurately verified.
+8. Are claims grounded in authentic automotive engineering reality?
 Output STRICT JSON:
 {
   "challenges": [
@@ -675,6 +783,7 @@ Output STRICT JSON:
 
     const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
 Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
+${commercialDefaults ? `Commercial Specs: Segment=${commercialDefaults.segmentNameTr}, Suspension=${commercialDefaults.suspensionType}, WetBelt=${commercialDefaults.hasWetTimingBelt}` : ''}
 Motorcycle Eras:
 ${JSON.stringify(agent1.motorcycleEras || [], null, 2)}
 Agent 1 Claims:
@@ -807,6 +916,7 @@ Perform adversarial red-team audit. Output strict JSON.`;
   private async runClosedReportWriter(
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
+    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<any> {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -955,8 +1065,15 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with deep 3-paragraph vehicleOverview, 4x4 transmission analysis, chassis fatigue, and physical specs.`;
     } else {
+      const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
+      const liters = commercialDefaults?.trunkCapacityLiters || 3400;
+      const weight = commercialDefaults?.curbWeightKg || 1420;
+      const susp = commercialDefaults?.suspensionType || 'Süspansiyon Sistemi';
+
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
-Configuration: ${context.trimPackage || '13 m3'}
+Segment: ${commercialDefaults?.segmentNameTr || 'Ticari Araç'}
+Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo Hacmi)
+Suspension: ${susp}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
 Commercial Details:
 ${JSON.stringify(judge.commercialDetails || {}, null, 2)}
@@ -964,25 +1081,103 @@ Approved Facts:
 ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
-Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3-paragraph vehicleOverview, cargo configuration analysis, manual vs automatic gearbox analysis, and physical specs.`;
+Write the complete Minivan/Panelvan Commercial Report in strict JSON:
+{
+  "vehicleOverview": "En az 3 detaylı paragraflık kapsamlı uzman sürüş ve ticari karakter analizi (1. Paragraf: şasi, yükleme ergonomisi, kabin pratikliği ve duruş; 2. Paragraf: motor tork eğrisi, çekiş gücü, şanzıman oranları ve otoyol/şehir içi sürüş hissiyatı; 3. Paragraf: filo/şahsi dayanıklılık, malzeme kalitesi ve pazar konumu - KESİNLİKLE RAKİP MARKA ADI GEÇMEYECEK)",
+  "configurationAnalysis": "${vol} m³ hacmindeki kargo alanı, yükleme eşiği, istiap haddi ve operasyonel kullanım amacının değerlendirmesi",
+  "manualTransmissionAnalysis": "Manuel şanzımanın baskı balata ömrü, debriyaj pedalı hissiyatı ve ağır yük altındaki vites geçiş dayanıklılığı",
+  "automaticTransmissionAnalysis": "Modelde otomatik şanzıman opsiyonu var mı, varsa şanzıman tipi (tork konvertörlü, çift kavrama vb.) ve şehir içi dur-kalk trafiğindeki avantaj/riskleri; yoksa modelin sadece manuel üretildiğinin teknik açıklaması",
+  "manualVsAutomatic": "Manuel ve otomatik şanzıman seçeneklerinin filo ve ticari kullanım açısından işletme maliyeti ve dayanıklılık kıyaslaması",
+  "commercialDutyRisks": [
+    {
+      "title": "string (Ağır ticari kullanım kaynaklı spesifik arıza başlığı)",
+      "risk": "string (Arıza mekanizması ve getireceği maliyet)",
+      "checkRecommendation": "string (Ekspertiz ve alım öncesi yapılması gereken somut kontrol)"
+    }
+  ],
+  "dailyUse": {
+    "cityUse": "string (Şehir içi dar sokak kıvraklığı, dur-kalk teslimat pratikliği, dönüş çapı ve süspansiyon konforu)",
+    "highwayUse": "string (Otoyolda yüklü ve boş seyir kararlılığı, yan rüzgar duyarlılığı ve tork rezervi)"
+  },
+  "technicalSpecifications": {
+    "engineDisplacementCc": ${judge.finalDisplacementCc},
+    "enginePowerHp": ${judge.finalPowerHp},
+    "powerRange": "${judge.finalPowerRangeText || `${judge.finalPowerHp} HP`}",
+    "powerUnit": "HP",
+    "engineTorqueNm": number,
+    "transmissionTypeAndSpeeds": "string (örn: 6 İleri Manuel)",
+    "clutchType": "string (örn: Kuru Tek Disk / Hidrolik)",
+    "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD))",
+    "topSpeedKmh": number,
+    "zeroToHundredKmh": number,
+    "catalogCombinedFuelL100km": number,
+    "trunkCapacityLiters": ${liters},
+    "curbWeightKg": ${weight}
+  },
+  "strongReasons": [
+    { "title": "string", "explanation": "string (en az 2 cümlelik teknik açıklama - rakip ismi geçmeyecek)" }
+  ],
+  "tradeoffs": [
+    { "title": "string", "explanation": "string (en az 2 cümlelik açıklama - araçta olmayan yaprak yay vb. uydurulmayacak)" }
+  ],
+  "idealFor": [
+    { "profile": "string", "explanation": "string" }
+  ],
+  "notIdealFor": [
+    { "profile": "string", "explanation": "string" }
+  ],
+  "conditionsToConsider": [
+    { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
+  ],
+  "walkAwayConditions": [
+    { "condition": "string (Kritik vazgeçme nedeni)", "reason": "string" }
+  ],
+  "inspectionChecklist": [
+    { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
+  ],
+  "sellerQuestions": [
+    { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
+  ],
+  "decisionSynthesis": {
+    "score": ${judge.decisionScore},
+    "riskLevel": "${judge.technicalRiskLevel}",
+    "verdict": "string"
+  }
+}`;
     }
 
     let writerJson = await this.callAiJson(systemPrompt, userPrompt, 4096, 30000);
 
     if (!writerJson || Object.keys(writerJson).length === 0) {
-      writerJson = this.generateDeterministicReportFallback(context, judge);
+      writerJson = this.generateDeterministicReportFallback(context, judge, commercialDefaults);
     }
 
-    return this.harmonizeIntoStandardVehicleReport(context, judge, writerJson);
+    return this.harmonizeIntoStandardVehicleReport(context, judge, writerJson, commercialDefaults);
   }
 
   /**
    * Translates / sanitizes any residual English text into proper automotive Turkish.
    * Completely eliminates English terms and literal translations like "düzeltici".
    */
-  private sanitizeTurkishAutomotiveText(raw?: string | null): string {
+  private sanitizeTurkishAutomotiveText(raw?: any): string {
     if (!raw) return '';
+    if (typeof raw === 'object') {
+      if (typeof raw.text === 'string') raw = raw.text;
+      else if (typeof raw.detailedAssessment === 'string') raw = raw.detailedAssessment;
+      else if (typeof raw.vehicleOverview === 'string') raw = raw.vehicleOverview;
+      else if (typeof raw.summary === 'string') raw = raw.summary;
+      else if (typeof raw.description === 'string') raw = raw.description;
+      else {
+        const values = Object.values(raw).filter((v) => typeof v === 'string' && (v as string).trim().length > 0);
+        if (values.length > 0) {
+          raw = values.join('\n\n');
+        } else {
+          raw = '';
+        }
+      }
+    }
     let text = String(raw).trim();
+    if (text === '[object Object]') text = '';
 
     const dictionary: Array<[RegExp, string]> = [
       // Regülatör / Düzeltici / Konjektör
@@ -1054,6 +1249,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
     writer: any,
+    commercialDefaults?: CommercialVehicleDefaults,
   ): any {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -1086,17 +1282,32 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         ? baseCc >= 600 ? 5.2 : baseCc >= 200 ? 3.6 : 2.5
         : isSuvPickup ? 8.4 : 8.2;
 
-    const trunkCapacityLiters =
-      typeof writer.technicalSpecifications?.trunkCapacityLiters === 'number'
+    let trunkCapacityLiters =
+      typeof writer.technicalSpecifications?.trunkCapacityLiters === 'number' &&
+      writer.technicalSpecifications.trunkCapacityLiters > 0
         ? writer.technicalSpecifications.trunkCapacityLiters
-        : isMotorcycle ? 0 : isSuvPickup ? 650 : 13000;
+        : isMotorcycle
+        ? 0
+        : isSuvPickup
+        ? 650
+        : commercialDefaults?.trunkCapacityLiters || 3400;
+
+    // Guard against commercial volume hallucinations (e.g. 13000L on Doblo or Courier)
+    if (!isMotorcycle && !isSuvPickup && commercialDefaults) {
+      if (commercialDefaults.segment === 'COMPACT' && trunkCapacityLiters > 5000) {
+        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
+      } else if (commercialDefaults.segment === 'MEDIUM' && (trunkCapacityLiters > 8500 || trunkCapacityLiters < 4500)) {
+        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
+      }
+    }
 
     const curbWeightKg =
-      typeof writer.technicalSpecifications?.curbWeightKg === 'number'
+      typeof writer.technicalSpecifications?.curbWeightKg === 'number' &&
+      writer.technicalSpecifications.curbWeightKg > 0
         ? writer.technicalSpecifications.curbWeightKg
         : isMotorcycle
         ? baseCc >= 600 ? 215 : baseCc >= 200 ? 170 : 130
-        : isSuvPickup ? 1950 : 2050;
+        : isSuvPickup ? 1950 : commercialDefaults?.curbWeightKg || 1420;
 
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
@@ -1243,15 +1454,15 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
       vehicleIdentity: {
         brand: context.brand,
         model: context.model,
-        modelYear: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2011),
-        year: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2011),
-        bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : 'Minivan & Panelvan',
-        engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : '2.3 dCi'),
+        modelYear: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
+        year: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
+        bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : commercialDefaults?.segmentNameTr || 'Minivan & Panelvan',
+        engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : `${commercialDefaults?.defaultCc || judge.finalDisplacementCc} cc Dizel`),
         transmissionName: isMotorcycle
           ? (context.transmission || (writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('otomatik') || writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('cvt') ? 'Otomatik' : 'Manuel'))
           : (context.transmission || 'Manuel'),
         fuelType: isMotorcycle ? 'Benzin' : (context.fuel || 'Dizel'),
-        trim: context.trimPackage || (isMotorcycle ? 'Standart' : '13 m3'),
+        trim: context.trimPackage || (isMotorcycle ? 'Standart' : `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`),
         engineDisplacementCc: judge.finalDisplacementCc,
         enginePowerHp: judge.finalPowerHp,
         canonicalDisplayPowerHp: judge.finalPowerHp,
@@ -1265,7 +1476,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
           ? writer.technicalSpecifications.engineTorqueNm
           : isMotorcycle
           ? (judge.finalDisplacementCc >= 650 ? 68 : judge.finalDisplacementCc >= 350 ? 35 : 24)
-          : isSuvPickup ? 380 : 310,
+          : isSuvPickup ? 380 : (commercialDefaults?.segment === 'COMPACT' ? 260 : 385),
         torqueUnit: 'Nm',
         transmissionTypeAndSpeeds: writer.technicalSpecifications?.transmissionTypeAndSpeeds || (
           isMotorcycle
@@ -1465,11 +1676,18 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
               manualTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.manualTransmissionAnalysis),
               automaticTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.automaticTransmissionAnalysis),
               transmissionComparison: this.sanitizeTurkishAutomotiveText(writer.manualVsAutomatic),
-              commercialDutyRisks: writer.commercialDutyRisks,
+              commercialDutyRisks: (writer.commercialDutyRisks || []).map((r: any) => ({
+                title: this.sanitizeTurkishAutomotiveText(r.title),
+                risk: this.sanitizeTurkishAutomotiveText(r.risk),
+                checkRecommendation: this.sanitizeTurkishAutomotiveText(r.checkRecommendation),
+              })),
               configurationContext: {
-                rawPackage: context.trimPackage || '13 m3',
-                cargoVolumeM3: 13,
-                commercialMeaning: this.sanitizeTurkishAutomotiveText(writer.configurationAnalysis || `${context.trimPackage || '13 m³'} kargo yük hacmi konfigürasyonu`),
+                rawPackage: context.trimPackage || `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`,
+                cargoVolumeM3: commercialDefaults?.cargoVolumeM3 || Number((trunkCapacityLiters / 1000).toFixed(1)),
+                commercialMeaning: this.sanitizeTurkishAutomotiveText(
+                  writer.configurationAnalysis ||
+                    `${context.trimPackage || (commercialDefaults?.cargoVolumeM3 || 3.4) + ' m³'} kargo yük hacmi konfigürasyonu`,
+                ),
               },
             }
           : undefined,
@@ -1528,6 +1746,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
   private generateDeterministicReportFallback(
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
+    commercialDefaults?: CommercialVehicleDefaults,
   ): any {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -1707,8 +1926,17 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
       };
     }
 
+    const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
     return {
       vehicleOverview: `${context.brand} ${context.model}, sınıfında operasyonel dayanıklılığı, tork karakteri ve ergonomik yapısıyla profesyonel kullanıma yönelik tasarlanmıştır.\n\nMotor ünitesi ağır kullanım koşullarında yeterli tork rezervi sağlarken şanzıman oranları yakıt ekonomisi ile çekiş gücünü dengeler.\n\nPazar tecrübesi yüksek olan model, yaygın yedek parça ve tecrübeli servis ağıyla ikinci elde değerini korumaktadır.`,
+      configurationAnalysis: `${context.trimPackage || vol + ' m³'} kargo yükleme hacmi ve operasyonel taşıma kapasitesi.`,
+      manualTransmissionAnalysis: 'Ağır yük ve dur-kalk teslimat şartlarında debriyaj kavrama ve volan dayanımı.',
+      automaticTransmissionAnalysis: 'Modelin şanzıman opsiyonları ve tork aktarım kararlılığı.',
+      manualVsAutomatic: 'İşletme maliyeti, debriyaj değişim periyotları ve kullanım kolaylığı kıyaslaması.',
+      commercialDutyRisks: [
+        { title: 'Sürgülü Kapı ve Kilit Karşılığı Aşınması', risk: 'Mekanizma boşluğu ve ayar bozulması', checkRecommendation: 'Rulman ve kilit karşılığı kontrolü' },
+        { title: 'Ağır Yük Süspansiyon Yorgunluğu', risk: 'Süspansiyon burçlarında ve yaylarda çökme', checkRecommendation: 'Alt takım ve yay kontrolü' },
+      ],
       modelHistory: `${context.brand} ${context.model} serisi pazar talepleri ve regülasyonlar doğrultusunda periyodik olarak güncellenmiştir.`,
       strongReasons: [
         { title: 'Dayanıklı Şasi ve Yürüyen Aksam', explanation: 'Yoğun kullanım şartlarına dayanıklı süspansiyon ve gövde mimarisi.' },

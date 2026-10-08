@@ -7,6 +7,7 @@ import { resolveAutomotiveEngineTaxonomy, lookupAutomotiveTransmissionTaxonomy }
 import { isUserNeglectOrRoutineMaintenance } from './vehicle-report-auditor.service';
 import * as crypto from 'crypto';
 import OpenAI from 'openai';
+import { resolveCommercialVehicleDefaults } from '../vehicle/commercial-vehicle-defaults';
 
 @Injectable()
 export class VehicleReportContextBuilderService {
@@ -619,12 +620,19 @@ export class VehicleReportContextBuilderService {
     };
 
     if (variant.vehicleType === 'MINIVAN_PANELVAN') {
+      const commDefaults = resolveCommercialVehicleDefaults(
+        variant.brand?.name || (variant as any).model?.brand?.name || '',
+        (variant as any).model?.name || '',
+        variant.engine?.description || variant.engine?.code || (variant as any).engineCode,
+        variant.trim?.name || (variant as any).trimPackage,
+        variant.year,
+      );
       (contextObj as any).vehicleType = 'MINIVAN_PANELVAN';
       (contextObj.vehicleIdentity as any).vehicleType = 'MINIVAN_PANELVAN';
       (contextObj as any).commercialConfiguration = {
-        rawPackage: variant.trim?.name || (variant as any).trimPackage || '13 m3',
-        cargoVolumeM3: 13,
-        commercialMeaning: `${variant.trim?.name || (variant as any).trimPackage || '13 m³'} yük hacmi konfigürasyonu`,
+        rawPackage: variant.trim?.name || (variant as any).trimPackage || `${commDefaults.cargoVolumeM3} m³`,
+        cargoVolumeM3: commDefaults.cargoVolumeM3,
+        commercialMeaning: `${variant.trim?.name || (variant as any).trimPackage || commDefaults.cargoVolumeM3 + ' m³'} yük hacmi konfigürasyonu`,
       };
       (contextObj as any).transmissionScope = 'Manuel + Otomatik';
     } else {
