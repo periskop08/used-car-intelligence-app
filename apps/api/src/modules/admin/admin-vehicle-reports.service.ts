@@ -67,6 +67,26 @@ export class AdminVehicleReportsService {
       }
     }
 
+    // Vehicle Type Filtering (Otomobil, Arazi & SUV, Minivan & Panelvan, Motosiklet)
+    if (dto.vehicleType) {
+      const vt = dto.vehicleType.toUpperCase();
+      const typeCondition =
+        vt === 'AUTOMOBILE'
+          ? { OR: [{ vehicleType: 'AUTOMOBILE' }, { vehicleType: null }, { vehicleType: '' }] }
+          : vt === 'SUV_PICKUP' || vt === 'SUV'
+          ? { vehicleType: { in: ['SUV_PICKUP', 'SUV', 'PICKUP'] } }
+          : vt === 'MINIVAN_PANELVAN' || vt === 'COMMERCIAL'
+          ? { vehicleType: { in: ['MINIVAN_PANELVAN', 'MINIVAN', 'PANELVAN', 'COMMERCIAL'] } }
+          : vt === 'MOTORCYCLE'
+          ? { vehicleType: 'MOTORCYCLE' }
+          : undefined;
+
+      if (typeCondition) {
+        if (!where.AND) where.AND = [];
+        where.AND.push(typeCondition);
+      }
+    }
+
     // Filter by Brand, Model, Year, or Search via Variant matching
     let matchingVariantIds: string[] | undefined = undefined;
 
@@ -117,8 +137,27 @@ export class AdminVehicleReportsService {
       }
     }
 
-    // Count and find summary records + tab counts
-    const [total, reports, activeCount, draftsCount, archivedCount] = await Promise.all([
+    const tabWhere =
+      activeTab === 'active'
+        ? { isCurrentPublished: true, isDraft: false }
+        : activeTab === 'drafts'
+        ? { isDraft: true }
+        : activeTab === 'archived'
+        ? { isCurrentPublished: false, isDraft: false }
+        : {};
+
+    // Count and find summary records + tab counts + category counts
+    const [
+      total,
+      reports,
+      activeCount,
+      draftsCount,
+      archivedCount,
+      autoCount,
+      suvCount,
+      vanCount,
+      motoCount,
+    ] = await Promise.all([
       this.prisma.generatedVehicleReport.count({ where }),
       this.prisma.generatedVehicleReport.findMany({
         where,
@@ -126,6 +165,7 @@ export class AdminVehicleReportsService {
           id: true,
           mode: true,
           variantId: true,
+          vehicleType: true,
           listingId: true,
           status: true,
           versionNumber: true,
@@ -142,6 +182,7 @@ export class AdminVehicleReportsService {
           generatedAt: true,
           completedAt: true,
           updatedAt: true,
+          reportData: true,
         },
         orderBy: [{ isCurrentPublished: 'desc' }, { updatedAt: 'desc' }],
         skip,
@@ -155,6 +196,30 @@ export class AdminVehicleReportsService {
       }),
       this.prisma.generatedVehicleReport.count({
         where: { isCurrentPublished: false, isDraft: false },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: {
+          ...tabWhere,
+          OR: [{ vehicleType: 'AUTOMOBILE' }, { vehicleType: null }, { vehicleType: '' }],
+        },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: {
+          ...tabWhere,
+          vehicleType: { in: ['SUV_PICKUP', 'SUV', 'PICKUP'] },
+        },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: {
+          ...tabWhere,
+          vehicleType: { in: ['MINIVAN_PANELVAN', 'MINIVAN', 'PANELVAN', 'COMMERCIAL'] },
+        },
+      }),
+      this.prisma.generatedVehicleReport.count({
+        where: {
+          ...tabWhere,
+          vehicleType: 'MOTORCYCLE',
+        },
       }),
     ]);
 
@@ -199,10 +264,15 @@ export class AdminVehicleReportsService {
       const reportIssues = feedbackCountMap.get(report.id) || 0;
       const totalPendingIssues = variantIssues + reportIssues;
 
+      const rd = report.reportData as any;
+      const resolvedVehicleType = report.vehicleType || rd?.vehicleType || rd?.vehicleIdentity?.vehicleType || 'AUTOMOBILE';
+      const fallbackIdentity = rd?.vehicleIdentity || null;
+
       return {
         id: report.id,
         mode: report.mode,
         variantId: report.variantId,
+        vehicleType: resolvedVehicleType,
         listingId: report.listingId,
         status: report.status,
         versionNumber: report.versionNumber,
@@ -232,6 +302,21 @@ export class AdminVehicleReportsService {
               powerHp: variant.engine?.horsepower,
               transmission: variant.transmission?.name || '',
               fuelType: variant.engine?.fuelType || '',
+              vehicleType: resolvedVehicleType,
+            }
+          : fallbackIdentity
+          ? {
+              brand: fallbackIdentity.brand || '',
+              model: fallbackIdentity.model || '',
+              year: fallbackIdentity.year || fallbackIdentity.modelYear || '',
+              bodyType: fallbackIdentity.bodyType || '',
+              trim: fallbackIdentity.trim || '',
+              engineCode: fallbackIdentity.engineCode || '',
+              displacementCc: fallbackIdentity.engineDisplacementCc || fallbackIdentity.displacementCc,
+              powerHp: fallbackIdentity.enginePowerHp || fallbackIdentity.powerHp,
+              transmission: fallbackIdentity.transmissionName || fallbackIdentity.transmission || '',
+              fuelType: fallbackIdentity.fuelType || '',
+              vehicleType: resolvedVehicleType,
             }
           : null,
       };
@@ -249,12 +334,18 @@ export class AdminVehicleReportsService {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
       counts: {
         active: activeCount,
         drafts: draftsCount,
         archived: archivedCount,
         all: activeCount + draftsCount + archivedCount,
+      },
+      categoryCounts: {
+        automobile: autoCount,
+        suvPickup: suvCount,
+        minivanPanelvan: vanCount,
+        motorcycle: motoCount,
       },
     };
   }

@@ -20,6 +20,11 @@ import {
   ChevronRight,
   ShieldAlert,
   Archive,
+  Car,
+  Mountain,
+  Truck,
+  Bike,
+  Layers,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/utils/apiConfig';
 
@@ -34,6 +39,7 @@ interface VehicleIdentity {
   powerHp?: number;
   transmission: string;
   fuelType: string;
+  vehicleType?: string;
 }
 
 interface ReportSummary {
@@ -41,6 +47,7 @@ interface ReportSummary {
   mode: string;
   variantId: string | null;
   listingId: string | null;
+  vehicleType?: string;
   status: string;
   versionNumber: number;
   isCurrentPublished: boolean;
@@ -76,6 +83,20 @@ export default function AdminVehicleReportsPage() {
     all: 0,
   });
 
+  // Category Filter & Counts (Otomobil, Arazi & SUV, Minivan & Panelvan, Motosiklet)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<{
+    automobile: number;
+    suvPickup: number;
+    minivanPanelvan: number;
+    motorcycle: number;
+  }>({
+    automobile: 0,
+    suvPickup: 0,
+    minivanPanelvan: 0,
+    motorcycle: 0,
+  });
+
   // Filters & Search
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
@@ -99,6 +120,7 @@ export default function AdminVehicleReportsPage() {
       const params = new URLSearchParams();
 
       params.append('tab', activeTab);
+      if (selectedCategory) params.append('vehicleType', selectedCategory);
       if (search.trim()) params.append('search', search.trim());
       if (brandFilter.trim()) params.append('brand', brandFilter.trim());
       if (modelFilter.trim()) params.append('model', modelFilter.trim());
@@ -132,12 +154,15 @@ export default function AdminVehicleReportsPage() {
       if (data.counts) {
         setCounts(data.counts);
       }
+      if (data.categoryCounts) {
+        setCategoryCounts(data.categoryCounts);
+      }
     } catch (err: any) {
       setError(err.message || 'Rapor listesi alınırken beklenmeyen bir hata oluştu.');
     } finally {
       setLoading(false);
     }
-  }, [activeTab, search, brandFilter, modelFilter, yearFilter, statusFilter, onlyEdited, onlyWithFeedback, onlyDraft, page]);
+  }, [activeTab, selectedCategory, search, brandFilter, modelFilter, yearFilter, statusFilter, onlyEdited, onlyWithFeedback, onlyDraft, page]);
 
   useEffect(() => {
     fetchReports();
@@ -150,6 +175,7 @@ export default function AdminVehicleReportsPage() {
   };
 
   const handleResetFilters = () => {
+    setSelectedCategory(null);
     setSearch('');
     setBrandFilter('');
     setModelFilter('');
@@ -229,6 +255,136 @@ export default function AdminVehicleReportsPage() {
           </button>
         </div>
       </div>
+
+      {/* 4 VEHICLE CATEGORY BOXES (Otomobil, Arazi SUV & Pickup, Minivan & Panelvan, Motosiklet) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {[
+          {
+            id: 'AUTOMOBILE',
+            label: 'Otomobil',
+            icon: Car,
+            count: categoryCounts.automobile,
+            bgClass: 'bg-blue-500/10',
+            borderClass: 'border-blue-500/20',
+            textClass: 'text-blue-400',
+            activeClass: 'border-blue-500 bg-slate-900 shadow-[0_0_20px_rgba(59,130,246,0.25)] ring-1 ring-blue-500/40',
+            activeBadge: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+          },
+          {
+            id: 'SUV_PICKUP',
+            label: 'Arazi, SUV & Pickup',
+            icon: Mountain,
+            count: categoryCounts.suvPickup,
+            bgClass: 'bg-emerald-500/10',
+            borderClass: 'border-emerald-500/20',
+            textClass: 'text-emerald-400',
+            activeClass: 'border-emerald-500 bg-slate-900 shadow-[0_0_20px_rgba(16,185,129,0.25)] ring-1 ring-emerald-500/40',
+            activeBadge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+          },
+          {
+            id: 'MINIVAN_PANELVAN',
+            label: 'Minivan & Panelvan',
+            icon: Truck,
+            count: categoryCounts.minivanPanelvan,
+            bgClass: 'bg-amber-500/10',
+            borderClass: 'border-amber-500/20',
+            textClass: 'text-amber-400',
+            activeClass: 'border-amber-500 bg-slate-900 shadow-[0_0_20px_rgba(245,158,11,0.25)] ring-1 ring-amber-500/40',
+            activeBadge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+          },
+          {
+            id: 'MOTORCYCLE',
+            label: 'Motosiklet',
+            icon: Bike,
+            count: categoryCounts.motorcycle,
+            bgClass: 'bg-purple-500/10',
+            borderClass: 'border-purple-500/20',
+            textClass: 'text-purple-400',
+            activeClass: 'border-purple-500 bg-slate-900 shadow-[0_0_20px_rgba(168,85,247,0.25)] ring-1 ring-purple-500/40',
+            activeBadge: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+          },
+        ].map((cat) => {
+          const isSelected = selectedCategory === cat.id;
+          const Icon = cat.icon;
+
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => {
+                setSelectedCategory((prev) => (prev === cat.id ? null : cat.id));
+                setPage(1);
+              }}
+              className={`relative flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer overflow-hidden group ${
+                isSelected
+                  ? cat.activeClass
+                  : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+              }`}
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  className={`p-2.5 rounded-xl border transition-all ${
+                    isSelected
+                      ? `${cat.activeBadge} shadow-md`
+                      : `${cat.bgClass} ${cat.borderClass} ${cat.textClass} group-hover:scale-105`
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <span
+                    className={`text-xs font-bold block transition-colors ${
+                      isSelected ? 'text-white' : 'text-slate-200 group-hover:text-white'
+                    }`}
+                  >
+                    {cat.label}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {cat.count} Rapor
+                  </span>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              <div className="flex items-center">
+                {isSelected ? (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${cat.activeBadge}`}>
+                    Aktif
+                  </span>
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-slate-700 group-hover:bg-slate-500 transition-colors" />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected Category Notice Banner */}
+      {selectedCategory && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-xl text-xs text-orange-300">
+          <div className="flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+            <span>
+              Şu an yalnızca <strong>{
+                selectedCategory === 'AUTOMOBILE' ? 'Otomobil' :
+                selectedCategory === 'SUV_PICKUP' ? 'Arazi, SUV & Pickup' :
+                selectedCategory === 'MINIVAN_PANELVAN' ? 'Minivan & Panelvan' : 'Motosiklet'
+              }</strong> kategorisindeki raporlar filtreleniyor.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory(null);
+              setPage(1);
+            }}
+            className="text-xs font-bold text-orange-400 hover:text-orange-200 underline cursor-pointer shrink-0 ml-2"
+          >
+            Filtreyi Temizle (Tümü)
+          </button>
+        </div>
+      )}
 
       {/* TABS: Yayındaki Raporlar, Taslaklar, Arşiv, Tümü */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg">
@@ -493,8 +649,32 @@ export default function AdminVehicleReportsPage() {
                       {/* Vehicle Identity */}
                       <td className="py-4 px-4">
                         {veh ? (
-                          <div className="space-y-0.5">
-                            <span className="font-bold text-white text-sm group-hover:text-orange-400 transition-colors">
+                          <div className="space-y-1">
+                            {/* Category badge */}
+                            {(() => {
+                              const vType = (report.vehicleType || veh.vehicleType || veh.bodyType || '').toUpperCase();
+                              const isMoto = vType.includes('MOTO') || vType.includes('MOTOSİKLET');
+                              const isSuv = vType.includes('SUV') || vType.includes('PICKUP') || vType.includes('ARAZİ');
+                              const isVan = vType.includes('MINIVAN') || vType.includes('PANELVAN') || vType.includes('COMMERCIAL') || vType.includes('TİCARİ');
+
+                              const catConfig = isMoto
+                                ? { label: 'Motosiklet', icon: Bike, badgeClass: 'bg-purple-500/10 text-purple-300 border-purple-500/30' }
+                                : isSuv
+                                ? { label: 'Arazi, SUV & Pickup', icon: Mountain, badgeClass: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' }
+                                : isVan
+                                ? { label: 'Minivan & Panelvan', icon: Truck, badgeClass: 'bg-amber-500/10 text-amber-300 border-amber-500/30' }
+                                : { label: 'Otomobil', icon: Car, badgeClass: 'bg-blue-500/10 text-blue-300 border-blue-500/30' };
+                              const CatIcon = catConfig.icon;
+
+                              return (
+                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${catConfig.badgeClass}`}>
+                                  <CatIcon className="w-3 h-3" />
+                                  <span>{catConfig.label}</span>
+                                </div>
+                              );
+                            })()}
+
+                            <span className="font-bold text-white text-sm group-hover:text-orange-400 transition-colors block">
                               {veh.year} {veh.brand} {veh.model}
                             </span>
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">

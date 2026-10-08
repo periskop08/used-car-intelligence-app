@@ -43,6 +43,10 @@ export class ListAdminVehicleReportsDto {
   tab?: string;
 
   @IsOptional()
+  @IsString()
+  vehicleType?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   page?: number = 1;
