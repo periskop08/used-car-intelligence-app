@@ -3413,3 +3413,38 @@ model IsiCepteEventLog {
   @@index([eventType, createdAt])
   @@index([providerId, eventType])
 }
+
+model VerifiedSpecLibrary {
+  id                  String   @id @default(uuid())
+  vehicleType         String   @default("AUTOMOBILE") // AUTOMOBILE | SUV_PICKUP | COMMERCIAL | MOTORCYCLE
+  brand               String
+  model               String
+  year                Int?
+  bodyType            String?
+  engine              String?
+  fuelType            String?
+  transmission        String?
+  trim                String?
+  variantId           String?
+  modelId             String?
+
+  displacementCc      Int      // Exact displacement e.g. 49, 125, 1598
+  powerHp             Int      // Exact horsepower e.g. 3, 110, 150
+  candidatePowers     Json?    // Optional power variants
+  powerRange          String?  // e.g. "3 HP" or "24-28 HP"
+
+  verificationStatus  String   @default("VERIFIED") // VERIFIED | PENDING | REJECTED
+  verificationSource  String   @default("CANLI_AI_ARASTIRMA") // CANLI_AI_ARASTIRMA | MANUAL_ADMIN
+  sourceUrl           String?  @default("https://catalog.torquescout.com")
+  notes               String?
+
+  verifiedAt          DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([vehicleType, brand, model])
+  @@index([brand, model, year])
+  @@index([variantId])
+  @@index([modelId])
+}
+

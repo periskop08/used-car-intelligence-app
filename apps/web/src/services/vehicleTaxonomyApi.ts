@@ -17,6 +17,32 @@ export interface MatchVariantParams {
   category?: string;
 }
 
+export interface LiveSpecVerificationParams {
+  vehicleType: string;
+  brand: string;
+  model: string;
+  year?: string | number;
+  bodyType?: string;
+  engine?: string;
+  fuelType?: string;
+  transmission?: string;
+  trim?: string;
+  variantId?: string;
+  modelId?: string;
+}
+
+export interface LiveSpecVerificationResult {
+  displacementCc: number;
+  powerHp: number;
+  candidatePowers?: number[];
+  powerRange?: string;
+  source: 'VERIFIED_SPEC_LIBRARY' | 'CANLI_AI_ARASTIRMA';
+  isCached: boolean;
+  verifiedAt: string;
+  libraryId?: string;
+  notes?: string;
+}
+
 export const vehicleTaxonomyApi = {
   async getBrands(category?: string): Promise<TaxonomyOption[]> {
     const url = category
@@ -142,6 +168,24 @@ export const vehicleTaxonomyApi = {
     const res = await fetch(`${API_URL}/vehicle-filters/trims?${query.toString()}`);
     const json = await res.json();
     return json.success && Array.isArray(json.data) ? json.data : [];
+  },
+
+  async verifyLiveSpecs(params: LiveSpecVerificationParams): Promise<LiveSpecVerificationResult | null> {
+    try {
+      const res = await fetch(`${API_URL}/vehicle-specs/verify-live`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.success ? json.data : null;
+    } catch (err) {
+      console.error('Error verifying live specs:', err);
+      return null;
+    }
   },
 
   async matchVariant(params: MatchVariantParams): Promise<{ success: boolean; variantId: string | null; modelId?: string | null; vehicleType?: string }> {

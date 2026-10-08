@@ -13,9 +13,17 @@ import { EngineIdentityResolverService } from './engine-identity-resolver.servic
 import { WebSearchProvider } from '../research/providers/web-search.provider';
 import { CanonicalDisplayService } from './canonical-display.service';
 import { VariantTechnicalFactsService } from './variant-technical-facts.service';
+import { VerifiedSpecLibraryController } from './verified-spec-library.controller';
+import { VerifiedSpecLibraryService } from './verified-spec-library.service';
 
 @Module({
-  controllers: [VehicleController, VehicleFiltersController, AdminVehicleFiltersController, DataQualityController],
+  controllers: [
+    VehicleController,
+    VehicleFiltersController,
+    AdminVehicleFiltersController,
+    DataQualityController,
+    VerifiedSpecLibraryController,
+  ],
   providers: [
     VehicleService,
     SubscriptionService,
@@ -26,7 +34,16 @@ import { VariantTechnicalFactsService } from './variant-technical-facts.service'
     WebSearchProvider,
     CanonicalDisplayService,
     VariantTechnicalFactsService,
+    VerifiedSpecLibraryService,
   ],
-  exports: [VehicleService, DataQualityService, VehiclePowerEnrichmentService, EngineIdentityResolverService, CanonicalDisplayService, VariantTechnicalFactsService],
+  exports: [
+    VehicleService,
+    DataQualityService,
+    VehiclePowerEnrichmentService,
+    EngineIdentityResolverService,
+    CanonicalDisplayService,
+    VariantTechnicalFactsService,
+    VerifiedSpecLibraryService,
+  ],
 })
 export class VehicleModule {}

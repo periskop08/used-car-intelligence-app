@@ -300,8 +300,65 @@ export default function CreateListing() {
   const clearSelectedVariant = () => {
     setSelectedVariant("");
     setSelectedModelId("");
+    setEngineDisplacement("");
+    setEnginePower("");
+    setCandidatePowers([]);
+    setSelectedCandidateHp(null);
+    setTechSpecsVerified(false);
+    setDisplacementVerified(false);
+    setPowerVerified(false);
+    setTechSpecsConflict(false);
     activeVariantEnrichmentRef.current = "";
     lastPrefetchedVariantIdRef.current = "";
+  };
+
+  const executeLiveSpecVerification = async (params: {
+    vehicleType: string;
+    brand: string;
+    model: string;
+    year?: string | number;
+    bodyType?: string;
+    engine?: string;
+    fuelType?: string;
+    transmission?: string;
+    trim?: string;
+    variantId?: string;
+    modelId?: string;
+  }) => {
+    if (!params.brand || !params.model) return;
+    setLoadingTechSpecs(true);
+    setTechSpecsVerified(false);
+    try {
+      const res = await vehicleTaxonomyApi.verifyLiveSpecs({
+        vehicleType: params.vehicleType,
+        brand: params.brand,
+        model: params.model,
+        year: params.year,
+        bodyType: params.bodyType,
+        engine: params.engine,
+        fuelType: params.fuelType,
+        transmission: params.transmission,
+        trim: params.trim,
+        variantId: params.variantId,
+        modelId: params.modelId,
+      });
+
+      if (res && res.displacementCc > 0 && res.powerHp > 0) {
+        setEngineDisplacement(String(res.displacementCc));
+        setEnginePower(String(res.powerHp));
+        setCandidatePowers(res.candidatePowers || [res.powerHp]);
+        setDisplacementVerified(true);
+        setPowerVerified(true);
+        setTechSpecsVerified(true);
+      } else {
+        setTechSpecsVerified(false);
+      }
+    } catch (e) {
+      console.error("Live spec verification failed:", e);
+      setTechSpecsVerified(false);
+    } finally {
+      setLoadingTechSpecs(false);
+    }
   };
 
   const handleSearchModeChange = (newMode: VehicleSearchMode) => {
@@ -347,6 +404,7 @@ export default function CreateListing() {
 
   // Cascade Handlers for 8 Canonical Dimensions
   const handleBrandChange = async (brand: string) => {
+    clearSelectedVariant();
     setSelectedBrand(brand);
     setSelectedModel("");
     setSelectedYear("");
@@ -355,8 +413,6 @@ export default function CreateListing() {
     setSelectedFuelType("");
     setSelectedTransmission("");
     setSelectedTrim("");
-    setSelectedVariant("");
-    setSelectedModelId("");
 
     setIsYearAutoSelected(false);
     setIsBodyTypeAutoSelected(false);
@@ -384,6 +440,7 @@ export default function CreateListing() {
   };
 
   const handleModelChange = async (model: string) => {
+    clearSelectedVariant();
     setSelectedModel(model);
     setSelectedYear("");
     setSelectedBodyType("");
@@ -391,8 +448,6 @@ export default function CreateListing() {
     setSelectedFuelType("");
     setSelectedTransmission("");
     setSelectedTrim("");
-    setSelectedVariant("");
-    setSelectedModelId("");
 
     setIsYearAutoSelected(false);
     setIsBodyTypeAutoSelected(false);
@@ -409,8 +464,6 @@ export default function CreateListing() {
     setTrims([]);
 
     if (!model || !selectedBrand) return;
-    // Pre-resolve technical specs from model-level verified facts (for motorcycles & multi-era models)
-    resolveModelTechnicalSpecs(model);
     setLoadingYears(true);
     try {
       if (searchMode === 'MOTORCYCLE') {
@@ -429,35 +482,6 @@ export default function CreateListing() {
       }
     } finally {
       setLoadingYears(false);
-    }
-  };
-
-  const resolveModelTechnicalSpecs = async (modelName: string) => {
-    if (!modelName) return;
-    try {
-      const specs = await vehicleTaxonomyApi.getModelTechnicalSpecs(modelName);
-      if (specs) {
-        if (specs.engineDisplacement?.valueCc) {
-          setEngineDisplacement(String(specs.engineDisplacement.valueCc));
-          setDisplacementVerified(true);
-        }
-        if (specs.candidatePowers && specs.candidatePowers.length > 1) {
-          setCandidatePowers(specs.candidatePowers);
-          if (specs.enginePower?.valueHp && specs.candidatePowers.includes(specs.enginePower.valueHp)) {
-            setEnginePower(String(specs.enginePower.valueHp));
-            setPowerVerified(true);
-          } else {
-            setEnginePower("");
-            setPowerVerified(false);
-          }
-        } else if (specs.enginePower?.valueHp) {
-          setEnginePower(String(specs.enginePower.valueHp));
-          setPowerVerified(true);
-          setCandidatePowers([]);
-        }
-      }
-    } catch (e) {
-      console.warn("Could not fetch model technical specs:", e);
     }
   };
 
@@ -492,6 +516,13 @@ export default function CreateListing() {
       setBodyTypes(data);
       if (data.length === 1) {
         handleBodyTypeChange(data[0].value, year, currentModel, true);
+      } else if (searchMode === 'MOTORCYCLE' && data.length === 0) {
+        executeLiveSpecVerification({
+          vehicleType: 'MOTORCYCLE',
+          brand: selectedBrand,
+          model: currentModel,
+          year: year,
+        });
       }
     } finally {
       setLoadingBodyTypes(false);
@@ -653,15 +684,39 @@ export default function CreateListing() {
         const initialDrivetrain = inferDrivetrain(selectedBrand, currentModel, currentEngine, trim);
         setDrivetrain(initialDrivetrain);
 
-        // Automatically resolve authoritative technical specs (Motor Hacmi cc + Motor Gücü HP + Drivetrain)
-        resolveTechnicalSpecs(res.variantId);
-      } else if (res.success && searchMode === 'MOTORCYCLE' && res.modelId) {
-        setSelectedModelId(res.modelId);
+        // Perform Live AI Spec Verification & Library Caching
+        executeLiveSpecVerification({
+          vehicleType: searchMode,
+          brand: selectedBrand,
+          model: currentModel,
+          year: currentYear,
+          bodyType: currentBody,
+          engine: currentEngine,
+          fuelType: currentFuel,
+          transmission: currentTrans,
+          trim,
+          variantId: res.variantId,
+        });
+      } else if (res.success && searchMode === 'MOTORCYCLE') {
+        setSelectedModelId(res.modelId || "");
         setBodyType("OTHER");
         setFuelType("PETROL");
         setTransmission("MANUAL");
         setDrivetrain("RWD");
-        setTechSpecsVerified(true);
+
+        // Perform Live AI Spec Verification & Library Caching for Motorcycle
+        executeLiveSpecVerification({
+          vehicleType: 'MOTORCYCLE',
+          brand: selectedBrand,
+          model: currentModel,
+          year: currentYear,
+          bodyType: currentBody,
+          engine: currentEngine,
+          fuelType: currentFuel,
+          transmission: currentTrans,
+          trim,
+          modelId: res.modelId || undefined,
+        });
       } else {
         setSelectedVariant("");
         setSelectedModelId("");
@@ -1418,12 +1473,17 @@ export default function CreateListing() {
               ) : loadingTechSpecs ? (
                 <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                  <span>Motor teknik bilgileri doğrulanıyor (cc ve HP)...</span>
+                  <span>🔍 Canlı AI & Katalog Taraması: Motor Hacmi (cc) ve Motor Gücü (HP) araştırılıp doğrulanıyor...</span>
                 </div>
-              ) : selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear) ? (
+              ) : (techSpecsVerified && (selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear))) ? (
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span>✅ {searchMode === 'MOTORCYCLE' ? 'Motosiklet' : 'Araç'} Veritabanı Eşleşmesi Başarılı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' ? selectedTrim : ''} {engineDisplacement ? `• ${engineDisplacement} cc` : ""} {enginePower ? `• ${enginePower} HP` : ""} {selectedVariant ? `(Varyant ID: ${selectedVariant.slice(0, 8)}...)` : ''}</span>
+                  <span>✅ Doğrulandı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' ? selectedTrim : ''} • {engineDisplacement} cc • {enginePower} HP (Doğrulanmış Kütüphane)</span>
+                </div>
+              ) : (selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear)) ? (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <span>⏳ Teknik özellik doğrulaması yapılıyor, lütfen bekleyiniz...</span>
                 </div>
               ) : (selectedBrand && selectedModel && selectedYear && selectedBodyType && selectedEngine && selectedFuelType && selectedTransmission && selectedTrim) ? (
                 <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
@@ -1488,12 +1548,29 @@ export default function CreateListing() {
             }}
             disabled={
               !useCustomVariant
-                ? (!selectedVariant && !(searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear))
+                ? (
+                    matchingVariant ||
+                    loadingTechSpecs ||
+                    !techSpecsVerified ||
+                    (!selectedVariant && !(searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear))
+                  )
                 : (!customBrand || !customModel || !customYear)
             }
             className="w-full mt-4 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-2xl transition cursor-pointer"
           >
-            Devam Et
+            {loadingTechSpecs ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                Teknik Veriler Doğrulanıyor...
+              </span>
+            ) : matchingVariant ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                Varyant Eşleştiriliyor...
+              </span>
+            ) : (
+              "Devam Et"
+            )}
           </button>
         </div>
       )}
