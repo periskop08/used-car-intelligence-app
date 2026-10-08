@@ -656,7 +656,8 @@ Investigate:
 3. Did Agent 1 claim ABS on a model/era that has drum brakes (Ön Disk Arka Kampana), or claim 3 spark plugs on a V-Twin / 2-cylinder engine? If so, flag contradiction!
 4. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
 5. For commercial vehicles: was automatic transmission claimed when the selected application was strictly manual?
-6. Are claims grounded in authentic automotive engineering reality?
+6. For automatic / CVT scooters (such as Honda Forza, PCX, Yamaha XMAX, NMAX, Vespa): did Agent 1 hallucinate manual transmission, gear shift dogs (vites hilali / sekromeç / boşa atma), clutch plates or clutch cables? If so, immediately CONTRADICT with reason "Otomatik CVT scooter modelinde manuel şanzıman veya vites hilali/cırtlaması arızası iddia edilemez; varyatör bagaları ve kayış aktarması geçerlidir"!
+7. Are claims grounded in authentic automotive engineering reality?
 Output STRICT JSON:
 {
   "challenges": [
@@ -896,11 +897,19 @@ Write the complete Motorcycle Report in strict JSON:
       ]
     }
   ],
+  "dailyUse": {
+    "cityUse": "string (Modelin gerçek mimarisine, tork karakterine ve şanzımanına özel detaylı şehir içi sürüş ve dur-kalk tahlili - şablon cümle KULLANMA)",
+    "highwayUse": "string (Modelin gerçek aerodinamik rüzgar direnci, otoyol tork rezervi ve yüksek sürat şasi stabilitesi)"
+  },
   "technicalSpecifications": {
     "engineDisplacementCc": ${judge.finalDisplacementCc},
     "enginePowerHp": ${judge.finalPowerHp},
     "powerRange": "${judge.finalPowerRangeText || `${judge.finalPowerHp} HP`}",
     "powerUnit": "HP",
+    "engineTorqueNm": number,
+    "transmissionTypeAndSpeeds": "string (örn: 6 İleri Manuel veya Otomatik (CVT))",
+    "clutchType": "string (örn: Islak Çoklu Disk veya Kuru Santrifüj / Varyatör)",
+    "drivetrain": "string (örn: Zincir Tahrikli veya Kayış Tahrikli veya Şaft Tahrikli)",
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
@@ -1238,7 +1247,9 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         year: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2011),
         bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : 'Minivan & Panelvan',
         engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : '2.3 dCi'),
-        transmissionName: isMotorcycle ? 'Manuel' : (context.transmission || 'Manuel'),
+        transmissionName: isMotorcycle
+          ? (context.transmission || (writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('otomatik') || writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('cvt') ? 'Otomatik' : 'Manuel'))
+          : (context.transmission || 'Manuel'),
         fuelType: isMotorcycle ? 'Benzin' : (context.fuel || 'Dizel'),
         trim: context.trimPackage || (isMotorcycle ? 'Standart' : '13 m3'),
         engineDisplacementCc: judge.finalDisplacementCc,
@@ -1250,12 +1261,28 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         engineDisplacementCc: judge.finalDisplacementCc,
         enginePowerHp: judge.finalPowerHp,
         powerUnit: 'HP',
-        engineTorqueNm: isMotorcycle ? 22 : isSuvPickup ? 380 : 310,
+        engineTorqueNm: typeof writer.technicalSpecifications?.engineTorqueNm === 'number' && writer.technicalSpecifications.engineTorqueNm > 0
+          ? writer.technicalSpecifications.engineTorqueNm
+          : isMotorcycle
+          ? (judge.finalDisplacementCc >= 650 ? 68 : judge.finalDisplacementCc >= 350 ? 35 : 24)
+          : isSuvPickup ? 380 : 310,
         torqueUnit: 'Nm',
-        transmissionTypeAndSpeeds: isMotorcycle ? '5 İleri Manuel' : '6 İleri Manuel',
-        transmissionSpeeds: isMotorcycle ? 5 : 6,
-        clutchType: isMotorcycle ? 'Islak Çoklu Disk' : 'Kuru Tek Disk / Hidrolik',
-        drivetrain: isMotorcycle ? 'Zincir Tahrikli' : isSuvPickup ? 'Dört Tekerden Çekiş (4WD/AWD)' : 'Önden Çekiş (FWD)',
+        transmissionTypeAndSpeeds: writer.technicalSpecifications?.transmissionTypeAndSpeeds || (
+          isMotorcycle
+            ? (context.transmission === 'Otomatik' ? 'Otomatik (CVT)' : judge.finalDisplacementCc > 500 ? '6 İleri Manuel' : '5 İleri Manuel')
+            : '6 İleri Manuel'
+        ),
+        transmissionSpeeds: isMotorcycle && context.transmission === 'Otomatik' ? 1 : isMotorcycle ? (judge.finalDisplacementCc > 500 ? 6 : 5) : 6,
+        clutchType: writer.technicalSpecifications?.clutchType || (
+          isMotorcycle
+            ? (context.transmission === 'Otomatik' ? 'Kuru Santrifüj / Varyatör' : 'Islak Çoklu Disk')
+            : 'Kuru Tek Disk / Hidrolik'
+        ),
+        drivetrain: writer.technicalSpecifications?.drivetrain || (
+          isMotorcycle
+            ? (context.transmission === 'Otomatik' ? 'Kayış Tahrikli (Belt Drive)' : 'Zincir Tahrikli')
+            : isSuvPickup ? 'Dört Tekerden Çekiş (4WD/AWD)' : 'Önden Çekiş (FWD)'
+        ),
         zeroToHundredKmh,
         zeroToHundredSec: zeroToHundredKmh,
         topSpeedKmh,
@@ -1287,16 +1314,22 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
           supportingFactIds: [],
         },
         dailyUseAssessment: {
-          cityUse: isMotorcycle
-            ? 'Şehir içi kıvraklığı, düşük devir tork dengesi ve dur-kalk trafiğindeki debriyaj yumuşaklığı.'
-            : isSuvPickup
-            ? 'Şehir içi manevra kabiliyeti, yüksek sürüş pozisyonu ve kaldırım/tümsek aşma rahatlığı.'
-            : 'Şehir içi dağıtım ve dar sokaklarda dönüş çapı ile ayna görüş açısı manevra kabiliyeti.',
-          highwayUse: isMotorcycle
-            ? 'Otoyol rüzgar direnci ve yüksek süratlerdeki titreşim/şasi stabilitesi.'
-            : isSuvPickup
-            ? 'Otoyol seyir konforu, rüzgar sesi yalıtımı ve yüksek sürat şasi dengesi.'
-            : 'Yüklü otoyol seyrinde motor tork rezervi ve rüzgar savurma direnci.',
+          cityUse: this.sanitizeTurkishAutomotiveText(
+            writer.dailyUse?.cityUse || (isMotorcycle
+              ? (context.transmission === 'Otomatik'
+                ? 'Şehir içi dur-kalk trafiğinde vites gerektirmeyen varyatör konforu ve dar alanlarda yüksek manevra kıvraklığı.'
+                : 'Şehir içi kıvraklığı, düşük devir tork dengesi ve dur-kalk trafiğindeki manevra kabiliyeti.')
+              : isSuvPickup
+              ? 'Şehir içi manevra kabiliyeti, yüksek sürüş pozisyonu ve kaldırım/tümsek aşma rahatlığı.'
+              : 'Şehir içi dağıtım ve dar sokaklarda dönüş çapı ile ayna görüş açısı manevra kabiliyeti.'),
+          ),
+          highwayUse: this.sanitizeTurkishAutomotiveText(
+            writer.dailyUse?.highwayUse || (isMotorcycle
+              ? 'Otoyol rüzgar direnci ve yüksek süratlerdeki titreşim/şasi stabilitesi.'
+              : isSuvPickup
+              ? 'Otoyol seyir konforu, rüzgar sesi yalıtımı ve yüksek sürat şasi dengesi.'
+              : 'Yüklü otoyol seyrinde motor tork rezervi ve rüzgar savurma direnci.'),
+          ),
           supportingFactIds: [],
         },
         strongestReasonsToChoose: (writer.strongReasons || []).map((r: any) => ({
@@ -1472,6 +1505,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         score: judge.decisionScore,
         riskLevel: judge.technicalRiskLevel,
         verdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.'),
+        shortVerdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.'),
         deductedRisks,
         totalRiskPenalty,
       },
