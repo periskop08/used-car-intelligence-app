@@ -644,6 +644,21 @@ export default function Home() {
 
   const handleInspect = () => {
     if (!matchedVariantId) return;
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(
+          "ts_search_scope",
+          JSON.stringify({
+            year: selectedYear,
+            bodyType: selectedBodyType,
+            engine: selectedEngine,
+            fuel: selectedFuelType,
+            trim: selectedTrim,
+            transmission: selectedTransmission,
+          })
+        );
+      } catch {}
+    }
     router.push(`/vehicle/${matchedVariantId}`);
   };
 

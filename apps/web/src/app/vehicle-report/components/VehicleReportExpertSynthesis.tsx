@@ -147,9 +147,14 @@ export default function VehicleReportExpertSynthesis({
                 <tbody className="divide-y divide-white/5">
                   {synthesis.motorcycleEraAnalysis.productionEras.map((era, idx) => {
                     const eraTitle = era.eraName || `${era.startYear} – ${era.endYear || 'Günümüz'} Dönemi`;
-                    const keyChangesText = Array.isArray(era.keyChanges)
-                      ? era.keyChanges.join(', ')
-                      : (typeof (era.keyChanges as any) === 'string' && (era.keyChanges as any).trim() ? String(era.keyChanges) : 'Temel üretim konfigürasyonu');
+                    const validKeyChanges = Array.isArray(era.keyChanges)
+                      ? era.keyChanges.filter((k: any) => typeof k === 'string' && k.trim().length > 0)
+                      : [];
+                    const keyChangesText = validKeyChanges.length > 0
+                      ? validKeyChanges.join(', ')
+                      : (typeof (era.keyChanges as any) === 'string' && (era.keyChanges as any).trim()
+                        ? String(era.keyChanges)
+                        : (era.fuelSystem === 'EFI' ? 'Elektronik yakıt enjeksiyonu ve dönemsel fabrika revizyonları' : 'Karbüratörlü yakıt sistemi ve dönemsel fabrika donanımı'));
                     return (
                       <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
                         <td className="py-2.5 px-3 font-semibold text-cyan-300">{eraTitle}</td>

@@ -369,11 +369,22 @@ export default function VehicleDetail() {
       }
 
       const isMotorcycle = vehicle?.vehicleType === "MOTORCYCLE";
+      let searchScope: any = undefined;
+      if (typeof window !== "undefined") {
+        try {
+          const rawScope = sessionStorage.getItem("ts_search_scope");
+          if (rawScope) {
+            searchScope = JSON.parse(rawScope);
+          }
+        } catch {}
+      }
+
       const reportPayload: any = {
         mode: "TORQUE_SCOUT_VEHICLE_REPORT",
         entryPoint: "VEHICLE_SEARCH",
         idempotencyKey: `vr_${variantId}_${Date.now()}`,
         forceRefresh: force,
+        ...(searchScope ? { searchScope } : {}),
       };
       if (isMotorcycle) {
         reportPayload.modelId = variantId;

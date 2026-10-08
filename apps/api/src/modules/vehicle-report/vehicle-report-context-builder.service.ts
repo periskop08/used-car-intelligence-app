@@ -658,16 +658,26 @@ export class VehicleReportContextBuilderService {
       specs = await this.variantTechnicalFactsService.getModelTechnicalFacts(modelId);
     }
 
+    const selectedYear = searchScope?.year && searchScope.year !== 'Tüm Üretim Yılları' ? searchScope.year : 'Tüm Üretim Yılları';
+    const selectedEngine = searchScope?.engine && searchScope.engine !== 'Tüm Motor / Versiyonlar' ? searchScope.engine : 'Standart / Tüm Dönemler';
+    const selectedFuel = searchScope?.fuel && searchScope.fuel !== 'Tümü' ? searchScope.fuel : 'Benzin';
+    const selectedTrans = searchScope?.trim && searchScope.trim !== 'Tüm Vites Tipleri' ? searchScope.trim : 'Manuel';
+
     const contextObj = {
       vehicleType: 'MOTORCYCLE',
       modelId,
       vehicleIdentity: {
         brand: model.brand?.name || '',
         model: model.name,
-        modelYear: 'Tüm Üretim Yılları',
-        year: 'Tüm Üretim Yılları',
-        bodyType: 'Motosiklet',
+        modelYear: selectedYear,
+        year: selectedYear,
+        bodyType: searchScope?.bodyType && searchScope.bodyType !== 'Tüm Tipler' ? searchScope.bodyType : 'Motosiklet',
         vehicleType: 'MOTORCYCLE',
+        engineCode: selectedEngine,
+        engine: selectedEngine,
+        fuelType: selectedFuel,
+        transmissionName: selectedTrans,
+        transmission: selectedTrans,
         engineDisplacementCc: specs?.engineDisplacementCc || null,
         enginePowerHp: specs?.enginePowerHp || null,
         candidatePowers: specs?.candidatePowers || [],

@@ -76,6 +76,7 @@ export class VehicleReportProviderService {
             trimPackage: vehicleContext.vehicleIdentity?.trim,
             modelId: vehicleContext.modelId,
             variantId: vehicleContext.variantId,
+            searchScope: vehicleContext.searchScope,
           });
 
           return {

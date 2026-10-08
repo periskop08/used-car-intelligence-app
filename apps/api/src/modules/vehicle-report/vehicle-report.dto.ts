@@ -34,6 +34,16 @@ export class CreateVehicleReportDto {
 
   @IsOptional()
   forceRefresh?: boolean;
+
+  @IsOptional()
+  searchScope?: {
+    year?: string | number;
+    bodyType?: string;
+    engine?: string;
+    fuel?: string;
+    transmission?: string;
+    trim?: string;
+  };
 }
 
 export class CreateListingVehicleReportDto {

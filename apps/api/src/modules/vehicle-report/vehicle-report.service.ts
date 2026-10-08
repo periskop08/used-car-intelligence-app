@@ -290,7 +290,7 @@ export class VehicleReportService implements OnModuleInit {
       let vehicleContextHash: string;
 
       if (isMotorcycle && modelId) {
-        const mRes = await this.vehicleContextBuilder.buildMotorcycleContext(modelId);
+        const mRes = await this.vehicleContextBuilder.buildMotorcycleContext(modelId, dto.searchScope);
         vehicleContext = mRes.vehicleContext;
         vehicleContextHash = mRes.vehicleContextHash;
       } else {
