@@ -310,6 +310,7 @@ export class VehicleReportService implements OnModuleInit {
             isCurrentPublished: true,
             isDraft: false,
             status: VehicleReportStatus.COMPLETED,
+            contextHash: vehicleContextHash,
           },
           orderBy: { completedAt: 'desc' },
         });

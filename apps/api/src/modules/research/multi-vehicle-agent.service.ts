@@ -316,12 +316,14 @@ export class MultiVehicleAgentService {
     let liveWebSnippets = '';
     try {
       let searchTerms: string[];
+      const filterYear = context.year && String(context.year) !== 'Tüm Üretim Yılları' ? String(context.year) : '';
+      const filterEngine = context.engine && context.engine !== 'Standart / Tüm Dönemler' && context.engine !== 'Tüm Motor / Versiyonlar' ? context.engine : '';
       if (isMotorcycle) {
         searchTerms = [
-          `${context.brand} ${context.model} kronik sorunlar arızalar kullanıcı şikayetleri`,
-          `${context.brand} ${context.model} motor mekanik eksantrik zincir debriyaj şanzıman sorunları`,
-          `${context.brand} ${context.model} elektrik tesisat statör konjektör gösterge arızaları`,
-          `${context.brand} ${context.model} üretim yılları teknik özellikleri beygir enjeksiyon abs`,
+          `${context.brand} ${context.model} ${filterYear} ${filterEngine} kronik sorunlar arızalar kullanıcı şikayetleri`.trim(),
+          `${context.brand} ${context.model} ${filterYear} motor şanzıman aktarma mekanik arızaları`.trim(),
+          `${context.brand} ${context.model} ${filterYear} elektrik tesisat statör konjektör gösterge şarj arızaları`.trim(),
+          `${context.brand} ${context.model} ${filterYear} üretim yılları karbüratör enjeksiyon teknik özellikleri`.trim(),
         ];
       } else if (isSuvPickup) {
         searchTerms = [
@@ -368,22 +370,23 @@ MANDATORY RULES:
    - Use "Gidon Boğaz Rulmanı ve Ön Çatal Keçeleri", NEVER "Steering stem bearing" or "fork seals".
    - Use "Eksantrik Zincir Gergisi (CCT) Gevşemesi ve Zincir Şakırtısı", NEVER English terms.
    - Inspection checks must be written in Turkish (e.g. "... ekspertizde detaylıca kontrol edilmelidir"). Never use English words like "Inspect...".
-2. ABSOLUTE CATALOG ACCURACY ON FUEL INDUCTION (ASLA UYDURMA KARBÜRATÖR DÖNEMİ YAZMA):
-   - You MUST verify whether the model was born fuel-injected (EFI) from its initial launch year.
-   - If the motorcycle model was introduced with electronic fuel injection (EFI) from day one (such as Bajaj Pulsar 200 RS, Bajaj Pulsar NS 200, KTM Duke/RC, Yamaha R25/MT-25, Honda CBR250R, etc.), IT NEVER HAD A CARBURETOR VERSION!
-   - For born-EFI motorcycles, ALL productionEras MUST have fuelSystem: "EFI". Strictly FORBID creating a synthetic "Karbüratörlü Seri"!
-   - For born-EFI motorcycles, divide production eras by real-world transitions: Euro 3 (Single-Channel ABS) vs Euro 4 (AHO headlights, revised ECU/exhaust) vs Euro 5 (Dual-Channel ABS, updated styling/USD forks).
-   - Only if the model genuinely started production with a carburetor (like Hyosung GV 250 in 2003-2009, Yamaha YBR 125, Honda CBF 150) may you list a carburetor era.
+2. ABSOLUTE CATALOG ACCURACY ON FUEL INDUCTION & BRAKING (KARBÜRATÖR VS ENJEKSİYON DÖNEM DİSİPLİNİ):
+   - You MUST determine the genuine fuel induction system (CARBURETOR or EFI) based on the actual history of this model family:
+     a) BORN-EFI MODELS: If introduced with electronic fuel injection (EFI) from launch (such as Bajaj Pulsar 200 RS, NS 200, KTM Duke/RC, Yamaha R25/MT-25, Honda CBR250R), IT NEVER HAD A CARBURETOR! Strictly forbid creating synthetic carburetor eras.
+     b) CLASSIC / PRE-2008 MODELS: Classic cruisers and older series (e.g. 2001-2007 Honda VT 750 Shadow, Yamaha Dragstar, Hyosung GV250 early series) were CARBURETOR-FED from the factory! PGM-FI/EFI was introduced around 2008 with Euro 3. NEVER label pre-2008 carburetor models as EFI or Euro 3!
+     c) BRAKING ACCURACY: If brakingSystem is "Ön Disk Arka Kampana" or has no ABS, hasAbs MUST be false and you MUST NEVER write ABS in keyChanges!
+     d) ENGINE CYLINDERS: If engineLayout is V-Twin or 2-cylinder, NEVER claim single-cylinder traits or 3 spark plugs!
 3. SIFIR RAKİP KIYASLAMASI (ZERO COMPETITOR / RIVAL COMPARISON):
    - KESİNLİKLE başka marka veya rakip model ismi yazma (Honda, Yamaha, Kawasaki, KTM, Suzuki vb.).
    - "Rakiplerine göre", "sınıfındaki rakipleri gibi" gibi kıyaslama ifadeleri kesinlikle yasaktır.
    - Sadece incelenen modelin kendi teknik kabiliyetine, mekaniğine ve sürüş karakterine odaklan.
-4. "keyChanges" MUST CONTAIN AT LEAST 2 CONCRETE TURKISH REVISIONS PER ERA:
-   - Every era in "motorcycleEras" MUST have a keyChanges array with at least 2 detailed Turkish bullet points (e.g. ["Bosch tek kanal ABS ve çift projektör far", "Euro 3 normlu 3 bujili DTS-i motor"]). NEVER leave keyChanges empty.
-5. Extract REAL, specific chronic mechanical and electrical failure modes for this exact model (e.g. eksantrik zincir gergisi, kafa grenajı rezonansı, statör/konjektör, gösterge su alma).
+4. "keyChanges" MUST CONTAIN AT LEAST 2 AUTHENTIC TURKISH REVISIONS PER ERA:
+   - Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (ilgili döneme ait fabrika güncellemesi, yakıt besleme veya mekanik optimizasyonlar). Asla başka bir modelin özelliklerini veya uydurma donanım yazma.
+5. Extract REAL, specific chronic mechanical and electrical failure modes for this exact model (e.g. eksantrik zincir gergisi, kafa grenajı rezonansı, statör/konjektör, 2. vites boşa atma).
 6. Output strict JSON only.`;
 
       userPrompt = `Motorcycle: ${context.brand} ${context.model}
+Selected Filter Scope: Year=${context.year || 'Tüm Üretim Yılları'}, Engine=${context.engine || 'Standart'}, Fuel=${context.fuel || 'Benzin'}, Trans=${context.transmission || 'Manuel'}
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -716,9 +719,11 @@ Extract strict JSON matching schema with commercialDetails, commercialDutyRisks,
 Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1.
 Investigate:
 1. Did Agent 1 hallucinate a carburetor claim or carburetor era for a motorcycle that was born fuel-injected (EFI) from its launch (such as Bajaj Pulsar 200 RS, NS 200, KTM Duke, Yamaha R25, Honda CBR250R)? If so, immediately CONTRADICT the claim with reason "Doğuştan EFI motosiklette karbüratör arızası uydurulamaz"!
-2. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
-3. For commercial vehicles: was automatic transmission claimed when the selected application was strictly manual?
-4. Are claims grounded in authentic automotive engineering reality?
+2. Did Agent 1 claim EFI or Euro 3 for a vintage / pre-2008 carburetor model (such as Honda Shadow VT750 2001-2007, Yamaha Dragstar)? If so, CONTRADICT with reason "2007 öncesi klasik cruiser serisi karbüratörlüdür"!
+3. Did Agent 1 claim ABS on a model/era that has drum brakes (Ön Disk Arka Kampana), or claim 3 spark plugs on a V-Twin / 2-cylinder engine? If so, flag contradiction!
+4. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
+5. For commercial vehicles: was automatic transmission claimed when the selected application was strictly manual?
+6. Are claims grounded in authentic automotive engineering reality?
 Output STRICT JSON:
 {
   "challenges": [
@@ -736,6 +741,8 @@ Output STRICT JSON:
 
     const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
 Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
+Motorcycle Eras:
+${JSON.stringify(agent1.motorcycleEras || [], null, 2)}
 Agent 1 Claims:
 ${JSON.stringify(
   agent1.claims.map((c) => ({
@@ -887,15 +894,16 @@ MANDATORY RULES:
    Raporda KESİNLİKLE başka bir marka veya rakip model ismi (örneğin Honda, Yamaha, Kawasaki, KTM, Suzuki vb.) geçmemelidir.
    "Rakiplerine kıyasla", "sınıfındaki rakipleri gibi" gibi kıyaslamalar kesinlikle yasaktır.
    Rapor %100 sadece incelenen aracın kendi şasisi, motor karakteri, ergonomisi, malzeme kalitesi ve kronik/yıpranma durumuna odaklanmalıdır.
-4. FUEL SYSTEM ACCURACY (ASLA UYDURMA KARBÜRATÖR YAZMA):
-   Eğer araç doğuştan elektronik enjeksiyonlu (EFI) ise, ASLA "Karbüratörlü Seri" uydurma ve tavizlerde "Karbüratörlü Versiyonun Bakım Zorluğu" yazma!
-   Dönemleri gerçek emisyon (Euro 3 vs Euro 4 vs Euro 5) veya ABS geçişlerine göre yaz.
+4. FUEL SYSTEM & HARDWARE ACCURACY:
+   - Eğer araç doğuştan elektronik enjeksiyonlu (EFI) ise, ASLA "Karbüratörlü Seri" uydurma ve tavizlerde "Karbüratörlü Versiyonun Bakım Zorluğu" yazma!
+   - Eğer araç klasik karbüratörlü ise (örn. 2001-2007 Honda Shadow gibi), ASLA enjeksiyon (EFI) veya Euro 3 deme ve ASLA vazgeçme şartına "FI arıza lambası" yazma!
+   - Kampana frenli motora ASLA ABS yazma! V-Twin motora ASLA 3 buji uydurma!
 5. "productionEras" TABLE GUARANTEE:
-   Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (Örn: ["Bosch tek kanal ABS ve projektör farlar", "Euro 3 emisyon normu ve 3 bujili DTS-i motor"]). Asla boş bırakılamaz!
+   Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (ilgili döneme ait gerçek fabrika güncellemesi, yakıt besleme veya mekanik revizyon). ASLA başka bir modelin donanımını veya uydurma parça adını yazma!
 6. "conditionsToConsider" (Hangi Şartlarda Değerlendirilebilir):
-   Genel araç özellikleri (örneğin "Yüksek Yakıt Tüketimi") YAZILAMAZ. Mutlaka somut satın alma önkoşulları yazılmalıdır (örneğin: "Soğuk ilk marşta eksantrik zincir sesi gelmemesi ve motor bloğundan şıkırtı duyulmaması şartıyla").
+   Genel araç özellikleri (örneğin "Yüksek Yakıt Tüketimi") YAZILAMAZ. Mutlaka incelenen modelin motor tipine uygun somut mekanik ve ekspertiz önkoşulları yazılmalıdır.
 7. "walkAwayConditions" (Hangi Durumda Satın Almaktan Vazgeçilmeli):
-   Mutlaka ağır mekanik ve elektriksel vazgeçme nedenleri yazılmalıdır (örneğin: "FI arıza lambasının sürekli yanması ve teşhis cihazında çözülemeyen sensör/enjektör hatası vermesi", "Krank veya biyel kolu mekanik vuruntusu").
+   Mutlaka ağır mekanik/yapısal vazgeçme nedenleri yazılmalıdır (Örn: Krank ve yatak sarması mekanik vuruntusu, şasi çatlağı veya çözülemeyen motor arızası). Karbüratörlü araçta ASLA "FI lambası" yazma!
 8. PHYSICAL SPECIFICATIONS ARE MANDATORY:
    - topSpeedKmh (number)
    - zeroToHundredKmh (number)
@@ -1183,33 +1191,64 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
     let motorcycleEraAnalysis: any = undefined;
     if (isMotorcycle) {
       const rawEras = judge.motorcycleEras || writer.productionEras || [];
+      const brandModelLower = `${context.brand} ${context.model}`.toLowerCase();
+      const isKnownClassicCruiser =
+        brandModelLower.includes('shadow') ||
+        brandModelLower.includes('dragstar') ||
+        brandModelLower.includes('virago');
+      const isVtwIn =
+        isKnownClassicCruiser ||
+        brandModelLower.includes('gv') ||
+        String(judge.motorcycleEras?.[0]?.engineLayout || '').toLowerCase().includes('v-twin');
+
       const cleanEras = rawEras.map((era: any) => {
+        const startYr = Number(era.startYear) || 2000;
+        let isCarb = era.fuelSystem === 'CARBURETOR';
+        if (isKnownClassicCruiser && startYr < 2008) {
+          isCarb = true; // Honda Shadow / Dragstar pre-2008 was strictly carburetor
+        }
+
+        const brakingLower = String(era.brakingSystem || '').toLowerCase();
+        const hasAbs = Boolean(era.hasAbs && !brakingLower.includes('kampana') && brakingLower.includes('abs'));
+
         let keyChanges = Array.isArray(era.keyChanges)
           ? era.keyChanges
               .map((k: string) => this.sanitizeTurkishAutomotiveText(k))
-              .filter((k: string) => k.trim().length > 0)
+              .filter((k: string) => {
+                const kl = k.toLowerCase();
+                if (!hasAbs && kl.includes('abs')) return false; // Never claim ABS on non-ABS or drum brakes
+                if (isVtwIn && (kl.includes('3 buji') || kl.includes('dts-i') || kl.includes('tek silindir'))) return false;
+                if (!brandModelLower.includes('bajaj') && kl.includes('dts-i')) return false;
+                return kl.trim().length > 0;
+              })
           : typeof era.keyChanges === 'string' && era.keyChanges.trim()
           ? [this.sanitizeTurkishAutomotiveText(era.keyChanges)]
           : [];
 
-        if (keyChanges.length === 0) {
-          if (era.fuelSystem === 'EFI') {
+        if (keyChanges.length < 2) {
+          if (isCarb) {
             keyChanges = [
-              era.hasAbs ? 'Elektronik yakıt enjeksiyonu ve ABS fren sistemi' : 'Elektronik yakıt enjeksiyonu ve optimize ateşleme haritası',
-              'Euro emisyon uyumlu egzoz katalizörü ve dijital gösterge paneli',
+              'Karbüratörlü yakıt besleme sistemi ve mekanik jigle mekanizması',
+              hasAbs ? 'ABS frenleme sistemi' : 'Kombine şasi geometrisi ve klasik analog gösterge grubu',
             ];
           } else {
             keyChanges = [
-              'Karbüratörlü yakıt besleme sistemi ve manuel jigle mekanizması',
-              'Klasik analog gösterge paneli ve standart fren donanımı',
+              hasAbs ? 'Elektronik yakıt enjeksiyonu ve ABS fren desteği' : 'Elektronik yakıt enjeksiyonu ve optimize ateşleme haritası',
+              'Euro emisyon uyumlu egzoz katalizörü ve dijital gösterge paneli',
             ];
           }
         }
 
+        let cleanEraName = this.sanitizeTurkishAutomotiveText(era.eraName);
+        if (isCarb && cleanEraName.toLowerCase().includes('efi')) {
+          cleanEraName = cleanEraName.replace(/efi/gi, 'Karbüratörlü').replace(/enjeksiyon/gi, 'Karbüratör');
+        }
+
         return {
           ...era,
-          eraName: this.sanitizeTurkishAutomotiveText(era.eraName),
-          fuelSystem: era.fuelSystem || 'EFI',
+          eraName: cleanEraName,
+          fuelSystem: isCarb ? 'CARBURETOR' : 'EFI',
+          hasAbs,
           keyChanges,
         };
       });
@@ -1328,9 +1367,13 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
         compromisesAndLimitations: (writer.tradeoffs || [])
           .filter((t: any) => {
             const tText = `${t.title} ${t.explanation}`.toLowerCase();
-            const allErasEfi = (judge.motorcycleEras || []).every((e: any) => e.fuelSystem === 'EFI');
+            const allErasEfi = (motorcycleEraAnalysis?.productionEras || judge.motorcycleEras || []).every((e: any) => e.fuelSystem === 'EFI');
+            const allErasCarb = (motorcycleEraAnalysis?.productionEras || judge.motorcycleEras || []).every((e: any) => e.fuelSystem === 'CARBURETOR');
             if (isMotorcycle && allErasEfi && tText.includes('karbüratör')) {
-              return false; // Eliminate fake carburetor tradeoff on EFI motorcycles!
+              return false; // Eliminate fake carburetor tradeoff on born-EFI motorcycles
+            }
+            if (isMotorcycle && allErasCarb && (tText.includes('enjektör') || tText.includes('fi lambası') || tText.includes('elektronik beyin'))) {
+              return false; // Eliminate fake EFI tradeoff on pure carburetor motorcycles
             }
             return true;
           })
@@ -1362,17 +1405,25 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
               supportingFactIds: [],
             }));
 
+          const hasCarbEra = (motorcycleEraAnalysis?.productionEras || judge.motorcycleEras || []).some(
+            (e: any) => e.fuelSystem === 'CARBURETOR',
+          );
+
           if (conds.length === 0 && isMotorcycle) {
             conds = [
               {
-                condition: 'Soğuk ilk marşta eksantrik zincir sesi ve motor bloğundan şıkırtı gelmediğinin teyit edilmesi şartıyla',
-                reason: 'Eksantrik zincir gergisi veya subap aşınmalarını önceden tespit etmek için zorunludur.',
+                condition: hasCarbEra
+                  ? 'Karbüratör hava-yakıt ayarının rölantide stop etmemesi ve soğuk marşta jigle mekanizmasının düzgün çalışması şartıyla'
+                  : 'Soğuk ilk marşta eksantrik zincir sesi ve motor bloğundan şıkırtı gelmediğinin teyit edilmesi şartıyla',
+                reason: hasCarbEra
+                  ? 'Karbüratör diyafram ve manifold hava kaçaklarını önceden tespit etmek için zorunludur.'
+                  : 'Eksantrik zincir gergisi veya subap aşınmalarını önceden tespit etmek için zorunludur.',
                 priority: 'IMPORTANT' as const,
                 supportingFactIds: [],
               },
               {
-                condition: 'Radyatör fanının trafikte hararet kritik seviyeye gelmeden zamanında açtığının test edilmesi şartıyla',
-                reason: 'Termostat ve fan müşürünün şehir içi soğutma kapasitesini doğrulamak için gereklidir.',
+                condition: 'Statör ve şarj konjektörünün akü kutup başlarında en az 13.8V şarj ürettiğinin teyit edilmesi şartıyla',
+                reason: 'Akü boşalma ve elektrik tesisatında yolda kalma riskini önlemek için gereklidir.',
                 priority: 'IMPORTANT' as const,
                 supportingFactIds: [],
               },
@@ -1381,17 +1432,39 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON with deep 3
           return conds;
         })(),
         walkAwayConditions: (() => {
-          let walks = (writer.walkAwayConditions || []).map((w: any) => ({
-            condition: this.sanitizeTurkishAutomotiveText(w.condition),
-            reason: this.sanitizeTurkishAutomotiveText(w.reason),
-            priority: 'CRITICAL' as const,
-            supportingFactIds: [],
-          }));
+          const hasCarbEra = (motorcycleEraAnalysis?.productionEras || judge.motorcycleEras || []).some(
+            (e: any) => e.fuelSystem === 'CARBURETOR',
+          );
+
+          let walks = (writer.walkAwayConditions || []).map((w: any) => {
+            const condText = this.sanitizeTurkishAutomotiveText(w.condition);
+            const rText = this.sanitizeTurkishAutomotiveText(w.reason);
+            // If the vehicle is carburetor-fed, replace any hallucinated FI lamp with mechanical dealbreaker
+            if (isMotorcycle && hasCarbEra && (condText.toLowerCase().includes('fi arıza') || condText.toLowerCase().includes('enjektör'))) {
+              return {
+                condition: 'Krank veya biyel kolu mekanik vuruntusu ile karbüratör boğazı çatlağı',
+                reason: 'Ağır motor rektifiyesi veya çözülemeyen hava sızıntısı ve dengesiz yanma riski doğurur.',
+                priority: 'CRITICAL' as const,
+                supportingFactIds: [],
+              };
+            }
+            return {
+              condition: condText,
+              reason: rText,
+              priority: 'CRITICAL' as const,
+              supportingFactIds: [],
+            };
+          });
+
           if (walks.length === 0 && isMotorcycle) {
             walks = [
               {
-                condition: 'FI arıza lambasının sürekli yanması ve teşhis cihazında çözülemeyen beyin/enjektör hatası vermesi',
-                reason: 'Yüksek maliyetli elektronik beyin veya tesisat revizyonu gerektirebilir.',
+                condition: hasCarbEra
+                  ? 'Krank veya biyel kolu mekanik vuruntusu ile karter çatlağı'
+                  : 'FI arıza lambasının sürekli yanması ve teşhis cihazında çözülemeyen beyin/enjektör hatası vermesi',
+                reason: hasCarbEra
+                  ? 'Ağır motor revizyonu ve yüksek maliyetli rektifiye riski doğurur.'
+                  : 'Yüksek maliyetli elektronik beyin veya tesisat revizyonu gerektirebilir.',
                 priority: 'CRITICAL' as const,
                 supportingFactIds: [],
               },
