@@ -1015,6 +1015,11 @@ MANDATORY RULES:
       - Eğer araçta otomatik şanzıman opsiyonu varsa (örn. Transporter 7 İleri DSG DQ500, Custom SelectShift, Vito 7G/9G-Tronic, Ducato ZF 9 vb.), KESİNLİKLE "Modelde otomatik şanzıman opsiyonu bulunmamaktadır / sadece manuel üretilmiştir" YAZILAMAZ! Modelin gerçek otomatik şanzıman teknolojisini, dur-kalk trafiğindeki mekatronik/kavrama/tork konvertörü davranışını açıkla.
       - Eğer araç ağır ticari odaklı üretilmiş ve pazarda ağırlıklı manuel ise, Türkiye pazarında neden manuel şanzımanın tercih edildiğini ve ağır yük altındaki senkromeç/debriyaj dayanıklılığını açıkla.
    b) ZERO PROMPT CLICHÉ / REPETITION BAN (ŞABLON CÜMLE VE TEKRAR YASAĞI):
+      - vehicleOverview KESİNLİKLE tek bir kısa paragrafla geçiştirilemez. Mutlaka çift satır boşluğu (\n\n) ile ayrılmış TAM 3 BAĞIMSIZ VE ZENGİN PARAGRAF olmalıdır:
+        1. Paragraf: Aracın gövde tasarımı, şasi yapısı, sürgülü kapı ve yükleme eşiği ergonomisi, sürücü oturma pozisyonu.
+        2. Paragraf: İncelenen motorun alt devir tork karakteri, yük altındaki çekiş gücü, şanzıman oranları ve otoyol/şehir içi sürüş hissiyatı.
+        3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye pazarındaki ticari yeri.
+      - "Şasi yapısı, yükleme ergonomisi ve kabin pratikliği ile kullanıcı dostu bir deneyim sunuyor..." gibi şablon cümleleri kopyalamak KESİNLİKLE YASAKTIR.
       - Prompt kılavuz metinlerini ("Bu durum aracın sadece manuel üretildiğini gösterir", "sürüş keyfini artırıyor", "iş yükünü hafifletiyor", "dar sokak kıvraklığı, dur-kalk teslimat pratikliği sunuyor", "tork rezervi güvenli sürüş sağlıyor") kelimesi kelimesine kopyalamak KESİNLİKLE YASAKTIR. Her analiz bağımsız, profesyonel otomotiv mühendisliği diliyle yazılmalıdır.
    c) REAL-WORLD DIMENSIONS & URBAN ERGONOMICS:
       - cityUse: Aracın tavan yüksekliği (kapalı AVM/site otoparklarına 2.0m kotunda giriş durumu), dönüş yarıçapı, yan ayna görüşü ve dar sokak manevralarındaki kör nokta risklerini modele özgü yaz.
@@ -1147,11 +1152,10 @@ Transmission Architecture:
 - Manuel Şanzıman: ${trans?.manualType || '6 İleri Manuel'}
 - Otomatik Şanzıman Durumu: ${trans?.hasAutomatic ? `MEVCUT (${trans.automaticType})` : 'TÜRKİYE PAZARINDA AĞIRLIKLI MANUEL'}
 - Şanzıman Rehberi: ${trans?.summaryTr || ''}
-Operational Dimensions & Real-World Driving:
-- Tavan Yüksekliği: ${ops?.heightMeters || 2.0} metre
+Operational Dimensions:
+- Tavan Yüksekliği: ${ops?.heightMeters || 2.0} metre (${ops?.heightMeters && ops.heightMeters <= 2.0 ? 'Standart 2.0m kotundaki kapalı AVM/site otoparklarına girebilir' : 'Standart kapalı AVM/site otoparklarına yüksekliği nedeniyle giremez'})
 - Dönüş Yarıçapı: ${ops?.turningRadiusMeters || 12.0} metre
-- Şehir İçi Referansı: ${ops?.cityManeuverSummaryTr || ''}
-- Otoyol Referansı: ${ops?.highwayStabilitySummaryTr || ''}
+- Arka Aks Yapısı: ${susp}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
 Commercial Details:
 ${JSON.stringify(judge.commercialDetails || {}, null, 2)}
@@ -1161,7 +1165,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Minivan/Panelvan Commercial Report in strict JSON:
 {
-  "vehicleOverview": "En az 3 detaylı paragraflık kapsamlı uzman sürüş ve ticari karakter analizi (1. Paragraf: şasi, yükleme ergonomisi, kabin pratikliği ve duruş; 2. Paragraf: motor tork eğrisi, çekiş gücü, şanzıman oranları ve otoyol/şehir içi sürüş hissiyatı; 3. Paragraf: filo/şahsi dayanıklılık, malzeme kalitesi ve pazar konumu - KESİNLİKLE RAKİP MARKA ADI GEÇMEYECEK)",
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki dizel motorun ${judge.finalPowerHp} HP güç ve alt devir tork karakteri, ağır yük altındaki çekiş kabiliyeti, şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
   "configurationAnalysis": "${vol} m³ kargo alanının pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve operasyonel dayanıklılık değerlendirmesi",
   "manualTransmissionAnalysis": "${trans?.manualType || 'Manuel'} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti",
   "automaticTransmissionAnalysis": "${trans?.hasAutomatic ? `Modelin ${trans.automaticType} şanzıman opsiyonunun teknik analizi; yoğun dur-kalk trafiğindeki ısınma/kavrama durumu ve bakım gereksinimleri` : `Modelin Türkiye ticari pazarında neden ağırlıklı manuel tercih edildiği ve ağır yük şartlarındaki mekanik dayanıklılığı`}",
@@ -1196,7 +1200,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
     { "title": "string", "explanation": "string (en az 2 cümlelik teknik açıklama - rakip ismi geçmeyecek)" }
   ],
   "tradeoffs": [
-    { "title": "string (Aracın gerçek bir kısıtı veya dezavantajı - KESİNLİKLE 'avantaj' veya olumlu özellik yazma; örn: dar sokak manevrası, boşken arka sekme, yüksek yedek parça maliyeti)", "explanation": "string (en az 2 cümlelik teknik açıklama - araçta otomatik varsa asla 'otomatik yok' deme, olmayan yaprak yay vb. uydurma)" }
+    { "title": "string (Aracın gerçek bir kısıtı veya dezavantajı - KESİNLİKLE 'avantaj', 'üstünlük' veya 'konforu' gibi olumlu başlık yazma; örn: dar sokak manevrası, boşken arka sekme, yüksek yedek parça maliyeti, sac panel arka kör nokta)", "explanation": "string (en az 2 cümlelik teknik açıklama - araçta otomatik varsa asla 'otomatik yok' deme, olmayan yaprak yay vb. uydurma)" }
   ],
   "idealFor": [
     { "profile": "string", "explanation": "string" }
@@ -1310,6 +1314,14 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
       [/(?:rakiplerinden|rakiplerine göre)/gi, 'segmentinde'],
       [/(?:rakipleri gibi)/gi, 'genel standartlarda'],
       [/(?:rakiplerine kıyasla)/gi, 'segmentine kıyasla'],
+
+      // Ticari & Dizel Türkçe Terim Harmonizasyonu (Ortak Ray ve Soot Düzeltmesi)
+      [/ortak raylı enjektör sızıntısı/gi, 'Common Rail Enjektör ve Pul Kaçağı'],
+      [/ortak ray enjektör sızıntısı/gi, 'Common Rail Enjektör ve Pul Kaçağı'],
+      [/ortak raylı/gi, 'Common Rail'],
+      [/ortak ray/gi, 'Common Rail'],
+      [/soot birikimi/gi, 'Kurum Birikimi'],
+      [/soot/gi, 'Kurum'],
     ];
 
     for (const [pattern, replacement] of dictionary) {
