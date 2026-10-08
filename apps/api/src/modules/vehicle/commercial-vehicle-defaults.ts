@@ -17,6 +17,18 @@ export interface CommercialVehicleDefaults {
   suspensionType: string;
   hasWetTimingBelt: boolean;
   typicalFocusIssues: string[];
+  transmissionOptions: {
+    hasAutomatic: boolean;
+    manualType: string;
+    automaticType: string;
+    summaryTr: string;
+  };
+  operationalProfile: {
+    turningRadiusMeters: number;
+    heightMeters: number;
+    cityManeuverSummaryTr: string;
+    highwayStabilitySummaryTr: string;
+  };
 }
 
 export function resolveCommercialVehicleDefaults(
@@ -285,6 +297,137 @@ export function resolveCommercialVehicleDefaults(
     'Şehir içi dur-kalk teslimatlarda debriyaj baskı balata ve çift kütleli volan (DMF) vuruntusu',
   );
 
+  // 7. Transmission Options Resolution
+  let hasAutomatic = false;
+  let manualType = '6 İleri Manuel';
+  let automaticType = 'Mevcut Değil (Sadece Manuel)';
+  let transmissionSummaryTr = '';
+
+  if (normModel.includes('transporter') || normModel.includes('caravelle') || normModel.includes('multivan')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = '7 İleri DSG (DQ500 Islak Çift Kavrama)';
+    transmissionSummaryTr =
+      'Volkswagen Transporter serisinde ağır tork dayanımlı DQ500 ıslak çift kavramalı 7 ileri DSG şanzıman opsiyonu yaygındır. Manueli net geçişli ve dayanıklıdır; DSG versiyonunda ise 60.000 km şanzıman yağı/filtre değişimi ve yoğun dur-kalkta mekatronik basınç sağlığı hayati önem taşır.';
+  } else if (normModel.includes('caddy')) {
+    hasAutomatic = true;
+    manualType = '5 veya 6 İleri Manuel';
+    automaticType = '7 İleri DSG (Kuru veya Islak Çift Kavrama)';
+    transmissionSummaryTr =
+      'Caddy serisinde 7 ileri DSG çift kavrama şanzıman mevcuttur. Binek konforu sunsa da dur-kalk trafikte kavrama aşınması kontrol edilmelidir; manuel şanzıman ise düşük işletme maliyeti sunar.';
+  } else if (normModel.includes('custom') || (normBrand.includes('ford') && segment === 'MEDIUM')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = '6 İleri SelectShift (Tork Konvertörlü)';
+    transmissionSummaryTr =
+      'Ford Transit Custom serisinde 6 ileri manuelin yanında 6 ileri SelectShift tork konvertörlü tam otomatik şanzıman sunulmaktadır. Tork konvertörlü yapı şehir içi dur-kalk teslimatlarda balata aşınması yaşatmaz, ticari kullanımda yüksek dayanıklılık sağlar.';
+  } else if (normModel.includes('vito') || normModel.includes('v-klasse') || normModel.includes('viano')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = '7G-Tronic Plus / 9G-Tronic (Tork Konvertörlü)';
+    transmissionSummaryTr =
+      'Mercedes Vito serisinde 6 ileri manuelin yanı sıra konfor odaklı 7G-Tronic veya 9G-Tronic tork konvertörlü otomatik şanzımanlar sunulmaktadır. Filo ve VIP taşımacılıkta tork konvertörü uzun ömürlü ve sarsıntısızdır.';
+  } else if (normModel.includes('doblo')) {
+    hasAutomatic = year && year >= 2023 ? true : normEngine.includes('1.6');
+    manualType = '5 veya 6 İleri Manuel';
+    automaticType = year && year >= 2023 ? '8 İleri Tork Konvertörlü (EAT8)' : 'Comfort-Matic Robotize (Tek Kavrama)';
+    transmissionSummaryTr =
+      'Piyasada %90 oranında 5 veya 6 ileri manuel şanzımanla bulunur. Eski nesil Comfort-Matic robotize ünite dur-kalkta vites geçiş sarsıntısı yapabilir ve robot aktüatör bakımı ister; manuel versiyon ise çok düşük işletme maliyetiyle ticari olarak en ekonomik çözümdür.';
+  } else if (normModel.includes('fiorino') || normModel.includes('nemo') || normModel.includes('bipper')) {
+    hasAutomatic = false;
+    manualType = '5 İleri Manuel';
+    automaticType = 'Nadir Comfort-Matic Robotize';
+    transmissionSummaryTr =
+      'Ağırlıklı olarak 5 ileri manuel şanzımanla donatılmıştır. Kısa vites oranları şehir içi çevikliği destekler, debriyaj parça maliyeti son derece ekonomiktir.';
+  } else if (normModel.includes('courier')) {
+    hasAutomatic = Boolean(year && year >= 2024);
+    manualType = '6 İleri Manuel';
+    automaticType = year && year >= 2024 ? '7 İleri Çift Kavrama Otomatik' : 'Mevcut Değil (Sadece Manuel)';
+    transmissionSummaryTr =
+      'Model nesline göre 6 ileri manuel şanzıman hakimdir; vites yolları binek otomobil netliğinde olup debriyaj hafif ve ömürlüdür.';
+  } else if (normModel.includes('berlingo') || normModel.includes('partner') || normModel.includes('rifter') || normModel.includes('combo')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = 'EAT8 (8 İleri Tork Konvertörlü Tam Otomatik)';
+    transmissionSummaryTr =
+      '6 ileri manuel ve Japon Aisin üretimi EAT8 tam otomatik tork konvertörlü şanzıman seçenekleri bulunur. EAT8 pürüzsüz geçişleri ve arıza direnciyle ticari/aile karması kullanımda büyük avantajdır.';
+  } else if (normModel.includes('trafic') || normModel.includes('vivaro') || normModel.includes('expert') || normModel.includes('jumpy')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = normBrand.includes('renault') ? 'EDC Çift Kavrama Otomatik' : 'EAT8 Tork Konvertörlü Otomatik';
+    transmissionSummaryTr =
+      '6 ileri manuel standart olup, yeni nesillerde çift kavrama veya tork konvertörlü otomatik opsiyonları mevcuttur. Manuel şanzıman ağır yük altında kemikli ve dirençlidir.';
+  } else if (normModel.includes('master')) {
+    hasAutomatic = false;
+    manualType = '6 İleri Manuel (Kısa 1. ve 2. Vites Oranlı)';
+    automaticType = 'Nadir Quickshift Robotize (Piyasada %98 Manuel)';
+    transmissionSummaryTr =
+      'Renault Master serisinde ağır ticari yük taşımacılığına uygun kısa oranlı 6 ileri manuel şanzıman temel donanımdır. Türkiye pazarında otomatik opsiyonu neredeyse bulunmaz; manuel şanzımanın debriyaj baskısı ve senkromeçleri ağır tonajlı yüklere dirençlidir.';
+  } else if (normModel.includes('ducato') || normModel.includes('boxer') || normModel.includes('jumper')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = 'ZF 9 İleri Tork Konvertörlü Otomatik veya Comfort-Matic Robotize';
+    transmissionSummaryTr =
+      'Standart olarak 6 ileri manuel sunulur; 2020 sonrası modellerde ZF kaynaklı 9 ileri tork konvertörlü otomatik şanzıman opsiyonu ile uzun yol yakıt ekonomisi ve sürüş konforu üst seviyeye çıkmıştır.';
+  } else if (normModel.includes('daily')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = 'Hi-Matic (ZF 8 İleri Tork Konvertörlü Otomatik)';
+    transmissionSummaryTr =
+      'Iveco Daily sınıfında 8 ileri Hi-Matic tam otomatik tork konvertörlü şanzımanıyla öne çıkar. Ağır yük altında vites geçişleri kusursuzdur; manuel seçeneği ise şantiye ve ağır yük şartlarına azami direnç sunar.';
+  } else if (normModel.includes('sprinter') || normModel.includes('crafter')) {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = normBrand.includes('mercedes') ? '7G-Tronic / 9G-Tronic Otomatik' : '8 İleri Tork Konvertörlü Otomatik';
+    transmissionSummaryTr =
+      '6 ileri manuel ve tork konvertörlü tam otomatik şanzıman opsiyonları mevcuttur. Uzun yol taşımacılığında otomatik şanzıman yakıt tüketimini ve sürücü yorgunluğunu minimize eder.';
+  } else if (normModel.includes('transit') && segment === 'LARGE') {
+    hasAutomatic = true;
+    manualType = '6 İleri Manuel';
+    automaticType = '10 İleri Otomatik (Arkadan İtiş) veya 6 İleri Otomatik (Önden Çekiş)';
+    transmissionSummaryTr =
+      'Büyük Transit modellerinde 6 ileri manuelin yanında arkadan itişli versiyonlarda 10 ileri tork konvertörlü otomatik şanzıman opsiyonu sunulmaktadır.';
+  } else {
+    hasAutomatic = segment === 'COMPACT';
+    manualType = '5 veya 6 İleri Manuel';
+    automaticType = segment === 'COMPACT' ? 'Tork Konvertörlü / Çift Kavrama Opsiyonel' : 'Mevcut Değil (Sadece Manuel)';
+    transmissionSummaryTr = hasAutomatic
+      ? 'Manuel ve otomatik şanzıman opsiyonları mevcuttur; ticari kullanımda manuel versiyon düşük bakım maliyeti sunar.'
+      : 'Model ticari dayanıklılık ve işletme maliyeti gerekçesiyle ağırlıklı olarak manuel şanzıman ile üretilmiştir.';
+  }
+
+  // 8. Operational Dimensions & Ergonomics Profile
+  const turningRadiusMeters = segment === 'LARGE' ? 14.1 : segment === 'MEDIUM' ? 12.0 : 10.8;
+  const heightMeters = segment === 'LARGE' ? 2.50 : segment === 'MEDIUM' ? 1.97 : 1.83;
+  let cityManeuverSummaryTr = '';
+  let highwayStabilitySummaryTr = '';
+
+  if (segment === 'COMPACT') {
+    cityManeuverSummaryTr = `${turningRadiusMeters} metrelik dar dönüş yarıçapı, ${heightMeters} m tavan yüksekliği ve binek araç tabanlı şasisi sayesinde kapalı otoparklara sorunsuz girer, yoğun sokak arası teslimatlarda yüksek kıvraklık sunar.`;
+    highwayStabilitySummaryTr = `${hasLeafSprings ? 'Arka yaprak yaylar yüksüzken arka aksta hafif sekme yapabilir' : 'Helezon yaylı arka süspansiyon sayesinde yüksüz durumda zıplama yapmaz'}; otoyolda binek otomobil dengesine yakın stabil bir seyir sergiler.`;
+  } else if (segment === 'MEDIUM') {
+    cityManeuverSummaryTr = `Yaklaşık ${heightMeters} m standart tavan yüksekliği sayesinde standart 2.0 metre tavan kotuna sahip kapalı AVM ve site otoparklarına giriş yapabilir; binek otomobili andıran kokpit ergonomisiyle şehir içi dağıtımda sürücüyü yormaz.`;
+    highwayStabilitySummaryTr = `${hasLeafSprings ? 'Tek yaprak parabolik makaslar orta yükte optimum esneklik sağlar' : 'Dört tekerlekten bağımsız süspansiyonu sayesinde boşken bile savrulma ve arka sekme yaşatmaz'}; yüksek süratlerde binek araç konforunda şerit kararlılığı sunar.`;
+  } else {
+    // LARGE
+    cityManeuverSummaryTr = `${heightMeters} metrelik H2 yüksek tavan yapısı ve 6 metreyi aşan gövde boyu nedeniyle kapalı otoparklara kesinlikle giremez. ${turningRadiusMeters} metrelik geniş dönüş çapı, dar şehir içi sokak dönüşlerinde arka aks salınımına ve kör noktalara ekstra dikkat gerektirir.`;
+    highwayStabilitySummaryTr = `Büyük yan gövde panelleri viyadük ve köprü geçişlerinde şiddetli yan rüzgarlara karşı gövdeyi yanal kuvvete maruz bırakır. Ağır parabolik makas mimarisi yüklü durumda mükemmel yol tutuşu sağlarken yüksüz seyirde arka aksta rijit tepkiler verir.`;
+  }
+
+  const transmissionOptions = {
+    hasAutomatic,
+    manualType,
+    automaticType,
+    summaryTr: transmissionSummaryTr,
+  };
+
+  const operationalProfile = {
+    turningRadiusMeters,
+    heightMeters,
+    cityManeuverSummaryTr,
+    highwayStabilitySummaryTr,
+  };
+
   return {
     segment,
     segmentNameTr,
@@ -298,5 +441,7 @@ export function resolveCommercialVehicleDefaults(
     suspensionType,
     hasWetTimingBelt,
     typicalFocusIssues,
+    transmissionOptions,
+    operationalProfile,
   };
 }

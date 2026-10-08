@@ -484,6 +484,8 @@ Extract strict JSON matching schema with candidatePowers, claims, and physical s
       const wetBeltRule = commercialDefaults?.hasWetTimingBelt
         ? 'DİKKAT: Ford 2.0 EcoBlue motorda yağ içinde çalışan ıslak triger kayışının (Belt-in-Oil / BIO) lif ayrışmasıyla karter yağ süzgecini tıkaması ve motor sarması en kritik arıza modudur.'
         : '';
+      const trans = commercialDefaults?.transmissionOptions;
+      const ops = commercialDefaults?.operationalProfile;
 
       systemPrompt = `You are TorqueScout Agent 1: Commercial Vehicle Application Technical Research Specialist.
 Map the exact commercial vehicle class (${commercialDefaults?.segmentNameTr || 'Ticari Araç'}), authentic cargo volume (${vol} m³ / ${liters} Litre), payload capacity, gearbox availability (manual vs automatic), and heavy commercial duty wear.
@@ -491,7 +493,10 @@ CRITICAL RULES:
 1. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
 2. Rear suspension architecture: ${susp}. ${leafRule}
 3. Engine architecture: ${wetBeltRule || 'Extract authentic injector leak-off, turbo boost hose wear, EGR cooler and DPF soot issues.'}
-4. Validate whether automatic actually exists for this specific model or if it is strictly manual.
+4. Transmission architecture:
+   - Manuel: ${trans?.manualType || '6 İleri Manuel'}
+   - Otomatik Opsiyonu: ${trans?.hasAutomatic ? `Mevcut (${trans.automaticType})` : 'Türkiye pazarında ağırlıklı sadece manuel'}
+   - Gerçek Bilgi: ${trans?.summaryTr || ''}
 5. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks.
 6. Output strict JSON only.`;
 
@@ -504,7 +509,58 @@ Base Catalog HP: ${baseHp}
 Live Web Evidence:
 ${liveWebSnippets}
 
-Extract strict JSON matching schema with commercialDetails, commercialDutyRisks, claims, and verified powers.`;
+Extract strict JSON:
+{
+  "displacementCc": ${baseCc},
+  "powerHp": ${baseHp},
+  "powerRangeText": "${powerRangeText || `${baseHp} HP`}",
+  "candidatePowers": ${JSON.stringify(candidatePowers)},
+  "commercialDetails": {
+    "generationName": "string (örn: T6, Custom V362, Master III)",
+    "productionEra": "string",
+    "engineFamily": "string (örn: 2.0 TDI EA288, 2.0 EcoBlue, 2.3 dCi M9T)",
+    "displacementCc": ${baseCc},
+    "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
+    "exactPowerHp": ${baseHp},
+    "emissionStandard": "Euro 5 veya Euro 6",
+    "hasDpf": true,
+    "hasEgr": true,
+    "hasAdBlue": boolean,
+    "manualGearboxVerified": true,
+    "manualGearboxType": "${trans?.manualType || '6 İleri Manuel'}",
+    "automaticGearboxVerified": ${trans?.hasAutomatic ?? false},
+    "automaticGearboxType": "${trans?.hasAutomatic ? trans.automaticType : ''}",
+    "automaticUnverifiedReason": "${trans?.hasAutomatic ? '' : 'Model ağır ticari odaklı üretilmiş olup Türkiye pazarında neredeyse tamamen manueldir.'}",
+    "configurationContext": {
+      "rawSourceLabel": "${context.trimPackage || `${vol} m³`}",
+      "commercialMeaning": "${vol} m³ kargo hacmi konfigürasyonu",
+      "cargoVolumeM3": ${vol}
+    }
+  },
+  "commercialDutyRisks": [
+    {
+      "title": "string (Ağır ticari kullanım aşınma başlığı)",
+      "risk": "string (Mekanizma ve maliyet)",
+      "checkRecommendation": "string (Ekspertiz kontrol adımı)"
+    }
+  ],
+  "claims": [
+    {
+      "claimId": "CLM-001",
+      "title": "string (Gerçek arıza adı)",
+      "system": "YÜRÜYEN_AKSAM | MOTOR | ŞANZIMAN | YAKIT_BESLEME | GÖVDE_TRİM",
+      "scopeType": "ALL_ERA_COMMON",
+      "symptoms": ["string"],
+      "userExperience": "string",
+      "testDriveCheck": "string",
+      "inspectionCheck": "string",
+      "sellerQuestion": "string",
+      "costRisk": "ORTA | YUKSEK | COK_YUKSEK",
+      "severity": "MODERATE | HIGH | CRITICAL",
+      "confidence": 0.90
+    }
+  ]
+};`;
     }
 
     const parsed = await this.callAiJson(systemPrompt, userPrompt, 4096, 25000);
@@ -954,7 +1010,18 @@ MANDATORY RULES:
    - catalogCombinedFuelL100km (number)
    - trunkCapacityLiters (number)
    - curbWeightKg (number)
-9. Output STRICT JSON only.`;
+9. MINIVAN & COMMERCIAL VEHICLE INTEGRITY MANDATES:
+   a) TRANSMISSION FACTUAL ACCURACY:
+      - Eğer araçta otomatik şanzıman opsiyonu varsa (örn. Transporter 7 İleri DSG DQ500, Custom SelectShift, Vito 7G/9G-Tronic, Ducato ZF 9 vb.), KESİNLİKLE "Modelde otomatik şanzıman opsiyonu bulunmamaktadır / sadece manuel üretilmiştir" YAZILAMAZ! Modelin gerçek otomatik şanzıman teknolojisini, dur-kalk trafiğindeki mekatronik/kavrama/tork konvertörü davranışını açıkla.
+      - Eğer araç ağır ticari odaklı üretilmiş ve pazarda ağırlıklı manuel ise, Türkiye pazarında neden manuel şanzımanın tercih edildiğini ve ağır yük altındaki senkromeç/debriyaj dayanıklılığını açıkla.
+   b) ZERO PROMPT CLICHÉ / REPETITION BAN (ŞABLON CÜMLE VE TEKRAR YASAĞI):
+      - Prompt kılavuz metinlerini ("Bu durum aracın sadece manuel üretildiğini gösterir", "sürüş keyfini artırıyor", "iş yükünü hafifletiyor", "dar sokak kıvraklığı, dur-kalk teslimat pratikliği sunuyor", "tork rezervi güvenli sürüş sağlıyor") kelimesi kelimesine kopyalamak KESİNLİKLE YASAKTIR. Her analiz bağımsız, profesyonel otomotiv mühendisliği diliyle yazılmalıdır.
+   c) REAL-WORLD DIMENSIONS & URBAN ERGONOMICS:
+      - cityUse: Aracın tavan yüksekliği (kapalı AVM/site otoparklarına 2.0m kotunda giriş durumu), dönüş yarıçapı, yan ayna görüşü ve dar sokak manevralarındaki kör nokta risklerini modele özgü yaz.
+      - highwayUse: Aracın otoyol hızlarındaki yan rüzgar duyarlılığı (yüksek tavan etkisi), yüklü vs yüksüz süspansiyon tepkisi (arka yaprak makas veya bağımsız helezon yay) ve sollamadaki tork rezervini analiz et.
+   d) ZERO CONFLICTING LIMITATIONS:
+      - tradeoffs / compromisesAndLimitations içinde otomatik şanzımanı olan araca "Otomatik şanzıman seçeneği bulunmuyor" YAZILAMAZ! Her taviz özgün bir işletme, şasi veya yük kısıtını temsil etmelidir.
+10. Output STRICT JSON only.`;
 
     const factsJson = JSON.stringify(judge.approvedFactsOnly, null, 2);
 
@@ -1069,11 +1136,22 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
       const liters = commercialDefaults?.trunkCapacityLiters || 3400;
       const weight = commercialDefaults?.curbWeightKg || 1420;
       const susp = commercialDefaults?.suspensionType || 'Süspansiyon Sistemi';
+      const trans = commercialDefaults?.transmissionOptions;
+      const ops = commercialDefaults?.operationalProfile;
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Segment: ${commercialDefaults?.segmentNameTr || 'Ticari Araç'}
 Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo Hacmi)
 Suspension: ${susp}
+Transmission Architecture:
+- Manuel Şanzıman: ${trans?.manualType || '6 İleri Manuel'}
+- Otomatik Şanzıman Durumu: ${trans?.hasAutomatic ? `MEVCUT (${trans.automaticType})` : 'TÜRKİYE PAZARINDA AĞIRLIKLI MANUEL'}
+- Şanzıman Rehberi: ${trans?.summaryTr || ''}
+Operational Dimensions & Real-World Driving:
+- Tavan Yüksekliği: ${ops?.heightMeters || 2.0} metre
+- Dönüş Yarıçapı: ${ops?.turningRadiusMeters || 12.0} metre
+- Şehir İçi Referansı: ${ops?.cityManeuverSummaryTr || ''}
+- Otoyol Referansı: ${ops?.highwayStabilitySummaryTr || ''}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
 Commercial Details:
 ${JSON.stringify(judge.commercialDetails || {}, null, 2)}
@@ -1084,20 +1162,20 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON:
 {
   "vehicleOverview": "En az 3 detaylı paragraflık kapsamlı uzman sürüş ve ticari karakter analizi (1. Paragraf: şasi, yükleme ergonomisi, kabin pratikliği ve duruş; 2. Paragraf: motor tork eğrisi, çekiş gücü, şanzıman oranları ve otoyol/şehir içi sürüş hissiyatı; 3. Paragraf: filo/şahsi dayanıklılık, malzeme kalitesi ve pazar konumu - KESİNLİKLE RAKİP MARKA ADI GEÇMEYECEK)",
-  "configurationAnalysis": "${vol} m³ hacmindeki kargo alanı, yükleme eşiği, istiap haddi ve operasyonel kullanım amacının değerlendirmesi",
-  "manualTransmissionAnalysis": "Manuel şanzımanın baskı balata ömrü, debriyaj pedalı hissiyatı ve ağır yük altındaki vites geçiş dayanıklılığı",
-  "automaticTransmissionAnalysis": "Modelde otomatik şanzıman opsiyonu var mı, varsa şanzıman tipi (tork konvertörlü, çift kavrama vb.) ve şehir içi dur-kalk trafiğindeki avantaj/riskleri; yoksa modelin sadece manuel üretildiğinin teknik açıklaması",
-  "manualVsAutomatic": "Manuel ve otomatik şanzıman seçeneklerinin filo ve ticari kullanım açısından işletme maliyeti ve dayanıklılık kıyaslaması",
+  "configurationAnalysis": "${vol} m³ kargo alanının pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve operasyonel dayanıklılık değerlendirmesi",
+  "manualTransmissionAnalysis": "${trans?.manualType || 'Manuel'} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti",
+  "automaticTransmissionAnalysis": "${trans?.hasAutomatic ? `Modelin ${trans.automaticType} şanzıman opsiyonunun teknik analizi; yoğun dur-kalk trafiğindeki ısınma/kavrama durumu ve bakım gereksinimleri` : `Modelin Türkiye ticari pazarında neden ağırlıklı manuel tercih edildiği ve ağır yük şartlarındaki mekanik dayanıklılığı`}",
+  "manualVsAutomatic": "Manuel ve otomatik seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması",
   "commercialDutyRisks": [
     {
       "title": "string (Ağır ticari kullanım kaynaklı spesifik arıza başlığı)",
-      "risk": "string (Arıza mekanizması ve getireceği maliyet)",
+      "risk": "string (Mekanizma ve getireceği maliyet)",
       "checkRecommendation": "string (Ekspertiz ve alım öncesi yapılması gereken somut kontrol)"
     }
   ],
   "dailyUse": {
-    "cityUse": "string (Şehir içi dar sokak kıvraklığı, dur-kalk teslimat pratikliği, dönüş çapı ve süspansiyon konforu)",
-    "highwayUse": "string (Otoyolda yüklü ve boş seyir kararlılığı, yan rüzgar duyarlılığı ve tork rezervi)"
+    "cityUse": "string (Aracın ${ops?.heightMeters || 2.0} m tavan yüksekliğinin AVM/kapalı garaj girişlerine etkisi, ${ops?.turningRadiusMeters || 12.0} m dönüş çapı ve dar sokaklardaki ayna/kör nokta manevra kabiliyeti odaklı özgün analiz. Asla şablon cümle kopyalama.)",
+    "highwayUse": "string (Aracın otoyol hızlarındaki yan rüzgar tepkileri, yüklü ve yüksüz süspansiyon esnemesi ile sollamalardaki motor tork rezervi odaklı özgün analiz. Asla şablon cümle kopyalama.)"
   },
   "technicalSpecifications": {
     "engineDisplacementCc": ${judge.finalDisplacementCc},
@@ -1118,7 +1196,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
     { "title": "string", "explanation": "string (en az 2 cümlelik teknik açıklama - rakip ismi geçmeyecek)" }
   ],
   "tradeoffs": [
-    { "title": "string", "explanation": "string (en az 2 cümlelik açıklama - araçta olmayan yaprak yay vb. uydurulmayacak)" }
+    { "title": "string (Aracın gerçek bir kısıtı veya dezavantajı - KESİNLİKLE 'avantaj' veya olumlu özellik yazma; örn: dar sokak manevrası, boşken arka sekme, yüksek yedek parça maliyeti)", "explanation": "string (en az 2 cümlelik teknik açıklama - araçta otomatik varsa asla 'otomatik yok' deme, olmayan yaprak yay vb. uydurma)" }
   ],
   "idealFor": [
     { "profile": "string", "explanation": "string" }
@@ -1558,6 +1636,14 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
             }
             if (isMotorcycle && allErasCarb && (tText.includes('enjektör') || tText.includes('fi lambası') || tText.includes('elektronik beyin'))) {
               return false; // Eliminate fake EFI tradeoff on pure carburetor motorcycles
+            }
+            if (!isMotorcycle && !isSuvPickup && commercialDefaults?.transmissionOptions?.hasAutomatic) {
+              if (tText.includes('otomatik şanzıman') && (tText.includes('yok') || tText.includes('bulunm') || tText.includes('eksikli'))) {
+                return false; // Eliminate fake "no automatic transmission" tradeoff on commercial models with automatic options (e.g. Transporter DSG)
+              }
+            }
+            if (t.title && (t.title.toLowerCase().includes('avantaj') || t.title.toLowerCase().includes('üstünlük'))) {
+              return false; // Compromises are strictly trade-offs/limitations, never advantages
             }
             return true;
           })
