@@ -64,22 +64,17 @@ This workspace corresponds to the **TorqueScout** (formerly Used Car Intelligenc
 * **Mandatory Warning & Gatekeeper Policy:**
   - Any proposed modification, refactoring, or external touch directly or indirectly affecting `MultiVehicleAgentService`, `VehicleReportService` cache lookup, or multi-vehicle context builder MUST trigger an explicit warning to the user before proceeding, requiring explicit confirmation.
 
-## 🔒 LOCKED MINIVAN & PANELVAN COMMERCIAL INTELLIGENCE CONTRACT (FROZEN - DO NOT ALTER)
-* **Segment Taxonomy & Physical Specifications (`commercial-vehicle-defaults.ts`):**
-  - **Kompakt Panelvan / Minivan (Doblo, Fiorino, Courier, Caddy vb.):** ~3.4 m³ (2.5–4.2 m³ Maxi), 1420 kg, 10.8 m dönüş çapı, 1.83 m tavan (AVM/kapalı garajlara binek gibi giriş).
-  - **Orta Boy Panelvan / Minivan (Transporter, Custom, Vito, Trafic vb.):** ~6.0 m³ (6.0–6.8 m³ Uzun), 2050 kg, 12.0 m dönüş çapı, 1.97 m tavan (standart 2.0m otopark kotuna giriş).
-  - **Büyük Boy Panelvan (Master, Ducato, Transit, Sprinter, Crafter, Daily vb.):** ~13.0 m³ (11.5–15.0 m³ L4), 2350 kg, 14.1 m dönüş çapı, 2.50 m H2 tavan (kapalı otoparklara kesinlikle giremez).
-* **Suspension & Chassis Mechanical Grounding:**
-  - **Helezon Yaylı Modeller (Makas Yoktur):** Fiat Doblo (Bi-Link bağımsız helezon), VW Transporter / Caravelle (bağımsız helezon yay), Mercedes Vito (bağımsız helezon yay). Bu araçlarda ASLA yaprak yay / makas çökmesi uydurulamaz.
-  - **Parabolik Makaslı Modeller:** Ford Custom (tek yaprak parabolik makas), Büyük Panelvanlar (Master, Ducato, Transit, Daily - çok katlı parabolik makas). Yüksüz durumda arka aks rijitliği ve sekme karakteri analiz edilir.
-* **Authentic Transmission Architecture & Zero False Manual Clichés:**
-  - Eğer modelde otomatik şanzıman opsiyonu varsa (örn: VW Transporter 7 İleri DSG DQ500 ıslak çift kavrama, Ford Custom 6 İleri SelectShift tork konvertörlü, Mercedes Vito 7G/9G-Tronic, Fiat Ducato ZF 9 ileri vb.), KESİNLİKLE *"Modelde otomatik şanzıman seçeneği bulunmuyor / sadece manuel üretilmiştir"* YAZILAMAZ!
-  - `commercialDefaults.transmissionOptions` üzerinden modelin gerçek otomatik ve manuel şanzıman mimarisi beslenir; ticari filodaki işletme maliyeti, dur-kalk trafiğindeki kavrama/tork konvertörü davranışı ve mekatronik bakım gereksinimleri profesyonelce açıklanır.
-* **Anti-Cliché & Prompt Echo Ban:**
-  - Prompt yönlendirme ve şablon cümlelerinin (*"Bu durum aracın sadece manuel üretildiğini gösterir"*, *"dur-kalk teslimat pratikliği sunuyor"*, *"tork rezervi güvenli sürüş sağlıyor"*, vb.) kelimesi kelimesine rapora kopyalanması KESİNLİKLE YASAKTIR.
-  - `dailyUse.cityUse` aracın gerçek tavan yüksekliği (AVM otoparkı), dönüş çapı ve ayna kör noktalarına dayandırılır.
-  - `dailyUse.highwayUse` aracın gövde rüzgar direnci (H2 tavan etkisi), yüklü/yüksüz süspansiyon esnemesi ve tork rezervine dayandırılır.
-* **Compromises & Limitations Semantic Integrity:**
-  - `compromisesAndLimitations` (Tavizler ve Sınırlar) içine ASLA "avantaj" veya "üstünlük" başlıklı maddeler konulamaz.
-  - Otomatik opsiyonu bulunan araçların tavizler listesinde asla *"Otomatik şanzıman eksikliği"* yer alamaz; harmonizer bunu programatik olarak filtreler.
-* **Zero Serialization Defects:** `[object Object]` çıktısı kesin olarak yasaktır; tüm alanlar `sanitizeTurkishAutomotiveText` ve iç içe nesne açıcıları ile korunur.
+## 🔒 ZERO STATIC VEHICLE DEFAULTS & USER FILTER INTEGRITY CONTRACT (FROZEN - DO NOT ALTER)
+* **Strict User Selection Grounding:** All vehicle research and intelligence (whether Minivan, Panelvan, SUV, Pickup, Motorcycle, or Automobile) MUST derive strictly and exclusively from the user's selected filter set: **Marka + Model + Yıl + Donanım/Motor + Vites (+ Yakıt)**.
+* **Zero Hardcoded Spec Dictionaries / Default Files Ban:** Creating static vehicle lookup files (such as `commercial-vehicle-defaults.ts`), hardcoded vehicle spec dictionaries, or synthetic in-code fallback mappings is STRICTLY FORBIDDEN. No memory files, lookup tables, or manual spec overrides may be created or maintained in the codebase.
+* **Dynamic AI Research & Verification:**
+  - Transmission architectures (e.g. 5-speed manual vs 6-speed manual, ETG6 vs EAT8, DSG DQ500 vs ZF 9-speed, factory automatic availability for that exact year and trim), suspension types (Bi-Link independent/helezon vs parabolic leaf springs), and body volumes must be researched and verified dynamically by the AI agent pipeline (`MultiVehicleAgentService`) strictly for the user-selected model year, engine, and trim.
+  - The AI pipeline investigates the authentic manufacturer catalog and automotive evidence dynamically without relying on static code presets.
+* **Context-Scoped Cache & Final Locking Policy (`vehicleContextHash`):**
+  - The research output is bound directly to `contextHash: vehicleContextHash` (Marka + Model + Yıl + Donanım + Motor + Vites + Yakıt).
+  - Once reports are verified and produced with 100% accuracy, they are locked and cached globally under their unique hash. Zero hardcoded dictionary files are permitted.
+* **Anti-Cliché, Tone & Semantic Integrity:**
+  - Prompt phrases or synthetic clichés must never be echoed verbatim.
+  - `compromisesAndLimitations` (Tavizler ve Sınırlar) cannot contain advantages or praise.
+  - Vehicles with verified automatic options cannot claim "otomatik şanzıman eksikliği", and vehicles that are strictly manual-only cannot have hallucinated automatic gearbox failure modes.
+  - Zero serialization defects: `[object Object]` output is strictly forbidden across all report fields.

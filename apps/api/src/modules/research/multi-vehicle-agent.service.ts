@@ -3,7 +3,6 @@ import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
 import { VerifiedSpecLibraryService } from '../vehicle/verified-spec-library.service';
-import { resolveCommercialVehicleDefaults, CommercialVehicleDefaults } from '../vehicle/commercial-vehicle-defaults';
 import OpenAI from 'openai';
 
 export type SupportedMultiVehicleType = 'MOTORCYCLE' | 'MINIVAN_PANELVAN' | 'SUV_PICKUP' | 'AUTOMOBILE';
@@ -296,18 +295,6 @@ export class MultiVehicleAgentService {
       candidatePowers = facts.candidatePowers || (resolvedHp ? [resolvedHp] : []);
     }
 
-    const commercialDefaults =
-      context.vehicleType === 'MINIVAN_PANELVAN'
-        ? resolveCommercialVehicleDefaults(
-            context.brand,
-            context.model,
-            context.engine,
-            context.trimPackage,
-            context.year,
-            context.fuel,
-          )
-        : undefined;
-
     // Fallbacks if resolution didn't yield values
     if (!resolvedCc) {
       resolvedCc =
@@ -315,7 +302,7 @@ export class MultiVehicleAgentService {
           ? 249
           : context.vehicleType === 'SUV_PICKUP'
           ? 1995
-          : commercialDefaults?.defaultCc || 1598;
+          : 1598;
     }
     if (!resolvedHp) {
       resolvedHp =
@@ -323,35 +310,35 @@ export class MultiVehicleAgentService {
           ? 24
           : context.vehicleType === 'SUV_PICKUP'
           ? 150
-          : commercialDefaults?.defaultHp || 105;
+          : 105;
     }
     if (candidatePowers.length === 0) {
-      candidatePowers = commercialDefaults?.candidatePowers || [resolvedHp];
+      candidatePowers = [resolvedHp];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 1: Primary Research Agent
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[AGENT 1] Executing Primary Research for ${context.brand} ${context.model}...`);
-    const agent1Output = await this.runAgent1PrimaryResearch(context, resolvedCc, resolvedHp, candidatePowers, powerRangeText, commercialDefaults);
+    const agent1Output = await this.runAgent1PrimaryResearch(context, resolvedCc, resolvedHp, candidatePowers, powerRangeText);
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 2: Reverse Validation / Red Team Agent
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[AGENT 2] Executing Reverse Validation / Red Team on ${agent1Output.claims.length} claims...`);
-    const agent2Output = await this.runAgent2RedTeam(context, agent1Output, commercialDefaults);
+    const agent2Output = await this.runAgent2RedTeam(context, agent1Output);
 
     // ─────────────────────────────────────────────────────────────────────────
     // AGENT 3: Judge / Final Fact Validation Agent
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[AGENT 3] Adjudicating findings and resolving final factual record...`);
-    const agent3Output = this.runAgent3Judge(context, agent1Output, agent2Output, commercialDefaults);
+    const agent3Output = this.runAgent3Judge(context, agent1Output, agent2Output);
 
     // ─────────────────────────────────────────────────────────────────────────
     // CLOSED REPORT WRITER: Pure presenter with 0 internet access & 0 fact invention
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[REPORT WRITER] Generating closed presentation report from ${agent3Output.approvedFactsOnly.length} approved facts...`);
-    const finalReport = await this.runClosedReportWriter(context, agent3Output, commercialDefaults);
+    const finalReport = await this.runClosedReportWriter(context, agent3Output);
 
     // Persist verified specs to VerifiedSpecLibrary so future listings and reports share this ground truth
     if (agent3Output.finalDisplacementCc > 0 && agent3Output.finalPowerHp > 0) {
@@ -414,7 +401,6 @@ export class MultiVehicleAgentService {
     baseHp: number,
     candidatePowers: number[],
     powerRangeText?: string,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<Agent1Output> {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -438,7 +424,9 @@ export class MultiVehicleAgentService {
           `${context.brand} ${context.model} ${context.year || ''} yakıt tüketimi bagaj hacmi teknik verileri`,
         ];
       } else {
-        const commModelSearch = commercialDefaults?.hasWetTimingBelt
+        const normEng = (context.engine || '').toLowerCase();
+        const isWetTimingBelt = normEng.includes('ecoblue') || (context.brand.toLowerCase() === 'ford' && context.engine?.includes('2.0'));
+        const commModelSearch = isWetTimingBelt
           ? `${context.brand} ${context.model} 2.0 ecoblue yağ içinde çalışan triger kayışı yağ süzgeci tıkanması arızası`
           : `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar kullanıcı şikayetleri`;
         searchTerms = [
@@ -559,33 +547,20 @@ ${liveWebSnippets}
 
 Extract strict JSON matching schema with candidatePowers, claims, and physical specs.`;
     } else {
-      const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
-      const liters = commercialDefaults?.trunkCapacityLiters || 3400;
-      const susp = commercialDefaults?.suspensionType || 'Süspansiyon Sistemi';
-      const leafRule = commercialDefaults?.hasLeafSprings
-        ? 'Parabolik makas (yaprak yay) aşınması ve burç boşluklarını incele.'
-        : 'Bu araçta arkada yaprak yay (makas) YOKTUR! Helezon yay veya Bi-Link bağımsız süspansiyon sistemidir; ASLA makas çökmesi uydurma!';
-      const wetBeltRule = commercialDefaults?.hasWetTimingBelt
-        ? 'DİKKAT: Ford 2.0 EcoBlue motorda yağ içinde çalışan ıslak triger kayışının (Belt-in-Oil / BIO) lif ayrışmasıyla karter yağ süzgecini tıkaması ve motor sarması en kritik arıza modudur.'
-        : '';
-      const trans = commercialDefaults?.transmissionOptions;
-      const ops = commercialDefaults?.operationalProfile;
       const normEngine = (context.engine || '').toLowerCase();
       const normTrim = (context.trimPackage || '').toLowerCase();
       const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
-      const hasAutoOption = Boolean(trans?.hasAutomatic || normTrim.includes('otomatik'));
-      const autoGearboxTitle = trans?.hasAutomatic
-        ? trans.automaticType
-        : normTrim.includes('otomatik')
-        ? '7 İleri Çift Kavrama Otomatik'
-        : 'Mevcut Değil (Sadece Manuel)';
+      const isWetBelt = normEngine.includes('ecoblue') || (context.brand.toLowerCase() === 'ford' && context.engine?.includes('2.0'));
+      const wetBeltRule = isWetBelt
+        ? 'DİKKAT: Ford 2.0 EcoBlue motorda yağ içinde çalışan ıslak triger kayışının (Belt-in-Oil / BIO) lif ayrışmasıyla karter yağ süzgecini tıkaması ve motor sarması en kritik arıza modudur.'
+        : '';
 
       const engineArchitectureRule = isGasoline
-        ? 'Araç BENZİNLİ motordur (1.0 EcoBoost vb.): Termostat gövdesi, soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu incelenmelidir. DPF (dizel partikül filtresi) veya dizel EGR soğutucu kurum tıkanması KESİNLİKLE İDDİA EDİLEMEZ!'
+        ? 'Araç BENZİNLİ motordur: Termostat gövdesi, soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu incelenmelidir. DPF (dizel partikül filtresi) veya dizel EGR soğutucu kurum tıkanması KESİNLİKLE İDDİA EDİLEMEZ!'
         : (wetBeltRule || 'Dizel motor: Enjektör geri dönüş hattı sızıntısı, turbo intercooler besleme hortumu yırtılması, DPF kurum doluluğu, EGR valfi ve soğutucu petek tıkanması.');
 
       systemPrompt = `You are TorqueScout Agent 1: Commercial Vehicle Application Technical Research Specialist.
-Map the exact commercial vehicle class (${commercialDefaults?.segmentNameTr || 'Ticari Araç'}), authentic cargo volume (${vol} m³ / ${liters} Litre), payload capacity, gearbox availability (manual vs automatic), and heavy commercial duty wear.
+Investigate the exact vehicle platform based STRICTLY on the provided user filters (Brand: ${context.brand}, Model: ${context.model}, Year: ${context.year || 'Genel'}, Trim/Body: ${context.trimPackage || 'Standart'}, Engine: ${context.engine || `${baseCc} cc`}, Transmission: ${context.transmission || 'Belirtilmemiş'}).
 CRITICAL RULES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
    ALL text, claim titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
@@ -596,23 +571,22 @@ CRITICAL RULES:
      * Şanzıman, debriyaj, baskı balata, volan, mekatronik -> ŞANZIMAN
      * Alt takım, süspansiyon, amortisör, helezon yay, makas -> YÜRÜYEN_AKSAM
 2. AUTHENTIC GEARBOX DISCOVERY & ZERO FALSE AUTOMATIC HALLUCINATIONS:
-   - The user selects "Manuel / Otomatik" together to research both options for this vehicle.
-   - You MUST investigate if this exact vehicle year, engine, and trim configuration actually offered an automatic transmission option from the factory:
+   - Investigate if this exact vehicle year, engine, and trim configuration actually offered an automatic transmission option from the factory:
      * If YES:
-       Set "automaticGearboxVerified": true, specify exact "automaticGearboxType" (e.g. Çift Kavrama, Tork Konvertörlü, DSG, EAT8 vb.).
+       Set "automaticGearboxVerified": true, specify exact "automaticGearboxType" (e.g. Çift Kavrama, Tork Konvertörlü, DSG, EAT8, ETG6, EDC vb.).
      * If NO:
        Set "automaticGearboxVerified": false, "automaticGearboxType": "Mevcut Değil (Sadece Manuel)", and "automaticUnverifiedReason": "Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman opsiyonu bulunmamakta olup yalnızca manuel şanzımanla üretilmiştir.".
        DO NOT hallucinate automatic gearbox issues, maintenance costs or tradeoffs if the vehicle was only manual!
-3. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
-4. Rear suspension architecture: ${susp}. ${leafRule}
+3. Understand the exact body configuration from ${context.trimPackage || 'katalog verisi'}. Distinguish passenger Combi/Kombi vs Panelvan/Cargo.
+4. Suspension architecture: Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
 5. Engine architecture: ${engineArchitectureRule}
 6. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks or coolant leaks.
 7. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
-Engine: ${context.engine || `${commercialDefaults?.defaultCc || baseCc} cc`}
+Engine: ${context.engine || `${baseCc} cc`}
 Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
-Configuration: ${context.trimPackage || `${vol} m3`}
+Configuration / Trim: ${context.trimPackage || 'Standart'}
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -636,15 +610,15 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "hasEgr": true,
     "hasAdBlue": ${!isGasoline && Boolean(context.year && context.year >= 2016)},
     "manualGearboxVerified": true,
-    "manualGearboxType": "${trans?.manualType || '6 İleri Manuel'}",
-    "manualGearboxSpeeds": ${trans?.manualType?.includes('5') ? 5 : 6},
-    "automaticGearboxVerified": ${hasAutoOption},
-    "automaticGearboxType": "${autoGearboxTitle}",
-    "automaticUnverifiedReason": "${hasAutoOption ? '' : 'Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman seçeneği bulunmamakta olup yalnızca manuel üretilmiştir.'}",
+    "manualGearboxType": "string (örn: 5 İleri Manuel veya 6 İleri Manuel)",
+    "manualGearboxSpeeds": 5,
+    "automaticGearboxVerified": false,
+    "automaticGearboxType": "string (örn: Çift Kavrama / Tork Konvertörlü / EAT8 / ETG6 / DSG veya Mevcut Değil (Sadece Manuel))",
+    "automaticUnverifiedReason": "string (Otomatik şanzıman opsiyonu yoksa gerekçesi)",
     "configurationContext": {
-      "rawSourceLabel": "${context.trimPackage || `${vol} m³`}",
-      "commercialMeaning": "${vol} m³ kargo hacmi konfigürasyonu",
-      "cargoVolumeM3": ${vol}
+      "rawSourceLabel": "${context.trimPackage || 'Standart'}",
+      "commercialMeaning": "string (kargo veya kombi bagaj hacmi anlamı)",
+      "cargoVolumeM3": 3.4
     }
   },
   "commercialDutyRisks": [
@@ -825,18 +799,15 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
         }
       } else {
         // MINIVAN & PANELVAN COMMERCIAL RECOVERY
-        this.logger.log(`[AGENT 1 RECOVERY] Extracting model-specific commercial failure modes for ${context.brand} ${context.model} (${commercialDefaults?.segment || 'VAN'})...`);
-        const suspensionRule = commercialDefaults?.hasLeafSprings
-          ? 'Rear leaf spring (parabolik makas) sag, overload cracking, and center bolt wear under heavy payload.'
-          : `Rear suspension uses ${commercialDefaults?.suspensionType || 'coil springs'} (NO leaf springs / makas!). Focus on rear coil spring/damper and bushing fatigue.`;
-        const timingRule = commercialDefaults?.hasWetTimingBelt
-          ? 'Ford 2.0 EcoBlue Wet Timing Belt (Belt-in-Oil / BIO) rubber degradation contaminating engine oil, clogging the oil pump pickup strainer and causing oil pressure loss and catastrophic engine seizure.'
-          : '';
-
+        this.logger.log(`[AGENT 1 RECOVERY] Extracting model-specific commercial failure modes for ${context.brand} ${context.model}...`);
         const normEngine = (context.engine || '').toLowerCase();
         const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
+        const isWetBelt = normEngine.includes('ecoblue') || (context.brand.toLowerCase() === 'ford' && context.engine?.includes('2.0'));
+        const timingRule = isWetBelt
+          ? 'Ford 2.0 EcoBlue Wet Timing Belt (Belt-in-Oil / BIO) rubber degradation contaminating engine oil, clogging the oil pump pickup strainer and causing oil pressure loss and catastrophic engine seizure.'
+          : '';
         const fuelRule = isGasoline
-          ? 'Fuel Type is BENZİN (Gasoline Engine, e.g. 1.0 EcoBoost). Focus on gasoline-specific failure modes (termostat kütüğü ve soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu, yağ kütüğü sızıntısı). KESİNLİKLE dizel partikül filtresi (DPF), AdBlue veya dizel EGR soğutucu kurum tıkanması iddia edilemez!'
+          ? 'Fuel Type is BENZİN (Gasoline Engine). Focus on gasoline-specific failure modes (termostat kütüğü ve soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu, yağ kütüğü sızıntısı). KESİNLİKLE dizel partikül filtresi (DPF), AdBlue veya dizel EGR soğutucu kurum tıkanması iddia edilemez!'
           : 'Fuel Type is DİZEL (Diesel Engine). Focus on authentic diesel failure modes (enjektör geri dönüş hattı sızıntıları, turboşarj intercooler basınç hortumu yırtılması, DPF kurum doluluğu, EGR valfi ve soğutucusu).';
 
         const recoverySystemPrompt = `You are a Master Commercial Fleet Diagnostic Specialist.
@@ -845,8 +816,8 @@ CRITICAL DIRECTIVES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
    All titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
    - Use authentic Turkish terminology (e.g. Aşınma, Kaçak, Boşluk, Gevşeme, Tıkanma, Sızıntı, Yırtılma).
-2. Ground your analysis in the ACTUAL platform engineering of "${context.year || ''} ${context.brand} ${context.model}" (Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}, Suspension: ${commercialDefaults?.suspensionType}).
-3. Suspension Accuracy: ${suspensionRule}
+2. Ground your analysis in the ACTUAL platform engineering of "${context.year || ''} ${context.brand} ${context.model}" (Engine: ${context.engine || `${baseCc} cc`}).
+3. Suspension Accuracy: Investigate authentic rear suspension (coil vs leaf springs) for this exact vehicle platform.
 4. Engine & Fuel Accuracy: ${timingRule || fuelRule}
 5. System Categorization:
    - Sürgülü kapı / ray / rulman / kilit / gövde parçaları -> GÖVDE_TRİM
@@ -857,10 +828,9 @@ CRITICAL DIRECTIVES:
 7. Output strict JSON only.`;
 
         const recoveryUserPrompt = `Commercial Vehicle: ${context.year || ''} ${context.brand} ${context.model}
-Segment: ${commercialDefaults?.segmentNameTr}
-Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}
-Suspension: ${commercialDefaults?.suspensionType}
-Configuration: ${context.trimPackage || `${commercialDefaults?.cargoVolumeM3} m3`}
+Engine: ${context.engine || `${baseCc} cc`}
+Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
+Configuration: ${context.trimPackage || 'Standart'}
 Extract 3-4 genuine, authentic chronic failure modes for this exact model in strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE):
 {
   "claims": [
@@ -928,7 +898,6 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
   private async runAgent2RedTeam(
     context: MultiVehicleResearchContext,
     agent1: Agent1Output,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<Agent2Output> {
     const systemPrompt = `You are TorqueScout Agent 2: Adversarial Red Team Technical Validator.
 Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context (Brand, Model, Year, Engine, Fuel, Transmission, Trim).
@@ -969,7 +938,6 @@ Output STRICT JSON:
 
     const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
 Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
-${commercialDefaults ? `Commercial Specs: Segment=${commercialDefaults.segmentNameTr}, Suspension=${commercialDefaults.suspensionType}, WetBelt=${commercialDefaults.hasWetTimingBelt}` : ''}
 ${agent1.commercialDetails ? `Commercial Details Claimed by Agent 1:\n${JSON.stringify(agent1.commercialDetails, null, 2)}` : ''}
 Motorcycle Eras:
 ${JSON.stringify(agent1.motorcycleEras || [], null, 2)}
@@ -998,12 +966,13 @@ Perform adversarial red-team audit. Output strict JSON.`;
         }));
 
     const normTrim = (context.trimPackage || '').toLowerCase();
-    const hasAuto = Boolean(commercialDefaults?.transmissionOptions?.hasAutomatic);
-    const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic');
+    const contextTrans = (context.transmission || '').toLowerCase();
+    const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic') || contextTrans.includes('otomatik');
+    const hasAuto = Boolean(trimClaimsAuto || agent1.commercialDetails?.automaticGearboxVerified);
 
     return {
       challenges,
-      transmissionRefuted: Boolean(parsed?.transmissionRefuted) && !hasAuto && !trimClaimsAuto,
+      transmissionRefuted: Boolean(parsed?.transmissionRefuted) && !hasAuto,
       transmissionRefutedReason: parsed?.transmissionRefutedReason,
       gearboxSpeedRefuted: Boolean(parsed?.gearboxSpeedRefuted),
       gearboxSpeedRefutedReason: parsed?.gearboxSpeedRefutedReason,
@@ -1018,7 +987,6 @@ Perform adversarial red-team audit. Output strict JSON.`;
     context: MultiVehicleResearchContext,
     agent1: Agent1Output,
     agent2: Agent2Output,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): Agent3Output {
     const challengeMap = new Map<string, Agent2RedTeamChallenge>();
     for (const ch of agent2.challenges) {
@@ -1073,17 +1041,17 @@ Perform adversarial red-team audit. Output strict JSON.`;
 
     const normTrim = (context.trimPackage || '').toLowerCase();
     const contextTrans = (context.transmission || '').toLowerCase();
-    const hasAutoOption = Boolean(commercialDefaults?.transmissionOptions?.hasAutomatic);
     const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic') || contextTrans.includes('otomatik');
+    const hasAutoOption = Boolean(trimClaimsAuto || agent1.commercialDetails?.automaticGearboxVerified);
 
-    if (agent2.transmissionRefuted && agent1.commercialDetails && !hasAutoOption && !trimClaimsAuto) {
+    if (agent2.transmissionRefuted && agent1.commercialDetails && !hasAutoOption) {
       agent1.commercialDetails.automaticGearboxVerified = false;
       agent1.commercialDetails.automaticUnverifiedReason =
         agent2.transmissionRefutedReason || 'Seçilen ticari konfigürasyonda resmi katalogda otomatik şanzıman opsiyonu doğrulanmadı.';
-    } else if (agent1.commercialDetails && (hasAutoOption || trimClaimsAuto)) {
+    } else if (agent1.commercialDetails && hasAutoOption) {
       agent1.commercialDetails.automaticGearboxVerified = true;
       agent1.commercialDetails.automaticGearboxType =
-        commercialDefaults?.transmissionOptions?.automaticType || agent1.commercialDetails.automaticGearboxType || 'Tam Otomatik';
+        agent1.commercialDetails.automaticGearboxType || 'Tam Otomatik';
       agent1.commercialDetails.automaticUnverifiedReason = undefined;
     }
 
@@ -1134,7 +1102,6 @@ Perform adversarial red-team audit. Output strict JSON.`;
   private async runClosedReportWriter(
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<any> {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -1308,13 +1275,6 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with deep 3-paragraph vehicleOverview, 4x4 transmission analysis, chassis fatigue, and physical specs.`;
     } else {
-      const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
-      const liters = commercialDefaults?.trunkCapacityLiters || 3400;
-      const weight = commercialDefaults?.curbWeightKg || 1420;
-      const susp = commercialDefaults?.suspensionType || 'Süspansiyon Sistemi';
-      const trans = commercialDefaults?.transmissionOptions;
-      const ops = commercialDefaults?.operationalProfile;
-
       const normModel = (context.model || '').toLowerCase();
       const normEngine = (context.engine || '').toLowerCase();
       const normTrim = (context.trimPackage || '').toLowerCase();
@@ -1340,18 +1300,16 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
         normTrim.includes('manual') ||
         (contextTrans.includes('manuel') && !contextTrans.includes('otomatik'));
 
-      const hasAutoOption = Boolean(trans?.hasAutomatic || judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
+      const hasAutoOption = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
       const isAutoVerified = hasAutoOption && judge.commercialDetails?.automaticGearboxVerified !== false;
-      const autoName = judge.commercialDetails?.automaticGearboxType || trans?.automaticType || 'Tam Otomatik';
+      const autoName = judge.commercialDetails?.automaticGearboxType || 'Tam Otomatik';
 
       // Resolve authentic manual gearbox speeds prioritizing context.transmission and Agent 1 research
-      let manualName = judge.commercialDetails?.manualGearboxType || trans?.manualType || 'Manuel';
+      let manualName = judge.commercialDetails?.manualGearboxType || 'Manuel';
       if (contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5) {
         manualName = '5 İleri Manuel';
       } else if (contextTrans.includes('6') || judge.commercialDetails?.manualGearboxSpeeds === 6) {
         manualName = '6 İleri Manuel';
-      } else if (trans?.manualType) {
-        manualName = trans.manualType;
       }
 
       const activeTransmissionName = isVariantAutomatic
@@ -1360,19 +1318,21 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
         ? manualName
         : (isAutoVerified ? `${manualName} / ${autoName}` : manualName);
 
+      const isCombi =
+        (context.trimPackage || '').toLowerCase().includes('combi') ||
+        (context.trimPackage || '').toLowerCase().includes('kombi') ||
+        (context.model || '').toLowerCase().includes('combi');
+      const defaultLiters = isCombi ? 675 : 3400;
+      const defaultWeight = isCombi ? 1420 : 1600;
+
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
-Segment: ${commercialDefaults?.segmentNameTr || 'Ticari Araç'}
-Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo/Bagaj Hacmi)
-Suspension: ${susp}
+Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
+Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
+Configuration: ${context.trimPackage || 'Standart Kasa'}
 Transmission Architecture:
 - Manuel Şanzıman: ${manualName}
 - Otomatik Şanzıman Durumu: ${isAutoVerified ? `MEVCUT (${autoName})` : 'OPSİYON YOK (YALNIZCA MANUEL ÜRETİLMİŞTİR)'}
 - Aktif Varyant Tercihi: ${isVariantAutomatic ? `OTOMATİK (${autoName})` : isVariantManual ? `MANUEL (${manualName})` : 'MANUEL + OTOMATİK'}
-- Şanzıman Rehberi: ${trans?.summaryTr || ''}
-Operational Dimensions:
-- Tavan Yüksekliği: ${ops?.heightMeters || 2.0} metre (${ops?.heightMeters && ops.heightMeters <= 2.0 ? 'Standart 2.0m kotundaki kapalı AVM/site otoparklarına girebilir' : 'Standart kapalı AVM/site otoparklarına yüksekliği nedeniyle giremez'})
-- Dönüş Yarıçapı: ${ops?.turningRadiusMeters || 12.0} metre
-- Arka Aks Yapısı: ${susp}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
 Commercial Details:
 ${JSON.stringify(judge.commercialDetails || {}, null, 2)}
@@ -1383,7 +1343,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; 5 kişilik camlı binek/kombi versiyonlarda bagaj hacmi (${liters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; 5 kişilik camlı binek/kombi versiyonlarda bagaj hacmi (${defaultLiters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
   "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi, şehir içi dur-kalk konforu ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Manuel şanzımanın (${manualName}) ticari filo operasyonları, bakım kolaylığı ve yakıt verimliliği odaklı özgün değerlendirmesi.`})",
@@ -1395,7 +1355,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     }
   ],
   "dailyUse": {
-    "cityUse": "string (Aracın ${ops?.heightMeters || 2.0} m tavan yüksekliğinin AVM/kapalı garaj girişlerine etkisi, ${ops?.turningRadiusMeters || 12.0} m dönüş çapı ve dar sokaklardaki ayna/kör nokta manevra kabiliyeti odaklı özgün analiz. Asla şablon cümle kopyalama.)",
+    "cityUse": "string (Aracın tavan yüksekliğinin AVM/kapalı garaj girişlerine etkisi, dönüş çapı ve dar sokaklardaki ayna/kör nokta manevra kabiliyeti odaklı özgün analiz. Asla şablon cümle kopyalama.)",
     "highwayUse": "string (Aracın otoyol hızlarındaki yan rüzgar tepkileri, yüklü ve yüksüz süspansiyon esnemesi ile sollamalardaki motor tork rezervi odaklı özgün analiz. Asla şablon cümle kopyalama.)"
   },
   "technicalSpecifications": {
@@ -1410,8 +1370,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
-    "trunkCapacityLiters": ${liters},
-    "curbWeightKg": ${weight}
+    "trunkCapacityLiters": ${defaultLiters},
+    "curbWeightKg": ${defaultWeight}
   },
   "strongReasons": [
     { "title": "string (Özgün ve net bir güçlü neden başlığı)", "explanation": "string (En az 2 cümlelik derin teknik açıklama. Başlığı tekrar eden veya 'pratikliği artırır' gibi sığ ve kendini tekrarlayan cümleler KESİNLİKLE YASAKTIR; motorun dayanıklılığı, parça bulunurluğu veya süspansiyon geometrisi somut olarak açıklanmalıdır.)" }
@@ -1448,10 +1408,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     let writerJson = await this.callAiJson(systemPrompt, userPrompt, 4096, 30000);
 
     if (!writerJson || Object.keys(writerJson).length === 0) {
-      writerJson = this.generateDeterministicReportFallback(context, judge, commercialDefaults);
+      writerJson = this.generateDeterministicReportFallback(context, judge);
     }
 
-    return this.harmonizeIntoStandardVehicleReport(context, judge, writerJson, commercialDefaults);
+    return this.harmonizeIntoStandardVehicleReport(context, judge, writerJson);
   }
 
   /**
@@ -1566,7 +1526,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
     writer: any,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): any {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -1599,13 +1558,12 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
     const autoGearboxName =
       judge.commercialDetails?.automaticGearboxType ||
-      commercialDefaults?.transmissionOptions?.automaticType ||
-      '7 İleri Çift Kavrama Otomatik';
+      'Tam Otomatik';
 
     const manualGearboxName =
       contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5
         ? '5 İleri Manuel'
-        : (judge.commercialDetails?.manualGearboxType || commercialDefaults?.transmissionOptions?.manualType || '6 İleri Manuel');
+        : (judge.commercialDetails?.manualGearboxType || '6 İleri Manuel');
 
     let canonicalTransmission = manualGearboxName;
     let canonicalSpeeds = manualGearboxName.includes('5') ? 5 : 6;
@@ -1630,7 +1588,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       } else if (isVariantManual) {
         canonicalTransmission = manualGearboxName;
         canonicalSpeeds = manualGearboxName.includes('5') ? 5 : 6;
-      } else if (contextTrans.includes('manuel') && contextTrans.includes('otomatik') && (commercialDefaults?.transmissionOptions?.hasAutomatic || judge.commercialDetails?.automaticGearboxVerified)) {
+      } else if (contextTrans.includes('manuel') && contextTrans.includes('otomatik') && judge.commercialDetails?.automaticGearboxVerified) {
         canonicalTransmission = `${manualGearboxName} / ${autoGearboxName}`;
         canonicalSpeeds = 6;
       } else if (contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5) {
@@ -1641,9 +1599,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         canonicalSpeeds = 6;
       } else if (judge.commercialDetails?.manualGearboxType) {
         canonicalTransmission = judge.commercialDetails.manualGearboxType;
-        canonicalSpeeds = canonicalTransmission.includes('5') ? 5 : 6;
-      } else if (commercialDefaults?.transmissionOptions?.manualType) {
-        canonicalTransmission = commercialDefaults.transmissionOptions.manualType;
         canonicalSpeeds = canonicalTransmission.includes('5') ? 5 : 6;
       }
     }
@@ -1710,17 +1665,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         ? 0
         : isSuvPickup
         ? 650
-        : commercialDefaults?.trunkCapacityLiters || 3400;
+        : (isCombi ? 675 : 3400);
 
-    // Guard against commercial volume hallucinations (e.g. 13000L, or 3400L on a Combi)
-    if (!isMotorcycle && !isSuvPickup && commercialDefaults) {
-      if (isCombi) {
-        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
-      } else if (commercialDefaults.segment === 'COMPACT' && trunkCapacityLiters > 5000) {
-        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
-      } else if (commercialDefaults.segment === 'MEDIUM' && (trunkCapacityLiters > 8500 || trunkCapacityLiters < 4500)) {
-        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
-      }
+    if (isCombi && trunkCapacityLiters > 2000) {
+      trunkCapacityLiters = 675;
     }
 
     const curbWeightKg =
@@ -1729,7 +1677,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         ? writer.technicalSpecifications.curbWeightKg
         : isMotorcycle
         ? baseCc >= 600 ? 215 : baseCc >= 200 ? 170 : 130
-        : isSuvPickup ? 1950 : commercialDefaults?.curbWeightKg || 1420;
+        : isSuvPickup ? 1950 : (isCombi ? 1420 : 1600);
 
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
@@ -1922,13 +1870,13 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         model: context.model,
         modelYear: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
         year: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
-        bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : commercialDefaults?.segmentNameTr || 'Minivan & Panelvan',
-        engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : `${commercialDefaults?.defaultCc || judge.finalDisplacementCc} cc ${isGasoline ? 'Benzin' : 'Dizel'}`),
+        bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Minivan'),
+        engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : `${judge.finalDisplacementCc} cc ${isGasoline ? 'Benzin' : 'Dizel'}`),
         transmissionName: isMotorcycle
           ? (context.transmission || (writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('otomatik') || writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('cvt') ? 'Otomatik' : 'Manuel'))
           : canonicalTransmission,
         fuelType: isMotorcycle ? 'Benzin' : (isGasoline ? 'Benzin' : (context.fuel || 'Dizel')),
-        trim: context.trimPackage || (isMotorcycle ? 'Standart' : `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`),
+        trim: context.trimPackage || (isMotorcycle ? 'Standart' : 'Standart Kasa'),
         engineDisplacementCc: judge.finalDisplacementCc,
         enginePowerHp: judge.finalPowerHp,
         canonicalDisplayPowerHp: judge.finalPowerHp,
@@ -1942,7 +1890,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           ? writer.technicalSpecifications.engineTorqueNm
           : isMotorcycle
           ? (judge.finalDisplacementCc >= 650 ? 68 : judge.finalDisplacementCc >= 350 ? 35 : 24)
-          : isSuvPickup ? 380 : (commercialDefaults?.segment === 'COMPACT' ? 260 : 385),
+          : isSuvPickup ? 380 : 300,
         torqueUnit: 'Nm',
         transmissionTypeAndSpeeds: canonicalTransmission,
         transmissionSpeeds: canonicalSpeeds,
@@ -2022,7 +1970,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               return false; // Eliminate fake EFI tradeoff on pure carburetor motorcycles
             }
             if (!isMotorcycle && !isSuvPickup) {
-              const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? commercialDefaults?.transmissionOptions?.hasAutomatic);
+              const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
               if (hasAuto) {
                 if (tText.includes('otomatik şanzıman') && (tText.includes('yok') || tText.includes('bulunm') || tText.includes('eksikli'))) {
                   return false; // Eliminate fake "no automatic transmission" tradeoff on commercial models with automatic options (e.g. Transporter DSG)
@@ -2051,7 +1999,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         notSuitableFor: (writer.notIdealFor || writer.notSuitableFor || [])
           .filter((n: any) => {
             const nText = `${n.profile} ${n.explanation}`.toLowerCase();
-            const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? commercialDefaults?.transmissionOptions?.hasAutomatic);
+            const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
             if (!isMotorcycle && !isSuvPickup && !hasAuto) {
               if (/otomatik/i.test(nText)) return false;
             }
@@ -2174,12 +2122,12 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
                 checkRecommendation: this.sanitizeTurkishAutomotiveText(r.checkRecommendation),
               })),
               configurationContext: {
-                rawPackage: context.trimPackage || `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`,
-                cargoVolumeM3: commercialDefaults?.cargoVolumeM3 || Number((trunkCapacityLiters / 1000).toFixed(1)),
+                rawPackage: context.trimPackage || (isCombi ? 'Kombi' : 'Panelvan'),
+                cargoVolumeM3: Number((trunkCapacityLiters / 1000).toFixed(1)),
                 commercialMeaning: this.sanitizeTurkishAutomotiveText(
                   writer.configurationBadge ||
                     context.trimPackage ||
-                    `${commercialDefaults?.segmentNameTr || 'Kombi'} (${commercialDefaults?.cargoVolumeM3 || 3.4} m³)`,
+                    (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Yük Taşıma'),
                 ),
               },
             }
@@ -2487,7 +2435,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
   private generateDeterministicReportFallback(
     context: MultiVehicleResearchContext,
     judge: Agent3Output,
-    commercialDefaults?: CommercialVehicleDefaults,
   ): any {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
@@ -2667,7 +2614,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       };
     }
 
-    const vol = commercialDefaults?.cargoVolumeM3 || 3.4;
+    const vol = 3.4;
     return {
       vehicleOverview: `${context.brand} ${context.model}, sınıfında operasyonel dayanıklılığı, tork karakteri ve ergonomik yapısıyla profesyonel kullanıma yönelik tasarlanmıştır.\n\nMotor ünitesi ağır kullanım koşullarında yeterli tork rezervi sağlarken şanzıman oranları yakıt ekonomisi ile çekiş gücünü dengeler.\n\nPazar tecrübesi yüksek olan model, yaygın yedek parça ve tecrübeli servis ağıyla ikinci elde değerini korumaktadır.`,
       configurationAnalysis: `${context.trimPackage || vol + ' m³'} kargo yükleme hacmi ve operasyonel taşıma kapasitesi.`,
