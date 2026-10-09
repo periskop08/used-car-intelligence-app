@@ -207,11 +207,12 @@ export class VerifiedSpecLibraryService {
       });
     }
 
-    // Automobile, SUV, Commercial matching
+    // Automobile, SUV, Commercial matching: Year is strictly scoped so pre-facelift / post-facelift specs never cross-contaminate!
     return this.prisma.verifiedSpecLibrary.findFirst({
       where: {
         brand: { equals: filter.brand, mode: 'insensitive' },
         model: { equals: filter.model, mode: 'insensitive' },
+        ...(filter.year ? { year: filter.year } : {}),
         ...(filter.engine ? { engine: { equals: filter.engine, mode: 'insensitive' } } : {}),
         verificationStatus: 'VERIFIED',
       },
@@ -257,6 +258,7 @@ Given vehicle brand, model, year, engine version, body type, fuel and transmissi
 CRITICAL RULES:
 1. Turkish market BMW models (e.g. 520i G30, 320i) have 1598 cc (B48B16), while global has 1998 cc.
 2. Provide exact factory metrics, never rough rounding.
+3. STRICT YEAR & EMISSION ERA RESPECT: Different model years often have different power outputs (e.g. pre-facelift Euro 5 vs facelift Euro 6). For instance, 2010-2015 Fiat Doblo 1.6 Multijet is 105 HP (Euro 5), while 2016+ is 120 HP (Euro 6). Always return the EXACT factory power for the specified YEAR.
 Output ONLY valid JSON:
 {
   "displacementCc": number,

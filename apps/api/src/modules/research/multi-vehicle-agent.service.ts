@@ -1496,6 +1496,9 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
       if (cleanTitle.toLowerCase().includes('egr') && (cleanInspect.toLowerCase().includes('enjektör') || cleanInspect.length < 10)) {
         cleanInspect = 'EGR valfi kurum doluluk oranı ve elektronik valf konumu OBD cihazı ile canlı parametrelerden kontrol edilmelidir.';
       }
+      if (cleanTitle.toLowerCase().includes('turbo') && (cleanInspect.toLowerCase().includes('debriyaj') || cleanInspect.length < 10)) {
+        cleanInspect = 'Turboşarj intercooler boruları, hortum kelepçeleri yağ sızıntısı ve basınç kaçağı yönünden kontrol edilmelidir.';
+      }
 
       return {
         title: cleanTitle,
@@ -1869,8 +1872,9 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
                 rawPackage: context.trimPackage || `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`,
                 cargoVolumeM3: commercialDefaults?.cargoVolumeM3 || Number((trunkCapacityLiters / 1000).toFixed(1)),
                 commercialMeaning: this.sanitizeTurkishAutomotiveText(
-                  writer.configurationAnalysis ||
-                    `${context.trimPackage || (commercialDefaults?.cargoVolumeM3 || 3.4) + ' m³'} konfigürasyonu`,
+                  writer.configurationBadge ||
+                    context.trimPackage ||
+                    `${commercialDefaults?.segmentNameTr || 'Kombi'} (${commercialDefaults?.cargoVolumeM3 || 3.4} m³)`,
                 ),
               },
             }
