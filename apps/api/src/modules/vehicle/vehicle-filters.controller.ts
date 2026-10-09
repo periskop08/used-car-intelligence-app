@@ -548,7 +548,21 @@ export class VehicleFiltersController {
     });
     const order = ['Benzin', 'Dizel', 'Hibrit', 'Elektrik', 'LPG & Benzin'];
     const fuelsSet = new Set(variants.map(v => getFuelTypeTr(v.fuelType?.toString() || '')));
-    const sortedFuels = Array.from(fuelsSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    let sortedFuels = Array.from(fuelsSet).filter(Boolean).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+    // Strict Powertrain Fuel Integrity Gatekeeper:
+    // Known diesel engines (Multijet, TDI, dCi, HDi, BlueHDi, EcoBlue, CDI, CRDi, CDTI, JTD) can NEVER be Petrol or LPG.
+    const engineLower = (targetEngine || '').toLowerCase();
+    const isStrictlyDiesel = /multijet|mjet|\btdi\b|\bdci\b|\bhdi\b|\bbluehdi\b|\bcdi\b|\bcrdi\b|\bcdti\b|\becoblue\b|\bjtd\b|\bd-4d\b|\bd4d\b/i.test(engineLower);
+    const isStrictlyPetrol = /\btsi\b|\btfsi\b|\bpuretech\b|\becoboost\b|\bvtec\b|\bi-vtec\b|\bt-jet\b|\btjet\b|\bfirefly\b|\btce\b/i.test(engineLower);
+
+    if (isStrictlyDiesel) {
+      sortedFuels = sortedFuels.filter(f => f === 'Dizel');
+      if (sortedFuels.length === 0) sortedFuels = ['Dizel'];
+    } else if (isStrictlyPetrol) {
+      sortedFuels = sortedFuels.filter(f => f !== 'Dizel');
+    }
+
     return {
       success: true,
       data: sortedFuels.map(name => ({ label: name, value: name })),
