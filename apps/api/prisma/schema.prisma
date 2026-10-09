@@ -3236,6 +3236,29 @@ model DataQualitySnapshot {
   createdAt       DateTime @default(now())
 }
 
+model CatalogAnomaly {
+  id          String    @id @default(uuid())
+  category    String    // MISSING_YEARS, PARSER_DROP, CASCADE_ERROR, DATA_INTEGRITY
+  severity    String    @default("WARNING") // CRITICAL, WARNING, INFO
+  vehicleType String?   // AUTOMOBILE, SUV_PICKUP, MINIVAN_PANELVAN, MOTORCYCLE
+  brandName   String?
+  modelName   String?
+  source      String    // e.g. "Arabam Scraper Part 2", "Live Watchdog Scan", "Quick Query Cascade"
+  title       String
+  description String
+  rawPayload  Json?
+  status      String    @default("OPEN") // OPEN, RESOLVED, IGNORED
+  detectedAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?
+
+  @@index([category])
+  @@index([severity])
+  @@index([status])
+  @@index([brandName, modelName])
+  @@index([detectedAt])
+}
+
 enum PowerVerificationStatus {
   PENDING
   RESEARCHING

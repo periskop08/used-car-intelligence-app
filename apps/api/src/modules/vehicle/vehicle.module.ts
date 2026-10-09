@@ -16,6 +16,9 @@ import { VariantTechnicalFactsService } from './variant-technical-facts.service'
 import { VerifiedSpecLibraryController } from './verified-spec-library.controller';
 import { VerifiedSpecLibraryService } from './verified-spec-library.service';
 
+import { CatalogWatchdogController } from './catalog-watchdog.controller';
+import { CatalogWatchdogService } from './catalog-watchdog.service';
+
 @Module({
   controllers: [
     VehicleController,
@@ -23,6 +26,7 @@ import { VerifiedSpecLibraryService } from './verified-spec-library.service';
     AdminVehicleFiltersController,
     DataQualityController,
     VerifiedSpecLibraryController,
+    CatalogWatchdogController,
   ],
   providers: [
     VehicleService,
@@ -35,6 +39,7 @@ import { VerifiedSpecLibraryService } from './verified-spec-library.service';
     CanonicalDisplayService,
     VariantTechnicalFactsService,
     VerifiedSpecLibraryService,
+    CatalogWatchdogService,
   ],
   exports: [
     VehicleService,
@@ -44,6 +49,7 @@ import { VerifiedSpecLibraryService } from './verified-spec-library.service';
     CanonicalDisplayService,
     VariantTechnicalFactsService,
     VerifiedSpecLibraryService,
+    CatalogWatchdogService,
   ],
 })
 export class VehicleModule {}

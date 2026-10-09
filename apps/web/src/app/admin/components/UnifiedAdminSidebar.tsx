@@ -108,6 +108,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: 'Araç Verisi',
     icon: Database,
     children: [
+      { key: 'CATALOG_HEALTH', label: 'Katalog Sağlığı & Hata Takibi', href: '/admin/vehicle-data/catalog-health' },
       { key: 'VARIANT_DB', label: 'Araç Varyant Veritabanı', href: '/admin/vehicle-data/variants' },
       { key: 'VERIFIED_SPECS', label: 'Doğrulanan Teknik Veri Kütüphanesi', href: '/admin/vehicle-data/verified-specs' },
       { key: 'VEHICLE_REPORTS', label: 'Araç Raporları', href: '/admin/vehicle-data/reports' },
