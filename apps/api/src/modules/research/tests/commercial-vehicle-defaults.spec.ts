@@ -78,7 +78,8 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
         getModelTechnicalFacts: jest.fn().mockResolvedValue({}),
         getVariantTechnicalFacts: jest.fn().mockResolvedValue({}),
       };
-      service = new MultiVehicleAgentService(mockPrisma, mockSearch, mockFacts);
+      const mockLibrary: any = { verifyAndGetSpecs: jest.fn().mockResolvedValue(null) };
+      service = new MultiVehicleAgentService(mockPrisma, mockSearch, mockFacts, mockLibrary);
     });
 
     it('sanitizeTurkishAutomotiveText unpacks nested objects without producing "[object Object]"', () => {
@@ -149,7 +150,7 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
       expect(harmonized.vehicleIdentity.engineCode).toBe('1.6 MultiJet');
       expect(harmonized.vehicleIdentity.trim).toBe('Cargo');
       expect(harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.configurationContext.cargoVolumeM3).toBe(3.4);
-      expect(harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.applicationSummary).toBe('Kapsamlı sürüş analizi metni.');
+      expect(harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.applicationSummary).toBe('3.4 m³ kargo yükleme alanı.');
     });
   });
 });

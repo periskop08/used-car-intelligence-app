@@ -570,15 +570,30 @@ Extract strict JSON matching schema with candidatePowers, claims, and physical s
       systemPrompt = `You are TorqueScout Agent 1: Commercial Vehicle Application Technical Research Specialist.
 Map the exact commercial vehicle class (${commercialDefaults?.segmentNameTr || 'Ticari Araç'}), authentic cargo volume (${vol} m³ / ${liters} Litre), payload capacity, gearbox availability (manual vs automatic), and heavy commercial duty wear.
 CRITICAL RULES:
-1. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
-2. Rear suspension architecture: ${susp}. ${leafRule}
-3. Engine architecture: ${wetBeltRule || 'Extract authentic injector leak-off, turbo boost hose wear, EGR cooler and DPF soot issues.'}
-4. Transmission architecture:
-   - Manuel: ${trans?.manualType || '6 İleri Manuel'}
-   - Otomatik Opsiyonu: ${trans?.hasAutomatic ? `Mevcut (${trans.automaticType})` : 'Türkiye pazarında ağırlıklı sadece manuel'}
-   - Gerçek Bilgi: ${trans?.summaryTr || ''}
-5. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks.
-6. Output strict JSON only.`;
+1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
+   ALL text, claim titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
+   - Use "Turbo Besleme Hortumu Kaçağı ve Yağ Sızıntısı", NEVER "Turbo boost hose leaks".
+   - Use "EGR Soğutucu Petek Tıkanması ve Hararet Riski", NEVER "EGR cooler issues" or "Engine overheating".
+   - Use "Sürgülü Kapı Alt Ray ve Rulman Aşınması", NEVER "Cargo sliding door roller wear".
+   - Use "Debriyaj Baskı Balata ve Çift Kütleli Volan Aşınması", NEVER English terms.
+   - System Categorization:
+     * Sürgülü kapı mekanizması, raylar, makaralar, kapı kilitleri, gövde parçaları -> GÖVDE_TRİM
+     * Motor, turbo, intercooler, triger, egr, enjektör -> MOTOR
+     * Şanzıman, debriyaj, baskı balata, volan -> ŞANZIMAN
+     * Alt takım, süspansiyon, amortisör, helezon yay, makas -> YÜRÜYEN_AKSAM
+2. AUTHENTIC GEARBOX DISCOVERY & ZERO FALSE AUTOMATIC HALLUCINATIONS:
+   - The user selects "Manuel / Otomatik" together to research both options for this vehicle.
+   - You MUST investigate if this exact vehicle year and engine actually offered an automatic transmission option from the factory:
+     * If YES (e.g. Ford Transit Custom 6-ileri SelectShift, VW Transporter DSG, Mercedes Vito 7G/9G-Tronic, 2023+ Doblo EAT8, 2010-2015 Doblo Comfort-Matic):
+       Set "automaticGearboxVerified": true, specify exact "automaticGearboxType" (e.g. "6 İleri SelectShift", "7 İleri DSG").
+     * If NO (e.g. 2016-2022 Fiat Doblo 1.6 Multijet, Ford Courier 2014-2023 1.5 TDCi, Fiat Fiorino 1.3 Multijet):
+       Set "automaticGearboxVerified": false, "automaticGearboxType": "Mevcut Değil (Sadece Manuel)", and "automaticUnverifiedReason": "Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman opsiyonu bulunmamakta olup yalnızca manuel şanzımanla üretilmiştir.".
+       DO NOT hallucinate automatic gearbox issues, maintenance costs or tradeoffs if the vehicle was only manual!
+3. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
+4. Rear suspension architecture: ${susp}. ${leafRule}
+5. Engine architecture: ${wetBeltRule || 'Extract authentic injector leak-off, turbo boost hose wear, EGR cooler and DPF soot issues.'}
+6. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks.
+7. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Engine: ${context.engine || `${commercialDefaults?.defaultCc || baseCc} cc`}
@@ -589,16 +604,16 @@ Base Catalog HP: ${baseHp}
 Live Web Evidence:
 ${liveWebSnippets}
 
-Extract strict JSON:
+Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR):
 {
   "displacementCc": ${baseCc},
   "powerHp": ${baseHp},
   "powerRangeText": "${powerRangeText || `${baseHp} HP`}",
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "commercialDetails": {
-    "generationName": "string (örn: T6, Custom V362, Master III)",
+    "generationName": "string (örn: T6, Custom V362, Doblo IV, Master III)",
     "productionEra": "string",
-    "engineFamily": "string (örn: 2.0 TDI EA288, 2.0 EcoBlue, 2.3 dCi M9T)",
+    "engineFamily": "string (örn: 1.6 Multijet, 2.0 TDI EA288, 2.0 EcoBlue)",
     "displacementCc": ${baseCc},
     "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
     "exactPowerHp": ${baseHp},
@@ -609,8 +624,8 @@ Extract strict JSON:
     "manualGearboxVerified": true,
     "manualGearboxType": "${trans?.manualType || '6 İleri Manuel'}",
     "automaticGearboxVerified": ${trans?.hasAutomatic ?? false},
-    "automaticGearboxType": "${trans?.hasAutomatic ? trans.automaticType : ''}",
-    "automaticUnverifiedReason": "${trans?.hasAutomatic ? '' : 'Model ağır ticari odaklı üretilmiş olup Türkiye pazarında neredeyse tamamen manueldir.'}",
+    "automaticGearboxType": "${trans?.hasAutomatic ? trans.automaticType : 'Mevcut Değil (Sadece Manuel)'}",
+    "automaticUnverifiedReason": "${trans?.hasAutomatic ? '' : 'Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman seçeneği bulunmamakta olup yalnızca manuel üretilmiştir.'}",
     "configurationContext": {
       "rawSourceLabel": "${context.trimPackage || `${vol} m³`}",
       "commercialMeaning": "${vol} m³ kargo hacmi konfigürasyonu",
@@ -619,22 +634,22 @@ Extract strict JSON:
   },
   "commercialDutyRisks": [
     {
-      "title": "string (Ağır ticari kullanım aşınma başlığı)",
-      "risk": "string (Mekanizma ve maliyet)",
-      "checkRecommendation": "string (Ekspertiz kontrol adımı)"
+      "title": "string (Ağır ticari kullanım aşınma başlığı - Türkçe)",
+      "risk": "string (Mekanizma ve maliyet - Türkçe)",
+      "checkRecommendation": "string (Ekspertiz kontrol adımı - Türkçe)"
     }
   ],
   "claims": [
     {
       "claimId": "CLM-001",
-      "title": "string (Gerçek arıza adı)",
+      "title": "string (Modelin gerçek Türkçe arıza adı - Örn: 'Turbo Besleme Hortumu Kaçağı ve Yağ Sızıntısı')",
       "system": "YÜRÜYEN_AKSAM | MOTOR | ŞANZIMAN | YAKIT_BESLEME | GÖVDE_TRİM",
       "scopeType": "ALL_ERA_COMMON",
-      "symptoms": ["string"],
-      "userExperience": "string",
-      "testDriveCheck": "string",
-      "inspectionCheck": "string",
-      "sellerQuestion": "string",
+      "symptoms": ["string (Türkçe somut belirti)"],
+      "userExperience": "string (Türkçe kullanıcı deneyimi)",
+      "testDriveCheck": "string (Türkçe test sürüşü kontrolü)",
+      "inspectionCheck": "string (Türkçe ekspertiz kontrolü)",
+      "sellerQuestion": "string (Türkçe satıcı sorusu)",
       "costRisk": "ORTA | YUKSEK | COK_YUKSEK",
       "severity": "MODERATE | HIGH | CRITICAL",
       "confidence": 0.90
@@ -806,33 +821,39 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
         const recoverySystemPrompt = `You are a Master Commercial Fleet Diagnostic Specialist.
 Extract exactly 3 to 4 documented, authentic chronic failure modes specifically for "${context.year || ''} ${context.brand} ${context.model}".
 CRITICAL DIRECTIVES:
-1. Ground your analysis in the ACTUAL platform engineering of "${context.year || ''} ${context.brand} ${context.model}" (Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}, Suspension: ${commercialDefaults?.suspensionType}).
-2. Suspension Accuracy: ${suspensionRule}
-3. Engine Accuracy: ${timingRule || 'Analyze genuine common rail injector leak-off, turbo boost pressure hose cracking, EGR cooler and DPF soot accumulation.'}
-   - E.g. for Fiat Doblo: Independent Bi-Link rear suspension (helezon yay - NOT leaf spring/makas), 1.3/1.6 MultiJet EGR cooler cracking, swirl flap failure, sliding door lower guide bearing wear.
-   - E.g. for Ford Transit Custom 2.0 EcoBlue: Wet timing belt (Belt-in-Oil / BIO) rubber degradation contaminating oil and clogging oil pump strainer causing oil pressure loss and engine seizure; AdBlue injector crystallization; dual-mass flywheel shudder.
-   - E.g. for VW Transporter: Transporter rear trailing arm bushes, 2.0 TDI EGR cooler leak, DSG clutch wear.
-4. DO NOT use generic copy-paste text! Output 3-4 genuine, authentic chronic failure modes corresponding to its exact platform.
-5. Output strict JSON only matching CandidateClaim schema with claimId, title, system, symptoms, userExperience, testDriveCheck, inspectionCheck, sellerQuestion, costRisk, severity.`;
+1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
+   All titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
+   - Use "Turbo Besleme Hortumu Kaçağı ve Yağ Sızıntısı", NEVER "Turbo boost hose leaks".
+   - Use "EGR Soğutucu Petek Tıkanması ve Hararet Riski", NEVER "EGR cooler issues".
+   - Use "Sürgülü Kapı Alt Ray ve Rulman Aşınması", NEVER "Cargo sliding door roller wear".
+2. Ground your analysis in the ACTUAL platform engineering of "${context.year || ''} ${context.brand} ${context.model}" (Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}, Suspension: ${commercialDefaults?.suspensionType}).
+3. Suspension Accuracy: ${suspensionRule}
+4. System Categorization:
+   - Sürgülü kapı / ray / rulman / kilit / gövde parçaları -> GÖVDE_TRİM
+   - Motor / turbo / egr / enjektör -> MOTOR
+   - Şanzıman / debriyaj / volan -> ŞANZIMAN
+   - Alt takım / helezon yay / makas -> YÜRÜYEN_AKSAM
+5. DO NOT use generic copy-paste text! Output 3-4 genuine, authentic chronic failure modes corresponding to its exact platform.
+6. Output strict JSON only.`;
 
         const recoveryUserPrompt = `Commercial Vehicle: ${context.year || ''} ${context.brand} ${context.model}
 Segment: ${commercialDefaults?.segmentNameTr}
 Engine: ${context.engine || `${commercialDefaults?.defaultCc} cc`}
 Suspension: ${commercialDefaults?.suspensionType}
 Configuration: ${context.trimPackage || `${commercialDefaults?.cargoVolumeM3} m3`}
-Extract 3-4 genuine, authentic chronic failure modes for this exact model in strict JSON:
+Extract 3-4 genuine, authentic chronic failure modes for this exact model in strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE):
 {
   "claims": [
     {
       "claimId": "CLM-001",
       "title": "string (Modelin gerçek Türkçe arıza adı)",
-      "system": "string",
+      "system": "GÖVDE_TRİM | MOTOR | ŞANZIMAN | YÜRÜYEN_AKSAM",
       "scopeType": "ALL_ERA_COMMON | APPLICATION_SPECIFIC",
-      "symptoms": ["string"],
-      "userExperience": "string",
-      "testDriveCheck": "string",
-      "inspectionCheck": "string",
-      "sellerQuestion": "string",
+      "symptoms": ["string (Türkçe somut belirti)"],
+      "userExperience": "string (Türkçe kullanıcı tecrübesi)",
+      "testDriveCheck": "string (Türkçe test sürüşü adımı)",
+      "inspectionCheck": "string (Türkçe ekspertiz kontrol adımı)",
+      "sellerQuestion": "string (Türkçe satıcı sorusu)",
       "costRisk": "DUSUK | ORTA | YUKSEK | COK_YUKSEK",
       "severity": "LOW | MODERATE | HIGH | CRITICAL",
       "confidence": 0.92
@@ -896,7 +917,15 @@ Investigate:
 2. Did Agent 1 claim EFI or Euro 3 for a vintage / pre-2008 carburetor model (such as Honda Shadow VT750 2001-2007, Yamaha Dragstar)? If so, CONTRADICT with reason "2007 öncesi klasik cruiser serisi karbüratörlüdür"!
 3. Did Agent 1 claim ABS on a model/era that has drum brakes (Ön Disk Arka Kampana), or claim 3 spark plugs on a V-Twin / 2-cylinder engine? If so, flag contradiction!
 4. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
-5. For commercial vehicles: was automatic transmission claimed when the selected application was strictly manual?
+5. For commercial vehicles: AUDIT TRANSMISSION REALITY!
+   - Did Agent 1 claim an automatic transmission (e.g. Comfort-Matic, robotize, DSG, EAT8) for a model/year that was strictly manual from the factory?
+     * E.g. 2016-2022 Fiat Doblo 1.6 Multijet was ONLY 6-speed manual in Turkey (Comfort-Matic was discontinued after 2015!).
+     * E.g. 2014-2023 Ford Tourneo/Transit Courier 1.5/1.6 TDCi was ONLY manual!
+     * E.g. Fiat Fiorino 1.3 Multijet was essentially manual!
+   - If an automatic transmission is claimed for a model/year that never offered it, you MUST set:
+     "transmissionRefuted": true,
+     "transmissionRefutedReason": "Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman üretilmemiştir; araç yalnızca manueldir.",
+     and CONTRADICT any claims mentioning automatic transmission or robotized actuators!
 6. For automatic / CVT scooters (such as Honda Forza, PCX, Yamaha XMAX, NMAX, Vespa): did Agent 1 hallucinate manual transmission, gear shift dogs (vites hilali / sekromeç / boşa atma), clutch plates or clutch cables? If so, immediately CONTRADICT with reason "Otomatik CVT scooter modelinde manuel şanzıman veya vites hilali/cırtlaması arızası iddia edilemez; varyatör bagaları ve kayış aktarması geçerlidir"!
 7. For commercial vehicles (Minivan/Panelvan):
    - If the vehicle uses coil springs / independent suspension (such as Fiat Doblo with Bi-Link suspension, VW Transporter, Mercedes Vito), did Agent 1 claim rear leaf spring (makas / yaprak yay) fatigue or sag? If so, immediately CONTRADICT with reason "Bu modelde arkada makas (yaprak yay) değil, bağımsız Bi-Link / helezon yaylı süspansiyon sistemi mevcuttur; makas çökmesi arızası teknik olarak hatalıdır"!
@@ -920,6 +949,7 @@ Output STRICT JSON:
     const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
 Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
 ${commercialDefaults ? `Commercial Specs: Segment=${commercialDefaults.segmentNameTr}, Suspension=${commercialDefaults.suspensionType}, WetBelt=${commercialDefaults.hasWetTimingBelt}` : ''}
+${agent1.commercialDetails ? `Commercial Details Claimed by Agent 1:\n${JSON.stringify(agent1.commercialDetails, null, 2)}` : ''}
 Motorcycle Eras:
 ${JSON.stringify(agent1.motorcycleEras || [], null, 2)}
 Agent 1 Claims:
@@ -1224,13 +1254,19 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
       const trans = commercialDefaults?.transmissionOptions;
       const ops = commercialDefaults?.operationalProfile;
 
+      const isAutoVerified = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? trans?.hasAutomatic);
+      const autoName = isAutoVerified
+        ? (judge.commercialDetails?.automaticGearboxType || trans?.automaticType || 'Tam Otomatik')
+        : 'Mevcut Değil (Sadece Manuel)';
+      const manualName = judge.commercialDetails?.manualGearboxType || trans?.manualType || '6 İleri Manuel';
+
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Segment: ${commercialDefaults?.segmentNameTr || 'Ticari Araç'}
 Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo Hacmi)
 Suspension: ${susp}
 Transmission Architecture:
-- Manuel Şanzıman: ${trans?.manualType || '6 İleri Manuel'}
-- Otomatik Şanzıman Durumu: ${trans?.hasAutomatic ? `MEVCUT (${trans.automaticType})` : 'TÜRKİYE PAZARINDA AĞIRLIKLI MANUEL'}
+- Manuel Şanzıman: ${manualName}
+- Otomatik Şanzıman Durumu: ${isAutoVerified ? `MEVCUT (${autoName})` : 'OPSİYON YOK (YALNIZCA MANUEL ÜRETİLMİŞTİR)'}
 - Şanzıman Rehberi: ${trans?.summaryTr || ''}
 Operational Dimensions:
 - Tavan Yüksekliği: ${ops?.heightMeters || 2.0} metre (${ops?.heightMeters && ops.heightMeters <= 2.0 ? 'Standart 2.0m kotundaki kapalı AVM/site otoparklarına girebilir' : 'Standart kapalı AVM/site otoparklarına yüksekliği nedeniyle giremez'})
@@ -1243,13 +1279,13 @@ Approved Facts:
 ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
-Write the complete Minivan/Panelvan Commercial Report in strict JSON:
+Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki dizel motorun ${judge.finalPowerHp} HP güç ve alt devir tork karakteri, ağır yük altındaki çekiş kabiliyeti, şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki dizel motorun ${judge.finalPowerHp} HP güç ve alt devir tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${manualName} şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
   "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve ticari dayanıklılığı hakkında 2-3 cümlelik ÖZGÜN değerlendirme. Kesinlikle yönerge metnini kopyalama.)",
-  "manualTransmissionAnalysis": "string (Manuel şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
-  "automaticTransmissionAnalysis": "string (${trans?.hasAutomatic ? `Modelin ${trans.automaticType} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama durumu ve bakım gereksinimleri hakkında ÖZGÜN analiz.` : `Modelin Türkiye pazarında neden ağırlıklı manuel tercih edildiği ve ağır yük şartlarındaki mekanik dayanıklılığı hakkında ÖZGÜN analiz.`})",
-  "manualVsAutomatic": "string (Manuel ve otomatik seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması.)",
+  "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
+  "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz.` : `Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca ${manualName} ile üretilmiştir. Ağır ticari şartlarda manuel şanzıman düşük bakım ve parça maliyeti sağlar.`})",
+  "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Varyant fabrika çıkışı yalnızca manuel şanzıman ile sunulduğundan otomatik vitese bağlı bir tercih ayrımı bulunmamaktadır; manuel şanzıman düşük işletme maliyeti sağlar.`})",
   "commercialDutyRisks": [
     {
       "title": "string (Ağır ticari kullanım kaynaklı spesifik arıza başlığı)",
@@ -1402,6 +1438,16 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
       [/ortak ray/gi, 'Common Rail'],
       [/soot birikimi/gi, 'Kurum Birikimi'],
       [/soot/gi, 'Kurum'],
+
+      // Ticari Arıza Başlıkları ve Kontroller (İngilizce Koruma)
+      [/turbo boost hose leaks/gi, 'Turboşarj Basınç Hortumu Kaçakları'],
+      [/turbo boost hoses for wear\.?/gi, 'Turbo basınç hortumları çatlak ve aşınma yönünden kontrol edilmelidir.'],
+      [/egr cooler issues/gi, 'EGR Soğutucu Petek Tıkanması ve Hararet'],
+      [/engine overheating\.?/gi, 'Motor hararet ve aşırı ısınma riski.'],
+      [/egr cooler for blockages\.?/gi, 'EGR soğutucu petekleri ve su kanalları tıkanma yönünden kontrol edilmelidir.'],
+      [/cargo sliding door roller wear/gi, 'Sürgülü Kapı Alt Ray ve Rulman Aşınması'],
+      [/difficulty in opening\/closing doors\.?/gi, 'Sürgülü kapıların açılıp kapanmasında zorlanma ve ray takılması.'],
+      [/rollers for wear and lubrication\.?/gi, 'Kapı alt ray makaraları ve rulmanları aşınma ve yağlama yönünden kontrol edilmelidir.'],
     ];
 
     for (const [pattern, replacement] of dictionary) {
@@ -1482,17 +1528,19 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
       const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
-      const domainKey =
-        fact.system.includes('ELEKTRİK') ? 'ELECTRONICS_BODY' :
-        fact.system.includes('ŞANZIMAN') ? 'POWERTRAIN_TRANS' :
-        fact.system.includes('YAKIT') || fact.system.includes('MOTOR') ? 'POWERTRAIN_ENGINE' :
-        fact.system.includes('YÜRÜYEN') || fact.system.includes('ŞASİ') ? 'CHASSIS_BRAKES' :
-        'POWERTRAIN_ENGINE';
-
       const cleanTitle = this.sanitizeTurkishAutomotiveText(fact.title);
       const cleanReason = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || fact.userExperience);
       const cleanDesc = this.sanitizeTurkishAutomotiveText(fact.userExperience);
       let cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck);
+
+      const domainKey =
+        /elektronik|elektrik|şarj|akü|statör|konjektör/i.test(fact.system) ? 'ELECTRONICS_BODY' :
+        /kapı|sürgülü|kilit|gövde|trim|karoser|body|door|roller|ray|fitil|boya|menteşe/i.test(`${fact.system} ${cleanTitle}`) ? 'ELECTRONICS_BODY' :
+        /şanzıman|vites|kavrama|debriyaj|volan|baskı|hilal/i.test(fact.system) ? 'POWERTRAIN_TRANS' :
+        /yürüyen|şasi|alt takım|fren|süspansiyon|makas|amortisör|salıncak|rot|rulman|chassis|suspension/i.test(fact.system) ? 'CHASSIS_BRAKES' :
+        /yakıt|motor|enjektör|turbo|triger|egr|dpf|silindir|hararet|yağ/i.test(fact.system) ? 'POWERTRAIN_ENGINE' :
+        'POWERTRAIN_ENGINE';
+
       if (cleanTitle.toLowerCase().includes('egr') && (cleanInspect.toLowerCase().includes('enjektör') || cleanInspect.length < 10)) {
         cleanInspect = 'EGR valfi kurum doluluk oranı ve elektronik valf konumu OBD cihazı ile canlı parametrelerden kontrol edilmelidir.';
       }
@@ -1735,9 +1783,16 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
             if (isMotorcycle && allErasCarb && (tText.includes('enjektör') || tText.includes('fi lambası') || tText.includes('elektronik beyin'))) {
               return false; // Eliminate fake EFI tradeoff on pure carburetor motorcycles
             }
-            if (!isMotorcycle && !isSuvPickup && commercialDefaults?.transmissionOptions?.hasAutomatic) {
-              if (tText.includes('otomatik şanzıman') && (tText.includes('yok') || tText.includes('bulunm') || tText.includes('eksikli'))) {
-                return false; // Eliminate fake "no automatic transmission" tradeoff on commercial models with automatic options (e.g. Transporter DSG)
+            if (!isMotorcycle && !isSuvPickup) {
+              const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? commercialDefaults?.transmissionOptions?.hasAutomatic);
+              if (hasAuto) {
+                if (tText.includes('otomatik şanzıman') && (tText.includes('yok') || tText.includes('bulunm') || tText.includes('eksikli'))) {
+                  return false; // Eliminate fake "no automatic transmission" tradeoff on commercial models with automatic options (e.g. Transporter DSG)
+                }
+              } else {
+                if (/otomatik|comfort-matic|robotize|aktüatör|dsg|şanzıman bakım/i.test(tText)) {
+                  return false; // Eliminate fake automatic transmission defect/maintenance tradeoff on models that are strictly manual!
+                }
               }
             }
             if (t.title && (t.title.toLowerCase().includes('avantaj') || t.title.toLowerCase().includes('üstünlük'))) {
@@ -1755,11 +1810,23 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
           explanation: this.sanitizeTurkishAutomotiveText(i.explanation),
           supportingFactIds: [],
         })),
-        notSuitableFor: (writer.notIdealFor || []).map((n: any) => ({
-          profile: this.sanitizeTurkishAutomotiveText(n.profile),
-          explanation: this.sanitizeTurkishAutomotiveText(n.explanation),
-          supportingFactIds: [],
-        })),
+        notSuitableFor: (writer.notIdealFor || [])
+          .filter((n: any) => {
+            const nText = `${n.profile} ${n.explanation}`.toLowerCase();
+            const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? commercialDefaults?.transmissionOptions?.hasAutomatic);
+            if (!isMotorcycle && !isSuvPickup && !hasAuto) {
+              if (/otomatik/i.test(nText)) return false;
+            }
+            return true;
+          })
+          .map((n: any) => ({
+            profile: this.sanitizeTurkishAutomotiveText(n.profile),
+            explanation: this.sanitizeTurkishAutomotiveText(n.explanation)
+              .replace(/ve otomatik şanzımanın bakım gereksinimleri,?/gi, '')
+              .replace(/otomatik şanzımanın bakım gereksinimleri ve,?/gi, '')
+              .trim(),
+            supportingFactIds: [],
+          })),
         purchaseConditions: (() => {
           let conds = (writer.conditionsToConsider || [])
             .filter((c: any) => {

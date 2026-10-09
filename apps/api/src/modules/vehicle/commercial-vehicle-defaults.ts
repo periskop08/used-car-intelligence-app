@@ -340,11 +340,25 @@ export function resolveCommercialVehicleDefaults(
     transmissionSummaryTr =
       'Mercedes Vito serisinde 6 ileri manuelin yanı sıra konfor odaklı 7G-Tronic veya 9G-Tronic tork konvertörlü otomatik şanzımanlar sunulmaktadır. Filo ve VIP taşımacılıkta tork konvertörü uzun ömürlü ve sarsıntısızdır.';
   } else if (normModel.includes('doblo')) {
-    hasAutomatic = year && year >= 2023 ? true : normEngine.includes('1.6');
-    manualType = '5 veya 6 İleri Manuel';
-    automaticType = year && year >= 2023 ? '8 İleri Tork Konvertörlü (EAT8)' : 'Comfort-Matic Robotize (Tek Kavrama)';
-    transmissionSummaryTr =
-      'Piyasada %90 oranında 5 veya 6 ileri manuel şanzımanla bulunur. Eski nesil Comfort-Matic robotize ünite dur-kalkta vites geçiş sarsıntısı yapabilir ve robot aktüatör bakımı ister; manuel versiyon ise çok düşük işletme maliyetiyle ticari olarak en ekonomik çözümdür.';
+    if (year && year >= 2023) {
+      hasAutomatic = true;
+      manualType = '6 İleri Manuel';
+      automaticType = '8 İleri Tork Konvertörlü (EAT8)';
+      transmissionSummaryTr =
+        'Yeni nesil K9 platformunda 6 ileri manuel ve 8 ileri tam otomatik EAT8 şanzıman opsiyonu sunulmaktadır. EAT8 tork konvertörlü yapısıyla pürüzsüz ve dayanıklıdır.';
+    } else if (year && year <= 2015 && normEngine.includes('1.6')) {
+      hasAutomatic = true;
+      manualType = '6 İleri Manuel';
+      automaticType = 'Comfort-Matic Robotize (Tek Kavrama)';
+      transmissionSummaryTr =
+        'Model 6 ileri manuelin yanında erken üretim döneminde sınırlı Comfort-Matic robotize tek kavrama ünitesiyle sunulmuştur. Robotize ünite dur-kalkta sarsıntı yapabilir ve aktüatör bakımı ister.';
+    } else {
+      hasAutomatic = false;
+      manualType = normEngine.includes('1.3') ? '5 İleri Manuel' : '6 İleri Manuel';
+      automaticType = 'Mevcut Değil (Sadece Manuel)';
+      transmissionSummaryTr =
+        'Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca manuel şanzımanla üretilmiştir. Debriyaj ve şanzıman işletme maliyeti son derece ekonomiktir.';
+    }
   } else if (normModel.includes('fiorino') || normModel.includes('nemo') || normModel.includes('bipper')) {
     hasAutomatic = false;
     manualType = '5 İleri Manuel';
