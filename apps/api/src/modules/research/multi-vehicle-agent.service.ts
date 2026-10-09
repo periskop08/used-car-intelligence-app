@@ -1382,7 +1382,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? autoName : manualName} şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
   "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; 5 kişilik camlı binek/kombi versiyonlarda bagaj hacmi (${liters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
@@ -1656,13 +1656,26 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       normModel.includes('tourneo') ||
       normModel.includes('tepee') ||
       normModel.includes('multispace') ||
+      normTrim.includes('selection') ||
+      normTrim.includes('multispace') ||
+      normTrim.includes('xtr') ||
+      normTrim.includes('feel') ||
+      normTrim.includes('shine') ||
+      normTrim.includes('life') ||
+      normTrim.includes('live') ||
+      normTrim.includes('active') ||
+      normTrim.includes('allure') ||
+      normTrim.includes('outdoor') ||
+      normTrim.includes('family') ||
+      normTrim.includes('trek') ||
+      normTrim.includes('business') ||
+      normTrim.includes('camli') ||
       normTrim.includes('titanium') ||
       normTrim.includes('plus') ||
       normTrim.includes('premio') ||
       normTrim.includes('safeline') ||
       normTrim.includes('pop') ||
-      normTrim.includes('urban') ||
-      normTrim.includes('life');
+      normTrim.includes('urban');
 
     // Physical Specs Gating (Zero-Null Guarantee)
     const baseHp = judge.finalPowerHp;
@@ -1699,9 +1712,11 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         ? 650
         : commercialDefaults?.trunkCapacityLiters || 3400;
 
-    // Guard against commercial volume hallucinations (e.g. 13000L on Doblo or Courier)
+    // Guard against commercial volume hallucinations (e.g. 13000L, or 3400L on a Combi)
     if (!isMotorcycle && !isSuvPickup && commercialDefaults) {
-      if (commercialDefaults.segment === 'COMPACT' && trunkCapacityLiters > 5000) {
+      if (isCombi) {
+        trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
+      } else if (commercialDefaults.segment === 'COMPACT' && trunkCapacityLiters > 5000) {
         trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
       } else if (commercialDefaults.segment === 'MEDIUM' && (trunkCapacityLiters > 8500 || trunkCapacityLiters < 4500)) {
         trunkCapacityLiters = commercialDefaults.trunkCapacityLiters;
@@ -2028,12 +2043,12 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             explanation: this.sanitizeTurkishAutomotiveText(t.explanation),
             supportingFactIds: [],
           })),
-        suitableFor: (writer.idealFor || []).map((i: any) => ({
+        suitableFor: (writer.idealFor || writer.suitableFor || []).map((i: any) => ({
           profile: this.sanitizeTurkishAutomotiveText(i.profile),
           explanation: this.sanitizeTurkishAutomotiveText(i.explanation),
           supportingFactIds: [],
         })),
-        notSuitableFor: (writer.notIdealFor || [])
+        notSuitableFor: (writer.notIdealFor || writer.notSuitableFor || [])
           .filter((n: any) => {
             const nText = `${n.profile} ${n.explanation}`.toLowerCase();
             const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified ?? commercialDefaults?.transmissionOptions?.hasAutomatic);
@@ -2246,11 +2261,18 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     let text = str;
 
     const normTrans = (canonicalTransmission || '').toLowerCase();
+    const hasBoth = normTrans.includes('manuel') && normTrans.includes('otomatik');
     const isAuto = normTrans.includes('otomatik') || Boolean(isVariantAutomatic);
     const isFiveSpeed = normTrans.includes('5') && !isAuto;
     const isSixSpeed = normTrans.includes('6') && !isAuto;
 
-    if (isAuto) {
+    if (hasBoth) {
+      text = text.replace(/6\s*[İi]leri\s*[Mm]anuel\s*şanzıman\s*dişli\s*oranları/gi, `${canonicalTransmission} şanzıman opsiyonları`);
+      text = text.replace(/5\s*[İi]leri\s*[Mm]anuel\s*şanzıman\s*dişli\s*oranları/gi, `${canonicalTransmission} şanzıman opsiyonları`);
+      text = text.replace(/yalnızca\s*manuel\s*üretilmiştir/gi, 'manuel ve otomatik şanzıman seçenekleri bulunmaktadır');
+      text = text.replace(/sadece\s*manuel\s*üretilmiştir/gi, 'manuel ve otomatik şanzıman seçenekleri mevcuttur');
+      text = text.replace(/otomatik\s*şanzıman\s*seçeneği\s*bulunmamaktadır/gi, 'otomatik şanzıman seçeneği mevcuttur');
+    } else if (isAuto) {
       text = text.replace(
         /Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca [^.]*\.?/gi,
         `${canonicalTransmission} şanzıman seçeneği, şehir içi dur-kalk trafiğinde üstün sürüş konforu ve akıcı vites geçişleri sunar.`,
@@ -2262,6 +2284,9 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       text = text.replace(/modelde otomatik şanzıman seçeneği bulunmuyor/gi, `${canonicalTransmission} seçeneği mevcuttur`);
       text = text.replace(/sadece manuel üretilmiştir/gi, `${canonicalTransmission} seçeneği sunulmaktadır`);
       text = text.replace(/yalnızca manuel üretilmiştir/gi, `${canonicalTransmission} seçeneği sunulmaktadır`);
+      text = text.replace(/6\s*[İi]leri\s*[Mm]anuel\s*şanzıman\s*dişli\s*oranları/gi, `${canonicalTransmission} dişli oranları`);
+      text = text.replace(/5\s*[İi]leri\s*[Mm]anuel\s*şanzıman\s*dişli\s*oranları/gi, `${canonicalTransmission} dişli oranları`);
+      text = text.replace(/manuel\s*şanzıman\s*dişli\s*oranları/gi, `${canonicalTransmission} dişli oranları`);
     } else if (isFiveSpeed) {
       text = text.replace(/6\s*[İi]leri\s*[Mm]anuel/g, '5 İleri Manuel');
       text = text.replace(/6\s*[İi]leri/g, '5 İleri');
@@ -2286,6 +2311,13 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       text = text.replace(/beşinci\s*viteste/gi, 'altıncı viteste');
     }
 
+    if (normTrans.includes('etg') || normTrans.includes('mcp')) {
+      text = text.replace(/EAT8[^\s,.]*/gi, 'ETG6');
+      text = text.replace(/EAT8\s*\(8\s*İleri\s*Tork\s*Konvertörlü\s*Tam\s*Otomatik\)/gi, 'ETG6 (6 İleri Robotize Otomatik)');
+      text = text.replace(/8\s*İleri\s*Tork\s*Konvertörlü\s*Tam\s*Otomatik/gi, '6 İleri Robotize Otomatik (ETG6 / MCP)');
+      text = text.replace(/Japon\s+Aisin\s+üretimi\s+EAT8\s+tam\s+otomatik\s+tork\s+konvertörlü/gi, '6 İleri ETG6 robotize (otomatikleştirilmiş tek kavrama)');
+    }
+
     if (isGasoline) {
       text = text.replace(/dizel\s+motorun/gi, 'benzinli motorun');
       text = text.replace(/dizel\s+motor\b/gi, 'benzinli motor');
@@ -2293,6 +2325,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     }
 
     if (isCombi) {
+      text = text.replace(/3\.4\s*m[3³]\s*kargo\s*hacmi/gi, 'geniş bagaj yükleme alanı');
+      text = text.replace(/3400\s*(?:lt|litre)\s*kargo\s*hacmi/gi, 'geniş bagaj alanı');
       text = text.replace(/palet\s+sığma\s+kabiliyeti/gi, 'geniş bagaj yükleme pratikliği');
       text = text.replace(/palet\s+yükleme\s+kabiliyeti/gi, 'kullanışlı bagaj yükleme pratikliği');
       text = text.replace(/palet(?:lerin)?\s+(?:kolayca\s+)?(?:yüklenebilmesi|sığabilmesi)/gi, 'aile ve iş eşyalarının kolayca yüklenebilmesi');
@@ -2389,7 +2423,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     if (isCombi && Array.isArray(report.expertDecisionSynthesis?.notSuitableFor)) {
       report.expertDecisionSynthesis.notSuitableFor = report.expertDecisionSynthesis.notSuitableFor.map((item: any) => {
         const fullText = `${item.profile || ''} ${item.explanation || ''}`.toLowerCase();
-        if (/büyük\s+aile|aileler\s+için\s+uygun\s+değil|aile\s+aracı\s+değil|aile\s+kullanımına\s+uygun\s+değil/i.test(fullText)) {
+        if (/aile|family/i.test(fullText)) {
           return {
             profile: 'Üst Segment Otoyol Konforu ve Sessizlik Arayanlar',
             explanation: 'Yüksek tavan formu ve ticari kökenli arka yürüyen aksam nedeniyle otoyol hızlarında D-segment binek sedan sessizliği ve viraj rijitliği arayan kullanıcılar için uygun değildir.',
@@ -2398,6 +2432,30 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         }
         return item;
       });
+    }
+
+    // 2b. Tradeoffs turning radius contradiction prevention (e.g. 10.8m is agile, not a limitation)
+    const targetCompromisesKey = Array.isArray(report.expertDecisionSynthesis?.compromisesAndLimitations)
+      ? 'compromisesAndLimitations'
+      : Array.isArray(report.expertDecisionSynthesis?.tradeoffs)
+      ? 'tradeoffs'
+      : undefined;
+
+    if (targetCompromisesKey) {
+      report.expertDecisionSynthesis[targetCompromisesKey] = report.expertDecisionSynthesis[targetCompromisesKey].filter((t: any) => {
+        const fullText = `${t.title || ''} ${t.explanation || ''}`.toLowerCase();
+        if ((fullText.includes('dönüş') || fullText.includes('dar sokak')) && (fullText.includes('10.8') || fullText.includes('10.') || fullText.includes('11.0'))) {
+          return false;
+        }
+        return true;
+      });
+      if (report.expertDecisionSynthesis[targetCompromisesKey].length === 0) {
+        report.expertDecisionSynthesis[targetCompromisesKey].push({
+          title: 'Yüksek Tavan Yan Rüzgar Hassasiyeti',
+          explanation: 'Kombinin yüksek tavan yapısı, otoyol hızlarında şiddetli yan rüzgarlarda ve viyadük geçişlerinde gövde esnemesi hissettirebilir.',
+          supportingFactIds: [],
+        });
+      }
     }
 
     // 3. Technical Cards & Identity Guarantee

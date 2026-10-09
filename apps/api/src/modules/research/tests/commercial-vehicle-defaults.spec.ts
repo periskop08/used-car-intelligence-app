@@ -353,5 +353,96 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
       expect(walkAway[0].condition).not.toContain('EGR');
       expect(walkAway[0].condition).toContain('soğutma sıvısı');
     });
+
+    it('accurately resolves 2013 Citroen Berlingo Selection (5-Speed Manual, 6-Speed ETG6, 675L Combi, Zero EAT8, Zero False 3400L)', () => {
+      const harmonizeFn = (service as any).harmonizeIntoStandardVehicleReport.bind(service);
+
+      const berlingoDefs = resolveCommercialVehicleDefaults('Citroen', 'Berlingo', '1.6 HDI (90 HP)', 'Selection', 2013);
+      expect(berlingoDefs.isPassengerOrCombi).toBe(true);
+      expect(berlingoDefs.trunkCapacityLiters).toBe(675);
+      expect(berlingoDefs.transmissionOptions.hasAutomatic).toBe(true);
+      expect(berlingoDefs.transmissionOptions.manualType).toBe('5 İleri Manuel');
+      expect(berlingoDefs.transmissionOptions.automaticType).toBe('6 İleri Robotize Otomatik (ETG6 / MCP)');
+      expect(berlingoDefs.transmissionOptions.automaticType).not.toContain('EAT8');
+
+      const berlingoContext: any = {
+        vehicleType: 'MINIVAN_PANELVAN',
+        brand: 'Citroen',
+        model: 'Berlingo',
+        year: 2013,
+        engine: '1.6 HDI',
+        fuel: 'Dizel',
+        transmission: 'Manuel + Otomatik',
+        trimPackage: 'Selection',
+      };
+
+      const mockJudge: any = {
+        finalPowerHp: 90,
+        finalDisplacementCc: 1560,
+        finalPowerRangeText: '90 HP',
+        candidatePowers: [90],
+        decisionScore: 78,
+        technicalRiskLevel: 'ORTA',
+        decisionRationale: 'Ticari ve mekanik kondisyon dengeli.',
+        approvedFactsOnly: [],
+        commercialDetails: {
+          manualGearboxType: '5 İleri Manuel',
+          manualGearboxSpeeds: 5,
+          automaticGearboxVerified: true,
+          automaticGearboxType: '6 İleri Robotize Otomatik (ETG6 / MCP)',
+        },
+      };
+
+      const mockWriter: any = {
+        vehicleOverview: 'Citroen Berlingo Selection modern gövde mimarisi ve sürüş pozisyonu ile dikkat çeker.\n\n1560 cc dizel motor 90 HP güç üretir. 6 İleri Manuel şanzıman dişli oranları şehir içi ve otoyol sürüşlerinde uyumludur.\n\nİkinci el pazarında tercih edilir.',
+        configurationAnalysis: 'Selection 3.4 m³ kargo hacmi, geniş yükleme alanı sunarak çeşitli eşyaların taşınmasına olanak tanıyor.',
+        manualTransmissionAnalysis: '5 İleri Manuel şanzımanın baskı balata ömrü kontrol edilmelidir.',
+        automaticTransmissionAnalysis: 'Modelin EAT8 (8 İleri Tork Konvertörlü Tam Otomatik) şanzıman opsiyonu dur-kalk trafiğinde konfor sağlar.',
+        manualVsAutomatic: 'Manuel (6 İleri Manuel) ve otomatik (EAT8 (8 İleri Tork Konvertörlü Tam Otomatik)) seçenekleri filo operasyonlarında farklı avantajlar sunar.',
+        dailyUse: {
+          cityUse: '10.8 m dönüş çapı dar sokaklarda manevra kabiliyetini artırıyor.',
+          highwayUse: 'Otoyolda yüksek tavan nedeniyle yan rüzgar hissedilebilir.',
+        },
+        tradeoffs: [
+          { title: 'Dar Sokak Manevrası', explanation: 'Aracın 10.8 m dönüş çapı, dar sokaklarda manevra yaparken zorluk çıkarabilir.' },
+        ],
+        notSuitableFor: [
+          { profile: 'Aile Kullanımı', explanation: 'Otoyolda sessizlik ve üst segment binek konforu arayanlar için uygun olmayabilir. Bu araç, daha çok ticari amaçlar için tasarlanmıştır.' },
+        ],
+        technicalSpecifications: {
+          trunkCapacityLiters: 3400, // Writer hallucination!
+          transmissionTypeAndSpeeds: '6 İleri Manuel',
+        },
+      };
+
+      const harmonized = harmonizeFn(berlingoContext, mockJudge, mockWriter, berlingoDefs);
+
+      // 1. Dual Transmission Card & Spec Check
+      expect(harmonized.technicalSpecifications.transmissionTypeAndSpeeds).toContain('5 İleri Manuel');
+      expect(harmonized.technicalSpecifications.transmissionTypeAndSpeeds).toContain('ETG6');
+      expect(harmonized.technicalSpecifications.transmissionTypeAndSpeeds).not.toContain('EAT8');
+      expect(harmonized.vehicleIdentity.transmissionName).toContain('ETG6');
+
+      // 2. Trunk Capacity check (bounded to genuine combi 675L, NEVER 3400L!)
+      expect(harmonized.technicalSpecifications.trunkCapacityLiters).toBe(675);
+      expect(harmonized.performanceUsage.trunkCapacityLiters).toBe(675);
+
+      // 3. Combi Family Protection (Selection is a family combi; "Aile Kullanımı için uygun değildir" is blocked!)
+      const notSuitable = harmonized.expertDecisionSynthesis.notSuitableFor;
+      expect(notSuitable[0].profile).not.toBe('Aile Kullanımı');
+      expect(notSuitable[0].profile).toBe('Üst Segment Otoyol Konforu ve Sessizlik Arayanlar');
+
+      // 4. Turning Radius Tradeoff Contradiction is Purged
+      const tradeoffs = harmonized.expertDecisionSynthesis.compromisesAndLimitations;
+      expect(tradeoffs.some((t: any) => t.title.includes('Dar Sokak') && t.explanation.includes('10.8'))).toBe(false);
+
+      // 5. Narrative Text Sanitization: "6 İleri Manuel şanzıman dişli oranları" and "EAT8" are replaced
+      const overview = harmonized.expertDecisionSynthesis.vehicleCharacter.detailedAssessment;
+      expect(overview).not.toContain('6 İleri Manuel şanzıman dişli oranları');
+
+      const autoAnalysis = harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis;
+      expect(autoAnalysis).not.toContain('EAT8');
+      expect(autoAnalysis).toContain('ETG6');
+    });
   });
 });

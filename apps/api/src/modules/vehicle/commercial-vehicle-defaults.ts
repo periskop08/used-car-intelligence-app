@@ -17,6 +17,7 @@ export interface CommercialVehicleDefaults {
   suspensionType: string;
   hasWetTimingBelt: boolean;
   typicalFocusIssues: string[];
+  isPassengerOrCombi?: boolean;
   transmissionOptions: {
     hasAutomatic: boolean;
     manualType: string;
@@ -243,6 +244,19 @@ export function resolveCommercialVehicleDefaults(
     normModel.includes('tepee') ||
     normModel.includes('multispace') ||
     normModel.includes('camli') ||
+    normTrim.includes('selection') ||
+    normTrim.includes('multispace') ||
+    normTrim.includes('xtr') ||
+    normTrim.includes('feel') ||
+    normTrim.includes('shine') ||
+    normTrim.includes('life') ||
+    normTrim.includes('live') ||
+    normTrim.includes('active') ||
+    normTrim.includes('allure') ||
+    normTrim.includes('outdoor') ||
+    normTrim.includes('family') ||
+    normTrim.includes('trek') ||
+    normTrim.includes('business') ||
     normTrim.includes('combi') ||
     normTrim.includes('titanium') ||
     normTrim.includes('plus') ||
@@ -252,9 +266,7 @@ export function resolveCommercialVehicleDefaults(
     normTrim.includes('urban') ||
     normTrim.includes('trend') ||
     normTrim.includes('deluxe') ||
-    normTrim.includes('feel') ||
-    normTrim.includes('shine') ||
-    normTrim.includes('life');
+    normTrim.includes('camli');
 
   // Check if volume is explicitly specified in trim (e.g. "13 m3", "11.5 m³", "5.8 m3", "3.4 m3")
   const volMatch = (trimPackage || '').match(/(\d+(?:[.,]\d+)?)\s*m[3³]/i);
@@ -281,8 +293,8 @@ export function resolveCommercialVehicleDefaults(
       curbWeightKg = 1260;
     } else {
       // C-Segment Vans (Doblo, Caddy, Partner, Berlingo, Kangoo)
-      cargoVolumeM3 = 3.4;
-      trunkCapacityLiters = isPassengerOrCombi ? 790 : 3400;
+      cargoVolumeM3 = isPassengerOrCombi ? 0.68 : 3.4;
+      trunkCapacityLiters = isPassengerOrCombi ? 675 : 3400;
       curbWeightKg = 1420;
     }
   } else if (segment === 'MEDIUM') {
@@ -422,12 +434,21 @@ export function resolveCommercialVehicleDefaults(
     transmissionSummaryTr = isPreFacelift
       ? 'Bu model neslinde (2014-2018 Mk1, 1.6 TDCi) fabrika çıkışı 5 ileri manuel şanzıman standarttır. Vites yolları binek otomobil netliğinde olup debriyaj pedalı hafif ve şehir içi kullanımda sürücüyü yormayan yapıdadır.'
       : 'Model nesline göre 6 ileri manuel şanzıman ve 2024 sonrası yeni nesilde 7 ileri çift kavrama otomatik şanzıman opsiyonu sunulmaktadır. Çift kavrama otomatik şanzıman şehir içi yoğun trafikte dinlendirici ve seri vites geçişleri sunar.';
-  } else if (normModel.includes('berlingo') || normModel.includes('partner') || normModel.includes('rifter') || normModel.includes('combo')) {
+  } else if (normModel.includes('berlingo') || normModel.includes('partner') || normModel.includes('rifter') || normModel.includes('combo') || normModel.includes('proace city')) {
     hasAutomatic = true;
-    manualType = '6 İleri Manuel';
-    automaticType = 'EAT8 (8 İleri Tork Konvertörlü Tam Otomatik)';
-    transmissionSummaryTr =
-      '6 ileri manuel ve Japon Aisin üretimi EAT8 tam otomatik tork konvertörlü şanzıman seçenekleri bulunur. EAT8 pürüzsüz geçişleri ve arıza direnciyle ticari/aile karması kullanımda büyük avantajdır.';
+    const isK9Gen = Boolean(year && year >= 2019) || normModel.includes('rifter');
+    if (isK9Gen) {
+      manualType = '6 İleri Manuel';
+      automaticType = '8 İleri Tam Otomatik (EAT8)';
+      transmissionSummaryTr =
+        'Yeni nesil K9 platformunda 6 ileri manuel ve Japon Aisin üretimi 8 ileri tam otomatik EAT8 şanzıman opsiyonu sunulmaktadır. EAT8 tork konvertörlü yapısıyla pürüzsüz ve dayanıklıdır.';
+    } else {
+      const isBlueHDi6Speed = normEngine.includes('bluehdi') && (normEngine.includes('100') || normEngine.includes('120'));
+      manualType = isBlueHDi6Speed ? '6 İleri Manuel' : '5 İleri Manuel';
+      automaticType = '6 İleri Robotize Otomatik (ETG6 / MCP)';
+      transmissionSummaryTr =
+        '2008-2018 model neslinde 1.6 HDi motorda 5 ileri manuel şanzıman yaygındır. Otomatik seçeneği olarak sunulan ETG6/MCP ünitesi 6 ileri robotize (otomatikleştirilmiş manuel tek kavrama) yapısındadır. Yoğun şehir içi dur-kalk trafiğinde aktüatör ve baskı balata sağlığı periyodik olarak kontrol edilmelidir.';
+    }
   } else if (normModel.includes('trafic') || normModel.includes('vivaro') || normModel.includes('expert') || normModel.includes('jumpy')) {
     hasAutomatic = true;
     manualType = '6 İleri Manuel';
@@ -518,6 +539,7 @@ export function resolveCommercialVehicleDefaults(
     suspensionType,
     hasWetTimingBelt,
     typicalFocusIssues,
+    isPassengerOrCombi,
     transmissionOptions,
     operationalProfile,
   };
