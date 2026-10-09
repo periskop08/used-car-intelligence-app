@@ -2,6 +2,10 @@ import { PrismaClient, BodyType, FuelType, TransmissionType, ApprovalStatus } fr
 import * as fs from 'fs';
 import * as path from 'path';
 
+import * as dotenv from 'dotenv';
+dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
+
 const prisma = new PrismaClient();
 
 interface ArabamPart2Row {
@@ -25,29 +29,108 @@ export interface ParseResult {
 export function parseMinivanCompositeDonanimPaketi(rawDp: string): ParseResult {
   const clean = (rawDp || '').trim();
   if (!clean) {
-    return { engine: '', package: '', isUnresolved: true, unresolvedReason: 'EMPTY_DONANIM_PAKETI' };
+    return { engine: 'Standart', package: 'Standart', isUnresolved: false };
   }
 
+  // 1. Classic hyphen format: "1.3 Multijet - Premio"
   const sepIdx = clean.indexOf(' - ');
-  if (sepIdx === -1) {
-    return { engine: '', package: '', isUnresolved: true, unresolvedReason: 'NO_HYPHEN_DELIMITER' };
-  }
-
-  const left = clean.substring(0, sepIdx).trim();
-  const right = clean.substring(sepIdx + 3).trim();
-
-  if (!left || !right) {
+  if (sepIdx !== -1) {
+    const left = clean.substring(0, sepIdx).trim();
+    const right = clean.substring(sepIdx + 3).trim();
     return {
-      engine: left,
-      package: right,
-      isUnresolved: true,
-      unresolvedReason: !left ? 'LEFT_EMPTY' : 'RIGHT_EMPTY',
+      engine: left || 'Standart',
+      package: right || 'Standart',
+      isUnresolved: false,
     };
   }
 
+  // 2. Engine family pattern with package: "1.3 Multijet Premio", "1.4 Fire Safeline", "1.5 BlueHDi Shine"
+  const engineFamilies = [
+    'Multijet', 'MultiJet', 'Ecojet', 'BlueHDi', 'BlueHDI', 'HDi', 'HDI', 'dCi', 'DCI', 
+    'TDI', 'TDCi', 'TDCI', 'CDTI', 'CRDI', 'CRD', 'JTD', 'Fire', 'Eko', 
+    'PureTech', 'Puretech', 'EcoBoost', 'TSI', 'TFSI', 'CDI', 'SDI', 'SDi', 
+    'BiTDI', 'CRDi'
+  ];
+  const p1 = new RegExp(`^(\\d+\\.\\d+(?:\\s+(?:${engineFamilies.join('|')})))\\s+(.+)$`, 'i');
+  const m1 = clean.match(p1);
+  if (m1) {
+    return {
+      engine: m1[1].trim(),
+      package: m1[2].trim(),
+      isUnresolved: false,
+    };
+  }
+
+  // 3. Engine family alone without package: "1.3 Multijet", "1.4 Fire", "2.0 TDI" -> Package = "Standart"
+  const p2 = new RegExp(`^(\\d+\\.\\d+(?:\\s+(?:${engineFamilies.join('|')})))$`, 'i');
+  const m2 = clean.match(p2);
+  if (m2) {
+    return {
+      engine: m2[1].trim(),
+      package: 'Standart',
+      isUnresolved: false,
+    };
+  }
+
+  // 4. Large Van Cargo Volume: "15 m³", "17 m³", "13 m³", "9.5 m³" -> Engine: "Standart", Package: "15 m³"
+  const p3 = /^(\d+(?:\.\d+)?\s*m[³3])$/i;
+  const m3 = clean.match(p3);
+  if (m3) {
+    return {
+      engine: 'Standart',
+      package: m3[1].trim(),
+      isUnresolved: false,
+    };
+  }
+
+  // 5. Mercedes Vito/Sprinter number codes: "111 CDI", "114 CDI Pro", "315 CDI"
+  const p5 = /^(\d{3}\s+CDI)(?:\s+(.+))?$/i;
+  const m5 = clean.match(p5);
+  if (m5) {
+    return {
+      engine: m5[1].trim(),
+      package: m5[2]?.trim() || 'Standart',
+      isUnresolved: false,
+    };
+  }
+
+  // 6. Ford Transit payload codes: "330 S", "350 ED", "320 L Trend"
+  const p4 = /^(\d{3}\s+[A-Z0-9]+)(?:\s+(.+))?$/i;
+  const m4 = clean.match(p4);
+  if (m4) {
+    return {
+      engine: m4[1].trim(),
+      package: m4[2]?.trim() || 'Standart',
+      isUnresolved: false,
+    };
+  }
+
+  // 7. Displacement + Package: "1.6 Elegance", "1.4 Active", "2.0 SE Family"
+  const p6 = /^(\d+\.\d+)\s+(.+)$/;
+  const m6 = clean.match(p6);
+  if (m6) {
+    return {
+      engine: m6[1].trim(),
+      package: m6[2].trim(),
+      isUnresolved: false,
+    };
+  }
+
+  // 8. Displacement alone: "1.2", "1.4", "1.6"
+  const p7 = /^(\d+\.\d+)$/;
+  const m7 = clean.match(p7);
+  if (m7) {
+    return {
+      engine: m7[1].trim(),
+      package: 'Standart',
+      isUnresolved: false,
+    };
+  }
+
+  // 9. Single package or type label: "Panelvan", "Camlı Van", "Savana", "Dynamic Lux" -> Engine = "Standart", Package = clean
   return {
-    engine: left,
-    package: right,
+    engine: 'Standart',
+    package: clean,
     isUnresolved: false,
   };
 }
