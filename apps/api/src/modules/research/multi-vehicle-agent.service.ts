@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WebSearchProvider } from './providers/web-search.provider';
 import { VariantTechnicalFactsService } from '../vehicle/variant-technical-facts.service';
+import { VerifiedSpecLibraryService } from '../vehicle/verified-spec-library.service';
 import { resolveCommercialVehicleDefaults, CommercialVehicleDefaults } from '../vehicle/commercial-vehicle-defaults';
 import OpenAI from 'openai';
 
@@ -150,6 +151,7 @@ export class MultiVehicleAgentService {
     private readonly prisma: PrismaService,
     private readonly searchProvider: WebSearchProvider,
     private readonly variantTechnicalFactsService: VariantTechnicalFactsService,
+    private readonly verifiedSpecLibraryService: VerifiedSpecLibraryService,
   ) {}
 
   /**
@@ -237,55 +239,58 @@ export class MultiVehicleAgentService {
     );
 
     // ─────────────────────────────────────────────────────────────────────────
-    // STEP 1: Mandatory Grounded CC & HP Resolution (Single Truth Pipeline)
+    // STEP 1: Mandatory Grounded CC & HP Resolution (On-The-Fly Real-Time Research)
     // ─────────────────────────────────────────────────────────────────────────
     let resolvedCc = 0;
     let resolvedHp = 0;
     let candidatePowers: number[] = [];
     let powerRangeText: string | undefined;
 
-    if (context.vehicleType === 'MOTORCYCLE' && context.modelId) {
-      const modelFacts = await this.variantTechnicalFactsService.getModelTechnicalFacts(context.modelId);
-      resolvedCc = modelFacts.engineDisplacementCc || 0;
-      resolvedHp = modelFacts.enginePowerHp || 0;
-      candidatePowers = modelFacts.candidatePowers || [];
-      if (candidatePowers.length > 1) {
-        powerRangeText = `${Math.min(...candidatePowers)}–${Math.max(...candidatePowers)} HP (üretim dönemine göre)`;
+    // Pure Dynamic Live Research:
+    // 1. Checks VerifiedSpecLibrary first (if previously investigated/verified).
+    // 2. If missing, conducts ON-THE-FLY LIVE AI CATALOG RESEARCH for the exact brand, model, year, and engine.
+    // 3. Persists to VerifiedSpecLibrary so future queries share the verified record.
+    try {
+      const liveSpec = await this.verifiedSpecLibraryService.verifyAndGetSpecs({
+        vehicleType:
+          context.vehicleType === 'MINIVAN_PANELVAN'
+            ? 'COMMERCIAL'
+            : context.vehicleType === 'SUV_PICKUP'
+            ? 'SUV'
+            : context.vehicleType === 'MOTORCYCLE'
+            ? 'MOTORCYCLE'
+            : 'AUTOMOBILE',
+        brand: context.brand,
+        model: context.model,
+        year: context.year,
+        engine: context.engine,
+        fuelType: context.fuel,
+        transmission: context.transmission,
+        trim: context.trimPackage,
+        variantId: context.variantId,
+        modelId: context.modelId,
+      });
+
+      if (liveSpec && liveSpec.displacementCc > 0 && liveSpec.powerHp > 0) {
+        resolvedCc = liveSpec.displacementCc;
+        resolvedHp = liveSpec.powerHp;
+        candidatePowers = Array.isArray(liveSpec.candidatePowers) && liveSpec.candidatePowers.length > 0
+          ? liveSpec.candidatePowers
+          : [liveSpec.powerHp];
+        powerRangeText = liveSpec.powerRange;
+        this.logger.log(
+          `[MULTI_VEHICLE_PIPELINE] Spec dynamically resolved via ${liveSpec.source}: ${context.brand} ${context.model} (${resolvedCc} cc / ${resolvedHp} HP)`,
+        );
       }
-    } else if (context.variantId) {
-      let facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(context.variantId);
-      if (!facts.engineDisplacementCc || !facts.enginePowerHp) {
-        facts = await this.variantTechnicalFactsService.enrichVariantTechnicalSpecs(context.variantId);
-      }
+    } catch (specErr: any) {
+      this.logger.warn(`[MULTI_VEHICLE_PIPELINE] Live spec dynamic research error: ${specErr.message}`);
+    }
+
+    if (!resolvedCc && context.variantId) {
+      const facts = await this.variantTechnicalFactsService.getVariantTechnicalFacts(context.variantId);
       resolvedCc = facts.engineDisplacementCc || 0;
       resolvedHp = facts.enginePowerHp || 0;
       candidatePowers = facts.candidatePowers || (resolvedHp ? [resolvedHp] : []);
-    }
-
-    // Single Truth Pipeline: Check VerifiedSpecLibrary if specs are not yet resolved
-    if (!resolvedCc || !resolvedHp) {
-      try {
-        const verified = await this.prisma.verifiedSpecLibrary.findFirst({
-          where: {
-            brand: { equals: context.brand, mode: 'insensitive' },
-            model: { equals: context.model, mode: 'insensitive' },
-            ...(context.year ? { year: Number(context.year) } : {}),
-          },
-          orderBy: { verifiedAt: 'desc' },
-        });
-        if (verified && verified.displacementCc > 0 && verified.powerHp > 0) {
-          resolvedCc = verified.displacementCc;
-          resolvedHp = verified.powerHp;
-          candidatePowers = Array.isArray(verified.candidatePowers) && verified.candidatePowers.length > 0
-            ? (verified.candidatePowers as number[])
-            : [verified.powerHp];
-          this.logger.log(
-            `[MULTI_VEHICLE_PIPELINE] VerifiedSpecLibrary HIT for ${context.brand} ${context.model}: ${resolvedCc} cc / ${resolvedHp} HP`,
-          );
-        }
-      } catch (e: any) {
-        this.logger.warn(`[MULTI_VEHICLE_PIPELINE] VerifiedSpecLibrary check error: ${e.message}`);
-      }
     }
 
     const commercialDefaults =

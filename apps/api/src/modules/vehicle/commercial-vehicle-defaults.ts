@@ -146,11 +146,8 @@ export function resolveCommercialVehicleDefaults(
     candidatePowers = [75, 100, 120, 130];
   } else if (normEngine.includes('1.6') || normEngine.includes('1,6')) {
     defaultCc = normBrand.includes('ford') || normBrand.includes('peugeot') || normBrand.includes('citroen') ? 1560 : 1598;
-    // Fiat Doblo and Euro 6 diesel platforms: 2016+ models are officially 120 HP (Euro 6 / Euro 6D)
-    const isPost2016Euro6 = Boolean(year && year >= 2016);
-    const isFiat16 = normBrand.includes('fiat') || normModel.includes('doblo');
-    defaultHp = explicitHp || (normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : (isPost2016Euro6 && isFiat16 ? 120 : 105));
-    candidatePowers = isPost2016Euro6 && isFiat16 ? [105, 120] : [90, 105, 120];
+    defaultHp = explicitHp || (normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : 105);
+    candidatePowers = [90, 105, 120];
   } else if (normEngine.includes('1.9') || normEngine.includes('1,9')) {
     defaultCc = 1910;
     defaultHp = explicitHp || 105;
@@ -205,9 +202,8 @@ export function resolveCommercialVehicleDefaults(
     // Segment-based fallbacks if engine string didn't specify
     if (segment === 'COMPACT') {
       defaultCc = normModel.includes('fiorino') ? 1248 : 1598;
-      const isPost2016Doblo = normModel.includes('doblo') && Boolean(year && year >= 2016);
-      defaultHp = explicitHp || (normModel.includes('fiorino') ? 95 : isPost2016Doblo ? 120 : 105);
-      candidatePowers = normModel.includes('fiorino') ? [75, 95] : isPost2016Doblo ? [105, 120] : [90, 105, 120];
+      defaultHp = explicitHp || (normModel.includes('fiorino') ? 95 : 105);
+      candidatePowers = normModel.includes('fiorino') ? [75, 95] : [90, 105, 120];
     } else if (segment === 'MEDIUM') {
       defaultCc = normBrand.includes('volkswagen') ? 1968 : 1995;
       defaultHp = explicitHp || 130;
