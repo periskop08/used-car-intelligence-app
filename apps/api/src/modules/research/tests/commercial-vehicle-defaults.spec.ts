@@ -245,5 +245,113 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
       expect(notIdealProfiles).not.toContain('Büyük Aileler');
       expect(notIdealProfiles.some((p: string) => p.includes('Otoyol'))).toBe(true);
     });
+
+    it('accurately resolves 2025 Ford Tourneo Courier 1.0 EcoBoost Titanium - Otomatik (7-Speed Auto, 845L, Benzin, Zero False Manual/Diesel)', () => {
+      const courier2025Defs = resolveCommercialVehicleDefaults('Ford', 'Tourneo Courier', '1.0 EcoBoost', 'Titanium - Otomatik', 2025, 'Benzin');
+
+      expect(courier2025Defs.segment).toBe('COMPACT');
+      expect(courier2025Defs.defaultCc).toBe(999);
+      expect(courier2025Defs.defaultHp).toBe(125);
+      expect(courier2025Defs.candidatePowers).toEqual([100, 125]);
+      expect(courier2025Defs.trunkCapacityLiters).toBe(845);
+      expect(courier2025Defs.cargoVolumeM3).toBe(2.1);
+      expect(courier2025Defs.transmissionOptions.hasAutomatic).toBe(true);
+      expect(courier2025Defs.transmissionOptions.automaticType).toBe('7 İleri Çift Kavrama Otomatik');
+
+      const harmonizeFn = (service as any).harmonizeIntoStandardVehicleReport.bind(service);
+
+      const courier2025Context: any = {
+        vehicleType: 'MINIVAN_PANELVAN',
+        brand: 'Ford',
+        model: 'Tourneo Courier',
+        year: 2025,
+        engine: '1.0 EcoBoost',
+        fuel: 'Benzin',
+        transmission: 'Manuel + Otomatik',
+        trimPackage: 'Titanium - Otomatik',
+      };
+
+      const mockJudge: any = {
+        finalPowerHp: 125,
+        finalDisplacementCc: 999,
+        finalPowerRangeText: '125 HP',
+        candidatePowers: [100, 125],
+        decisionScore: 85,
+        technicalRiskLevel: 'DUSUK',
+        decisionRationale: '2025 yeni nesil benzinli ve çift kavrama otomatik şanzıman kondisyonu olumlu.',
+        approvedFactsOnly: [
+          {
+            claimId: 'CLM-001',
+            title: 'EGR Soğutucu Petek Tıkanması ve Hararet Riski', // Agent 1 hallucination on gasoline!
+            system: 'MOTOR',
+            severity: 'HIGH',
+            userExperience: 'Kullanıcılar motorun hararet yaptığını belirtmektedir.',
+            inspectionCheck: 'EGR soğutucusunu ve motor sıcaklığını kontrol edin.',
+          },
+        ],
+        commercialDetails: {
+          manualGearboxType: '6 İleri Manuel',
+          manualGearboxSpeeds: 6,
+          automaticGearboxVerified: true,
+          automaticGearboxType: '7 İleri Çift Kavrama Otomatik',
+        },
+      };
+
+      const mockWriter: any = {
+        vehicleOverview: 'Ford Tourneo Courier modern tasarımıyla dikkat çeker.\n\n999 cc hacmindeki dizel motorun 125 HP güç ve tork karakteri, 6 İleri Manuel şanzıman dişli oranları ile uyumludur.\n\nFilo ve esnaf kullanımında dayanıklıdır.',
+        configurationAnalysis: '708 litre bagaj kapasitesi günlük ihtiyaçlar için yeterlidir.',
+        manualTransmissionAnalysis: '6 İleri Manuel şanzıman net geçişlidir.',
+        automaticTransmissionAnalysis: 'Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca 6 İleri Manuel ile üretilmiştir.',
+        manualVsAutomatic: 'Varyant fabrika çıkışı yalnızca manuel şanzıman ile sunulduğundan otomatik vitese bağlı bir tercih ayrımı bulunmamaktadır; manuel şanzıman düşük işletme maliyeti sağlar.',
+        dailyUse: {
+          cityUse: 'Şehir içi manevra kabiliyeti yüksektir.',
+          highwayUse: 'Otoyolda yeterli performans sunar.',
+        },
+        conditionsToConsider: [
+          { condition: 'EGR soğutucusu kontrolü şartıyla', reason: 'Hararet riskini önlemek için.' },
+        ],
+        walkAwayConditions: [
+          { condition: 'EGR soğutucu tıkanması ve hararet', reason: 'Motor hasarı riski.' },
+        ],
+        technicalSpecifications: {
+          trunkCapacityLiters: 845,
+          transmissionTypeAndSpeeds: '6 İleri Manuel',
+        },
+      };
+
+      const harmonized = harmonizeFn(courier2025Context, mockJudge, mockWriter, courier2025Defs);
+
+      // 1. Transmission Card & Identity Check
+      expect(harmonized.technicalSpecifications.transmissionTypeAndSpeeds).toBe('7 İleri Çift Kavrama Otomatik');
+      expect(harmonized.vehicleIdentity.transmissionName).toBe('7 İleri Çift Kavrama Otomatik');
+      expect(harmonized.vehicleIdentity.fuelType).toBe('Benzin');
+      expect(harmonized.technicalSpecifications.engineDisplacementCc).toBe(999);
+      expect(harmonized.technicalSpecifications.enginePowerHp).toBe(125);
+      expect(harmonized.technicalSpecifications.trunkCapacityLiters).toBe(845);
+
+      // 2. Automatic Transmission Narrative Check (False manual clichés eliminated!)
+      const autoAnalysis = harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis;
+      expect(autoAnalysis).toContain('7 İleri Çift Kavrama Otomatik');
+      expect(autoAnalysis).not.toContain('fabrika çıkışı otomatik şanzıman seçeneği sunulmamış');
+      expect(autoAnalysis).not.toContain('yalnızca 6 İleri Manuel');
+
+      const vsAnalysis = harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.transmissionComparison;
+      expect(vsAnalysis).toContain('7 İleri Çift Kavrama Otomatik');
+      expect(vsAnalysis).not.toContain('Varyant fabrika çıkışı yalnızca manuel şanzıman ile sunulduğundan');
+
+      // 3. Gasoline Engine Narrative Check ("dizel motorun" -> "benzinli motorun")
+      const overview = harmonized.expertDecisionSynthesis.vehicleCharacter.detailedAssessment;
+      expect(overview).toContain('benzinli motorun');
+      expect(overview).not.toContain('dizel motorun');
+
+      // 4. Gasoline Defect Sanitization Check (EGR/DPF hallucination cleaned to cooling/thermostat)
+      const deducted = harmonized.decisionScore.deductedRisks;
+      expect(deducted[0].title).toBe('Termostat Gövdesi ve Soğutma Sıvısı Sızıntısı');
+      expect(deducted[0].title).not.toContain('EGR');
+
+      const walkAway = harmonized.expertDecisionSynthesis.walkAwayConditions;
+      expect(walkAway[0].condition).not.toContain('EGR');
+      expect(walkAway[0].condition).toContain('soğutma sıvısı');
+    });
   });
 });

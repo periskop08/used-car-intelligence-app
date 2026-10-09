@@ -37,11 +37,13 @@ export function resolveCommercialVehicleDefaults(
   engine?: string,
   trimPackage?: string,
   year?: number,
+  fuel?: string,
 ): CommercialVehicleDefaults {
   const normBrand = (brand || '').toLowerCase().trim();
   const normModel = (model || '').toLowerCase().trim();
   const normEngine = (engine || '').toLowerCase().trim();
   const normTrim = (trimPackage || '').toLowerCase().trim();
+  const normFuel = (fuel || '').toLowerCase().trim();
 
   // 1. Identify Segment
   let segment: 'COMPACT' | 'MEDIUM' | 'LARGE' = 'COMPACT';
@@ -132,7 +134,15 @@ export function resolveCommercialVehicleDefaults(
   const hpMatch = normEngine.match(/(\d{2,3})\s*(?:hp|ps|bg)\b/i) || normTrim.match(/(\d{2,3})\s*(?:hp|ps|bg)\b/i);
   const explicitHp = hpMatch ? parseInt(hpMatch[1], 10) : undefined;
 
-  if (normEngine.includes('1.3') || normEngine.includes('1,3')) {
+  if (normEngine.includes('1.0') || normEngine.includes('1,0') || normEngine.includes('ecoboost')) {
+    defaultCc = 999;
+    defaultHp = explicitHp || (normEngine.includes('100') ? 100 : 125);
+    candidatePowers = [100, 125];
+  } else if (normEngine.includes('1.2') || normEngine.includes('1,2') || normEngine.includes('puretech')) {
+    defaultCc = 1199;
+    defaultHp = explicitHp || 110;
+    candidatePowers = [100, 110, 130];
+  } else if (normEngine.includes('1.3') || normEngine.includes('1,3')) {
     defaultCc = 1248;
     defaultHp = explicitHp || (normEngine.includes('75') ? 75 : 95);
     candidatePowers = [75, 90, 95];
@@ -257,12 +267,11 @@ export function resolveCommercialVehicleDefaults(
       trunkCapacityLiters = isPassengerOrCombi ? 1050 : 4200;
       curbWeightKg = 1490;
     } else if (normModel.includes('courier')) {
-      // Ford Courier (Fiesta B-platform sub-compact van)
-      // Tourneo Courier Combi: 708 Litre bagaj (koltuklar katlandığında 1.65 m³)
-      // Transit Courier Panelvan: 2.3 m³ kargo hacmi
-      cargoVolumeM3 = isPassengerOrCombi ? 1.65 : 2.3;
-      trunkCapacityLiters = isPassengerOrCombi ? 708 : 2300;
-      curbWeightKg = 1290;
+      // Ford Courier (Fiesta B-platform sub-compact van vs Mk2 Craiova 2024+)
+      const isMk2 = Boolean(year && year >= 2024);
+      cargoVolumeM3 = isPassengerOrCombi ? (isMk2 ? 2.1 : 1.65) : (isMk2 ? 2.9 : 2.3);
+      trunkCapacityLiters = isPassengerOrCombi ? (isMk2 ? 845 : 708) : (isMk2 ? 2900 : 2300);
+      curbWeightKg = isMk2 ? 1340 : 1290;
     } else if (normModel.includes('fiorino') || normModel.includes('nemo') || normModel.includes('bipper')) {
       // Fiat Fiorino / Nemo / Bipper
       // Combi: 356 Litre bagaj (koltuklar katlandığında 1.7 m³)
@@ -313,16 +322,31 @@ export function resolveCommercialVehicleDefaults(
 
   // 6. Typical Focus Issues
   const typicalFocusIssues: string[] = [];
+  const isGasoline = normFuel.includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
+
   if (hasWetTimingBelt) {
     typicalFocusIssues.push(
       'Yağ içinde çalışan ıslak triger kayışı (Belt-in-Oil / BIO) lif ayrışması ve karter yağ süzgeci tıkanması sonucu motor yatak sarması riski',
     );
   }
-  if (!hasLeafSprings && normModel.includes('doblo')) {
+
+  if (isGasoline) {
     typicalFocusIssues.push(
-      'Bi-Link bağımsız arka süspansiyon rot ve salıncak burçlarında boşluk; 1.6 MultiJet EGR soğutucu ve manifold kurum birikimi',
+      'Termostat gövdesi, soğutma sıvısı hortum bağlantıları ve genleşme kabı sızıntıları',
+      'Yüksek basınçlı direkt benzin enjektörleri ve turbo atık kapağı (wastegate) aktüatör boşluğu',
+    );
+  } else {
+    if (!hasLeafSprings && normModel.includes('doblo')) {
+      typicalFocusIssues.push(
+        'Bi-Link bağımsız arka süspansiyon rot ve salıncak burçlarında boşluk; 1.6 MultiJet EGR soğutucu ve manifold kurum birikimi',
+      );
+    }
+    typicalFocusIssues.push(
+      'Dizel partikül filtresi (DPF) şehir içi kurum doluluğu ve EGR valfi kirlenmesi',
+      'Enjektör geri dönüş hattı sızıntıları ve turbo intercooler besleme hortumu yırtılması',
     );
   }
+
   if (hasLeafSprings) {
     typicalFocusIssues.push(
       'Ağır ticari yük altında arka parabolik makas yapraklarında çökme, merkez cıvatası ve makas burcu aşınması',
@@ -390,14 +414,14 @@ export function resolveCommercialVehicleDefaults(
     transmissionSummaryTr =
       'Ağırlıklı olarak 5 ileri manuel şanzımanla donatılmıştır. Kısa vites oranları şehir içi çevikliği destekler, debriyaj parça maliyeti son derece ekonomiktir.';
   } else if (normModel.includes('courier')) {
-    hasAutomatic = Boolean(year && year >= 2024);
+    hasAutomatic = Boolean((year && year >= 2024) || normTrim.includes('otomatik'));
     // 2014-2018 Mk1 Courier (1.6 TDCi 95 HP ve 1.5 TDCi 75 HP) strictly 5 İleri Manuel!
     const isPreFacelift = Boolean(year && year < 2018) || normEngine.includes('1.6') || (normEngine.includes('1.5') && !normEngine.includes('100') && Boolean(year && year < 2018));
     manualType = isPreFacelift ? '5 İleri Manuel' : '6 İleri Manuel';
-    automaticType = year && year >= 2024 ? '7 İleri Çift Kavrama Otomatik' : 'Mevcut Değil (Sadece Manuel)';
+    automaticType = (year && year >= 2024) || normTrim.includes('otomatik') ? '7 İleri Çift Kavrama Otomatik' : 'Mevcut Değil (Sadece Manuel)';
     transmissionSummaryTr = isPreFacelift
       ? 'Bu model neslinde (2014-2018 Mk1, 1.6 TDCi) fabrika çıkışı 5 ileri manuel şanzıman standarttır. Vites yolları binek otomobil netliğinde olup debriyaj pedalı hafif ve şehir içi kullanımda sürücüyü yormayan yapıdadır.'
-      : 'Model nesline göre 6 ileri manuel şanzıman (2024 sonrası 7 ileri çift kavrama otomatik opsiyonlu) sunulmaktadır. Vites yolları binek netliğinde ve dayanıklıdır.';
+      : 'Model nesline göre 6 ileri manuel şanzıman ve 2024 sonrası yeni nesilde 7 ileri çift kavrama otomatik şanzıman opsiyonu sunulmaktadır. Çift kavrama otomatik şanzıman şehir içi yoğun trafikte dinlendirici ve seri vites geçişleri sunar.';
   } else if (normModel.includes('berlingo') || normModel.includes('partner') || normModel.includes('rifter') || normModel.includes('combo')) {
     hasAutomatic = true;
     manualType = '6 İleri Manuel';
