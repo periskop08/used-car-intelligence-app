@@ -293,7 +293,8 @@ export default function VehicleReportExpertSynthesis({
             )}
           </div>
 
-          {synthesis.commercialApplicationAnalysis.applicationSummary && (
+          {synthesis.commercialApplicationAnalysis.applicationSummary &&
+           cleanRangeText(synthesis.commercialApplicationAnalysis.applicationSummary).trim() !== cleanRangeText(synthesis.vehicleCharacter?.detailedAssessment || '').trim() && (
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               {cleanRangeText(synthesis.commercialApplicationAnalysis.applicationSummary)}
             </p>

@@ -254,7 +254,7 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
           {/* Subtle Like / Dislike Voting Widget */}
-          <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 rounded-xl px-2 py-1 shadow-sm">
+          <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800/90 rounded-xl px-2 py-1 shadow-sm select-none">
             <button
               type="button"
               onClick={() => handleVote("LIKE")}

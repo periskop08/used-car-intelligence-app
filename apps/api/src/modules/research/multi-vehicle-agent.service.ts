@@ -262,6 +262,32 @@ export class MultiVehicleAgentService {
       candidatePowers = facts.candidatePowers || (resolvedHp ? [resolvedHp] : []);
     }
 
+    // Single Truth Pipeline: Check VerifiedSpecLibrary if specs are not yet resolved
+    if (!resolvedCc || !resolvedHp) {
+      try {
+        const verified = await this.prisma.verifiedSpecLibrary.findFirst({
+          where: {
+            brand: { equals: context.brand, mode: 'insensitive' },
+            model: { equals: context.model, mode: 'insensitive' },
+            ...(context.year ? { year: Number(context.year) } : {}),
+          },
+          orderBy: { verifiedAt: 'desc' },
+        });
+        if (verified && verified.displacementCc > 0 && verified.powerHp > 0) {
+          resolvedCc = verified.displacementCc;
+          resolvedHp = verified.powerHp;
+          candidatePowers = Array.isArray(verified.candidatePowers) && verified.candidatePowers.length > 0
+            ? (verified.candidatePowers as number[])
+            : [verified.powerHp];
+          this.logger.log(
+            `[MULTI_VEHICLE_PIPELINE] VerifiedSpecLibrary HIT for ${context.brand} ${context.model}: ${resolvedCc} cc / ${resolvedHp} HP`,
+          );
+        }
+      } catch (e: any) {
+        this.logger.warn(`[MULTI_VEHICLE_PIPELINE] VerifiedSpecLibrary check error: ${e.message}`);
+      }
+    }
+
     const commercialDefaults =
       context.vehicleType === 'MINIVAN_PANELVAN'
         ? resolveCommercialVehicleDefaults(
@@ -317,6 +343,55 @@ export class MultiVehicleAgentService {
     // ─────────────────────────────────────────────────────────────────────────
     this.logger.log(`[REPORT WRITER] Generating closed presentation report from ${agent3Output.approvedFactsOnly.length} approved facts...`);
     const finalReport = await this.runClosedReportWriter(context, agent3Output, commercialDefaults);
+
+    // Persist verified specs to VerifiedSpecLibrary so future listings and reports share this ground truth
+    if (agent3Output.finalDisplacementCc > 0 && agent3Output.finalPowerHp > 0) {
+      try {
+        const existing = await this.prisma.verifiedSpecLibrary.findFirst({
+          where: {
+            brand: { equals: context.brand, mode: 'insensitive' },
+            model: { equals: context.model, mode: 'insensitive' },
+            ...(context.year ? { year: Number(context.year) } : {}),
+          },
+        });
+        if (existing) {
+          await this.prisma.verifiedSpecLibrary.update({
+            where: { id: existing.id },
+            data: {
+              displacementCc: agent3Output.finalDisplacementCc,
+              powerHp: agent3Output.finalPowerHp,
+              candidatePowers: agent3Output.candidatePowers,
+              verifiedAt: new Date(),
+            },
+          });
+        } else {
+          await this.prisma.verifiedSpecLibrary.create({
+            data: {
+              vehicleType:
+                context.vehicleType === 'MINIVAN_PANELVAN'
+                  ? 'COMMERCIAL'
+                  : context.vehicleType === 'SUV_PICKUP'
+                  ? 'SUV'
+                  : 'MOTORCYCLE',
+              brand: context.brand,
+              model: context.model,
+              year: context.year ? Number(context.year) : null,
+              bodyType: '',
+              engine: context.engine || '',
+              displacementCc: agent3Output.finalDisplacementCc,
+              powerHp: agent3Output.finalPowerHp,
+              candidatePowers: agent3Output.candidatePowers,
+              verificationStatus: 'VERIFIED',
+              verificationSource: 'MULTI_AGENT_RESEARCH',
+              notes: 'MultiVehicleAgent pipeline verified spec',
+              verifiedAt: new Date(),
+            },
+          });
+        }
+      } catch (upsertErr: any) {
+        this.logger.warn(`Failed to auto-upsert into VerifiedSpecLibrary: ${upsertErr.message}`);
+      }
+    }
 
     return finalReport;
   }
@@ -1166,10 +1241,10 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON:
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki dizel motorun ${judge.finalPowerHp} HP güç ve alt devir tork karakteri, ağır yük altındaki çekiş kabiliyeti, şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "${vol} m³ kargo alanının pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve operasyonel dayanıklılık değerlendirmesi",
-  "manualTransmissionAnalysis": "${trans?.manualType || 'Manuel'} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti",
-  "automaticTransmissionAnalysis": "${trans?.hasAutomatic ? `Modelin ${trans.automaticType} şanzıman opsiyonunun teknik analizi; yoğun dur-kalk trafiğindeki ısınma/kavrama durumu ve bakım gereksinimleri` : `Modelin Türkiye ticari pazarında neden ağırlıklı manuel tercih edildiği ve ağır yük şartlarındaki mekanik dayanıklılığı`}",
-  "manualVsAutomatic": "Manuel ve otomatik seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve ticari dayanıklılığı hakkında 2-3 cümlelik ÖZGÜN değerlendirme. Kesinlikle yönerge metnini kopyalama.)",
+  "manualTransmissionAnalysis": "string (Manuel şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
+  "automaticTransmissionAnalysis": "string (${trans?.hasAutomatic ? `Modelin ${trans.automaticType} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama durumu ve bakım gereksinimleri hakkında ÖZGÜN analiz.` : `Modelin Türkiye pazarında neden ağırlıklı manuel tercih edildiği ve ağır yük şartlarındaki mekanik dayanıklılığı hakkında ÖZGÜN analiz.`})",
+  "manualVsAutomatic": "string (Manuel ve otomatik seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması.)",
   "commercialDutyRisks": [
     {
       "title": "string (Ağır ticari kullanım kaynaklı spesifik arıza başlığı)",
@@ -1412,7 +1487,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
       const cleanTitle = this.sanitizeTurkishAutomotiveText(fact.title);
       const cleanReason = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || fact.userExperience);
       const cleanDesc = this.sanitizeTurkishAutomotiveText(fact.userExperience);
-      const cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck);
+      let cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck);
+      if (cleanTitle.toLowerCase().includes('egr') && (cleanInspect.toLowerCase().includes('enjektör') || cleanInspect.length < 10)) {
+        cleanInspect = 'EGR valfi kurum doluluk oranı ve elektronik valf konumu OBD cihazı ile canlı parametrelerden kontrol edilmelidir.';
+      }
 
       return {
         title: cleanTitle,
@@ -1769,7 +1847,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
         motorcycleEraAnalysis,
         commercialApplicationAnalysis: !isMotorcycle && !isSuvPickup
           ? {
-              applicationSummary: this.sanitizeTurkishAutomotiveText(writer.vehicleOverview),
+              applicationSummary: this.sanitizeTurkishAutomotiveText(
+                writer.configurationAnalysis ||
+                  `${context.brand} ${context.model} modelinin kargo ve bagaj yükleme pratikliği, operasyonel dayanıklılığı değerlendirilmiştir.`,
+              ),
               verifiedPowers: judge.candidatePowers,
               manualTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.manualTransmissionAnalysis),
               automaticTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.automaticTransmissionAnalysis),
@@ -1784,7 +1865,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON:
                 cargoVolumeM3: commercialDefaults?.cargoVolumeM3 || Number((trunkCapacityLiters / 1000).toFixed(1)),
                 commercialMeaning: this.sanitizeTurkishAutomotiveText(
                   writer.configurationAnalysis ||
-                    `${context.trimPackage || (commercialDefaults?.cargoVolumeM3 || 3.4) + ' m³'} kargo yük hacmi konfigürasyonu`,
+                    `${context.trimPackage || (commercialDefaults?.cargoVolumeM3 || 3.4) + ' m³'} konfigürasyonu`,
                 ),
               },
             }

@@ -146,8 +146,11 @@ export function resolveCommercialVehicleDefaults(
     candidatePowers = [75, 100, 120, 130];
   } else if (normEngine.includes('1.6') || normEngine.includes('1,6')) {
     defaultCc = normBrand.includes('ford') || normBrand.includes('peugeot') || normBrand.includes('citroen') ? 1560 : 1598;
-    defaultHp = explicitHp || (normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : 105);
-    candidatePowers = [90, 105, 120];
+    // Fiat Doblo and Euro 6 diesel platforms: 2016+ models are officially 120 HP (Euro 6 / Euro 6D)
+    const isPost2016Euro6 = Boolean(year && year >= 2016);
+    const isFiat16 = normBrand.includes('fiat') || normModel.includes('doblo');
+    defaultHp = explicitHp || (normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : (isPost2016Euro6 && isFiat16 ? 120 : 105));
+    candidatePowers = isPost2016Euro6 && isFiat16 ? [105, 120] : [90, 105, 120];
   } else if (normEngine.includes('1.9') || normEngine.includes('1,9')) {
     defaultCc = 1910;
     defaultHp = explicitHp || 105;
@@ -202,8 +205,9 @@ export function resolveCommercialVehicleDefaults(
     // Segment-based fallbacks if engine string didn't specify
     if (segment === 'COMPACT') {
       defaultCc = normModel.includes('fiorino') ? 1248 : 1598;
-      defaultHp = explicitHp || (normModel.includes('fiorino') ? 95 : 105);
-      candidatePowers = normModel.includes('fiorino') ? [75, 95] : [90, 105, 120];
+      const isPost2016Doblo = normModel.includes('doblo') && Boolean(year && year >= 2016);
+      defaultHp = explicitHp || (normModel.includes('fiorino') ? 95 : isPost2016Doblo ? 120 : 105);
+      candidatePowers = normModel.includes('fiorino') ? [75, 95] : isPost2016Doblo ? [105, 120] : [90, 105, 120];
     } else if (segment === 'MEDIUM') {
       defaultCc = normBrand.includes('volkswagen') ? 1968 : 1995;
       defaultHp = explicitHp || 130;
@@ -225,6 +229,16 @@ export function resolveCommercialVehicleDefaults(
   let cargoVolumeM3 = segment === 'LARGE' ? 13.0 : segment === 'MEDIUM' ? 6.0 : 3.4;
   let trunkCapacityLiters = Math.round(cargoVolumeM3 * 1000);
 
+  const isPassengerOrCombi =
+    normModel.includes('combi') ||
+    normModel.includes('kombi') ||
+    normModel.includes('panorama') ||
+    normModel.includes('tourneo') ||
+    normModel.includes('tepee') ||
+    normModel.includes('multispace') ||
+    normModel.includes('camli') ||
+    normTrim.includes('combi');
+
   // Check if volume is explicitly specified in trim (e.g. "13 m3", "11.5 m³", "5.8 m3", "3.4 m3")
   const volMatch = (trimPackage || '').match(/(\d+(?:[.,]\d+)?)\s*m[3³]/i);
   if (volMatch) {
@@ -233,11 +247,13 @@ export function resolveCommercialVehicleDefaults(
   } else if (segment === 'COMPACT') {
     if (normTrim.includes('maxi') || normTrim.includes('l2')) {
       cargoVolumeM3 = 4.2;
-      trunkCapacityLiters = 4200;
+      trunkCapacityLiters = isPassengerOrCombi ? 1050 : 4200;
       curbWeightKg = 1490;
     } else {
       cargoVolumeM3 = normModel.includes('fiorino') ? 2.5 : 3.4;
-      trunkCapacityLiters = normModel.includes('fiorino') ? 2500 : 3400;
+      trunkCapacityLiters = isPassengerOrCombi
+        ? (normModel.includes('fiorino') ? 356 : 790)
+        : (normModel.includes('fiorino') ? 2500 : 3400);
       curbWeightKg = normModel.includes('fiorino') ? 1260 : 1420;
     }
   } else if (segment === 'MEDIUM') {
