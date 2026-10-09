@@ -1121,20 +1121,30 @@ MANDATORY RULES:
    - trunkCapacityLiters (number)
    - curbWeightKg (number)
 9. MINIVAN & COMMERCIAL VEHICLE INTEGRITY MANDATES:
-   a) TRANSMISSION FACTUAL ACCURACY:
+   a) TRANSMISSION FACTUAL ACCURACY & EXACT SPEED COUNT:
+      - Rapor başlığında ve filtrede belirtilen şanzıman (örn: '5 İleri Manuel' veya '6 İleri Manuel') KESİNLİKLE metin gövdesiyle BİREBİR AYNI OLMAK ZORUNDADIR!
+      - Asla başlıkta 5 İleri Manuel yazarken metin gövdesinde 6 İleri Manuel iddia edilemez! 2014-2018 model Ford Tourneo Courier 1.6 TDCi (95 HP) ve 1.5 TDCi (75 HP) fabrikasyon olarak kesinlikle 5 İLERİ MANUEL üretilmiştir. Metinde mutlaka belirtilen doğru vites sayısı (5 İleri Manuel) kullanılmalıdır.
       - Eğer araçta otomatik şanzıman opsiyonu varsa (örn. Transporter 7 İleri DSG DQ500, Custom SelectShift, Vito 7G/9G-Tronic, Ducato ZF 9 vb.), KESİNLİKLE "Modelde otomatik şanzıman opsiyonu bulunmamaktadır / sadece manuel üretilmiştir" YAZILAMAZ! Modelin gerçek otomatik şanzıman teknolojisini, dur-kalk trafiğindeki mekatronik/kavrama/tork konvertörü davranışını açıkla.
-      - Eğer araç ağır ticari odaklı üretilmiş ve pazarda ağırlıklı manuel ise, Türkiye pazarında neden manuel şanzımanın tercih edildiğini ve ağır yük altındaki senkromeç/debriyaj dayanıklılığını açıkla.
-   b) ZERO PROMPT CLICHÉ / REPETITION BAN (ŞABLON CÜMLE VE TEKRAR YASAĞI):
+      - Eğer araç fabrika çıkışı yalnızca manuel üretilmişse, neden manuel olduğunu, düşük işletme/parça maliyetini ve ağır yük altındaki debriyaj/senkromeç dayanıklılığını açıkla.
+   b) ZERO PALLET / CARGO ILLUSION ON COMBI VEHICLES:
+      - Tourneo Courier, Fiorino Combi, Caddy Life, Doblo Panorama gibi 5 kişilik binek/kombi modellerde KESİNLİKLE "palet sığma kabiliyeti", "paletlerin kolayca yüklenebilmesi" GİBİ GERÇEK DIŞI ŞABLONLAR KULLANILAMAZ!
+      - Bu araçlar 5 kişilik binek koltukları, camları ve bagaj pandizotu olan aile/esnaf kombileridir. Kargo hacmi m³ olarak değil, bagaj hacmi (Litre) ve binek yaşam alanı ergonomisi olarak değerlendirilmelidir.
+   c) FAMILY-FRIENDLY COMBIS BAN ON 'NOT FOR FAMILIES':
+      - Tourneo Courier (özellikle Titanium, Titanium Plus), Fiorino Combi (Premio), Doblo Combi, Caddy gibi modeller Türkiye pazarında aileler ve esnaflar tarafından en çok tercih edilen binek kombi araçlarıdır.
+      - "Kimler İçin Uygun Olmayabilir" kısmına KESİNLİKLE "Büyük aileler için uygun değildir" veya "Aile aracı değildir" YAZILAMAZ!
+      - Bunun yerine: otoyolda mutlak sessizlik ve D-segment binek konforu arayanlar, ağır tonajlı şantiye/kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleler yazılmalıdır.
+   d) ZERO PROMPT CLICHÉ / REPETITION BAN:
       - vehicleOverview KESİNLİKLE tek bir kısa paragrafla geçiştirilemez. Mutlaka çift satır boşluğu (\n\n) ile ayrılmış TAM 3 BAĞIMSIZ VE ZENGİN PARAGRAF olmalıdır:
         1. Paragraf: Aracın gövde tasarımı, şasi yapısı, sürgülü kapı ve yükleme eşiği ergonomisi, sürücü oturma pozisyonu.
         2. Paragraf: İncelenen motorun alt devir tork karakteri, yük altındaki çekiş gücü, şanzıman oranları ve otoyol/şehir içi sürüş hissiyatı.
         3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye pazarındaki ticari yeri.
       - "Şasi yapısı, yükleme ergonomisi ve kabin pratikliği ile kullanıcı dostu bir deneyim sunuyor..." gibi şablon cümleleri kopyalamak KESİNLİKLE YASAKTIR.
-      - Prompt kılavuz metinlerini ("Bu durum aracın sadece manuel üretildiğini gösterir", "sürüş keyfini artırıyor", "iş yükünü hafifletiyor", "dar sokak kıvraklığı, dur-kalk teslimat pratikliği sunuyor", "tork rezervi güvenli sürüş sağlıyor") kelimesi kelimesine kopyalamak KESİNLİKLE YASAKTIR. Her analiz bağımsız, profesyonel otomotiv mühendisliği diliyle yazılmalıdır.
-   c) REAL-WORLD DIMENSIONS & URBAN ERGONOMICS:
+      - "iş yükünü hafifletir", "bu sayede yükleme işlemleri hızlı ve pratik bir şekilde gerçekleştirilebilir" gibi basmakalıp ifadeler KESİNLİKLE YASAKTIR.
+      - "Geniş Kargo Hacmi: 3.4 m³ kargo hacmi, geniş bir yükleme alanı sunarak çeşitli eşyaların taşınmasına olanak tanır. Bu özellik aracın pratikliğini artırır" gibi kendi kendini tekrarlayan sığ cümleler YASAKTIR.
+   e) REAL-WORLD DIMENSIONS & URBAN ERGONOMICS:
       - cityUse: Aracın tavan yüksekliği (kapalı AVM/site otoparklarına 2.0m kotunda giriş durumu), dönüş yarıçapı, yan ayna görüşü ve dar sokak manevralarındaki kör nokta risklerini modele özgü yaz.
       - highwayUse: Aracın otoyol hızlarındaki yan rüzgar duyarlılığı (yüksek tavan etkisi), yüklü vs yüksüz süspansiyon tepkisi (arka yaprak makas veya bağımsız helezon yay) ve sollamadaki tork rezervini analiz et.
-   d) ZERO CONFLICTING LIMITATIONS:
+   f) ZERO CONFLICTING LIMITATIONS:
       - tradeoffs / compromisesAndLimitations içinde otomatik şanzımanı olan araca "Otomatik şanzıman seçeneği bulunmuyor" YAZILAMAZ! Her taviz özgün bir işletme, şasi veya yük kısıtını temsil etmelidir.
 10. Output STRICT JSON only.`;
 
@@ -1258,11 +1268,26 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
       const autoName = isAutoVerified
         ? (judge.commercialDetails?.automaticGearboxType || trans?.automaticType || 'Tam Otomatik')
         : 'Mevcut Değil (Sadece Manuel)';
-      const manualName = judge.commercialDetails?.manualGearboxType || trans?.manualType || '6 İleri Manuel';
+
+      // Resolve authentic manual gearbox speeds prioritizing context.transmission and model generations
+      const contextTrans = (context.transmission || '').trim().toLowerCase();
+      const normModel = (context.model || '').toLowerCase();
+      const normEngine = (context.engine || '').toLowerCase();
+      const isCourierPreFacelift = normModel.includes('courier') && (Boolean(context.year && context.year < 2018) || normEngine.includes('1.6'));
+      const isFiorinoPreFaceliftOr13 = (normModel.includes('fiorino') || normModel.includes('bipper') || normModel.includes('nemo')) && !normEngine.includes('1.6');
+
+      let manualName = judge.commercialDetails?.manualGearboxType || trans?.manualType || 'Manuel';
+      if (contextTrans.includes('5') || isCourierPreFacelift || isFiorinoPreFaceliftOr13) {
+        manualName = '5 İleri Manuel';
+      } else if (contextTrans.includes('6')) {
+        manualName = '6 İleri Manuel';
+      } else if (trans?.manualType) {
+        manualName = trans.manualType;
+      }
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Segment: ${commercialDefaults?.segmentNameTr || 'Ticari Araç'}
-Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo Hacmi)
+Configuration: ${context.trimPackage || `${vol} m3`} (${vol} m³ / ${liters} Litre Kargo/Bagaj Hacmi)
 Suspension: ${susp}
 Transmission Architecture:
 - Manuel Şanzıman: ${manualName}
@@ -1282,7 +1307,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki dizel motorun ${judge.finalPowerHp} HP güç ve alt devir tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${manualName} şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı, yükleme eşiği yüksekliği, palet sığma kabiliyeti ve ticari dayanıklılığı hakkında 2-3 cümlelik ÖZGÜN değerlendirme. Kesinlikle yönerge metnini kopyalama.)",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; Tourneo/Combi gibi 5 kişilik camlı binek versiyonlarda bagaj hacmi (${liters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz.` : `Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca ${manualName} ile üretilmiştir. Ağır ticari şartlarda manuel şanzıman düşük bakım ve parça maliyeti sağlar.`})",
   "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Varyant fabrika çıkışı yalnızca manuel şanzıman ile sunulduğundan otomatik vitese bağlı bir tercih ayrımı bulunmamaktadır; manuel şanzıman düşük işletme maliyeti sağlar.`})",
@@ -1303,7 +1328,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     "powerRange": "${judge.finalPowerRangeText || `${judge.finalPowerHp} HP`}",
     "powerUnit": "HP",
     "engineTorqueNm": number,
-    "transmissionTypeAndSpeeds": "string (örn: 6 İleri Manuel)",
+    "transmissionTypeAndSpeeds": "${manualName}",
     "clutchType": "string (örn: Kuru Tek Disk / Hidrolik)",
     "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD))",
     "topSpeedKmh": number,
@@ -1313,7 +1338,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     "curbWeightKg": ${weight}
   },
   "strongReasons": [
-    { "title": "string", "explanation": "string (en az 2 cümlelik teknik açıklama - rakip ismi geçmeyecek)" }
+    { "title": "string (Özgün ve net bir güçlü neden başlığı)", "explanation": "string (En az 2 cümlelik derin teknik açıklama. Başlığı tekrar eden veya 'pratikliği artırır' gibi sığ ve kendini tekrarlayan cümleler KESİNLİKLE YASAKTIR; motorun dayanıklılığı, parça bulunurluğu veya süspansiyon geometrisi somut olarak açıklanmalıdır.)" }
   ],
   "tradeoffs": [
     { "title": "string (Aracın gerçek bir kısıtı veya dezavantajı - KESİNLİKLE 'avantaj', 'üstünlük' veya 'konforu' gibi olumlu başlık yazma; örn: dar sokak manevrası, boşken arka sekme, yüksek yedek parça maliyeti, sac panel arka kör nokta)", "explanation": "string (en az 2 cümlelik teknik açıklama - araçta otomatik varsa asla 'otomatik yok' deme, olmayan yaprak yay vb. uydurma)" }
@@ -1322,7 +1347,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     { "profile": "string", "explanation": "string" }
   ],
   "notIdealFor": [
-    { "profile": "string", "explanation": "string" }
+    { "profile": "string", "explanation": "string (Önemli: Tourneo Courier, Fiorino Combi, Caddy Life gibi 5 kişilik kombi binek modellerde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı şantiye/kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
   ],
   "conditionsToConsider": [
     { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
@@ -1529,8 +1554,37 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
       const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
       const cleanTitle = this.sanitizeTurkishAutomotiveText(fact.title);
-      const cleanReason = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || fact.userExperience);
-      const cleanDesc = this.sanitizeTurkishAutomotiveText(fact.userExperience);
+      
+      let cleanReason = '';
+      const exp = this.sanitizeTurkishAutomotiveText(fact.userExperience || '');
+      const sym = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || '');
+
+      if (exp && exp.length >= 25 && !exp.startsWith('string')) {
+        cleanReason = exp;
+      } else if (sym && sym.length >= 25) {
+        cleanReason = sym;
+      } else if (sym && exp) {
+        cleanReason = `${sym} — ${exp}`;
+      } else {
+        cleanReason = sym || exp;
+      }
+
+      // If reason is still too brief (less than 5 words or under 25 chars), build a rich, explanatory automotive engineering reason:
+      if (!cleanReason || cleanReason.split(/\s+/).length < 5) {
+        if (/egr/i.test(cleanTitle)) {
+          cleanReason = 'EGR valfi veya soğutucu peteklerinde biriken kurum sebebiyle soğutma akışının kısıtlanması ve motor hararetinin yükselme riski.';
+        } else if (/turbo/i.test(cleanTitle)) {
+          cleanReason = 'Turboşarj besleme hortumunda mikro çatlak veya kelepçe gevşemesi sonucu takviye basıncı kaybı ve çekişte belirgin düşüş riski.';
+        } else if (/debriyaj|kavrama|volan/i.test(cleanTitle)) {
+          cleanReason = 'Yoğun kullanımda debriyaj baskı balatasının aşınması sonucu kavrama kayması ve yokuş kalkışlarında titreme/koku riski.';
+        } else if (/sürgülü|kapı|ray|rulman/i.test(cleanTitle)) {
+          cleanReason = 'Sürgülü yan kapı alt kılavuz makara ve rulmanlarının kirlenmesi sebebiyle mekanizmanın kasması ve kapının zor kapanması riski.';
+        } else {
+          cleanReason = `${cleanTitle} bileşeninde mekanik aşınma kaynaklı performans kaybı ve beklenmedik onarım maliyeti riski.`;
+        }
+      }
+
+      const cleanDesc = cleanReason;
       let cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck);
 
       const domainKey =

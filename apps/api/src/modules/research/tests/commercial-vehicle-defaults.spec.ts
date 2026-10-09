@@ -56,15 +56,17 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
       expect(vitoDefs.suspensionType).toContain('Helezon Yay');
     });
 
-    it('accurately identifies Fiat Fiorino (Compact Van, 1.3L 95 HP, ~2.5 m3)', () => {
-      const fiorinoDefs = resolveCommercialVehicleDefaults('Fiat', 'Fiorino', '1.3 MultiJet', 'Cargo', 2021);
+    it('accurately identifies Ford Tourneo Courier Titanium Plus 2017 1.6 TDCi (5-Speed Manual, 708L Trunk, Combi)', () => {
+      const courierDefs = resolveCommercialVehicleDefaults('Ford', 'Tourneo Courier', '1.6 TDCi', 'Titanium Plus', 2017);
 
-      expect(fiorinoDefs.segment).toBe('COMPACT');
-      expect(fiorinoDefs.defaultCc).toBe(1248);
-      expect(fiorinoDefs.defaultHp).toBe(95);
-      expect(fiorinoDefs.cargoVolumeM3).toBe(2.5);
-      expect(fiorinoDefs.trunkCapacityLiters).toBe(2500);
-      expect(fiorinoDefs.hasLeafSprings).toBe(false);
+      expect(courierDefs.segment).toBe('COMPACT');
+      expect(courierDefs.defaultCc).toBe(1560);
+      expect(courierDefs.defaultHp).toBe(95);
+      expect(courierDefs.trunkCapacityLiters).toBe(708);
+      expect(courierDefs.cargoVolumeM3).toBe(1.65);
+      expect(courierDefs.transmissionOptions.manualType).toBe('5 İleri Manuel');
+      expect(courierDefs.transmissionOptions.hasAutomatic).toBe(false);
+      expect(courierDefs.segmentNameTr).toContain('Kombi');
     });
   });
 

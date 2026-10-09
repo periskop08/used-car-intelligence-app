@@ -146,8 +146,8 @@ export function resolveCommercialVehicleDefaults(
     candidatePowers = [75, 100, 120, 130];
   } else if (normEngine.includes('1.6') || normEngine.includes('1,6')) {
     defaultCc = normBrand.includes('ford') || normBrand.includes('peugeot') || normBrand.includes('citroen') ? 1560 : 1598;
-    defaultHp = explicitHp || (normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : 105);
-    candidatePowers = [90, 105, 120];
+    defaultHp = explicitHp || (normBrand.includes('ford') ? 95 : normEngine.includes('120') ? 120 : normEngine.includes('90') ? 90 : 105);
+    candidatePowers = normBrand.includes('ford') ? [95, 115] : [90, 105, 120];
   } else if (normEngine.includes('1.9') || normEngine.includes('1,9')) {
     defaultCc = 1910;
     defaultHp = explicitHp || 105;
@@ -233,7 +233,18 @@ export function resolveCommercialVehicleDefaults(
     normModel.includes('tepee') ||
     normModel.includes('multispace') ||
     normModel.includes('camli') ||
-    normTrim.includes('combi');
+    normTrim.includes('combi') ||
+    normTrim.includes('titanium') ||
+    normTrim.includes('plus') ||
+    normTrim.includes('pop') ||
+    normTrim.includes('premio') ||
+    normTrim.includes('safeline') ||
+    normTrim.includes('urban') ||
+    normTrim.includes('trend') ||
+    normTrim.includes('deluxe') ||
+    normTrim.includes('feel') ||
+    normTrim.includes('shine') ||
+    normTrim.includes('life');
 
   // Check if volume is explicitly specified in trim (e.g. "13 m3", "11.5 m³", "5.8 m3", "3.4 m3")
   const volMatch = (trimPackage || '').match(/(\d+(?:[.,]\d+)?)\s*m[3³]/i);
@@ -245,12 +256,25 @@ export function resolveCommercialVehicleDefaults(
       cargoVolumeM3 = 4.2;
       trunkCapacityLiters = isPassengerOrCombi ? 1050 : 4200;
       curbWeightKg = 1490;
+    } else if (normModel.includes('courier')) {
+      // Ford Courier (Fiesta B-platform sub-compact van)
+      // Tourneo Courier Combi: 708 Litre bagaj (koltuklar katlandığında 1.65 m³)
+      // Transit Courier Panelvan: 2.3 m³ kargo hacmi
+      cargoVolumeM3 = isPassengerOrCombi ? 1.65 : 2.3;
+      trunkCapacityLiters = isPassengerOrCombi ? 708 : 2300;
+      curbWeightKg = 1290;
+    } else if (normModel.includes('fiorino') || normModel.includes('nemo') || normModel.includes('bipper')) {
+      // Fiat Fiorino / Nemo / Bipper
+      // Combi: 356 Litre bagaj (koltuklar katlandığında 1.7 m³)
+      // Cargo: 2.5 m³ kargo hacmi
+      cargoVolumeM3 = isPassengerOrCombi ? 1.7 : 2.5;
+      trunkCapacityLiters = isPassengerOrCombi ? 356 : 2500;
+      curbWeightKg = 1260;
     } else {
-      cargoVolumeM3 = normModel.includes('fiorino') ? 2.5 : 3.4;
-      trunkCapacityLiters = isPassengerOrCombi
-        ? (normModel.includes('fiorino') ? 356 : 790)
-        : (normModel.includes('fiorino') ? 2500 : 3400);
-      curbWeightKg = normModel.includes('fiorino') ? 1260 : 1420;
+      // C-Segment Vans (Doblo, Caddy, Partner, Berlingo, Kangoo)
+      cargoVolumeM3 = 3.4;
+      trunkCapacityLiters = isPassengerOrCombi ? 790 : 3400;
+      curbWeightKg = 1420;
     }
   } else if (segment === 'MEDIUM') {
     if (normTrim.includes('uzun') || normTrim.includes('l2') || normTrim.includes('320l') || normTrim.includes('340l')) {
@@ -282,9 +306,9 @@ export function resolveCommercialVehicleDefaults(
   // 5. Segment Name in Turkish
   const segmentNameTr =
     segment === 'COMPACT'
-      ? 'Kompakt Panelvan / Minivan'
+      ? (isPassengerOrCombi ? 'Kompakt B-Segment Aile & Esnaf Kombisi' : 'Kompakt Panelvan / Minivan')
       : segment === 'MEDIUM'
-      ? 'Orta Boy Panelvan / Minivan'
+      ? (isPassengerOrCombi ? 'Orta Boy Yolcu & Aile Minibüsü / Minivan' : 'Orta Boy Panelvan / Minivan')
       : 'Büyük Boy Panelvan';
 
   // 6. Typical Focus Issues
@@ -367,10 +391,13 @@ export function resolveCommercialVehicleDefaults(
       'Ağırlıklı olarak 5 ileri manuel şanzımanla donatılmıştır. Kısa vites oranları şehir içi çevikliği destekler, debriyaj parça maliyeti son derece ekonomiktir.';
   } else if (normModel.includes('courier')) {
     hasAutomatic = Boolean(year && year >= 2024);
-    manualType = '6 İleri Manuel';
+    // 2014-2018 Mk1 Courier (1.6 TDCi 95 HP ve 1.5 TDCi 75 HP) strictly 5 İleri Manuel!
+    const isPreFacelift = Boolean(year && year < 2018) || normEngine.includes('1.6') || (normEngine.includes('1.5') && !normEngine.includes('100') && Boolean(year && year < 2018));
+    manualType = isPreFacelift ? '5 İleri Manuel' : '6 İleri Manuel';
     automaticType = year && year >= 2024 ? '7 İleri Çift Kavrama Otomatik' : 'Mevcut Değil (Sadece Manuel)';
-    transmissionSummaryTr =
-      'Model nesline göre 6 ileri manuel şanzıman hakimdir; vites yolları binek otomobil netliğinde olup debriyaj hafif ve ömürlüdür.';
+    transmissionSummaryTr = isPreFacelift
+      ? 'Bu model neslinde (2014-2018 Mk1, 1.6 TDCi) fabrika çıkışı 5 ileri manuel şanzıman standarttır. Vites yolları binek otomobil netliğinde olup debriyaj pedalı hafif ve şehir içi kullanımda sürücüyü yormayan yapıdadır.'
+      : 'Model nesline göre 6 ileri manuel şanzıman (2024 sonrası 7 ileri çift kavrama otomatik opsiyonlu) sunulmaktadır. Vites yolları binek netliğinde ve dayanıklıdır.';
   } else if (normModel.includes('berlingo') || normModel.includes('partner') || normModel.includes('rifter') || normModel.includes('combo')) {
     hasAutomatic = true;
     manualType = '6 İleri Manuel';
