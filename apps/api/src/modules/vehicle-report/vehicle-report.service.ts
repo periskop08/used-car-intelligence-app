@@ -294,7 +294,7 @@ export class VehicleReportService implements OnModuleInit {
         vehicleContext = mRes.vehicleContext;
         vehicleContextHash = mRes.vehicleContextHash;
       } else {
-        const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!);
+        const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!, dto.searchScope);
         vehicleContext = vRes.vehicleContext;
         vehicleContextHash = vRes.vehicleContextHash;
       }

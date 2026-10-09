@@ -597,10 +597,10 @@ CRITICAL RULES:
      * Alt takım, süspansiyon, amortisör, helezon yay, makas -> YÜRÜYEN_AKSAM
 2. AUTHENTIC GEARBOX DISCOVERY & ZERO FALSE AUTOMATIC HALLUCINATIONS:
    - The user selects "Manuel / Otomatik" together to research both options for this vehicle.
-   - You MUST investigate if this exact vehicle year and engine actually offered an automatic transmission option from the factory:
-     * If YES (e.g. Ford Tourneo Courier 2024+ 1.0 EcoBoost 7-ileri Çift Kavrama, Transit Custom 6-ileri SelectShift, VW Transporter DSG, Mercedes Vito 7G/9G-Tronic, 2023+ Doblo EAT8):
-       Set "automaticGearboxVerified": true, specify exact "automaticGearboxType" (e.g. "7 İleri Çift Kavrama Otomatik", "6 İleri SelectShift", "7 İleri DSG").
-     * If NO (e.g. 2016-2022 Fiat Doblo 1.6 Multijet, Ford Courier 2014-2023 1.5 TDCi, Fiat Fiorino 1.3 Multijet):
+   - You MUST investigate if this exact vehicle year, engine, and trim configuration actually offered an automatic transmission option from the factory:
+     * If YES:
+       Set "automaticGearboxVerified": true, specify exact "automaticGearboxType" (e.g. Çift Kavrama, Tork Konvertörlü, DSG, EAT8 vb.).
+     * If NO:
        Set "automaticGearboxVerified": false, "automaticGearboxType": "Mevcut Değil (Sadece Manuel)", and "automaticUnverifiedReason": "Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman opsiyonu bulunmamakta olup yalnızca manuel şanzımanla üretilmiştir.".
        DO NOT hallucinate automatic gearbox issues, maintenance costs or tradeoffs if the vehicle was only manual!
 3. Understand the exact body configuration: ${context.trimPackage || `${vol} m³`} (${vol} m³ / ${liters} Litre). Do NOT hallucinate 13 m³ for compact or medium vans!
@@ -625,9 +625,9 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
   "powerRangeText": "${powerRangeText || `${baseHp} HP`}",
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "commercialDetails": {
-    "generationName": "string (örn: Courier Mk2, T6, Custom V362, Doblo IV, Master III)",
+    "generationName": "string (resmi kasa/jenerasyon adı)",
     "productionEra": "string",
-    "engineFamily": "string (örn: 1.0 EcoBoost, 1.6 Multijet, 2.0 TDI EA288, 2.0 EcoBlue)",
+    "engineFamily": "string (resmi motor ailesi/kodu)",
     "displacementCc": ${baseCc},
     "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
     "exactPowerHp": ${baseHp},
@@ -931,35 +931,25 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
     commercialDefaults?: CommercialVehicleDefaults,
   ): Promise<Agent2Output> {
     const systemPrompt = `You are TorqueScout Agent 2: Adversarial Red Team Technical Validator.
-Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1.
-Investigate:
-1. Did Agent 1 hallucinate a carburetor claim or carburetor era for a motorcycle that was born fuel-injected (EFI) from its launch (such as Bajaj Pulsar 200 RS, NS 200, KTM Duke, Yamaha R25, Honda CBR250R)? If so, immediately CONTRADICT the claim with reason "Doğuştan EFI motosiklette karbüratör arızası uydurulamaz"!
-2. Did Agent 1 claim EFI or Euro 3 for a vintage / pre-2008 carburetor model (such as Honda Shadow VT750 2001-2007, Yamaha Dragstar)? If so, CONTRADICT with reason "2007 öncesi klasik cruiser serisi karbüratörlüdür"!
-3. Did Agent 1 claim ABS on a model/era that has drum brakes (Ön Disk Arka Kampana), or claim 3 spark plugs on a V-Twin / 2-cylinder engine? If so, flag contradiction!
-4. Did Agent 1 include any competitor brand or model comparison? If so, flag for deletion!
-5. For commercial vehicles: AUDIT TRANSMISSION REALITY!
-   - Did Agent 1 claim an automatic transmission (e.g. Comfort-Matic, robotize, DSG, EAT8) for a model/year that was strictly manual from the factory?
-     * E.g. 2016-2022 Fiat Doblo 1.6 Multijet was ONLY 6-speed manual in Turkey (Comfort-Matic was discontinued after 2015!).
-     * E.g. 2014-2023 Mk1 Ford Tourneo/Transit Courier was ONLY manual! (NOTE: 2024+ Mk2 Courier HAS authentic factory 7-speed dual clutch automatic / 7 İleri Çift Kavrama Otomatik on 1.0 EcoBoost!).
-     * E.g. Fiat Fiorino 1.3 Multijet was essentially manual!
-   - If an automatic transmission is claimed for a model/year that never offered it, you MUST set:
-     "transmissionRefuted": true,
-     "transmissionRefutedReason": "Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman üretilmemiştir; araç yalnızca manueldir.",
-     and CONTRADICT any claims mentioning automatic transmission or robotized actuators!
-5b. AUDIT MANUAL GEARBOX SPEED COUNT (5-SPEED VS 6-SPEED):
-   - Check if Agent 1 claimed 6-speed manual for a vehicle that was factory-produced strictly as 5-speed manual (e.g. 2014-2018 Ford Tourneo/Transit Courier 1.6 TDCi 95 HP / 1.5 TDCi 75 HP, Fiat Fiorino 1.3 Multijet, Peugeot Bipper 1.4 HDi, Citroen Nemo 1.4 HDi).
-   - If so, you MUST flag it:
-     "gearboxSpeedRefuted": true,
-     "gearboxSpeedRefutedReason": "Bu model jenerasyonu ve motor seçeneği fabrikasyon 5 İleri Manuel üretilmiştir; 6 İleri iddiası teknik hatadır."
-   - Or if Agent 1 claimed 5-speed manual for a vehicle that was factory-produced strictly as 6-speed manual (e.g. Ford Transit Custom 2.0 EcoBlue, VW Transporter 2.0 TDI, Fiat Ducato 2.3).
-   - If so, flag:
-     "gearboxSpeedRefuted": true,
-     "gearboxSpeedRefutedReason": "Bu model jenerasyonu ve motor seçeneği fabrikasyon 6 İleri Manuel üretilmiştir; 5 İleri iddiası teknik hatadır."
-6. For automatic / CVT scooters (such as Honda Forza, PCX, Yamaha XMAX, NMAX, Vespa): did Agent 1 hallucinate manual transmission, gear shift dogs (vites hilali / sekromeç / boşa atma), clutch plates or clutch cables? If so, immediately CONTRADICT with reason "Otomatik CVT scooter modelinde manuel şanzıman veya vites hilali/cırtlaması arızası iddia edilemez; varyatör bagaları ve kayış aktarması geçerlidir"!
-7. For commercial vehicles (Minivan/Panelvan):
-   - If the vehicle uses coil springs / independent suspension (such as Fiat Doblo with Bi-Link suspension, VW Transporter, Mercedes Vito), did Agent 1 claim rear leaf spring (makas / yaprak yay) fatigue or sag? If so, immediately CONTRADICT with reason "Bu modelde arkada makas (yaprak yay) değil, bağımsız Bi-Link / helezon yaylı süspansiyon sistemi mevcuttur; makas çökmesi arızası teknik olarak hatalıdır"!
-   - For Ford Transit / Transit Custom 2.0 EcoBlue: ensure wet timing belt (Belt-in-Oil) degradation is accurately verified.
-8. Are claims grounded in authentic automotive engineering reality?
+Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context (Brand, Model, Year, Engine, Fuel, Transmission, Trim).
+CRITICAL RULES:
+1. FUEL SYSTEM & POWERTRAIN ACCURACY:
+   - If the vehicle is fuel-injected (EFI), contradict any carburetor-era claims or carburetor failures.
+   - If the vehicle is an older vintage carburetor model, contradict any EFI claims.
+   - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
+   - If the vehicle uses a DİZEL (Diesel) engine, contradict gasoline ignition coil/spark plug claims.
+2. BRAKING & CHASSIS ACCURACY:
+   - If the vehicle has drum brakes (Ön Disk Arka Kampana), contradict any ABS claims.
+   - If the vehicle uses coil springs / independent suspension, contradict rear leaf spring (makas / yaprak yay) fatigue claims.
+   - If the vehicle has leaf springs, contradict independent multi-link suspension claims.
+3. TRANSMISSION GROUNDING:
+   - If the vehicle's filters, trim, or official catalog indicate an automatic transmission (çift kavrama, tork konvertörlü, CVT, DSG, EAT, vb.), NEVER contradict or refute its automatic transmission!
+   - Only if a vehicle was strictly manual-only from the factory across all trims and options for that exact year, flag transmissionRefuted: true.
+   - Audit manual gearbox speed count (5-speed vs 6-speed) against official manufacturer catalog for the exact model year and engine.
+4. ZERO COMPETITOR COMPARISONS:
+   - Flag any competitor brand or model comparisons for immediate deletion.
+5. SIFIR KALIP / SIFIR ÇAPRAZ ARAÇ BULAŞMASI:
+   - Değerlendirmeyi YALNIZCA sağlanan filtrelere göre yap. Asla başka model, başka motor veya başka model yılından kalıp aktarma!
 Output STRICT JSON:
 {
   "challenges": [
@@ -1010,11 +1000,10 @@ Perform adversarial red-team audit. Output strict JSON.`;
     const normTrim = (context.trimPackage || '').toLowerCase();
     const hasAuto = Boolean(commercialDefaults?.transmissionOptions?.hasAutomatic);
     const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic');
-    const isCourierMk2 = (context.model || '').toLowerCase().includes('courier') && Boolean(context.year && context.year >= 2024);
 
     return {
       challenges,
-      transmissionRefuted: Boolean(parsed?.transmissionRefuted) && !hasAuto && !trimClaimsAuto && !isCourierMk2,
+      transmissionRefuted: Boolean(parsed?.transmissionRefuted) && !hasAuto && !trimClaimsAuto,
       transmissionRefutedReason: parsed?.transmissionRefutedReason,
       gearboxSpeedRefuted: Boolean(parsed?.gearboxSpeedRefuted),
       gearboxSpeedRefutedReason: parsed?.gearboxSpeedRefutedReason,
@@ -1083,15 +1072,15 @@ Perform adversarial red-team audit. Output strict JSON.`;
     }
 
     const normTrim = (context.trimPackage || '').toLowerCase();
+    const contextTrans = (context.transmission || '').toLowerCase();
     const hasAutoOption = Boolean(commercialDefaults?.transmissionOptions?.hasAutomatic);
-    const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic');
-    const isCourierMk2 = (context.model || '').toLowerCase().includes('courier') && Boolean(context.year && context.year >= 2024);
+    const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic') || contextTrans.includes('otomatik');
 
-    if (agent2.transmissionRefuted && agent1.commercialDetails && !hasAutoOption && !trimClaimsAuto && !isCourierMk2) {
+    if (agent2.transmissionRefuted && agent1.commercialDetails && !hasAutoOption && !trimClaimsAuto) {
       agent1.commercialDetails.automaticGearboxVerified = false;
       agent1.commercialDetails.automaticUnverifiedReason =
         agent2.transmissionRefutedReason || 'Seçilen ticari konfigürasyonda resmi katalogda otomatik şanzıman opsiyonu doğrulanmadı.';
-    } else if (agent1.commercialDetails && (hasAutoOption || trimClaimsAuto || isCourierMk2)) {
+    } else if (agent1.commercialDetails && (hasAutoOption || trimClaimsAuto)) {
       agent1.commercialDetails.automaticGearboxVerified = true;
       agent1.commercialDetails.automaticGearboxType =
         commercialDefaults?.transmissionOptions?.automaticType || agent1.commercialDetails.automaticGearboxType || 'Tam Otomatik';
@@ -1186,16 +1175,15 @@ MANDATORY RULES:
 9. MINIVAN & COMMERCIAL VEHICLE INTEGRITY MANDATES:
    a) TRANSMISSION FACTUAL ACCURACY & EXACT SPEED COUNT:
       - Rapor başlığında ve filtrede belirtilen şanzıman (örn: '5 İleri Manuel' veya '6 İleri Manuel') KESİNLİKLE metin gövdesiyle BİREBİR AYNI OLMAK ZORUNDADIR!
-      - Asla başlıkta 5 İleri Manuel yazarken metin gövdesinde 6 İleri Manuel iddia edilemez! 2014-2018 model Ford Tourneo Courier 1.6 TDCi (95 HP) ve 1.5 TDCi (75 HP) fabrikasyon olarak kesinlikle 5 İLERİ MANUEL üretilmiştir. Metinde mutlaka belirtilen doğru vites sayısı (5 İleri Manuel) kullanılmalıdır.
-      - Eğer araçta otomatik şanzıman opsiyonu varsa (örn. Transporter 7 İleri DSG DQ500, Custom SelectShift, Vito 7G/9G-Tronic, Ducato ZF 9 vb.), KESİNLİKLE "Modelde otomatik şanzıman opsiyonu bulunmamaktadır / sadece manuel üretilmiştir" YAZILAMAZ! Modelin gerçek otomatik şanzıman teknolojisini, dur-kalk trafiğindeki mekatronik/kavrama/tork konvertörü davranışını açıkla.
+      - Asla başlıkta belirtilen şanzıman veya vites sayısı ile metin gövdesinde çelişen bir vites iddia edilemez. Metinde mutlaka kullanıcı filtresinde ve teknik özette sağlanan doğru şanzıman mimarisi kullanılmalıdır.
+      - Eğer araçta otomatik şanzıman opsiyonu varsa, KESİNLİKLE "Modelde otomatik şanzıman opsiyonu bulunmamaktadır / sadece manuel üretilmiştir" YAZILAMAZ! Modelin gerçek otomatik şanzıman teknolojisini, dur-kalk trafiğindeki mekatronik/kavrama/tork konvertörü davranışını açıkla.
       - Eğer araç fabrika çıkışı yalnızca manuel üretilmişse, neden manuel olduğunu, düşük işletme/parça maliyetini ve ağır yük altındaki debriyaj/senkromeç dayanıklılığını açıkla.
    b) ZERO PALLET / CARGO ILLUSION ON COMBI VEHICLES:
-      - Tourneo Courier, Fiorino Combi, Caddy Life, Doblo Panorama gibi 5 kişilik binek/kombi modellerde KESİNLİKLE "palet sığma kabiliyeti", "paletlerin kolayca yüklenebilmesi" GİBİ GERÇEK DIŞI ŞABLONLAR KULLANILAMAZ!
+      - 5 kişilik binek/kombi versiyonlarda (arka koltukları, camları ve bagaj pandizotu olan modellerde) KESİNLİKLE "palet sığma kabiliyeti", "paletlerin kolayca yüklenebilmesi" GİBİ GERÇEK DIŞI ŞABLONLAR KULLANILAMAZ!
       - Bu araçlar 5 kişilik binek koltukları, camları ve bagaj pandizotu olan aile/esnaf kombileridir. Kargo hacmi m³ olarak değil, bagaj hacmi (Litre) ve binek yaşam alanı ergonomisi olarak değerlendirilmelidir.
    c) FAMILY-FRIENDLY COMBIS BAN ON 'NOT FOR FAMILIES':
-      - Tourneo Courier (özellikle Titanium, Titanium Plus), Fiorino Combi (Premio), Doblo Combi, Caddy gibi modeller Türkiye pazarında aileler ve esnaflar tarafından en çok tercih edilen binek kombi araçlarıdır.
-      - "Kimler İçin Uygun Olmayabilir" kısmına KESİNLİKLE "Büyük aileler için uygun değildir" veya "Aile aracı değildir" YAZILAMAZ!
-      - Bunun yerine: otoyolda mutlak sessizlik ve D-segment binek konforu arayanlar, ağır tonajlı şantiye/kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleler yazılmalıdır.
+      - Binek kombi ve camlı aile tipi konfigürasyonlarda "Kimler İçin Uygun Olmayabilir" kısmına KESİNLİKLE "Büyük aileler için uygun değildir" veya "Aile aracı değildir" YAZILAMAZ!
+      - Bunun yerine: otoyolda mutlak sessizlik ve D-segment binek konforu arayanlar, ağır tonajlı kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleler yazılmalıdır.
    d) ZERO PROMPT CLICHÉ / REPETITION BAN:
       - vehicleOverview KESİNLİKLE tek bir kısa paragrafla geçiştirilemez. Mutlaka çift satır boşluğu (\n\n) ile ayrılmış TAM 3 BAĞIMSIZ VE ZENGİN PARAGRAF olmalıdır:
         1. Paragraf: Aracın gövde tasarımı, şasi yapısı, sürgülü kapı ve yükleme eşiği ergonomisi, sürücü oturma pozisyonu.
@@ -1356,14 +1344,11 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
       const isAutoVerified = hasAutoOption && judge.commercialDetails?.automaticGearboxVerified !== false;
       const autoName = judge.commercialDetails?.automaticGearboxType || trans?.automaticType || 'Tam Otomatik';
 
-      // Resolve authentic manual gearbox speeds prioritizing context.transmission and model generations
-      const isCourierPreFacelift = normModel.includes('courier') && (Boolean(context.year && context.year < 2018) || normEngine.includes('1.6'));
-      const isFiorinoPreFaceliftOr13 = (normModel.includes('fiorino') || normModel.includes('bipper') || normModel.includes('nemo')) && !normEngine.includes('1.6');
-
+      // Resolve authentic manual gearbox speeds prioritizing context.transmission and Agent 1 research
       let manualName = judge.commercialDetails?.manualGearboxType || trans?.manualType || 'Manuel';
-      if (contextTrans.includes('5') || isCourierPreFacelift || isFiorinoPreFaceliftOr13) {
+      if (contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5) {
         manualName = '5 İleri Manuel';
-      } else if (contextTrans.includes('6')) {
+      } else if (contextTrans.includes('6') || judge.commercialDetails?.manualGearboxSpeeds === 6) {
         manualName = '6 İleri Manuel';
       } else if (trans?.manualType) {
         manualName = trans.manualType;
@@ -1398,10 +1383,10 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? autoName : manualName} şanzıman dişli oranları.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; Tourneo/Combi gibi 5 kişilik camlı binek versiyonlarda bagaj hacmi (${liters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; 5 kişilik camlı binek/kombi versiyonlarda bagaj hacmi (${liters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
-  "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman seçeneği sunulmamış olup araç yalnızca ${manualName} ile üretilmiştir. Ağır ticari şartlarda manuel şanzıman düşük bakım ve parça maliyeti sağlar.`})",
-  "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi, şehir içi dur-kalk konforu ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Varyant fabrika çıkışı yalnızca manuel şanzıman ile sunulduğundan otomatik vitese bağlı bir tercih ayrımı bulunmamaktadır; manuel şanzıman düşük işletme maliyeti sağlar.`})",
+  "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
+  "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi, şehir içi dur-kalk konforu ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Manuel şanzımanın (${manualName}) ticari filo operasyonları, bakım kolaylığı ve yakıt verimliliği odaklı özgün değerlendirmesi.`})",
   "commercialDutyRisks": [
     {
       "title": "string (Ağır ticari kullanım kaynaklı spesifik arıza başlığı)",
@@ -1438,7 +1423,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     { "profile": "string", "explanation": "string" }
   ],
   "notIdealFor": [
-    { "profile": "string", "explanation": "string (Önemli: Tourneo Courier, Fiorino Combi, Caddy Life gibi 5 kişilik kombi binek modellerde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı şantiye/kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
+    { "profile": "string", "explanation": "string (Önemli: 5 kişilik kombi ve camlı binek tiplerinde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
   ],
   "conditionsToConsider": [
     { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
@@ -1595,9 +1580,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const normEngine = (context.engine || '').toLowerCase();
     const normTrim = (context.trimPackage || '').toLowerCase();
     const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
-    const isCourierPreFacelift = normModel.includes('courier') && (Boolean(context.year && context.year < 2018) || normEngine.includes('1.6'));
-    const isFiorinoPreFaceliftOr13 = (normModel.includes('fiorino') || normModel.includes('bipper') || normModel.includes('nemo')) && !normEngine.includes('1.6');
-
     const isVariantAutomatic =
       normTrim.includes('otomatik') ||
       normTrim.includes('automatic') ||
@@ -1621,7 +1603,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       '7 İleri Çift Kavrama Otomatik';
 
     const manualGearboxName =
-      (contextTrans.includes('5') || isCourierPreFacelift || isFiorinoPreFaceliftOr13)
+      contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5
         ? '5 İleri Manuel'
         : (judge.commercialDetails?.manualGearboxType || commercialDefaults?.transmissionOptions?.manualType || '6 İleri Manuel');
 
@@ -1651,10 +1633,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       } else if (contextTrans.includes('manuel') && contextTrans.includes('otomatik') && (commercialDefaults?.transmissionOptions?.hasAutomatic || judge.commercialDetails?.automaticGearboxVerified)) {
         canonicalTransmission = `${manualGearboxName} / ${autoGearboxName}`;
         canonicalSpeeds = 6;
-      } else if (contextTrans.includes('5') || isCourierPreFacelift || isFiorinoPreFaceliftOr13) {
+      } else if (contextTrans.includes('5') || judge.commercialDetails?.manualGearboxSpeeds === 5) {
         canonicalTransmission = '5 İleri Manuel';
         canonicalSpeeds = 5;
-      } else if (contextTrans.includes('6')) {
+      } else if (contextTrans.includes('6') || judge.commercialDetails?.manualGearboxSpeeds === 6) {
         canonicalTransmission = '6 İleri Manuel';
         canonicalSpeeds = 6;
       } else if (judge.commercialDetails?.manualGearboxType) {

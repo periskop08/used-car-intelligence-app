@@ -24,7 +24,7 @@ export class VehicleReportContextBuilderService {
     private variantTechnicalFactsService?: VariantTechnicalFactsService,
   ) {}
 
-  async buildVehicleContext(variantId: string) {
+  async buildVehicleContext(variantId: string, searchScope?: any) {
     const variant = await this.prisma.vehicleVariant.findUnique({
       where: { id: variantId },
       include: {
@@ -619,22 +619,53 @@ export class VehicleReportContextBuilderService {
       vehicleCharacterResearch: characterResearchCache,
     };
 
+    if (searchScope) {
+      (contextObj as any).searchScope = searchScope;
+      if (searchScope.transmission) {
+        contextObj.vehicleIdentity.transmissionName = searchScope.transmission;
+        contextObj.vehicleIdentity.selected8Filters.transmission = searchScope.transmission;
+      }
+      if (searchScope.trim) {
+        (contextObj.vehicleIdentity as any).trim = searchScope.trim;
+        contextObj.vehicleIdentity.trimName = searchScope.trim;
+        contextObj.vehicleIdentity.selected8Filters.trim = searchScope.trim;
+      }
+      if (searchScope.fuel) {
+        contextObj.vehicleIdentity.fuelType = searchScope.fuel;
+        contextObj.vehicleIdentity.selected8Filters.fuelType = searchScope.fuel;
+      }
+      if (searchScope.year) {
+        const parsedYear = Number(searchScope.year);
+        if (parsedYear > 1900) {
+          contextObj.vehicleIdentity.modelYear = parsedYear;
+          (contextObj.vehicleIdentity as any).year = parsedYear;
+          contextObj.vehicleIdentity.selected8Filters.year = parsedYear;
+        }
+      }
+      if (searchScope.engine) {
+        contextObj.vehicleIdentity.engineCode = searchScope.engine;
+        contextObj.vehicleIdentity.selected8Filters.engine = searchScope.engine;
+      }
+    }
+
     if (variant.vehicleType === 'MINIVAN_PANELVAN') {
+      const activeTrim = searchScope?.trim || variant.trim?.name || (variant as any).trimPackage;
+      const activeYear = (searchScope?.year && Number(searchScope.year) > 1900) ? Number(searchScope.year) : variant.year;
       const commDefaults = resolveCommercialVehicleDefaults(
         variant.brand?.name || (variant as any).model?.brand?.name || '',
         (variant as any).model?.name || '',
-        variant.engine?.description || variant.engine?.code || (variant as any).engineCode,
-        variant.trim?.name || (variant as any).trimPackage,
-        variant.year,
+        searchScope?.engine || variant.engine?.description || variant.engine?.code || (variant as any).engineCode,
+        activeTrim,
+        activeYear,
       );
       (contextObj as any).vehicleType = 'MINIVAN_PANELVAN';
       (contextObj.vehicleIdentity as any).vehicleType = 'MINIVAN_PANELVAN';
       (contextObj as any).commercialConfiguration = {
-        rawPackage: variant.trim?.name || (variant as any).trimPackage || `${commDefaults.cargoVolumeM3} m³`,
+        rawPackage: activeTrim || `${commDefaults.cargoVolumeM3} m³`,
         cargoVolumeM3: commDefaults.cargoVolumeM3,
-        commercialMeaning: `${variant.trim?.name || (variant as any).trimPackage || commDefaults.cargoVolumeM3 + ' m³'} yük hacmi konfigürasyonu`,
+        commercialMeaning: `${activeTrim || commDefaults.cargoVolumeM3 + ' m³'} yük hacmi konfigürasyonu`,
       };
-      (contextObj as any).transmissionScope = 'Manuel + Otomatik';
+      (contextObj as any).transmissionScope = searchScope?.transmission || 'Manuel + Otomatik';
     } else {
       (contextObj as any).vehicleType = 'AUTOMOBILE';
       (contextObj.vehicleIdentity as any).vehicleType = 'AUTOMOBILE';
