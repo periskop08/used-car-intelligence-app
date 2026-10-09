@@ -79,6 +79,7 @@ export interface CommercialAppDetails {
   hasAdBlue: boolean;
   manualGearboxVerified: boolean;
   manualGearboxType?: string;
+  manualGearboxSpeeds?: number;
   automaticGearboxVerified: boolean;
   automaticGearboxType?: string;
   automaticUnverifiedReason?: string;
@@ -119,6 +120,8 @@ export interface Agent2Output {
   challenges: Agent2RedTeamChallenge[];
   transmissionRefuted?: boolean;
   transmissionRefutedReason?: string;
+  gearboxSpeedRefuted?: boolean;
+  gearboxSpeedRefutedReason?: string;
   powerDiscrepancies?: string[];
 }
 
@@ -623,6 +626,7 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "hasAdBlue": boolean,
     "manualGearboxVerified": true,
     "manualGearboxType": "${trans?.manualType || '6 İleri Manuel'}",
+    "manualGearboxSpeeds": ${trans?.manualType?.includes('5') ? 5 : 6},
     "automaticGearboxVerified": ${trans?.hasAutomatic ?? false},
     "automaticGearboxType": "${trans?.hasAutomatic ? trans.automaticType : 'Mevcut Değil (Sadece Manuel)'}",
     "automaticUnverifiedReason": "${trans?.hasAutomatic ? '' : 'Bu model yılı ve motor seçeneğinde fabrika çıkışı otomatik şanzıman seçeneği bulunmamakta olup yalnızca manuel üretilmiştir.'}",
@@ -926,6 +930,15 @@ Investigate:
      "transmissionRefuted": true,
      "transmissionRefutedReason": "Bu model yılı ve motor kombinasyonunda fabrika çıkışı otomatik şanzıman üretilmemiştir; araç yalnızca manueldir.",
      and CONTRADICT any claims mentioning automatic transmission or robotized actuators!
+5b. AUDIT MANUAL GEARBOX SPEED COUNT (5-SPEED VS 6-SPEED):
+   - Check if Agent 1 claimed 6-speed manual for a vehicle that was factory-produced strictly as 5-speed manual (e.g. 2014-2018 Ford Tourneo/Transit Courier 1.6 TDCi 95 HP / 1.5 TDCi 75 HP, Fiat Fiorino 1.3 Multijet, Peugeot Bipper 1.4 HDi, Citroen Nemo 1.4 HDi).
+   - If so, you MUST flag it:
+     "gearboxSpeedRefuted": true,
+     "gearboxSpeedRefutedReason": "Bu model jenerasyonu ve motor seçeneği fabrikasyon 5 İleri Manuel üretilmiştir; 6 İleri iddiası teknik hatadır."
+   - Or if Agent 1 claimed 5-speed manual for a vehicle that was factory-produced strictly as 6-speed manual (e.g. Ford Transit Custom 2.0 EcoBlue, VW Transporter 2.0 TDI, Fiat Ducato 2.3).
+   - If so, flag:
+     "gearboxSpeedRefuted": true,
+     "gearboxSpeedRefutedReason": "Bu model jenerasyonu ve motor seçeneği fabrikasyon 6 İleri Manuel üretilmiştir; 5 İleri iddiası teknik hatadır."
 6. For automatic / CVT scooters (such as Honda Forza, PCX, Yamaha XMAX, NMAX, Vespa): did Agent 1 hallucinate manual transmission, gear shift dogs (vites hilali / sekromeç / boşa atma), clutch plates or clutch cables? If so, immediately CONTRADICT with reason "Otomatik CVT scooter modelinde manuel şanzıman veya vites hilali/cırtlaması arızası iddia edilemez; varyatör bagaları ve kayış aktarması geçerlidir"!
 7. For commercial vehicles (Minivan/Panelvan):
    - If the vehicle uses coil springs / independent suspension (such as Fiat Doblo with Bi-Link suspension, VW Transporter, Mercedes Vito), did Agent 1 claim rear leaf spring (makas / yaprak yay) fatigue or sag? If so, immediately CONTRADICT with reason "Bu modelde arkada makas (yaprak yay) değil, bağımsız Bi-Link / helezon yaylı süspansiyon sistemi mevcuttur; makas çökmesi arızası teknik olarak hatalıdır"!
@@ -943,6 +956,8 @@ Output STRICT JSON:
   ],
   "transmissionRefuted": boolean,
   "transmissionRefutedReason": string,
+  "gearboxSpeedRefuted": boolean,
+  "gearboxSpeedRefutedReason": string,
   "powerDiscrepancies": string[]
 }`;
 
@@ -980,6 +995,8 @@ Perform adversarial red-team audit. Output strict JSON.`;
       challenges,
       transmissionRefuted: Boolean(parsed?.transmissionRefuted),
       transmissionRefutedReason: parsed?.transmissionRefutedReason,
+      gearboxSpeedRefuted: Boolean(parsed?.gearboxSpeedRefuted),
+      gearboxSpeedRefutedReason: parsed?.gearboxSpeedRefutedReason,
       powerDiscrepancies: Array.isArray(parsed?.powerDiscrepancies) ? parsed.powerDiscrepancies : [],
     };
   }
@@ -1043,6 +1060,16 @@ Perform adversarial red-team audit. Output strict JSON.`;
       agent1.commercialDetails.automaticGearboxVerified = false;
       agent1.commercialDetails.automaticUnverifiedReason =
         agent2.transmissionRefutedReason || 'Seçilen ticari konfigürasyonda resmi katalogda otomatik şanzıman opsiyonu doğrulanmadı.';
+    }
+
+    if (agent2.gearboxSpeedRefuted && agent1.commercialDetails) {
+      if (agent2.gearboxSpeedRefutedReason?.includes('5 İleri')) {
+        agent1.commercialDetails.manualGearboxType = '5 İleri Manuel';
+        agent1.commercialDetails.manualGearboxSpeeds = 5;
+      } else if (agent2.gearboxSpeedRefutedReason?.includes('6 İleri')) {
+        agent1.commercialDetails.manualGearboxType = '6 İleri Manuel';
+        agent1.commercialDetails.manualGearboxSpeeds = 6;
+      }
     }
 
     const highSeverityCount = approvedFactsOnly.filter((c) => c.severity === 'HIGH' || c.severity === 'CRITICAL').length;
@@ -1498,6 +1525,61 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       ? `${context.brand} ${context.model}`
       : `${context.year || ''} ${context.brand} ${context.model} ${context.trimPackage || ''}`.trim();
 
+    // Canonical Transmission & Speeds Ground Truth Resolution
+    const contextTrans = (context.transmission || '').trim().toLowerCase();
+    const normModel = (context.model || '').toLowerCase();
+    const normEngine = (context.engine || '').toLowerCase();
+    const isCourierPreFacelift = normModel.includes('courier') && (Boolean(context.year && context.year < 2018) || normEngine.includes('1.6'));
+    const isFiorinoPreFaceliftOr13 = (normModel.includes('fiorino') || normModel.includes('bipper') || normModel.includes('nemo')) && !normEngine.includes('1.6');
+
+    let canonicalTransmission = judge.commercialDetails?.manualGearboxType || commercialDefaults?.transmissionOptions?.manualType || '6 İleri Manuel';
+    let canonicalSpeeds = 6;
+
+    if (isMotorcycle) {
+      if (context.transmission === 'Otomatik') {
+        canonicalTransmission = 'Otomatik (CVT)';
+        canonicalSpeeds = 1;
+      } else {
+        canonicalSpeeds = judge.finalDisplacementCc > 500 ? 6 : 5;
+        canonicalTransmission = `${canonicalSpeeds} İleri Manuel`;
+      }
+    } else if (isSuvPickup) {
+      canonicalSpeeds = contextTrans.includes('5') ? 5 : contextTrans.includes('7') ? 7 : contextTrans.includes('8') ? 8 : 6;
+      canonicalTransmission = context.transmission || `${canonicalSpeeds} İleri Manuel`;
+    } else {
+      // Commercial vehicle canonical resolution
+      if (contextTrans.includes('5') || isCourierPreFacelift || isFiorinoPreFaceliftOr13) {
+        canonicalTransmission = '5 İleri Manuel';
+        canonicalSpeeds = 5;
+      } else if (contextTrans.includes('6')) {
+        canonicalTransmission = '6 İleri Manuel';
+        canonicalSpeeds = 6;
+      } else if (judge.commercialDetails?.manualGearboxType) {
+        canonicalTransmission = judge.commercialDetails.manualGearboxType;
+        canonicalSpeeds = canonicalTransmission.includes('5') ? 5 : 6;
+      } else if (commercialDefaults?.transmissionOptions?.manualType) {
+        canonicalTransmission = commercialDefaults.transmissionOptions.manualType;
+        canonicalSpeeds = canonicalTransmission.includes('5') ? 5 : 6;
+      }
+    }
+
+    const normTrim = (context.trimPackage || '').toLowerCase();
+    const isCombi =
+      normModel.includes('courier') ||
+      normModel.includes('combi') ||
+      normModel.includes('kombi') ||
+      normModel.includes('panorama') ||
+      normModel.includes('tourneo') ||
+      normModel.includes('tepee') ||
+      normModel.includes('multispace') ||
+      normTrim.includes('titanium') ||
+      normTrim.includes('plus') ||
+      normTrim.includes('premio') ||
+      normTrim.includes('safeline') ||
+      normTrim.includes('pop') ||
+      normTrim.includes('urban') ||
+      normTrim.includes('life');
+
     // Physical Specs Gating (Zero-Null Guarantee)
     const baseHp = judge.finalPowerHp;
     const baseCc = judge.finalDisplacementCc;
@@ -1722,7 +1804,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       };
     }
 
-    return {
+    const rawReport = {
       reportId: `vr_${isMotorcycle ? (context.modelId || context.model) : context.variantId}_${Date.now()}`,
       mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
       status: 'COMPLETED',
@@ -1738,7 +1820,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : `${commercialDefaults?.defaultCc || judge.finalDisplacementCc} cc Dizel`),
         transmissionName: isMotorcycle
           ? (context.transmission || (writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('otomatik') || writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('cvt') ? 'Otomatik' : 'Manuel'))
-          : (context.transmission || 'Manuel'),
+          : canonicalTransmission,
         fuelType: isMotorcycle ? 'Benzin' : (context.fuel || 'Dizel'),
         trim: context.trimPackage || (isMotorcycle ? 'Standart' : `${commercialDefaults?.cargoVolumeM3 || 3.4} m³`),
         engineDisplacementCc: judge.finalDisplacementCc,
@@ -1756,12 +1838,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           ? (judge.finalDisplacementCc >= 650 ? 68 : judge.finalDisplacementCc >= 350 ? 35 : 24)
           : isSuvPickup ? 380 : (commercialDefaults?.segment === 'COMPACT' ? 260 : 385),
         torqueUnit: 'Nm',
-        transmissionTypeAndSpeeds: writer.technicalSpecifications?.transmissionTypeAndSpeeds || (
-          isMotorcycle
-            ? (context.transmission === 'Otomatik' ? 'Otomatik (CVT)' : judge.finalDisplacementCc > 500 ? '6 İleri Manuel' : '5 İleri Manuel')
-            : '6 İleri Manuel'
-        ),
-        transmissionSpeeds: isMotorcycle && context.transmission === 'Otomatik' ? 1 : isMotorcycle ? (judge.finalDisplacementCc > 500 ? 6 : 5) : 6,
+        transmissionTypeAndSpeeds: canonicalTransmission,
+        transmissionSpeeds: canonicalSpeeds,
         clutchType: writer.technicalSpecifications?.clutchType || (
           isMotorcycle
             ? (context.transmission === 'Otomatik' ? 'Kuru Santrifüj / Varyatör' : 'Islak Çoklu Disk')
@@ -2050,6 +2128,148 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         technicalRiskScore: { value: totalRiskPenalty },
       },
     };
+
+    return this.deepReconcileReportSemantics(
+      rawReport,
+      canonicalTransmission,
+      canonicalSpeeds,
+      isCombi,
+      trunkCapacityLiters,
+    );
+  }
+
+  /**
+   * String-level automotive semantic harmonizer.
+   * Eliminates transmission contradictions, pallet illusions on combis, and repetitive slogans.
+   */
+  private reconcileStringSemantics(
+    str: string,
+    canonicalTransmission: string,
+    isCombi: boolean,
+  ): string {
+    if (!str || typeof str !== 'string') return '';
+    let text = str;
+
+    const normTrans = (canonicalTransmission || '').toLowerCase();
+    const isFiveSpeed = normTrans.includes('5');
+    const isSixSpeed = normTrans.includes('6');
+
+    if (isFiveSpeed) {
+      text = text.replace(/6\s*[İi]leri\s*[Mm]anuel/g, '5 İleri Manuel');
+      text = text.replace(/6\s*[İi]leri/g, '5 İleri');
+      text = text.replace(/6\s*vitesli/gi, '5 vitesli');
+      text = text.replace(/6\s*vites\b/gi, '5 vites');
+      text = text.replace(/Altı\s*ileri/g, 'Beş ileri');
+      text = text.replace(/altı\s*ileri/g, 'beş ileri');
+      text = text.replace(/Altı\s*vites/g, 'Beş vites');
+      text = text.replace(/altı\s*vites/g, 'beş vites');
+      text = text.replace(/6\.\s*viteste/gi, '5. viteste');
+      text = text.replace(/altıncı\s*viteste/gi, 'beşinci viteste');
+    } else if (isSixSpeed) {
+      text = text.replace(/5\s*[İi]leri\s*[Mm]anuel/g, '6 İleri Manuel');
+      text = text.replace(/5\s*[İi]leri/g, '6 İleri');
+      text = text.replace(/5\s*vitesli/gi, '6 vitesli');
+      text = text.replace(/5\s*vites\b/gi, '6 vites');
+      text = text.replace(/Beş\s*ileri/g, 'Altı ileri');
+      text = text.replace(/beş\s*ileri/g, 'altı ileri');
+      text = text.replace(/Beş\s*vites/g, 'Altı vites');
+      text = text.replace(/beş\s*vites/g, 'altı vites');
+      text = text.replace(/5\.\s*viteste/gi, '6. viteste');
+      text = text.replace(/beşinci\s*viteste/gi, 'altıncı viteste');
+    }
+
+    if (isCombi) {
+      text = text.replace(/palet\s+sığma\s+kabiliyeti/gi, 'geniş bagaj yükleme pratikliği');
+      text = text.replace(/palet\s+yükleme\s+kabiliyeti/gi, 'kullanışlı bagaj yükleme pratikliği');
+      text = text.replace(/palet(?:lerin)?\s+(?:kolayca\s+)?(?:yüklenebilmesi|sığabilmesi)/gi, 'aile ve iş eşyalarının kolayca yüklenebilmesi');
+      text = text.replace(/euro[-\s]?palet\s+kapasitesi/gi, 'geniş yükleme kapasitesi');
+      text = text.replace(/paletlerin\s+kolayca\s+yüklen/gi, 'eşyaların ve valizlerin kolayca yüklen');
+      text = text.replace(/palet\s+yükleme/gi, 'bagaj yükleme');
+      text = text.replace(/palet\s+sığma/gi, 'geniş hacim');
+    }
+
+    // Cliché / prompt echo cleanup
+    text = text.replace(/Bu özellik aracın pratikliğini artırır\.?/gi, '');
+    text = text.replace(/bu özellik aracın pratikliğini artırır\.?/gi, '');
+    text = text.replace(/iş yükünü hafifletir/gi, 'kullanım kolaylığı sağlar');
+    text = text.replace(/bu sayede yükleme işlemleri hızlı ve pratik bir şekilde gerçekleştirilebilir\.?/gi, 'yükleme ve bagaj erişimi son derece pratiktir.');
+
+    return text.trim();
+  }
+
+  /**
+   * Deep recursive semantic reconciliation gate.
+   * Guarantees 100% harmony between cards, narrative paragraphs, audience, and risk items.
+   */
+  private deepReconcileReportSemantics(
+    report: any,
+    canonicalTransmission: string,
+    canonicalSpeeds: number,
+    isCombi: boolean,
+    luggageLiters: number,
+  ): any {
+    if (!report) return report;
+
+    // 1. Recursive string-level sanitizer
+    const reconcileRecursive = (obj: any): any => {
+      if (typeof obj === 'string') {
+        return this.reconcileStringSemantics(obj, canonicalTransmission, isCombi);
+      }
+      if (Array.isArray(obj)) {
+        return obj.map((item) => reconcileRecursive(item));
+      }
+      if (typeof obj === 'object' && obj !== null) {
+        for (const key of Object.keys(obj)) {
+          if (key === 'reportId' || key === 'claimId' || key === 'severity' || key === 'status' || key === 'mode') {
+            continue;
+          }
+          obj[key] = reconcileRecursive(obj[key]);
+        }
+      }
+      return obj;
+    };
+
+    reconcileRecursive(report);
+
+    // 2. Strict Combi Audience Protection
+    if (isCombi && Array.isArray(report.expertDecisionSynthesis?.notSuitableFor)) {
+      report.expertDecisionSynthesis.notSuitableFor = report.expertDecisionSynthesis.notSuitableFor.map((item: any) => {
+        const fullText = `${item.profile || ''} ${item.explanation || ''}`.toLowerCase();
+        if (/büyük\s+aile|aileler\s+için\s+uygun\s+değil|aile\s+aracı\s+değil|aile\s+kullanımına\s+uygun\s+değil/i.test(fullText)) {
+          return {
+            profile: 'Üst Segment Otoyol Konforu ve Sessizlik Arayanlar',
+            explanation: 'Yüksek tavan formu ve ticari kökenli arka yürüyen aksam nedeniyle otoyol hızlarında D-segment binek sedan sessizliği ve viraj rijitliği arayan kullanıcılar için uygun değildir.',
+            supportingFactIds: [],
+          };
+        }
+        return item;
+      });
+    }
+
+    // 3. Technical Cards & Identity Guarantee
+    if (report.technicalSpecifications) {
+      report.technicalSpecifications.transmissionTypeAndSpeeds = canonicalTransmission;
+      report.technicalSpecifications.transmissionSpeeds = canonicalSpeeds;
+      if (luggageLiters > 0) {
+        report.technicalSpecifications.trunkCapacityLiters = luggageLiters;
+      }
+    }
+    if (report.performanceUsage) {
+      if (luggageLiters > 0) {
+        report.performanceUsage.trunkCapacityLiters = luggageLiters;
+      }
+    }
+    if (report.expertDecisionSynthesis?.technicalSpecifications) {
+      report.expertDecisionSynthesis.technicalSpecifications.transmissionTypeAndSpeeds = canonicalTransmission;
+      if (luggageLiters > 0) {
+        report.expertDecisionSynthesis.technicalSpecifications.trunkCapacityLiters = luggageLiters;
+      }
+    }
+    if (report.vehicleIdentity) {
+      report.vehicleIdentity.transmissionName = canonicalTransmission;
+    }
+
+    return report;
   }
 
   private generateDeterministicReportFallback(

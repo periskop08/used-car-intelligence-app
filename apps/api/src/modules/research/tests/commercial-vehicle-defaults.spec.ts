@@ -154,5 +154,96 @@ describe('Commercial Vehicle Intelligence & Defaults System', () => {
       expect(harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.configurationContext.cargoVolumeM3).toBe(3.4);
       expect(harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.applicationSummary).toBe('3.4 m³ kargo yükleme alanı.');
     });
+
+    it('deepReconcileReportSemantics strictly enforces 5-Speed Manual on 2017 Courier and purges stray 6-speed text', () => {
+      const harmonizeFn = (service as any).harmonizeIntoStandardVehicleReport.bind(service);
+
+      const courierContext: any = {
+        vehicleType: 'MINIVAN_PANELVAN',
+        brand: 'Ford',
+        model: 'Tourneo Courier',
+        year: 2017,
+        engine: '1.6 TDCi',
+        transmission: '5 İleri Manuel',
+        trimPackage: 'Titanium Plus',
+      };
+      const courierDefaults = resolveCommercialVehicleDefaults('Ford', 'Tourneo Courier', '1.6 TDCi', 'Titanium Plus', 2017);
+
+      const mockJudge: any = {
+        finalPowerHp: 95,
+        finalDisplacementCc: 1560,
+        finalPowerRangeText: '95 HP',
+        candidatePowers: [95],
+        decisionScore: 82,
+        technicalRiskLevel: 'DUSUK',
+        decisionRationale: 'Mekanik ve ticari kondisyon olumlu.',
+        approvedFactsOnly: [],
+        commercialDetails: {
+          manualGearboxType: '5 İleri Manuel',
+          manualGearboxSpeeds: 5,
+        },
+      };
+
+      // Simulating a writer that hallucinated "6 İleri Manuel", "palet sığma kabiliyeti", and "Büyük aileler için uygun değildir"
+      const mockWriter: any = {
+        vehicleOverview: 'Ford Tourneo Courier sürüş pozisyonu ve kabin ergonomisi ile öne çıkar.\n\n1560 cc dizel motor 95 HP güç üretir. 6 İleri Manuel şanzıman, vites geçişlerinde netlik sağlarken motorun performansını optimize eder. Altı ileri vites oranları otoyolda tasarruf sağlar.\n\nİkinci el pazarında esnaf ve aileler tarafından tercih edilir.',
+        configurationAnalysis: 'Yükleme eşiği, palet sığma kabiliyeti ile ticari kullanımda büyük avantaj sunar.',
+        manualTransmissionAnalysis: '6 İleri Manuel şanzımanın baskı balata ömrü ve debriyaj pedalı sertliği kontrol edilmelidir.',
+        automaticTransmissionAnalysis: 'Modelde otomatik şanzıman seçeneği bulunmamakta olup yalnızca manuel üretilmiştir.',
+        manualVsAutomatic: 'Araç yalnızca manuel şanzımanla üretilmiştir.',
+        dailyUse: {
+          cityUse: 'Şehir içinde 6 vites ile rahat manevra kabiliyeti sunar.',
+          highwayUse: 'Otoyolda 6. viteste düşük devirde seyreder.',
+        },
+        idealFor: [{ profile: 'Aileler ve Esnaflar', explanation: 'Geniş hacim arayanlar.' }],
+        notIdealFor: [{ profile: 'Büyük Aileler', explanation: 'Bu araç büyük aileler için uygun değildir.' }],
+        tradeoffs: [{ title: 'Gövde Esnemesi', explanation: 'Yüksek hızda yan rüzgar duyarlılığı.' }],
+        technicalSpecifications: {
+          trunkCapacityLiters: 708,
+          curbWeightKg: 1290,
+          transmissionTypeAndSpeeds: '6 İleri Manuel', // Writer hallucination!
+        },
+      };
+
+      const harmonized = harmonizeFn(courierContext, mockJudge, mockWriter, courierDefaults);
+
+      // 1. Technical Card check
+      expect(harmonized.technicalSpecifications.transmissionTypeAndSpeeds).toBe('5 İleri Manuel');
+      expect(harmonized.technicalSpecifications.transmissionSpeeds).toBe(5);
+      expect(harmonized.vehicleIdentity.transmissionName).toBe('5 İleri Manuel');
+      expect(harmonized.technicalSpecifications.trunkCapacityLiters).toBe(708);
+
+      // 2. Narrative paragraph reconciliation check
+      const overview = harmonized.expertDecisionSynthesis.vehicleCharacter.detailedAssessment;
+      expect(overview).toContain('5 İleri Manuel');
+      expect(overview).not.toContain('6 İleri Manuel');
+      expect(overview).not.toContain('Altı ileri');
+      expect(overview).toContain('Beş ileri');
+
+      // 3. Manual transmission analysis reconciliation check
+      const transAnalysis = harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.manualTransmissionAnalysis;
+      expect(transAnalysis).toContain('5 İleri Manuel');
+      expect(transAnalysis).not.toContain('6 İleri Manuel');
+
+      // 4. Daily use reconciliation check
+      const cityUse = harmonized.expertDecisionSynthesis.dailyUseAssessment.cityUse;
+      expect(cityUse).toContain('5 vites');
+      expect(cityUse).not.toContain('6 vites');
+
+      const highwayUse = harmonized.expertDecisionSynthesis.dailyUseAssessment.highwayUse;
+      expect(highwayUse).toContain('5. viteste');
+      expect(highwayUse).not.toContain('6. viteste');
+
+      // 5. Pallet removal on combi check
+      const configAnalysis = harmonized.expertDecisionSynthesis.commercialApplicationAnalysis.applicationSummary;
+      expect(configAnalysis).not.toContain('palet sığma kabiliyeti');
+      expect(configAnalysis).toContain('bagaj yükleme pratikliği');
+
+      // 6. Combi Audience Protection check ("Büyük aileler için uygun değildir" replaced!)
+      const notIdeal = harmonized.expertDecisionSynthesis.notSuitableFor;
+      const notIdealProfiles = notIdeal.map((n: any) => n.profile);
+      expect(notIdealProfiles).not.toContain('Büyük Aileler');
+      expect(notIdealProfiles.some((p: string) => p.includes('Otoyol'))).toBe(true);
+    });
   });
 });
