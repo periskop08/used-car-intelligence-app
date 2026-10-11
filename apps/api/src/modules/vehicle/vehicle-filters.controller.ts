@@ -143,10 +143,10 @@ export function getCategoryVariantWhere(category?: string): any {
 
 export const KNOWN_TRIM_TOKENS = [
   'POP', 'PREMIO', 'EMOTION', 'SAFELINE', 'DYNAMIC', 'ACTIVE', 'TREKKING', 'URBAN', 'LOUNGE',
-  'DELUXE', 'DELUX', 'TREND', 'TITANIUM PLUS', 'TITANIUM', 'BLACK LINE', 'JOURNEY TREND',
-  'AMBIENTE', 'ELEGANCE', 'COMFORTLINE', 'HIGHLINE', 'COMFORT', 'STYLE', 'ALLURE', 'GT LINE',
-  'ICON', 'TOUCH', 'JOY', 'LIFE', 'SHINE', 'FEEL', 'MAXI BUSINESS', 'BUSINESS', 'TEKNA', 'VISIA',
-  'PLATINUM', 'MIRROR', 'CROSS', 'EXCLUSIVE', 'CUSTOM', 'EDITION'
+  'DELUXE', 'DELUX', 'TREND', 'TITANIUM PLUS', 'TITANIUM PL', 'TITANIUM', 'BLACK LINE', 'JOURNEY TREND', 'JOURNEY DELUXE',
+  'AMBIENTE', 'ELEGANCE', 'COMFORTLINE', 'HIGHLINE', 'MIDLINE', 'COMFORT', 'STYLE', 'ALLURE', 'GT LINE',
+  'ICON', 'TOUCH', 'JOY', 'LIFE', 'SHINE BOLD', 'SHINE', 'FEEL BOLD', 'FEEL STIL', 'FEEL', 'MAXI BUSINESS', 'BUSINESS', 'TEKNA', 'VISIA',
+  'PLATINUM', 'MIRROR', 'CROSS', 'EXCLUSIVE', 'CUSTOM', 'EDITION', 'KONFOR', 'ACTIVITY'
 ];
 
 export const NON_TRIM_WORDS = new Set([
@@ -187,20 +187,31 @@ export function cleanTrimName(rawName?: string | null): string | null {
 
 export function cleanEngineCodeAndExtractTrim(rawEngineCode?: string | null): { cleanEngine: string; extractedTrim: string | null } {
   if (!rawEngineCode) return { cleanEngine: '', extractedTrim: null };
-  const trimmed = rawEngineCode.trim();
+  let trimmed = rawEngineCode.trim();
+
+  let extractedTrim: string | null = null;
 
   for (const token of KNOWN_TRIM_TOKENS) {
     const regex = new RegExp(`\\b${token}\\b`, 'i');
     if (regex.test(trimmed)) {
       const match = trimmed.match(regex);
       const rawTrim = match ? match[0] : token;
-      const extractedTrim = rawTrim.charAt(0).toUpperCase() + rawTrim.slice(1).toLowerCase();
-      const cleanEngine = trimmed.replace(regex, '').replace(/\s+/g, ' ').trim();
-      return { cleanEngine, extractedTrim };
+      extractedTrim = rawTrim.charAt(0).toUpperCase() + rawTrim.slice(1).toLowerCase();
+      trimmed = trimmed.replace(regex, '').replace(/\s+/g, ' ').trim();
+      break;
     }
   }
 
-  return { cleanEngine: trimmed, extractedTrim: null };
+  // Strip trailing transmissions: e.g. 'e-CVT', 'CVT', 'DSG', 'EDC', 'Otomatik', 'Manuel', 'Düz'
+  trimmed = trimmed.replace(/\b(e-cvt|cvt|dsg|edc|otomatik|manuel|düz|duz)\b/gi, '').replace(/\s+/g, ' ').trim();
+
+  // Strip trailing body styles: e.g. 'Gran Coupe', 'Coupe', 'Cabrio', 'Panelvan', 'Camlı Van', 'Minivan'
+  trimmed = trimmed.replace(/\b(gran coupe|coupe|cabrio|panelvan|camlı van|camli van|camlı|camli|minivan|van|city van|cityvan|cargo)\b/gi, '').replace(/\s+/g, ' ').trim();
+
+  // Strip trailing chassis/wheelbase/bmt tokens: e.g. '320 L', '320 S', '340 L', '340 S', '310 L', '310 S', '300 L', '300 S', 'Kısa', 'Orta', 'Uzun', 'XL', 'BMT'
+  trimmed = trimmed.replace(/\b(\d{3}\s+[ls]|kısa|kisa|orta|uzun|xl|bmt)\b/gi, '').replace(/\s+/g, ' ').trim();
+
+  return { cleanEngine: trimmed, extractedTrim };
 }
 
 import { VariantTechnicalFactsService } from './variant-technical-facts.service';
