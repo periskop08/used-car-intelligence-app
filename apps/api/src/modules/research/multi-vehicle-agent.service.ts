@@ -124,6 +124,7 @@ export interface Agent2Output {
   powerRefuted?: boolean;
   powerRefutedReason?: string;
   correctedPowerHp?: number;
+  correctedAutomaticGearboxType?: string;
   powerDiscrepancies?: string[];
 }
 
@@ -873,10 +874,18 @@ CRITICAL RULES:
    - If the vehicle has drum brakes (Ön Disk Arka Kampana), contradict any ABS claims.
    - If the vehicle uses coil springs / independent suspension, contradict rear leaf spring (makas / yaprak yay) fatigue claims.
    - If the vehicle has leaf springs, contradict independent multi-link suspension claims.
-3. TRANSMISSION GROUNDING:
-   - If the vehicle's filters, trim, or official catalog indicate an automatic transmission (çift kavrama, tork konvertörlü, CVT, DSG, EAT, vb.), NEVER contradict or refute its automatic transmission!
-   - Only if a vehicle was strictly manual-only from the factory across all trims and options for that exact year, flag transmissionRefuted: true.
-   - Audit manual gearbox speed count (5-speed vs 6-speed) against official manufacturer catalog for the exact model year and engine.
+3. TRANSMISSION GROUNDING & SHANZIMAN ÇAPRAZ DENETİMİ (SIFIR 'MEVCUT DEĞİL' ŞANZIMAN ADI):
+   - Eğer kullanıcı veya filtre otomatik/yarı otomatik belirtiyorsa (örn: Transmission = 'Yarı Otomatik' veya 'Otomatik' veya trimde otomatik varsa):
+     * Agent 1'in "automaticGearboxType": "Mevcut Değil (Sadece Manuel)" veya "Yok" iddiasını KESİNLİKLE ÇÜRÜT!
+     * Bu modelin gerçek fabrika çıkışı otomatik şanzıman mimarisini belirle ve "correctedAutomaticGearboxType" alanına yaz:
+       - Fiat Fiorino / Doblo 1.3 Multijet -> "5 İleri Yarı Otomatik (Comfort-Matic / Dualogic)"
+       - Peugeot Bipper / Partner / Citroen Nemo / Berlingo -> "6 İleri Yarı Otomatik (ETG6)" veya "8 İleri Tam Otomatik (EAT8)"
+       - Renault Kangoo -> "6 İleri EDC (Çift Kavrama)"
+       - Ford Tourneo Courier / Custom -> "6 İleri SelectShift" veya "8 İleri Tork Konvertörlü Otomatik"
+       - Volkswagen Caddy -> "7 İleri DSG (Çift Kavrama)"
+     * ASLA "Mevcut Değil (Sadece Manuel)" stringini kabul etme!
+   - Yalnızca araç o model yılında fabrika çıkışı kesin olarak sadece manuel üretildiyse transmissionRefuted: true yap.
+   - Manuel şanzıman vites sayısını (5 İleri vs 6 İleri) resmi katalogla denetle.
 4. ENGINE DISPLACEMENT & HORSEPOWER AUDIT (SIFIR BEYGİR HALÜSİNASYONU):
    - Audit claimed engine displacement (${agent1.displacementCc} cc) and power (${agent1.powerHp} HP) against the official manufacturer catalog for this model, year, and TRIM (${context.trimPackage || 'Genel'}).
    - For multi-tier engines (e.g. Ford Tourneo / Transit Courier 1.5 TDCi):
@@ -902,6 +911,7 @@ Output STRICT JSON:
   ],
   "transmissionRefuted": boolean,
   "transmissionRefutedReason": string,
+  "correctedAutomaticGearboxType": string,
   "gearboxSpeedRefuted": boolean,
   "gearboxSpeedRefutedReason": string,
   "powerRefuted": boolean,
@@ -953,6 +963,7 @@ Perform adversarial red-team audit. Output strict JSON.`;
       challenges,
       transmissionRefuted: Boolean(parsed?.transmissionRefuted) && !hasAuto,
       transmissionRefutedReason: parsed?.transmissionRefutedReason,
+      correctedAutomaticGearboxType: parsed?.correctedAutomaticGearboxType || undefined,
       gearboxSpeedRefuted: Boolean(parsed?.gearboxSpeedRefuted),
       gearboxSpeedRefutedReason: parsed?.gearboxSpeedRefutedReason,
       powerRefuted: Boolean(parsed?.powerRefuted),
@@ -1026,15 +1037,49 @@ Perform adversarial red-team audit. Output strict JSON.`;
     const trimClaimsAuto = normTrim.includes('otomatik') || normTrim.includes('automatic') || contextTrans.includes('otomatik');
     const hasAutoOption = Boolean(trimClaimsAuto || agent1.commercialDetails?.automaticGearboxVerified);
 
-    if (agent2.transmissionRefuted && agent1.commercialDetails && !hasAutoOption) {
-      agent1.commercialDetails.automaticGearboxVerified = false;
-      agent1.commercialDetails.automaticUnverifiedReason =
-        agent2.transmissionRefutedReason || 'Seçilen ticari konfigürasyonda resmi katalogda otomatik şanzıman opsiyonu doğrulanmadı.';
-    } else if (agent1.commercialDetails && hasAutoOption) {
-      agent1.commercialDetails.automaticGearboxVerified = true;
-      agent1.commercialDetails.automaticGearboxType =
-        agent1.commercialDetails.automaticGearboxType || 'Tam Otomatik';
-      agent1.commercialDetails.automaticUnverifiedReason = undefined;
+    if (agent1.commercialDetails) {
+      // 1. Sanitize: NEVER allow "Mevcut Değil" or "Sadece Manuel" to be accepted as an automatic gearbox name!
+      const currentAutoType = agent1.commercialDetails.automaticGearboxType || '';
+      const isUnverifiedString =
+        currentAutoType.includes('Mevcut Değil') ||
+        currentAutoType.includes('Sadece Manuel') ||
+        currentAutoType.toLowerCase().includes('yok');
+
+      if (isUnverifiedString) {
+        agent1.commercialDetails.automaticGearboxType = undefined;
+      }
+
+      // 2. Adjudicate with Agent 2 Adversarial Correction
+      if (agent2.correctedAutomaticGearboxType) {
+        agent1.commercialDetails.automaticGearboxVerified = true;
+        agent1.commercialDetails.automaticGearboxType = agent2.correctedAutomaticGearboxType;
+        agent1.commercialDetails.automaticUnverifiedReason = undefined;
+      } else if (hasAutoOption) {
+        agent1.commercialDetails.automaticGearboxVerified = true;
+        if (!agent1.commercialDetails.automaticGearboxType) {
+          // Canonical commercial gearbox resolution based on authentic platform engineering
+          const brandLower = (context.brand || '').toLowerCase();
+          const modelLower = (context.model || '').toLowerCase();
+          if (brandLower.includes('fiat') && (modelLower.includes('fiorino') || modelLower.includes('doblo'))) {
+            agent1.commercialDetails.automaticGearboxType = '5 İleri Yarı Otomatik (Comfort-Matic / Dualogic)';
+          } else if ((brandLower.includes('peugeot') || brandLower.includes('citroen')) && (modelLower.includes('bipper') || modelLower.includes('nemo'))) {
+            agent1.commercialDetails.automaticGearboxType = '6 İleri Yarı Otomatik (ETG6)';
+          } else if (brandLower.includes('renault') && modelLower.includes('kangoo')) {
+            agent1.commercialDetails.automaticGearboxType = '6 İleri EDC (Çift Kavrama)';
+          } else if (brandLower.includes('volkswagen') && modelLower.includes('caddy')) {
+            agent1.commercialDetails.automaticGearboxType = '7 İleri DSG (Çift Kavrama)';
+          } else if (contextTrans.includes('yarı') || contextTrans.includes('yari')) {
+            agent1.commercialDetails.automaticGearboxType = '5 İleri Yarı Otomatik';
+          } else {
+            agent1.commercialDetails.automaticGearboxType = 'Tam Otomatik';
+          }
+        }
+        agent1.commercialDetails.automaticUnverifiedReason = undefined;
+      } else if (agent2.transmissionRefuted) {
+        agent1.commercialDetails.automaticGearboxVerified = false;
+        agent1.commercialDetails.automaticUnverifiedReason =
+          agent2.transmissionRefutedReason || 'Seçilen ticari konfigürasyonda resmi katalogda otomatik şanzıman opsiyonu doğrulanmadı.';
+      }
     }
 
     if (agent2.gearboxSpeedRefuted && agent1.commercialDetails) {
@@ -1300,9 +1345,33 @@ Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with
         normTrim.includes('manual') ||
         (contextTrans.includes('manuel') && !contextTrans.includes('otomatik'));
 
-      const hasAutoOption = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
-      const isAutoVerified = hasAutoOption && judge.commercialDetails?.automaticGearboxVerified !== false;
-      const autoName = judge.commercialDetails?.automaticGearboxType || 'Tam Otomatik';
+      let autoName = judge.commercialDetails?.automaticGearboxType || '';
+      const isAutoNameInvalid =
+        !autoName ||
+        autoName.includes('Mevcut Değil') ||
+        autoName.includes('Sadece Manuel') ||
+        autoName.toLowerCase().includes('yok');
+
+      if (isAutoNameInvalid) {
+        const brandLower = (context.brand || '').toLowerCase();
+        const modelLower = (context.model || '').toLowerCase();
+        if (brandLower.includes('fiat') && (modelLower.includes('fiorino') || modelLower.includes('doblo'))) {
+          autoName = '5 İleri Yarı Otomatik (Comfort-Matic / Dualogic)';
+        } else if ((brandLower.includes('peugeot') || brandLower.includes('citroen')) && (modelLower.includes('bipper') || modelLower.includes('nemo'))) {
+          autoName = '6 İleri Yarı Otomatik (ETG6)';
+        } else if (brandLower.includes('renault') && modelLower.includes('kangoo')) {
+          autoName = '6 İleri EDC (Çift Kavrama)';
+        } else if (brandLower.includes('volkswagen') && modelLower.includes('caddy')) {
+          autoName = '7 İleri DSG (Çift Kavrama)';
+        } else if (contextTrans.includes('yarı') || contextTrans.includes('yari')) {
+          autoName = '5 İleri Yarı Otomatik';
+        } else {
+          autoName = 'Tam Otomatik';
+        }
+      }
+
+      const hasAutoOption = Boolean(isVariantAutomatic || (judge.commercialDetails?.automaticGearboxVerified && !isAutoNameInvalid));
+      const isAutoVerified = hasAutoOption;
 
       // Resolve authentic manual gearbox speeds prioritizing context.transmission and Agent 1 research
       let manualName = judge.commercialDetails?.manualGearboxType || 'Manuel';
