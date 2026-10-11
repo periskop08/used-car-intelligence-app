@@ -83,6 +83,10 @@ export interface CommercialAppDetails {
   automaticGearboxVerified: boolean;
   automaticGearboxType?: string;
   automaticUnverifiedReason?: string;
+  bodyStyleClassification?: 'COMBI_PASSENGER' | 'CARGO_PANELVAN';
+  seatingCapacity?: number;
+  trunkCapacityLiters?: number;
+  curbWeightKg?: number;
   configurationContext: {
     rawSourceLabel: string;
     commercialMeaning: string;
@@ -100,6 +104,11 @@ export interface Agent1Output {
   candidatePowers?: number[];
   transmissionType?: string;
   coolingType?: string;
+  trunkCapacityLiters?: number;
+  curbWeightKg?: number;
+  topSpeedKmh?: number;
+  zeroToHundredKmh?: number;
+  catalogCombinedFuelL100km?: number;
   motorcycleEras?: MotorcycleEraItem[];
   commercialDetails?: CommercialAppDetails;
   claims: CandidateClaim[];
@@ -133,6 +142,14 @@ export interface Agent2Output {
   correctedPowerHp?: number;
   correctedAutomaticGearboxType?: string;
   powerDiscrepancies?: string[];
+  trunkCapacityRefuted?: boolean;
+  trunkCapacityRefutedReason?: string;
+  correctedTrunkCapacityLiters?: number;
+  cargoVolumeRefuted?: boolean;
+  cargoVolumeRefutedReason?: string;
+  correctedCargoVolumeM3?: number;
+  dpfRefuted?: boolean;
+  dpfRefutedReason?: string;
 }
 
 export interface AdjudicatedFact {
@@ -151,6 +168,12 @@ export interface Agent3Output {
   candidatePowers: number[];
   finalTransmissionType: string;
   finalCoolingType: string;
+  finalTrunkCapacityLiters?: number;
+  finalCurbWeightKg?: number;
+  finalCargoVolumeM3?: number;
+  finalTopSpeedKmh?: number;
+  finalZeroToHundredKmh?: number;
+  finalCombinedFuelL100km?: number;
   motorcycleEras?: MotorcycleEraItem[];
   commercialDetails?: CommercialAppDetails;
   decisionScore: number;
@@ -442,7 +465,8 @@ export class MultiVehicleAgentService {
           ? `${context.brand} ${context.model} 2.0 ecoblue yağ içinde çalışan triger kayışı yağ süzgeci tıkanması arızası`
           : `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar kullanıcı şikayetleri`;
         searchTerms = [
-          `${exactSignature} motor gücü beygir hp teknik özellikleri katalog`,
+          `${exactSignature} bagaj hacmi kargo alanı koltuk sayısı teknik özellikleri katalog`,
+          `${exactSignature} motor gücü beygir hp şanzıman tork katalog`,
           `${context.brand} ${context.model} ${context.year || ''} ${cleanTrim} ticari kullanım ağır yük aşınma`,
           commModelSearch,
           `${context.brand} ${context.model} ${context.year || ''} sürgülü kapı kilit mekanizması süspansiyon burç arızaları`,
@@ -560,6 +584,11 @@ Extract strict JSON:
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "transmissionType": "string (örn: 6 İleri Manuel veya 8 İleri Otomatik veya 9 İleri Otomatik)",
   "coolingType": "SIVI",
+  "trunkCapacityLiters": number,
+  "curbWeightKg": number,
+  "topSpeedKmh": number,
+  "zeroToHundredKmh": number,
+  "catalogCombinedFuelL100km": number,
   "claims": [
     {
       "claimId": "CLM-001",
@@ -594,8 +623,10 @@ CRITICAL DIRECTIVES:
 5. ENGINE POWER ACCURACY & ZERO CROSS-MODEL CONFUSION:
    - KESİNLİKLE kardeş modellerden (Peugeot 508, DS7 Crossback, DS4, Citroen C5 Aircross vb.) teknik veri veya beygir gücü TAŞINAMAZ.
    - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8). NEVER downgrade DS9 to 180 HP (180 HP belongs to DS7/508, DS9 petrol is strictly 225 HP).
-6. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
-7. Output strict JSON only.`;
+6. DYNAMIC SPEC EXTRACTION:
+   - Extract authentic official catalog trunk capacity (Liters), curb weight (kg), top speed (km/h), 0-100 (sec), and combined fuel consumption (L/100km) for this exact model, year, body type, and engine.
+7. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
+8. Output strict JSON only.`;
 
       userPrompt = `Target Passenger Automobile Specification:
 ${filterBlock}
@@ -612,6 +643,11 @@ Extract strict JSON:
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "transmissionType": "string (örn: 6 İleri Manuel veya 7 İleri Otomatik DSG veya 8 İleri Tam Otomatik)",
   "coolingType": "SIVI",
+  "trunkCapacityLiters": number,
+  "curbWeightKg": number,
+  "topSpeedKmh": number,
+  "zeroToHundredKmh": number,
+  "catalogCombinedFuelL100km": number,
   "claims": [
     {
       "claimId": "CLM-001",
@@ -642,36 +678,6 @@ Extract strict JSON:
       const isPreEuro5 = vehicleYear > 0 && vehicleYear < 2011;
       const hasDpf = !isGasoline && !isPreEuro5;
 
-      const normBody = (context.bodyType || '').toLowerCase();
-      const normModel = (context.model || '').toLowerCase();
-      const normTrim = (context.trimPackage || '').toLowerCase();
-      const isCombi =
-        normBody.includes('combi') ||
-        normBody.includes('kombi') ||
-        normBody.includes('camlı') ||
-        normBody.includes('minivan') ||
-        normModel.includes('tourneo') ||
-        normModel.includes('combi') ||
-        normModel.includes('kombi') ||
-        normModel.includes('multispace') ||
-        normModel.includes('tepee') ||
-        normModel.includes('rifter') ||
-        normTrim.includes('combi') ||
-        normTrim.includes('kombi') ||
-        normTrim.includes('camlı') ||
-        normTrim.includes('deluxe') ||
-        normTrim.includes('glx') ||
-        normTrim.includes('titanium') ||
-        normTrim.includes('trend') ||
-        normTrim.includes('premio') ||
-        normTrim.includes('emotion') ||
-        normTrim.includes('elegance') ||
-        normTrim.includes('safeline') ||
-        normTrim.includes('silverline') ||
-        normTrim.includes('blackline');
-
-      const defaultCargoVolume = isCombi ? 0.7 : 3.2;
-
       const engineArchitectureRule = isGasoline
         ? 'Araç BENZİNLİ motordur: Termostat gövdesi, soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu incelenmelidir. DPF (dizel partikül filtresi) veya dizel EGR soğutucu kurum tıkanması KESİNLİKLE İDDİA EDİLEMEZ!'
         : isPreEuro5
@@ -689,10 +695,30 @@ CRITICAL RULES:
    ALL text, claim titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
 2. AUTHENTIC GEARBOX DISCOVERY:
    - Investigate if this exact vehicle year, engine, and trim configuration actually offered an automatic transmission option from the factory.
-3. Understand the exact body configuration from ${context.trimPackage || 'katalog verisi'}. ${isCombi ? 'Bu araç 5 KİŞİLİK CAMLI KOMBİ versiyonudur (Tourneo / Combi). Bagaj hacmi binek/yolcu standartlarındadır (~650-700 Litre). ASLA 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!' : 'Bu araç PANELVAN kargo versiyonudur.'}
-4. Suspension architecture: Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
-5. Engine architecture: ${engineArchitectureRule}
-6. Output strict JSON only.`;
+3. DYNAMIC BODY STYLE, SEATING & LUGGAGE/CARGO RESEARCH:
+   - Authentically research the exact vehicle body configuration based STRICTLY on the user's selected 8 filters:
+     * Kasa Tipi: '${context.bodyType || 'Belirtilmemiş'}'
+     * Model Ailesi: '${context.model}'
+     * Donanım Paketi: '${context.trimPackage || 'Belirtilmemiş'}'
+   - Classify into:
+     * "COMBI_PASSENGER" if it is a 5-seater passenger combi/camlı van (e.g. Tourneo, Combi, Multispace, Tepee, Rifter, Caddy Life, Kangoo Multix). In this case:
+       - seatingCapacity: 5
+       - trunkCapacityLiters: Authentic catalog rear trunk volume behind 2nd row seats in Liters (~500-750 Litre). KESİNLİKLE 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!
+       - cargoVolumeM3: Authentic volume behind seats (~0.6-0.8 m³).
+     * "CARGO_PANELVAN" if it is a 2-seater closed industrial cargo van (e.g. Transit Connect Van, Fiorino Kargo). In this case:
+       - seatingCapacity: 2
+       - trunkCapacityLiters: 0
+       - cargoVolumeM3: Genuine rear cargo box volume (~2.8 - 3.8 m³).
+   - curbWeightKg: Authentic catalog curb weight (kg).
+4. EMISSIONS & DPF FIDELITY:
+   - Research whether this exact model year (${vehicleYear}) and engine came with a factory DPF (Dizel Partikül Filtresi).
+   - In Turkish/European market, Euro 4 commercial diesels (pre-2011, e.g. 2008 Ford 1.8 TDCi Lynx) DO NOT HAVE FACTORY DPF! (hasDpf: false). Euro 5/6 commercial diesels (2011+) have DPF (hasDpf: true). Gasoline engines NEVER have DPF (hasDpf: false).
+   - DO NOT claim DPF soot clogging or DPF warning lights on vehicles without factory DPF!
+5. SUSPENSION ARCHITECTURE:
+   - Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
+6. ENGINE & MECHANICAL ARCHITECTURE:
+   ${engineArchitectureRule}
+7. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle Specification:
 ${filterBlock}
@@ -709,6 +735,11 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "transmissionType": "string (örn: 5 İleri Manuel veya 6 İleri Manuel veya 8 İleri Otomatik EAT8)",
   "coolingType": "SIVI",
+  "trunkCapacityLiters": number,
+  "curbWeightKg": number,
+  "topSpeedKmh": number,
+  "zeroToHundredKmh": number,
+  "catalogCombinedFuelL100km": number,
   "commercialDetails": {
     "generationName": "string (resmi kasa/jenerasyon adı)",
     "productionEra": "string",
@@ -716,20 +747,24 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "displacementCc": ${baseCc},
     "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
     "exactPowerHp": number,
-    "emissionStandard": "${isPreEuro5 ? 'Euro 4' : 'Euro 5 veya Euro 6'}",
-    "hasDpf": ${hasDpf},
-    "hasEgr": true,
-    "hasAdBlue": ${!isGasoline && vehicleYear >= 2016},
-    "manualGearboxVerified": true,
+    "emissionStandard": "string (katalog Euro normu: Euro 4 veya Euro 5 veya Euro 6)",
+    "hasDpf": boolean,
+    "hasEgr": boolean,
+    "hasAdBlue": boolean,
+    "manualGearboxVerified": boolean,
     "manualGearboxType": "string",
     "manualGearboxSpeeds": 5,
     "automaticGearboxVerified": false,
     "automaticGearboxType": "string",
     "automaticUnverifiedReason": "string",
+    "bodyStyleClassification": "COMBI_PASSENGER | CARGO_PANELVAN",
+    "seatingCapacity": number,
+    "trunkCapacityLiters": number,
+    "curbWeightKg": number,
     "configurationContext": {
       "rawSourceLabel": "${context.trimPackage || 'Standart'}",
       "commercialMeaning": "string",
-      "cargoVolumeM3": ${defaultCargoVolume}
+      "cargoVolumeM3": number
     }
   },
   "commercialDutyRisks": [
@@ -992,6 +1027,20 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
       }
     }
 
+    const rawTrunk =
+      typeof parsed?.trunkCapacityLiters === 'number' && parsed.trunkCapacityLiters > 0
+        ? parsed.trunkCapacityLiters
+        : typeof parsed?.commercialDetails?.trunkCapacityLiters === 'number' && parsed.commercialDetails.trunkCapacityLiters > 0
+        ? parsed.commercialDetails.trunkCapacityLiters
+        : undefined;
+
+    const rawWeight =
+      typeof parsed?.curbWeightKg === 'number' && parsed.curbWeightKg > 0
+        ? parsed.curbWeightKg
+        : typeof parsed?.commercialDetails?.curbWeightKg === 'number' && parsed.commercialDetails.curbWeightKg > 0
+        ? parsed.commercialDetails.curbWeightKg
+        : undefined;
+
     return {
       vehicleType: context.vehicleType,
       brand: context.brand,
@@ -1002,6 +1051,11 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
       candidatePowers: finalPowers,
       transmissionType: parsed?.transmissionType || parsed?.motorcycleEras?.[0]?.transmission || (parsed?.commercialDetails?.automaticGearboxVerified ? parsed.commercialDetails.automaticGearboxType : parsed?.commercialDetails?.manualGearboxType),
       coolingType: parsed?.coolingType || parsed?.motorcycleEras?.[0]?.cooling || (context.vehicleType === 'MOTORCYCLE' ? 'HAVA' : 'SIVI'),
+      trunkCapacityLiters: rawTrunk,
+      curbWeightKg: rawWeight,
+      topSpeedKmh: typeof parsed?.topSpeedKmh === 'number' && parsed.topSpeedKmh > 0 ? parsed.topSpeedKmh : undefined,
+      zeroToHundredKmh: typeof parsed?.zeroToHundredKmh === 'number' && parsed.zeroToHundredKmh > 0 ? parsed.zeroToHundredKmh : undefined,
+      catalogCombinedFuelL100km: typeof parsed?.catalogCombinedFuelL100km === 'number' && parsed.catalogCombinedFuelL100km > 0 ? parsed.catalogCombinedFuelL100km : undefined,
       motorcycleEras: parsed?.motorcycleEras,
       commercialDetails: parsed?.commercialDetails,
       commercialDutyRisks: parsed?.commercialDutyRisks,
@@ -1016,6 +1070,7 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
     context: MultiVehicleResearchContext,
     agent1: Agent1Output,
   ): Promise<Agent2Output> {
+    const vehicleYear = typeof context.year === 'number' ? context.year : parseInt(String(context.year || '2015'), 10);
     const filterBlock = this.format8FilterBlock(context);
     const systemPrompt = `You are TorqueScout Agent 2: Adversarial Red Team Technical Validator.
 Your role is to rigorously AUDIT and VALIDATE claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context:
@@ -1058,6 +1113,15 @@ CRITICAL DIRECTIVES:
    - Flag any competitor brand or model comparisons for immediate deletion.
 9. TIMELINE INTEGRITY (MOTORCYCLE):
    - For modern models introduced post-2015, CONTRADICT any fake pre-2018 or 2010 carburetor era claims!
+10. LUGGAGE & CARGO VOLUME AUDIT:
+    - If the vehicle is a 5-seater passenger combi (e.g. Tourneo Connect, Doblo Combi, Caddy Life, Kangoo Multix, Rifter, Berlingo) or passenger automobile:
+      It CANNOT have 3000+ liters cargo panelvan volume! The trunk behind seats is authentic passenger luggage volume (~500-750 Liters).
+      If Agent 1 claimed >1500 liters for a passenger/combi vehicle or 0 liters, set "trunkCapacityRefuted": true, "correctedTrunkCapacityLiters": <authentic Liters>, "cargoVolumeRefuted": true, "correctedCargoVolumeM3": <authentic m³, ~0.6-0.8 m³>, and explain in "trunkCapacityRefutedReason".
+    - If the vehicle is a 2-seater closed panelvan (Kargo / Van):
+      "trunkCapacityLiters" is 0, and cargo box volume is ~2.8 - 4.2 m³.
+11. EMISSIONS & DPF AUDIT:
+    - If this model year (${vehicleYear}) and engine is Euro 4 diesel (pre-2011) or gasoline:
+      Factory DPF DOES NOT EXIST! If Agent 1 claimed DPF (dizel partikül filtresi) issues, set "dpfRefuted": true, "dpfRefutedReason": "Euro 4 / benzinli araçta fabrikasyon DPF bulunmaz".
 Output STRICT JSON:
 {
   "challenges": [
@@ -1080,7 +1144,15 @@ Output STRICT JSON:
   "powerRefuted": boolean,
   "powerRefutedReason": string,
   "correctedPowerHp": number,
-  "powerDiscrepancies": string[]
+  "powerDiscrepancies": string[],
+  "trunkCapacityRefuted": boolean,
+  "trunkCapacityRefutedReason": string,
+  "correctedTrunkCapacityLiters": number,
+  "cargoVolumeRefuted": boolean,
+  "cargoVolumeRefutedReason": string,
+  "correctedCargoVolumeM3": number,
+  "dpfRefuted": boolean,
+  "dpfRefutedReason": string
 }`;
 
     const userPrompt = `Target Vehicle Specification:
@@ -1090,6 +1162,8 @@ Claimed by Agent 1:
 - Power: ${agent1.powerHp} HP
 - Transmission: ${agent1.transmissionType || 'Belirtilmemiş'}
 - Cooling: ${agent1.coolingType || 'SIVI'}
+${agent1.trunkCapacityLiters ? `- Trunk Capacity: ${agent1.trunkCapacityLiters} Liters` : ''}
+${agent1.curbWeightKg ? `- Curb Weight: ${agent1.curbWeightKg} kg` : ''}
 ${agent1.commercialDetails ? `Commercial Details:\n${JSON.stringify(agent1.commercialDetails, null, 2)}` : ''}
 ${agent1.motorcycleEras ? `Motorcycle Eras:\n${JSON.stringify(agent1.motorcycleEras, null, 2)}` : ''}
 Claims by Agent 1:
@@ -1136,6 +1210,14 @@ Perform adversarial red-team audit. Output strict JSON.`;
       powerRefutedReason: parsed?.powerRefutedReason,
       correctedPowerHp: typeof parsed?.correctedPowerHp === 'number' && parsed.correctedPowerHp > 0 ? parsed.correctedPowerHp : undefined,
       powerDiscrepancies: Array.isArray(parsed?.powerDiscrepancies) ? parsed.powerDiscrepancies : [],
+      trunkCapacityRefuted: Boolean(parsed?.trunkCapacityRefuted),
+      trunkCapacityRefutedReason: parsed?.trunkCapacityRefutedReason,
+      correctedTrunkCapacityLiters: typeof parsed?.correctedTrunkCapacityLiters === 'number' && parsed.correctedTrunkCapacityLiters > 0 ? parsed.correctedTrunkCapacityLiters : undefined,
+      cargoVolumeRefuted: Boolean(parsed?.cargoVolumeRefuted),
+      cargoVolumeRefutedReason: parsed?.cargoVolumeRefutedReason,
+      correctedCargoVolumeM3: typeof parsed?.correctedCargoVolumeM3 === 'number' && parsed.correctedCargoVolumeM3 > 0 ? parsed.correctedCargoVolumeM3 : undefined,
+      dpfRefuted: Boolean(parsed?.dpfRefuted),
+      dpfRefutedReason: parsed?.dpfRefutedReason,
     };
   }
 
@@ -1301,6 +1383,33 @@ Perform adversarial red-team audit. Output strict JSON.`;
         ? `Model ailesi üretim dönemleri ve kronik mekanik eğilimleri haritalandı. ${finalApprovedFacts.length} adet doğrulanmış teknik iddia üzerinden değerlendirildi.`
         : `Seçilen konfigürasyon kapsamında ${finalApprovedFacts.length} adet doğrulanmış teknik ve yıpranma kriteri üzerinden sentezlendi.`;
 
+    const finalTrunkCapacityLiters =
+      agent2.trunkCapacityRefuted && typeof agent2.correctedTrunkCapacityLiters === 'number' && agent2.correctedTrunkCapacityLiters > 0
+        ? agent2.correctedTrunkCapacityLiters
+        : typeof agent1.trunkCapacityLiters === 'number' && agent1.trunkCapacityLiters > 0
+        ? agent1.trunkCapacityLiters
+        : typeof agent1.commercialDetails?.trunkCapacityLiters === 'number' && agent1.commercialDetails.trunkCapacityLiters > 0
+        ? agent1.commercialDetails.trunkCapacityLiters
+        : undefined;
+
+    const finalCargoVolumeM3 =
+      agent2.cargoVolumeRefuted && typeof agent2.correctedCargoVolumeM3 === 'number' && agent2.correctedCargoVolumeM3 > 0
+        ? agent2.correctedCargoVolumeM3
+        : typeof agent1.commercialDetails?.configurationContext?.cargoVolumeM3 === 'number' && agent1.commercialDetails.configurationContext.cargoVolumeM3 > 0
+        ? agent1.commercialDetails.configurationContext.cargoVolumeM3
+        : undefined;
+
+    const finalCurbWeightKg =
+      typeof agent1.curbWeightKg === 'number' && agent1.curbWeightKg > 0
+        ? agent1.curbWeightKg
+        : typeof agent1.commercialDetails?.curbWeightKg === 'number' && agent1.commercialDetails.curbWeightKg > 0
+        ? agent1.commercialDetails.curbWeightKg
+        : undefined;
+
+    const finalTopSpeedKmh = typeof agent1.topSpeedKmh === 'number' && agent1.topSpeedKmh > 0 ? agent1.topSpeedKmh : undefined;
+    const finalZeroToHundredKmh = typeof agent1.zeroToHundredKmh === 'number' && agent1.zeroToHundredKmh > 0 ? agent1.zeroToHundredKmh : undefined;
+    const finalCombinedFuelL100km = typeof agent1.catalogCombinedFuelL100km === 'number' && agent1.catalogCombinedFuelL100km > 0 ? agent1.catalogCombinedFuelL100km : undefined;
+
     return {
       vehicleType: agent1.vehicleType,
       adjudicatedFacts,
@@ -1311,6 +1420,12 @@ Perform adversarial red-team audit. Output strict JSON.`;
       candidatePowers,
       finalTransmissionType,
       finalCoolingType,
+      finalTrunkCapacityLiters,
+      finalCargoVolumeM3,
+      finalCurbWeightKg,
+      finalTopSpeedKmh,
+      finalZeroToHundredKmh,
+      finalCombinedFuelL100km,
       motorcycleEras: agent1.motorcycleEras,
       commercialDetails: agent1.commercialDetails,
       decisionScore,
@@ -1525,8 +1640,8 @@ Write the complete Motorcycle Report in strict JSON:
       const activeTransmissionName = judge.finalTransmissionType || context.transmission || 'Otomatik';
       const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
       const fuelTypeLabel = isGasoline ? 'benzinli' : 'dizel';
-      const defaultLiters = 550;
-      const defaultWeight = 1850;
+      const adjudicatedLiters = judge.finalTrunkCapacityLiters || 550;
+      const adjudicatedWeight = judge.finalCurbWeightKg || 1850;
 
       userPrompt = `4x4 / SUV & Pickup: ${context.brand} ${context.model} ${context.year || ''}
 Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
@@ -1557,8 +1672,8 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
-    "trunkCapacityLiters": ${defaultLiters},
-    "curbWeightKg": ${defaultWeight}
+    "trunkCapacityLiters": ${adjudicatedLiters},
+    "curbWeightKg": ${adjudicatedWeight}
   },
   "strongReasons": [
     { "title": "string (SUV/Arazi aracına özgü somut güçlü neden)", "explanation": "string (En az 2 cümlelik derin teknik açıklama; 4x4 çekiş gücü, taban yüksekliği veya şasi sağlamlığını anlatan özgün metin.)" }
@@ -1594,8 +1709,8 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const activeTransmissionName = judge.finalTransmissionType || context.transmission || 'Otomatik';
       const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
       const fuelTypeLabel = isGasoline ? 'benzinli' : 'dizel';
-      const defaultLiters = 480;
-      const defaultWeight = 1350;
+      const adjudicatedLiters = judge.finalTrunkCapacityLiters || 480;
+      const adjudicatedWeight = judge.finalCurbWeightKg || 1350;
       const cleanTrim = context.trimPackage && !/^(standart|standart donanım|standart kasa)$/i.test(context.trimPackage) ? context.trimPackage : '';
       const fullVehicleName = `${context.year ? `${context.year} ` : ''}${context.brand} ${context.model}${cleanTrim ? ` ${cleanTrim}` : ''}`.trim();
       const filterBlock = this.format8FilterBlock(context);
@@ -1623,12 +1738,12 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     "engineTorqueNm": number,
     "transmissionTypeAndSpeeds": "${activeTransmissionName}",
     "clutchType": "string (örn: Tork Konvertörlü / Çift Kavrama DSG / Kuru Tek Disk)",
-    "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD) veya Dört Tekerden Çekiş (AWD))",
+    "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD))",
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
-    "trunkCapacityLiters": ${defaultLiters},
-    "curbWeightKg": ${defaultWeight}
+    "trunkCapacityLiters": ${adjudicatedLiters},
+    "curbWeightKg": ${adjudicatedWeight}
   },
   "strongReasons": [
     { "title": "string (Binek araca özgü güçlü neden başlığı)", "explanation": "string (En az 2 cümlelik derin teknik açıklama. Başlığı tekrar etmeyen, motor dinamikleri, sürüş konforu veya yakıt verimliliğini somut anlatan cümleler.)" }
@@ -1701,6 +1816,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
 
       const normBody = (context.bodyType || '').toLowerCase();
       const isCombi =
+        judge.commercialDetails?.bodyStyleClassification === 'COMBI_PASSENGER' ||
         normBody.includes('combi') ||
         normBody.includes('kombi') ||
         normBody.includes('camlı') ||
@@ -1727,8 +1843,10 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
         normTrim.includes('silverline') ||
         normTrim.includes('blackline') ||
         normTrim.includes('multispace');
-      const defaultLiters = isCombi ? 675 : 3200;
-      const defaultWeight = isCombi ? 1420 : 1600;
+
+      const adjudicatedLiters = judge.finalTrunkCapacityLiters || (isCombi ? 675 : 3200);
+      const adjudicatedCargoM3 = judge.finalCargoVolumeM3 || (isCombi ? 0.7 : 3.2);
+      const adjudicatedWeight = judge.finalCurbWeightKg || (isCombi ? 1420 : 1600);
 
       userPrompt = `Commercial Vehicle: ${fullVehicleName}
 Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
@@ -1748,7 +1866,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; ${isCombi ? `5 kişilik camlı binek/kombi (${cleanTrim || 'Kombi'}) versiyonunda arka koltuk arkası bagaj hacmi (${defaultLiters} Litre) ve aile/esnaf kullanım ergonomisi anlatılacaktır. KESİNLİKLE 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!` : `Panelvan versiyonunda ${defaultLiters} Litre kargo hacmi ve yükleme pratikliği anlatılacaktır.`})",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; ${isCombi ? `5 kişilik camlı binek/kombi (${cleanTrim || 'Kombi'}) versiyonunda arka koltuk arkası bagaj hacmi (${adjudicatedLiters} Litre / ~${adjudicatedCargoM3} m³) ve aile/esnaf kullanım ergonomisi anlatılacaktır. KESİNLİKLE 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!` : `Panelvan versiyonunda ${adjudicatedLiters || `${adjudicatedCargoM3} m³`} kargo hacmi ve yükleme pratikliği anlatılacaktır.`})",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
   "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi, şehir içi dur-kalk konforu ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Manuel şanzımanın (${manualName}) ticari filo operasyonları, bakım kolaylığı ve yakıt verimliliği odaklı özgün değerlendirmesi.`})",
@@ -1775,8 +1893,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
-    "trunkCapacityLiters": ${defaultLiters},
-    "curbWeightKg": ${defaultWeight}
+    "trunkCapacityLiters": ${adjudicatedLiters},
+    "curbWeightKg": ${adjudicatedWeight}
   },
   "strongReasons": [
     { "title": "string (Özgün ve net bir güçlü neden başlığı)", "explanation": "string (En az 2 cümlelik derin teknik açıklama. Başlığı tekrar eden veya 'pratikliği artırır' gibi sığ ve kendini tekrarlayan cümleler KESİNLİKLE YASAKTIR; motorun dayanıklılığı, parça bulunurluğu veya süspansiyon geometrisi somut olarak açıklanmalıdır.)" }
@@ -1977,6 +2095,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
     const normBody = (context.bodyType || '').toLowerCase();
     const isCombi =
+      judge.commercialDetails?.bodyStyleClassification === 'COMBI_PASSENGER' ||
       normBody.includes('combi') ||
       normBody.includes('kombi') ||
       normBody.includes('camlı') ||
@@ -2017,7 +2136,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       typeof writer.technicalSpecifications?.topSpeedKmh === 'number' &&
       writer.technicalSpecifications.topSpeedKmh > (isMotorcycle ? 30 : 160)
         ? writer.technicalSpecifications.topSpeedKmh
-        : realisticTopSpeed;
+        : judge.finalTopSpeedKmh || realisticTopSpeed;
 
     const realisticZeroHundred =
       isMotorcycle
@@ -2028,26 +2147,26 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       typeof writer.technicalSpecifications?.zeroToHundredKmh === 'number' &&
       writer.technicalSpecifications.zeroToHundredKmh > 0
         ? writer.technicalSpecifications.zeroToHundredKmh
-        : realisticZeroHundred;
+        : judge.finalZeroToHundredKmh !== undefined ? judge.finalZeroToHundredKmh : realisticZeroHundred;
 
     const catalogCombinedFuelL100km =
       typeof writer.technicalSpecifications?.catalogCombinedFuelL100km === 'number' &&
       writer.technicalSpecifications.catalogCombinedFuelL100km > 0
         ? writer.technicalSpecifications.catalogCombinedFuelL100km
-        : isMotorcycle ? 2.8 : 6.0;
+        : judge.finalCombinedFuelL100km || (isMotorcycle ? 2.8 : 6.0);
 
     const trunkCapacityLiters =
       typeof writer.technicalSpecifications?.trunkCapacityLiters === 'number' &&
       writer.technicalSpecifications.trunkCapacityLiters > 0 &&
       (!isCombi || writer.technicalSpecifications.trunkCapacityLiters <= 1200)
         ? writer.technicalSpecifications.trunkCapacityLiters
-        : isMotorcycle ? 0 : isCombi ? 675 : isSuvPickup ? 550 : isCommercial ? 3200 : 480;
+        : judge.finalTrunkCapacityLiters || (isMotorcycle ? 0 : isCombi ? 675 : isSuvPickup ? 550 : isCommercial ? 3200 : 480);
 
     const curbWeightKg =
       typeof writer.technicalSpecifications?.curbWeightKg === 'number' &&
       writer.technicalSpecifications.curbWeightKg > 0
         ? writer.technicalSpecifications.curbWeightKg
-        : isMotorcycle ? 115 : isSuvPickup ? 1750 : 1420;
+        : judge.finalCurbWeightKg || (isMotorcycle ? 115 : isSuvPickup ? 1750 : 1420);
 
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
@@ -2455,7 +2574,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               })),
               configurationContext: {
                 rawPackage: context.trimPackage || (isCombi ? 'Kombi' : 'Panelvan'),
-                cargoVolumeM3: isCombi ? 0.7 : Number((trunkCapacityLiters / 1000).toFixed(1)),
+                cargoVolumeM3: judge.finalCargoVolumeM3 || (isCombi ? 0.7 : Number((trunkCapacityLiters / 1000).toFixed(1))),
                 commercialMeaning: this.sanitizeTurkishAutomotiveText(
                   writer.configurationBadge ||
                     context.trimPackage ||
