@@ -296,6 +296,7 @@ export default function VehicleDetail() {
     if (payload && typeof payload === "object" && (payload.executiveSummary || payload.vehicleIdentity || payload.finalVerdict)) {
       return {
         ...payload,
+        vehicleType: data.vehicleType || payload.vehicleType || (payload.vehicleIdentity as any)?.vehicleType,
         reportId: data.id || payload.reportId || payload.id,
         likeCount: data.likeCount ?? payload.likeCount ?? 0,
         dislikeCount: data.dislikeCount ?? payload.dislikeCount ?? 0,
@@ -332,6 +333,31 @@ export default function VehicleDetail() {
     try {
       const headers = getAuthHeaders();
 
+      // Resolve the actual vehicleType from URL query param, searchScope, or vehicle object
+      let searchScope: any = undefined;
+      if (typeof window !== "undefined") {
+        try {
+          const rawScope = sessionStorage.getItem("ts_search_scope");
+          if (rawScope) {
+            searchScope = JSON.parse(rawScope);
+          }
+        } catch {}
+      }
+
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const queryVehicleType = urlParams?.get("vehicleType")?.toUpperCase();
+      const scopeVehicleType = searchScope?.vehicleType?.toUpperCase();
+      const resolvedVehicleType =
+        queryVehicleType ||
+        scopeVehicleType ||
+        vehicle?.vehicleType?.toUpperCase() ||
+        "AUTOMOBILE";
+
+      const isMotorcycle = resolvedVehicleType === "MOTORCYCLE";
+      const effectiveSearchScope = searchScope
+        ? { ...searchScope, vehicleType: resolvedVehicleType }
+        : { vehicleType: resolvedVehicleType };
+
       if (!force) {
         const res = await fetch(`${API_URL}/vehicle-reports/by-variant/${variantId}/current`, {
           headers,
@@ -339,8 +365,18 @@ export default function VehicleDetail() {
         if (res.ok) {
           const data = await safeFetchJson(res);
           const parsed = extractReportData(data);
+          const cachedVehicleType = (
+            (parsed as any)?.vehicleType ||
+            (parsed as any)?.vehicleIdentity?.vehicleType ||
+            (data as any)?.vehicleType ||
+            ""
+          ).toUpperCase();
+
+          const isTypeCompatible = !cachedVehicleType || cachedVehicleType === resolvedVehicleType;
+
           if (
             parsed && 
+            isTypeCompatible &&
             data.status === "COMPLETED" && 
             data.provider !== "DETERMINISTIC_FALLBACK" &&
             (data.reportData?.status || data.status) !== "SAFE_FALLBACK"
@@ -368,32 +404,18 @@ export default function VehicleDetail() {
         setPipelineStep(1);
       }
 
-      const isMotorcycle = vehicle?.vehicleType === "MOTORCYCLE";
-      let searchScope: any = undefined;
-      if (typeof window !== "undefined") {
-        try {
-          const rawScope = sessionStorage.getItem("ts_search_scope");
-          if (rawScope) {
-            searchScope = JSON.parse(rawScope);
-          }
-        } catch {}
-      }
-
       const reportPayload: any = {
         mode: "TORQUE_SCOUT_VEHICLE_REPORT",
         entryPoint: "VEHICLE_SEARCH",
         idempotencyKey: `vr_${variantId}_${Date.now()}`,
         forceRefresh: force,
-        ...(searchScope ? { searchScope } : {}),
+        vehicleType: resolvedVehicleType,
+        searchScope: effectiveSearchScope,
       };
       if (isMotorcycle) {
         reportPayload.modelId = variantId;
-        reportPayload.vehicleType = "MOTORCYCLE";
       } else {
         reportPayload.variantId = variantId;
-        if (vehicle?.vehicleType) {
-          reportPayload.vehicleType = vehicle.vehicleType;
-        }
       }
 
       const genRes = await fetch(`${API_URL}/vehicle-reports`, {

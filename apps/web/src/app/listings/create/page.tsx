@@ -914,6 +914,7 @@ export default function CreateListing() {
       customBrand: useCustomVariant ? customBrand : (!selectedVariant ? selectedBrand : undefined),
       customModel: useCustomVariant ? customModel : (!selectedVariant ? selectedModel : undefined),
       customYear: useCustomVariant ? parseInt(customYear, 10) : (!selectedVariant && selectedYear ? parseInt(selectedYear, 10) : undefined),
+      vehicleType: searchMode,
     };
 
     const res = await fetch(`${API_URL}/listings`, {
@@ -1080,6 +1081,7 @@ export default function CreateListing() {
       customYear: useCustomVariant ? parseInt(customYear, 10) : (!selectedVariant && selectedYear ? parseInt(selectedYear, 10) : undefined),
       urgentRequested: selectedPromotionSku === "URGENT_LISTING" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
       showcaseRequested: selectedPromotionSku === "SHOWCASE_FEED" || selectedPromotionSku === "URGENT_SHOWCASE_BUNDLE",
+      vehicleType: searchMode,
     };
 
     const isPaidPromotion = !!selectedPromotionSku;

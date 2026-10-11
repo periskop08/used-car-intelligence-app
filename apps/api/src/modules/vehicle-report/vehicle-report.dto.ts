@@ -22,7 +22,7 @@ export class CreateVehicleReportDto {
 
   @IsString()
   @IsOptional()
-  vehicleType?: 'AUTOMOBILE' | 'MOTORCYCLE' | 'MINIVAN_PANELVAN';
+  vehicleType?: 'AUTOMOBILE' | 'MOTORCYCLE' | 'MINIVAN_PANELVAN' | 'SUV_PICKUP';
 
   @IsString()
   @IsOptional()
@@ -37,6 +37,7 @@ export class CreateVehicleReportDto {
 
   @IsOptional()
   searchScope?: {
+    vehicleType?: string;
     year?: string | number;
     bodyType?: string;
     engine?: string;

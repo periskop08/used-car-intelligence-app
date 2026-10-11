@@ -647,18 +647,30 @@ export class VehicleReportContextBuilderService {
       }
     }
 
-    if (variant.vehicleType === 'MINIVAN_PANELVAN') {
+    const effectiveVehicleType: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' = (() => {
+      const fromScope = (searchScope?.vehicleType || '').toUpperCase();
+      if (fromScope === 'MOTORCYCLE') return 'MOTORCYCLE';
+      if (fromScope === 'MINIVAN_PANELVAN' || fromScope === 'COMMERCIAL' || fromScope === 'TICARI') return 'MINIVAN_PANELVAN';
+      if (fromScope === 'SUV_PICKUP' || fromScope === 'SUV' || fromScope === 'PICKUP' || fromScope === 'ARAZI') return 'SUV_PICKUP';
+      if (fromScope === 'AUTOMOBILE') return 'AUTOMOBILE';
+
+      const fromVariant = ((variant as any).vehicleType || variant.model?.vehicleType || '').toUpperCase();
+      if (fromVariant === 'MOTORCYCLE') return 'MOTORCYCLE';
+      if (fromVariant === 'MINIVAN_PANELVAN' || fromVariant === 'COMMERCIAL' || fromVariant === 'TICARI') return 'MINIVAN_PANELVAN';
+      if (fromVariant === 'SUV_PICKUP' || fromVariant === 'SUV' || fromVariant === 'PICKUP' || fromVariant === 'ARAZI') return 'SUV_PICKUP';
+      return 'AUTOMOBILE';
+    })();
+
+    (contextObj as any).vehicleType = effectiveVehicleType;
+    (contextObj.vehicleIdentity as any).vehicleType = effectiveVehicleType;
+
+    if (effectiveVehicleType === 'MINIVAN_PANELVAN') {
       const activeTrim = searchScope?.trim || variant.trim?.name || (variant as any).trimPackage;
-      (contextObj as any).vehicleType = 'MINIVAN_PANELVAN';
-      (contextObj.vehicleIdentity as any).vehicleType = 'MINIVAN_PANELVAN';
       (contextObj as any).commercialConfiguration = {
         rawPackage: activeTrim || '',
         commercialMeaning: activeTrim ? `${activeTrim} konfigürasyonu` : 'Ticari konfigürasyon',
       };
       (contextObj as any).transmissionScope = searchScope?.transmission || 'Manuel + Otomatik';
-    } else {
-      (contextObj as any).vehicleType = 'AUTOMOBILE';
-      (contextObj.vehicleIdentity as any).vehicleType = 'AUTOMOBILE';
     }
 
     const contextHash = crypto

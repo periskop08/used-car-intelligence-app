@@ -72,6 +72,7 @@ export class ListingReportContextService {
       missingFields,
       photoCount: listing.media?.length || 0,
       approvedPhotoCount: listing.media?.filter((m) => m.moderationStatus === 'APPROVED').length || 0,
+      vehicleType: variant?.vehicleType || variant?.model?.vehicleType || 'AUTOMOBILE',
       sellerDescriptionWrapped: `<SELLER_DESCRIPTION>\n${sanitizedDesc}\n</SELLER_DESCRIPTION>`,
     };
 
@@ -84,6 +85,7 @@ export class ListingReportContextService {
       listingContext: listingContextObj,
       listingContextHash,
       variantId: listing.vehicleVariantId || undefined,
+      vehicleType: variant?.vehicleType || variant?.model?.vehicleType || 'AUTOMOBILE',
     };
   }
 }

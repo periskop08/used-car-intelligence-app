@@ -1411,13 +1411,143 @@ Write the complete Motorcycle Report in strict JSON:
   }
 }`;
     } else if (isSuvPickup) {
-      userPrompt = `Vehicle: ${context.brand} ${context.model} ${context.year || ''}
+      const activeTransmissionName = judge.finalTransmissionType || context.transmission || 'Otomatik';
+      const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
+      const fuelTypeLabel = isGasoline ? 'benzinli' : 'dizel';
+      const defaultLiters = 550;
+      const defaultWeight = 1850;
+
+      userPrompt = `4x4 / SUV & Pickup: ${context.brand} ${context.model} ${context.year || ''}
+Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
+Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
+Transmission: ${activeTransmissionName}
+Trim/Body: ${context.trimPackage || 'Standart'} (${context.bodyType || 'SUV'})
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
 Approved Facts:
 ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
-Write the complete 4x4 / SUV / Pickup Report in strict JSON matching schema with deep 3-paragraph vehicleOverview, 4x4 transmission analysis, chassis fatigue, and physical specs.`;
+Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE):
+{
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde yapısı (unibody veya merdiven şasi), yaklaşma/uzaklaşma açıları, taban yüksekliği, kabin ferahlığı ve yüksek sürüş pozisyonu.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, 4x4/AWD aktarma kabiliyeti, diferansiyel kilit davranışı ve otoyol/arazi dengesi.\\n3. Paragraf: Alt takım rijitliği, süspansiyon dayanıklılığı, arazi yorgunluğu ve Türkiye SUV/Pickup pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK)",
+  "dailyUse": {
+    "cityUse": "string (Şehir içi boyutlar, dar sokak manevrası, kaldırım/tümsek avantajı ve yüksek görüş açısı odaklı özgün analiz.)",
+    "highwayUse": "string (Yüksek gövde yapısının yan rüzgar tepkileri, otoyol stabilitesi, 4x4 çekiş kararlılığı ve motor rezervi odaklı özgün analiz.)"
+  },
+  "technicalSpecifications": {
+    "engineDisplacementCc": ${judge.finalDisplacementCc},
+    "enginePowerHp": ${judge.finalPowerHp},
+    "powerRange": "${judge.finalPowerRangeText || `${judge.finalPowerHp} HP`}",
+    "powerUnit": "HP",
+    "engineTorqueNm": number,
+    "transmissionTypeAndSpeeds": "${activeTransmissionName}",
+    "clutchType": "string (örn: Tork Konvertörlü / Çift Kavrama / Kuru Tek Disk)",
+    "drivetrain": "string (örn: Akıllı Dört Tekerden Çekiş (AWD) veya 4x4 Arazi Şanzımanı)",
+    "topSpeedKmh": number,
+    "zeroToHundredKmh": number,
+    "catalogCombinedFuelL100km": number,
+    "trunkCapacityLiters": ${defaultLiters},
+    "curbWeightKg": ${defaultWeight}
+  },
+  "strongReasons": [
+    { "title": "string (SUV/Arazi aracına özgü somut güçlü neden)", "explanation": "string (En az 2 cümlelik derin teknik açıklama; 4x4 çekiş gücü, taban yüksekliği veya şasi sağlamlığını anlatan özgün metin.)" }
+  ],
+  "tradeoffs": [
+    { "title": "string (Aracın gerçek arazi/SUV kaynaklı kısıtı; örn: yüksek ağırlık kaynaklı fren mesafesi, dar manevra çapı, yüksek yakıt sarfiyatı)", "explanation": "string (en az 2 cümlelik teknik açıklama)" }
+  ],
+  "idealFor": [
+    { "profile": "string", "explanation": "string" }
+  ],
+  "notIdealFor": [
+    { "profile": "string", "explanation": "string" }
+  ],
+  "conditionsToConsider": [
+    { "condition": "string (4x4 aktarma, diferansiyel ve alt takım ekspertiz önkoşulu)", "reason": "string" }
+  ],
+  "walkAwayConditions": [
+    { "condition": "string (Şasi korozyonu/eğrilmesi veya arazi şanzımanı çatlağı gibi kritik vazgeçme nedeni)", "reason": "string" }
+  ],
+  "inspectionChecklist": [
+    { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
+  ],
+  "sellerQuestions": [
+    { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
+  ],
+  "decisionSynthesis": {
+    "score": ${judge.decisionScore},
+    "riskLevel": "${judge.technicalRiskLevel}",
+    "verdict": "string"
+  }
+}`;
+    } else if (isAutomobile) {
+      const activeTransmissionName = judge.finalTransmissionType || context.transmission || 'Otomatik';
+      const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
+      const fuelTypeLabel = isGasoline ? 'benzinli' : 'dizel';
+      const defaultLiters = 480;
+      const defaultWeight = 1350;
+
+      userPrompt = `Passenger Automobile: ${context.brand} ${context.model} ${context.year || ''}
+Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
+Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
+Transmission: ${activeTransmissionName}
+Trim/Body: ${context.trimPackage || 'Standart'} (${context.bodyType || 'Sedan'})
+Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
+Approved Facts:
+${factsJson}
+Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
+
+Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZCE):
+{
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el binek otomobil pazarındaki likidite ve yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "dailyUse": {
+    "cityUse": "string (Şehir içi dur-kalk trafiğindeki sürüş konforu, direksiyon manevra kabiliyeti, görüş açıları ve dar alan park kolaylığı odaklı özgün binek analizi.)",
+    "highwayUse": "string (Yüksek hızlardaki yol tutuşu, rüzgar ve yol gürültüsü izolasyonu, süspansiyonun dalgalanma sönümlemesi ve sollamalardaki motor rezervi odaklı özgün binek analizi.)"
+  },
+  "technicalSpecifications": {
+    "engineDisplacementCc": ${judge.finalDisplacementCc},
+    "enginePowerHp": ${judge.finalPowerHp},
+    "powerRange": "${judge.finalPowerRangeText || `${judge.finalPowerHp} HP`}",
+    "powerUnit": "HP",
+    "engineTorqueNm": number,
+    "transmissionTypeAndSpeeds": "${activeTransmissionName}",
+    "clutchType": "string (örn: Tork Konvertörlü / Çift Kavrama DSG / Kuru Tek Disk)",
+    "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD) veya Dört Tekerden Çekiş (AWD))",
+    "topSpeedKmh": number,
+    "zeroToHundredKmh": number,
+    "catalogCombinedFuelL100km": number,
+    "trunkCapacityLiters": ${defaultLiters},
+    "curbWeightKg": ${defaultWeight}
+  },
+  "strongReasons": [
+    { "title": "string (Binek araca özgü güçlü neden başlığı)", "explanation": "string (En az 2 cümlelik derin teknik açıklama. Başlığı tekrar etmeyen, motor dinamikleri, sürüş konforu veya yakıt verimliliğini somut anlatan cümleler.)" }
+  ],
+  "tradeoffs": [
+    { "title": "string (Aracın gerçek bir kısıtı veya dezavantajı - KESİNLİKLE olumlu başlık yazma; örn: sert süspansiyon tepkisi, arka baş mesafesi kısıtı, yüksek hızda lastik yuvarlanma gürültüsü)", "explanation": "string (en az 2 cümlelik teknik açıklama)" }
+  ],
+  "idealFor": [
+    { "profile": "string", "explanation": "string (Bu binek otomobilin karakterine tam uyan kullanıcı profili)" }
+  ],
+  "notIdealFor": [
+    { "profile": "string", "explanation": "string (Bu araca uygun olmayan kullanıcı profili)" }
+  ],
+  "conditionsToConsider": [
+    { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
+  ],
+  "walkAwayConditions": [
+    { "condition": "string (Kritik vazgeçme nedeni - ağır motor/şanzıman arızası veya yapısal gövde hasarı)", "reason": "string" }
+  ],
+  "inspectionChecklist": [
+    { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
+  ],
+  "sellerQuestions": [
+    { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
+  ],
+  "decisionSynthesis": {
+    "score": ${judge.decisionScore},
+    "riskLevel": "${judge.technicalRiskLevel}",
+    "verdict": "string"
+  }
+}`;
     } else {
       const normModel = (context.model || '').toLowerCase();
       const normEngine = (context.engine || '').toLowerCase();
@@ -2062,8 +2192,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           confidence: 'HIGH',
           supportingFactIds: [],
         },
-        motorcycleEraAnalysis,
-        commercialApplicationAnalysis: !isMotorcycle && !isSuvPickup
+        motorcycleEraAnalysis: isMotorcycle ? motorcycleEraAnalysis : undefined,
+        commercialApplicationAnalysis: context.vehicleType === 'MINIVAN_PANELVAN'
           ? {
               applicationSummary: this.sanitizeTurkishAutomotiveText(
                 writer.configurationAnalysis ||

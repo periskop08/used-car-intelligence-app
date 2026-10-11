@@ -115,7 +115,7 @@ export default function VehicleReportExpertSynthesis({
       )}
 
       {/* MOTORCYCLE: ÜRETİM DÖNEMLERİ & DÖNEM ANALİZİ */}
-      {synthesis.motorcycleEraAnalysis && (
+      {normalizedType === 'MOTORCYCLE' && synthesis.motorcycleEraAnalysis && (
         <div className="bg-[#090d1a] border border-cyan-500/20 p-6 rounded-2xl space-y-5 shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
             <h3 className="text-sm font-black text-cyan-400 uppercase tracking-wider flex items-center gap-2">
@@ -279,7 +279,7 @@ export default function VehicleReportExpertSynthesis({
       )}
 
       {/* MINIVAN / PANELVAN: TİCARİ UYGULAMA, ŞANZIMAN & YIPRANMA ANALİZİ */}
-      {synthesis.commercialApplicationAnalysis && (
+      {normalizedType === 'MINIVAN_PANELVAN' && synthesis.commercialApplicationAnalysis && (
         <div className="bg-[#090d1a] border border-blue-500/20 p-6 rounded-2xl space-y-5 shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-blue-500/20 pb-3">
             <h3 className="text-sm font-black text-blue-400 uppercase tracking-wider flex items-center gap-2">

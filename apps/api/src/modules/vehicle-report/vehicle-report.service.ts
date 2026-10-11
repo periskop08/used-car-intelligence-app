@@ -250,12 +250,15 @@ export class VehicleReportService implements OnModuleInit {
       let variantId = dto.variantId;
       let modelId = dto.modelId;
       const listingId = dto.listingId;
-      const requestedVehicleType = dto.vehicleType;
+      let requestedVehicleType = dto.vehicleType || dto.searchScope?.vehicleType;
 
       // 1. Resolve variantId if listingId is provided
       if (listingId && !variantId && !modelId) {
         const listingRes = await this.listingContextBuilder.buildListingContext(listingId);
         variantId = listingRes.variantId;
+        if (!requestedVehicleType && (listingRes as any).vehicleType) {
+          requestedVehicleType = (listingRes as any).vehicleType;
+        }
 
         if (!variantId) {
           throw new BadRequestException({
@@ -288,13 +291,17 @@ export class VehicleReportService implements OnModuleInit {
       // 2. Build Vehicle Context
       let vehicleContext: any;
       let vehicleContextHash: string;
+      const effectiveSearchScope = {
+        ...(dto.searchScope || {}),
+        vehicleType: requestedVehicleType,
+      };
 
       if (isMotorcycle && modelId) {
-        const mRes = await this.vehicleContextBuilder.buildMotorcycleContext(modelId, dto.searchScope);
+        const mRes = await this.vehicleContextBuilder.buildMotorcycleContext(modelId, effectiveSearchScope);
         vehicleContext = mRes.vehicleContext;
         vehicleContextHash = mRes.vehicleContextHash;
       } else {
-        const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!, dto.searchScope);
+        const vRes = await this.vehicleContextBuilder.buildVehicleContext(variantId!, effectiveSearchScope);
         vehicleContext = vRes.vehicleContext;
         vehicleContextHash = vRes.vehicleContextHash;
       }
@@ -394,7 +401,7 @@ export class VehicleReportService implements OnModuleInit {
 
       const reportStatus = providerRes.report.status === 'SAFE_FALLBACK' ? VehicleReportStatus.SAFE_FALLBACK : VehicleReportStatus.COMPLETED;
 
-      const vehicleTypePersist = isMotorcycle ? 'MOTORCYCLE' : (vehicleContext?.vehicleType === 'MINIVAN_PANELVAN' ? 'MINIVAN_PANELVAN' : 'AUTOMOBILE');
+      const vehicleTypePersist = isMotorcycle ? 'MOTORCYCLE' : (vehicleContext?.vehicleType || requestedVehicleType || 'AUTOMOBILE');
 
       const savedRecord = await this.prisma.generatedVehicleReport.create({
         data: {

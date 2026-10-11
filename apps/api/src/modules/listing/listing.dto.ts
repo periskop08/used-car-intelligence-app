@@ -205,9 +205,17 @@ export class CreateListingDto {
   @IsBoolean()
   @IsOptional()
   showcaseRequested?: boolean;
+
+  @ApiProperty({ example: 'AUTOMOBILE', required: false })
+  @IsString()
+  @IsOptional()
+  vehicleType?: string;
 }
 
 export class UpdateListingDto {
+  @IsString()
+  @IsOptional()
+  vehicleType?: string;
   @IsString()
   @IsOptional()
   title?: string;

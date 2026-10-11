@@ -649,6 +649,7 @@ export default function Home() {
         sessionStorage.setItem(
           "ts_search_scope",
           JSON.stringify({
+            vehicleType: searchMode,
             year: selectedYear,
             bodyType: selectedBodyType,
             engine: selectedEngine,
@@ -659,7 +660,7 @@ export default function Home() {
         );
       } catch {}
     }
-    router.push(`/vehicle/${matchedVariantId}`);
+    router.push(`/vehicle/${matchedVariantId}?vehicleType=${searchMode}`);
   };
 
   // Helper conversion functions
