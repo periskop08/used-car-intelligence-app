@@ -538,6 +538,7 @@ export class VehicleReportContextBuilderService {
         },
         drivetrain: driveType,
         trimName: variant.trim?.name || 'Standart Donanım',
+        trim: variant.trim?.name || 'Standart Donanım',
         marketRegion: variant.marketRegion || 'TR',
         variantMatchConfidence: 'KESİN',
       },
@@ -644,6 +645,10 @@ export class VehicleReportContextBuilderService {
       if (searchScope.engine) {
         contextObj.vehicleIdentity.engineCode = searchScope.engine;
         contextObj.vehicleIdentity.selected8Filters.engine = searchScope.engine;
+      }
+      if (searchScope.bodyType) {
+        contextObj.vehicleIdentity.bodyType = searchScope.bodyType;
+        contextObj.vehicleIdentity.selected8Filters.bodyType = searchScope.bodyType;
       }
     }
 

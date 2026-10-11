@@ -238,6 +238,19 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             {typeof report.vehicleIdentity?.modelYear === "number"
               ? `${report.vehicleIdentity.modelYear} `
               : ""}{report.vehicleIdentity?.brand} {report.vehicleIdentity?.model}
+            {(() => {
+              const rawTrim = (
+                (report.vehicleIdentity as any)?.trim ||
+                report.vehicleIdentity?.trimName ||
+                (report as any)?.vehicleIdentity?.trimPackage ||
+                (report as any)?.trimPackage ||
+                (report as any)?.trimPackageComparison?.selectedTrimName ||
+                ""
+              ).trim();
+              return rawTrim && !/^(standart|standart donanım|standart kasa)$/i.test(rawTrim)
+                ? ` ${rawTrim}`
+                : "";
+            })()}
           </h1>
           {(() => {
             const rawEngineCode = (report.vehicleIdentity.engineCode || "").trim();

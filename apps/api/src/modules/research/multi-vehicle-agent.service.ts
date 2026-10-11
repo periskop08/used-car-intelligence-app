@@ -284,6 +284,7 @@ export class MultiVehicleAgentService {
         fuelType: context.fuel,
         transmission: context.transmission,
         trim: context.trimPackage,
+        bodyType: context.bodyType,
         variantId: context.variantId,
         modelId: context.modelId,
       });
@@ -359,6 +360,30 @@ export class MultiVehicleAgentService {
   }
 
   /**
+   * Helper to format the authoritative 8 user filters
+   */
+  private format8FilterBlock(context: MultiVehicleResearchContext): string {
+    return [
+      "=== KULLANICININ SEÇTİĞİ KESİN 8'Lİ FİLTRE (TEK BAĞLAYICI REFERANS) ===",
+      `1. Vasıta Türü: ${context.vehicleType}`,
+      `2. Marka: ${context.brand}`,
+      `3. Model Ailesi: ${context.model}`,
+      `4. Yıl: ${context.year || 'Belirtilmemiş'}`,
+      `5. Kasa Tipi: ${context.bodyType || 'Belirtilmemiş'}`,
+      `6. Motor / Versiyon: ${context.engine || 'Belirtilmemiş'}`,
+      `7. Yakıt Türü: ${context.fuel || 'Belirtilmemiş'}`,
+      `8. Şanzıman Tipi: ${context.transmission || 'Belirtilmemiş'}`,
+      `9. Donanım Paketi: ${context.trimPackage || 'Standart'}`,
+      "=====================================================================",
+      "DİKKAT - SIFIR ÇAPRAZ MODEL / SIFIR KARDEŞ PLATFORM KARIŞIKLIĞI KURALI:",
+      "Aynı motor bloğunu paylaşan başka kardeş modellerin (Peugeot 508, DS7 Crossback, DS4, Citroen C5 Aircross vb.)",
+      "teknik verileri, beygir güçleri veya kronik arızaları ASLA bu araca taşınamaz.",
+      "Araştırma ve değerlendirme yalnızca ve yalnızca kullanıcının yukarıda seçtiği 8 filtredeki spesifik araç için yapılmalıdır!",
+      "=====================================================================",
+    ].join('\n');
+  }
+
+  /**
    * Agent 1: Primary Research
    */
   private async runAgent1PrimaryResearch(
@@ -376,6 +401,18 @@ export class MultiVehicleAgentService {
     // 1. Live Web Grounding Search
     let liveWebSnippets = '';
     try {
+      const cleanTrim = context.trimPackage && !/^(standart|standart donanım|standart kasa)$/i.test(context.trimPackage) ? context.trimPackage : '';
+      const exactSignature = [
+        context.year,
+        context.brand,
+        context.model,
+        cleanTrim,
+        context.engine,
+        context.fuel,
+        context.transmission,
+        context.bodyType,
+      ].filter(Boolean).join(' ');
+
       let searchTerms: string[];
       if (isMotorcycle) {
         searchTerms = [
@@ -386,17 +423,17 @@ export class MultiVehicleAgentService {
         ];
       } else if (isSuvPickup) {
         searchTerms = [
+          `${exactSignature} teknik özellikleri motor gücü hp beygir tork katalog`,
           `${context.brand} ${context.model} ${context.year || ''} 4x4 arazi şanzımanı diferansiyel kilidi aktarma sorunları`,
           `${context.brand} ${context.model} ${context.year || ''} şasi korozyon alt takım makas salıncak kronik sorunlar`,
           `${context.brand} ${context.model} ${context.year || ''} enjektör turbo dpf kullanıcı yorumları`,
-          `${context.brand} ${context.model} ${context.year || ''} yakıt tüketimi bagaj hacmi teknik verileri`,
         ];
       } else if (isAutomobile) {
         searchTerms = [
-          `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar arızalar kullanıcı şikayetleri`,
-          `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} motor şanzıman yakıt tüketimi teknik özellikleri katalog`,
+          `${exactSignature} teknik özellikleri motor gücü beygir hp tork şanzıman katalog`,
+          `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} ${cleanTrim} kronik sorunlar kullanıcı şikayetleri`,
+          `${context.brand} ${context.model} ${context.year || ''} ${context.transmission || ''} şanzıman kavrama arızaları`,
           `${context.brand} ${context.model} ${context.year || ''} süspansiyon yol tutuş donanım ekspertiz kontrolleri`,
-          `${context.brand} ${context.model} ${context.year || ''} otomatik manuel şanzıman kavrama mekatronik arızaları`,
         ];
       } else {
         const normEng = (context.engine || '').toLowerCase();
@@ -405,11 +442,10 @@ export class MultiVehicleAgentService {
           ? `${context.brand} ${context.model} 2.0 ecoblue yağ içinde çalışan triger kayışı yağ süzgeci tıkanması arızası`
           : `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar kullanıcı şikayetleri`;
         searchTerms = [
-          `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} ${context.trimPackage || ''} motor gücü beygir hp teknik özellikleri katalog`,
-          `${context.brand} ${context.model} ${context.year || ''} ${context.trimPackage || ''} ticari kullanım ağır yük aşınma`,
+          `${exactSignature} motor gücü beygir hp teknik özellikleri katalog`,
+          `${context.brand} ${context.model} ${context.year || ''} ${cleanTrim} ticari kullanım ağır yük aşınma`,
           commModelSearch,
           `${context.brand} ${context.model} ${context.year || ''} sürgülü kapı kilit mekanizması süspansiyon burç arızaları`,
-          `${context.brand} ${context.model} ${context.year || ''} enjektör turbo debriyaj volan bakım maliyetleri`,
         ];
       }
 
@@ -543,8 +579,11 @@ Extract strict JSON:
 }`;
     } else if (isAutomobile) {
       const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
+      const filterBlock = this.format8FilterBlock(context);
       systemPrompt = `You are TorqueScout Agent 1: Senior Passenger Automobile Technical Research Specialist.
-Investigate the exact passenger car platform based STRICTLY on the user filters (Brand: ${context.brand}, Model: ${context.model}, Year: ${context.year || 'Genel'}, Engine: ${context.engine || `${baseCc} cc`}, Transmission: ${context.transmission || 'Belirtilmemiş'}, Trim: ${context.trimPackage || 'Standart'}).
+Investigate the exact passenger car platform based STRICTLY on the user filters:
+${filterBlock}
+
 CRITICAL DIRECTIVES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE): All titles, symptoms, inspections must be 100% in authentic Turkish automotive engineering terminology.
 2. PASSENGER CAR ARCHITECTURE (SIFIR TİCARİ TERİM): This is a PASSENGER AUTOMOBILE (Sedan, Hatchback, Station Wagon, Coupe, Cabriolet). KESİNLİKLE "sürgülü kapı", "kargo yükleme eşiği", "palet", "esnaf/filo" gibi hafif ticari terimler KULLANILAMAZ!
@@ -553,16 +592,13 @@ CRITICAL DIRECTIVES:
    - If Gasoline: focus on ignition coils, spark plugs, turbo wastegate, thermostat housing. NEVER claim DPF soot clogging or AdBlue on gasoline!
    - If Diesel: focus on injectors, DPF soot clogging, EGR valve, turbo boost leaks.
 5. ENGINE POWER ACCURACY & ZERO CROSS-MODEL CONFUSION:
-   - Use the authentic catalog power for this exact model and trim.
+   - KESİNLİKLE kardeş modellerden (Peugeot 508, DS7 Crossback, DS4, Citroen C5 Aircross vb.) teknik veri veya beygir gücü TAŞINAMAZ.
    - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8). NEVER downgrade DS9 to 180 HP (180 HP belongs to DS7/508, DS9 petrol is strictly 225 HP).
 6. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
 7. Output strict JSON only.`;
 
-      userPrompt = `Passenger Automobile: ${context.brand} ${context.model} ${context.year || ''}
-Engine: ${context.engine || `${baseCc} cc`}
-Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
-Transmission: ${context.transmission || 'Belirtilmemiş'}
-Trim: ${context.trimPackage || 'Standart'}
+      userPrompt = `Target Passenger Automobile Specification:
+${filterBlock}
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -938,37 +974,46 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
     context: MultiVehicleResearchContext,
     agent1: Agent1Output,
   ): Promise<Agent2Output> {
+    const filterBlock = this.format8FilterBlock(context);
     const systemPrompt = `You are TorqueScout Agent 2: Adversarial Red Team Technical Validator.
-Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context (Brand, Model, Year, Engine, Fuel, Transmission, Trim, VehicleType).
+Your role is to rigorously AUDIT and VALIDATE claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context:
+${filterBlock}
+
+If a claim is technically accurate and genuinely applies to this specific vehicle, model year, engine, and trim, mark its stance as "CONFIRM".
+Only mark "CONTRADICT" or "NARROW" if the claim is false, inaccurate, inapplicable (e.g. diesel claim on gasoline, commercial claim on automobile), or carried over from another sister platform.
+
 CRITICAL DIRECTIVES:
-1. FUEL SYSTEM & POWERTRAIN ACCURACY:
+1. ZERO SISTER-MODEL CONTAMINATION (SIFIR ÇAPRAZ MODEL KARIŞIKLIĞI):
+   - Check if Agent 1 brought in horsepower or specs from sister models sharing the same motor block (e.g. Peugeot 508, DS7, C5 Aircross 180 HP confused with DS9 225 HP, or Focus 120 HP confused with Courier 75 HP).
+   - If so, IMMEDIATELY REFUTE IT: set "powerRefuted": true, "correctedPowerHp": <authentic catalog HP for this exact model, year, and trim>, and explain the sister model confusion in "powerRefutedReason".
+2. FUEL SYSTEM & POWERTRAIN ACCURACY:
    - If the vehicle is fuel-injected (EFI) or modern post-2015, CONTRADICT any claims mentioning carburetor ("karbüratör", "karbüratör diyaframı", "karbüratör temizliği"). It uses electronic fuel injection (EFI), so fuel issues must target injectors, fuel pump pressure, or throttle body/TPS.
    - If the vehicle is a classic vintage carburetor model, contradict any EFI claims.
    - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
    - If the vehicle uses a DİZEL (Diesel) engine, contradict gasoline ignition coil/spark plug claims.
-2. BRAKING & CHASSIS ACCURACY:
+3. BRAKING & CHASSIS ACCURACY:
    - If the vehicle has drum brakes (Ön Disk Arka Kampana), contradict any ABS claims.
    - If the vehicle uses coil springs / independent suspension, contradict rear leaf spring (makas / yaprak yay) fatigue claims.
    - If the vehicle has leaf springs, contradict independent multi-link suspension claims.
-3. TRANSMISSION GROUNDING & CROSS-AUDIT:
+4. TRANSMISSION GROUNDING & CROSS-AUDIT:
    - Audit the transmission claimed by Agent 1 (${agent1.transmissionType || 'Belirtilmemiş'}).
    - If the vehicle is a SCOOTER or CVT commuter, contradict any manual gearbox, clutch cable, or gear dog claims, and set "correctedTransmissionType": "Otomatik (CVT)".
    - If the vehicle is manual only, contradict false automatic claims.
    - If user/context selected Automatic but Agent 1 claimed manual only, refute it and set "correctedTransmissionType" to the genuine factory automatic architecture.
-4. COOLING FIDELITY (HAVA VS SIVI SOĞUTMA):
+5. COOLING FIDELITY (HAVA VS SIVI SOĞUTMA):
    - Audit the cooling architecture claimed by Agent 1 (${agent1.coolingType || 'SIVI'}).
    - If the vehicle is AIR-COOLED (Hava Soğutmalı, including small displacement scooters/mopeds or classic cruisers):
      Immediately CONTRADICT any claims mentioning "radyatör", "antifriz", "termostat", "soğutma sıvısı kaçağı", "su pompası", "genleşme kabı". Set stance to "CONTRADICT", explain that the engine is air-cooled, and set "correctedCoolingType": "HAVA".
-5. CROSS-CATEGORY CONTAMINATION BAN:
+6. CROSS-CATEGORY CONTAMINATION BAN:
    - If the vehicle is a PASSENGER AUTOMOBILE or MOTORCYCLE:
      Immediately CONTRADICT any claims mentioning "sürgülü kapı", "kargo yükleme eşiği", "palet", "esnaf/filo". Set stance to "CONTRADICT" and explain that these are commercial van claims inapplicable to this vehicle.
-6. ENGINE POWER & TRIM ACCURACY:
+7. ENGINE POWER & TRIM ACCURACY:
    - Audit claimed engine displacement (${agent1.displacementCc} cc) and power (${agent1.powerHp} HP) against the official catalog for this model, year, and TRIM (${context.trimPackage || 'Genel'}).
    - DO NOT hallucinate cross-model engine power! (e.g. DS Automobiles DS9 1.6 PureTech petrol is strictly 225 HP, NOT 180 HP; Ford Courier 1.5 TDCi Delux is strictly 75 HP, NOT 120 HP).
    - If Agent 1's power does not match genuine factory catalog metrics for this trim, set "powerRefuted": true, "correctedPowerHp": <authentic HP>, and explain in "powerRefutedReason".
-7. ZERO COMPETITOR COMPARISONS:
+8. ZERO COMPETITOR COMPARISONS:
    - Flag any competitor brand or model comparisons for immediate deletion.
-8. TIMELINE INTEGRITY (MOTORCYCLE):
+9. TIMELINE INTEGRITY (MOTORCYCLE):
    - For modern models introduced post-2015, CONTRADICT any fake pre-2018 or 2010 carburetor era claims!
 Output STRICT JSON:
 {
@@ -995,8 +1040,8 @@ Output STRICT JSON:
   "powerDiscrepancies": string[]
 }`;
 
-    const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
-Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
+    const userPrompt = `Target Vehicle Specification:
+${filterBlock}
 Claimed by Agent 1:
 - Displacement: ${agent1.displacementCc} cc
 - Power: ${agent1.powerHp} HP
@@ -1489,20 +1534,21 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const fuelTypeLabel = isGasoline ? 'benzinli' : 'dizel';
       const defaultLiters = 480;
       const defaultWeight = 1350;
+      const cleanTrim = context.trimPackage && !/^(standart|standart donanım|standart kasa)$/i.test(context.trimPackage) ? context.trimPackage : '';
+      const fullVehicleName = `${context.year ? `${context.year} ` : ''}${context.brand} ${context.model}${cleanTrim ? ` ${cleanTrim}` : ''}`.trim();
+      const filterBlock = this.format8FilterBlock(context);
 
-      userPrompt = `Passenger Automobile: ${context.brand} ${context.model} ${context.year || ''}
-Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
-Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
-Transmission: ${activeTransmissionName}
-Trim/Body: ${context.trimPackage || 'Standart'} (${context.bodyType || 'Sedan'})
+      userPrompt = `Passenger Automobile Specification:
+${filterBlock}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
+Transmission: ${activeTransmissionName}
 Approved Facts:
 ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el binek otomobil pazarındaki likidite ve yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el binek otomobil pazarındaki likidite ve yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
   "dailyUse": {
     "cityUse": "string (Modelin şehir içi dur-kalk trafiğindeki direksiyon hissiyatı, süspansiyon sönümlemesi ve manevra kabiliyeti analizi. ASLA talimat cümlesini metne kopyalama!)",
     "highwayUse": "string (Modelin otoyol hızlarındaki rüzgar ve lastik yuvarlanma izolasyonu, şasi stabilitesi ve motor rezervi analizi. ASLA talimat cümlesini metne kopyalama!)"
@@ -1980,18 +2026,27 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       generatedAt: new Date().toISOString(),
       schemaVersion: 2,
       vehicleType: context.vehicleType,
+      vehicleOverview: this.sanitizeTurkishAutomotiveText(writer.vehicleOverview || 'Araç mekanik ve kullanım özellikleri incelendi.'),
       vehicleIdentity: {
         brand: context.brand,
         model: context.model,
         modelYear: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
         year: context.year || (isMotorcycle ? 'Tüm Üretim Yılları' : 2020),
-        bodyType: isMotorcycle ? 'Motosiklet' : isSuvPickup ? 'Arazi / SUV' : (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Minivan'),
+        bodyType: isMotorcycle
+          ? 'Motosiklet'
+          : isSuvPickup
+          ? (context.bodyType || 'Arazi / SUV')
+          : isAutomobile
+          ? (context.bodyType || 'Sedan')
+          : (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Minivan'),
         engineCode: context.engine || (isMotorcycle ? 'Katalog Motoru' : `${judge.finalDisplacementCc} cc ${isGasoline ? 'Benzin' : 'Dizel'}`),
         transmissionName: isMotorcycle
           ? (context.transmission || (writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('otomatik') || writer.technicalSpecifications?.transmissionTypeAndSpeeds?.toLowerCase().includes('cvt') ? 'Otomatik' : 'Manuel'))
           : canonicalTransmission,
         fuelType: isMotorcycle ? 'Benzin' : (isGasoline ? 'Benzin' : (context.fuel || 'Dizel')),
-        trim: context.trimPackage || (isMotorcycle ? 'Standart' : 'Standart Kasa'),
+        trim: context.trimPackage || (isMotorcycle ? 'Standart' : 'Standart Donanım'),
+        trimName: context.trimPackage || (isMotorcycle ? 'Standart' : 'Standart Donanım'),
+        trimPackage: context.trimPackage || (isMotorcycle ? 'Standart' : 'Standart Donanım'),
         engineDisplacementCc: judge.finalDisplacementCc,
         enginePowerHp: judge.finalPowerHp,
         canonicalDisplayPowerHp: judge.finalPowerHp,
