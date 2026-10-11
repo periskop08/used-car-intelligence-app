@@ -567,7 +567,8 @@ Extract off-road, towing, chassis, drivetrain, and powertrain failure modes.
 CRITICAL RULES:
 1. Validate 4WD/AWD systems: transfer case 2H/4H/4L electronic actuator, differential locks, propeller shaft universal joint & center support bearing.
 2. Investigate underbody corrosion, ladder frame / unibody fatigue, leaf spring sag, and suspension arm bushing wear.
-3. Output strict JSON only.`;
+3. KULLANICI KAYNAKLI BAKIM İHMALİ KRONİK KUSUR SAYILAMAZ: Yağ değişimini geciktirme, hor kullanma, debriyaj yakma, kalitesiz antifriz/yakıt gibi her araçta çıkabilecek kullanıcı ihmalleri ASLA bu aracın kronik fabrikasyon kusuru sayılamaz ve puan kırılamaz. Yalnızca bu modele özgü doğrulanmış fabrikasyon zaafiyetleri listelenmelidir.
+4. Output strict JSON only.`;
 
       userPrompt = `Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Engine: ${context.engine || ''}
@@ -625,8 +626,10 @@ CRITICAL DIRECTIVES:
    - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8). NEVER downgrade DS9 to 180 HP (180 HP belongs to DS7/508, DS9 petrol is strictly 225 HP).
 6. DYNAMIC SPEC EXTRACTION:
    - Extract authentic official catalog trunk capacity (Liters), curb weight (kg), top speed (km/h), 0-100 (sec), and combined fuel consumption (L/100km) for this exact model, year, body type, and engine.
-7. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
-8. Output strict JSON only.`;
+7. KULLANICI KAYNAKLI BAKIM İHMALİ KRONİK KUSUR SAYILAMAZ:
+   - Yağ değişimini geciktirme, hor kullanma, debriyaj yakma, kalitesiz antifriz gibi her arabada çıkabilecek kullanıcı ihmalleri ASLA bu arabanın kronik arızası sayılamaz. Yalnızca bu motora/şanzımana özgü fabrikasyon tasarım/mühendislik kusurları listelenmelidir.
+8. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
+9. Output strict JSON only.`;
 
       userPrompt = `Target Passenger Automobile Specification:
 ${filterBlock}
@@ -718,7 +721,9 @@ CRITICAL RULES:
    - Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
 6. ENGINE & MECHANICAL ARCHITECTURE:
    ${engineArchitectureRule}
-7. Output strict JSON only.`;
+7. KULLANICI KAYNAKLI BAKIM İHMALİ KRONİK KUSUR SAYILAMAZ:
+   - Yağ değişimini geciktirme, hor kullanma, debriyaj yakma, kalitesiz yakıt alma gibi her ikinci el ticari araçta olabilecek kullanıcı ihmalleri ASLA bu aracın kronik fabrikasyon kusuru sayılamaz ve puan kırılamaz. Yalnızca bu model ve motor ailesine özgü doğrulanmış fabrikasyon mühendislik zaafiyetleri (kaset triger zinciri, intercooler hortumu yırtılması, enjektör geri dönüş hattı vb.) listelenmelidir.
+8. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle Specification:
 ${filterBlock}
@@ -1122,6 +1127,10 @@ CRITICAL DIRECTIVES:
 11. EMISSIONS & DPF AUDIT:
     - If this model year (${vehicleYear}) and engine is Euro 4 diesel (pre-2011) or gasoline:
       Factory DPF DOES NOT EXIST! If Agent 1 claimed DPF (dizel partikül filtresi) issues, set "dpfRefuted": true, "dpfRefutedReason": "Euro 4 / benzinli araçta fabrikasyon DPF bulunmaz".
+12. USER NEGLECT AUDIT (KULLANICI İHMALİ DENETİMİ):
+    - Audit claims to ensure they represent authentic engineering/design failure modes of this specific model, not ordinary user maintenance neglect.
+    - If a claim describes general user neglect (e.g. periyodik yağ değişimini geciktirme, kalitesiz yakıt alma, debriyaj yakma, hor kullanma, rutin balata aşınması) that could happen to any car:
+      Immediately CONTRADICT the claim with stance: "CONTRADICT" and explain: "Kullanıcı kaynaklı bakım ihmalleri ve rutin aşınmalar aracın kronik kusuru sayılamaz ve puan kırılamaz."
 Output STRICT JSON:
 {
   "challenges": [
@@ -1370,10 +1379,13 @@ Perform adversarial red-team audit. Output strict JSON.`;
       });
     }
 
-    const highSeverityCount = finalApprovedFacts.filter((c) => c.severity === 'HIGH' || c.severity === 'CRITICAL').length;
-    const moderateCount = finalApprovedFacts.filter((c) => c.severity === 'MODERATE').length;
-    let decisionScore = 88 - highSeverityCount * 7 - moderateCount * 3;
-    decisionScore = Math.max(55, Math.min(94, decisionScore));
+    const totalPenalty = finalApprovedFacts.reduce((sum, fact) => {
+      const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
+      return sum + penalty;
+    }, 0);
+
+    const baseScore = 96;
+    let decisionScore = Math.max(50, Math.min(96, baseScore - totalPenalty));
 
     const technicalRiskLevel: 'DUSUK' | 'ORTA' | 'YUKSEK' | 'KRITIK' =
       decisionScore >= 80 ? 'DUSUK' : decisionScore >= 70 ? 'ORTA' : decisionScore >= 60 ? 'YUKSEK' : 'KRITIK';
@@ -1522,9 +1534,13 @@ MANDATORY RULES:
 5. "productionEras" TABLE GUARANTEE:
    Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (ilgili döneme ait gerçek fabrika güncellemesi, yakıt besleme veya mekanik revizyon). ASLA başka bir modelin donanımını veya uydurma parça adını yazma!
 6. "conditionsToConsider" (Hangi Şartlarda Değerlendirilebilir):
-   Genel araç özellikleri (örneğin "Yüksek Yakıt Tüketimi") YAZILAMAZ. Mutlaka incelenen modelin motor tipine uygun somut mekanik ve ekspertiz önkoşulları yazılmalıdır.
+   - KESİNLİKLE 'Motorun sağlam olması şartıyla', 'Motorun genel durumu detaylı kontrol edilmeli', 'Ekspertiz yapılması şartıyla' gibi basmakalıp, jenerik ve içi boş cümleler YAZILAMAZ!
+   - Şartlar doğrudan bu araç için doğrulanmış somut teknik parçalara (örn: triger kaset grubu, intercooler basınç hortumu, enjektör geri dönüş hattı, şanzıman mekatroniği vb.) bağlanmalıdır.
+   - Eğer araçta doğrulanmış spesifik kronik risk yoksa, şart: 'Aracın yetkili/uzman servis periyodik bakım kayıtlarında üretici onaylı sarf malzemelerinin kullanıldığının ve bilgisayarlı diyagnostik taramasında aktif arıza kodu bulunmadığının teyit edilmesi şartıyla' şeklinde profesyonel ve somut olmalıdır.
 7. "walkAwayConditions" (Hangi Durumda Satın Almaktan Vazgeçilmeli):
-   Mutlaka ağır mekanik/yapısal vazgeçme nedenleri yazılmalıdır (Örn: Krank ve yatak sarması mekanik vuruntusu, şasi çatlağı veya çözülemeyen motor arızası). Karbüratörlü araçta ASLA "FI lambası" yazma!
+   - KESİNLİKLE 'ağır motor mekanik hasarı veya çözülemeyen krank vuruntusu' gibi basmakalıp korkutma şablonları ve 'Bu tür sorunlar uzun ömürlü kullanımı etkiler' gibi laf kalabalığı YAZILAMAZ!
+   - Bu motorun ve şanzımanın gerçek mühendislik felaket senaryosu (dealbreaker) yazılmalıdır (Örn: Triger kaset kopması kaynaklı subap eğilmesi veya yüksek basınç pompa metal çapağının yakıt rayını sarması; şaside podye/direk kaynaklı yapısal deformasyon).
+   - Gerekçe (reason) bölümünde soyut laf değil, somut maliyet veya güvenlik riski (örn: komple sandık motor veya komple enjektör/pompa hattı revizyon maliyetinin araç piyasa değerinin önemli bir bölümünü aşması) açıklanmalıdır. Karbüratörlü araçta ASLA 'FI lambası' yazma!
 8. PHYSICAL SPECIFICATIONS ARE MANDATORY:
    - topSpeedKmh (number)
    - zeroToHundredKmh (number or null)
@@ -1688,10 +1704,10 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
     { "profile": "string", "explanation": "string" }
   ],
   "conditionsToConsider": [
-    { "condition": "string (4x4 aktarma, diferansiyel ve alt takım ekspertiz önkoşulu)", "reason": "string" }
+    { "condition": "string (4x4 aktarma, diferansiyel ve alt takım doğrulanmış parçalarına yönelik somut ekspertiz önkoşulu. KESİNLİKLE 'motorun sağlam olması şartıyla' gibi basmakalıp laflar YAZILAMAZ!)", "reason": "string (Somut arıza mekanizması ve getireceği risk; asla 'detaylı kontrolle belirlenmelidir' gibi klişeler yazma!)" }
   ],
   "walkAwayConditions": [
-    { "condition": "string (Şasi korozyonu/eğrilmesi veya arazi şanzımanı çatlağı gibi kritik vazgeçme nedeni)", "reason": "string" }
+    { "condition": "string (Şasi korozyonu/eğrilmesi, arazi şanzımanı/diferansiyel kilit çatlağı gibi ağır felaket dealbreaker senaryosu. KESİNLİKLE 'çözülemeyen krank vuruntusu' gibi basmakalıp kalıplar YAZILAMAZ!)", "reason": "string (Somut maliyet/güvenlik gerekçesi - asla 'uzun ömürlü kullanımı etkiler' gibi laf kalabalığı yazma!)" }
   ],
   "inspectionChecklist": [
     { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
@@ -1758,10 +1774,10 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     { "profile": "string", "explanation": "string (Bu araca uygun olmayan kullanıcı profili - ÖNEMLİ: Asfalt binek otomobilde KESİNLİKLE 'off-road yapanlar' gibi absürt profiller yazma! Dar sokaklarda küçük boyut/hatchback arayanlar veya yüksek oturma pozisyonlu SUV isteyenler gibi gerçekçi profiller yaz)" }
   ],
   "conditionsToConsider": [
-    { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
+    { "condition": "string (Bu binek modelin doğrulanmış motor/aktarma organı parçalarına yönelik somut ekspertiz şartı. KESİNLİKLE 'motorun sağlam olması şartıyla' gibi basmakalıp laflar YAZILAMAZ!)", "reason": "string (Somut arıza mekanizması ve getireceği risk; asla 'detaylı kontrolle belirlenmelidir' gibi klişeler yazma!)" }
   ],
   "walkAwayConditions": [
-    { "condition": "string (Kritik vazgeçme nedeni - ağır motor/şanzıman arızası veya yapısal gövde hasarı)", "reason": "string" }
+    { "condition": "string (Bu binek modelin motor/şanzıman mimarisine özgü ağır felaket dealbreaker senaryosu veya şasi/direk yapısal hasarı. KESİNLİKLE 'çözülemeyen krank vuruntusu' gibi basmakalıp kalıplar YAZILAMAZ!)", "reason": "string (Somut maliyet/güvenlik gerekçesi - asla 'uzun ömürlü kullanımı etkiler' gibi laf kalabalığı yazma!)" }
   ],
   "inspectionChecklist": [
     { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
@@ -1909,10 +1925,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     { "profile": "string", "explanation": "string (Önemli: 5 kişilik kombi ve camlı binek tiplerinde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
   ],
   "conditionsToConsider": [
-    { "condition": "string (Mutlaka '...sağlamlığının ekspertiz testiyle teyit edilmesi şartıyla' veya '...kaçak bulunmadığının teyit edilmesi şartıyla' şeklinde somut mekanik şart cümlesi olmalıdır. Asla sadece arıza adını başlık olarak yazma!)", "reason": "string" }
+    { "condition": "string (Bu aracın doğrulanmış teknik parçalarına yönelik somut ekspertiz şartı; örn: intercooler hortumu, enjektör geri dönüş hattı veya kaset triger sızıntı/aşınma teyidi. KESİNLİKLE 'motorun sağlam olması şartıyla' gibi basmakalıp laflar YAZILAMAZ!)", "reason": "string (Somut arıza mekanizması ve getireceği risk; asla 'detaylı kontrolle belirlenmelidir' gibi klişeler yazma!)" }
   ],
   "walkAwayConditions": [
-    { "condition": "string (Kritik vazgeçme nedeni - ağır motor mekanik hasarı veya çözülemeyen krank vuruntusu)", "reason": "string" }
+    { "condition": "string (Bu aracın motor/şanzıman mimarisine özgü ağır felaket dealbreaker senaryosu; örn: triger kaset kopması veya yüksek basınç pompa talaşı; şaside taşıyıcı podye/direk hasarı. KESİNLİKLE 'çözülemeyen krank vuruntusu' gibi basmakalıp kalıplar YAZILAMAZ!)", "reason": "string (Somut finansal/güvenlik yıkımı; komple motor veya yakıt hattı revizyon maliyeti. Asla 'uzun ömürlü kullanımı etkiler' gibi laf kalabalığı yazma!)" }
   ],
   "inspectionChecklist": [
     { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
@@ -2198,7 +2214,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       };
     });
 
-    const totalRiskPenalty = Math.max(0, 100 - judge.decisionScore);
+    const totalRiskPenalty = deductedRisks.reduce((sum, r) => sum + r.penalty, 0);
+    const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
 
     // Motorcycle Era Analysis Sanitization
     let motorcycleEraAnalysis: any = undefined;
@@ -2440,10 +2457,36 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           return list;
         })(),
         purchaseConditions: (() => {
+          const isTautologicalCondition = (cond: string, reason: string): boolean => {
+            const combined = `${cond} ${reason}`.toLowerCase();
+            if (
+              combined.includes('motorun genel durumu') ||
+              combined.includes('motorun sağlamlığı') ||
+              combined.includes('aracın genel durumu') ||
+              combined.includes('alım öncesi detaylı bir kontrol ile belirlenmelidir') ||
+              combined.includes('detaylı bir kontrol ile belirlenmelidir') ||
+              combined.includes('ekspertiz testiyle belirlenmelidir') ||
+              combined.includes('uzun ömürlü kullanımını ciddi şekilde etkileyebilir') ||
+              combined.includes('uzun ömürlü kullanımını etkiler')
+            ) {
+              return true;
+            }
+            if (/^(motorun|aracın|ünitenin)\s+sağlam(lığının|lığı)?/i.test(cond.trim())) {
+              return true;
+            }
+            return false;
+          };
+
           let conds = (writer.conditionsToConsider || [])
             .filter((c: any) => {
               const cText = `${c.condition} ${c.reason}`.toLowerCase();
-              return !cText.includes('yüksek yakıt') && !cText.includes('yakıt tüketimi art');
+              if (cText.includes('yüksek yakıt') || cText.includes('yakıt tüketimi art')) {
+                return false;
+              }
+              if (isTautologicalCondition(c.condition || '', c.reason || '')) {
+                return false;
+              }
+              return true;
             })
             .map((c: any) => {
               let cond = this.sanitizeTurkishAutomotiveText(c.condition);
@@ -2465,7 +2508,18 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           );
 
           if (conds.length === 0) {
-            if (isMotorcycle) {
+            if (judge.approvedFactsOnly && judge.approvedFactsOnly.length > 0) {
+              conds = judge.approvedFactsOnly.slice(0, 2).map((fact) => {
+                const title = this.sanitizeTurkishAutomotiveText(fact.title);
+                const inspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck || '');
+                return {
+                  condition: `${title} mekanizmasında aşınma, boşluk veya yağ sızıntısı bulunmadığının ekspertiz kontrolünde teyit edilmesi şartıyla`,
+                  reason: inspect || `${title} bileşeninde olası aşınma yüksek maliyetli parça onarımı gerektirebilir.`,
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [fact.claimId],
+                };
+              });
+            } else if (isMotorcycle) {
               conds = [
                 {
                   condition: hasCarbEra
@@ -2499,6 +2553,15 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
                   supportingFactIds: [],
                 },
               ];
+            } else {
+              conds = [
+                {
+                  condition: 'Periyodik bakım geçmişinin eksiksiz olduğunun ve bilgisayarlı diyagnostik/OBD taramasında aktif arıza kodu bulunmadığının teyit edilmesi şartıyla',
+                  reason: 'Doğrulanmış kronik tasarım kusuru saptanmayan bu konfigürasyonda, yetkili servis periyodik bakım disiplini mekanik sağlığın en temel güvencesidir.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+              ];
             }
           }
           return conds;
@@ -2508,50 +2571,99 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             (e: any) => e.fuelSystem === 'CARBURETOR',
           );
 
-          let walks = (writer.walkAwayConditions || []).map((w: any) => {
-            const condText = this.sanitizeTurkishAutomotiveText(w.condition);
-            const rText = this.sanitizeTurkishAutomotiveText(w.reason);
-            // If the vehicle is carburetor-fed, replace any hallucinated FI lamp with mechanical dealbreaker
-            if (isMotorcycle && hasCarbEra && (condText.toLowerCase().includes('fi arıza') || condText.toLowerCase().includes('enjektör'))) {
+          const isTautologicalWalkAway = (cond: string, reason: string): boolean => {
+            const combined = `${cond} ${reason}`.toLowerCase();
+            if (
+              combined.includes('çözülemeyen krank vuruntusu') ||
+              combined.includes('uzun ömürlü kullanımını ciddi şekilde etkileyebilir') ||
+              combined.includes('uzun ömürlü kullanımını etkiler') ||
+              combined.includes('aracın ömrünü kısaltır')
+            ) {
+              return true;
+            }
+            if (/^ağır motor mekanik hasarı$/i.test(cond.trim())) {
+              return true;
+            }
+            return false;
+          };
+
+          let walks = (writer.walkAwayConditions || [])
+            .filter((w: any) => !isTautologicalWalkAway(w.condition || '', w.reason || ''))
+            .map((w: any) => {
+              const condText = this.sanitizeTurkishAutomotiveText(w.condition);
+              const rText = this.sanitizeTurkishAutomotiveText(w.reason);
+              // If the vehicle is carburetor-fed, replace any hallucinated FI lamp with mechanical dealbreaker
+              if (isMotorcycle && hasCarbEra && (condText.toLowerCase().includes('fi arıza') || condText.toLowerCase().includes('enjektör'))) {
+                return {
+                  condition: 'Krank veya biyel kolu mekanik vuruntusu ile karbüratör boğazı çatlağı',
+                  reason: 'Ağır motor rektifiyesi veya çözülemeyen hava sızıntısı ve dengesiz yanma riski doğurur.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                };
+              }
               return {
-                condition: 'Krank veya biyel kolu mekanik vuruntusu ile karbüratör boğazı çatlağı',
-                reason: 'Ağır motor rektifiyesi veya çözülemeyen hava sızıntısı ve dengesiz yanma riski doğurur.',
+                condition: condText,
+                reason: rText,
                 priority: 'CRITICAL' as const,
                 supportingFactIds: [],
               };
-            }
-            return {
-              condition: condText,
-              reason: rText,
-              priority: 'CRITICAL' as const,
-              supportingFactIds: [],
-            };
-          });
+            });
 
-          if (walks.length === 0 && isMotorcycle) {
-            walks = [
-              {
-                condition: hasCarbEra
-                  ? 'Krank veya biyel kolu mekanik vuruntusu ile karter çatlağı'
-                  : 'FI arıza lambasının sürekli yanması ve teşhis cihazında çözülemeyen beyin/enjektör hatası vermesi',
-                reason: hasCarbEra
-                  ? 'Ağır motor revizyonu ve yüksek maliyetli rektifiye riski doğurur.'
-                  : 'Yüksek maliyetli elektronik beyin veya tesisat revizyonu gerektirebilir.',
-                priority: 'CRITICAL' as const,
-                supportingFactIds: [],
-              },
-              {
-                condition: 'Krank veya biyel kolu mekanik vuruntusu ile şasi mesnet çatlağı',
-                reason: 'Ağır motor rektifiyesi ve sürüş güvenliği riski doğurur.',
-                priority: 'CRITICAL' as const,
-                supportingFactIds: [],
-              },
-            ];
+          if (walks.length === 0) {
+            const criticalOrHighFact = judge.approvedFactsOnly.find(
+              (f) => f.severity === 'CRITICAL' || f.severity === 'HIGH',
+            );
+
+            if (criticalOrHighFact) {
+              const fTitle = this.sanitizeTurkishAutomotiveText(criticalOrHighFact.title);
+              walks = [
+                {
+                  condition: `${fTitle} kaynaklı mekanik blok deformasyonu veya aktarma organında geri döndürülemez aşınma tespit edilmesi`,
+                  reason: 'Komple sandık parça değişimi veya ağır mekanik revizyon maliyeti aracın piyasa değerine oranla rasyonel bir alım olmaktan çıkarır.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [criticalOrHighFact.claimId],
+                },
+                {
+                  condition: 'Şasi kuleleri, podye, direkler veya ana taşıyıcı iskelette düzeltme, kaynak veya ağır yapısal hasar bulunması',
+                  reason: 'Yapısal geometrisini ve fabrika toleranslarını yitirmiş gövdeler sürüş güvenliğini ve aktif yol tutuş dengesini kalıcı olarak bozar.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            } else if (isMotorcycle) {
+              walks = [
+                {
+                  condition: hasCarbEra
+                    ? 'Krank veya biyel kolu mekanik vuruntusu ile karter çatlağı'
+                    : 'FI arıza lambasının sürekli yanması ve teşhis cihazında çözülemeyen beyin/enjektör hatası vermesi',
+                  reason: hasCarbEra
+                    ? 'Ağır motor revizyonu ve yüksek maliyetli rektifiye riski doğurur.'
+                    : 'Yüksek maliyetli elektronik beyin veya tesisat revizyonu gerektirebilir.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+                {
+                  condition: 'Şasi ve gidon mesnet bölgesinde kaynak, çatlak veya geometri bozukluğu bulunması',
+                  reason: 'Sürüş geometrisi bozulmuş motosikletler doğrudan kaza ve can güvenliği riski doğurur.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            } else {
+              walks = [
+                {
+                  condition: 'Şasi kuleleri, podye, marşpiyel veya ana taşıyıcı direklerde düzeltme, kesme-ekleme veya ağır yapısal deformasyon tespit edilmesi',
+                  reason: 'Gövde rijitliğini ve çarpışma güvenliğini kalıcı olarak yitirmiş araçlar sürüş dengesini bozduğu için doğrudan eleme kriteridir.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            }
           }
           return walks;
         })(),
         finalConditionalVerdict: {
-          shortVerdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || `Karar Puanı: ${judge.decisionScore}/100. Kontroller teyit edilerek değerlendirilebilir.`),
+          shortVerdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || `Karar Puanı: ${calibratedScore}/100. Kontroller teyit edilerek değerlendirilebilir.`),
           detailedVerdict: judge.decisionRationale,
           confidence: 'HIGH',
           supportingFactIds: [],
@@ -2646,16 +2758,16 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         importance: 'HIGH',
       })),
       decisionScore: {
-        score: judge.decisionScore,
-        riskLevel: judge.technicalRiskLevel,
+        score: calibratedScore,
+        riskLevel: calibratedScore >= 80 ? 'DUSUK' : calibratedScore >= 70 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK',
         verdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.'),
         shortVerdict: this.sanitizeTurkishAutomotiveText(writer.decisionSynthesis?.verdict || 'Kontroller teyit edilerek değerlendirilebilir.'),
         deductedRisks,
         totalRiskPenalty,
       },
       torqueScoutDecisionScoreV1: {
-        score: judge.decisionScore,
-        state: judge.decisionScore >= 85 ? 'EXCELLENT' : judge.decisionScore >= 70 ? 'GOOD' : judge.decisionScore >= 50 ? 'CAUTION' : 'HIGH_RISK',
+        score: calibratedScore,
+        state: calibratedScore >= 85 ? 'EXCELLENT' : calibratedScore >= 70 ? 'GOOD' : calibratedScore >= 50 ? 'CAUTION' : 'HIGH_RISK',
         scope: 'VEHICLE',
         modelDecisionRisk: totalRiskPenalty,
         totalRiskPenalty,
@@ -2663,7 +2775,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         deductedRisks,
       },
       scoring: {
-        buyabilityScore: { value: judge.decisionScore },
+        buyabilityScore: { value: calibratedScore },
         technicalRiskScore: { value: totalRiskPenalty },
       },
     };
