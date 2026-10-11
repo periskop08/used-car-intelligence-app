@@ -552,8 +552,11 @@ CRITICAL DIRECTIVES:
 4. FUEL SPECIFICITY:
    - If Gasoline: focus on ignition coils, spark plugs, turbo wastegate, thermostat housing. NEVER claim DPF soot clogging or AdBlue on gasoline!
    - If Diesel: focus on injectors, DPF soot clogging, EGR valve, turbo boost leaks.
-5. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
-6. Output strict JSON only.`;
+5. ENGINE POWER ACCURACY & ZERO CROSS-MODEL CONFUSION:
+   - Use the authentic catalog power for this exact model and trim.
+   - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8). NEVER downgrade DS9 to 180 HP (180 HP belongs to DS7/508, DS9 petrol is strictly 225 HP).
+6. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
+7. Output strict JSON only.`;
 
       userPrompt = `Passenger Automobile: ${context.brand} ${context.model} ${context.year || ''}
 Engine: ${context.engine || `${baseCc} cc`}
@@ -961,6 +964,7 @@ CRITICAL DIRECTIVES:
      Immediately CONTRADICT any claims mentioning "sürgülü kapı", "kargo yükleme eşiği", "palet", "esnaf/filo". Set stance to "CONTRADICT" and explain that these are commercial van claims inapplicable to this vehicle.
 6. ENGINE POWER & TRIM ACCURACY:
    - Audit claimed engine displacement (${agent1.displacementCc} cc) and power (${agent1.powerHp} HP) against the official catalog for this model, year, and TRIM (${context.trimPackage || 'Genel'}).
+   - DO NOT hallucinate cross-model engine power! (e.g. DS Automobiles DS9 1.6 PureTech petrol is strictly 225 HP, NOT 180 HP; Ford Courier 1.5 TDCi Delux is strictly 75 HP, NOT 120 HP).
    - If Agent 1's power does not match genuine factory catalog metrics for this trim, set "powerRefuted": true, "correctedPowerHp": <authentic HP>, and explain in "powerRefutedReason".
 7. ZERO COMPETITOR COMPARISONS:
    - Flag any competitor brand or model comparisons for immediate deletion.

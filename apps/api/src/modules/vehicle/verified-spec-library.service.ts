@@ -270,6 +270,8 @@ CRITICAL RULES:
      * 1.6 TDCi (pre-2018) is 75 HP or 95 HP.
      * 1.0 EcoBoost is 100 HP.
      * 120 HP NEVER EXISTED on Courier! (120 HP 1.5 EcoBlue belongs to Focus / Kuga / Connect). DO NOT hallucinate 120 HP on Courier!
+   - DS Automobiles DS9:
+     * The pure petrol 1.6 PureTech in DS9 is exclusively 225 HP (165 kW / PureTech 225 with EAT8). NEVER output 180 HP for DS9 petrol! (180 HP was used in DS7/508, DS9 pure petrol is strictly 225 HP).
    - If the model is Tourneo Courier or Transit Courier and trim is Delux, Deluxe, or Trend, powerHp MUST be 75 HP (candidatePowers: [75, 100]).
 5. TRIM POWER RESOLUTION: If the user provides a specific trim (e.g. Delux, Trend vs Titanium), 'powerHp' MUST be the exact power of that trim, and 'candidatePowers' should list all genuine power options for that engine.
 Output ONLY valid JSON:
