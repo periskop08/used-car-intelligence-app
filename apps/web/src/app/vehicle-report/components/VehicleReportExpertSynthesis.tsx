@@ -307,12 +307,16 @@ export default function VehicleReportExpertSynthesis({
             <div className="p-4 bg-slate-950/70 border border-white/10 rounded-xl space-y-3">
               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
                 <Wrench className="w-3.5 h-3.5 text-blue-400" />
-                Şanzıman Analizi: Manuel mi Otomatik mi?
+                {synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis 
+                  ? 'Şanzıman Analizi: Manuel mi Otomatik mi?' 
+                  : 'Şanzıman ve Aktarma Analizi'}
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className={synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis ? "grid grid-cols-1 md:grid-cols-2 gap-3 text-xs" : "space-y-3 text-xs"}>
                 {synthesis.commercialApplicationAnalysis.manualTransmissionAnalysis && (
                   <div className="p-3 bg-white/[0.02] border border-white/5 rounded-lg space-y-1">
-                    <span className="font-bold text-emerald-400 block">Manuel Şanzıman Uygulaması</span>
+                    <span className="font-bold text-emerald-400 block">
+                      {synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis ? 'Manuel Şanzıman Uygulaması' : 'Aktarma ve Şanzıman Karakteri'}
+                    </span>
                     <p className="text-slate-300">{cleanRangeText(synthesis.commercialApplicationAnalysis.manualTransmissionAnalysis)}</p>
                   </div>
                 )}
@@ -323,7 +327,7 @@ export default function VehicleReportExpertSynthesis({
                   </div>
                 )}
               </div>
-              {synthesis.commercialApplicationAnalysis.transmissionComparison && (
+              {synthesis.commercialApplicationAnalysis.automaticTransmissionAnalysis && synthesis.commercialApplicationAnalysis.transmissionComparison && (
                 <div className="pt-2 border-t border-white/5 text-xs text-slate-300">
                   <span className="font-semibold text-blue-300">Uzman Değerlendirmesi: </span>
                   {cleanRangeText(synthesis.commercialApplicationAnalysis.transmissionComparison)}

@@ -660,8 +660,8 @@ Extract strict JSON:
       "symptoms": ["string (Türkçe somut belirti)"],
       "userExperience": "string (Türkçe kullanıcı deneyimi)",
       "testDriveCheck": "string (Türkçe test sürüşü kontrolü)",
-      "inspectionCheck": "string (Türkçe ekspertiz kontrolü)",
-      "sellerQuestion": "string (Türkçe satıcı sorusu)",
+      "inspectionCheck": "string (Ekspertiz ve usta seviyesinde somut diagnostik kontrol; örn: OBD canlı veri loglama, manifold/turbo basınç testi, kaçak testi veya mekanik boşluk ölçümü. KESİNLİKLE sadece 'gözle muayene edin' yazma!)",
+      "sellerQuestion": "string (Alıcının araç başında veya telefonda satıcıya doğrudan yönelteceği doğal, usta/piyasa diliyle teknik soru; örn: 'Soğuk ilk marşta enjektör diplerinde mazot terlemesi var mı, rekor pulları değişti mi?')",
       "costRisk": "DUSUK | ORTA | YUKSEK | COK_YUKSEK",
       "severity": "LOW | MODERATE | HIGH | CRITICAL",
       "confidence": 0.90
@@ -788,8 +788,8 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
       "symptoms": ["string (Türkçe somut belirti)"],
       "userExperience": "string (Türkçe kullanıcı deneyimi)",
       "testDriveCheck": "string (Türkçe test sürüşü kontrolü)",
-      "inspectionCheck": "string (Türkçe ekspertiz kontrolü)",
-      "sellerQuestion": "string (Türkçe satıcı sorusu)",
+      "inspectionCheck": "string (Ekspertiz ve usta seviyesinde somut diagnostik kontrol; örn: OBD canlı veri loglama, kaçak/basınç testi veya tolerans ölçümü. KESİNLİKLE sadece 'gözle muayene edin' yazma!)",
+      "sellerQuestion": "string (Alıcının araç başında veya telefonda satıcıya doğrudan yönelteceği doğal, usta/piyasa diliyle teknik soru)",
       "costRisk": "ORTA | YUKSEK | COK_YUKSEK",
       "severity": "MODERATE | HIGH | CRITICAL",
       "confidence": 0.90
@@ -1771,7 +1771,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     { "profile": "string", "explanation": "string (Bu binek otomobilin karakterine tam uyan kullanıcı profili)" }
   ],
   "notIdealFor": [
-    { "profile": "string", "explanation": "string (Bu araca uygun olmayan kullanıcı profili - ÖNEMLİ: Asfalt binek otomobilde KESİNLİKLE 'off-road yapanlar' gibi absürt profiller yazma! Dar sokaklarda küçük boyut/hatchback arayanlar veya yüksek oturma pozisyonlu SUV isteyenler gibi gerçekçi profiller yaz)" }
+    { "profile": "string (Bu modele uygun olmayan profil - Örn: 'Otoyol Hızlarında Yüksek Ses İzolasyonu ve Üst Segment Binek Konforu Bekleyenler' veya 'Dar Şehir Sokaklarında Kompakt Boyut Arayanlar'. KESİNLİKLE 'Büyük Aileler' veya 'Off-road' gibi çelişkili profiller YAZILAMAZ!)", "explanation": "string (Somut otoyol izolasyonu, süspansiyon rijitliği veya boyut kısıtlarını açıklayan teknik cümle)" }
   ],
   "conditionsToConsider": [
     { "condition": "string (Bu binek modelin doğrulanmış motor/aktarma organı parçalarına yönelik somut ekspertiz şartı. KESİNLİKLE 'motorun sağlam olması şartıyla' gibi basmakalıp laflar YAZILAMAZ!)", "reason": "string (Somut arıza mekanizması ve getireceği risk; asla 'detaylı kontrolle belirlenmelidir' gibi klişeler yazma!)" }
@@ -1922,7 +1922,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     { "profile": "string", "explanation": "string" }
   ],
   "notIdealFor": [
-    { "profile": "string", "explanation": "string (Önemli: 5 kişilik kombi ve camlı binek tiplerinde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
+    { "profile": "string (Örn: 'Otoyol Hızlarında Yüksek Ses İzolasyonu ve Üst Segment Binek Konforu Bekleyenler' veya 'Ağır Tonajlı Endüstriyel Taşımacılık Yapanlar'. KESİNLİKLE 'Büyük Aileler' veya 'Aileler' YAZILAMAZ!)", "explanation": "string (Somut otoyol rüzgar sesi, süspansiyon sertliği veya kargo taşıma sınırı gibi teknik kısıtları açıkla)" }
   ],
   "conditionsToConsider": [
     { "condition": "string (Bu aracın doğrulanmış teknik parçalarına yönelik somut ekspertiz şartı; örn: intercooler hortumu, enjektör geri dönüş hattı veya kaset triger sızıntı/aşınma teyidi. KESİNLİKLE 'motorun sağlam olması şartıyla' gibi basmakalıp laflar YAZILAMAZ!)", "reason": "string (Somut arıza mekanizması ve getireceği risk; asla 'detaylı kontrolle belirlenmelidir' gibi klişeler yazma!)" }
@@ -1936,8 +1936,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
   "sellerQuestions": [
     {
       "topic": "string",
-      "question": "string (Modelin spesifik motor, turbo, yakıt sistemi, şanzıman veya yürüyen aksamına yönelik DERİN TEKNİK SORU. KESİNLİKLE 'Motorun genel durumu nedir?', 'Araçta sorun var mı?', 'Bakımları yapıldı mı?' gibi genel ve klişe sorular YAZILAMAZ!)",
-      "expectedAnswer": "string (Yetkili veya uzman servisteki somut kontrolü ve parça değişim durumunu belirten teknik ve tatmin edici yanıt)"
+      "question": "string (Alıcının araç başında veya telefonda satıcıya doğrudan yönelteceği doğal, usta/piyasa diliyle teknik soru. Asla kitap çevirisi gibi '...herhangi bir sızıntı var mı?' değil; örn: 'Soğuk ilk marşta enjektör diplerinde mazot kokusu/terleme oluyor mu, pul veya rekorlar daha önce elden geçti mi?' gibi gerçek alıcı sorusu)",
+      "expectedAnswer": "string (Satıcının vermesi gereken güven verici, somut servis ve parça teyidi)"
     }
   ],
   "decisionSynthesis": {
@@ -2191,7 +2191,14 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       const exp = this.sanitizeTurkishAutomotiveText(fact.userExperience || '');
       const sym = this.sanitizeTurkishAutomotiveText(fact.symptoms?.[0] || '');
       const cleanReason = exp && exp.length >= 15 ? exp : (sym && sym.length >= 15 ? sym : `${cleanTitle} bileşeninde mekanik aşınma ve arıza riski.`);
-      const cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck || `${cleanTitle} kontrol edilmelidir.`);
+      let cleanInspect = this.sanitizeTurkishAutomotiveText(fact.inspectionCheck || fact.testDriveCheck || `${cleanTitle} kontrol edilmelidir.`);
+      if (/^gözle (muayene|kontrol) edin/i.test(cleanInspect.trim())) {
+        cleanInspect = cleanInspect.replace(/^gözle (muayene|kontrol) edin\s*(ve)?\s*/i, '');
+        cleanInspect = cleanInspect.charAt(0).toUpperCase() + cleanInspect.slice(1);
+      }
+      if (!/obd|diyagnostik|canlı veri|live data|basınç|manometre|test|ölçüm|tolerans|kaçak/i.test(cleanInspect)) {
+        cleanInspect = `${cleanInspect}. Yetkili/uzman ekspertizde OBD cihazı ile canlı parametre sapmaları loglanmalı ve fiziki kontrol uygulanmalıdır.`.replace(/\.\./g, '.');
+      }
 
       const domainKey =
         /elektronik|elektrik|şarj|akü|statör|konjektör/i.test(fact.system) ? 'ELECTRONICS_BODY' :
@@ -2438,21 +2445,42 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               }
               return true;
             })
-            .map((n: any) => ({
-              profile: this.sanitizeTurkishAutomotiveText(n.profile),
-              explanation: this.sanitizeTurkishAutomotiveText(n.explanation)
+            .map((n: any) => {
+              let prof = this.sanitizeTurkishAutomotiveText(n.profile);
+              let exp = this.sanitizeTurkishAutomotiveText(n.explanation)
                 .replace(/ve otomatik şanzımanın bakım gereksinimleri,?/gi, '')
                 .replace(/otomatik şanzımanın bakım gereksinimleri ve,?/gi, '')
-                .trim(),
-              supportingFactIds: [],
-            }));
+                .trim();
 
-          if (list.length === 0 && isAutomobile) {
-            list.push({
-              profile: 'Dar Şehir İçi Sokaklarında Kompakt Boyut Arayanlar',
-              explanation: 'Geniş gövde boyutları ve uzun aks mesafesi nedeniyle dar sokaklarda park etme ve kıvrak manevra yapma beklentisi olanlar için hatchback veya küçük sınıf araçlar daha pratik olabilir.',
-              supportingFactIds: [],
+              // Clean up contradictory profile names where a combi/family car is flagged as unsuitable for families
+              if (/^(büyük aileler|geniş aileler|aileler|aile kullanımı)$/i.test(prof.trim())) {
+                prof = 'Otoyol Hızlarında Yüksek Ses İzolasyonu ve Üst Segment Binek Konforu Bekleyenler';
+                if (/aile/i.test(exp) || exp.length < 30) {
+                  exp = 'Geniş kabin ve bagaj hacmine karşın, ticari gövde aerodinamiği sebebiyle yüksek otoyol hızlarında kabin içi rüzgar ve yol sesi seviyesi D/C segmenti binek otomobillerin gerisinde kalabilir.';
+                }
+              }
+
+              return {
+                profile: prof,
+                explanation: exp,
+                supportingFactIds: [],
+              };
             });
+
+          if (list.length === 0) {
+            if (isCombi || isCommercial) {
+              list.push({
+                profile: 'Otoyolda Üst Segment Sessizlik ve Binek Süspansiyon Konforu Arayanlar',
+                explanation: 'Yüksek tavan yapısı ve hafif ticari arka süspansiyon geometrisi sebebiyle 110 km/s üzeri otoyol seyrinde rüzgar sesi ve yüksüz arka aks esnemesi binek araçlara göre daha belirgindir.',
+                supportingFactIds: [],
+              });
+            } else if (isAutomobile) {
+              list.push({
+                profile: 'Dar Şehir İçi Sokaklarında Kompakt Boyut Arayanlar',
+                explanation: 'Geniş gövde boyutları ve uzun aks mesafesi nedeniyle dar sokaklarda park etme ve kıvrak manevra yapma beklentisi olanlar için hatchback veya küçük sınıf araçlar daha pratik olabilir.',
+                supportingFactIds: [],
+              });
+            }
           }
           return list;
         })(),
@@ -2670,35 +2698,51 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         },
         motorcycleEraAnalysis: isMotorcycle ? motorcycleEraAnalysis : undefined,
         commercialApplicationAnalysis: context.vehicleType === 'MINIVAN_PANELVAN'
-          ? {
-              applicationSummary: this.sanitizeTurkishAutomotiveText(
-                writer.configurationAnalysis ||
-                  `${context.brand} ${context.model} modelinin kargo ve bagaj yükleme pratikliği, operasyonel dayanıklılığı değerlendirilmiştir.`,
-              ),
-              verifiedPowers: judge.candidatePowers,
-              manualTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.manualTransmissionAnalysis),
-              automaticTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.automaticTransmissionAnalysis),
-              transmissionComparison: this.sanitizeTurkishAutomotiveText(writer.manualVsAutomatic),
-              commercialDutyRisks: (writer.commercialDutyRisks || []).map((r: any) => ({
-                title: this.sanitizeTurkishAutomotiveText(r.title),
-                risk: this.sanitizeTurkishAutomotiveText(r.risk),
-                checkRecommendation: this.sanitizeTurkishAutomotiveText(r.checkRecommendation),
-              })),
-              configurationContext: {
-                rawPackage: context.trimPackage || (isCombi ? 'Kombi' : 'Panelvan'),
-                cargoVolumeM3: judge.finalCargoVolumeM3 || (isCombi ? 0.7 : Number((trunkCapacityLiters / 1000).toFixed(1))),
-                commercialMeaning: this.sanitizeTurkishAutomotiveText(
-                  writer.configurationBadge ||
-                    context.trimPackage ||
-                    (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Yük Taşıma'),
+          ? (() => {
+              const hasVerifiedAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
+              return {
+                applicationSummary: this.sanitizeTurkishAutomotiveText(
+                  writer.configurationAnalysis ||
+                    `${context.brand} ${context.model} modelinin kargo ve bagaj yükleme pratikliği, operasyonel dayanıklılığı değerlendirilmiştir.`,
                 ),
-              },
-            }
+                verifiedPowers: judge.candidatePowers,
+                manualTransmissionAnalysis: this.sanitizeTurkishAutomotiveText(writer.manualTransmissionAnalysis),
+                automaticTransmissionAnalysis: hasVerifiedAuto ? this.sanitizeTurkishAutomotiveText(writer.automaticTransmissionAnalysis) : undefined,
+                transmissionComparison: hasVerifiedAuto ? this.sanitizeTurkishAutomotiveText(writer.manualVsAutomatic) : undefined,
+                commercialDutyRisks: (writer.commercialDutyRisks || []).map((r: any) => {
+                  let rec = this.sanitizeTurkishAutomotiveText(r.checkRecommendation);
+                  if (/^gözle (muayene|kontrol) edin/i.test(rec.trim())) {
+                    rec = rec.replace(/^gözle (muayene|kontrol) edin\s*(ve)?\s*/i, '');
+                    rec = rec.charAt(0).toUpperCase() + rec.slice(1);
+                  }
+                  return {
+                    title: this.sanitizeTurkishAutomotiveText(r.title),
+                    risk: this.sanitizeTurkishAutomotiveText(r.risk),
+                    checkRecommendation: rec,
+                  };
+                }),
+                configurationContext: {
+                  rawPackage: context.trimPackage || (isCombi ? 'Kombi' : 'Panelvan'),
+                  cargoVolumeM3: judge.finalCargoVolumeM3 || (isCombi ? 0.7 : Number((trunkCapacityLiters / 1000).toFixed(1))),
+                  commercialMeaning: this.sanitizeTurkishAutomotiveText(
+                    writer.configurationBadge ||
+                      context.trimPackage ||
+                      (isCombi ? 'Kombi / Camlı Van' : 'Panelvan / Yük Taşıma'),
+                  ),
+                },
+              };
+            })()
           : undefined,
       },
       sellerQuestions: (writer.sellerQuestions || []).map((q: any) => {
         let qText = this.sanitizeTurkishAutomotiveText(q.question);
         let ans = this.sanitizeTurkishAutomotiveText(q.expectedAnswer);
+
+        // Turn overly sterile/translated questions into natural, realistic vehicle buyer inquiries
+        qText = qText
+          .replace(/^motorun enjektör geri dönüş hattında herhangi bir sızıntı veya yakıt kokusu var mı\??$/i, 'Soğuk ilk marşta enjektör diplerinde mazot kokusu veya terleme hissediliyor mu, enjektör pulları ve rekorları daha önce elden geçti mi?')
+          .replace(/^aracın /i, '')
+          .trim();
 
         // Detect generic cliches in the question itself
         const isGenericQuestion =
