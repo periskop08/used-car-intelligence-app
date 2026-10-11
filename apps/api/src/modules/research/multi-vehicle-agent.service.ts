@@ -638,26 +638,64 @@ Extract strict JSON:
         ? 'DİKKAT: Ford 2.0 EcoBlue motorda yağ içinde çalışan ıslak triger kayışının (Belt-in-Oil / BIO) lif ayrışmasıyla karter yağ süzgecini tıkaması ve motor sarması en kritik arıza modudur.'
         : '';
 
+      const vehicleYear = typeof context.year === 'number' ? context.year : parseInt(String(context.year || '2015'), 10);
+      const isPreEuro5 = vehicleYear > 0 && vehicleYear < 2011;
+      const hasDpf = !isGasoline && !isPreEuro5;
+
+      const normBody = (context.bodyType || '').toLowerCase();
+      const normModel = (context.model || '').toLowerCase();
+      const normTrim = (context.trimPackage || '').toLowerCase();
+      const isCombi =
+        normBody.includes('combi') ||
+        normBody.includes('kombi') ||
+        normBody.includes('camlı') ||
+        normBody.includes('minivan') ||
+        normModel.includes('tourneo') ||
+        normModel.includes('combi') ||
+        normModel.includes('kombi') ||
+        normModel.includes('multispace') ||
+        normModel.includes('tepee') ||
+        normModel.includes('rifter') ||
+        normTrim.includes('combi') ||
+        normTrim.includes('kombi') ||
+        normTrim.includes('camlı') ||
+        normTrim.includes('deluxe') ||
+        normTrim.includes('glx') ||
+        normTrim.includes('titanium') ||
+        normTrim.includes('trend') ||
+        normTrim.includes('premio') ||
+        normTrim.includes('emotion') ||
+        normTrim.includes('elegance') ||
+        normTrim.includes('safeline') ||
+        normTrim.includes('silverline') ||
+        normTrim.includes('blackline');
+
+      const defaultCargoVolume = isCombi ? 0.7 : 3.2;
+
       const engineArchitectureRule = isGasoline
         ? 'Araç BENZİNLİ motordur: Termostat gövdesi, soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu incelenmelidir. DPF (dizel partikül filtresi) veya dizel EGR soğutucu kurum tıkanması KESİNLİKLE İDDİA EDİLEMEZ!'
-        : (wetBeltRule || 'Dizel motor: Enjektör geri dönüş hattı sızıntısı, turbo intercooler besleme hortumu yırtılması, DPF kurum doluluğu, EGR valfi ve soğutucu petek tıkanması.');
+        : isPreEuro5
+        ? `Araç ${vehicleYear} model EURO 4 dizel motordur: Bu araçta FABRİKASYON DPF (Dizel Partikül Filtresi) KESİNLİKLE BULUNMAZ! DPF arızası, DPF rejenerasyonu veya DPF kurum doluluğu KESİNLİKLE İDDİA EDİLEMEZ (puan kırılamaz). İnceleme; enjektör geri dönüş hattı sızıntısı, turbo intercooler besleme hortumu yırtılması, EGR valfi mekanik kurum tıkanması, alt kaset triger/zincir aşınması ve çift kütleli volan üzerine odaklanmalıdır.`
+        : (wetBeltRule || 'Euro 5/6 Dizel motor: Enjektör geri dönüş hattı sızıntısı, turbo intercooler besleme hortumu yırtılması, DPF kurum doluluğu, EGR valfi ve soğutucu petek tıkanması.');
+
+      const filterBlock = this.format8FilterBlock(context);
 
       systemPrompt = `You are TorqueScout Agent 1: Commercial Vehicle Application Technical Research Specialist.
-Investigate the exact vehicle platform based STRICTLY on the provided user filters (Brand: ${context.brand}, Model: ${context.model}, Year: ${context.year || 'Genel'}, Trim/Body: ${context.trimPackage || 'Standart'}, Engine: ${context.engine || `${baseCc} cc`}, Transmission: ${context.transmission || 'Belirtilmemiş'}).
+Investigate the exact vehicle platform based STRICTLY on the provided user filters:
+${filterBlock}
+
 CRITICAL RULES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE KURALI):
    ALL text, claim titles, symptoms, user experiences, test drive checks, inspection checks, and seller questions MUST BE 100% IN TURKISH automotive terminology. Zero English allowed!
 2. AUTHENTIC GEARBOX DISCOVERY:
    - Investigate if this exact vehicle year, engine, and trim configuration actually offered an automatic transmission option from the factory.
-3. Understand the exact body configuration from ${context.trimPackage || 'katalog verisi'}. Distinguish passenger Combi/Kombi vs Panelvan/Cargo.
+3. Understand the exact body configuration from ${context.trimPackage || 'katalog verisi'}. ${isCombi ? 'Bu araç 5 KİŞİLİK CAMLI KOMBİ versiyonudur (Tourneo / Combi). Bagaj hacmi binek/yolcu standartlarındadır (~650-700 Litre). ASLA 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!' : 'Bu araç PANELVAN kargo versiyonudur.'}
 4. Suspension architecture: Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
 5. Engine architecture: ${engineArchitectureRule}
 6. Output strict JSON only.`;
 
-      userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
-Engine: ${context.engine || `${baseCc} cc`}
-Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
-Configuration / Trim: ${context.trimPackage || 'Standart'}
+      userPrompt = `Commercial Vehicle Specification:
+${filterBlock}
 Base Catalog CC: ${baseCc}
 Base Catalog HP: ${baseHp}
 Live Web Evidence:
@@ -678,10 +716,10 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "displacementCc": ${baseCc},
     "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
     "exactPowerHp": number,
-    "emissionStandard": "Euro 5 veya Euro 6",
-    "hasDpf": ${!isGasoline},
+    "emissionStandard": "${isPreEuro5 ? 'Euro 4' : 'Euro 5 veya Euro 6'}",
+    "hasDpf": ${hasDpf},
     "hasEgr": true,
-    "hasAdBlue": ${!isGasoline && Boolean(context.year && context.year >= 2016)},
+    "hasAdBlue": ${!isGasoline && vehicleYear >= 2016},
     "manualGearboxVerified": true,
     "manualGearboxType": "string",
     "manualGearboxSpeeds": 5,
@@ -691,7 +729,7 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "configurationContext": {
       "rawSourceLabel": "${context.trimPackage || 'Standart'}",
       "commercialMeaning": "string",
-      "cargoVolumeM3": 3.4
+      "cargoVolumeM3": ${defaultCargoVolume}
     }
   },
   "commercialDutyRisks": [
@@ -874,6 +912,8 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
         // MINIVAN & PANELVAN COMMERCIAL RECOVERY
         this.logger.log(`[AGENT 1 RECOVERY] Extracting model-specific commercial failure modes for ${context.brand} ${context.model}...`);
         const normEngine = (context.engine || '').toLowerCase();
+        const vehicleYear = typeof context.year === 'number' ? context.year : parseInt(String(context.year || '2015'), 10);
+        const isPreEuro5 = vehicleYear > 0 && vehicleYear < 2011;
         const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
         const isWetBelt = normEngine.includes('ecoblue') || (context.brand.toLowerCase() === 'ford' && context.engine?.includes('2.0'));
         const timingRule = isWetBelt
@@ -881,6 +921,8 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
           : '';
         const fuelRule = isGasoline
           ? 'Fuel Type is BENZİN (Gasoline Engine). Focus on gasoline-specific failure modes (termostat kütüğü ve soğutma sıvısı sızıntıları, ateşleme bobinleri/bujiler, turbo wastegate aktüatör boşluğu, yağ kütüğü sızıntısı). KESİNLİKLE dizel partikül filtresi (DPF), AdBlue veya dizel EGR soğutucu kurum tıkanması iddia edilemez!'
+          : isPreEuro5
+          ? `Fuel Type is EURO 4 DİZEL (${vehicleYear} model - NO DPF / FABRİKASYON DPF YOKTUR). Bu araçta fabrikasyon DPF (Dizel Partikül Filtresi) kesinlikle bulunmaz! DPF kurum doluluğu, DPF tıkanması veya DPF arıza lambası KESİNLİKLE İDDİA EDİLEMEZ (puan kırılamaz). Arızalar: Enjektör geri dönüş hattı sızıntıları, turboşarj intercooler basınç hortumu yırtılması, EGR valfi mekanik kurum tıkanması, alt kaset triger/zincir aşınması ve çift kütleli volan olmalıdır.`
           : 'Fuel Type is DİZEL (Diesel Engine). Focus on authentic diesel failure modes (enjektör geri dönüş hattı sızıntıları, turboşarj intercooler basınç hortumu yırtılması, DPF kurum doluluğu, EGR valfi ve soğutucusu).';
 
         const recoverySystemPrompt = `You are a Master Commercial Fleet Diagnostic Specialist.
@@ -990,6 +1032,7 @@ CRITICAL DIRECTIVES:
    - If the vehicle is fuel-injected (EFI) or modern post-2015, CONTRADICT any claims mentioning carburetor ("karbüratör", "karbüratör diyaframı", "karbüratör temizliği"). It uses electronic fuel injection (EFI), so fuel issues must target injectors, fuel pump pressure, or throttle body/TPS.
    - If the vehicle is a classic vintage carburetor model, contradict any EFI claims.
    - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
+   - If the vehicle is a PRE-2011 EURO 4 DIESEL (e.g. 2008 Ford Tourneo Connect 1.8 TDCi, 2006 Fiat Doblo 1.3 Multijet Euro 4), it DOES NOT HAVE A FACTORY DPF (Dizel Partikül Filtresi)! Immediately CONTRADICT any claim about DPF ("DPF kurum doluluğu", "partikül filtresi", "DPF rejenerasyonu", "DPF arıza ışığı") with stance: "CONTRADICT" and reason: "${context.year || ''} model Euro 4 dizel araçlarda fabrikasyon DPF bulunmaz; arıza geçersizdir."
    - If the vehicle uses a DİZEL (Diesel) engine, contradict gasoline ignition coil/spark plug claims.
 3. BRAKING & CHASSIS ACCURACY:
    - If the vehicle has drum brakes (Ön Disk Arka Kampana), contradict any ABS claims.
@@ -1112,7 +1155,26 @@ Perform adversarial red-team audit. Output strict JSON.`;
     const adjudicatedFacts: AdjudicatedFact[] = [];
     const approvedFactsOnly: CandidateClaim[] = [];
 
+    const vehicleYear = typeof context.year === 'number' ? context.year : parseInt(String(context.year || '2015'), 10);
+    const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || (context.engine || '').toLowerCase().includes('puretech') || (context.engine || '').toLowerCase().includes('tsi');
+    const isPreEuro5 = vehicleYear > 0 && vehicleYear < 2011;
+
     for (const claim of agent1.claims) {
+      const claimTitle = (claim.title || '').toLowerCase();
+      const claimDesc = `${claimTitle} ${(claim.symptoms || []).join(' ')} ${claim.userExperience || ''}`.toLowerCase();
+      const isDpfClaim = claimDesc.includes('dpf') || claimDesc.includes('partikül filtresi') || claimDesc.includes('dizel partikül');
+
+      if (isDpfClaim && (isGasoline || isPreEuro5)) {
+        adjudicatedFacts.push({
+          claim,
+          status: 'REJECTED',
+          adjudicationReason: isGasoline
+            ? 'Benzinli araçlarda dizel partikül filtresi (DPF) bulunmaz.'
+            : `${vehicleYear} model Euro 4 dizel araçlarda fabrikasyon DPF (Dizel Partikül Filtresi) bulunmamaktadır; DPF arızası iddia edilemez.`,
+        });
+        continue;
+      }
+
       const challenge = challengeMap.get(claim.claimId);
 
       if (!challenge) {
@@ -1634,17 +1696,44 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
       const autoName = isAutoVerified ? activeTransmissionName : (judge.commercialDetails?.automaticGearboxType || 'Tam Otomatik');
       const manualName = !isAutoVerified ? activeTransmissionName : (judge.commercialDetails?.manualGearboxType || 'Manuel');
 
+      const cleanTrim = (context.trimPackage || '').trim();
+      const fullVehicleName = `${context.year ? `${context.year} ` : ''}${context.brand} ${context.model}${cleanTrim ? ` ${cleanTrim}` : ''}`.trim();
+
+      const normBody = (context.bodyType || '').toLowerCase();
       const isCombi =
-        (context.trimPackage || '').toLowerCase().includes('combi') ||
-        (context.trimPackage || '').toLowerCase().includes('kombi') ||
-        (context.model || '').toLowerCase().includes('combi');
-      const defaultLiters = isCombi ? 675 : 3400;
+        normBody.includes('combi') ||
+        normBody.includes('kombi') ||
+        normBody.includes('camlı') ||
+        normBody.includes('minivan') ||
+        normBody.includes('binek') ||
+        normModel.includes('tourneo') ||
+        normModel.includes('combi') ||
+        normModel.includes('kombi') ||
+        normModel.includes('multispace') ||
+        normModel.includes('tepee') ||
+        normModel.includes('rifter') ||
+        normModel.includes('caddy') ||
+        normTrim.includes('combi') ||
+        normTrim.includes('kombi') ||
+        normTrim.includes('camlı') ||
+        normTrim.includes('deluxe') ||
+        normTrim.includes('glx') ||
+        normTrim.includes('titanium') ||
+        normTrim.includes('trend') ||
+        normTrim.includes('premio') ||
+        normTrim.includes('emotion') ||
+        normTrim.includes('elegance') ||
+        normTrim.includes('safeline') ||
+        normTrim.includes('silverline') ||
+        normTrim.includes('blackline') ||
+        normTrim.includes('multispace');
+      const defaultLiters = isCombi ? 675 : 3200;
       const defaultWeight = isCombi ? 1420 : 1600;
 
-      userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
+      userPrompt = `Commercial Vehicle: ${fullVehicleName}
 Engine: ${context.engine || `${judge.finalDisplacementCc} cc`}
 Fuel: ${isGasoline ? 'Benzin' : (context.fuel || 'Dizel')}
-Configuration: ${context.trimPackage || 'Standart Kasa'}
+Configuration: ${context.trimPackage || (isCombi ? 'Kombi / Camlı Van' : 'Standart Kasa')}
 Transmission Architecture:
 - Manuel Şanzıman: ${manualName}
 - Otomatik Şanzıman Durumu: ${isAutoVerified ? `MEVCUT (${autoName})` : 'OPSİYON YOK (YALNIZCA MANUEL ÜRETİLMİŞTİR)'}
@@ -1658,8 +1747,8 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
-  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; 5 kişilik camlı binek/kombi versiyonlarda bagaj hacmi (${defaultLiters} Litre) ve binek/esnaf kullanım ergonomisi anlatılacaktır.)",
+  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; ${isCombi ? `5 kişilik camlı binek/kombi (${cleanTrim || 'Kombi'}) versiyonunda arka koltuk arkası bagaj hacmi (${defaultLiters} Litre) ve aile/esnaf kullanım ergonomisi anlatılacaktır. KESİNLİKLE 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!` : `Panelvan versiyonunda ${defaultLiters} Litre kargo hacmi ve yükleme pratikliği anlatılacaktır.`})",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
   "manualVsAutomatic": "string (${isAutoVerified ? `Manuel (${manualName}) ve otomatik (${autoName}) seçeneklerin filo operasyonları, yakıt tüketimi, şehir içi dur-kalk konforu ve ağır ticari yıpranma açısından profesyonel karşılaştırması.` : `Manuel şanzımanın (${manualName}) ticari filo operasyonları, bakım kolaylığı ve yakıt verimliliği odaklı özgün değerlendirmesi.`})",
@@ -1702,16 +1791,20 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     { "profile": "string", "explanation": "string (Önemli: 5 kişilik kombi ve camlı binek tiplerinde KESİNLİKLE 'Büyük aileler için uygun değildir' veya 'Aile kullanımına uygun değildir' YAZILAMAZ! Bunun yerine otoyolda sessizlik ve üst segment binek konforu arayanlar, ağır tonajlı kargo taşımacılığı yapanlar gibi gerçek uyumsuz kitleleri yaz.)" }
   ],
   "conditionsToConsider": [
-    { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
+    { "condition": "string (Mutlaka '...sağlamlığının ekspertiz testiyle teyit edilmesi şartıyla' veya '...kaçak bulunmadığının teyit edilmesi şartıyla' şeklinde somut mekanik şart cümlesi olmalıdır. Asla sadece arıza adını başlık olarak yazma!)", "reason": "string" }
   ],
   "walkAwayConditions": [
-    { "condition": "string (Kritik vazgeçme nedeni)", "reason": "string" }
+    { "condition": "string (Kritik vazgeçme nedeni - ağır motor mekanik hasarı veya çözülemeyen krank vuruntusu)", "reason": "string" }
   ],
   "inspectionChecklist": [
     { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
   ],
   "sellerQuestions": [
-    { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
+    {
+      "topic": "string",
+      "question": "string (Modelin spesifik motor, turbo, yakıt sistemi, şanzıman veya yürüyen aksamına yönelik DERİN TEKNİK SORU. KESİNLİKLE 'Motorun genel durumu nedir?', 'Araçta sorun var mı?', 'Bakımları yapıldı mı?' gibi genel ve klişe sorular YAZILAMAZ!)",
+      "expectedAnswer": "string (Yetkili veya uzman servisteki somut kontrolü ve parça değişim durumunu belirten teknik ve tatmin edici yanıt)"
+    }
   ],
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
@@ -1882,10 +1975,34 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const speedMatch = canonicalTransmission.match(/(\d+)\s*İleri/i);
     const canonicalSpeeds = speedMatch ? parseInt(speedMatch[1], 10) : canonicalTransmission.toLowerCase().includes('cvt') ? 1 : 6;
 
+    const normBody = (context.bodyType || '').toLowerCase();
     const isCombi =
-      (context.trimPackage || '').toLowerCase().includes('combi') ||
-      (context.trimPackage || '').toLowerCase().includes('kombi') ||
-      (context.bodyType || '').toLowerCase().includes('combi');
+      normBody.includes('combi') ||
+      normBody.includes('kombi') ||
+      normBody.includes('camlı') ||
+      normBody.includes('minivan') ||
+      normBody.includes('binek') ||
+      normModel.includes('tourneo') ||
+      normModel.includes('combi') ||
+      normModel.includes('kombi') ||
+      normModel.includes('multispace') ||
+      normModel.includes('tepee') ||
+      normModel.includes('rifter') ||
+      normModel.includes('caddy') ||
+      normTrim.includes('combi') ||
+      normTrim.includes('kombi') ||
+      normTrim.includes('camlı') ||
+      normTrim.includes('deluxe') ||
+      normTrim.includes('glx') ||
+      normTrim.includes('titanium') ||
+      normTrim.includes('trend') ||
+      normTrim.includes('premio') ||
+      normTrim.includes('emotion') ||
+      normTrim.includes('elegance') ||
+      normTrim.includes('safeline') ||
+      normTrim.includes('silverline') ||
+      normTrim.includes('blackline') ||
+      normTrim.includes('multispace');
 
     // Physical Specs Gating (Zero-Null Guarantee)
     const baseHp = judge.finalPowerHp;
@@ -1921,9 +2038,10 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
     const trunkCapacityLiters =
       typeof writer.technicalSpecifications?.trunkCapacityLiters === 'number' &&
-      writer.technicalSpecifications.trunkCapacityLiters > 0
+      writer.technicalSpecifications.trunkCapacityLiters > 0 &&
+      (!isCombi || writer.technicalSpecifications.trunkCapacityLiters <= 1200)
         ? writer.technicalSpecifications.trunkCapacityLiters
-        : isMotorcycle ? 0 : isSuvPickup ? 550 : 480;
+        : isMotorcycle ? 0 : isCombi ? 675 : isSuvPickup ? 550 : isCommercial ? 3200 : 480;
 
     const curbWeightKg =
       typeof writer.technicalSpecifications?.curbWeightKg === 'number' &&
@@ -2208,36 +2326,61 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               const cText = `${c.condition} ${c.reason}`.toLowerCase();
               return !cText.includes('yüksek yakıt') && !cText.includes('yakıt tüketimi art');
             })
-            .map((c: any) => ({
-              condition: this.sanitizeTurkishAutomotiveText(c.condition),
-              reason: this.sanitizeTurkishAutomotiveText(c.reason),
-              priority: 'IMPORTANT' as const,
-              supportingFactIds: [],
-            }));
+            .map((c: any) => {
+              let cond = this.sanitizeTurkishAutomotiveText(c.condition);
+              const reason = this.sanitizeTurkishAutomotiveText(c.reason);
+              if (!/şartıyla|koşuluyla|kaydıyla|teyit edilmesi|sağlanması/i.test(cond)) {
+                cond = cond.replace(/\s*(bulunması|arızası|sızıntısı|yırtılması|aşınması|tıkanması|doluluğu)$/i, '');
+                cond = `${cond} arızası veya kaçağı bulunmadığının ekspertiz testiyle teyit edilmesi şartıyla`;
+              }
+              return {
+                condition: cond,
+                reason,
+                priority: 'IMPORTANT' as const,
+                supportingFactIds: [],
+              };
+            });
 
           const hasCarbEra = (motorcycleEraAnalysis?.productionEras || judge.motorcycleEras || []).some(
             (e: any) => e.fuelSystem === 'CARBURETOR',
           );
 
-          if (conds.length === 0 && isMotorcycle) {
-            conds = [
-              {
-                condition: hasCarbEra
-                  ? 'Karbüratör hava-yakıt ayarının rölantide stop etmemesi ve soğuk marşta jigle mekanizmasının düzgün çalışması şartıyla'
-                  : 'Soğuk ilk marşta eksantrik zincir sesi ve motor bloğundan şıkırtı gelmediğinin teyit edilmesi şartıyla',
-                reason: hasCarbEra
-                  ? 'Karbüratör diyafram ve manifold hava kaçaklarını önceden tespit etmek için zorunludur.'
-                  : 'Eksantrik zincir gergisi veya subap aşınmalarını önceden tespit etmek için zorunludur.',
-                priority: 'IMPORTANT' as const,
-                supportingFactIds: [],
-              },
-              {
-                condition: 'Statör ve şarj konjektörünün akü kutup başlarında en az 13.8V şarj ürettiğinin teyit edilmesi şartıyla',
-                reason: 'Akü boşalma ve elektrik tesisatında yolda kalma riskini önlemek için gereklidir.',
-                priority: 'IMPORTANT' as const,
-                supportingFactIds: [],
-              },
-            ];
+          if (conds.length === 0) {
+            if (isMotorcycle) {
+              conds = [
+                {
+                  condition: hasCarbEra
+                    ? 'Karbüratör hava-yakıt ayarının rölantide stop etmemesi ve soğuk marşta jigle mekanizmasının düzgün çalışması şartıyla'
+                    : 'Soğuk ilk marşta eksantrik zincir sesi ve motor bloğundan şıkırtı gelmediğinin teyit edilmesi şartıyla',
+                  reason: hasCarbEra
+                    ? 'Karbüratör diyafram ve manifold hava kaçaklarını önceden tespit etmek için zorunludur.'
+                    : 'Eksantrik zincir gergisi veya subap aşınmalarını önceden tespit etmek için zorunludur.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+                {
+                  condition: 'Statör ve şarj konjektörünün akü kutup başlarında en az 13.8V şarj ürettiğinin teyit edilmesi şartıyla',
+                  reason: 'Akü boşalma ve elektrik tesisatında yolda kalma riskini önlemek için gereklidir.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            } else if (isCommercial) {
+              conds = [
+                {
+                  condition: 'Intercooler basınç hortumunda yağ sızıntısı ve yırtık bulunmadığının ekspertizde teyit edilmesi şartıyla',
+                  reason: 'Basınç kaybı çekiş düşüklüğüne ve yüksek yakıt sarfiyatına yol açar.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+                {
+                  condition: 'Enjektör geri dönüş hatlarında mazot kaçağı bulunmadığının ve alt kaset triger/zincir grubunun kontrol edilmesi şartıyla',
+                  reason: 'Sızıntı yangın ve yanma dengesizliği riski taşır; triger kaset aşınması motor hasarına yol açabilir.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            }
           }
           return conds;
         })(),
@@ -2312,7 +2455,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               })),
               configurationContext: {
                 rawPackage: context.trimPackage || (isCombi ? 'Kombi' : 'Panelvan'),
-                cargoVolumeM3: Number((trunkCapacityLiters / 1000).toFixed(1)),
+                cargoVolumeM3: isCombi ? 0.7 : Number((trunkCapacityLiters / 1000).toFixed(1)),
                 commercialMeaning: this.sanitizeTurkishAutomotiveText(
                   writer.configurationBadge ||
                     context.trimPackage ||
@@ -2323,8 +2466,29 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           : undefined,
       },
       sellerQuestions: (writer.sellerQuestions || []).map((q: any) => {
-        const qText = this.sanitizeTurkishAutomotiveText(q.question);
+        let qText = this.sanitizeTurkishAutomotiveText(q.question);
         let ans = this.sanitizeTurkishAutomotiveText(q.expectedAnswer);
+
+        // Detect generic cliches in the question itself
+        const isGenericQuestion =
+          !qText ||
+          /^(motorun genel durumu nedir|aracın genel durumu nedir|araçta bir sorun var mı|herhangi bir sorunu var mı|araç nasıl|bakımları yapıldı mı)\??$/i.test(qText.trim()) ||
+          /genel durumu nedir\??$/i.test(qText.trim()) ||
+          /sorun var m[ıi]\??$/i.test(qText.trim());
+
+        if (isGenericQuestion) {
+          if (isCommercial) {
+            qText = 'Alt kaset triger/zincir grubu, enjektör geri dönüş hatları ve intercooler basınç hortumu en son ne zaman kontrol edildi veya yenilendi?';
+            ans = 'Yetkili veya uzman serviste periyodik bakımı yapıldı; kaset triger zinciri ve gergi grubu kontrol edildi, intercooler basınç hortumunda ve enjektör diplerinde herhangi bir kaçak veya yağ terlemesi bulunmuyor.';
+          } else if (isAutomobile) {
+            qText = 'Motor triger/zincir seti, devirdaim ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
+            ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve soğutma grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
+          } else {
+            qText = 'Eksantrik zincir gergisi, subap ayarları ve şarj konjektörü stabil çalışıyor mu, soğuk çalıştırmada şıkırtı var mı?';
+            ans = 'Soğuk ve sıcak marşta zincir şıkırtısı veya ses yoktur; şarj sistemi ve akü voltajı ideal fabrika değerindedir.';
+          }
+        }
+
         const isGenericAns =
           !ans ||
           /^(evet|hay\u0131r|evet\/hay\u0131r)$/i.test(ans.trim()) ||
@@ -2335,23 +2499,25 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         if (isGenericAns) {
           if (/klima|so\u011futma|iklimlendirme|kompres\u00f6r/i.test(qText)) {
             ans = 'Klima kompres\u00f6r\u00fc ve evaporat\u00f6r gaz bas\u0131nc\u0131 test edildi; \u00e7ift b\u00f6lgeli so\u011futma kanallar\u0131 ve klape motorlar\u0131 kusursuz \u00e7al\u0131\u015f\u0131yor.';
-          } else if (/zincir|gergi|triger|ya\u011f t\u00fcketim|eksiltme/i.test(qText)) {
-            ans = 'Yetkili servis periyodik bak\u0131mlar\u0131nda \u00fcretici onayl\u0131 ya\u011f kullan\u0131ld\u0131; 10.000 km aral\u0131kta belirgin bir ya\u011f eksiltme ve so\u011fuk \u00e7al\u0131\u015ft\u0131rmada zincir \u015fak\u0131rt\u0131s\u0131 bulunmuyor.';
+          } else if (/zincir|gergi|triger|ya\u011f t\u00fcketim|eksiltme|kaset/i.test(qText)) {
+            ans = 'Yetkili servis periyodik bak\u0131mlar\u0131nda \u00fcretici onayl\u0131 ya\u011f kullan\u0131ld\u0131; zincir/kaset \u015fak\u0131rt\u0131s\u0131 bulunmuyor, bak\u0131m aral\u0131\u011f\u0131 d\u00fczenli.';
+          } else if (/intercooler|hortum|bas\u0131n\u00e7|turbo/i.test(qText)) {
+            ans = 'Turbo bas\u0131n\u00e7 testi yap\u0131ld\u0131, intercooler borular\u0131nda y\u0131rt\u0131k veya ya\u011f terlemesi yoktur; bas\u0131n\u00e7 de\u011ferleri nominal.';
           } else if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|\u015farj/i.test(qText)) {
             ans = 'Yetkili veya uzman serviste orijinal par\u00e7ayla yenilendi; r\u00f6lantide ve y\u00fcksek devirde ak\u00fc \u015farj voltaj\u0131 14V \u00fczerinde stabil.';
-          } else if (/pompa|enjeksiyon|yak\u0131t|benzin/i.test(qText)) {
-            ans = 'Depo i\u00e7i yak\u0131t pompas\u0131 ve filtreleri temizlendi, hat bas\u0131nc\u0131 fabrika tolerans\u0131nda.';
-          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal|kavrama|tork konvert/i.test(qText)) {
+          } else if (/pompa|enjeksiyon|yak\u0131t|benzin|enjekt[oö]r/i.test(qText)) {
+            ans = 'Enjekt\u00f6r geri d\u00f6n\u00fc\u015f debileri ve p\u00fcsk\u00fcrtme de\u011ferleri test edildi; mazot ka\u00e7a\u011f\u0131 veya geri d\u00f6n\u00fc\u015f s\u0131z\u0131nt\u0131s\u0131 yoktur.';
+          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal|kavrama|tork konvert|volan/i.test(qText)) {
             ans = 'Vites ge\u00e7i\u015flerinde herhangi bir sertlik, vuruntu, kayd\u0131rma veya gecikme ya\u015fanm\u0131yor; mekanik ve kavrama sa\u011fl\u0131\u011f\u0131 tam.';
           } else {
             ans = 'Periyodik bak\u0131mlar\u0131 zaman\u0131nda yetkili serviste fatural\u0131 ve kay\u0131tl\u0131 olarak yap\u0131ld\u0131, t\u00fcm fonksiyonlar eksiksiz \u00e7al\u0131\u015f\u0131yor.';
           }
         }
         return {
-          category: 'TEKN\u0130K_VE_BAKIM',
+          category: 'TEKNİK_VE_BAKIM',
           questionText: qText,
           expectedAnswerHint: ans,
-          redFlagAnswerHint: 'Belirsiz veya ka\u00e7amak cevaplar ("bilmiyorum", "hi\u00e7 bakt\u0131rmad\u0131m")',
+          redFlagAnswerHint: 'Belirsiz veya kaçamak cevaplar ("bilmiyorum", "hiç baktırmadım")',
         };
       }),
       inspectionChecklist: (writer.inspectionChecklist || []).map((c: any) => ({
