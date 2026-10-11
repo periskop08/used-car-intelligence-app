@@ -259,6 +259,14 @@ CRITICAL RULES:
 1. Turkish market BMW models (e.g. 520i G30, 320i) have 1598 cc (B48B16), while global has 1998 cc.
 2. Provide exact factory metrics, never rough rounding.
 3. STRICT YEAR & EMISSION ERA RESPECT: Different model years often have different power outputs (e.g. pre-facelift Euro 5 vs facelift Euro 6). For instance, 2010-2015 Fiat Doblo 1.6 Multijet is 105 HP (Euro 5), while 2016+ is 120 HP (Euro 6). Always return the EXACT factory power for the specified YEAR.
+4. MODEL-SPECIFIC POWERTRAIN TRUTH & ZERO CROSS-SEGMENT CONFUSION:
+   - Ford Tourneo Courier / Transit Courier:
+     * 1.5 TDCi / EcoBlue engines in Courier are ONLY 75 HP (55 kW) for Trend / Deluxe / Delux trims, and 100 HP (74 kW) for Titanium / Titanium Plus / Black Line.
+     * 1.6 TDCi (pre-2018) is 75 HP or 95 HP.
+     * 1.0 EcoBoost is 100 HP.
+     * 120 HP NEVER EXISTED on Courier! (120 HP 1.5 EcoBlue belongs to Focus / Kuga / Connect). DO NOT hallucinate 120 HP on Courier!
+   - If the model is Tourneo Courier or Transit Courier and trim is Delux, Deluxe, or Trend, powerHp MUST be 75 HP (candidatePowers: [75, 100]).
+5. TRIM POWER RESOLUTION: If the user provides a specific trim (e.g. Delux, Trend vs Titanium), 'powerHp' MUST be the exact power of that trim, and 'candidatePowers' should list all genuine power options for that engine.
 Output ONLY valid JSON:
 {
   "displacementCc": number,

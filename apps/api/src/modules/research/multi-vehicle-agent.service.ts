@@ -121,6 +121,9 @@ export interface Agent2Output {
   transmissionRefutedReason?: string;
   gearboxSpeedRefuted?: boolean;
   gearboxSpeedRefutedReason?: string;
+  powerRefuted?: boolean;
+  powerRefutedReason?: string;
+  correctedPowerHp?: number;
   powerDiscrepancies?: string[];
 }
 
@@ -430,6 +433,7 @@ export class MultiVehicleAgentService {
           ? `${context.brand} ${context.model} 2.0 ecoblue yağ içinde çalışan triger kayışı yağ süzgeci tıkanması arızası`
           : `${context.brand} ${context.model} ${context.year || ''} kronik sorunlar kullanıcı şikayetleri`;
         searchTerms = [
+          `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} ${context.trimPackage || ''} motor gücü beygir hp teknik özellikleri katalog`,
           `${context.brand} ${context.model} ${context.year || ''} ${context.trimPackage || ''} ticari kullanım ağır yük aşınma`,
           commModelSearch,
           `${context.brand} ${context.model} ${context.year || ''} sürgülü kapı kilit mekanizması süspansiyon burç arızaları`,
@@ -581,7 +585,14 @@ CRITICAL RULES:
 4. Suspension architecture: Authentically research whether this model uses independent/helezon springs or parabolic leaf springs (makas). Do not invent leaf springs for vehicles with coil springs (e.g. Doblo Bi-Link, Transporter, Vito).
 5. Engine architecture: ${engineArchitectureRule}
 6. Extract cargo sliding door roller wear, commercial clutch / dual-mass flywheel wear, turbo boost hose leaks or coolant leaks.
-7. Output strict JSON only.`;
+7. AUTHENTIC ENGINE POWER & TRIM RESOLUTION (SIFIR BEYGİR HALÜSİNASYONU):
+   - Cross-check Live Web Evidence and candidate powers against the specific TRIM (${context.trimPackage || 'Genel'}).
+   - For Ford Tourneo Courier / Transit Courier:
+     * 1.5 TDCi is ONLY 75 HP (55 kW) for Trend / Deluxe / Delux trims, and 100 HP (74 kW) for Titanium / Titanium Plus / Black Line.
+     * 120 HP NEVER EXISTED on Courier! (120 HP 1.5 EcoBlue is only on Focus/Connect).
+     * If the trim is Delux, Deluxe, or Trend, output "powerHp": 75!
+   - Ensure "powerHp" matches the genuine catalog horsepower for the user-selected trim.
+8. Output strict JSON only.`;
 
       userPrompt = `Commercial Vehicle: ${context.brand} ${context.model} ${context.year || ''}
 Engine: ${context.engine || `${baseCc} cc`}
@@ -595,7 +606,7 @@ ${liveWebSnippets}
 Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR):
 {
   "displacementCc": ${baseCc},
-  "powerHp": ${baseHp},
+  "powerHp": number (Doğrulanmış fabrika motor gücü HP - Delux/Trend için 75 HP),
   "powerRangeText": "${powerRangeText || `${baseHp} HP`}",
   "candidatePowers": ${JSON.stringify(candidatePowers)},
   "commercialDetails": {
@@ -604,7 +615,7 @@ Extract strict JSON (SIFIR İNGİLİZCE - TÜM METİNLER %100 TÜRKÇE OLMALIDIR
     "engineFamily": "string (resmi motor ailesi/kodu)",
     "displacementCc": ${baseCc},
     "verifiedPowerOptions": ${JSON.stringify(candidatePowers)},
-    "exactPowerHp": ${baseHp},
+    "exactPowerHp": number,
     "emissionStandard": "Euro 5 veya Euro 6",
     "hasDpf": ${!isGasoline},
     "hasEgr": true,
@@ -915,9 +926,18 @@ CRITICAL RULES:
    - If the vehicle's filters, trim, or official catalog indicate an automatic transmission (çift kavrama, tork konvertörlü, CVT, DSG, EAT, vb.), NEVER contradict or refute its automatic transmission!
    - Only if a vehicle was strictly manual-only from the factory across all trims and options for that exact year, flag transmissionRefuted: true.
    - Audit manual gearbox speed count (5-speed vs 6-speed) against official manufacturer catalog for the exact model year and engine.
-4. ZERO COMPETITOR COMPARISONS:
+4. ENGINE DISPLACEMENT & HORSEPOWER AUDIT (SIFIR BEYGİR HALÜSİNASYONU):
+   - Audit claimed engine displacement (${agent1.displacementCc} cc) and power (${agent1.powerHp} HP) against the official manufacturer catalog for this model, year, and TRIM (${context.trimPackage || 'Genel'}).
+   - For multi-tier engines (e.g. Ford Tourneo / Transit Courier 1.5 TDCi):
+     * Trend and Deluxe / Delux trims are strictly 75 HP (55 kW).
+     * Titanium, Titanium Plus, Black Line trims are 100 HP (74 kW).
+     * 120 HP NEVER EXISTED on Courier! (120 HP belongs to Focus/Connect).
+     * If Agent 1 claimed 120 HP on a Courier or an incorrect power for the trim:
+       Set "powerRefuted": true, "correctedPowerHp": 75 (or authentic power for that trim), and explain in "powerRefutedReason".
+   - If Agent 1's power matches genuine factory catalog metrics for this trim, set "powerRefuted": false.
+5. ZERO COMPETITOR COMPARISONS:
    - Flag any competitor brand or model comparisons for immediate deletion.
-5. SIFIR KALIP / SIFIR ÇAPRAZ ARAÇ BULAŞMASI:
+6. SIFIR KALIP / SIFIR ÇAPRAZ ARAÇ BULAŞMASI:
    - Değerlendirmeyi YALNIZCA sağlanan filtrelere göre yap. Asla başka model, başka motor veya başka model yılından kalıp aktarma!
 Output STRICT JSON:
 {
@@ -933,11 +953,19 @@ Output STRICT JSON:
   "transmissionRefutedReason": string,
   "gearboxSpeedRefuted": boolean,
   "gearboxSpeedRefutedReason": string,
+  "powerRefuted": boolean,
+  "powerRefutedReason": string,
+  "correctedPowerHp": number,
   "powerDiscrepancies": string[]
 }`;
 
     const userPrompt = `Vehicle: ${context.brand} ${context.model} (${context.vehicleType})
 Context: Year=${context.year || 'ALL'}, Engine=${context.engine || ''}, Transmission=${context.transmission || ''}, Trim=${context.trimPackage || ''}
+Claimed Engine & Power by Agent 1:
+- Displacement: ${agent1.displacementCc} cc
+- Power: ${agent1.powerHp} HP
+- Candidate Powers: ${JSON.stringify(agent1.candidatePowers || [])}
+- Selected Trim: ${context.trimPackage || 'Genel'}
 ${agent1.commercialDetails ? `Commercial Details Claimed by Agent 1:\n${JSON.stringify(agent1.commercialDetails, null, 2)}` : ''}
 Motorcycle Eras:
 ${JSON.stringify(agent1.motorcycleEras || [], null, 2)}
@@ -976,6 +1004,9 @@ Perform adversarial red-team audit. Output strict JSON.`;
       transmissionRefutedReason: parsed?.transmissionRefutedReason,
       gearboxSpeedRefuted: Boolean(parsed?.gearboxSpeedRefuted),
       gearboxSpeedRefutedReason: parsed?.gearboxSpeedRefutedReason,
+      powerRefuted: Boolean(parsed?.powerRefuted),
+      powerRefutedReason: parsed?.powerRefutedReason,
+      correctedPowerHp: typeof parsed?.correctedPowerHp === 'number' && parsed.correctedPowerHp > 0 ? parsed.correctedPowerHp : undefined,
       powerDiscrepancies: Array.isArray(parsed?.powerDiscrepancies) ? parsed.powerDiscrepancies : [],
     };
   }
@@ -1065,6 +1096,24 @@ Perform adversarial red-team audit. Output strict JSON.`;
       }
     }
 
+    let finalPowerHp = agent1.powerHp;
+    let finalPowerRangeText = agent1.powerRangeText;
+    let candidatePowers = agent1.candidatePowers || [agent1.powerHp];
+
+    if (agent2.powerRefuted && agent2.correctedPowerHp && agent2.correctedPowerHp > 0) {
+      this.logger.warn(
+        `[AGENT 3 ADJUDICATION] Overriding refuted power (${agent1.powerHp} HP -> ${agent2.correctedPowerHp} HP): ${agent2.powerRefutedReason}`,
+      );
+      finalPowerHp = agent2.correctedPowerHp;
+      finalPowerRangeText = `${finalPowerHp} HP`;
+      if (!candidatePowers.includes(finalPowerHp)) {
+        candidatePowers = [finalPowerHp, ...candidatePowers];
+      }
+      if (agent1.commercialDetails) {
+        agent1.commercialDetails.exactPowerHp = finalPowerHp;
+      }
+    }
+
     const highSeverityCount = approvedFactsOnly.filter((c) => c.severity === 'HIGH' || c.severity === 'CRITICAL').length;
     const moderateCount = approvedFactsOnly.filter((c) => c.severity === 'MODERATE').length;
     let decisionScore = 88 - highSeverityCount * 7 - moderateCount * 3;
@@ -1083,9 +1132,9 @@ Perform adversarial red-team audit. Output strict JSON.`;
       adjudicatedFacts,
       approvedFactsOnly,
       finalDisplacementCc: agent1.displacementCc,
-      finalPowerHp: agent1.powerHp,
-      finalPowerRangeText: agent1.powerRangeText,
-      candidatePowers: agent1.candidatePowers || [agent1.powerHp],
+      finalPowerHp,
+      finalPowerRangeText,
+      candidatePowers,
       motorcycleEras: agent1.motorcycleEras,
       commercialDetails: agent1.commercialDetails,
       decisionScore,
