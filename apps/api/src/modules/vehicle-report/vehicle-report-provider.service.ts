@@ -92,7 +92,7 @@ export class VehicleReportProviderService {
         return {
           report: multiReport,
           provider: 'MULTI_AGENT_3_PHASE_PIPELINE',
-          modelName: 'gpt-4o-mini-multi-vehicle-agent',
+          modelName: 'gpt-4o-multi-vehicle-agent',
           qualityScore: multiReport.decisionScore?.score || 85,
           repairAttempted: false,
         };

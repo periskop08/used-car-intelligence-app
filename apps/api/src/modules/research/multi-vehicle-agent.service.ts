@@ -193,20 +193,20 @@ export class MultiVehicleAgentService {
   ) {}
 
   /**
-   * Universal AI Caller with OpenAI (gpt-4o-mini) and Gemini Fallback
+   * Universal AI Caller with OpenAI (gpt-4o) and Gemini Fallback
    */
   private async callAiJson(
     systemPrompt: string,
     userPrompt: string,
-    maxTokens = 4096,
-    timeoutMs = 30000,
+    maxTokens = 6144,
+    timeoutMs = 45000,
   ): Promise<any> {
     const openaiKey = process.env.OPENAI_API_KEY;
     if (openaiKey) {
       try {
         const openai = new OpenAI({ apiKey: openaiKey, timeout: timeoutMs });
         const res = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: process.env.MULTI_VEHICLE_AI_MODEL || 'gpt-4o',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -228,7 +228,7 @@ export class MultiVehicleAgentService {
     // Gemini Fallback
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
-      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest'];
+      const models = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
       for (const mName of models) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${geminiKey}`;
@@ -618,6 +618,9 @@ Extract strict JSON:
 }`;
     } else if (isAutomobile) {
       const isGasoline = (context.fuel || '').toLowerCase().includes('benzin');
+      const autoSellerQuestionExample = isGasoline
+        ? 'Soğuk ilk marşta motor rölantisinde dalgalanma veya tekleme oluyor mu, bujiler ve ateşleme bobinleri ne zaman yenilendi?'
+        : 'Soğuk ilk marşta enjektör diplerinde mazot terlemesi var mı, enjektör pulları ve rekorları daha önce elden geçti mi?';
       const filterBlock = this.format8FilterBlock(context);
       systemPrompt = `You are TorqueScout Agent 1: Senior Passenger Automobile Technical Research Specialist.
 Investigate the exact passenger car platform based STRICTLY on the user filters:
@@ -677,7 +680,7 @@ Extract strict JSON:
       "userExperience": "string (Türkçe kullanıcı deneyimi)",
       "testDriveCheck": "string (Türkçe test sürüşü kontrolü)",
       "inspectionCheck": "string (Ekspertiz ve usta seviyesinde somut diagnostik kontrol; örn: OBD canlı veri loglama, manifold/turbo basınç testi, kaçak testi veya mekanik boşluk ölçümü. KESİNLİKLE sadece 'gözle muayene edin' yazma!)",
-      "sellerQuestion": "string (Alıcının araç başında veya telefonda satıcıya doğrudan yönelteceği doğal, usta/piyasa diliyle teknik soru; örn: 'Soğuk ilk marşta enjektör diplerinde mazot terlemesi var mı, rekor pulları değişti mi?')",
+      "sellerQuestion": "string (Alıcının araç başında veya telefonda satıcıya doğrudan yönelteceği doğal, usta/piyasa diliyle teknik soru; örn: '${autoSellerQuestionExample}')",
       "costRisk": "DUSUK | ORTA | YUKSEK | COK_YUKSEK",
       "severity": "LOW | MODERATE | HIGH | CRITICAL",
       "confidence": 0.90
@@ -2556,8 +2559,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             .map((c: any) => {
               let cond = this.sanitizeTurkishAutomotiveText(c.condition);
               const reason = this.sanitizeTurkishAutomotiveText(c.reason);
-              if (/kontrol edilmesi|kontrolü$/i.test(cond.trim())) {
-                cond = cond.replace(/\s*(kontrol edilmesi|kontrolü)$/i, '');
+              if (/kontrol(ü|ü\s+yapılmalı|ü\s+yapılmalıdır|ü\s+sağlanmalı|ü\s+sağlanmalıdır|ü\s+yapılması|ü\s+sağlanması)?$|kontrol\s*edilmeli(dir)?$|kontrol\s*edilmesi$|incelenmeli(dir)?$|test\s*edilmeli(dir)?$/i.test(cond.trim())) {
+                cond = cond.replace(/\s*(kontrol(ü|ü\s+yapılmalı|ü\s+yapılmalıdır|ü\s+sağlanmalı|ü\s+sağlanmalıdır|ü\s+yapılması|ü\s+sağlanması)?|kontrol\s*edilmeli(dir)?|kontrol\s*edilmesi|incelenmeli(dir)?|test\s*edilmeli(dir)?)$/i, '');
                 cond = `${cond} arızası, aşınması veya kaçağı bulunmadığının ekspertiz testiyle teyit edilmesi şartıyla`;
               } else if (!/şartıyla|koşuluyla|kaydıyla|teyit edilmesi|sağlanması/i.test(cond)) {
                 cond = cond.replace(/\s*(bulunması|arızası|sızıntısı|yırtılması|aşınması|tıkanması|doluluğu)$/i, '');
@@ -2821,8 +2824,16 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         let ans = this.sanitizeTurkishAutomotiveText(q.expectedAnswer);
 
         // Turn overly sterile/translated questions into natural, realistic vehicle buyer inquiries
+        if (isPetrol) {
+          qText = qText
+            .replace(/^motorun enjektör geri dönüş hattında herhangi bir sızıntı veya yakıt kokusu var mı\??$/i, 'Soğuk ilk marşta enjektör diplerinde veya yakıt kütüğünde benzin kokusu/terleme oluyor mu, bujiler ve ateşleme bobinleri ne zaman elden geçti?')
+            .replace(/mazot/gi, 'benzin')
+            .replace(/enjektör geri dönüş hattı(nda)?/gi, 'yakıt kütüğü ve enjektör contalarında');
+        } else {
+          qText = qText
+            .replace(/^motorun enjektör geri dönüş hattında herhangi bir sızıntı veya yakıt kokusu var mı\??$/i, 'Soğuk ilk marşta enjektör diplerinde mazot kokusu veya terleme hissediliyor mu, enjektör pulları ve rekorları daha önce elden geçti mi?');
+        }
         qText = qText
-          .replace(/^motorun enjektör geri dönüş hattında herhangi bir sızıntı veya yakıt kokusu var mı\??$/i, 'Soğuk ilk marşta enjektör diplerinde mazot kokusu veya terleme hissediliyor mu, enjektör pulları ve rekorları daha önce elden geçti mi?')
           .replace(/^aracın /i, '')
           .trim();
 
@@ -2838,13 +2849,20 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             qText = 'Boksör motor silindir kapak contalarında yağ terlemesi var mı, bujiler ve triger seti ne zaman değişti, AWD diferansiyel yağları düzenli yenilendi mi?';
             ans = 'Subaru yetkili/uzman servisinde periyodik bakımları yapıldı; conta terlemesi, sıvı eksiltme veya diferansiyel ötmesi yoktur, triger ve buji bakımı günceldir.';
           } else if (isCommercial) {
-            qText = 'Alt kaset triger/zincir grubu, enjektör geri dönüş hatları ve intercooler basınç hortumu en son ne zaman kontrol edildi veya yenilendi?';
-            ans = 'Yetkili veya uzman serviste periyodik bakımı yapıldı; kaset triger zinciri ve gergi grubu kontrol edildi, intercooler basınç hortumunda ve enjektör diplerinde herhangi bir kaçak veya yağ terlemesi bulunmuyor.';
+            qText = isPetrol
+              ? 'Motor triger kayış/zincir seti, buji/ateşleme sistemi ve yakıt enjektörleri en son ne zaman kontrol edildi veya yenilendi?'
+              : 'Alt kaset triger/zincir grubu, enjektör geri dönüş hatları ve intercooler basınç hortumu en son ne zaman kontrol edildi veya yenilendi?';
+            ans = isPetrol
+              ? 'Yetkili servis periyodik bakım kayıtlıdır; triger ve ateşleme grubu kontrol edilmiş olup herhangi bir yakıt sızıntısı veya mekanik aşınma bulunmamaktadır.'
+              : 'Yetkili veya uzman serviste periyodik bakımı yapıldı; kaset triger zinciri ve gergi grubu kontrol edildi, intercooler basınç hortumunda ve enjektör diplerinde herhangi bir kaçak veya yağ terlemesi bulunmuyor.';
           } else if (isAutomobile) {
             const isAutoTurbo = /turbo|tsi|tfsi|tce|puretech|ecoboost|tdci|crdi|dci|cdti|hdi|multijet/i.test(`${context.engine || ''} ${context.model || ''}`);
-            if (isAutoTurbo) {
-              qText = 'Motor triger/zincir seti, devirdaim ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
-              ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve turbo besleme grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
+            if (isAutoTurbo && !isPetrol) {
+              qText = 'Motor triger/zincir seti, devirdaim, enjektörler ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
+              ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger, enjektör ve turbo besleme grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
+            } else if (isAutoTurbo && isPetrol) {
+              qText = 'Motor triger/zincir seti, bujiler/ateşleme bobinleri ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
+              ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger, ateşleme ve turbo besleme grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
             } else {
               qText = 'Motor triger kayış/zincir grubu, silindir kapak contası ve soğutma devirdaim hattı en son ne zaman kontrol edildi, yağ veya antifriz eksiltme var mı?';
               ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve soğutma devirdaim grubu kontrol edilmiş olup conta terlemesi veya sıvı kaçağı bulunmamaktadır.';
@@ -2857,26 +2875,33 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
         const isGenericAns =
           !ans ||
-          /^(evet|hay\u0131r|evet\/hay\u0131r)$/i.test(ans.trim()) ||
-          /kliman\u0131n \u00e7al\u0131\u015fmas\u0131nda herhangi bir sorun yok/i.test(ans) ||
-          /ya\u011f t\u00fcketimi normal seviyelerde/i.test(ans) ||
+          /^(evet|hayır|evet\/hayır)$/i.test(ans.trim()) ||
+          /klimanın çalışmasında herhangi bir sorun yok/i.test(ans) ||
+          /yağ tüketimi normal seviyelerde/i.test(ans) ||
           /^(sorun yok|herhangi bir anormallik yok|normal seviyede)$/i.test(ans.trim().replace(/[.,!]/g, ''));
 
         if (isGenericAns) {
-          if (/klima|so\u011futma|iklimlendirme|kompres\u00f6r/i.test(qText)) {
-            ans = 'Klima kompres\u00f6r\u00fc ve evaporat\u00f6r gaz bas\u0131nc\u0131 test edildi; \u00e7ift b\u00f6lgeli so\u011futma kanallar\u0131 ve klape motorlar\u0131 kusursuz \u00e7al\u0131\u015f\u0131yor.';
-          } else if (/zincir|gergi|triger|ya\u011f t\u00fcketim|eksiltme|kaset/i.test(qText)) {
-            ans = 'Yetkili servis periyodik bak\u0131mlar\u0131nda \u00fcretici onayl\u0131 ya\u011f kullan\u0131ld\u0131; zincir/kaset \u015fak\u0131rt\u0131s\u0131 bulunmuyor, bak\u0131m aral\u0131\u011f\u0131 d\u00fczenli.';
-          } else if (/intercooler|hortum|bas\u0131n\u00e7|turbo/i.test(qText)) {
-            ans = 'Turbo bas\u0131n\u00e7 testi yap\u0131ld\u0131, intercooler borular\u0131nda y\u0131rt\u0131k veya ya\u011f terlemesi yoktur; bas\u0131n\u00e7 de\u011ferleri nominal.';
-          } else if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|\u015farj/i.test(qText)) {
-            ans = 'Yetkili veya uzman serviste orijinal par\u00e7ayla yenilendi; r\u00f6lantide ve y\u00fcksek devirde ak\u00fc \u015farj voltaj\u0131 14V \u00fczerinde stabil.';
-          } else if (/pompa|enjeksiyon|yak\u0131t|benzin|enjekt[oö]r/i.test(qText)) {
-            ans = 'Enjekt\u00f6r geri d\u00f6n\u00fc\u015f debileri ve p\u00fcsk\u00fcrtme de\u011ferleri test edildi; mazot ka\u00e7a\u011f\u0131 veya geri d\u00f6n\u00fc\u015f s\u0131z\u0131nt\u0131s\u0131 yoktur.';
-          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal|kavrama|tork konvert|volan/i.test(qText)) {
-            ans = 'Vites ge\u00e7i\u015flerinde herhangi bir sertlik, vuruntu, kayd\u0131rma veya gecikme ya\u015fanm\u0131yor; mekanik ve kavrama sa\u011fl\u0131\u011f\u0131 tam.';
+          if (/klima|soğutma|iklimlendirme|kompresör/i.test(qText)) {
+            ans = 'Klima kompresörü ve evaporatör gaz basıncı test edildi; çift bölgeli soğutma kanalları ve klape motorları kusursuz çalışıyor.';
+          } else if (/zincir|gergi|triger|yağ tüketim|eksiltme|kaset/i.test(qText)) {
+            const chainLabel = isCommercial ? 'zincir/kaset şakırtısı' : 'triger/zincir şakırtısı';
+            ans = `Yetkili servis periyodik bakımlarında üretici onaylı yağ kullanıldı; ${chainLabel} bulunmuyor, bakım aralığı düzenli.`;
+          } else if (/intercooler|hortum|basınç|turbo/i.test(qText)) {
+            if (!isTurbo && isPetrol) {
+              ans = 'Emme manifoldu, gaz kelebeği ve vakum hatları test edildi; hava kaçağı veya basınç sapması bulunmuyor.';
+            } else {
+              ans = 'Turbo basınç testi yapıldı, intercooler borularında yırtık veya yağ terlemesi yoktur; basınç değerleri nominal.';
+            }
+          } else if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|şarj/i.test(qText)) {
+            ans = 'Yetkili veya uzman serviste orijinal parçayla yenilendi; rölantide ve yüksek devirde akü şarj voltajı 14V üzerinde stabil.';
+          } else if (/pompa|enjeksiyon|yakıt|benzin|enjekt[oö]r/i.test(qText)) {
+            ans = isPetrol
+              ? 'Enjektör püskürtme debileri, yakıt kütüğü ve benzin pompası basıncı test edildi; yakıt hattında kaçak veya basınç sapması yoktur.'
+              : 'Enjektör geri dönüş debileri ve püskürtme değerleri test edildi; mazot kaçağı veya geri dönüş sızıntısı yoktur.';
+          } else if (/vites|şanzıman|sekrome[cç]|hilal|kavrama|tork konvert|volan/i.test(qText)) {
+            ans = 'Vites geçişlerinde herhangi bir sertlik, vuruntu, kaydırma veya gecikme yaşanmıyor; mekanik ve kavrama sağlığı tam.';
           } else {
-            ans = 'Periyodik bak\u0131mlar\u0131 zaman\u0131nda yetkili serviste fatural\u0131 ve kay\u0131tl\u0131 olarak yap\u0131ld\u0131, t\u00fcm fonksiyonlar eksiksiz \u00e7al\u0131\u015f\u0131yor.';
+            ans = 'Periyodik bakımları zamanında yetkili serviste faturalı ve kayıtlı olarak yapıldı, tüm fonksiyonlar eksiksiz çalışıyor.';
           }
         }
         return {
@@ -2915,12 +2940,302 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       },
     };
 
+    const sanitizedReport = this.sanitizeMechanicalCrossContamination(rawReport, context, judge);
+
     return this.deepReconcileReportSemantics(
-      rawReport,
+      sanitizedReport,
       canonicalTransmission,
       canonicalSpeeds,
       trunkCapacityLiters,
     );
+  }
+
+  /**
+   * Deterministic Mechanical Validator Gatekeeper
+   * Programmatically purges and prevents cross-contamination:
+   * 1. Gasoline vs Diesel isolation (mazot, DPF, AdBlue, enjektör geri dönüş)
+   * 2. Naturally Aspirated vs Turbo isolation (intercooler, wastegate, turbo besleme)
+   * 3. Passenger Automobile vs Commercial Van isolation (triger kaseti, sürgülü kapı, palet)
+   * 4. Subaru Boxer & Symmetrical AWD consistency & realistic market positioning
+   * 5. Strict Zero Estimated Cost (TL) and Zero Bargaining Guide enforcement
+   */
+  private sanitizeMechanicalCrossContamination(
+    report: any,
+    context: MultiVehicleResearchContext,
+    judge: Agent3Output,
+  ): any {
+    if (!report) return report;
+
+    const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
+    const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
+    const isCommercial = context.vehicleType === 'MINIVAN_PANELVAN';
+    const isAutomobile = context.vehicleType === 'AUTOMOBILE' || (!isMotorcycle && !isSuvPickup && !isCommercial);
+
+    const normEngine = (context.engine || '').toLowerCase();
+    const isPetrol = (context.fuel || '').toLowerCase().includes('benzin') ||
+      normEngine.includes('ecoboost') ||
+      normEngine.includes('puretech') ||
+      normEngine.includes('tsi') ||
+      normEngine.includes('tfsi') ||
+      normEngine.includes('tce');
+
+    const isTurbo = /turbo|tsi|tfsi|tce|puretech|ecoboost|tdci|crdi|dci|cdti|hdi|multijet/i.test(`${context.engine || ''} ${context.model || ''}`);
+    const isSubaru = context.brand.toLowerCase() === 'subaru';
+
+    // 1. Purge Diesel Defects & Inapplicable Claims on Petrol Vehicles
+    if (isPetrol && report.decisionScore?.deductedRisks) {
+      report.decisionScore.deductedRisks = report.decisionScore.deductedRisks.filter((risk: any) => {
+        const text = `${risk.title || ''} ${risk.reason || ''} ${risk.description || ''}`.toLowerCase();
+        if (
+          text.includes('enjektör geri dönüş') ||
+          text.includes('mazot') ||
+          text.includes('dpf') ||
+          text.includes('dizel partikül') ||
+          text.includes('adblue') ||
+          text.includes('kızdırma bujisi') ||
+          text.includes('ısıtma bujisi')
+        ) {
+          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged diesel defect '${risk.title}' on petrol vehicle.`);
+          return false;
+        }
+        if (!isTurbo && (text.includes('turboşarj') || text.includes('turbo besleme') || text.includes('intercooler') || text.includes('wastegate'))) {
+          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged turbo defect '${risk.title}' on naturally aspirated petrol vehicle.`);
+          return false;
+        }
+        if (isAutomobile && (text.includes('triger kaset') || text.includes('kaset triger') || text.includes('sürgülü kapı'))) {
+          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged commercial van defect '${risk.title}' on passenger car.`);
+          return false;
+        }
+        return true;
+      });
+
+      // Recalculate score from surviving valid risks
+      const totalRiskPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0);
+      const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
+      report.decisionScore.score = calibratedScore;
+      report.decisionScore.totalRiskPenalty = totalRiskPenalty;
+      report.decisionScore.riskLevel = calibratedScore >= 80 ? 'DUSUK' : calibratedScore >= 70 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK';
+
+      if (report.torqueScoutDecisionScoreV1) {
+        report.torqueScoutDecisionScoreV1.score = calibratedScore;
+        report.torqueScoutDecisionScoreV1.deductedRisks = report.decisionScore.deductedRisks;
+        report.torqueScoutDecisionScoreV1.totalRiskPenalty = totalRiskPenalty;
+        report.torqueScoutDecisionScoreV1.modelDecisionRisk = totalRiskPenalty;
+        report.torqueScoutDecisionScoreV1.state = calibratedScore >= 85 ? 'EXCELLENT' : calibratedScore >= 70 ? 'GOOD' : calibratedScore >= 50 ? 'CAUTION' : 'HIGH_RISK';
+      }
+      if (report.scoring) {
+        report.scoring.buyabilityScore = { value: calibratedScore };
+        report.scoring.technicalRiskScore = { value: totalRiskPenalty };
+      }
+    }
+
+    // 2. Text Cleaner for Mechanical Leaks across all narrative sections
+    const cleanMechanicalText = (str: string): string => {
+      if (!str || typeof str !== 'string') return str;
+      let cleaned = str;
+      if (isPetrol) {
+        cleaned = cleaned
+          .replace(/enjektör geri dönüş hattı(nda|nın|na)?/gi, 'yakıt kütüğü ve enjektör contaları$1')
+          .replace(/mazot kaçağı/gi, 'benzin sızıntısı')
+          .replace(/mazot terlemesi/gi, 'benzin terlemesi')
+          .replace(/mazot kokusu/gi, 'benzin kokusu')
+          .replace(/mazot pompası/gi, 'benzin pompası')
+          .replace(/mazot/gi, 'yakıt');
+      }
+      if (!isTurbo && isPetrol) {
+        cleaned = cleaned
+          .replace(/turbo besleme hatları(nda)?/gi, 'emme manifoldu ve vakum hatları$1')
+          .replace(/turboşarj arızası/gi, 'emme sistemi kaçakları')
+          .replace(/turbo basınç testi/gi, 'vakum ve kompresyon testi')
+          .replace(/intercooler boruları(nda)?/gi, 'emme boruları$1');
+      }
+      if (isAutomobile) {
+        cleaned = cleaned
+          .replace(/kaset triger/gi, 'triger kayışı / zinciri')
+          .replace(/triger kaseti/gi, 'triger kayışı')
+          .replace(/triger kaset/gi, 'triger seti')
+          .replace(/sürgülü kapı mekanizması/gi, 'kapı kilit mekanizması')
+          .replace(/sürgülü kapı/gi, 'arka kapı')
+          .replace(/yükleme eşiği/gi, 'bagaj yükleme eşiği');
+      }
+      if (isSubaru) {
+        cleaned = cleaned
+          .replace(/likiditesi oldukça yüksektir/gi, 'Türkiye ikinci el pazarında niş ve meraklısına hitap eden dengeli bir kitleye sahiptir')
+          .replace(/likiditesi yüksektir/gi, 'Türkiye ikinci el pazarında meraklısına hitap eden stabil bir konuma sahiptir');
+      }
+      return cleaned;
+    };
+
+    // Clean overview
+    if (report.vehicleOverview) report.vehicleOverview = cleanMechanicalText(report.vehicleOverview);
+    if (report.expertDecisionSynthesis?.vehicleCharacter?.detailedAssessment) {
+      report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment = cleanMechanicalText(report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment);
+    }
+
+    // Clean dailyUse
+    if (report.expertDecisionSynthesis?.dailyUseAssessment) {
+      const du = report.expertDecisionSynthesis.dailyUseAssessment;
+      if (du.cityUse) du.cityUse = cleanMechanicalText(du.cityUse);
+      if (du.highwayUse) du.highwayUse = cleanMechanicalText(du.highwayUse);
+    }
+
+    // Clean conditionsToConsider
+    if (report.expertDecisionSynthesis?.purchaseConditions) {
+      report.expertDecisionSynthesis.purchaseConditions = report.expertDecisionSynthesis.purchaseConditions
+        .map((c: any) => ({
+          ...c,
+          condition: cleanMechanicalText(c.condition),
+          reason: cleanMechanicalText(c.reason),
+        }))
+        .filter((c: any) => {
+          const combined = `${c.condition} ${c.reason}`.toLowerCase();
+          if (isPetrol && (combined.includes('mazot') || combined.includes('dpf') || combined.includes('enjektör geri dönüş'))) return false;
+          if (!isTurbo && isPetrol && (combined.includes('turbo') || combined.includes('intercooler'))) return false;
+          if (isAutomobile && combined.includes('triger kaset')) return false;
+          return true;
+        });
+
+      if (report.expertDecisionSynthesis.purchaseConditions.length === 0) {
+        if (isSubaru) {
+          report.expertDecisionSynthesis.purchaseConditions = [
+            {
+              condition: 'Boksör motor silindir kapak contalarında dışa doğru yağ veya soğutma sıvısı sızıntısı bulunmadığının ve egzozda beyaz duman/soğutma sıvısı kokusu olmadığının teyit edilmesi şartıyla',
+              reason: 'Yatay karşıt boksör mimaride silindir kapak contası deformasyonu motor hararetine ve yüksek revizyon maliyetine yol açabilir.',
+              priority: 'IMPORTANT',
+              supportingFactIds: [],
+            },
+            {
+              condition: 'Sürekli simetrik dört çeker (Symmetrical AWD) aktarma organında, şaft askı bilyasında ve arka diferansiyelde mekanik boşluk veya uğultu bulunmadığının teyit edilmesi şartıyla',
+              reason: 'AWD aktarma bileşenlerindeki aşınma ve boşluklar sürüş dengesini bozar ve yüksek maliyetli diferansiyel onarımı gerektirebilir.',
+              priority: 'IMPORTANT',
+              supportingFactIds: [],
+            },
+          ];
+        } else {
+          report.expertDecisionSynthesis.purchaseConditions = [
+            {
+              condition: 'Periyodik bakım geçmişinin eksiksiz olduğunun ve bilgisayarlı diyagnostik/OBD taramasında aktif arıza kodu bulunmadığının teyit edilmesi şartıyla',
+              reason: 'Doğrulanmış kronik tasarım kusuru saptanmayan bu konfigürasyonda, yetkili servis periyodik bakım disiplini mekanik sağlığın en temel güvencesidir.',
+              priority: 'IMPORTANT',
+              supportingFactIds: [],
+            },
+          ];
+        }
+      }
+    }
+
+    // Clean walkAwayConditions
+    if (report.expertDecisionSynthesis?.walkAwayConditions) {
+      report.expertDecisionSynthesis.walkAwayConditions = report.expertDecisionSynthesis.walkAwayConditions
+        .map((w: any) => ({
+          ...w,
+          condition: cleanMechanicalText(w.condition),
+          reason: cleanMechanicalText(w.reason),
+        }))
+        .filter((w: any) => {
+          const combined = `${w.condition} ${w.reason}`.toLowerCase();
+          if (isPetrol && (combined.includes('mazot') || combined.includes('dpf') || combined.includes('enjektör geri dönüş'))) return false;
+          if (!isTurbo && isPetrol && (combined.includes('turbo') || combined.includes('intercooler'))) return false;
+          if (isAutomobile && combined.includes('triger kaset')) return false;
+          return true;
+        });
+
+      if (report.expertDecisionSynthesis.walkAwayConditions.length === 0) {
+        if (isSubaru) {
+          report.expertDecisionSynthesis.walkAwayConditions = [
+            {
+              condition: 'Silindir kapak contası yanması kaynaklı motor yağına soğutma sıvısı karışması veya blokta hararet kaynaklı termal deformasyon tespit edilmesi',
+              reason: 'Boksör motor bloğunun taşlanması veya komple sandık motor revizyonu maliyetinin araç piyasa değerine oranla rasyonel olmaması.',
+              priority: 'CRITICAL',
+              supportingFactIds: [],
+            },
+            {
+              condition: 'Şasi kuleleri, podye, direkler veya ana taşıyıcı iskelette düzeltme, kaynak veya ağır yapısal deformasyon bulunması',
+              reason: 'Simetrik AWD yol tutuş geometrisini ve fabrika toleranslarını kalıcı olarak yitirmiş araçlar sürüş dengesi ve can güvenliği açısından doğrudan eleme kriteridir.',
+              priority: 'CRITICAL',
+              supportingFactIds: [],
+            },
+          ];
+        } else {
+          report.expertDecisionSynthesis.walkAwayConditions = [
+            {
+              condition: 'Şasi kuleleri, podye, marşpiyel veya ana taşıyıcı direklerde düzeltme, kesme-ekleme veya ağır yapısal deformasyon tespit edilmesi',
+              reason: 'Gövde rijitliğini ve çarpışma güvenliğini kalıcı olarak yitirmiş araçlar sürüş dengesini bozduğu için doğrudan eleme kriteridir.',
+              priority: 'CRITICAL',
+              supportingFactIds: [],
+            },
+          ];
+        }
+      }
+    }
+
+    // Clean sellerQuestions
+    if (report.sellerQuestions) {
+      report.sellerQuestions = report.sellerQuestions.map((q: any) => ({
+        ...q,
+        questionText: cleanMechanicalText(q.questionText),
+        expectedAnswerHint: cleanMechanicalText(q.expectedAnswerHint),
+      }));
+    }
+
+    // Clean strongReasons & tradeoffs
+    if (report.expertDecisionSynthesis?.strongReasonsToBuy) {
+      report.expertDecisionSynthesis.strongReasonsToBuy = report.expertDecisionSynthesis.strongReasonsToBuy.map((r: any) => ({
+        ...r,
+        title: cleanMechanicalText(r.title),
+        explanation: cleanMechanicalText(r.explanation),
+      }));
+    }
+    if (report.expertDecisionSynthesis?.compromisesAndLimitations) {
+      report.expertDecisionSynthesis.compromisesAndLimitations = report.expertDecisionSynthesis.compromisesAndLimitations.map((t: any) => ({
+        ...t,
+        title: cleanMechanicalText(t.title),
+        explanation: cleanMechanicalText(t.explanation),
+      }));
+    }
+
+    // Clean notIdealFor profiles (ensure no forbidden profiles)
+    if (report.expertDecisionSynthesis?.notIdealForProfiles) {
+      report.expertDecisionSynthesis.notIdealForProfiles = report.expertDecisionSynthesis.notIdealForProfiles.filter((p: any) => {
+        const text = `${p.profile || ''} ${p.explanation || ''}`.toLowerCase();
+        if (isAutomobile && (text.includes('palet') || text.includes('ağır tonaj') || text.includes('esnaf'))) return false;
+        return true;
+      });
+    }
+
+    // 3. User Explicit Bans Enforcement:
+    // Strictly NO Estimated Cost (TL)
+    delete report.estimatedCost;
+    delete report.tahminiMasraf;
+    delete report.estimatedRepairCosts;
+    delete report.financialRepairRisk;
+    if (report.decisionScore) {
+      delete report.decisionScore.estimatedRepairCosts;
+      delete report.decisionScore.financialRepairRisk;
+    }
+    // Strictly NO Seller Bargaining Guide (Pazarlık Rehberi / Satıcıyla Pazarlık Kozları)
+    delete report.sellerBargainingGuide;
+    delete report.bargainingPoints;
+    delete report.pazarlikKozlari;
+    delete report.sellerNegotiationGuide;
+    if (report.expertDecisionSynthesis) {
+      delete report.expertDecisionSynthesis.sellerBargainingGuide;
+      delete report.expertDecisionSynthesis.bargainingPoints;
+      delete report.expertDecisionSynthesis.pazarlikKozlari;
+      delete report.expertDecisionSynthesis.sellerNegotiationGuide;
+    }
+
+    // 4. Subaru Drivetrain Guarantee
+    if (isSubaru) {
+      if (report.technicalSpecifications) {
+        report.technicalSpecifications.drivetrain = 'Sürekli Simetrik Dört Tekerden Çekiş (Symmetrical AWD)';
+      }
+      if (report.expertDecisionSynthesis?.technicalSpecifications) {
+        report.expertDecisionSynthesis.technicalSpecifications.drivetrain = 'Sürekli Simetrik Dört Tekerden Çekiş (Symmetrical AWD)';
+      }
+    }
+
+    return report;
   }
 
   /**

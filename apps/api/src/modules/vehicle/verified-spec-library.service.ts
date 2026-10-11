@@ -301,9 +301,9 @@ Provide the exact factory catalog displacement (cc) and power (HP).`;
 
     if (openaiKey) {
       try {
-        const openai = new OpenAI({ apiKey: openaiKey, timeout: 7000 });
+        const openai = new OpenAI({ apiKey: openaiKey, timeout: 12000 });
         const res = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
