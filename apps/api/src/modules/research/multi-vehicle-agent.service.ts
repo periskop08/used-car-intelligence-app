@@ -439,7 +439,7 @@ MANDATORY RULES:
    ALL text, titles, era names, key revisions, symptoms, and inspection instructions MUST BE 100% IN TURKISH.
 2. ABSOLUTE CATALOG ACCURACY ON FUEL INDUCTION, COOLING & TRANSMISSION:
    - You MUST determine the genuine mechanical architecture dynamically:
-     a) BORN-EFI & MODERN POST-2015 MODELS: If introduced in recent years or born with electronic fuel injection, IT NEVER HAD A CARBURETOR! Strictly forbid fabricating synthetic pre-2018 or 2010 carburetor eras.
+     a) BORN-EFI & MODERN POST-2015 MODELS: If introduced in recent years or born with electronic fuel injection, IT NEVER HAD A CARBURETOR! Strictly forbid fabricating synthetic pre-2018 or 2010 carburetor eras. Claims, symptoms, and inspectionCheck MUST NEVER mention carburetor ("karbüratör / karburatör") on EFI models; fuel failure modes must be electronic injector clogging, fuel pump pressure, or throttle body.
      b) CLASSIC / PRE-2008 MODELS: Classic cruisers and older series were carburetor-fed from the factory. Never label pre-2008 classic carburetor models as EFI or Euro 3!
      c) SCOOTER & TRANSMISSION: If the vehicle is a scooter, moped, or urban step-through commuter, transmission is "Otomatik (CVT)". If it is a geared motorcycle, specify the authentic manual speeds (5 İleri Manuel / 6 İleri Manuel) or DCT.
      d) COOLING FIDELITY (HAVA VS SIVI SOĞUTMA): Small displacement urban commuters/scooters and classic air-cooled cruisers are "HAVA" (Hava Soğutmalı). NEVER claim radiator, coolant hoses, thermostat or antifreeze leaks on an air-cooled engine!
@@ -1173,7 +1173,7 @@ Perform adversarial red-team audit. Output strict JSON.`;
     if (isEfiOnly) {
       finalApprovedFacts = finalApprovedFacts.filter((fact) => {
         const text = `${fact.title} ${(fact.symptoms || []).join(' ')} ${fact.userExperience || ''} ${fact.testDriveCheck || ''} ${fact.inspectionCheck || ''}`.toLowerCase();
-        return !/karbüratör/i.test(text);
+        return !/karb[üu]rat[öo]r/i.test(text);
       });
     }
 
