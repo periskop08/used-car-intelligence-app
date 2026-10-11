@@ -452,12 +452,21 @@ export class MultiVehicleAgentService {
           `${context.brand} ${context.model} ${context.year || ''} enjektör turbo dpf kullanıcı yorumları`,
         ];
       } else if (isAutomobile) {
-        searchTerms = [
-          `${exactSignature} teknik özellikleri motor gücü beygir hp tork şanzıman katalog`,
-          `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} ${cleanTrim} kronik sorunlar kullanıcı şikayetleri`,
-          `${context.brand} ${context.model} ${context.year || ''} ${context.transmission || ''} şanzıman kavrama arızaları`,
-          `${context.brand} ${context.model} ${context.year || ''} süspansiyon yol tutuş donanım ekspertiz kontrolleri`,
-        ];
+        if (context.brand.toLowerCase() === 'subaru') {
+          searchTerms = [
+            `${exactSignature} boksör boxer motor silindir kapak contası yağ eksiltme kronik sorunlar`,
+            `${exactSignature} symmetrical awd 4 çeker diferansiyel şaft askı bilyası arızaları`,
+            `${exactSignature} teknik özellikleri motor gücü hp beygir tork katalog`,
+            `${context.brand} ${context.model} ${context.year || ''} otomatik şanzıman tork konvertör buji bakımı ekspertiz`,
+          ];
+        } else {
+          searchTerms = [
+            `${exactSignature} teknik özellikleri motor gücü beygir hp tork şanzıman katalog`,
+            `${context.brand} ${context.model} ${context.year || ''} ${context.engine || ''} ${cleanTrim} kronik sorunlar kullanıcı şikayetleri`,
+            `${context.brand} ${context.model} ${context.year || ''} ${context.transmission || ''} şanzıman kavrama arızaları`,
+            `${context.brand} ${context.model} ${context.year || ''} süspansiyon yol tutuş donanım ekspertiz kontrolleri`,
+          ];
+        }
       } else {
         const normEng = (context.engine || '').toLowerCase();
         const isWetTimingBelt = normEng.includes('ecoblue') || (context.brand.toLowerCase() === 'ford' && context.engine?.includes('2.0'));
@@ -618,17 +627,24 @@ CRITICAL DIRECTIVES:
 1. STRICT TURKISH LANGUAGE MANDATE (SIFIR İNGİLİZCE): All titles, symptoms, inspections must be 100% in authentic Turkish automotive engineering terminology.
 2. PASSENGER CAR ARCHITECTURE (SIFIR TİCARİ TERİM): This is a PASSENGER AUTOMOBILE (Sedan, Hatchback, Station Wagon, Coupe, Cabriolet). KESİNLİKLE "sürgülü kapı", "kargo yükleme eşiği", "palet", "esnaf/filo" gibi hafif ticari terimler KULLANILAMAZ!
 3. AUTHENTIC GEARBOX & POWERTRAIN RESEARCH: Investigate exact factory transmission options (Manuel, Tork Konvertörlü Otomatik, Çift Kavrama DSG/EDC/Powershift, CVT) and engine failure modes.
-4. FUEL SPECIFICITY:
-   - If Gasoline: focus on ignition coils, spark plugs, turbo wastegate, thermostat housing. NEVER claim DPF soot clogging or AdBlue on gasoline!
+4. FUEL & ASPIRATION SPECIFICITY:
+   - If Gasoline: focus on ignition coils, spark plugs, head gaskets, thermostat housing, PCV valve, fuel pump. NEVER claim diesel injector leak-off pipe (enjektör geri dönüş hattı), DPF soot clogging, or AdBlue on gasoline!
+   - If Naturally Aspirated (Atmosferik): KESİNLİKLE "turboşarj arızası", "turbo besleme hatları", "intercooler" gibi parçalar YAZILAMAZ!
    - If Diesel: focus on injectors, DPF soot clogging, EGR valve, turbo boost leaks.
-5. ENGINE POWER ACCURACY & ZERO CROSS-MODEL CONFUSION:
-   - KESİNLİKLE kardeş modellerden (Peugeot 508, DS7 Crossback, DS4, Citroen C5 Aircross vb.) teknik veri veya beygir gücü TAŞINAMAZ.
-   - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8). NEVER downgrade DS9 to 180 HP (180 HP belongs to DS7/508, DS9 petrol is strictly 225 HP).
-6. DYNAMIC SPEC EXTRACTION:
+5. SUBARU BOXER & SYMMETRICAL AWD ARCHITECTURE MANDATE:
+   - If the brand is Subaru (Impreza, Legacy, Outback, Forester vb.):
+     * The engine is strictly BOXER (Yatay Karşıt / Boksör Motor - EJ serisi) and the drivetrain is SYMMETRICAL AWD.
+     * Document authentic Boxer failure modes: Silindir kapak contası (head gasket) dışa yağ/antifriz terlemesi, buji değişim işçilik zorluğu, Boxer motor yağ tüketim takibi, AWD şaft askı bilyası ve arka diferansiyel yağı hassasiyeti.
+     * NEVER treat a Subaru as an ordinary inline-4 front-wheel-drive vehicle!
+     * NEVER mention diesel components (enjektör geri dönüş hattı, mazot kaçağı, DPF) on petrol Subarus, and NEVER mention turbo on naturally aspirated (160 HP 2.0R/Active) Subarus!
+6. ENGINE POWER ACCURACY & ZERO CROSS-MODEL CONFUSION:
+   - KESİNLİKLE kardeş modellerden teknik veri veya beygir gücü TAŞINAMAZ.
+   - For Subaru Impreza 2005-2007 (Hawkeye) 2.0 naturally aspirated petrol, power is strictly 160 HP (DOHC EJ204). NEVER output 140 HP!
+   - For DS Automobiles DS9 1.6 PureTech petrol, power is strictly 225 HP (PureTech 225 with EAT8).
+7. DYNAMIC SPEC EXTRACTION:
    - Extract authentic official catalog trunk capacity (Liters), curb weight (kg), top speed (km/h), 0-100 (sec), and combined fuel consumption (L/100km) for this exact model, year, body type, and engine.
-7. KULLANICI KAYNAKLI BAKIM İHMALİ KRONİK KUSUR SAYILAMAZ:
+8. KULLANICI KAYNAKLI BAKIM İHMALİ KRONİK KUSUR SAYILAMAZ:
    - Yağ değişimini geciktirme, hor kullanma, debriyaj yakma, kalitesiz antifriz gibi her arabada çıkabilecek kullanıcı ihmalleri ASLA bu arabanın kronik arızası sayılamaz. Yalnızca bu motora/şanzımana özgü fabrikasyon tasarım/mühendislik kusurları listelenmelidir.
-8. Extract realistic, documented chronic failure modes for this exact passenger model and engine.
 9. Output strict JSON only.`;
 
       userPrompt = `Target Passenger Automobile Specification:
@@ -1091,7 +1107,9 @@ CRITICAL DIRECTIVES:
 2. FUEL SYSTEM & POWERTRAIN ACCURACY:
    - If the vehicle is fuel-injected (EFI) or modern post-2015, CONTRADICT any claims mentioning carburetor ("karbüratör", "karbüratör diyaframı", "karbüratör temizliği"). It uses electronic fuel injection (EFI), so fuel issues must target injectors, fuel pump pressure, or throttle body/TPS.
    - If the vehicle is a classic vintage carburetor model, contradict any EFI claims.
-   - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
+   - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (enjektör geri dönüş hattı sızıntısı, mazot kaçağı, DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
+   - If the vehicle is NATURALLY ASPIRATED (Atmosferik, turbo yok), immediately CONTRADICT any turbocharger claims (turbo hortumu yırtılması, turbo boost kaybı, intercooler).
+   - If the vehicle is SUBARU, engine is strictly BOXER and drivetrain is Symmetrical AWD. Immediately CONTRADICT any commercial van terms like "triger kaseti" (kaset triger Ford Connect'e aittir, Subaru'da yoktur).
    - If the vehicle is a PRE-2011 EURO 4 DIESEL (e.g. 2008 Ford Tourneo Connect 1.8 TDCi, 2006 Fiat Doblo 1.3 Multijet Euro 4), it DOES NOT HAVE A FACTORY DPF (Dizel Partikül Filtresi)! Immediately CONTRADICT any claim about DPF ("DPF kurum doluluğu", "partikül filtresi", "DPF rejenerasyonu", "DPF arıza ışığı") with stance: "CONTRADICT" and reason: "${context.year || ''} model Euro 4 dizel araçlarda fabrikasyon DPF bulunmaz; arıza geçersizdir."
    - If the vehicle uses a DİZEL (Diesel) engine, contradict gasoline ignition coil/spark plug claims.
 3. BRAKING & CHASSIS ACCURACY:
@@ -1535,11 +1553,11 @@ MANDATORY RULES:
    Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (ilgili döneme ait gerçek fabrika güncellemesi, yakıt besleme veya mekanik revizyon). ASLA başka bir modelin donanımını veya uydurma parça adını yazma!
 6. "conditionsToConsider" (Hangi Şartlarda Değerlendirilebilir):
    - KESİNLİKLE 'Motorun sağlam olması şartıyla', 'Motorun genel durumu detaylı kontrol edilmeli', 'Ekspertiz yapılması şartıyla' gibi basmakalıp, jenerik ve içi boş cümleler YAZILAMAZ!
-   - Şartlar doğrudan bu araç için doğrulanmış somut teknik parçalara (örn: triger kaset grubu, intercooler basınç hortumu, enjektör geri dönüş hattı, şanzıman mekatroniği vb.) bağlanmalıdır.
+   - Şartlar doğrudan bu aracın doğrulanmış gerçek parçalarına bağlanmalıdır (benzinli için buji/bobin, silindir kapak contası, soğutma devirdaim hattı, kavrama; dizel için enjektör/pompa vb. ASLA benzinli araca 'enjektör geri dönüş hattı' veya binek araca 'triger kaseti' YAZILAMAZ!).
    - Eğer araçta doğrulanmış spesifik kronik risk yoksa, şart: 'Aracın yetkili/uzman servis periyodik bakım kayıtlarında üretici onaylı sarf malzemelerinin kullanıldığının ve bilgisayarlı diyagnostik taramasında aktif arıza kodu bulunmadığının teyit edilmesi şartıyla' şeklinde profesyonel ve somut olmalıdır.
 7. "walkAwayConditions" (Hangi Durumda Satın Almaktan Vazgeçilmeli):
    - KESİNLİKLE 'ağır motor mekanik hasarı veya çözülemeyen krank vuruntusu' gibi basmakalıp korkutma şablonları ve 'Bu tür sorunlar uzun ömürlü kullanımı etkiler' gibi laf kalabalığı YAZILAMAZ!
-   - Bu motorun ve şanzımanın gerçek mühendislik felaket senaryosu (dealbreaker) yazılmalıdır (Örn: Triger kaset kopması kaynaklı subap eğilmesi veya yüksek basınç pompa metal çapağının yakıt rayını sarması; şaside podye/direk kaynaklı yapısal deformasyon).
+   - Bu motorun ve şanzımanın gerçek mühendislik felaket senaryosu (dealbreaker) yazılmalıdır (Örn: triger sente atması/kopması sonucu subap eğilmesi, silindir kapak contası yanması kaynaklı blok hararet deformasyonu; şaside podye/direk kaynaklı yapısal hasar. ASLA benzinli veya binek araca 'triger kaseti' uydurma!).
    - Gerekçe (reason) bölümünde soyut laf değil, somut maliyet veya güvenlik riski (örn: komple sandık motor veya komple enjektör/pompa hattı revizyon maliyetinin araç piyasa değerinin önemli bir bölümünü aşması) açıklanmalıdır. Karbüratörlü araçta ASLA 'FI lambası' yazma!
 8. PHYSICAL SPECIFICATIONS ARE MANDATORY:
    - topSpeedKmh (number)
@@ -1731,6 +1749,13 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const fullVehicleName = `${context.year ? `${context.year} ` : ''}${context.brand} ${context.model}${cleanTrim ? ` ${cleanTrim}` : ''}`.trim();
       const filterBlock = this.format8FilterBlock(context);
 
+      const isSubaru = context.brand.toLowerCase() === 'subaru';
+      const autoOverviewGuide = isSubaru
+        ? `Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin ralli mirasını taşıyan rijit gövde mimarisi, sürücü oturma pozisyonu, ergonomik kokpiti, yatay boksör (Boxer) motorun sağladığı düşük ağırlık merkezi ve binek bagaj pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki Boxer (EJ204) motorun ${judge.finalPowerHp} HP güç karakteri, Symmetrical AWD (Sürekli Simetrik Dört Tekerden Çekiş) viraj dengesi ve ${activeTransmissionName} şanzıman aktarımı.\\n3. Paragraf: Kabin ses izolasyonu (NVH), süspansiyon konforu, Türkiye pazarında niş/meraklısı profili, usta ve yedek parça erişilebilirliği. (ASLA 'likiditesi oldukça yüksektir' gibi ezbere klişe yazma; meraklısı kitlesi ve servis ekosistemi olarak dürüstçe değerlendir)`
+        : `Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el pazarındaki konumu (geniş kitle veya niş/meraklısı tercihi, parça ve servis erişilebilirliği).`;
+
+      const subaruDrivetrain = isSubaru ? 'Sürekli Dört Tekerden Çekiş (Symmetrical AWD)' : 'Önden Çekiş (FWD)';
+
       userPrompt = `Passenger Automobile Specification:
 ${filterBlock}
 Displacement: ${judge.finalDisplacementCc} cc, Power: ${judge.finalPowerHp} HP
@@ -1741,7 +1766,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el binek otomobil pazarındaki likidite ve yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "vehicleOverview": "${autoOverviewGuide}",
   "dailyUse": {
     "cityUse": "string (Modelin şehir içi dur-kalk trafiğindeki direksiyon hissiyatı, süspansiyon sönümlemesi ve manevra kabiliyeti analizi. ASLA talimat cümlesini metne kopyalama!)",
     "highwayUse": "string (Modelin otoyol hızlarındaki rüzgar ve lastik yuvarlanma izolasyonu, şasi stabilitesi ve motor rezervi analizi. ASLA talimat cümlesini metne kopyalama!)"
@@ -1754,7 +1779,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     "engineTorqueNm": number,
     "transmissionTypeAndSpeeds": "${activeTransmissionName}",
     "clutchType": "string (örn: Tork Konvertörlü / Çift Kavrama DSG / Kuru Tek Disk)",
-    "drivetrain": "string (örn: Önden Çekiş (FWD) veya Arkadan İtiş (RWD))",
+    "drivetrain": "${subaruDrivetrain}",
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
@@ -2093,6 +2118,9 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const normEngine = (context.engine || '').toLowerCase();
     const normTrim = (context.trimPackage || '').toLowerCase();
     const isGasoline = (context.fuel || '').toLowerCase().includes('benzin') || normEngine.includes('ecoboost') || normEngine.includes('puretech') || normEngine.includes('tsi');
+    const isPetrol = isGasoline;
+    const isTurbo = /turbo|tsi|tfsi|tce|puretech|ecoboost|tdci|crdi|dci|cdti|hdi|multijet/i.test(`${context.engine || ''} ${context.model || ''}`);
+    const isSubaru = context.brand.toLowerCase() === 'subaru';
     const isVariantAutomatic =
       normTrim.includes('otomatik') ||
       normTrim.includes('automatic') ||
@@ -2514,12 +2542,24 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               if (isTautologicalCondition(c.condition || '', c.reason || '')) {
                 return false;
               }
+              if (isPetrol && (cText.includes('enjektör geri dönüş') || cText.includes('mazot') || cText.includes('dpf') || cText.includes('partikül filtresi'))) {
+                return false;
+              }
+              if (!isCommercial && cText.includes('triger kaset')) {
+                return false;
+              }
+              if (!isTurbo && isPetrol && (cText.includes('turbo') || cText.includes('intercooler'))) {
+                return false;
+              }
               return true;
             })
             .map((c: any) => {
               let cond = this.sanitizeTurkishAutomotiveText(c.condition);
               const reason = this.sanitizeTurkishAutomotiveText(c.reason);
-              if (!/şartıyla|koşuluyla|kaydıyla|teyit edilmesi|sağlanması/i.test(cond)) {
+              if (/kontrol edilmesi|kontrolü$/i.test(cond.trim())) {
+                cond = cond.replace(/\s*(kontrol edilmesi|kontrolü)$/i, '');
+                cond = `${cond} arızası, aşınması veya kaçağı bulunmadığının ekspertiz testiyle teyit edilmesi şartıyla`;
+              } else if (!/şartıyla|koşuluyla|kaydıyla|teyit edilmesi|sağlanması/i.test(cond)) {
                 cond = cond.replace(/\s*(bulunması|arızası|sızıntısı|yırtılması|aşınması|tıkanması|doluluğu)$/i, '');
                 cond = `${cond} arızası veya kaçağı bulunmadığının ekspertiz testiyle teyit edilmesi şartıyla`;
               }
@@ -2581,6 +2621,21 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
                   supportingFactIds: [],
                 },
               ];
+            } else if (isSubaru) {
+              conds = [
+                {
+                  condition: 'Boksör motor silindir kapak contalarında dışa doğru yağ veya soğutma sıvısı sızıntısı bulunmadığının ve egzozda beyaz duman/soğutma sıvısı kokusu olmadığının teyit edilmesi şartıyla',
+                  reason: 'Yatay karşıt boksör mimaride silindir kapak contası deformasyonu motor hararetine ve yüksek revizyon maliyetine yol açabilir.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+                {
+                  condition: 'Sürekli simetrik dört çeker (Symmetrical AWD) aktarma organında, şaft askı bilyasında ve arka diferansiyelde mekanik boşluk veya uğultu bulunmadığının teyit edilmesi şartıyla',
+                  reason: 'AWD aktarma bileşenlerindeki aşınma ve boşluklar sürüş dengesini bozar ve yüksek maliyetli diferansiyel onarımı gerektirebilir.',
+                  priority: 'IMPORTANT' as const,
+                  supportingFactIds: [],
+                },
+              ];
             } else {
               conds = [
                 {
@@ -2616,11 +2671,23 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           };
 
           let walks = (writer.walkAwayConditions || [])
-            .filter((w: any) => !isTautologicalWalkAway(w.condition || '', w.reason || ''))
+            .filter((w: any) => {
+              if (isTautologicalWalkAway(w.condition || '', w.reason || '')) return false;
+              const wText = `${w.condition} ${w.reason}`.toLowerCase();
+              if (isPetrol && (wText.includes('enjektör geri dönüş') || wText.includes('mazot') || wText.includes('dpf'))) {
+                return false;
+              }
+              if (!isCommercial && wText.includes('triger kaset')) {
+                return false;
+              }
+              if (!isTurbo && isPetrol && (wText.includes('turbo') || wText.includes('intercooler'))) {
+                return false;
+              }
+              return true;
+            })
             .map((w: any) => {
               const condText = this.sanitizeTurkishAutomotiveText(w.condition);
               const rText = this.sanitizeTurkishAutomotiveText(w.reason);
-              // If the vehicle is carburetor-fed, replace any hallucinated FI lamp with mechanical dealbreaker
               if (isMotorcycle && hasCarbEra && (condText.toLowerCase().includes('fi arıza') || condText.toLowerCase().includes('enjektör'))) {
                 return {
                   condition: 'Krank veya biyel kolu mekanik vuruntusu ile karbüratör boğazı çatlağı',
@@ -2673,6 +2740,21 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
                 {
                   condition: 'Şasi ve gidon mesnet bölgesinde kaynak, çatlak veya geometri bozukluğu bulunması',
                   reason: 'Sürüş geometrisi bozulmuş motosikletler doğrudan kaza ve can güvenliği riski doğurur.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+              ];
+            } else if (isSubaru) {
+              walks = [
+                {
+                  condition: 'Silindir kapak contası yanması kaynaklı motor yağına soğutma sıvısı karışması veya blokta hararet kaynaklı termal deformasyon tespit edilmesi',
+                  reason: 'Boksör motor bloğunun taşlanması veya komple sandık motor revizyonu maliyetinin araç piyasa değerine oranla rasyonel olmaması.',
+                  priority: 'CRITICAL' as const,
+                  supportingFactIds: [],
+                },
+                {
+                  condition: 'Şasi kuleleri, podye, direkler veya ana taşıyıcı iskelette düzeltme, kaynak veya ağır yapısal deformasyon bulunması',
+                  reason: 'Simetrik AWD yol tutuş geometrisini ve fabrika toleranslarını kalıcı olarak yitirmiş araçlar sürüş dengesi ve can güvenliği açısından doğrudan eleme kriteridir.',
                   priority: 'CRITICAL' as const,
                   supportingFactIds: [],
                 },
@@ -2752,12 +2834,21 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           /sorun var m[ıi]\??$/i.test(qText.trim());
 
         if (isGenericQuestion) {
-          if (isCommercial) {
+          if (context.brand.toLowerCase() === 'subaru') {
+            qText = 'Boksör motor silindir kapak contalarında yağ terlemesi var mı, bujiler ve triger seti ne zaman değişti, AWD diferansiyel yağları düzenli yenilendi mi?';
+            ans = 'Subaru yetkili/uzman servisinde periyodik bakımları yapıldı; conta terlemesi, sıvı eksiltme veya diferansiyel ötmesi yoktur, triger ve buji bakımı günceldir.';
+          } else if (isCommercial) {
             qText = 'Alt kaset triger/zincir grubu, enjektör geri dönüş hatları ve intercooler basınç hortumu en son ne zaman kontrol edildi veya yenilendi?';
             ans = 'Yetkili veya uzman serviste periyodik bakımı yapıldı; kaset triger zinciri ve gergi grubu kontrol edildi, intercooler basınç hortumunda ve enjektör diplerinde herhangi bir kaçak veya yağ terlemesi bulunmuyor.';
           } else if (isAutomobile) {
-            qText = 'Motor triger/zincir seti, devirdaim ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
-            ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve soğutma grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
+            const isAutoTurbo = /turbo|tsi|tfsi|tce|puretech|ecoboost|tdci|crdi|dci|cdti|hdi|multijet/i.test(`${context.engine || ''} ${context.model || ''}`);
+            if (isAutoTurbo) {
+              qText = 'Motor triger/zincir seti, devirdaim ve turbo besleme hatları en son ne zaman kontrol edildi, yağ veya soğutma sıvısı eksiltme var mı?';
+              ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve turbo besleme grubu kontrol edilmiş olup herhangi bir sıvı kaçağı veya mekanik aşınma bulunmamaktadır.';
+            } else {
+              qText = 'Motor triger kayış/zincir grubu, silindir kapak contası ve soğutma devirdaim hattı en son ne zaman kontrol edildi, yağ veya antifriz eksiltme var mı?';
+              ans = 'Yetkili servis periyodik bakım kayıtlıdır; triger ve soğutma devirdaim grubu kontrol edilmiş olup conta terlemesi veya sıvı kaçağı bulunmamaktadır.';
+            }
           } else {
             qText = 'Eksantrik zincir gergisi, subap ayarları ve şarj konjektörü stabil çalışıyor mu, soğuk çalıştırmada şıkırtı var mı?';
             ans = 'Soğuk ve sıcak marşta zincir şıkırtısı veya ses yoktur; şarj sistemi ve akü voltajı ideal fabrika değerindedir.';

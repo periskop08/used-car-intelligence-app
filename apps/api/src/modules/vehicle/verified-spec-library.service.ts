@@ -272,6 +272,10 @@ CRITICAL RULES:
      * 120 HP NEVER EXISTED on Courier! (120 HP 1.5 EcoBlue belongs to Focus / Kuga / Connect). DO NOT hallucinate 120 HP on Courier!
    - DS Automobiles DS9:
      * The pure petrol 1.6 PureTech in DS9 is exclusively 225 HP (165 kW / PureTech 225 with EAT8). NEVER output 180 HP for DS9 petrol! (180 HP was used in DS7/508, DS9 pure petrol is strictly 225 HP).
+   - Subaru Impreza:
+     * 2005-2007 2nd Gen Facelift (Hawkeye) 2.0 naturally aspirated petrol models (2.0R, Active, Elegance, Limited) are strictly 160 HP (118 kW, DOHC EJ204 engine). NEVER output 140 HP or 150 HP for 2005-2007 2.0 NA Impreza!
+     * Pre-facelift 2001-2005 2.0 GX is 125 HP (EJ201).
+     * 2007-2011 3rd gen (GH/GE) 2.0R is 150 HP.
    - If the model is Tourneo Courier or Transit Courier and trim is Delux, Deluxe, or Trend, powerHp MUST be 75 HP (candidatePowers: [75, 100]).
 5. TRIM POWER RESOLUTION: If the user provides a specific trim (e.g. Delux, Trend vs Titanium), 'powerHp' MUST be the exact power of that trim, and 'candidatePowers' should list all genuine power options for that engine.
 Output ONLY valid JSON:
