@@ -269,7 +269,7 @@ export class AdminVehicleReportsService {
       const resolvedVehicleType = report.vehicleType || rd?.vehicleType || rd?.vehicleIdentity?.vehicleType || 'AUTOMOBILE';
       const fallbackIdentity = rd?.vehicleIdentity || null;
 
-      // Prioritize verified specifications from reportData (or verified specs) over uncalibrated raw engine placeholders
+      // Extract power directly from the generated report data (100% report-driven, zero raw engine placeholders)
       const reportPowerHp =
         rd?.vehicleIdentity?.enginePowerHp ??
         rd?.vehicleIdentity?.powerHp ??
@@ -279,7 +279,6 @@ export class AdminVehicleReportsService {
         rd?.specs?.powerHp ??
         (variant?.specs?.specs as any)?.enginePowerHp ??
         (variant?.specs?.specs as any)?.powerHp ??
-        variant?.engine?.horsepower ??
         fallbackIdentity?.enginePowerHp ??
         fallbackIdentity?.powerHp ??
         null;
@@ -291,7 +290,6 @@ export class AdminVehicleReportsService {
         rd?.technicalSpecifications?.displacementCc ??
         (variant?.specs?.specs as any)?.engineDisplacementCc ??
         (variant?.specs?.specs as any)?.displacementCc ??
-        variant?.engine?.displacement ??
         fallbackIdentity?.engineDisplacementCc ??
         fallbackIdentity?.displacementCc ??
         null;
@@ -354,8 +352,8 @@ export class AdminVehicleReportsService {
               bodyType: variant.bodyType || fallbackIdentity?.bodyType || '',
               trim: reportTrim || variant.trim?.name || '',
               engineCode: reportEngineCode || variant.engine?.code || '',
-              displacementCc: reportDisplacementCc ?? variant.engine?.displacement,
-              powerHp: reportPowerHp ?? variant.engine?.horsepower,
+              displacementCc: reportDisplacementCc,
+              powerHp: reportPowerHp,
               transmission: reportTransmission || variant.transmission?.name || '',
               fuelType: reportFuelType || variant.engine?.fuelType || '',
               vehicleType: resolvedVehicleType,
@@ -458,7 +456,7 @@ export class AdminVehicleReportsService {
           rd?.specs?.powerHp ??
           specJson?.enginePowerHp ??
           specJson?.powerHp ??
-          variant.engine?.horsepower;
+          null;
 
         const reportDisplacement =
           rd?.vehicleIdentity?.engineDisplacementCc ??
@@ -467,7 +465,7 @@ export class AdminVehicleReportsService {
           rd?.technicalSpecifications?.displacementCc ??
           specJson?.engineDisplacementCc ??
           specJson?.displacementCc ??
-          variant.engine?.displacement;
+          null;
 
         canonicalSpecs = {
           powerHp: reportHp,
