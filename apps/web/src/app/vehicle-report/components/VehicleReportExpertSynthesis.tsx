@@ -115,24 +115,11 @@ export default function VehicleReportExpertSynthesis({
           {/* Donanım Paketi ve Günümüz Standartları (2024-2026) Değerlendirmesi */}
           {synthesis.trimPackageComparison && (
             <div className="mt-4 pt-4 border-t border-white/10 bg-slate-950/70 p-4 sm:p-5 rounded-xl space-y-3.5 border border-white/5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="text-xs sm:text-sm font-bold text-white">
-                    Donanım Paketi: <span className="text-amber-400">{synthesis.trimPackageComparison.selectedTrimName}</span>
-                  </span>
-                  {synthesis.trimPackageComparison.equipmentTier && (
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                      synthesis.trimPackageComparison.equipmentTier === 'BAZ_DONANIM'
-                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                        : synthesis.trimPackageComparison.equipmentTier === 'UST_DONANIM'
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                    }`}>
-                      {synthesis.trimPackageComparison.equipmentTier === 'BAZ_DONANIM' ? 'Giriş / Baz Seviye' : synthesis.trimPackageComparison.equipmentTier === 'UST_DONANIM' ? 'Üst / Dolu Seviye' : 'Orta / Dengeli Seviye'}
-                    </span>
-                  )}
-                </div>
+              <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+                <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold text-white">
+                  Donanım Paketi: <span className="text-amber-400">{synthesis.trimPackageComparison.selectedTrimName}</span>
+                </span>
               </div>
 
               {synthesis.trimPackageComparison.comparisonNarrative && (
@@ -286,15 +273,6 @@ export default function VehicleReportExpertSynthesis({
                     <div key={idx} className="p-3.5 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-1.5 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-amber-300">{issue.title}</span>
-                        {severity && (
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            severity === 'HIGH' || severity === 'CRITICAL'
-                              ? 'bg-rose-500/20 text-rose-300'
-                              : 'bg-amber-500/20 text-amber-300'
-                          }`}>
-                            {severity}
-                          </span>
-                        )}
                       </div>
                       {issueDesc && <p className="text-slate-300 leading-relaxed">{cleanRangeText(issueDesc)}</p>}
                       {checkAdvice && (
