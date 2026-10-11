@@ -153,6 +153,38 @@ export const NON_TRIM_WORDS = new Set([
   'DÜZ', 'DUZ', 'STANDART', 'MINIVAN', 'CAMLI VAN', 'CAMLIVAN', 'PANELVAN', 'VAN', 'OTOMATIK', 'OTOMATİK', 'YARI OTOMATIK', 'YARI OTOMATİK', 'MANUEL', 'DÜZ - MINIVAN', 'DÜZ - CAMLI VAN', 'DÜZ - MİNİVAN'
 ]);
 
+export function cleanTrimName(rawName?: string | null): string | null {
+  if (!rawName) return null;
+  let name = rawName.trim();
+  if (!name) return null;
+
+  if (NON_TRIM_WORDS.has(name.toUpperCase())) return null;
+
+  // Strip leading engine/displacement/drivetrain prefixes:
+  // e.g. '14 Tfsi Design' -> 'Design', '20 Tdi Sport' -> 'Sport', '20 Tdi Quattro Design' -> 'Design'
+  name = name.replace(/^(\d+(\.\d+)?[a-z]?|\d{2,3}[a-z]?)\s*(tdi|tfsi|tsi|cdti|dci|crdi|hdi|multijet|mjet|vtec|mpi|gdi|td|t|d|cgi|cdi|fsi)?\s*(quattro|4matic|4x4|4x2)?\s*/i, '').trim();
+
+  // Strip standalone drivetrain or body or chassis codes
+  name = name.replace(/^(quattro|4matic|4x4|4x2|sedan|station wagon|allroad|allroad quattro|k200s|k210s|k230l|\d+ps)\s*/i, '').trim();
+
+  if (
+    !name ||
+    /^\d+(\.\d+)?$/i.test(name) ||
+    /^(tdi|tfsi|tsi|cdti|dci|crdi|hdi|multijet|mjet|vtec|mpi|gdi|td|t|d|cgi|cdi|fsi|quattro|4matic|düz|duz|otomatik|yarı otomatik|yari otomatik|manuel)$/i.test(name) ||
+    NON_TRIM_WORDS.has(name.toUpperCase())
+  ) {
+    return null;
+  }
+
+  // Canonical casing normalization
+  if (/^s\s*line$/i.test(name)) return 'S line';
+  if (/^amg\s*line$/i.test(name) || /^amg$/i.test(name)) return 'AMG Line';
+  if (/^m\s*sport$/i.test(name)) return 'M Sport';
+  if (/^r\s*line$/i.test(name)) return 'R Line';
+
+  return name;
+}
+
 export function cleanEngineCodeAndExtractTrim(rawEngineCode?: string | null): { cleanEngine: string; extractedTrim: string | null } {
   if (!rawEngineCode) return { cleanEngine: '', extractedTrim: null };
   const trimmed = rawEngineCode.trim();
@@ -773,13 +805,11 @@ export class VehicleFiltersController {
       const trimsSet = new Set<string>();
       for (const v of matchingVariants) {
         const rawTrimName = (v.trim?.name || '').trim();
+        const cleanedDbTrim = cleanTrimName(rawTrimName);
         const { extractedTrim } = cleanEngineCodeAndExtractTrim(v.engine?.code);
 
-        const isDbTrimGeneric = !rawTrimName || NON_TRIM_WORDS.has(rawTrimName.toUpperCase());
-        if (extractedTrim && isDbTrimGeneric) {
-          trimsSet.add(extractedTrim);
-        } else if (rawTrimName && !NON_TRIM_WORDS.has(rawTrimName.toUpperCase())) {
-          trimsSet.add(rawTrimName);
+        if (cleanedDbTrim) {
+          trimsSet.add(cleanedDbTrim);
         } else if (extractedTrim) {
           trimsSet.add(extractedTrim);
         }
@@ -846,24 +876,24 @@ export class VehicleFiltersController {
       ? variants.filter(v => getTransmissionTr(v.transmission?.name || '').toLowerCase() === targetTrans.toLowerCase() || (v.transmission?.name || '').toLowerCase().includes(targetTrans.toLowerCase()))
       : variants;
 
-    const trimsSet = new Set(filtered.map(v => v.trim?.name).filter(Boolean));
-    const sortedTrims = Array.from(trimsSet).sort();
-
-    if (sortedTrims.length === 0) {
-      const allTrims = Array.from(new Set(variants.map(v => v.trim?.name).filter(Boolean))).sort();
-      if (allTrims.length > 0) {
-        return {
-          success: true,
-          data: allTrims.map(name => ({ label: name, value: name })),
-          autoVariantId: variants[0]?.id || null,
-        };
-      }
-      return {
-        success: true,
-        data: [{ label: 'Standart / Baz', value: 'Standart / Baz' }],
-        autoVariantId: variants[0]?.id || null,
-      };
+    const trimsSet = new Set<string>();
+    for (const v of filtered) {
+      const c = cleanTrimName(v.trim?.name);
+      if (c) trimsSet.add(c);
     }
+
+    if (trimsSet.size === 0) {
+      for (const v of variants) {
+        const c = cleanTrimName(v.trim?.name);
+        if (c) trimsSet.add(c);
+      }
+    }
+
+    if (trimsSet.size === 0) {
+      trimsSet.add('Standart');
+    }
+
+    const sortedTrims = Array.from(trimsSet).sort((a, b) => a.localeCompare(b, 'tr'));
 
     return {
       success: true,
@@ -932,7 +962,7 @@ export class VehicleFiltersController {
           ...(year ? { year: Number(year) } : {}),
           ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
           ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
-          ...(targetTrim ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
+          ...(targetTrim && !['standart', 'standart / baz'].includes(targetTrim.toLowerCase()) ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
         },
         select: { id: true },
         take: 1,
@@ -978,7 +1008,7 @@ export class VehicleFiltersController {
         year: Number(year),
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
-        ...(targetTrim && targetTrim !== 'Standart / Baz' ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
+        ...(targetTrim && !['standart', 'standart / baz'].includes(targetTrim.toLowerCase()) ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
         ...transFilterClause,
         ...categoryWhere,
       },
@@ -1001,8 +1031,12 @@ export class VehicleFiltersController {
           })
         : variants[0];
 
-      if (targetTrim && targetTrim !== 'Standart / Baz') {
-        const trimMatches = variants.filter(v => (v.trim?.name || '').toLowerCase() === targetTrim.toLowerCase());
+      if (targetTrim && !['standart', 'standart / baz'].includes(targetTrim.toLowerCase())) {
+        const trimMatches = variants.filter(v => {
+          const raw = (v.trim?.name || '').toLowerCase();
+          const clean = (cleanTrimName(v.trim?.name) || '').toLowerCase();
+          return raw === targetTrim.toLowerCase() || clean === targetTrim.toLowerCase();
+        });
         if (trimMatches.length > 0) {
           const transAndTrim = targetTrans
             ? trimMatches.find(v => {
@@ -1087,8 +1121,14 @@ export class VehicleFiltersController {
       }
 
       // Trim match
-      if (targetTrim && (vTrimName.includes(targetTrim.toLowerCase()) || targetTrim.toLowerCase().includes(vTrimName))) {
-        score += 30;
+      if (targetTrim) {
+        const isGenericTarget = ['standart', 'standart / baz'].includes(targetTrim.toLowerCase());
+        const cleanedVTrim = (cleanTrimName(v.trim?.name) || '').toLowerCase();
+        if (isGenericTarget && (cleanedVTrim === 'standart' || !cleanedVTrim)) {
+          score += 30;
+        } else if (!isGenericTarget && (cleanedVTrim.includes(targetTrim.toLowerCase()) || targetTrim.toLowerCase().includes(cleanedVTrim))) {
+          score += 30;
+        }
       }
 
       // BodyType match
