@@ -1035,12 +1035,17 @@ export default function VehicleReportScreen() {
     ?? (report as any)?.technicalSpecifications?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.displacementCc;
+  const resolvedVehicleType = ((report?.vehicleIdentity as any)?.vehicleType || (report as any)?.vehicleType || '').toUpperCase();
+  const isMotorcycle = resolvedVehicleType === 'MOTORCYCLE' || !!(report as any)?.isMotorcycle;
+
   const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '1598 cc');
   const mtvResult = calculateVehicleMtv({
     modelYear: report?.vehicleIdentity?.modelYear,
     engineDisplacement: rawDisplacement || report?.vehicleIdentity?.engineDisplacementCc,
     fuelType: report?.vehicleIdentity?.fuelType,
     horsepower: rawPower,
+    vehicleType: resolvedVehicleType,
+    isMotorcycle,
   });
   const hpValue = report?.performanceUsage?.powerHp || report?.vehicleIdentity?.enginePowerHp;
   const torqueValue = report?.performanceUsage?.torqueNm;
@@ -1070,11 +1075,14 @@ export default function VehicleReportScreen() {
     || (report as any)?.technicalSpecifications?.curbWeightKg
     || (report as any)?.technicalSpecifications?.weightKg;
 
-  const topSpeedDisplay = topSpeedValue ? `${topSpeedValue} km/h` : (hpValue && hpValue >= 200 ? '240 km/h' : '195 km/h');
-  const zeroToHundredDisplay = zeroToHundredValue ? `${zeroToHundredValue} sn` : (hpValue && hpValue >= 200 ? '7.2 sn' : '9.5 sn');
-  const fuelOrRangeDisplay = isElectricVehicle ? (electricRangeKm ? `${electricRangeKm} km` : '420 km') : (combinedFuel ? `${combinedFuel} lt/100km` : '6.8 lt/100km');
-  const trunkDisplay = trunkValue ? `${trunkValue} lt` : '450 lt';
-  const weightDisplay = weightValue ? `${weightValue} kg` : (isElectricVehicle ? '1850 kg' : '1380 kg');
+  const topSpeedDisplay = topSpeedValue ? `${topSpeedValue} km/h` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '60 km/h' : '140 km/h') : (hpValue && hpValue >= 200 ? '240 km/h' : '195 km/h'));
+  const isLowSpeedBike = isMotorcycle && ((topSpeedValue && topSpeedValue < 80) || (rawDisplacement && rawDisplacement <= 50));
+  const zeroToHundredDisplay = zeroToHundredValue 
+    ? `${zeroToHundredValue} sn` 
+    : (isLowSpeedBike ? 'Şehir İçi (<80 km/h)' : (hpValue && hpValue >= 200 ? '7.2 sn' : (isMotorcycle ? '6.5 sn' : '9.5 sn')));
+  const fuelOrRangeDisplay = isElectricVehicle ? (electricRangeKm ? `${electricRangeKm} km` : '420 km') : (combinedFuel ? `${combinedFuel} lt/100km` : (isMotorcycle ? '2.8 lt/100km' : '6.8 lt/100km'));
+  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? '18 lt' : '450 lt');
+  const weightDisplay = weightValue ? `${weightValue} kg` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '88 kg' : '165 kg') : (isElectricVehicle ? '1850 kg' : '1380 kg'));
   const mtvDisplay = mtvResult ? mtvResult.displayInstallment : 'Hesaplanıyor';
 
   const rawBuyability = report?.scoring?.buyabilityScore?.value ?? 73;
@@ -1613,7 +1621,7 @@ export default function VehicleReportScreen() {
               </View>
 
               <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>0-100 Hızlanma</Text>
+                <Text style={styles.techLabelLight}>{isLowSpeedBike ? '0-50 / Hızlanma' : '0-100 Hızlanma'}</Text>
                 <Text style={styles.techValLight}>{zeroToHundredDisplay}</Text>
               </View>
 
@@ -1623,7 +1631,7 @@ export default function VehicleReportScreen() {
               </View>
 
               <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Bagaj Hacmi</Text>
+                <Text style={styles.techLabelLight}>{isMotorcycle ? 'Depolama / Çanta' : 'Bagaj Hacmi'}</Text>
                 <Text style={styles.techValLight}>{trunkDisplay}</Text>
               </View>
 

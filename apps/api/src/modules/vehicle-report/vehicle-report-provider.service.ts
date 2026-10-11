@@ -58,37 +58,46 @@ export class VehicleReportProviderService {
     fallbackReason?: string;
     verifiedResearch?: VehicleReportResearchData;
   }> {
-    // DISCRIMINATED MULTI-VEHICLE 3-AGENT PIPELINE (MOTORCYCLE / MINIVAN_PANELVAN / SUV_PICKUP)
-    const normalizedType = (vehicleContext?.vehicleType || '').toUpperCase();
-    if (normalizedType === 'MOTORCYCLE' || normalizedType === 'MINIVAN_PANELVAN' || normalizedType === 'SUV_PICKUP' || normalizedType === 'SUV') {
-      if (this.multiVehicleAgentService) {
-        try {
-          const targetVehicleType = normalizedType === 'SUV' ? 'SUV_PICKUP' : normalizedType;
-          this.logger.log(`[DELEGATOR] Dispatching ${targetVehicleType} to MultiVehicleAgentService (3-Agent Pipeline)...`);
-          const multiReport = await this.multiVehicleAgentService.executeMultiAgentPipeline({
-            vehicleType: targetVehicleType as any,
-            brand: vehicleContext.vehicleIdentity?.brand,
-            model: vehicleContext.vehicleIdentity?.model,
-            year: Number(vehicleContext.vehicleIdentity?.modelYear || vehicleContext.vehicleIdentity?.year) || undefined,
-            engine: vehicleContext.vehicleIdentity?.engineCode || vehicleContext.vehicleIdentity?.engine,
-            fuel: vehicleContext.vehicleIdentity?.fuelType,
-            transmission: vehicleContext.vehicleIdentity?.transmissionName || vehicleContext.vehicleIdentity?.transmission,
-            trimPackage: vehicleContext.vehicleIdentity?.trim,
-            modelId: vehicleContext.modelId,
-            variantId: vehicleContext.variantId,
-            searchScope: vehicleContext.searchScope,
-          });
+    // UNIFIED 3-AGENT RESEARCH PIPELINE (FOR ALL 4 VEHICLE TYPES: AUTOMOBILE, SUV_PICKUP, MINIVAN_PANELVAN, MOTORCYCLE)
+    let targetVehicleType: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' = 'AUTOMOBILE';
+    const rawType = (vehicleContext?.vehicleType || '').toUpperCase();
+    if (rawType === 'MOTORCYCLE') {
+      targetVehicleType = 'MOTORCYCLE';
+    } else if (rawType === 'MINIVAN_PANELVAN' || rawType === 'COMMERCIAL' || rawType === 'TICARI') {
+      targetVehicleType = 'MINIVAN_PANELVAN';
+    } else if (rawType === 'SUV_PICKUP' || rawType === 'SUV' || rawType === 'PICKUP' || rawType === 'ARAZI') {
+      targetVehicleType = 'SUV_PICKUP';
+    } else {
+      targetVehicleType = 'AUTOMOBILE';
+    }
 
-          return {
-            report: multiReport,
-            provider: 'MULTI_AGENT_3_PHASE_PIPELINE',
-            modelName: 'gpt-4o-mini-multi-vehicle-agent',
-            qualityScore: multiReport.decisionScore?.score || 85,
-            repairAttempted: false,
-          };
-        } catch (mvErr: any) {
-          this.logger.error(`[MULTI_VEHICLE_PIPELINE] Multi-agent execution failed: ${mvErr?.message}. Falling back...`);
-        }
+    if (this.multiVehicleAgentService) {
+      try {
+        this.logger.log(`[DELEGATOR] Dispatching ${targetVehicleType} to MultiVehicleAgentService (Unified 3-Agent Pipeline)...`);
+        const multiReport = await this.multiVehicleAgentService.executeMultiAgentPipeline({
+          vehicleType: targetVehicleType,
+          brand: vehicleContext.vehicleIdentity?.brand,
+          model: vehicleContext.vehicleIdentity?.model,
+          year: Number(vehicleContext.vehicleIdentity?.modelYear || vehicleContext.vehicleIdentity?.year) || undefined,
+          engine: vehicleContext.vehicleIdentity?.engineCode || vehicleContext.vehicleIdentity?.engine,
+          fuel: vehicleContext.vehicleIdentity?.fuelType,
+          transmission: vehicleContext.vehicleIdentity?.transmissionName || vehicleContext.vehicleIdentity?.transmission,
+          trimPackage: vehicleContext.vehicleIdentity?.trim,
+          bodyType: vehicleContext.vehicleIdentity?.bodyType || (vehicleContext as any)?.bodyType,
+          modelId: vehicleContext.modelId,
+          variantId: vehicleContext.variantId,
+          searchScope: vehicleContext.searchScope,
+        });
+
+        return {
+          report: multiReport,
+          provider: 'MULTI_AGENT_3_PHASE_PIPELINE',
+          modelName: 'gpt-4o-mini-multi-vehicle-agent',
+          qualityScore: multiReport.decisionScore?.score || 85,
+          repairAttempted: false,
+        };
+      } catch (mvErr: any) {
+        this.logger.error(`[MULTI_VEHICLE_PIPELINE] Multi-agent execution failed: ${mvErr?.message}. Falling back...`);
       }
     }
 

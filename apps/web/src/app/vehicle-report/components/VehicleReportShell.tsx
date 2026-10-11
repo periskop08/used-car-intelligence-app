@@ -360,8 +360,14 @@ export default function VehicleReportShell({ report, onRefresh, isRefreshing }: 
             <span className="font-bold text-slate-100 text-base mt-0.5">{topSpeedValue ? `${topSpeedValue} km/h` : "—"}</span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">0-100 Hızlanma</span>
-            <span className="font-bold text-slate-100 text-base mt-0.5">{zeroToHundredValue ? `${zeroToHundredValue} sn` : "—"}</span>
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+              {isMotorcycle && ((topSpeedValue && topSpeedValue < 80) || (effectiveDisplacement && effectiveDisplacement <= 50)) ? "0-50 / Hızlanma" : "0-100 Hızlanma"}
+            </span>
+            <span className="font-bold text-slate-100 text-base mt-0.5">
+              {zeroToHundredValue 
+                ? `${zeroToHundredValue} sn` 
+                : (isMotorcycle && ((topSpeedValue && topSpeedValue < 80) || (effectiveDisplacement && effectiveDisplacement <= 50)) ? "Şehir İçi (<80 km/h)" : "—")}
+            </span>
           </div>
           <div className="bg-slate-950/60 border border-white/5 p-3.5 rounded-xl flex flex-col justify-center min-h-[72px]">
             <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
