@@ -299,18 +299,14 @@ export class VehicleReportService implements OnModuleInit {
         vehicleContextHash = vRes.vehicleContextHash;
       }
 
-      // 3. Check existing CURRENT PUBLISHED report (Rule 36: Same vehicle reuse)
+      // 3. Check existing CURRENT PUBLISHED report (Rule: 100% exact contextHash match)
       if (!dto.forceRefresh) {
         const existingCurrent = await this.prisma.generatedVehicleReport.findFirst({
           where: {
-            OR: [
-              ...(variantId ? [{ variantId }] : []),
-              ...(modelId ? [{ modelId }] : []),
-            ],
+            contextHash: vehicleContextHash,
             isCurrentPublished: true,
             isDraft: false,
             status: VehicleReportStatus.COMPLETED,
-            contextHash: vehicleContextHash,
           },
           orderBy: { completedAt: 'desc' },
         });
@@ -434,13 +430,6 @@ export class VehicleReportService implements OnModuleInit {
         report: savedRecord,
         createdAt: Date.now(),
       });
-
-      // Opportunistically feed canonical technical facts store from accepted exact report facts
-      if (variantId && reportStatus === VehicleReportStatus.COMPLETED) {
-        this.variantTechnicalFactsService
-          .reconcileFactsFromCompletedReport(variantId, providerRes.report)
-          .catch((e) => this.logger.warn(`Failed to reconcile technical facts from report for variant ${variantId}: ${e.message}`));
-      }
 
       // 8. Consume quota upon successful report creation
       if (quotaUsageId) {

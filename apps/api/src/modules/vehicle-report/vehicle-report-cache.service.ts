@@ -42,6 +42,7 @@ export class VehicleReportCacheService {
         const normYear = currentVariant.year;
         const normTrim = (currentVariant.trim?.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
         const normEngine = (currentVariant.engine?.code || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const normTrans = (currentVariant.transmission?.type || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
         const siblingVariants = await this.prisma.vehicleVariant.findMany({
           where: {
@@ -49,14 +50,15 @@ export class VehicleReportCacheService {
             brand: { name: { equals: currentVariant.brand?.name, mode: 'insensitive' } },
             model: { name: { equals: currentVariant.model?.name, mode: 'insensitive' } },
           },
-          include: { trim: true, engine: true },
+          include: { trim: true, engine: true, transmission: true },
         });
 
         const matchingVariantIds = siblingVariants
           .filter((v) => {
             const vTrim = (v.trim?.name || '').replace(/\s+/g, ' ').trim().toLowerCase();
             const vEng = (v.engine?.code || '').replace(/\s+/g, ' ').trim().toLowerCase();
-            return vTrim === normTrim && vEng === normEngine;
+            const vTrans = (v.transmission?.type || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            return vTrim === normTrim && vEng === normEngine && vTrans === normTrans;
           })
           .map((v) => v.id);
 

@@ -343,55 +343,6 @@ export class MultiVehicleAgentService {
     this.logger.log(`[REPORT WRITER] Generating closed presentation report from ${agent3Output.approvedFactsOnly.length} approved facts...`);
     const finalReport = await this.runClosedReportWriter(context, agent3Output);
 
-    // Persist verified specs to VerifiedSpecLibrary so future listings and reports share this ground truth
-    if (agent3Output.finalDisplacementCc > 0 && agent3Output.finalPowerHp > 0) {
-      try {
-        const existing = await this.prisma.verifiedSpecLibrary.findFirst({
-          where: {
-            brand: { equals: context.brand, mode: 'insensitive' },
-            model: { equals: context.model, mode: 'insensitive' },
-            ...(context.year ? { year: Number(context.year) } : {}),
-          },
-        });
-        if (existing) {
-          await this.prisma.verifiedSpecLibrary.update({
-            where: { id: existing.id },
-            data: {
-              displacementCc: agent3Output.finalDisplacementCc,
-              powerHp: agent3Output.finalPowerHp,
-              candidatePowers: agent3Output.candidatePowers,
-              verifiedAt: new Date(),
-            },
-          });
-        } else {
-          await this.prisma.verifiedSpecLibrary.create({
-            data: {
-              vehicleType:
-                context.vehicleType === 'MINIVAN_PANELVAN'
-                  ? 'COMMERCIAL'
-                  : context.vehicleType === 'SUV_PICKUP'
-                  ? 'SUV'
-                  : 'MOTORCYCLE',
-              brand: context.brand,
-              model: context.model,
-              year: context.year ? Number(context.year) : null,
-              bodyType: '',
-              engine: context.engine || '',
-              displacementCc: agent3Output.finalDisplacementCc,
-              powerHp: agent3Output.finalPowerHp,
-              candidatePowers: agent3Output.candidatePowers,
-              verificationStatus: 'VERIFIED',
-              verificationSource: 'MULTI_AGENT_RESEARCH',
-              notes: 'MultiVehicleAgent pipeline verified spec',
-              verifiedAt: new Date(),
-            },
-          });
-        }
-      } catch (upsertErr: any) {
-        this.logger.warn(`Failed to auto-upsert into VerifiedSpecLibrary: ${upsertErr.message}`);
-      }
-    }
-
     return finalReport;
   }
 

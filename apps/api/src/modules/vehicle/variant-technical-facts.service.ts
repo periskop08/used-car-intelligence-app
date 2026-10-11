@@ -847,39 +847,8 @@ export class VariantTechnicalFactsService {
       }
     }
 
-    // Generic Engine-Identity Fact Propagation (Read Path):
-    // If exact variant displacement is MISSING but another variant sharing the EXACT SAME engineId,
-    // brandId, and modelId is VERIFIED with authoritative provider provenance, resolve it cleanly.
-    if (dispStatus === 'MISSING' && variant.engineId && variant.modelId && variant.brandId) {
-      const verifiedSibling = await this.prisma.vehicleVariant.findFirst({
-        where: {
-          brandId: variant.brandId,
-          modelId: variant.modelId,
-          engineId: variant.engineId,
-          id: { not: variant.id },
-          specs: {
-            specs: {
-              path: ['displacementVerification', 'status'],
-              equals: 'VERIFIED',
-            },
-          },
-        },
-        include: { specs: true },
-      });
-
-      if (verifiedSibling?.specs?.specs) {
-        const sibSpecs = verifiedSibling.specs.specs as Record<string, any>;
-        const sibVerif = sibSpecs.displacementVerification as DisplacementVerificationData;
-        if (sibVerif && sibVerif.status === 'VERIFIED' && sibVerif.valueCc && Array.isArray(sibVerif.evidence)) {
-          const primaryEv = sibVerif.evidence.find((e) => e.accepted) || sibVerif.evidence[0];
-          dispStatus = 'VERIFIED';
-          displacementCc = sibVerif.valueCc;
-          displacementSource = primaryEv?.url || sibSpecs.displacementSource || 'CANONICAL_ENGINE_CATALOG_REUSE';
-          dispEvidence = primaryEv?.evidenceExcerpt || sibSpecs.displacementEvidence;
-          dispQuality = 'STRONG';
-        }
-      }
-    }
+    // Generic Engine-Identity Fact Propagation (DISABLED: Strict vehicle isolation — no cross-variant inheritance)
+    // Each variant must strictly derive its own facts without borrowing from sibling trims.
 
     if (
       variant.powerEnrichment?.verificationStatus === PowerVerificationStatus.VERIFIED &&
@@ -926,60 +895,8 @@ export class VariantTechnicalFactsService {
       }
     }
 
-    // Generic Engine-Identity Power Fact Propagation (Read Path):
-    // If exact variant power is MISSING but another variant sharing the EXACT SAME engineId,
-    // brandId, and modelId has verified powerEnrichment with authoritative provenance, resolve it cleanly.
-    if (powerStatus === 'MISSING' && variant.engineId && variant.modelId && variant.brandId) {
-      const verifiedPowerSibling = await this.prisma.vehicleVariant.findFirst({
-        where: {
-          brandId: variant.brandId,
-          modelId: variant.modelId,
-          engineId: variant.engineId,
-          id: { not: variant.id },
-          powerEnrichment: {
-            verificationStatus: PowerVerificationStatus.VERIFIED,
-          },
-        },
-        include: {
-          powerEnrichment: {
-            include: { evidences: true },
-          },
-        },
-      });
-
-      if (verifiedPowerSibling?.powerEnrichment) {
-        const pe = verifiedPowerSibling.powerEnrichment;
-        const evidences = pe.evidences || [];
-        const hasAcceptedEvidence =
-          evidences.length > 0 &&
-          evidences.some((e: any) => {
-            const meta = e.metadata as any;
-            const hasProvider =
-              meta && (meta.provider === 'serper' || meta.provider === 'gemini_grounding' || meta.provider === 'direct_fetch');
-            const tier = classifySourceTier(e.sourceUrl || e.sourceDomain, variant.brand?.name).tier;
-            return hasProvider && tier !== TechnicalSourceTier.TIER_5_COMMUNITY_FORUM && meta.applicationMatch !== false;
-          });
-
-        if (hasAcceptedEvidence) {
-          let canonicalHp = pe.powerHp;
-          if (typeof pe.powerPs === 'number' && pe.powerPs > 0) {
-            canonicalHp = Math.round(pe.powerPs);
-          } else if (typeof pe.sourceReportedValue === 'number' && pe.sourceReportedUnit) {
-            canonicalHp = convertPowerUnits(pe.sourceReportedValue, pe.sourceReportedUnit).powerHp;
-          }
-          if (typeof canonicalHp === 'number') {
-            const gateResult = this.evaluatePowerConsistency(canonicalHp, variant, true);
-            if (gateResult.status === 'VERIFIED') {
-              const primaryEv = evidences.find((e: any) => e.sourceUrl) || evidences[0];
-              powerStatus = 'VERIFIED';
-              powerHp = gateResult.validHp;
-              powerQuality = gateResult.evidenceQuality || 'STRONG';
-              powerSource = primaryEv?.sourceUrl || 'CANONICAL_ENGINE_CATALOG_REUSE';
-            }
-          }
-        }
-      }
-    }
+    // Generic Engine-Identity Power Fact Propagation (DISABLED: Strict vehicle isolation — no cross-variant inheritance)
+    // Each variant must strictly derive its own power without borrowing from sibling trims.
 
     // LEVEL 2: Structured facts from GeneratedVehicleReport for the EXACT SAME variantId only
     if (existingReport && existingReport.reportData) {
