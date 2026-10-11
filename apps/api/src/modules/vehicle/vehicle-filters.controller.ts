@@ -141,6 +141,36 @@ export function getCategoryVariantWhere(category?: string): any {
   return {};
 }
 
+export const KNOWN_TRIM_TOKENS = [
+  'POP', 'PREMIO', 'EMOTION', 'SAFELINE', 'DYNAMIC', 'ACTIVE', 'TREKKING', 'URBAN', 'LOUNGE',
+  'DELUXE', 'DELUX', 'TREND', 'TITANIUM PLUS', 'TITANIUM', 'BLACK LINE', 'JOURNEY TREND',
+  'AMBIENTE', 'ELEGANCE', 'COMFORTLINE', 'HIGHLINE', 'COMFORT', 'STYLE', 'ALLURE', 'GT LINE',
+  'ICON', 'TOUCH', 'JOY', 'LIFE', 'SHINE', 'FEEL', 'MAXI BUSINESS', 'BUSINESS', 'TEKNA', 'VISIA',
+  'PLATINUM', 'MIRROR', 'CROSS', 'EXCLUSIVE', 'CUSTOM', 'EDITION'
+];
+
+export const NON_TRIM_WORDS = new Set([
+  'DÜZ', 'DUZ', 'STANDART', 'MINIVAN', 'CAMLI VAN', 'CAMLIVAN', 'PANELVAN', 'VAN', 'OTOMATIK', 'OTOMATİK', 'YARI OTOMATIK', 'YARI OTOMATİK', 'MANUEL', 'DÜZ - MINIVAN', 'DÜZ - CAMLI VAN', 'DÜZ - MİNİVAN'
+]);
+
+export function cleanEngineCodeAndExtractTrim(rawEngineCode?: string | null): { cleanEngine: string; extractedTrim: string | null } {
+  if (!rawEngineCode) return { cleanEngine: '', extractedTrim: null };
+  const trimmed = rawEngineCode.trim();
+
+  for (const token of KNOWN_TRIM_TOKENS) {
+    const regex = new RegExp(`\\b${token}\\b`, 'i');
+    if (regex.test(trimmed)) {
+      const match = trimmed.match(regex);
+      const rawTrim = match ? match[0] : token;
+      const extractedTrim = rawTrim.charAt(0).toUpperCase() + rawTrim.slice(1).toLowerCase();
+      const cleanEngine = trimmed.replace(regex, '').replace(/\s+/g, ' ').trim();
+      return { cleanEngine, extractedTrim };
+    }
+  }
+
+  return { cleanEngine: trimmed, extractedTrim: null };
+}
+
 import { VariantTechnicalFactsService } from './variant-technical-facts.service';
 
 @ApiTags('Vehicle Filters')
@@ -460,9 +490,10 @@ export class VehicleFiltersController {
         .map(v => {
           const rawCode = v.engine?.code;
           if (!rawCode) return null;
-          if (norm === 'MINIVAN_PANELVAN') return rawCode.trim();
-          if (NON_ENGINE_TOKENS.has(rawCode.trim().toUpperCase())) return null;
-          return this.canonicalDisplayService.getProjectedEngineCode(v.id, rawCode);
+          const { cleanEngine } = cleanEngineCodeAndExtractTrim(rawCode);
+          if (!cleanEngine) return null;
+          if (NON_ENGINE_TOKENS.has(cleanEngine.toUpperCase())) return null;
+          return cleanEngine;
         })
         .filter(Boolean) as string[],
     );
@@ -719,22 +750,52 @@ export class VehicleFiltersController {
           brand: { name: { equals: brand, mode: 'insensitive' } },
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           year: Number(year),
-          ...(targetEngine ? { engine: { code: { equals: targetEngine, mode: 'insensitive' } } } : {}),
           ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         },
         select: {
           id: true,
+          engine: { select: { code: true } },
           trim: { select: { name: true } },
         },
       });
 
-      const trimsSet = new Set(variants.map(v => v.trim?.name).filter(Boolean) as string[]);
+      // Filter variants matching the target clean engine
+      const matchingVariants = variants.filter(v => {
+        if (!targetEngine) return true;
+        const rawCode = v.engine?.code || '';
+        const { cleanEngine } = cleanEngineCodeAndExtractTrim(rawCode);
+        return (
+          cleanEngine.toLowerCase() === targetEngine.toLowerCase() ||
+          rawCode.toLowerCase() === targetEngine.toLowerCase()
+        );
+      });
+
+      const trimsSet = new Set<string>();
+      for (const v of matchingVariants) {
+        const rawTrimName = (v.trim?.name || '').trim();
+        const { extractedTrim } = cleanEngineCodeAndExtractTrim(v.engine?.code);
+
+        const isDbTrimGeneric = !rawTrimName || NON_TRIM_WORDS.has(rawTrimName.toUpperCase());
+        if (extractedTrim && isDbTrimGeneric) {
+          trimsSet.add(extractedTrim);
+        } else if (rawTrimName && !NON_TRIM_WORDS.has(rawTrimName.toUpperCase())) {
+          trimsSet.add(rawTrimName);
+        } else if (extractedTrim) {
+          trimsSet.add(extractedTrim);
+        }
+      }
+
+      // If no authentic package was found, fallback to Standart
+      if (trimsSet.size === 0) {
+        trimsSet.add('Standart');
+      }
+
       const sortedTrims = Array.from(trimsSet).sort((a, b) => a.localeCompare(b, 'tr'));
 
       return {
         success: true,
         data: sortedTrims.map(name => ({ label: name, value: name })),
-        autoVariantId: variants[0]?.id || null,
+        autoVariantId: matchingVariants[0]?.id || null,
       };
     }
 
