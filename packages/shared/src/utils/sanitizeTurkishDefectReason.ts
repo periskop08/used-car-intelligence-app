@@ -703,6 +703,28 @@ export function formatVehicleAssessmentParagraphs(rawText?: string): string[] {
   // Replace PS with HP across narrative text
   const sanitizedText = replacePsWithHp(rawText);
 
+  // If text already has clean double-newline separated paragraphs, split by double newlines!
+  if (sanitizedText.includes('\n\n') || sanitizedText.includes('\r\n\r\n')) {
+    const directParas = sanitizedText
+      .split(/\r?\n\s*\r?\n/)
+      .map((p) => p.replace(/^[*\-:\s]+/, '').trim())
+      .filter((p) => p.length > 20);
+    if (directParas.length > 1) {
+      return directParas;
+    }
+  }
+
+  // Also check single newlines if separated by \n
+  if (sanitizedText.includes('\n')) {
+    const singleLineParas = sanitizedText
+      .split(/\r?\n+/)
+      .map((p) => p.replace(/^[*\-:\s]+/, '').trim())
+      .filter((p) => p.length > 35);
+    if (singleLineParas.length > 1) {
+      return singleLineParas;
+    }
+  }
+
   // Match numbered or bold section titles
   const generalHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*\d+\.\s*[^,.:\n*]{2,60}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
   const knownHeadingRegex = /(?:^|\s*)(?:\*|\-)?\s*\*{0,2}\s*(?:\d+\.)?\s*(?:Motor\s*(?:ve|&)?\s*Şanzıman|Donanım\s*Seviyesi|Sürüş\s*Dinamikleri|Tüketim\s*(?:ve|&)?\s*Kullanım|Genel\s*Bakış|Yakıt\s*Tüketimi|Mekanik\s*Karakter|Teknik\s*Bulgular)[^,.:\n*]{0,40}(?:\([^)]*\))?[^,.:\n*]*[:*]+\*{0,2}\s*/gi;
@@ -712,6 +734,15 @@ export function formatVehicleAssessmentParagraphs(rawText?: string): string[] {
 
   if (chunks.length <= 1) {
     chunks = text.split(knownHeadingRegex).map((c) => c.trim()).filter(Boolean);
+  }
+
+  // Semantic paragraph boundary splitting if all squashed into one single paragraph without breaks
+  if (chunks.length <= 1) {
+    const semanticSplitRegex = /(?<=[.!?])\s+(?=(?:\d{3,4}\s*cc\b|Kabin ses yalıtımı|NVH izolasyonu|Şasi ve süspansiyon))/gi;
+    const semanticParas = text.split(semanticSplitRegex).map((p) => p.trim()).filter((p) => p.length > 30);
+    if (semanticParas.length > 1) {
+      chunks = semanticParas;
+    }
   }
 
   // Clean remaining markdown markers from each chunk

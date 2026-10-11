@@ -1500,8 +1500,8 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
 {
   "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el binek otomobil pazarındaki likidite ve yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
   "dailyUse": {
-    "cityUse": "string (Şehir içi dur-kalk trafiğindeki sürüş konforu, direksiyon manevra kabiliyeti, görüş açıları ve dar alan park kolaylığı odaklı özgün binek analizi.)",
-    "highwayUse": "string (Yüksek hızlardaki yol tutuşu, rüzgar ve yol gürültüsü izolasyonu, süspansiyonun dalgalanma sönümlemesi ve sollamalardaki motor rezervi odaklı özgün binek analizi.)"
+    "cityUse": "string (Modelin şehir içi dur-kalk trafiğindeki direksiyon hissiyatı, süspansiyon sönümlemesi ve manevra kabiliyeti analizi. ASLA talimat cümlesini metne kopyalama!)",
+    "highwayUse": "string (Modelin otoyol hızlarındaki rüzgar ve lastik yuvarlanma izolasyonu, şasi stabilitesi ve motor rezervi analizi. ASLA talimat cümlesini metne kopyalama!)"
   },
   "technicalSpecifications": {
     "engineDisplacementCc": ${judge.finalDisplacementCc},
@@ -1528,7 +1528,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     { "profile": "string", "explanation": "string (Bu binek otomobilin karakterine tam uyan kullanıcı profili)" }
   ],
   "notIdealFor": [
-    { "profile": "string", "explanation": "string (Bu araca uygun olmayan kullanıcı profili)" }
+    { "profile": "string", "explanation": "string (Bu araca uygun olmayan kullanıcı profili - ÖNEMLİ: Asfalt binek otomobilde KESİNLİKLE 'off-road yapanlar' gibi absürt profiller yazma! Dar sokaklarda küçük boyut/hatchback arayanlar veya yüksek oturma pozisyonlu SUV isteyenler gibi gerçekçi profiller yaz)" }
   ],
   "conditionsToConsider": [
     { "condition": "string (Somut mekanik/ekspertiz önkoşulu)", "reason": "string" }
@@ -1540,7 +1540,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     { "system": "string", "checkpoint": "string", "riskIfIgnored": "string" }
   ],
   "sellerQuestions": [
-    { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
+    { "topic": "string", "question": "string", "expectedAnswer": "string (Yetkili servisteki kontrolü ve parça durumunu belirten tatmin edici ve somut teknik yanıt - asla 'sorun yok / normal seviyede' gibi tek cümlelik kaçamak yanıt yazma)" }
   ],
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
@@ -1704,6 +1704,15 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     let text = String(raw).trim();
     if (text === '[object Object]') text = '';
 
+    // Strip echoed prompt instruction templates
+    text = text
+      .replace(/^Şehir içi dur-kalk trafiğindeki[^\n.:]{0,140}analizi\.?\s*/i, '')
+      .replace(/^Yüksek hızlardaki yol tutuşu[^\n.:]{0,140}analizi\.?\s*/i, '')
+      .replace(/^Modelin şehir içi dur-kalk[^\n.:]{0,140}analizi\.?\s*/i, '')
+      .replace(/^Modelin otoyol hızlarındaki[^\n.:]{0,140}analizi\.?\s*/i, '')
+      .replace(/^Aracın tavan yüksekliğinin[^\n.:]{0,140}analizi\.?\s*/i, '')
+      .replace(/^Aracın otoyol hızlarındaki yan rüzgar[^\n.:]{0,140}analizi\.?\s*/i, '');
+
     const dictionary: Array<[RegExp, string]> = [
       // Regülatör / Düzeltici / Konjektör
       [/regulator\/rectifier overheating and battery drain/gi, 'Statör & Şarj Regülatörü (Konjektör) Aşırı Isınması ve Akü Boşalması'],
@@ -1795,6 +1804,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
   ): any {
     const isMotorcycle = context.vehicleType === 'MOTORCYCLE';
     const isSuvPickup = context.vehicleType === 'SUV_PICKUP';
+    const isCommercial = context.vehicleType === 'MINIVAN_PANELVAN';
+    const isAutomobile = context.vehicleType === 'AUTOMOBILE' || (!isMotorcycle && !isSuvPickup && !isCommercial);
     const titlePrefix = isMotorcycle
       ? `${context.brand} ${context.model}`
       : `${context.year || ''} ${context.brand} ${context.model} ${context.trimPackage || ''}`.trim();
@@ -1830,32 +1841,45 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const baseHp = judge.finalPowerHp;
     const baseCc = judge.finalDisplacementCc;
 
+    const realisticTopSpeed =
+      isMotorcycle
+        ? (baseCc <= 50 ? 50 : baseCc <= 125 ? 95 : 120)
+        : baseHp >= 400 ? 250 : baseHp >= 250 ? 245 : baseHp >= 180 ? 230 : baseHp >= 130 ? 205 : 185;
+
     const topSpeedKmh =
-      typeof writer.technicalSpecifications?.topSpeedKmh === 'number'
+      typeof writer.technicalSpecifications?.topSpeedKmh === 'number' &&
+      writer.technicalSpecifications.topSpeedKmh > (isMotorcycle ? 30 : 160)
         ? writer.technicalSpecifications.topSpeedKmh
-        : isMotorcycle ? 110 : 160;
+        : realisticTopSpeed;
+
+    const realisticZeroHundred =
+      isMotorcycle
+        ? null
+        : baseHp >= 400 ? 3.9 : baseHp >= 250 ? 6.2 : baseHp >= 180 ? 8.1 : baseHp >= 130 ? 9.6 : 11.2;
 
     const zeroToHundredKmh =
-      typeof writer.technicalSpecifications?.zeroToHundredKmh === 'number'
+      typeof writer.technicalSpecifications?.zeroToHundredKmh === 'number' &&
+      writer.technicalSpecifications.zeroToHundredKmh > 0
         ? writer.technicalSpecifications.zeroToHundredKmh
-        : null;
+        : realisticZeroHundred;
 
     const catalogCombinedFuelL100km =
-      typeof writer.technicalSpecifications?.catalogCombinedFuelL100km === 'number'
+      typeof writer.technicalSpecifications?.catalogCombinedFuelL100km === 'number' &&
+      writer.technicalSpecifications.catalogCombinedFuelL100km > 0
         ? writer.technicalSpecifications.catalogCombinedFuelL100km
-        : isMotorcycle ? 3.0 : 6.0;
+        : isMotorcycle ? 2.8 : 6.0;
 
     const trunkCapacityLiters =
       typeof writer.technicalSpecifications?.trunkCapacityLiters === 'number' &&
       writer.technicalSpecifications.trunkCapacityLiters > 0
         ? writer.technicalSpecifications.trunkCapacityLiters
-        : isMotorcycle ? 0 : 500;
+        : isMotorcycle ? 0 : isSuvPickup ? 550 : 480;
 
     const curbWeightKg =
       typeof writer.technicalSpecifications?.curbWeightKg === 'number' &&
       writer.technicalSpecifications.curbWeightKg > 0
         ? writer.technicalSpecifications.curbWeightKg
-        : isMotorcycle ? 120 : 1300;
+        : isMotorcycle ? 115 : isSuvPickup ? 1750 : 1420;
 
     // Deducted risks construction for V6 Score Hero (with Turkish sanitization)
     const deductedRisks = judge.approvedFactsOnly.map((fact) => {
@@ -2029,6 +2053,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
                 : 'Şehir içi kıvraklığı, düşük devir tork dengesi ve dur-kalk trafiğindeki manevra kabiliyeti.')
               : isSuvPickup
               ? 'Şehir içi manevra kabiliyeti, yüksek sürüş pozisyonu ve kaldırım/tümsek aşma rahatlığı.'
+              : isAutomobile
+              ? 'Şehir içi dur-kalk trafiğindeki direksiyon hassasiyeti, süspansiyon darbe emişi ve dar sokak manevra kabiliyeti.'
               : 'Şehir içi dağıtım ve dar sokaklarda dönüş çapı ile ayna görüş açısı manevra kabiliyeti.'),
           ),
           highwayUse: this.sanitizeTurkishAutomotiveText(
@@ -2036,6 +2062,8 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
               ? 'Otoyol rüzgar direnci ve yüksek süratlerdeki titreşim/şasi stabilitesi.'
               : isSuvPickup
               ? 'Otoyol seyir konforu, rüzgar sesi yalıtımı ve yüksek sürat şasi dengesi.'
+              : isAutomobile
+              ? 'Otoyol hızlarında yüksek hız şasi stabilitesi, kabin rüzgar yalıtımı ve sollamalardaki motor rezervi.'
               : 'Yüklü otoyol seyrinde motor tork rezervi ve rüzgar savurma direnci.'),
           ),
           supportingFactIds: [],
@@ -2083,23 +2111,38 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           explanation: this.sanitizeTurkishAutomotiveText(i.explanation),
           supportingFactIds: [],
         })),
-        notSuitableFor: (writer.notIdealFor || writer.notSuitableFor || [])
-          .filter((n: any) => {
-            const nText = `${n.profile} ${n.explanation}`.toLowerCase();
-            const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
-            if (!isMotorcycle && !isSuvPickup && !hasAuto) {
-              if (/otomatik/i.test(nText)) return false;
-            }
-            return true;
-          })
-          .map((n: any) => ({
-            profile: this.sanitizeTurkishAutomotiveText(n.profile),
-            explanation: this.sanitizeTurkishAutomotiveText(n.explanation)
-              .replace(/ve otomatik şanzımanın bakım gereksinimleri,?/gi, '')
-              .replace(/otomatik şanzımanın bakım gereksinimleri ve,?/gi, '')
-              .trim(),
-            supportingFactIds: [],
-          })),
+        notSuitableFor: (() => {
+          const list = (writer.notIdealFor || writer.notSuitableFor || [])
+            .filter((n: any) => {
+              const nText = `${n.profile} ${n.explanation}`.toLowerCase();
+              const hasAuto = Boolean(judge.commercialDetails?.automaticGearboxVerified || isVariantAutomatic);
+              if (!isMotorcycle && !isSuvPickup && !hasAuto) {
+                if (/otomatik/i.test(nText)) return false;
+              }
+              // For passenger automobiles, completely filter out off-road absurdity
+              if (isAutomobile && (nText.includes('off-road') || nText.includes('arazi') || nText.includes('bozuk zemin ve taşlık'))) {
+                return false;
+              }
+              return true;
+            })
+            .map((n: any) => ({
+              profile: this.sanitizeTurkishAutomotiveText(n.profile),
+              explanation: this.sanitizeTurkishAutomotiveText(n.explanation)
+                .replace(/ve otomatik şanzımanın bakım gereksinimleri,?/gi, '')
+                .replace(/otomatik şanzımanın bakım gereksinimleri ve,?/gi, '')
+                .trim(),
+              supportingFactIds: [],
+            }));
+
+          if (list.length === 0 && isAutomobile) {
+            list.push({
+              profile: 'Dar Şehir İçi Sokaklarında Kompakt Boyut Arayanlar',
+              explanation: 'Geniş gövde boyutları ve uzun aks mesafesi nedeniyle dar sokaklarda park etme ve kıvrak manevra yapma beklentisi olanlar için hatchback veya küçük sınıf araçlar daha pratik olabilir.',
+              supportingFactIds: [],
+            });
+          }
+          return list;
+        })(),
         purchaseConditions: (() => {
           let conds = (writer.conditionsToConsider || [])
             .filter((c: any) => {
@@ -2223,22 +2266,33 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       sellerQuestions: (writer.sellerQuestions || []).map((q: any) => {
         const qText = this.sanitizeTurkishAutomotiveText(q.question);
         let ans = this.sanitizeTurkishAutomotiveText(q.expectedAnswer);
-        if (!ans || /^(evet|hay\u0131r|evet\/hay\u0131r)$/i.test(ans.trim())) {
-          if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|\u015farj/i.test(qText)) {
-            ans = 'Yetkili veya uzman serviste orijinal parçayla yenilendi; rölantide ve 5000 devirde akü şarj voltajı 14V üzerinde stabil.';
+        const isGenericAns =
+          !ans ||
+          /^(evet|hay\u0131r|evet\/hay\u0131r)$/i.test(ans.trim()) ||
+          /kliman\u0131n \u00e7al\u0131\u015fmas\u0131nda herhangi bir sorun yok/i.test(ans) ||
+          /ya\u011f t\u00fcketimi normal seviyelerde/i.test(ans) ||
+          /^(sorun yok|herhangi bir anormallik yok|normal seviyede)$/i.test(ans.trim().replace(/[.,!]/g, ''));
+
+        if (isGenericAns) {
+          if (/klima|so\u011futma|iklimlendirme|kompres\u00f6r/i.test(qText)) {
+            ans = 'Klima kompres\u00f6r\u00fc ve evaporat\u00f6r gaz bas\u0131nc\u0131 test edildi; \u00e7ift b\u00f6lgeli so\u011futma kanallar\u0131 ve klape motorlar\u0131 kusursuz \u00e7al\u0131\u015f\u0131yor.';
+          } else if (/zincir|gergi|triger|ya\u011f t\u00fcketim|eksiltme/i.test(qText)) {
+            ans = 'Yetkili servis periyodik bak\u0131mlar\u0131nda \u00fcretici onayl\u0131 ya\u011f kullan\u0131ld\u0131; 10.000 km aral\u0131kta belirgin bir ya\u011f eksiltme ve so\u011fuk \u00e7al\u0131\u015ft\u0131rmada zincir \u015fak\u0131rt\u0131s\u0131 bulunmuyor.';
+          } else if (/reg[uü]lat[oö]r|konjekt[oö]r|stat[oö]r|ak[uü]|\u015farj/i.test(qText)) {
+            ans = 'Yetkili veya uzman serviste orijinal par\u00e7ayla yenilendi; r\u00f6lantide ve y\u00fcksek devirde ak\u00fc \u015farj voltaj\u0131 14V \u00fczerinde stabil.';
           } else if (/pompa|enjeksiyon|yak\u0131t|benzin/i.test(qText)) {
-            ans = 'Depo içi yakıt pompası ve filtreleri temizlendi, hat basıncı fabrika toleransında.';
-          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal/i.test(qText)) {
-            ans = 'Vites geçişlerinde herhangi bir sertlik, sekromeç cırtlaması veya 2. vitesten atma problemi yaşanmadı.';
+            ans = 'Depo i\u00e7i yak\u0131t pompas\u0131 ve filtreleri temizlendi, hat bas\u0131nc\u0131 fabrika tolerans\u0131nda.';
+          } else if (/vites|\u015fanz\u0131man|sekrome[cç]|hilal|kavrama|tork konvert/i.test(qText)) {
+            ans = 'Vites ge\u00e7i\u015flerinde herhangi bir sertlik, vuruntu, kayd\u0131rma veya gecikme ya\u015fanm\u0131yor; mekanik ve kavrama sa\u011fl\u0131\u011f\u0131 tam.';
           } else {
-            ans = 'Periyodik bakımları zamanında yetkili serviste faturalı ve kayıtlı olarak yapıldı.';
+            ans = 'Periyodik bak\u0131mlar\u0131 zaman\u0131nda yetkili serviste fatural\u0131 ve kay\u0131tl\u0131 olarak yap\u0131ld\u0131, t\u00fcm fonksiyonlar eksiksiz \u00e7al\u0131\u015f\u0131yor.';
           }
         }
         return {
-          category: 'TEKNİK_VE_BAKIM',
+          category: 'TEKN\u0130K_VE_BAKIM',
           questionText: qText,
           expectedAnswerHint: ans,
-          redFlagAnswerHint: 'Belirsiz veya kaçamak cevaplar ("bilmiyorum", "hiç baktırmadım")',
+          redFlagAnswerHint: 'Belirsiz veya ka\u00e7amak cevaplar ("bilmiyorum", "hi\u00e7 bakt\u0131rmad\u0131m")',
         };
       }),
       inspectionChecklist: (writer.inspectionChecklist || []).map((c: any) => ({
