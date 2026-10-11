@@ -1537,10 +1537,11 @@ MANDATORY RULES:
    Never translate rectifier as "düzeltici" - in Turkish motorcycle workshops it is strictly "Konjektör" or "Şarj Regülatörü".
    Never translate dog engagement as "engelleme" - in Turkish motorcycle mechanics it is strictly "Vites Hilali ve Dişli Tırnağı Aşınması".
    Never output "Evet/Hayır" in sellerQuestions; write the full reassuring technical answer the seller should provide.
-2. "vehicleOverview" MUST BE A MINIMUM OF 3 RICH PARAGRAPHS:
-   - Paragraph 1: Design language, ergonomics, riding/driving posture, chassis construction, and road presence.
-   - Paragraph 2: Powertrain character, torque curve delivery, engine sound, gear ratios, and real-world highway vs urban dynamics.
-   - Paragraph 3: Market positioning, materials and build quality evaluation. KESİNLİKLE RAKİP VEYA BAŞKA MARKA/MODEL KIYASLAMASI YAPMA.
+2. "vehicleOverview" (BU ARAÇ NASIL BİR OTOMOBİL / TİCARİ ARAÇ / SUV / MOTOSİKLET?) KURALI:
+   - "vehicleOverview", aralarında çift satır boşluğu (\n\n) bulunan ve HER BİRİ EN AZ 3-4 ZENGİN, TEKNİK VE AKICI CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAFTAN OLUŞMALIDIR. ASLA tek cümlelik kısa özetler veya tek bir şablon cümle yazma!
+   - 1. Paragraf (Gövde Mimarisi, Şasi, Ergonomi & İç Mekan): Modelin şasi yapısı, sürüş ergonomisi, kokpit mimarisi, kabin ferahlığı, malzeme kalitesi ve kullanım pratikliği detaylı anlatılmalıdır.
+   - 2. Paragraf (Motor Gücü, Şanzıman Aktarımı & Sürüş Dinamikleri): Motorun hacmi (${judge.finalDisplacementCc} cc), katalog gücü (${judge.finalPowerHp} HP), tork teslimatı, şanzıman geçiş karakteri ve otoyol/şehir içi yol tutuş dengesi derinlemesine incelenmelidir.
+   - 3. Paragraf (Seçilen Donanım Paketi & Günümüz Dünyasındaki Yeri): Seçilen donanım paketinin fabrika çıkışındaki donanım içeriği açıklanmalı; bu donanımlar günümüz (2024-2026) şartlarına göre açıkça OLUMLU (bugün de korunan değerler, sağlam mekanik kumandalar, temel konfor) ve OLUMSUZ (günümüz beklentilerine göre eksik kalan multimedya, CarPlay/Bluetooth, park kamerası/sensörü, aydınlatma, aktif güvenlik) yönleriyle derinlemesine değerlendirilmelidir. KESİNLİKLE BAŞKA MARKA VEYA RAKİP MODEL ADI KULLANILAMAZ!
 3. STRICT ZERO COMPETITOR / RIVAL COMPARISON (SIFIR RAKİP KIYASLAMASI KURALI):
    Raporda KESİNLİKLE başka bir marka veya rakip model ismi (örneğin Honda, Yamaha, Kawasaki, KTM, Suzuki vb.) geçmemelidir.
    "Rakiplerine kıyasla", "sınıfındaki rakipleri gibi" gibi kıyaslamalar kesinlikle yasaktır.
@@ -1667,6 +1668,22 @@ Write the complete Motorcycle Report in strict JSON:
   "sellerQuestions": [
     { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
   ],
+  "trimContemporaryAssessment": {
+    "trimName": "${context.trimPackage || 'Standart'}",
+    "equipmentTier": "BAZ_DONANIM | ORTA_DONANIM | UST_DONANIM",
+    "factoryStandardFeatures": [
+      "string (Fabrika çıkışında sunulan standart donanımlar)"
+    ],
+    "contemporaryPros": [
+      "string (Günümüz şartlarına göre bu modelde olumlu ve dayanıklı görülen özellikler)"
+    ],
+    "contemporaryCons": [
+      "string (Günümüz standartlarına göre eksik veya zayıf kalan donanım özellikleri)"
+    ],
+    "scorePenalty": 0,
+    "scorePenaltyReason": "string (Varsa kesinti gerekçesi)",
+    "narrativeSummary": "string (Donanım/versiyonun günümüzdeki konumunun 2-3 cümlelik özeti)"
+  },
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
     "riskLevel": "${judge.technicalRiskLevel}",
@@ -1692,7 +1709,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${context.brand} ${context.model} modelinin gövde yapısı (unibody veya merdiven şasi), yaklaşma/uzaklaşma açıları, taban yüksekliği, kabin ferahlığı ve yüksek sürüş pozisyonu.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, 4x4/AWD aktarma kabiliyeti, diferansiyel kilit davranışı ve otoyol/arazi dengesi.\\n3. Paragraf: Alt takım rijitliği, süspansiyon dayanıklılığı, arazi yorgunluğu ve Türkiye SUV/Pickup pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK)",
+  "vehicleOverview": "string (Aralarında \\n\\n olan, her biri EN AZ 3-4 ZENGİN VE DERİN CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAF. 1. Paragraf gövde yapısı, yaklaşma/uzaklaşma açıları, taban yüksekliği, kabin ferahlığı ve yüksek sürüş pozisyonu; 2. Paragraf ${judge.finalDisplacementCc} cc ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP gücü, 4x4/AWD aktarma kabiliyeti ve yol tutuşu; 3. Paragraf seçilen donanım paketinin (${context.trimPackage || 'Standart'}) fabrika çıkış içeriği ve 2024-2026 günümüz dünyasındaki OLUMLU / OLUMSUZ yönleri. Asla tek cümlelik özet yazma!)",
   "dailyUse": {
     "cityUse": "string (Şehir içi boyutlar, dar sokak manevrası, kaldırım/tümsek avantajı ve yüksek görüş açısı odaklı özgün analiz.)",
     "highwayUse": "string (Yüksek gövde yapısının yan rüzgar tepkileri, otoyol stabilitesi, 4x4 çekiş kararlılığı ve motor rezervi odaklı özgün analiz.)"
@@ -1736,6 +1753,22 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
   "sellerQuestions": [
     { "topic": "string", "question": "string", "expectedAnswer": "string (rahatlatıcı ve teknik beklenen yanıt)" }
   ],
+  "trimContemporaryAssessment": {
+    "trimName": "${context.trimPackage || 'Standart'}",
+    "equipmentTier": "BAZ_DONANIM | ORTA_DONANIM | UST_DONANIM",
+    "factoryStandardFeatures": [
+      "string (Bu SUV/Pickup donanım paketinde sunulan standart donanımlar)"
+    ],
+    "contemporaryPros": [
+      "string (Günümüz 2024-2026 şartlarına göre olumlu ve değerini koruyan özellikler)"
+    ],
+    "contemporaryCons": [
+      "string (Günümüz standartlarına göre eksik veya demode kalan donanım özellikleri)"
+    ],
+    "scorePenalty": number,
+    "scorePenaltyReason": "string (Kesinti gerekçesi)",
+    "narrativeSummary": "string (Donanım paketinin günümüzdeki yerinin 2-3 cümlelik özeti)"
+  },
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
     "riskLevel": "${judge.technicalRiskLevel}",
@@ -1753,10 +1786,6 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const filterBlock = this.format8FilterBlock(context);
 
       const isSubaru = context.brand.toLowerCase() === 'subaru';
-      const autoOverviewGuide = isSubaru
-        ? `Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin ralli mirasını taşıyan rijit gövde mimarisi, sürücü oturma pozisyonu, ergonomik kokpiti, yatay boksör (Boxer) motorun sağladığı düşük ağırlık merkezi ve binek bagaj pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki Boxer (EJ204) motorun ${judge.finalPowerHp} HP güç karakteri, Symmetrical AWD (Sürekli Simetrik Dört Tekerden Çekiş) viraj dengesi ve ${activeTransmissionName} şanzıman aktarımı.\\n3. Paragraf: Kabin ses izolasyonu (NVH), süspansiyon konforu, Türkiye pazarında niş/meraklısı profili, usta ve yedek parça erişilebilirliği. (ASLA 'likiditesi oldukça yüksektir' gibi ezbere klişe yazma; meraklısı kitlesi ve servis ekosistemi olarak dürüstçe değerlendir)`
-        : `Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği. KESİNLİKLE sürgülü kapı, palet, esnaf/filo gibi ticari terimler KULLANILAMAZ!\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, otoyol seyir kararlılığı ve viraj dengesi.\\n3. Paragraf: Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve Türkiye ikinci el pazarındaki konumu (geniş kitle veya niş/meraklısı tercihi, parça ve servis erişilebilirliği).`;
-
       const subaruDrivetrain = isSubaru ? 'Sürekli Dört Tekerden Çekiş (Symmetrical AWD)' : 'Önden Çekiş (FWD)';
 
       userPrompt = `Passenger Automobile Specification:
@@ -1767,9 +1796,14 @@ Approved Facts:
 ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
+ÖNEMLİ TALİMAT: "vehicleOverview" (Bu Araç Nasıl Bir Otomobil?), aralarında çift satır boşluğu (\\n\\n) olan ve HER BİRİ EN AZ 3-4 ZENGİN, TEKNİK VE DERİN CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAF OLMALIDIR:
+1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, rijitliği, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği.${isSubaru ? ' (Ralli mirası, yatay boksör motorun sağladığı düşük ağırlık merkezi ve kokpit görüş açıları)' : ''}
+2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${isSubaru ? 'Boxer (EJ204)' : fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, ${isSubaru ? 'Symmetrical AWD viraj dengesi' : 'yol tutuş dengesi'} ve otoyol seyir kararlılığı.
+3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu donanımların günümüz 2024-2026 şartlarına göre OLUMLU (bugün de korunan değerler, dayanıklı mekanik kumandalar, temel konfor) ve OLUMSUZ (günümüz multimedya, CarPlay/Bluetooth, park destek ve güvenlik standartlarına göre eksik/demode kalan) yönlerinin derinlemesine değerlendirmesi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'} KESİNLİKLE RAKİP VEYA BAŞKA MARKA/MODEL KIYASLAMASI YAPMA.
+
 Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "${autoOverviewGuide}",
+  "vehicleOverview": "string (Aralarında \\n\\n olan, her biri EN AZ 3-4 ZENGİN VE DERİN CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAF. 1. Paragraf gövde, ergonomi ve şasi; 2. Paragraf ${judge.finalDisplacementCc} cc ${judge.finalPowerHp} HP motor ve aktarma dinamikleri; 3. Paragraf seçilen donanım paketinin (${cleanTrim || 'Standart'}) fabrika çıkış donanımları ve 2024-2026 günümüz dünyasındaki OLUMLU / OLUMSUZ yönleri. Asla tek cümlelik özet yazma!)",
   "dailyUse": {
     "cityUse": "string (Modelin şehir içi dur-kalk trafiğindeki direksiyon hissiyatı, süspansiyon sönümlemesi ve manevra kabiliyeti analizi. ASLA talimat cümlesini metne kopyalama!)",
     "highwayUse": "string (Modelin otoyol hızlarındaki rüzgar ve lastik yuvarlanma izolasyonu, şasi stabilitesi ve motor rezervi analizi. ASLA talimat cümlesini metne kopyalama!)"
@@ -1813,6 +1847,22 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
   "sellerQuestions": [
     { "topic": "string", "question": "string", "expectedAnswer": "string (Yetkili servisteki kontrolü ve parça durumunu belirten tatmin edici ve somut teknik yanıt - asla 'sorun yok / normal seviyede' gibi tek cümlelik kaçamak yanıt yazma)" }
   ],
+  "trimContemporaryAssessment": {
+    "trimName": "${cleanTrim || 'Standart'}",
+    "equipmentTier": "BAZ_DONANIM | ORTA_DONANIM | UST_DONANIM",
+    "factoryStandardFeatures": [
+      "string (Bu binek otomobil donanım paketinde fabrikasyon sunulan standart donanımlar)"
+    ],
+    "contemporaryPros": [
+      "string (Günümüz 2024-2026 şartlarına göre bu pakette hâlâ değerini koruyan, olumlu görülen özellikler)"
+    ],
+    "contemporaryCons": [
+      "string (Günümüz standartlarına göre bu pakette eksik, yetersiz veya demode kalan donanım özellikleri)"
+    ],
+    "scorePenalty": number,
+    "scorePenaltyReason": "string (Kesinti gerekçesi; örn: '${cleanTrim || 'Baz'} donanım paketinde günümüz standartlarına kıyasla multimedya ekranı, Bluetooth ve park sensörü bulunmaması sebebiyle -3 puan')",
+    "narrativeSummary": "string (Donanım paketinin günümüzdeki yerini açıklayan 2-3 cümlelik uzman analizi)"
+  },
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
     "riskLevel": "${judge.technicalRiskLevel}",
@@ -1909,7 +1959,7 @@ Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNGİLİZCE):
 {
-  "vehicleOverview": "Aralarında çift satır boşluğu (\\n\\n) olan TAM 3 PARAGRAFLIK detaylı uzman analizi:\\n1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği.\\n2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork karakteri, ağır yük altındaki çekiş kabiliyeti, ${isVariantAutomatic ? `${autoName} şanzıman karakteri` : isVariantManual ? `${manualName} şanzıman dişli oranları` : (isAutoVerified ? `${manualName} ve ${autoName} şanzıman opsiyonları` : `${manualName} şanzıman yapısı`)}.\\n3. Paragraf: Filo ve esnaf kullanımındaki genel dayanıklılık, malzeme kalitesi ve Türkiye ikinci el ticari pazarındaki yeri. (KESİNLİKLE RAKİP MARKA/MODEL ADI GEÇMEYECEK, ASLA TEK PARAGRAFA SIKIŞTIRILMAYACAK)",
+  "vehicleOverview": "string (Aralarında \\n\\n olan, her biri EN AZ 3-4 ZENGİN VE DERİN CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAF. 1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, sürüş pozisyonu, kabin ergonomisi, sürgülü kapı ve yükleme eşiği pratikliği; 2. Paragraf: ${judge.finalDisplacementCc} cc ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP gücü ve tork karakteri, ağır yük altındaki çekişi ve şanzıman yapısı; 3. Paragraf: Seçilen donanım paketinin (${cleanTrim || 'Standart'}) fabrika çıkış içeriği, ticari dayanıklılığı ve 2024-2026 günümüz dünyasındaki OLUMLU / OLUMSUZ yönleri. Asla tek cümlelik özet yazma!)",
   "configurationAnalysis": "string (Aracın kargo/bagaj hacminin pratik kullanımı ve yükleme eşiği ergonomisi hakkında 2-3 cümlelik ÖZGÜN değerlendirme. KESİNLİKLE 'palet sığma kabiliyeti' veya 'iş yükünü hafifletir' gibi şablon cümleler kopyalanmayacak; ${isCombi ? `5 kişilik camlı binek/kombi (${cleanTrim || 'Kombi'}) versiyonunda arka koltuk arkası bagaj hacmi (${adjudicatedLiters} Litre / ~${adjudicatedCargoM3} m³) ve aile/esnaf kullanım ergonomisi anlatılacaktır. KESİNLİKLE 3000+ litre sac panelvan kargo hacmi yazılmayacaktır!` : `Panelvan versiyonunda ${adjudicatedLiters || `${adjudicatedCargoM3} m³`} kargo hacmi ve yükleme pratikliği anlatılacaktır.`})",
   "manualTransmissionAnalysis": "string (${manualName} şanzımanın baskı balata ömrü, debriyaj pedalı sertliği, yüklü kalkışlardaki kavrama toleransı ve vites geçiş hassasiyeti hakkında ÖZGÜN teknik analiz.)",
   "automaticTransmissionAnalysis": "string (${isAutoVerified ? `Modelin ${autoName} şanzıman opsiyonunun teknik analizi; dur-kalk trafiğindeki ısınma/kavrama davranışı ve bakım gereksinimleri hakkında ÖZGÜN analiz. KESİNLİKLE 'otomatik şanzıman bulunmuyor' veya 'yalnızca manuel üretilmiştir' YAZILMAYACAKTIR!` : `Modelin şanzıman yapısı (${manualName}) ve otomatik seçeneği bulunmaması durumunda mekanik debriyaj avantajları ve işletme maliyeti hakkında özgün analiz.`})",
@@ -1968,6 +2018,22 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       "expectedAnswer": "string (Satıcının vermesi gereken güven verici, somut servis ve parça teyidi)"
     }
   ],
+  "trimContemporaryAssessment": {
+    "trimName": "${cleanTrim || 'Standart'}",
+    "equipmentTier": "BAZ_DONANIM | ORTA_DONANIM | UST_DONANIM",
+    "factoryStandardFeatures": [
+      "string (Bu ticari donanım paketinde sunulan standart donanımlar)"
+    ],
+    "contemporaryPros": [
+      "string (Günümüz 2024-2026 şartlarına göre ticari ve günlük kullanımda olumlu görülen özellikler)"
+    ],
+    "contemporaryCons": [
+      "string (Günümüz standartlarına göre eksik veya demode kalan donanım özellikleri)"
+    ],
+    "scorePenalty": number,
+    "scorePenaltyReason": "string (Kesinti gerekçesi)",
+    "narrativeSummary": "string (Donanım paketinin günümüzdeki yerini açıklayan 2-3 cümlelik uzman analizi)"
+  },
   "decisionSynthesis": {
     "score": ${judge.decisionScore},
     "riskLevel": "${judge.technicalRiskLevel}",
@@ -2252,6 +2318,42 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       };
     });
 
+    // Trim Package Contemporary Evaluation (2024-2026) -> Deducted Risk & Decision Score Impact
+    const trimAssessment = writer.trimContemporaryAssessment;
+    const cleanTrimName = context.trimPackage && !/^(standart|standart donanım|standart kasa)$/i.test(context.trimPackage)
+      ? context.trimPackage
+      : (trimAssessment?.trimName || 'Standart Donanım');
+
+    let trimPenalty = typeof trimAssessment?.scorePenalty === 'number'
+      ? Math.max(0, Math.min(5, Math.round(trimAssessment.scorePenalty)))
+      : (
+          // Robust fallback for older base trims if scorePenalty not explicitly returned
+          /active|trend|joy|visia|delux|ambiente|authentique|comfort\b/i.test(cleanTrimName) && (context.year || 2020) <= 2018 ? 3 : 0
+        );
+
+    // If equipmentTier is explicitly BAZ_DONANIM and penalty is 0, guarantee standard 3 points deduction
+    if (trimAssessment?.equipmentTier === 'BAZ_DONANIM' && trimPenalty === 0) {
+      trimPenalty = 3;
+    }
+
+    if (trimPenalty > 0) {
+      const penaltyReason = trimAssessment?.scorePenaltyReason || 
+        `${cleanTrimName} donanım paketi; günümüz (2024-2026) otomotiv standartlarına kıyasla multimedya/bağlantı (CarPlay/Android Auto), geri görüş kamerası, park sensörleri ve modern aydınlatma teknolojilerinden yoksundur.`;
+
+      deductedRisks.push({
+        title: `${cleanTrimName} Donanım Paketi ve Günümüz Standartları Değerlendirmesi`,
+        reason: this.sanitizeTurkishAutomotiveText(penaltyReason),
+        description: this.sanitizeTurkishAutomotiveText(penaltyReason),
+        netDeduction: trimPenalty,
+        deduction: trimPenalty,
+        penalty: trimPenalty,
+        inspectionInstruction: 'Araç içi tüm elektrikli camlar, klima/havalandırma kumandaları, aydınlatma grubu ve varsa sonradan eklenmiş multimedya/ses tesisatının eksiksiz çalıştığı ekspertizde teyit edilmelidir.',
+        domain: 'ELECTRONICS_BODY',
+        normalizedFailureMode: 'TRIM_CONTEMPORARY_DEFICIT',
+        severity: trimPenalty >= 4 ? 'HIGH' : trimPenalty >= 3 ? 'MODERATE' : 'LOW',
+      });
+    }
+
     const totalRiskPenalty = deductedRisks.reduce((sum, r) => sum + r.penalty, 0);
     const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
 
@@ -2395,6 +2497,34 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           headline: `${titlePrefix} Kapsamlı Analiz ve Karar Raporu`,
           detailedAssessment: this.sanitizeTurkishAutomotiveText(writer.vehicleOverview || 'Araç mekanik ve kullanım özellikleri incelendi.'),
           supportingFactIds: [],
+        },
+        trimPackageComparison: {
+          selectedTrimName: cleanTrimName,
+          lowerOrAlternativeTrimName: trimAssessment?.equipmentTier === 'BAZ_DONANIM' ? 'Orta / Üst Donanımlar' : 'Baz Donanım',
+          comparisonNarrative: this.sanitizeTurkishAutomotiveText(
+            trimAssessment?.narrativeSummary ||
+            `${cleanTrimName} donanım paketi, fabrika çıkışında aracın temel kullanım gereksinimlerini karşılayan konfigürasyondur.`
+          ),
+          keyAddedFeatures: Array.isArray(trimAssessment?.factoryStandardFeatures)
+            ? trimAssessment.factoryStandardFeatures.map((f: string) => this.sanitizeTurkishAutomotiveText(f))
+            : [],
+          missingFeaturesInLowerTrim: Array.isArray(trimAssessment?.contemporaryPros)
+            ? trimAssessment.contemporaryPros.map((p: string) => this.sanitizeTurkishAutomotiveText(p))
+            : [],
+          equipmentTier: trimAssessment?.equipmentTier || (/active|trend|joy|visia|delux/i.test(cleanTrimName) ? 'BAZ_DONANIM' : 'ORTA_DONANIM'),
+          contemporaryPros: Array.isArray(trimAssessment?.contemporaryPros)
+            ? trimAssessment.contemporaryPros.map((p: string) => this.sanitizeTurkishAutomotiveText(p))
+            : [],
+          contemporaryCons: Array.isArray(trimAssessment?.contemporaryCons)
+            ? trimAssessment.contemporaryCons.map((c: string) => this.sanitizeTurkishAutomotiveText(c))
+            : [],
+          scoreImpact: -trimPenalty,
+          scoreImpactReason: this.sanitizeTurkishAutomotiveText(
+            trimAssessment?.scorePenaltyReason || 
+            (trimPenalty > 0 
+              ? `${cleanTrimName} donanım seviyesinin günümüz standartlarına göre zayıf ve eksik kalan yönleri sebebiyle satın alma puanından -${trimPenalty} puan kesilmiştir.` 
+              : 'Donanım seviyesi dönemine göre zengin olup günümüz temel beklentilerini karşıladığı için puan kesintisi uygulanmamıştır.')
+          ),
         },
         dailyUseAssessment: {
           cityUse: this.sanitizeTurkishAutomotiveText(

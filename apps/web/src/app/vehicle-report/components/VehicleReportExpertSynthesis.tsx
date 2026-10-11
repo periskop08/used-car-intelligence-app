@@ -111,6 +111,99 @@ export default function VehicleReportExpertSynthesis({
               )}
             </div>
           )}
+
+          {/* Donanım Paketi ve Günümüz Standartları (2024-2026) Değerlendirmesi */}
+          {synthesis.trimPackageComparison && (
+            <div className="mt-4 pt-4 border-t border-white/10 bg-slate-950/70 p-4 sm:p-5 rounded-xl space-y-3.5 border border-white/5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-bold text-white">
+                    Donanım Paketi: <span className="text-amber-400">{synthesis.trimPackageComparison.selectedTrimName}</span>
+                  </span>
+                  {synthesis.trimPackageComparison.equipmentTier && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      synthesis.trimPackageComparison.equipmentTier === 'BAZ_DONANIM'
+                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                        : synthesis.trimPackageComparison.equipmentTier === 'UST_DONANIM'
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                    }`}>
+                      {synthesis.trimPackageComparison.equipmentTier === 'BAZ_DONANIM' ? 'Giriş / Baz Seviye' : synthesis.trimPackageComparison.equipmentTier === 'UST_DONANIM' ? 'Üst / Dolu Seviye' : 'Orta / Dengeli Seviye'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Score impact badge */}
+                {typeof synthesis.trimPackageComparison.scoreImpact === 'number' && (
+                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                    synthesis.trimPackageComparison.scoreImpact < 0
+                      ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  }`}>
+                    {synthesis.trimPackageComparison.scoreImpact < 0
+                      ? `Satın Alma Puanı: ${synthesis.trimPackageComparison.scoreImpact} Puan (Donanım Kesintisi)`
+                      : 'Satın Alma Puanı: Kesintisiz Tam Puan'}
+                  </span>
+                )}
+              </div>
+
+              {synthesis.trimPackageComparison.comparisonNarrative && (
+                <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed">
+                  {cleanRangeText(synthesis.trimPackageComparison.comparisonNarrative)}
+                </p>
+              )}
+
+              {/* 2-Column: Contemporary Pros vs Cons */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {/* Günümüz Şartlarında Olumlu (Artıları) */}
+                <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl space-y-2 text-xs">
+                  <span className="font-bold text-emerald-300 flex items-center gap-1.5 border-b border-emerald-500/10 pb-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    Günümüz Şartlarında Olumlu (Artıları)
+                  </span>
+                  {toArray(synthesis.trimPackageComparison.contemporaryPros || synthesis.trimPackageComparison.keyAddedFeatures).length > 0 ? (
+                    <ul className="space-y-1.5 text-slate-300 text-[11px] sm:text-xs">
+                      {toArray(synthesis.trimPackageComparison.contemporaryPros || synthesis.trimPackageComparison.keyAddedFeatures).map((pro, pIdx) => (
+                        <li key={pIdx} className="flex items-start gap-1.5 leading-snug">
+                          <span className="text-emerald-400 font-bold shrink-0">✔</span>
+                          <span>{cleanRangeText(String(pro))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">Temel mekanik dayanıklılık ve fabrika konforu mevcuttur.</p>
+                  )}
+                </div>
+
+                {/* Günümüz Şartlarında Olumsuz (Eksiklikleri) */}
+                <div className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-xl space-y-2 text-xs">
+                  <span className="font-bold text-rose-300 flex items-center gap-1.5 border-b border-rose-500/10 pb-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    Günümüz Şartlarında Olumsuz (Eksiklikleri)
+                  </span>
+                  {toArray(synthesis.trimPackageComparison.contemporaryCons || synthesis.trimPackageComparison.missingFeaturesInLowerTrim).length > 0 ? (
+                    <ul className="space-y-1.5 text-slate-300 text-[11px] sm:text-xs">
+                      {toArray(synthesis.trimPackageComparison.contemporaryCons || synthesis.trimPackageComparison.missingFeaturesInLowerTrim).map((con, cIdx) => (
+                        <li key={cIdx} className="flex items-start gap-1.5 leading-snug">
+                          <span className="text-rose-400 font-bold shrink-0">✖</span>
+                          <span>{cleanRangeText(String(con))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">Dönemine göre belirgin bir donanım eksikliği bulunmamaktadır.</p>
+                  )}
+                </div>
+              </div>
+
+              {synthesis.trimPackageComparison.scoreImpactReason && (
+                <p className="text-[11px] text-amber-300/90 pt-1 border-t border-white/5">
+                  💡 <strong>Satın Alma Puanı Değerlendirmesi:</strong> {cleanRangeText(synthesis.trimPackageComparison.scoreImpactReason)}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

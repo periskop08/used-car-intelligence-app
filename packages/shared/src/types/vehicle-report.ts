@@ -697,6 +697,11 @@ export interface TrimPackageComparison {
   keyAddedFeatures: string[];
   missingFeaturesInLowerTrim?: string[];
   supportingFactIds?: string[];
+  equipmentTier?: 'BAZ_DONANIM' | 'ORTA_DONANIM' | 'UST_DONANIM' | string;
+  contemporaryPros?: string[];
+  contemporaryCons?: string[];
+  scoreImpact?: number;
+  scoreImpactReason?: string;
 }
 
 export interface ExpertDecisionSynthesis {
