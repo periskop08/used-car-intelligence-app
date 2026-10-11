@@ -360,6 +360,11 @@ export default function AdminVehicleReportDetailPage() {
 
   // Technical conflict detection (Rule 31)
   const reportHp =
+    currentReportData?.vehicleIdentity?.enginePowerHp ||
+    currentReportData?.vehicleIdentity?.powerHp ||
+    currentReportData?.vehicleIdentity?.canonicalDisplayPowerHp ||
+    currentReportData?.technicalSpecifications?.enginePowerHp ||
+    currentReportData?.technicalSpecifications?.powerHp ||
     currentReportData?.performanceUsage?.powerHp ||
     currentReportData?.expertDecisionSynthesis?.technicalSpecifications?.enginePowerHp;
   const hasHpConflict =

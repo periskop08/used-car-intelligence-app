@@ -234,6 +234,7 @@ export class AdminVehicleReportsService {
             trim: true,
             engine: true,
             transmission: true,
+            specs: true,
           },
         })
       : [];
@@ -268,6 +269,61 @@ export class AdminVehicleReportsService {
       const resolvedVehicleType = report.vehicleType || rd?.vehicleType || rd?.vehicleIdentity?.vehicleType || 'AUTOMOBILE';
       const fallbackIdentity = rd?.vehicleIdentity || null;
 
+      // Prioritize verified specifications from reportData (or verified specs) over uncalibrated raw engine placeholders
+      const reportPowerHp =
+        rd?.vehicleIdentity?.enginePowerHp ??
+        rd?.vehicleIdentity?.powerHp ??
+        rd?.vehicleIdentity?.canonicalDisplayPowerHp ??
+        rd?.technicalSpecifications?.enginePowerHp ??
+        rd?.technicalSpecifications?.powerHp ??
+        rd?.specs?.powerHp ??
+        (variant?.specs?.specs as any)?.enginePowerHp ??
+        (variant?.specs?.specs as any)?.powerHp ??
+        variant?.engine?.horsepower ??
+        fallbackIdentity?.enginePowerHp ??
+        fallbackIdentity?.powerHp ??
+        null;
+
+      const reportDisplacementCc =
+        rd?.vehicleIdentity?.engineDisplacementCc ??
+        rd?.vehicleIdentity?.displacementCc ??
+        rd?.technicalSpecifications?.engineDisplacementCc ??
+        rd?.technicalSpecifications?.displacementCc ??
+        (variant?.specs?.specs as any)?.engineDisplacementCc ??
+        (variant?.specs?.specs as any)?.displacementCc ??
+        variant?.engine?.displacement ??
+        fallbackIdentity?.engineDisplacementCc ??
+        fallbackIdentity?.displacementCc ??
+        null;
+
+      const reportTransmission =
+        rd?.vehicleIdentity?.transmissionName ??
+        rd?.vehicleIdentity?.transmission ??
+        variant?.transmission?.name ??
+        fallbackIdentity?.transmissionName ??
+        fallbackIdentity?.transmission ??
+        '';
+
+      const reportFuelType =
+        rd?.vehicleIdentity?.fuelType ??
+        variant?.engine?.fuelType ??
+        fallbackIdentity?.fuelType ??
+        '';
+
+      const reportTrim =
+        rd?.vehicleIdentity?.trimName ??
+        rd?.vehicleIdentity?.trim ??
+        rd?.vehicleIdentity?.trimPackage ??
+        variant?.trim?.name ??
+        fallbackIdentity?.trim ??
+        '';
+
+      const reportEngineCode =
+        rd?.vehicleIdentity?.engineCode ??
+        variant?.engine?.code ??
+        fallbackIdentity?.engineCode ??
+        '';
+
       return {
         id: report.id,
         mode: report.mode,
@@ -292,30 +348,30 @@ export class AdminVehicleReportsService {
         pendingIssueCount: totalPendingIssues,
         vehicleIdentity: variant
           ? {
-              brand: variant.brand?.name || '',
-              model: variant.model?.name || '',
-              year: variant.year,
-              bodyType: variant.bodyType || '',
-              trim: variant.trim?.name || '',
-              engineCode: variant.engine?.code || '',
-              displacementCc: variant.engine?.displacement,
-              powerHp: variant.engine?.horsepower,
-              transmission: variant.transmission?.name || '',
-              fuelType: variant.engine?.fuelType || '',
+              brand: variant.brand?.name || fallbackIdentity?.brand || '',
+              model: variant.model?.name || fallbackIdentity?.model || '',
+              year: variant.year || fallbackIdentity?.year || fallbackIdentity?.modelYear || '',
+              bodyType: variant.bodyType || fallbackIdentity?.bodyType || '',
+              trim: reportTrim || variant.trim?.name || '',
+              engineCode: reportEngineCode || variant.engine?.code || '',
+              displacementCc: reportDisplacementCc ?? variant.engine?.displacement,
+              powerHp: reportPowerHp ?? variant.engine?.horsepower,
+              transmission: reportTransmission || variant.transmission?.name || '',
+              fuelType: reportFuelType || variant.engine?.fuelType || '',
               vehicleType: resolvedVehicleType,
             }
           : fallbackIdentity
           ? {
-              brand: fallbackIdentity.brand || '',
-              model: fallbackIdentity.model || '',
-              year: fallbackIdentity.year || fallbackIdentity.modelYear || '',
-              bodyType: fallbackIdentity.bodyType || '',
-              trim: fallbackIdentity.trim || '',
-              engineCode: fallbackIdentity.engineCode || '',
-              displacementCc: fallbackIdentity.engineDisplacementCc || fallbackIdentity.displacementCc,
-              powerHp: fallbackIdentity.enginePowerHp || fallbackIdentity.powerHp,
-              transmission: fallbackIdentity.transmissionName || fallbackIdentity.transmission || '',
-              fuelType: fallbackIdentity.fuelType || '',
+              brand: fallbackIdentity.brand || rd?.vehicleIdentity?.brand || '',
+              model: fallbackIdentity.model || rd?.vehicleIdentity?.model || '',
+              year: fallbackIdentity.year || fallbackIdentity.modelYear || rd?.vehicleIdentity?.year || '',
+              bodyType: fallbackIdentity.bodyType || rd?.vehicleIdentity?.bodyType || '',
+              trim: reportTrim || fallbackIdentity.trim || '',
+              engineCode: reportEngineCode || fallbackIdentity.engineCode || '',
+              displacementCc: reportDisplacementCc ?? (fallbackIdentity.engineDisplacementCc || fallbackIdentity.displacementCc),
+              powerHp: reportPowerHp ?? (fallbackIdentity.enginePowerHp || fallbackIdentity.powerHp),
+              transmission: reportTransmission || fallbackIdentity.transmissionName || fallbackIdentity.transmission || '',
+              fuelType: reportFuelType || fallbackIdentity.fuelType || '',
               vehicleType: resolvedVehicleType,
             }
           : null,
@@ -392,18 +448,39 @@ export class AdminVehicleReportsService {
 
       if (variant) {
         const specJson = (variant.specs?.specs as any) || {};
+        const rd = (report.reportData as any) || {};
+        const reportHp =
+          rd?.vehicleIdentity?.enginePowerHp ??
+          rd?.vehicleIdentity?.powerHp ??
+          rd?.vehicleIdentity?.canonicalDisplayPowerHp ??
+          rd?.technicalSpecifications?.enginePowerHp ??
+          rd?.technicalSpecifications?.powerHp ??
+          rd?.specs?.powerHp ??
+          specJson?.enginePowerHp ??
+          specJson?.powerHp ??
+          variant.engine?.horsepower;
+
+        const reportDisplacement =
+          rd?.vehicleIdentity?.engineDisplacementCc ??
+          rd?.vehicleIdentity?.displacementCc ??
+          rd?.technicalSpecifications?.engineDisplacementCc ??
+          rd?.technicalSpecifications?.displacementCc ??
+          specJson?.engineDisplacementCc ??
+          specJson?.displacementCc ??
+          variant.engine?.displacement;
+
         canonicalSpecs = {
-          powerHp: variant.engine?.horsepower || specJson?.powerHp,
-          displacementCc: variant.engine?.displacement || specJson?.engineDisplacementCc,
+          powerHp: reportHp,
+          displacementCc: reportDisplacement,
           torqueNm: variant.engine?.torque || specJson?.torqueNm,
-          fuelType: variant.engine?.fuelType,
-          transmission: variant.transmission?.name,
-          bodyType: variant.bodyType,
-          topSpeedKmh: specJson?.topSpeedKmh,
-          zeroToHundredSec: specJson?.zeroToHundredSec,
-          combinedFuelL100km: specJson?.combinedFuelL100km,
-          trunkCapacityLiters: specJson?.trunkCapacityLiters,
-          curbWeightKg: specJson?.curbWeightKg,
+          fuelType: variant.engine?.fuelType || rd?.vehicleIdentity?.fuelType,
+          transmission: variant.transmission?.name || rd?.vehicleIdentity?.transmissionName,
+          bodyType: variant.bodyType || rd?.vehicleIdentity?.bodyType,
+          topSpeedKmh: rd?.technicalSpecifications?.topSpeedKmh || specJson?.topSpeedKmh,
+          zeroToHundredSec: rd?.technicalSpecifications?.zeroToHundredSec || specJson?.zeroToHundredSec,
+          combinedFuelL100km: rd?.technicalSpecifications?.combinedFuelL100km || specJson?.combinedFuelL100km,
+          trunkCapacityLiters: rd?.technicalSpecifications?.trunkCapacityLiters || specJson?.trunkCapacityLiters,
+          curbWeightKg: rd?.technicalSpecifications?.curbWeightKg || specJson?.curbWeightKg,
         };
       }
     }
