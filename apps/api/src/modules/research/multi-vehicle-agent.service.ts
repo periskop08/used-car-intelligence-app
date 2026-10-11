@@ -939,7 +939,7 @@ Extract 3-4 genuine, authentic chronic failure modes for this exact model in str
 Your ONLY role is to CHALLENGE, CONTRADICT, or NARROW claims produced by Agent 1 based STRICTLY on the vehicle filters provided in the context (Brand, Model, Year, Engine, Fuel, Transmission, Trim, VehicleType).
 CRITICAL DIRECTIVES:
 1. FUEL SYSTEM & POWERTRAIN ACCURACY:
-   - If the vehicle is fuel-injected (EFI), contradict any carburetor claims or carburetor failures.
+   - If the vehicle is fuel-injected (EFI) or modern post-2015, CONTRADICT any claims mentioning carburetor ("karbüratör", "karbüratör diyaframı", "karbüratör temizliği"). It uses electronic fuel injection (EFI), so fuel issues must target injectors, fuel pump pressure, or throttle body/TPS.
    - If the vehicle is a classic vintage carburetor model, contradict any EFI claims.
    - If the vehicle uses a BENZİN (Gasoline) engine, immediately CONTRADICT any diesel-specific claims (DPF soot clogging, AdBlue, diesel EGR cooler soot clogging, etc.).
    - If the vehicle uses a DİZEL (Diesel) engine, contradict gasoline ignition coil/spark plug claims.
@@ -1169,6 +1169,13 @@ Perform adversarial red-team audit. Output strict JSON.`;
         return !/şanzıman dişlisi|vites geçişi|debriyaj teli|2\. vites|vites hilali|senkromeç/i.test(text);
       });
     }
+    const isEfiOnly = context.vehicleType === 'MOTORCYCLE' && agent1.motorcycleEras && agent1.motorcycleEras.length > 0 && agent1.motorcycleEras.every((e: any) => e.fuelSystem === 'EFI');
+    if (isEfiOnly) {
+      finalApprovedFacts = finalApprovedFacts.filter((fact) => {
+        const text = `${fact.title} ${(fact.symptoms || []).join(' ')} ${fact.userExperience || ''} ${fact.testDriveCheck || ''} ${fact.inspectionCheck || ''}`.toLowerCase();
+        return !/karbüratör/i.test(text);
+      });
+    }
 
     const highSeverityCount = finalApprovedFacts.filter((c) => c.severity === 'HIGH' || c.severity === 'CRITICAL').length;
     const moderateCount = finalApprovedFacts.filter((c) => c.severity === 'MODERATE').length;
@@ -1280,8 +1287,11 @@ MANDATORY RULES:
    "Rakiplerine kıyasla", "sınıfındaki rakipleri gibi" gibi kıyaslamalar kesinlikle yasaktır.
    Rapor %100 sadece incelenen aracın kendi şasisi, motor karakteri, ergonomisi, malzeme kalitesi ve kronik/yıpranma durumuna odaklanmalıdır.
 4. FUEL SYSTEM & HARDWARE ACCURACY:
-   - Eğer araç doğuştan elektronik enjeksiyonlu (EFI) ise, ASLA "Karbüratörlü Seri" uydurma ve tavizlerde "Karbüratörlü Versiyonun Bakım Zorluğu" yazma!
-   - Eğer araç klasik karbüratörlü ise (örn. 2001-2007 Honda Shadow gibi), ASLA enjeksiyon (EFI) veya Euro 3 deme ve ASLA vazgeçme şartına "FI arıza lambası" yazma!
+   - Eğer araç doğuştan veya ilgili dönemde elektronik yakıt enjeksiyonlu (EFI) ise:
+     * ASLA "Karbüratörlü Seri" uydurma ve tavizlerde "Karbüratörlü Versiyonun Bakım Zorluğu" yazma!
+     * "allEraCommonIssues", "eraSpecificIssues", tavizler ve ekspertiz kontrollerinde KESİNLİKLE "karbüratör" kelimesi KULLANILAMAZ! Yakıt sistemi kontrollerinde doğrudan elektronik enjektör püskürtmesi, elektrikli benzin pompası basıncı ve gaz kelebeği / TPS sensörü yazılmalıdır.
+   - Eğer araç klasik karbüratörlü ise (örn. 2001-2007 vintage modeller):
+     * ASLA enjeksiyon (EFI) veya Euro 3 deme ve ASLA vazgeçme şartına "FI arıza lambası" yazma!
    - Kampana frenli motora ASLA ABS yazma! V-Twin motora ASLA 3 buji uydurma!
 5. "productionEras" TABLE GUARANTEE:
    Her dönemin "keyChanges" dizisi EN AZ 2 adet somut Türkçe teknik revizyon maddesi içermelidir (ilgili döneme ait gerçek fabrika güncellemesi, yakıt besleme veya mekanik revizyon). ASLA başka bir modelin donanımını veya uydurma parça adını yazma!
