@@ -64,13 +64,14 @@ export class VerifiedSpecLibraryService {
       throw new NotFoundException('Marka ve Model bilgisi zorunludur.');
     }
 
-    // 1. Check VerifiedSpecLibrary Cache
+    // 1. Check VerifiedSpecLibrary Cache strictly with trim/package isolation
     const existingEntry = await this.findLibraryEntry({
       vehicleType: cleanType,
       brand: cleanBrand,
       model: cleanModel,
       engine,
       year: parsedYear,
+      trim,
       variantId,
       modelId,
     });
@@ -183,6 +184,7 @@ export class VerifiedSpecLibraryService {
     model: string;
     engine?: string;
     year?: number;
+    trim?: string;
     variantId?: string;
     modelId?: string;
   }) {
@@ -207,13 +209,16 @@ export class VerifiedSpecLibraryService {
       });
     }
 
-    // Automobile, SUV, Commercial matching: Year is strictly scoped so pre-facelift / post-facelift specs never cross-contaminate!
+    // Automobile, SUV, Commercial matching:
+    // Year and Trim are strictly scoped so different trim packages (e.g. Delux 75 HP vs Titanium 100 HP)
+    // NEVER cross-contaminate or return incorrect horsepower!
     return this.prisma.verifiedSpecLibrary.findFirst({
       where: {
         brand: { equals: filter.brand, mode: 'insensitive' },
         model: { equals: filter.model, mode: 'insensitive' },
         ...(filter.year ? { year: filter.year } : {}),
         ...(filter.engine ? { engine: { equals: filter.engine, mode: 'insensitive' } } : {}),
+        ...(filter.trim ? { trim: { equals: filter.trim, mode: 'insensitive' } } : {}),
         verificationStatus: 'VERIFIED',
       },
       orderBy: { verifiedAt: 'desc' },
