@@ -133,19 +133,6 @@ export default function VehicleReportExpertSynthesis({
                     </span>
                   )}
                 </div>
-
-                {/* Score impact badge */}
-                {typeof synthesis.trimPackageComparison.scoreImpact === 'number' && (
-                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
-                    synthesis.trimPackageComparison.scoreImpact < 0
-                      ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                  }`}>
-                    {synthesis.trimPackageComparison.scoreImpact < 0
-                      ? `Satın Alma Puanı: ${synthesis.trimPackageComparison.scoreImpact} Puan (Donanım Kesintisi)`
-                      : 'Satın Alma Puanı: Kesintisiz Tam Puan'}
-                  </span>
-                )}
               </div>
 
               {synthesis.trimPackageComparison.comparisonNarrative && (
@@ -196,12 +183,6 @@ export default function VehicleReportExpertSynthesis({
                   )}
                 </div>
               </div>
-
-              {synthesis.trimPackageComparison.scoreImpactReason && (
-                <p className="text-[11px] text-amber-300/90 pt-1 border-t border-white/5">
-                  💡 <strong>Satın Alma Puanı Değerlendirmesi:</strong> {cleanRangeText(synthesis.trimPackageComparison.scoreImpactReason)}
-                </p>
-              )}
             </div>
           )}
         </div>

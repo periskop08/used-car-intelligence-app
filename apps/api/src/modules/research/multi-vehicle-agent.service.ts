@@ -1549,8 +1549,9 @@ MANDATORY RULES:
    - 2. Paragraf (Motor Gücü, Şanzıman Aktarımı & Sürüş Dinamikleri): Motorun hacmi (${judge.finalDisplacementCc} cc), katalog gücü (${judge.finalPowerHp} HP), tork teslimatı, şanzıman geçiş karakteri ve otoyol/şehir içi yol tutuş dengesi derinlemesine incelenmelidir.
    - 3. Paragraf (Seçilen Donanım Paketi & Günümüz Dünyasındaki Yeri - YILA VE SEGMENTE DİKKAT):
      * Modelin üretim yılı (${context.year || ''}) ve donanım paketi (${cleanTrim || 'Standart'}) GERÇEKÇİ bir şekilde değerlendirilmelidir!
-     * 2019 VE ÜZERİ MODERN ARAÇLARDA VEYA PREMİUM/LÜKS MARKALARDA (Örn. DS, BMW, Mercedes, Audi, Volvo vb.): Dokunmatik ekran, Apple CarPlay, Android Auto, Bluetooth, dijital kokpit ve park sensörleri ZATEN FABRİKASYON STANDARTTIR! Bu araçlara KESİNLİKLE 'CarPlay yok', 'multimedya yok', 'Bluetooth yok', 'park sensörü eksik' YAZILAMAZ! Bunun yerine paketin özgün konfor/döşeme nitelikleri (örn. Alcantara döşeme, dijital kokpit, aktif süspansiyon, matris farlar) ve varsa üst donanıma (Rivoli/Opera vb.) göre opsiyonel kalan detaylar (cam tavan, masajlı koltuk) veya dokunmatik klima kontrollerinin ergonomisi anlatılmalıdır. Bu modern ve üst seviye araçlarda donanım puan kesintisi YAPILMAMALIDIR (scorePenalty: 0).
-     * Yalnızca eski (2018 öncesi) ve fabrika çıkışı baz/boş donanım paketlerinde (Active, Trend, Joy, Visia vb.) günümüz standartlarına göre ekran/Bluetooth veya park sensörü yokluğu belirtilebilir ve bu eski baz araçlarda scorePenalty: 2-3 verilebilir.
+     * 2019 VE ÜZERİ MODERN ARAÇLARDA VEYA PREMİUM/LÜKS MARKALARDA (Örn. DS, BMW, Mercedes, Audi, Volvo vb.): Dokunmatik ekran, Apple CarPlay, Android Auto, Bluetooth, dijital kokpit ve park sensörleri ZATEN FABRİKASYON STANDARTTIR! Bu araçlara KESİNLİKLE 'CarPlay yok', 'multimedya yok', 'Bluetooth yok', 'park sensörü eksik' YAZILAMAZ! Bunun yerine paketin özgün konfor/döşeme nitelikleri (örn. Alcantara döşeme, dijital kokpit, aktif süspansiyon, matris farlar) ve varsa üst donanıma (Rivoli/Opera vb.) göre opsiyonel kalan detaylar (cam tavan, masajlı koltuk) veya dokunmatik klima kontrollerinin ergonomisi anlatılmalıdır.
+     * Yalnızca eski (2018 öncesi) ve fabrika çıkışı baz/boş donanım paketlerinde (Active, Trend, Joy, Visia vb.) günümüz standartlarına göre ekran/Bluetooth veya park sensörü yokluğu belirtilebilir.
+     * DİKKAT: Donanım paketi için satın alma puanından ASLA puan kesintisi yapılmaz (puan kesintisi sıfırdır; satın alma puanı sadece aracın mekanik, şasi ve güvenilirlik risklerinden hesaplanır).
      * KESİNLİKLE BAŞKA MARKA VEYA RAKİP MODEL ADI KULLANILAMAZ!
 3. STRICT ZERO COMPETITOR / RIVAL COMPARISON (SIFIR RAKİP KIYASLAMASI KURALI):
    Raporda KESİNLİKLE başka bir marka veya rakip model ismi (örneğin Honda, Yamaha, Kawasaki, KTM, Suzuki vb.) geçmemelidir.
@@ -1690,8 +1691,6 @@ Write the complete Motorcycle Report in strict JSON:
     "contemporaryCons": [
       "string (Günümüz standartlarına göre eksik veya zayıf kalan donanım özellikleri)"
     ],
-    "scorePenalty": 0,
-    "scorePenaltyReason": "string (Varsa kesinti gerekçesi)",
     "narrativeSummary": "string (Donanım/versiyonun günümüzdeki konumunun 2-3 cümlelik özeti)"
   },
   "decisionSynthesis": {
@@ -1775,8 +1774,6 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
     "contemporaryCons": [
       "string (Gerçek çağdaş kısıtlar; MODERN/PREMIUM ARAÇTA ASLA 'CARPLAY/BLUETOOTH/PARK SENSÖRÜ YOK' DEME!)"
     ],
-    "scorePenalty": 0,
-    "scorePenaltyReason": "string (Varsa kesinti gerekçesi; modern 2019+ veya dolu araçlarda 'Donanım seviyesi günümüz standartlarını karşılamaktadır')",
     "narrativeSummary": "string (Donanım paketinin günümüzdeki yerinin 2-3 cümlelik özeti)"
   },
   "decisionSynthesis": {
@@ -1804,7 +1801,7 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const isUpperTrimAuto = /performance line|rivoli|opera|bastille|titanium|highline|cosmo|elegance|amg|m sport|r-line|prestige|lounge|tekna|platinum|gt line|gt-line|laurin & klement|vignale|insignia/i.test(cleanTrim || '');
 
       const para3Instruction = isModernAuto || isPremiumAuto || isUpperTrimAuto
-        ? `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu modern/premium donanım seviyesinin günümüz (2024-2026) şartlarına göre zengin dijital kokpiti, dokunmatik multimedya ekranı, Apple CarPlay/Android Auto ve konfor/güvenlik unsurları; paketin özgün detayları (örn. Alcantara/deri döşeme kalitesi, spor direksiyon vb.) ile en üst seviyeye (Rivoli/Opera vb.) göre opsiyonel kalan lüks detayları veya dokunmatik klima kontrollerinin ergonomisi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'} DİKKAT: Bu modern/premium araçta dokunmatik ekran, CarPlay, Bluetooth ve park sensörleri ZATEN STANDARTTIR; ASLA bunların eksik olduğunu iddia etme ve donanım için puan kırma (scorePenalty: 0)!`
+        ? `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu modern/premium donanım seviyesinin günümüz (2024-2026) şartlarına göre zengin dijital kokpiti, dokunmatik multimedya ekranı, Apple CarPlay/Android Auto ve konfor/güvenlik unsurları; paketin özgün detayları (örn. Alcantara/deri döşeme kalitesi, spor direksiyon vb.) ile en üst seviyeye (Rivoli/Opera vb.) göre opsiyonel kalan lüks detayları veya dokunmatik klima kontrollerinin ergonomisi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'} DİKKAT: Bu modern/premium araçta dokunmatik ekran, CarPlay, Bluetooth ve park sensörleri ZATEN STANDARTTIR; ASLA bunların eksik olduğunu iddia etme!`
         : `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu dönemin donanım seviyesinin günümüz 2024-2026 şartlarına göre OLUMLU (bugün de korunan değerler, dayanıklı mekanik kumandalar, temel konfor) ve OLUMSUZ (günümüz multimedya, CarPlay/Bluetooth, park destek ve güvenlik standartlarına göre eksik/demode kalan) yönlerinin gerçekçi değerlendirmesi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'}`;
 
       userPrompt = `Passenger Automobile Specification:
@@ -1878,8 +1875,6 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     "contemporaryCons": [
       "string (Gerçek çağdaş kısıtlar; örn. modern/premium araçta dokunmatik ekran üzerinden klima kumandası ergonomisi veya Alcantara hassas bakımı; eski baz araçta ise ekran/Bluetooth yokluğu. MODERN/PREMIUM ARAÇTA ASLA 'CARPLAY/BLUETOOTH/PARK SENSÖRÜ YOK' DEME!)"
     ],
-    "scorePenalty": ${isModernVehicle || isPremiumBrand || isUpperTrim ? 0 : 'number (Modern 2019+ veya dolu araçlar için KESİNLİKLE 0; YALNIZCA eski baz araçlar için 2-3)'},
-    "scorePenaltyReason": "${isModernVehicle || isPremiumBrand || isUpperTrim ? 'Donanım seviyesi ve bağlantı teknolojileri günümüz standartlarını eksiksiz karşılamaktadır.' : 'string (Varsa kesinti gerekçesi)'}",
     "narrativeSummary": "string (Donanım paketinin günümüzdeki yerini açıklayan 2-3 cümlelik uzman analizi)"
   },
   "decisionSynthesis": {
@@ -2049,8 +2044,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     "contemporaryCons": [
       "string (Gerçek çağdaş kısıtlar; ticari modelde modern bağlantı eksikliği vb.)"
     ],
-    "scorePenalty": 0,
-    "scorePenaltyReason": "string (Varsa kesinti gerekçesi)",
     "narrativeSummary": "string (Donanım paketinin günümüzdeki yerini açıklayan 2-3 cümlelik uzman analizi)"
   },
   "decisionSynthesis": {
@@ -2337,7 +2330,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
       };
     });
 
-    // Trim Package Contemporary Evaluation (2024-2026) -> Deducted Risk & Decision Score Impact
+    // Trim Package Contemporary Evaluation (Informational only: zero score penalty, pure mechanical risk scoring)
     const trimAssessment = writer.trimContemporaryAssessment;
     const cleanTrimName = context.trimPackage && !/^(standart|standart donanım|standart kasa)$/i.test(context.trimPackage)
       ? context.trimPackage
@@ -2346,39 +2339,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const isModernVehicle = (context.year || 2020) >= 2019;
     const isPremiumBrand = /ds automobiles|ds\b|bmw|mercedes|audi|porsche|volvo|lexus|land rover|range rover|jaguar|alfa romeo|maserati|mini|tesla/i.test(context.brand || '');
     const isUpperTrim = /performance line|rivoli|opera|bastille|titanium|highline|cosmo|elegance|amg|m sport|r-line|prestige|lounge|tekna|platinum|gt line|gt-line|laurin & klement|vignale|insignia/i.test(cleanTrimName);
-
-    let trimPenalty = 0;
-    if (!isModernVehicle && !isPremiumBrand && !isUpperTrim) {
-      trimPenalty = typeof trimAssessment?.scorePenalty === 'number'
-        ? Math.max(0, Math.min(5, Math.round(trimAssessment.scorePenalty)))
-        : (
-            // Robust fallback for older base trims if scorePenalty not explicitly returned
-            /active|trend|joy|visia|delux|ambiente|authentique|comfort\b/i.test(cleanTrimName) && (context.year || 2020) <= 2018 ? 3 : 0
-          );
-
-      // If equipmentTier is explicitly BAZ_DONANIM and penalty is 0, guarantee standard 3 points deduction
-      if (trimAssessment?.equipmentTier === 'BAZ_DONANIM' && trimPenalty === 0) {
-        trimPenalty = 3;
-      }
-    }
-
-    if (trimPenalty > 0) {
-      const penaltyReason = trimAssessment?.scorePenaltyReason || 
-        `${cleanTrimName} donanım paketi; günümüz (2024-2026) otomotiv standartlarına kıyasla multimedya/bağlantı (CarPlay/Android Auto), geri görüş kamerası, park sensörleri ve modern aydınlatma teknolojilerinden yoksundur.`;
-
-      deductedRisks.push({
-        title: `${cleanTrimName} Donanım Paketi ve Günümüz Standartları Değerlendirmesi`,
-        reason: this.sanitizeTurkishAutomotiveText(penaltyReason),
-        description: this.sanitizeTurkishAutomotiveText(penaltyReason),
-        netDeduction: trimPenalty,
-        deduction: trimPenalty,
-        penalty: trimPenalty,
-        inspectionInstruction: 'Araç içi tüm elektrikli camlar, klima/havalandırma kumandaları, aydınlatma grubu ve varsa sonradan eklenmiş multimedya/ses tesisatının eksiksiz çalıştığı ekspertizde teyit edilmelidir.',
-        domain: 'ELECTRONICS_BODY',
-        normalizedFailureMode: 'TRIM_CONTEMPORARY_DEFICIT',
-        severity: trimPenalty >= 4 ? 'HIGH' : trimPenalty >= 3 ? 'MODERATE' : 'LOW',
-      });
-    }
 
     const totalRiskPenalty = deductedRisks.reduce((sum, r) => sum + r.penalty, 0);
     const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
@@ -2574,14 +2534,6 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             }
             return cons;
           })(),
-          scoreImpact: -trimPenalty,
-          scoreImpactReason: this.sanitizeTurkishAutomotiveText(
-            (isModernVehicle || isPremiumBrand || isUpperTrim)
-              ? `${cleanTrimName} donanım seviyesi, dijital multimedya ve güvenlik donanımlarıyla günümüz standartlarını eksiksiz karşılamakta olup puan kesintisi uygulanmamıştır.`
-              : (trimPenalty > 0 
-                  ? `${cleanTrimName} donanım seviyesinin günümüz standartlarına göre zayıf ve eksik kalan yönleri sebebiyle satın alma puanından -${trimPenalty} puan kesilmiştir.` 
-                  : 'Donanım seviyesi dönemine göre zengin olup günümüz temel beklentilerini karşıladığı için puan kesintisi uygulanmamıştır.')
-          ),
         },
         dailyUseAssessment: {
           cityUse: this.sanitizeTurkishAutomotiveText(
@@ -3176,26 +3128,41 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     const cleanTrim = (context.trimPackage || (context as any).package || '').trim();
     const isUpperTrim = /performance line|rivoli|opera|bastille|titanium|highline|cosmo|elegance|amg|m sport|r-line|prestige|lounge|tekna|platinum|gt line|gt-line|laurin & klement|vignale|insignia/i.test(cleanTrim);
 
-    // 1. Purge Diesel Defects & Inapplicable Claims on Petrol Vehicles
-    if (isPetrol && report.decisionScore?.deductedRisks) {
+    // 1. Purge Inapplicable Claims, Diesel Defects on Petrol, and Trim Score Deductions
+    if (report.decisionScore?.deductedRisks) {
       report.decisionScore.deductedRisks = report.decisionScore.deductedRisks.filter((risk: any) => {
         const text = `${risk.title || ''} ${risk.reason || ''} ${risk.description || ''}`.toLowerCase();
+
+        // Purge any trim package deductions (decision score is strictly mechanical/structural)
         if (
-          text.includes('enjektör geri dönüş') ||
-          text.includes('mazot') ||
-          text.includes('dpf') ||
-          text.includes('dizel partikül') ||
-          text.includes('adblue') ||
-          text.includes('kızdırma bujisi') ||
-          text.includes('ısıtma bujisi')
+          risk.normalizedFailureMode === 'TRIM_CONTEMPORARY_DEFICIT' ||
+          text.includes('donanım paketi ve günümüz standartları') ||
+          text.includes('donanım kesintisi') ||
+          text.includes('donanım seviyesinin günümüz standartlarına göre zayıf')
         ) {
-          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged diesel defect '${risk.title}' on petrol vehicle.`);
+          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged trim package score deduction '${risk.title}'.`);
           return false;
         }
-        if (!isTurbo && (text.includes('turboşarj') || text.includes('turbo besleme') || text.includes('intercooler') || text.includes('wastegate'))) {
-          this.logger.warn(`[VALIDATOR GATEKEEPER] Purged turbo defect '${risk.title}' on naturally aspirated petrol vehicle.`);
-          return false;
+
+        if (isPetrol) {
+          if (
+            text.includes('enjektör geri dönüş') ||
+            text.includes('mazot') ||
+            text.includes('dpf') ||
+            text.includes('dizel partikül') ||
+            text.includes('adblue') ||
+            text.includes('kızdırma bujisi') ||
+            text.includes('ısıtma bujisi')
+          ) {
+            this.logger.warn(`[VALIDATOR GATEKEEPER] Purged diesel defect '${risk.title}' on petrol vehicle.`);
+            return false;
+          }
+          if (!isTurbo && (text.includes('turboşarj') || text.includes('turbo besleme') || text.includes('intercooler') || text.includes('wastegate'))) {
+            this.logger.warn(`[VALIDATOR GATEKEEPER] Purged turbo defect '${risk.title}' on naturally aspirated petrol vehicle.`);
+            return false;
+          }
         }
+
         if (isAutomobile && (text.includes('triger kaset') || text.includes('kaset triger') || text.includes('sürgülü kapı'))) {
           this.logger.warn(`[VALIDATOR GATEKEEPER] Purged commercial van defect '${risk.title}' on passenger car.`);
           return false;
@@ -3221,6 +3188,11 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         report.scoring.buyabilityScore = { value: calibratedScore };
         report.scoring.technicalRiskScore = { value: totalRiskPenalty };
       }
+    }
+
+    if (report.expertDecisionSynthesis?.trimPackageComparison) {
+      delete report.expertDecisionSynthesis.trimPackageComparison.scoreImpact;
+      delete report.expertDecisionSynthesis.trimPackageComparison.scoreImpactReason;
     }
 
     // 2. Text Cleaner for Mechanical Leaks across all narrative sections
