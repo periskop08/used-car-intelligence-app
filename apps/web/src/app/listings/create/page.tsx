@@ -1480,7 +1480,7 @@ export default function CreateListing() {
               ) : (techSpecsVerified && (selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear))) ? (
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span>✅ Doğrulandı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' ? selectedTrim : ''} • {engineDisplacement} cc • {enginePower} HP (Doğrulanmış Kütüphane)</span>
+                  <span>Doğrulandı: {selectedBrand} {selectedModel} ({selectedYear}) {selectedTrim && selectedTrim !== 'Tüm Vites Tipleri' ? selectedTrim : ''} • {engineDisplacement} cc • {enginePower} HP</span>
                 </div>
               ) : (selectedVariant || (searchMode === 'MOTORCYCLE' && (selectedVariant || selectedModelId) && selectedYear)) ? (
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl text-xs font-bold flex items-center gap-2">
