@@ -24,6 +24,22 @@ import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWi
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const cleanRangeText = (text?: string): string => {
+  if (!text) return '';
+  return replacePsWithHp(text)
+    .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)yla\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "$1 kapasitesine sahiptir")
+    .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)\s+ve\s+yaklaşık\s+\d+\s*km\s*menzil,\s*sık\s+mola\s+ihtiyacını\s+azaltır/gi, "$1 kapasitesi sunar")
+    .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "")
+    .replace(/ve\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/ve\s+yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/yaklaşık\s+\d+\s*km\s*menzil/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+\./g, ".")
+    .replace(/\.\./g, ".")
+    .trim();
+};
+
 interface ConditionItem {
   title: string;
   text?: string;
@@ -102,6 +118,30 @@ interface ComprehensiveReport {
       highwayUse?: string;
       trafficBehavior?: string;
       comfortAssessment?: string;
+    };
+    trimPackageComparison?: {
+      selectedTrimName?: string;
+      comparisonNarrative?: string;
+      contemporaryPros?: string[];
+      contemporaryCons?: string[];
+      keyAddedFeatures?: string[];
+      missingFeaturesInLowerTrim?: string[];
+    };
+    motorcycleEraAnalysis?: {
+      modelHistory?: string;
+      productionEras?: Array<{
+        eraName?: string;
+        startYear: number;
+        endYear?: number | null;
+        fuelSystem?: string;
+        displacementCc?: number;
+        powerHp?: number;
+        powerRange?: string;
+        hasAbs?: boolean;
+        brakingSystem?: string;
+        keyChanges?: string[] | string;
+      }>;
+      recommendedEraComparison?: string;
     };
     strongestReasonsToChoose?: Array<{ title: string; explanation: string }>;
     compromisesAndLimitations?: Array<{ title: string; explanation: string }>;
@@ -1037,6 +1077,13 @@ export default function VehicleReportScreen() {
     ?? (report?.performanceUsage as any)?.displacementCc;
   const resolvedVehicleType = ((report?.vehicleIdentity as any)?.vehicleType || (report as any)?.vehicleType || '').toUpperCase();
   const isMotorcycle = resolvedVehicleType === 'MOTORCYCLE' || !!(report as any)?.isMotorcycle;
+  const characterHeading = isMotorcycle
+    ? 'Bu Araç Nasıl Bir Motosiklet?'
+    : (resolvedVehicleType === 'SUV_PICKUP' || resolvedVehicleType === 'SUV'
+      ? 'Bu Araç Nasıl Bir Arazi Aracı / SUV?'
+      : (resolvedVehicleType === 'MINIVAN_PANELVAN' || resolvedVehicleType === 'COMMERCIAL'
+        ? 'Bu Araç Nasıl Bir Ticari Araç?'
+        : 'Bu Araç Nasıl Bir Otomobil?'));
 
   const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '1598 cc');
   const mtvResult = calculateVehicleMtv({
@@ -1295,12 +1342,12 @@ export default function VehicleReportScreen() {
 
           {/* 3. TORQUE SCOUT EXPERT DECISION SYNTHESIS SECTIONS IN LIGHT COLLAPSIBLE CARDS */}
 
-          {/* 3.1 BU ARAÇ NASIL BİR OTOMOBİL? */}
+          {/* 3.1 BU ARAÇ NASIL BİR OTOMOBİL / MOTOSİKLET / TİCARİ ARAÇ? */}
           {synthesis?.vehicleCharacter && (
             <CollapsibleLightSection
-              title="Bu Araç Nasıl Bir Otomobil?"
+              title={characterHeading}
               subtitle="Araç Karakteri ve Değerlendirme"
-              iconName="car-sport-outline"
+              iconName={isMotorcycle ? 'bicycle-outline' : 'car-sport-outline'}
               iconColor="#ea580c"
               iconBgColor="#fff7ed"
               borderColor="#fed7aa"
@@ -1313,7 +1360,7 @@ export default function VehicleReportScreen() {
               {Boolean(synthesis.vehicleCharacter.detailedAssessment) && (
                 <View style={{ gap: 8 }}>
                   {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
-                    <Text key={idx} style={styles.bodyTextLight}>{para}</Text>
+                    <Text key={idx} style={styles.bodyTextLight}>{cleanRangeText(para)}</Text>
                   ))}
                 </View>
               )}
@@ -1324,31 +1371,162 @@ export default function VehicleReportScreen() {
                   {Boolean(synthesis.dailyUseAssessment.cityUse) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Şehir İçi Kullanım</Text>
-                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.cityUse)}</Text>
+                      <Text style={styles.dailyUseTextLight}>{cleanRangeText(synthesis.dailyUseAssessment.cityUse)}</Text>
                     </View>
                   )}
                   {Boolean(synthesis.dailyUseAssessment.highwayUse) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Otoyol ve Seyir</Text>
-                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.highwayUse)}</Text>
+                      <Text style={styles.dailyUseTextLight}>{cleanRangeText(synthesis.dailyUseAssessment.highwayUse)}</Text>
                     </View>
                   )}
                   {Boolean(synthesis.dailyUseAssessment.trafficBehavior) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Trafik & Dur-Kalk Karakteri</Text>
-                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.trafficBehavior)}</Text>
+                      <Text style={styles.dailyUseTextLight}>{cleanRangeText(synthesis.dailyUseAssessment.trafficBehavior)}</Text>
                     </View>
                   )}
                   {Boolean(synthesis.dailyUseAssessment.comfortAssessment) && (
                     <View style={styles.dailyUseBoxLight}>
                       <Text style={styles.dailyUseTitleLight}>Süspansiyon & Konfor</Text>
-                      <Text style={styles.dailyUseTextLight}>{replacePsWithHp(synthesis.dailyUseAssessment.comfortAssessment)}</Text>
+                      <Text style={styles.dailyUseTextLight}>{cleanRangeText(synthesis.dailyUseAssessment.comfortAssessment)}</Text>
                     </View>
                   )}
                 </View>
               )}
+
+              {/* Donanım Paketi ve Günümüz Standartları Değerlendirmesi */}
+              {Boolean(synthesis?.trimPackageComparison) && (() => {
+                const trimPkg = synthesis?.trimPackageComparison;
+                if (!trimPkg) return null;
+                const pros = trimPkg.contemporaryPros || trimPkg.keyAddedFeatures || [];
+                const cons = trimPkg.contemporaryCons || trimPkg.missingFeaturesInLowerTrim || [];
+                return (
+                  <View style={styles.trimBoxContainerLight}>
+                    <View style={styles.trimBoxHeaderLight}>
+                      <Ionicons name="layers-outline" size={16} color="#d97706" />
+                      <Text style={styles.trimBoxHeaderTextLight}>
+                        Donanım Paketi: <Text style={{ color: '#b45309', fontWeight: '900' }}>{trimPkg.selectedTrimName || 'Standart'}</Text>
+                      </Text>
+                    </View>
+
+                    {Boolean(trimPkg.comparisonNarrative) && (
+                      <Text style={styles.trimNarrativeTextLight}>
+                        {cleanRangeText(trimPkg.comparisonNarrative)}
+                      </Text>
+                    )}
+
+                    {/* 2-Box: Contemporary Pros vs Cons */}
+                    <View style={styles.trimProsConsWrapLight}>
+                      {/* Günümüz Şartlarında Olumlu (Artıları) */}
+                      <View style={styles.trimProsCardLight}>
+                        <View style={styles.trimProsHeaderRowLight}>
+                          <Ionicons name="checkmark-circle" size={15} color="#16a34a" />
+                          <Text style={styles.trimProsTitleLight}>Günümüz Şartlarında Olumlu (Artıları)</Text>
+                        </View>
+                        {pros.length > 0 ? (
+                          <View style={{ gap: 4, marginTop: 4 }}>
+                            {pros.map((pro, pIdx) => (
+                              <View key={pIdx} style={styles.trimBulletRowLight}>
+                                <Text style={styles.trimProBulletIconLight}>✔</Text>
+                                <Text style={styles.trimBulletTextLight}>{cleanRangeText(String(pro))}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={styles.trimEmptyTextLight}>Temel mekanik dayanıklılık ve fabrika konforu mevcuttur.</Text>
+                        )}
+                      </View>
+
+                      {/* Günümüz Şartlarında Olumsuz (Eksiklikleri) */}
+                      <View style={styles.trimConsCardLight}>
+                        <View style={styles.trimConsHeaderRowLight}>
+                          <Ionicons name="alert-circle" size={15} color="#dc2626" />
+                          <Text style={styles.trimConsTitleLight}>Günümüz Şartlarında Olumsuz (Eksiklikleri)</Text>
+                        </View>
+                        {cons.length > 0 ? (
+                          <View style={{ gap: 4, marginTop: 4 }}>
+                            {cons.map((con, cIdx) => (
+                              <View key={cIdx} style={styles.trimBulletRowLight}>
+                                <Text style={styles.trimConBulletIconLight}>✖</Text>
+                                <Text style={styles.trimBulletTextLight}>{cleanRangeText(String(con))}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={styles.trimEmptyTextLight}>Dönemine göre belirgin bir donanım eksikliği bulunmamaktadır.</Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
             </CollapsibleLightSection>
           )}
+
+          {/* 3.1.b MOTORCYCLE: MODEL GEÇMİŞİ & ÜRETİM DÖNEMLERİ */}
+          {Boolean(isMotorcycle && synthesis?.motorcycleEraAnalysis) && (() => {
+            const motoEra = synthesis?.motorcycleEraAnalysis;
+            if (!motoEra) return null;
+            return (
+              <CollapsibleLightSection
+                title="Model Geçmişi ve Üretim Dönemleri Haritası"
+                subtitle="Karbüratör / Enjeksiyon ve Revizyon Dönemleri"
+                iconName="time-outline"
+                iconColor="#0891b2"
+                iconBgColor="#ecfeff"
+                borderColor="#a5f3fc"
+                titleColor="#0e7490"
+                defaultOpen={true}
+              >
+                {Boolean(motoEra.modelHistory) && (
+                  <Text style={styles.bodyTextLight}>
+                    {cleanRangeText(motoEra.modelHistory)}
+                  </Text>
+                )}
+
+                {Boolean(motoEra.productionEras && motoEra.productionEras.length > 0) && (() => {
+                  const eras = motoEra.productionEras || [];
+                  return (
+                    <View style={{ gap: 8, marginTop: 6 }}>
+                      {eras.map((era, idx) => {
+                        const eraTitle = era.eraName || `${era.startYear} – ${era.endYear || 'Günümüz'} Dönemi`;
+                      return (
+                        <View key={idx} style={styles.motoEraCardLight}>
+                          <View style={styles.motoEraHeaderLight}>
+                            <Text style={styles.motoEraTitleLight}>{eraTitle}</Text>
+                            <View style={[styles.motoEraFuelBadgeLight, { backgroundColor: era.fuelSystem === 'EFI' ? '#dcfce7' : '#fef3c7' }]}>
+                              <Text style={[styles.motoEraFuelBadgeTextLight, { color: era.fuelSystem === 'EFI' ? '#15803d' : '#b45309' }]}>
+                                {era.fuelSystem || 'Standart'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.motoEraSpecsTextLight}>
+                            {era.displacementCc ? `${era.displacementCc} cc` : '—'} • {era.powerRange || (era.powerHp ? `${era.powerHp} HP` : '—')} • {era.hasAbs ? 'ABS Mevcut' : (era.brakingSystem || 'Standart')}
+                          </Text>
+                          {Boolean(era.keyChanges) && (
+                            <Text style={styles.motoEraChangesTextLight}>
+                              {Array.isArray(era.keyChanges) ? era.keyChanges.filter(Boolean).join(', ') : String(era.keyChanges)}
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                    </View>
+                  );
+                })()}
+
+                {Boolean(motoEra.recommendedEraComparison) && (
+                  <View style={styles.motoEraRecBoxLight}>
+                    <Text style={styles.motoEraRecTitleLight}>💡 Hangi Dönem Daha Mantıklı?</Text>
+                    <Text style={styles.motoEraRecDescLight}>
+                      {cleanRangeText(motoEra.recommendedEraComparison)}
+                    </Text>
+                  </View>
+                )}
+              </CollapsibleLightSection>
+            );
+          })()}
 
           {/* 3.2 TERCİH ETMEK İÇİN GÜÇLÜ NEDENLER */}
           {Boolean(synthesis?.strongestReasonsToChoose && synthesis.strongestReasonsToChoose.length > 0) && (() => {
@@ -3016,5 +3194,165 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '800',
+  },
+  trimBoxContainerLight: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#fafafa',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    gap: 8,
+  },
+  trimBoxHeaderLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 6,
+  },
+  trimBoxHeaderTextLight: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  trimNarrativeTextLight: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 18,
+  },
+  trimProsConsWrapLight: {
+    gap: 8,
+    marginTop: 4,
+  },
+  trimProsCardLight: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 10,
+    padding: 10,
+  },
+  trimProsHeaderRowLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dcfce7',
+    paddingBottom: 4,
+  },
+  trimProsTitleLight: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  trimConsCardLight: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 10,
+    padding: 10,
+  },
+  trimConsHeaderRowLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fee2e2',
+    paddingBottom: 4,
+  },
+  trimConsTitleLight: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#dc2626',
+  },
+  trimBulletRowLight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  trimProBulletIconLight: {
+    fontSize: 11,
+    color: '#16a34a',
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  trimConBulletIconLight: {
+    fontSize: 11,
+    color: '#dc2626',
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  trimBulletTextLight: {
+    flex: 1,
+    fontSize: 11,
+    color: '#334155',
+    lineHeight: 16,
+  },
+  trimEmptyTextLight: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 4,
+  },
+
+  // Motorcycle Era Analysis Styles
+  motoEraCardLight: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  motoEraHeaderLight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  motoEraTitleLight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0e7490',
+  },
+  motoEraFuelBadgeLight: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  motoEraFuelBadgeTextLight: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  motoEraSpecsTextLight: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  motoEraChangesTextLight: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  motoEraRecBoxLight: {
+    backgroundColor: '#ecfeff',
+    borderWidth: 1,
+    borderColor: '#a5f3fc',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    gap: 4,
+  },
+  motoEraRecTitleLight: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0891b2',
+  },
+  motoEraRecDescLight: {
+    fontSize: 11,
+    color: '#0e7490',
+    lineHeight: 16,
   },
 });
