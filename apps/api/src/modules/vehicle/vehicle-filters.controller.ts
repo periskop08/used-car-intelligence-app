@@ -104,9 +104,11 @@ export function getTransmissionWhereClause(targetTrans?: string): any {
   };
 }
 
-export function normalizeVehicleType(category?: string): string {
+export function normalizeVehicleType(category?: string | string[]): string {
   if (!category) return 'AUTOMOBILE';
-  const clean = category.toUpperCase().trim();
+  const raw = Array.isArray(category) ? category[0] : category;
+  if (!raw || typeof raw !== 'string') return 'AUTOMOBILE';
+  const clean = raw.toUpperCase().trim();
   if (clean === 'MOTORCYCLE' || clean === 'MOTOSIKLET' || clean === 'MOTO') return 'MOTORCYCLE';
   if (clean === 'MINIVAN_PANELVAN' || clean === 'MINIVAN' || clean === 'COMMERCIAL' || clean === 'PANELVAN') return 'MINIVAN_PANELVAN';
   if (clean === 'SUV_PICKUP' || clean === 'SUV' || clean === 'PICKUP') return 'SUV_PICKUP';
@@ -987,6 +989,7 @@ export class VehicleFiltersController {
 
     const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
     const categoryWhere = getCategoryVariantWhere(category);
+    const numYear = year && !isNaN(Number(year)) && Number(year) > 1900 ? Number(year) : undefined;
 
     // 1. Try strict matching first
     let engineFilterClause: any = {};
@@ -997,7 +1000,7 @@ export class VehicleFiltersController {
           brand: { name: { equals: brand, mode: 'insensitive' } },
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
-          year: Number(year),
+          ...(numYear ? { year: numYear } : {}),
           ...categoryWhere,
         },
         select: { id: true, engine: { select: { code: true } } },
@@ -1016,7 +1019,7 @@ export class VehicleFiltersController {
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
         ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
-        year: Number(year),
+        ...(numYear ? { year: numYear } : {}),
         ...engineFilterClause,
         ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         ...(targetTrim && !['standart', 'standart / baz'].includes(targetTrim.toLowerCase()) ? { trim: { name: { equals: targetTrim, mode: 'insensitive' } } } : {}),
@@ -1075,7 +1078,7 @@ export class VehicleFiltersController {
         status: 'APPROVED',
         brand: { name: { equals: brand, mode: 'insensitive' } },
         model: { name: { equals: targetModel, mode: 'insensitive' } },
-        year: Number(year),
+        ...(numYear ? { year: numYear } : {}),
         ...transFilterClause, // Never cross-contaminate transmission even in fallback!
       },
       include: { transmission: true, trim: true, engine: true },

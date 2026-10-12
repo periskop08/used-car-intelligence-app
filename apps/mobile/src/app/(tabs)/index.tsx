@@ -1198,17 +1198,18 @@ export default function MobileDashboard() {
 
   const handleStartReport = () => {
     if (selectedBrand && selectedModel) {
+      const isMoto = selectedCategory === 'MOTORCYCLE';
       router.push({
         pathname: '/vehicle-report',
         params: {
           brand: selectedBrand.name,
           model: selectedModel.name,
-          year: selectedYear || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Üretim Yılları' : '2020'),
-          bodyType: selectedBodyType || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Tipler' : 'Sedan'),
-          engine: selectedEngine || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Motor / Versiyonlar' : '1.6'),
-          fuel: selectedFuelType || (selectedCategory === 'MOTORCYCLE' ? 'Tümü' : 'Benzin'),
-          transmission: selectedTransmission || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Motor Hacimleri' : 'Otomatik'),
-          trim: selectedTrim || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Vites Tipleri' : 'M Sport'),
+          year: selectedYear && !selectedYear.startsWith('Tüm') ? selectedYear : (isMoto ? undefined : '2020'),
+          bodyType: selectedBodyType && !selectedBodyType.startsWith('Tüm') ? selectedBodyType : (isMoto ? undefined : 'Sedan'),
+          engine: selectedEngine && !selectedEngine.startsWith('Tüm') ? selectedEngine : (isMoto ? undefined : '1.6'),
+          fuel: selectedFuelType && selectedFuelType !== 'Tümü' ? selectedFuelType : (isMoto ? undefined : 'Benzin'),
+          transmission: selectedTransmission && !selectedTransmission.startsWith('Tüm') ? selectedTransmission : (isMoto ? undefined : 'Otomatik'),
+          trim: selectedTrim && !selectedTrim.startsWith('Tüm') ? selectedTrim : (isMoto ? undefined : 'M Sport'),
           category: selectedCategory || 'AUTOMOBILE',
         },
       });

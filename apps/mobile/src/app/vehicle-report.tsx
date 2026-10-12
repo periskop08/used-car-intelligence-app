@@ -859,44 +859,60 @@ export default function VehicleReportScreen() {
   const resolveVariantIdFromParams = async (): Promise<string | null> => {
     try {
       const categoryParam = params.category ? String(params.category) : 'AUTOMOBILE';
+      const cleanVal = (v: any) => {
+        if (!v) return undefined;
+        const s = String(v).trim();
+        if (s.startsWith('Tüm') || s === 'Tümü' || s === 'Seçilmedi' || s === 'undefined' || s === 'null') return undefined;
+        return s;
+      };
+
+      const brandClean = cleanVal(params.brand);
+      const modelClean = cleanVal(params.model);
+      const yearClean = cleanVal(params.year);
+      const bodyClean = cleanVal(params.bodyType);
+      const engineClean = cleanVal(params.engine);
+      const fuelClean = cleanVal(params.fuel);
+      const transClean = cleanVal(params.transmission);
+      const trimClean = cleanVal(params.trim);
+
       const queryCandidates = [
         {
-          brand: params.brand,
-          modelFamily: params.model,
-          year: params.year,
-          bodyType: params.bodyType,
-          engine: params.engine,
-          fuelType: params.fuel,
-          transmission: params.transmission,
-          trim: params.trim,
+          brand: brandClean,
+          modelFamily: modelClean,
+          year: yearClean,
+          bodyType: bodyClean,
+          engine: engineClean,
+          fuelType: fuelClean,
+          transmission: transClean,
+          trim: trimClean,
           category: categoryParam,
         },
         {
-          brand: params.brand,
-          modelFamily: params.model,
-          year: params.year,
-          bodyType: params.bodyType,
-          engine: params.engine,
-          fuelType: params.fuel,
-          transmission: params.transmission,
+          brand: brandClean,
+          modelFamily: modelClean,
+          year: yearClean,
+          bodyType: bodyClean,
+          engine: engineClean,
+          fuelType: fuelClean,
+          transmission: transClean,
           category: categoryParam,
         },
         {
-          brand: params.brand,
-          modelFamily: params.model,
-          year: params.year,
-          engine: params.engine,
+          brand: brandClean,
+          modelFamily: modelClean,
+          year: yearClean,
+          engine: engineClean,
           category: categoryParam,
         },
         {
-          brand: params.brand,
-          modelFamily: params.model,
-          year: params.year,
+          brand: brandClean,
+          modelFamily: modelClean,
+          year: yearClean,
           category: categoryParam,
         },
         {
-          brand: params.brand,
-          modelFamily: params.model,
+          brand: brandClean,
+          modelFamily: modelClean,
           category: categoryParam,
         },
       ];
@@ -906,11 +922,8 @@ export default function VehicleReportScreen() {
 
         const query = new URLSearchParams();
         Object.entries(candidate).forEach(([key, val]) => {
-          if (val) query.append(key, String(val));
+          if (val) query.set(key, String(val));
         });
-        if (params.category) {
-          query.append('category', String(params.category));
-        }
 
         const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
         if (res.ok) {
