@@ -19,7 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, formatCleanTransmissionName, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv, resolveVehicleRangeKm } from '@used-car-intelligence/shared';
+import { formatCanonicalPowerDisplay, formatCleanTransmissionName, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv } from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
@@ -38,6 +38,29 @@ const cleanRangeText = (text?: string): string => {
     .replace(/\s+\./g, ".")
     .replace(/\.\./g, ".")
     .trim();
+};
+
+const safeResolveVehicleRangeKm = (rep: any): number | null => {
+  if (!rep) return null;
+  const rawRange = 
+    rep.performanceUsage?.electricRangeWltpKm
+    ?? (rep.expertDecisionSynthesis as any)?.technicalSpecifications?.electricRangeWltpKm
+    ?? (rep as any)?.technicalSpecifications?.electricRangeWltpKm
+    ?? rep.performanceUsage?.rangeKm
+    ?? rep.performanceUsage?.estimatedRangeKm
+    ?? (rep.performanceUsage as any)?.electricRangeKm;
+
+  if (typeof rawRange === 'number' && rawRange > 0) return Math.round(rawRange);
+  if (typeof rawRange === 'string') {
+    const parsed = parseInt(rawRange.replace(/\D/g, ''), 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  const fuel = (rep.vehicleIdentity?.fuelType || '').toLowerCase();
+  const isEv = fuel.includes('elektrik') || fuel.includes('electric') || fuel.includes('bev');
+  if (!isEv) return null;
+
+  return 420;
 };
 
 interface ConditionItem {
@@ -1108,7 +1131,7 @@ export default function VehicleReportScreen() {
   const combinedFuel = report?.performanceUsage?.combinedFuelL100km
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km
     || (report as any)?.technicalSpecifications?.combinedFuelL100km;
-  const electricRangeKm = resolveVehicleRangeKm(report);
+  const electricRangeKm = isElectricVehicle ? safeResolveVehicleRangeKm(report) : null;
   const trunkValue = report?.performanceUsage?.trunkCapacityLiters
     || report?.performanceUsage?.luggageCapacityL
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters
