@@ -16,6 +16,7 @@ import TechnicalComparisonTable from "./components/TechnicalComparisonTable";
 import QuotaBadge from "@/components/QuotaBadge";
 import ComparisonChatbot from "./components/ComparisonChatbot";
 import { adaptLegacyComparisonResult } from "@used-car-intelligence/shared";
+import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/common/VehicleSearchModeSelector";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -103,33 +104,46 @@ export default function ComparisonPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
+  // Selected vehicle category (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
+  const [searchMode, setSearchMode] = useState<VehicleSearchMode>("AUTOMOBILE");
+
   // Fetch initial brands and user quota/tier
-  useEffect(() => {
-    const loadBrands = () => {
-      fetch(`${API_URL}/vehicle-filters/brands`)
-        .then(res => res.json())
-        .then(res => {
-          if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-            setBrands(res.data.map((b: any) => b.value));
-          } else {
-            fetch(`${API_URL}/vehicles/brands`)
-              .then(r => r.json())
-              .then(bData => {
-                if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
-              })
-              .catch(() => null);
-          }
-        })
-        .catch(() => {
-          fetch(`${API_URL}/vehicles/brands`)
+  const loadBrands = (mode: VehicleSearchMode = searchMode) => {
+    fetch(`${API_URL}/vehicle-filters/brands?category=${mode}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setBrands(res.data.map((b: any) => b.value));
+        } else {
+          fetch(`${API_URL}/vehicles/brands?category=${mode}`)
             .then(r => r.json())
             .then(bData => {
               if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
             })
             .catch(() => null);
-        });
-    };
-    loadBrands();
+        }
+      })
+      .catch(() => {
+        fetch(`${API_URL}/vehicles/brands?category=${mode}`)
+          .then(r => r.json())
+          .then(bData => {
+            if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
+          })
+          .catch(() => null);
+      });
+  };
+
+  const handleSearchModeChange = (newMode: VehicleSearchMode) => {
+    if (newMode === searchMode) return;
+    setSearchMode(newMode);
+    setComparisonResult(null);
+    setError("");
+    setSlots(prev => prev.map(s => createEmptySlot(s.id)));
+    loadBrands(newMode);
+  };
+
+  useEffect(() => {
+    loadBrands(searchMode);
 
     // Immediately check localStorage user state for instant 10/5 slots render
     const storedUserStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
@@ -166,6 +180,9 @@ export default function ComparisonPage() {
     if (savedDraftStr) {
       try {
         const draft = JSON.parse(savedDraftStr);
+        if (draft.searchMode) {
+          setSearchMode(draft.searchMode);
+        }
         if (Array.isArray(draft.slots) && draft.slots.length >= 2) {
           setSlots(draft.slots);
         }
@@ -236,7 +253,7 @@ export default function ComparisonPage() {
 
     if (!brandName) return;
 
-    fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brandName)}`)
+    fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brandName)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -250,6 +267,48 @@ export default function ComparisonPage() {
 
   const handleModelChange = (index: number, modelName: string) => {
     const slot = slots[index];
+    if (!modelName || !slot.selectedBrand) return;
+
+    if (searchMode === 'MOTORCYCLE') {
+      updateSlot(index, {
+        selectedModel: modelName,
+        selectedYear: "Tüm Üretim Yılları",
+        selectedBodyType: "Tüm Tipler",
+        selectedEngine: "Tüm Motor / Versiyonlar",
+        selectedFuelType: "Tümü",
+        selectedTransmission: "Tüm Motor Hacimleri",
+        selectedTrim: "Tüm Vites Tipleri",
+        years: ["Tüm Üretim Yılları"],
+        bodyTypes: ["Tüm Tipler"],
+        engines: ["Tüm Motor / Versiyonlar"],
+        fuelTypes: ["Tümü"],
+        transmissions: ["Tüm Motor Hacimleri"],
+        trims: ["Tüm Vites Tipleri"],
+        loadingYears: false,
+        loadingBodyTypes: false,
+        loadingEngines: false,
+        loadingFuels: false,
+        loadingTransmissions: false,
+        loadingTrims: false,
+      });
+
+      const queryParams = new URLSearchParams({
+        brand: slot.selectedBrand,
+        model: modelName,
+        category: "MOTORCYCLE",
+      });
+
+      fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success && res.variantId) {
+            updateSlot(index, { matchedVariantId: res.variantId });
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
     updateSlot(index, {
       selectedModel: modelName,
       selectedYear: "",
@@ -265,16 +324,18 @@ export default function ComparisonPage() {
       fuelTypes: [],
       transmissions: [],
       trims: [],
-      loadingYears: !!modelName,
+      loadingYears: true,
     });
 
-    if (!modelName || !slot.selectedBrand) return;
-
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(modelName)}`)
+    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(modelName)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { years: res.data.map((y: any) => y.value), loadingYears: false });
+          const yearList = res.data.map((y: any) => String(y.value));
+          updateSlot(index, { years: yearList, loadingYears: false });
+          if (yearList.length === 1) {
+            handleYearChange(index, yearList[0]);
+          }
         } else {
           updateSlot(index, { loadingYears: false });
         }
@@ -306,7 +367,7 @@ export default function ComparisonPage() {
 
     if (!yearVal || !slot.selectedBrand || !slot.selectedModel) return;
 
-    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}`;
+    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}&category=${searchMode}`;
 
     fetch(`${API_URL}/vehicle-filters/body-types?${baseQuery}`)
       .then(res => res.json())
@@ -391,7 +452,7 @@ export default function ComparisonPage() {
 
     if (!bodyVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear) return;
 
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}`)
+    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -419,7 +480,7 @@ export default function ComparisonPage() {
 
     if (!engineVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
 
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}`)
+    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -445,7 +506,7 @@ export default function ComparisonPage() {
 
     if (!fuelVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine) return;
 
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}`)
+    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -469,7 +530,7 @@ export default function ComparisonPage() {
 
     if (!transVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType) return;
 
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}&category=${searchMode}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -504,6 +565,7 @@ export default function ComparisonPage() {
       fuelType: slot.selectedFuelType,
       transmission: slot.selectedTransmission,
       trim: trimVal,
+      category: searchMode,
     });
 
     fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
@@ -518,12 +580,13 @@ export default function ComparisonPage() {
 
   const [selectedPriority, setSelectedPriority] = useState<string>("BALANCED");
 
-  // Auto-save draft to localStorage whenever slots or selectedPriority change
+  // Auto-save draft to localStorage whenever slots, searchMode or selectedPriority change
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hasAnySelection = slots.some(s => s.selectedBrand);
     if (hasAnySelection) {
       const draft = {
+        searchMode,
         slots,
         selectedPriority,
         savedAt: Date.now(),
@@ -532,7 +595,7 @@ export default function ComparisonPage() {
         localStorage.setItem("torquescout_comparison_draft_v1", JSON.stringify(draft));
       } catch (e) {}
     }
-  }, [slots, selectedPriority]);
+  }, [slots, searchMode, selectedPriority]);
 
   // Collect filled matched variant IDs
   const matchedVariantIds = slots.map(s => s.matchedVariantId).filter((id): id is string => !!id);
@@ -714,6 +777,14 @@ export default function ComparisonPage() {
       {/* Quota Banner */}
       <QuotaBadge feature="comparisons" />
 
+      {/* Vehicle Category Selector (Otomobil, Arazi SUV & Pickup, Minivan & Panelvan, Motosiklet) */}
+      <div className="w-full bg-slate-900/60 p-2 sm:p-2.5 rounded-2xl border border-white/10 shadow-lg">
+        <VehicleSearchModeSelector
+          value={searchMode}
+          onChange={handleSearchModeChange}
+        />
+      </div>
+
       {/* Dynamic Selectors Grid */}
       <div className={`grid grid-cols-1 ${
         vehicleLimit === 2 ? "md:grid-cols-2 gap-6 md:gap-8" : "md:grid-cols-6 gap-4 md:gap-5"
@@ -778,7 +849,7 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedYear}
                   onChange={e => handleYearChange(index, e.target.value)}
-                  disabled={!slot.selectedModel || slot.loadingYears || slot.years.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedModel || slot.loadingYears || slot.years.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
                   <option value="">{slot.loadingYears ? "Yükleniyor..." : "Yıl Seçiniz..."}</option>
@@ -791,10 +862,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedBodyType}
                   onChange={e => handleBodyTypeChange(index, e.target.value)}
-                  disabled={!slot.selectedYear || slot.loadingBodyTypes || slot.bodyTypes.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedYear || slot.loadingBodyTypes || slot.bodyTypes.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : "Kasa Tipi Seçiniz..."}</option>
+                  <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Tip / Kasa Tipi Seçiniz..." : "Kasa Tipi Seçiniz...")}</option>
                   {slot.bodyTypes.map(b => (
                     <option key={b} value={b}>{b}</option>
                   ))}
@@ -804,7 +875,7 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedEngine}
                   onChange={e => handleEngineChange(index, e.target.value)}
-                  disabled={!slot.selectedBodyType || slot.loadingEngines || slot.engines.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedBodyType || slot.loadingEngines || slot.engines.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
                   <option value="">{slot.loadingEngines ? "Yükleniyor..." : "Motor / Versiyon Seçiniz..."}</option>
@@ -817,10 +888,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedFuelType}
                   onChange={e => handleFuelTypeChange(index, e.target.value)}
-                  disabled={!slot.selectedEngine || slot.loadingFuels || slot.fuelTypes.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedEngine || slot.loadingFuels || slot.fuelTypes.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingFuels ? "Yükleniyor..." : "Yakıt Türü Seçiniz..."}</option>
+                  <option value="">{slot.loadingFuels ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Yakıt / Güç Ünitesi Seçiniz..." : "Yakıt Türü Seçiniz...")}</option>
                   {slot.fuelTypes.map(fuel => (
                     <option key={fuel} value={fuel}>{fuel}</option>
                   ))}
@@ -830,10 +901,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedTransmission}
                   onChange={e => handleTransmissionChange(index, e.target.value)}
-                  disabled={!slot.selectedFuelType || slot.loadingTransmissions || slot.transmissions.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedFuelType || slot.loadingTransmissions || slot.transmissions.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingTransmissions ? "Yükleniyor..." : "Şanzıman Tipi Seçiniz..."}</option>
+                  <option value="">{slot.loadingTransmissions ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Motor Hacmi Seçiniz..." : "Şanzıman Tipi Seçiniz...")}</option>
                   {slot.transmissions.map(trans => (
                     <option key={trans} value={trans}>{trans}</option>
                   ))}
@@ -843,12 +914,12 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedTrim}
                   onChange={e => handleTrimChange(index, e.target.value)}
-                  disabled={!slot.selectedTransmission || slot.loadingTrims || slot.trims.length === 0}
+                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedTransmission || slot.loadingTrims || slot.trims.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingTrims ? "Yükleniyor..." : "Donanım Paketi Seçiniz..."}</option>
-                  {slot.trims.map(trim => (
-                    <option key={trim} value={trim}>{trim}</option>
+                  <option value="">{slot.loadingTrims ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Vites Tipi Seçiniz..." : "Donanım Paketi Seçiniz...")}</option>
+                  {slot.trims.map(tr => (
+                    <option key={tr} value={tr}>{tr}</option>
                   ))}
                 </select>
               </div>

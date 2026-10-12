@@ -119,6 +119,15 @@ interface VehicleSlot {
   variantId?: string;
 }
 
+type VehicleCategory = 'AUTOMOBILE' | 'SUV_PICKUP' | 'COMMERCIAL' | 'MOTORCYCLE';
+
+const VEHICLE_CATEGORIES: { key: VehicleCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'AUTOMOBILE', label: 'Otomobil', icon: 'car-sport-outline' },
+  { key: 'SUV_PICKUP', label: 'Arazi, SUV & Pickup', icon: 'trail-sign-outline' },
+  { key: 'COMMERCIAL', label: 'Minivan & Panelvan', icon: 'bus-outline' },
+  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: 'bicycle-outline' },
+];
+
 const CRITERIA_METADATA: Record<string, { title: string; weightStr: string; icon: string }> = {
   RELIABILITY: {
     title: 'Mekanik Güvenilirlik',
@@ -326,6 +335,9 @@ const DEFAULT_RECENT_VEHICLES: VehicleSlot[] = [
 export default function ComparisonScreen() {
   const router = useRouter();
 
+  // Vehicle category state (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
+  const [searchMode, setSearchMode] = useState<VehicleCategory>('AUTOMOBILE');
+
   // Multi-vehicle slot state
   const [vehicleLimit, setVehicleLimit] = useState<number>(10);
   const [userTier, setUserTier] = useState<string>('PREMIUM');
@@ -473,29 +485,41 @@ export default function ComparisonScreen() {
     }
   };
 
-  const loadAllBrandsFromDb = async () => {
+  const loadAllBrandsFromDb = async (cat: VehicleCategory = searchMode) => {
     try {
-      const res = await fetch(`${API_URL}/vehicle-filters/brands`);
+      const res = await fetch(`${API_URL}/vehicle-filters/brands?category=${cat}`);
       if (res.ok) {
         const json = await res.json();
         const items = json.data || json;
         if (Array.isArray(items) && items.length > 0) {
           const list = items.map((i: any) => (typeof i === 'string' ? i : i.value || i.name || String(i)));
           setCachedBrands(list);
-          return;
+          return list;
         }
       }
-      const res2 = await fetch(`${API_URL}/vehicles/brands`);
+      const res2 = await fetch(`${API_URL}/vehicles/brands?category=${cat}`);
       if (res2.ok) {
         const bData = await res2.json();
         if (Array.isArray(bData)) {
           const list = bData.map((b: any) => b.name || String(b)).filter(Boolean).sort();
           setCachedBrands(list);
+          return list;
         }
       }
     } catch (e) {
       console.error(e);
     }
+    return [];
+  };
+
+  const handleSearchModeChange = async (newMode: VehicleCategory) => {
+    if (newMode === searchMode) return;
+    setSearchMode(newMode);
+    setComparisonResponse(null);
+    setSlots([{ slotId: 1 }, { slotId: 2 }]);
+    setLoadingOptions(true);
+    await loadAllBrandsFromDb(newMode);
+    setLoadingOptions(false);
   };
 
   const fetchQuota = async () => {
@@ -562,7 +586,10 @@ export default function ComparisonScreen() {
         setLoadingOptions(false);
       } else {
         setLoadingOptions(true);
-        loadAllBrandsFromDb().then(() => setLoadingOptions(false));
+        loadAllBrandsFromDb(searchMode).then((list) => {
+          setOptions(list || []);
+          setLoadingOptions(false);
+        });
       }
       return;
     }
@@ -577,21 +604,22 @@ export default function ComparisonScreen() {
       const eng = encodeURIComponent(currentSlot.engineCode || '');
       const f = encodeURIComponent(currentSlot.fuelType || '');
       const trs = encodeURIComponent(currentSlot.transmissionName || '');
+      const cat = encodeURIComponent(searchMode);
 
       if (targetStep === 2) {
-        endpoint = `${API_URL}/vehicle-filters/models?brand=${b}`;
+        endpoint = `${API_URL}/vehicle-filters/models?brand=${b}&category=${cat}`;
       } else if (targetStep === 3) {
-        endpoint = `${API_URL}/vehicle-filters/years?brand=${b}&model=${m}&modelFamily=${m}`;
+        endpoint = `${API_URL}/vehicle-filters/years?brand=${b}&model=${m}&modelFamily=${m}&category=${cat}`;
       } else if (targetStep === 4) {
-        endpoint = `${API_URL}/vehicle-filters/body-types?brand=${b}&model=${m}&modelFamily=${m}&year=${y}`;
+        endpoint = `${API_URL}/vehicle-filters/body-types?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&category=${cat}`;
       } else if (targetStep === 5) {
-        endpoint = `${API_URL}/vehicle-filters/engines?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}`;
+        endpoint = `${API_URL}/vehicle-filters/engines?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&category=${cat}`;
       } else if (targetStep === 6) {
-        endpoint = `${API_URL}/vehicle-filters/fuel-types?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}`;
+        endpoint = `${API_URL}/vehicle-filters/fuel-types?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}&category=${cat}`;
       } else if (targetStep === 7) {
-        endpoint = `${API_URL}/vehicle-filters/transmissions?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}&fuelType=${f}`;
+        endpoint = `${API_URL}/vehicle-filters/transmissions?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}&fuelType=${f}&category=${cat}`;
       } else if (targetStep === 8) {
-        endpoint = `${API_URL}/vehicle-filters/trims?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}&fuelType=${f}&transmission=${trs}&transmissionType=${trs}`;
+        endpoint = `${API_URL}/vehicle-filters/trims?brand=${b}&model=${m}&modelFamily=${m}&year=${y}&bodyType=${bt}&engine=${eng}&engineVersion=${eng}&fuelType=${f}&transmission=${trs}&transmissionType=${trs}&category=${cat}`;
       }
 
       const controller = new AbortController();
@@ -656,6 +684,32 @@ export default function ComparisonScreen() {
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
+
+      if (searchMode === 'MOTORCYCLE') {
+        updatedSlot.year = 'Tüm Üretim Yılları';
+        updatedSlot.bodyType = 'Tüm Tipler';
+        updatedSlot.engineCode = 'Tüm Motor / Versiyonlar';
+        updatedSlot.fuelType = 'Tümü';
+        updatedSlot.transmissionName = 'Tüm Motor Hacimleri';
+        updatedSlot.trimName = 'Tüm Vites Tipleri';
+
+        const newSlots = slots.map((s) => (s.slotId === activeSlotId ? updatedSlot : s));
+        setSlots(newSlots);
+        setModalVisible(false);
+        saveRecentVehicle(updatedSlot);
+        resolveSlotVariant(updatedSlot);
+
+        // Auto-advance to next empty slot if available
+        const currentSlotIndex = slots.findIndex((s) => s.slotId === activeSlotId);
+        const nextEmptySlot = newSlots.find((s, idx) => idx > currentSlotIndex && (!s.brand || !s.model));
+
+        if (nextEmptySlot) {
+          setTimeout(() => {
+            openSlotWizard(nextEmptySlot.slotId);
+          }, 350);
+        }
+        return;
+      }
     } else if (step === 3) {
       updatedSlot.year = option;
       updatedSlot.bodyType = undefined;
@@ -731,6 +785,7 @@ export default function ComparisonScreen() {
         transmission_type: slot.transmissionName || '',
         trim: slot.trimName || '',
         trimPackage: slot.trimName || '',
+        category: searchMode,
       });
 
       const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
@@ -820,12 +875,12 @@ export default function ComparisonScreen() {
     switch (s) {
       case 1: return 'Marka Seçin';
       case 2: return 'Model Seçin';
-      case 3: return 'Model Yılı Seçin';
-      case 4: return 'Kasa Tipi Seçin';
-      case 5: return 'Motor Seçin';
-      case 6: return 'Yakıt Tipi Seçin';
-      case 7: return 'Şanzıman Seçin';
-      case 8: return 'Donanım Paketi Seçin';
+      case 3: return searchMode === 'MOTORCYCLE' ? 'Üretim Dönemi' : 'Model Yılı Seçin';
+      case 4: return searchMode === 'MOTORCYCLE' ? 'Tip / Kasa Tipi Seçin' : 'Kasa Tipi Seçin';
+      case 5: return searchMode === 'MOTORCYCLE' ? 'Motor / Versiyon Seçin' : 'Motor Seçin';
+      case 6: return searchMode === 'MOTORCYCLE' ? 'Yakıt / Güç Ünitesi Seçin' : 'Yakıt Tipi Seçin';
+      case 7: return searchMode === 'MOTORCYCLE' ? 'Motor Hacmi Seçin' : 'Şanzıman Seçin';
+      case 8: return searchMode === 'MOTORCYCLE' ? 'Vites Tipi Seçin' : 'Donanım Paketi Seçin';
       default: return 'Seçim Yapın';
     }
   };
@@ -928,6 +983,37 @@ export default function ComparisonScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Taşıt Türü Seçimi (Otomobil, Arazi SUV & Pickup, Minivan & Panelvan, Motosiklet) */}
+        <View style={styles.categoryPillsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryPillsScroll}
+          >
+            {VEHICLE_CATEGORIES.map((cat) => {
+              const isActive = searchMode === cat.key;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[styles.categoryPillBtn, isActive && styles.categoryPillBtnActive]}
+                  onPress={() => handleSearchModeChange(cat.key)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={cat.icon}
+                    size={14}
+                    color={isActive ? '#ffffff' : '#64748b'}
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* Vehicles Selector Horizontal Cards */}
         <View style={styles.slotsCard}>
           <View style={styles.slotsCardHeader}>
@@ -1963,8 +2049,54 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     padding: 16,
-    gap: 16,
+    gap: 12,
     paddingBottom: 40,
+  },
+
+  // Category Pills Bar
+  categoryPillsWrapper: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  categoryPillsScroll: {
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  categoryPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  categoryPillBtnActive: {
+    backgroundColor: '#ea580c',
+    borderColor: '#ea580c',
+    shadowColor: '#ea580c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  categoryPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  categoryPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
 
   // Slots Card
