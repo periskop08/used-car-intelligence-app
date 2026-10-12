@@ -9,7 +9,7 @@ export interface UrgentBadgeProps {
 
 export default function UrgentBadge({ size = 'small', animated = true }: UrgentBadgeProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.8)).current;
+  const glowAnim = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     if (!animated) return;
@@ -32,12 +32,12 @@ export default function UrgentBadge({ size = 'small', animated = true }: UrgentB
           Animated.timing(glowAnim, {
             toValue: 1,
             duration: 750,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
-            toValue: 0.7,
+            toValue: 0.85,
             duration: 750,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ]),
       ])
@@ -67,7 +67,7 @@ export default function UrgentBadge({ size = 'small', animated = true }: UrgentB
           height: dimension,
           borderRadius: radius,
           transform: [{ scale: pulseAnim }],
-          shadowOpacity: animated ? glowAnim : 0.4,
+          opacity: animated ? glowAnim : 1,
         },
       ]}
     >
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(254, 202, 202, 0.7)',
     shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
     shadowRadius: 4,
     elevation: 4,
   },

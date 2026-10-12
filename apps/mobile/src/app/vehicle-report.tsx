@@ -616,10 +616,18 @@ function CollapsibleLightSection({
   );
 }
 
+const isUuid = (val?: string | null): boolean => {
+  return typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+};
+
 export default function VehicleReportScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const rawVariantId = params.variantId ? String(params.variantId) : null;
+  const rawVariantId = isUuid(params.variantId as string)
+    ? String(params.variantId)
+    : isUuid(params.modelId as string)
+      ? String(params.modelId)
+      : null;
 
   const [activeVariantId, setActiveVariantId] = useState<string | null>(rawVariantId);
   const [report, setReport] = useState<ComprehensiveReport | null>(null);
@@ -900,6 +908,9 @@ export default function VehicleReportScreen() {
         Object.entries(candidate).forEach(([key, val]) => {
           if (val) query.append(key, String(val));
         });
+        if (params.category) {
+          query.append('category', String(params.category));
+        }
 
         const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
         if (res.ok) {
@@ -1007,7 +1018,7 @@ export default function VehicleReportScreen() {
   const fetchReport = async (targetVariantId: string | null, force = false) => {
     setLoading(true);
     try {
-      let finalVariantId = targetVariantId;
+      let finalVariantId = isUuid(targetVariantId) ? targetVariantId : null;
       if (!finalVariantId && params.brand && params.model) {
         finalVariantId = await resolveVariantIdFromParams();
       }
@@ -1062,7 +1073,7 @@ export default function VehicleReportScreen() {
         mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
         entryPoint: 'VEHICLE_SEARCH',
         idempotencyKey,
-        forceRefresh: true,
+        forceRefresh: force,
         vehicleType: reqVehicleType,
         searchScope: effectiveSearchScope,
       };
@@ -1098,6 +1109,15 @@ export default function VehicleReportScreen() {
           setLoading(false);
           return;
         }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Report creation failed:', res.status, errJson);
+        Alert.alert(
+          'TorqueScout Araç Danışmanı',
+          errJson.message || 'TorqueScout Araç Danışmanı şu an raporu üretemedi lütfen tekrar deneyin veya geri bildirim gönderin.'
+        );
+        setLoading(false);
+        return;
       }
 
       Alert.alert(
@@ -1238,7 +1258,7 @@ export default function VehicleReportScreen() {
     ? `${zeroToHundredValue} sn` 
     : (isLowSpeedBike ? 'Şehir İçi (<80 km/h)' : (hpValue && hpValue >= 200 ? '7.2 sn' : (isMotorcycle ? '6.5 sn' : '9.5 sn')));
   const fuelOrRangeDisplay = isElectricVehicle ? (electricRangeKm ? `${electricRangeKm} km` : '420 km') : (combinedFuel ? `${combinedFuel} lt/100km` : (isMotorcycle ? '2.8 lt/100km' : '6.8 lt/100km'));
-  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? '18 lt' : '450 lt');
+  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? 'Sele Altı / Çanta Uyumlu' : '450 lt');
   const weightDisplay = weightValue ? `${weightValue} kg` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '88 kg' : '165 kg') : (isElectricVehicle ? '1850 kg' : '1380 kg'));
   const mtvDisplay = mtvResult ? mtvResult.displayInstallment : 'Hesaplanıyor';
 
@@ -1362,35 +1382,42 @@ export default function VehicleReportScreen() {
               {/* Title & Subtitle */}
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={styles.heroCarNameTextLight} numberOfLines={1}>
-                  {report.vehicleIdentity.modelYear} {report.vehicleIdentity.brand} {report.vehicleIdentity.model}
+                  {typeof report.vehicleIdentity.modelYear === 'number' ? `${report.vehicleIdentity.modelYear} ` : ''}{report.vehicleIdentity.brand} {report.vehicleIdentity.model}
                 </Text>
 
                 <Text style={styles.heroSubTextLight} numberOfLines={1}>
-                  {report.vehicleIdentity.engineCode || ''} {params.trim ? `• ${params.trim}` : ''} {report.vehicleIdentity.transmissionName ? `• ${safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}
+                  {isMotorcycle
+                    ? `${report.vehicleIdentity.brand} • ${report.vehicleIdentity.model}`
+                    : `${report.vehicleIdentity.engineCode || ''} ${params.trim ? `• ${params.trim}` : ''} ${report.vehicleIdentity.transmissionName ? `• ${safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}`
+                  }
                 </Text>
               </View>
             </View>
 
             {/* Spacious Metric Chips Bar */}
             <View style={styles.specChipsBarLight}>
-              <View style={styles.specChipLight}>
-                <Ionicons name="calendar-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{report.vehicleIdentity.modelYear}</Text>
-              </View>
+              {!isMotorcycle && (
+                <View style={styles.specChipLight}>
+                  <Ionicons name="calendar-outline" size={13} color="#0284c7" />
+                  <Text style={styles.specChipTextLight}>{report.vehicleIdentity.modelYear}</Text>
+                </View>
+              )}
 
               <View style={styles.specChipLight}>
                 <Ionicons name="funnel-outline" size={13} color="#0284c7" />
                 <Text style={styles.specChipTextLight}>{formatFuelTypeTr(report.vehicleIdentity.fuelType)}</Text>
               </View>
 
-              <View style={styles.specChipLight}>
-                <Ionicons name="options-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
-              </View>
+              {!isMotorcycle && (
+                <View style={styles.specChipLight}>
+                  <Ionicons name="options-outline" size={13} color="#0284c7" />
+                  <Text style={styles.specChipTextLight}>{safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
+                </View>
+              )}
 
               <View style={styles.specChipLight}>
-                <Ionicons name="car-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{params.bodyType ? String(params.bodyType) : 'Sedan'}</Text>
+                <Ionicons name={isMotorcycle ? 'bicycle-outline' : 'car-outline'} size={13} color="#0284c7" />
+                <Text style={styles.specChipTextLight}>{isMotorcycle ? 'Motosiklet' : (params.bodyType ? String(params.bodyType) : 'Sedan')}</Text>
               </View>
 
               {hpDisplay !== '—' && (

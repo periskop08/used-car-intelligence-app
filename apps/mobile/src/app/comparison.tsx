@@ -368,7 +368,7 @@ export default function ComparisonScreen() {
   const specsTableScrollRef = useRef<ScrollView>(null);
   const [specsScrollIdx, setSpecsScrollIdx] = useState<number>(0);
   const [isSpecsAutoScrollPaused, setIsSpecsAutoScrollPaused] = useState<boolean>(false);
-  const specsPauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const specsPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Criterion Detail Modal State
   const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
@@ -914,7 +914,7 @@ export default function ComparisonScreen() {
   const topCardsScrollRef = useRef<ScrollView>(null);
   const [activeCardIdx, setActiveCardIdx] = useState<number>(0);
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState<boolean>(false);
-  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!vehicleEvaluations || vehicleEvaluations.length <= 1 || isAutoScrollPaused) {

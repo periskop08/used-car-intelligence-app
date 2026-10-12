@@ -479,6 +479,56 @@ function TorkScoutWebExactAnimatedLogo() {
   );
 }
 
+export const CATEGORY_ITEMS: {
+  id: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE';
+  name: string;
+  desc: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  {
+    id: 'AUTOMOBILE',
+    name: 'Otomobil',
+    desc: 'Sedan, Hatchback, Station Wagon ve binek araçlar',
+    icon: 'car-sport-outline',
+  },
+  {
+    id: 'SUV_PICKUP',
+    name: 'Arazi, SUV & Pickup',
+    desc: 'SUV, Crossover, Pickup ve 4x4 arazi araçları',
+    icon: 'trail-sign-outline',
+  },
+  {
+    id: 'MINIVAN_PANELVAN',
+    name: 'Minivan & Panelvan',
+    desc: 'Hafif ticari, kamyonet, minibüs ve panelvan araçlar',
+    icon: 'bus-outline',
+  },
+  {
+    id: 'MOTORCYCLE',
+    name: 'Motosiklet',
+    desc: 'Scooter, touring, supersport ve tüm motosikletler',
+    icon: 'bicycle-outline',
+  },
+];
+
+export const getCategoryLabel = (
+  cat: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' | null | undefined
+) => {
+  if (!cat) return 'Seçiniz...';
+  switch (cat) {
+    case 'AUTOMOBILE':
+      return 'Otomobil';
+    case 'SUV_PICKUP':
+      return 'Arazi, SUV & Pickup';
+    case 'MINIVAN_PANELVAN':
+      return 'Minivan & Panelvan';
+    case 'MOTORCYCLE':
+      return 'Motosiklet';
+    default:
+      return 'Seçiniz...';
+  }
+};
+
 export default function MobileDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<{
@@ -553,7 +603,62 @@ export default function MobileDashboard() {
   const [selectedFuelType, setSelectedFuelType] = useState<string>('');
   const [selectedTransmission, setSelectedTransmission] = useState<string>('');
   const [selectedTrim, setSelectedTrim] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE'>('AUTOMOBILE');
+  const [selectedCategory, setSelectedCategory] = useState<'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' | null>(null);
+  const [isCategoryCycling, setIsCategoryCycling] = useState<boolean>(false);
+  const [cyclingCategoryText, setCyclingCategoryText] = useState<string>('Otomobil');
+  const cycleTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const stopCategoryCycle = useCallback(() => {
+    cycleTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    cycleTimeoutsRef.current = [];
+    setIsCategoryCycling(false);
+  }, []);
+
+  const startCategoryCycle = useCallback(() => {
+    stopCategoryCycle();
+    // 1. Reset all vehicle choices
+    setSelectedCategory(null);
+    setSelectedBrand(null);
+    setSelectedModel(null);
+    setSelectedYear('');
+    setSelectedBodyType('');
+    setSelectedEngine('');
+    setSelectedFuelType('');
+    setSelectedTransmission('');
+    setSelectedTrim('');
+    setBrands([]);
+    setModels([]);
+    setYears([]);
+    setBodyTypes([]);
+    setEngines([]);
+    setFuelTypes([]);
+    setTransmissions([]);
+    setTrims([]);
+
+    // 2. Start cycling sequence
+    setIsCategoryCycling(true);
+    setCyclingCategoryText('Otomobil');
+
+    // 1s -> Arazi, SUV & Pickup | 2s -> Minivan & Panelvan | 3s -> Motosiklet | 4s -> Seçiniz...
+    const t1 = setTimeout(() => {
+      setCyclingCategoryText('Arazi, SUV & Pickup');
+    }, 1000);
+
+    const t2 = setTimeout(() => {
+      setCyclingCategoryText('Minivan & Panelvan');
+    }, 2000);
+
+    const t3 = setTimeout(() => {
+      setCyclingCategoryText('Motosiklet');
+    }, 3000);
+
+    const t4 = setTimeout(() => {
+      setCyclingCategoryText('Seçiniz...');
+      setIsCategoryCycling(false);
+    }, 4000);
+
+    cycleTimeoutsRef.current = [t1, t2, t3, t4];
+  }, [stopCategoryCycle]);
 
   // Loading States for Cascading Options
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -562,7 +667,7 @@ export default function MobileDashboard() {
   const [queryModalVisible, setQueryModalVisible] = useState(false);
   const [modalView, setModalView] = useState<'form' | 'step'>('form');
   const [activeStep, setActiveStep] = useState<
-    'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
+    'category' | 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim'
   >('brand');
   const [searchText, setSearchText] = useState('');
 
@@ -575,7 +680,7 @@ export default function MobileDashboard() {
   const kesfetLayoutWidthRef = useRef<number>(0);
   const kesfetDirectionRef = useRef<'right' | 'left'>('right');
   const kesfetUserInteractingRef = useRef<boolean>(false);
-  const kesfetInteractionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const kesfetInteractionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const autoScrollInterval = setInterval(() => {
@@ -613,8 +718,13 @@ export default function MobileDashboard() {
   useEffect(() => {
     checkUserSession();
     fetchFeaturedListings();
-    fetchBrands();
-  }, []);
+    if (selectedCategory) {
+      fetchBrands(selectedCategory);
+    }
+    return () => {
+      stopCategoryCycle();
+    };
+  }, [selectedCategory, stopCategoryCycle]);
 
   // 1. Brand Changes -> Fetch Models
   useEffect(() => {
@@ -841,7 +951,10 @@ export default function MobileDashboard() {
   };
 
   // 1. Fetch All Brands (Scoped by Category)
-  const fetchBrands = async (cat = selectedCategory) => {
+  const fetchBrands = async (
+    cat: 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE' | null = selectedCategory
+  ) => {
+    if (!cat) return;
     setLoadingOptions(true);
     try {
       const res = await fetch(`${API_URL}/vehicle-filters/brands?category=${cat}`);
@@ -1096,7 +1209,7 @@ export default function MobileDashboard() {
           fuel: selectedFuelType || (selectedCategory === 'MOTORCYCLE' ? 'Tümü' : 'Benzin'),
           transmission: selectedTransmission || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Motor Hacimleri' : 'Otomatik'),
           trim: selectedTrim || (selectedCategory === 'MOTORCYCLE' ? 'Tüm Vites Tipleri' : 'M Sport'),
-          category: selectedCategory,
+          category: selectedCategory || 'AUTOMOBILE',
         },
       });
       setQueryModalVisible(false);
@@ -1106,7 +1219,7 @@ export default function MobileDashboard() {
   };
 
   const openStepView = (
-    step: 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim',
+    step: 'category' | 'brand' | 'model' | 'year' | 'bodyType' | 'engine' | 'fuelType' | 'transmission' | 'trim',
     overrideBrand?: Brand | null,
     overrideModel?: Model | null,
     overrideYear?: string,
@@ -1118,6 +1231,10 @@ export default function MobileDashboard() {
     setActiveStep(step);
     setSearchText('');
     setModalView('step');
+
+    if (step === 'category') {
+      return;
+    }
 
     const curBrand = overrideBrand !== undefined ? overrideBrand : selectedBrand;
     const curModel = overrideModel !== undefined ? overrideModel : selectedModel;
@@ -1148,6 +1265,9 @@ export default function MobileDashboard() {
 
   const handleStepBack = () => {
     switch (activeStep) {
+      case 'category':
+        setModalView('form');
+        break;
       case 'model':
         openStepView('brand');
         break;
@@ -1179,6 +1299,13 @@ export default function MobileDashboard() {
   const selectOption = (rawItem: any) => {
     const itemString = typeof rawItem === 'string' ? rawItem : rawItem.name || rawItem.value || rawItem.label || String(rawItem);
     const itemObj = typeof rawItem === 'object' && rawItem.id ? rawItem : { id: itemString, name: itemString };
+
+    if (activeStep === 'category') {
+      const catId = (itemObj.id || itemObj.value || itemString) as 'AUTOMOBILE' | 'SUV_PICKUP' | 'MINIVAN_PANELVAN' | 'MOTORCYCLE';
+      handleCategoryChange(catId);
+      setModalView('form');
+      return;
+    }
 
     if (activeStep === 'brand') {
       const nextBrand = itemObj;
@@ -1254,6 +1381,7 @@ export default function MobileDashboard() {
 
   const getStepNumber = () => {
     switch (activeStep) {
+      case 'category': return 0;
       case 'brand': return 1;
       case 'model': return 2;
       case 'year': return 3;
@@ -1268,7 +1396,8 @@ export default function MobileDashboard() {
 
   const getStepTitle = () => {
     switch (activeStep) {
-      case 'brand': return 'Marka Seç';
+      case 'category': return 'Vasıta Türü Seç';
+      case 'brand': return selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markası Seç' : 'Marka Seç';
       case 'model': return 'Model Ailesi Seç';
       case 'year': return 'Yıl Seç';
       case 'bodyType': return 'Kasa Tipi Seç';
@@ -1282,7 +1411,8 @@ export default function MobileDashboard() {
 
   const getStepSubtitle = () => {
     switch (activeStep) {
-      case 'brand': return 'Aracınızın markasını seçerek devam edin.';
+      case 'category': return 'Sorgulamak istediğiniz vasıta türünü seçerek devam edin.';
+      case 'brand': return selectedCategory === 'MOTORCYCLE' ? 'Motosikletinizin markasını seçerek devam edin.' : 'Aracınızın markasını seçerek devam edin.';
       case 'model': return 'Seçtiğiniz marka için model ailesini belirleyin.';
       case 'year': return 'Seçtiğiniz model için yılı belirleyin.';
       case 'bodyType': return 'Seçtiğiniz model için kasa tipini belirleyin.';
@@ -1296,7 +1426,8 @@ export default function MobileDashboard() {
 
   const getSearchPlaceholder = () => {
     switch (activeStep) {
-      case 'brand': return 'Marka ara...';
+      case 'category': return 'Vasıta türü ara...';
+      case 'brand': return selectedCategory === 'MOTORCYCLE' ? 'Motosiklet markası ara...' : 'Marka ara...';
       case 'model': return 'Model ara...';
       case 'year': return 'Model yılı ara...';
       case 'bodyType': return 'Kasa tipi ara...';
@@ -1431,7 +1562,7 @@ export default function MobileDashboard() {
                 activeOpacity={0.85}
                 onPress={() => {
                   setModalView('form');
-                  if (brands.length === 0) fetchBrands();
+                  startCategoryCycle();
                   setQueryModalVisible(true);
                 }}
               >
@@ -1728,14 +1859,27 @@ export default function MobileDashboard() {
     </ScrollView>
 
       {/* SINGLE UNIFIED MODAL MATCHING REFERENCE UI */ }
-  <Modal visible={queryModalVisible} animationType="slide">
+  <Modal
+    visible={queryModalVisible}
+    animationType="slide"
+    onRequestClose={() => {
+      stopCategoryCycle();
+      setQueryModalVisible(false);
+    }}
+  >
     <SafeAreaView style={styles.fullModalContainer}>
       {modalView === 'form' ? (
         /* FORM VIEW MATCHING REFERENCE IMAGE 2 */
         <ScrollView contentContainerStyle={styles.refFormPadding} showsVerticalScrollIndicator={false}>
           {/* Header with Back Arrow & Centered Title */}
           <View style={styles.refHeaderRow}>
-            <TouchableOpacity style={styles.refBackButton} onPress={() => setQueryModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.refBackButton}
+              onPress={() => {
+                stopCategoryCycle();
+                setQueryModalVisible(false);
+              }}
+            >
               <Ionicons name="chevron-back" size={24} color="#0f172a" />
             </TouchableOpacity>
             <Text style={styles.refHeaderTitle}>Araç Sorgula</Text>
@@ -1757,32 +1901,7 @@ export default function MobileDashboard() {
             </Text>
           </View>
 
-          {/* Category Tabs */}
-          <View style={styles.categoryPillsContainer}>
-            {(
-              [
-                { id: 'AUTOMOBILE', label: 'Otomobil' },
-                { id: 'SUV_PICKUP', label: 'Arazi/SUV' },
-                { id: 'MINIVAN_PANELVAN', label: 'Minivan' },
-                { id: 'MOTORCYCLE', label: 'Motosiklet' },
-              ] as const
-            ).map((cat) => {
-              const isActive = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryPill, isActive && styles.categoryPillActive]}
-                  onPress={() => handleCategoryChange(cat.id)}
-                >
-                  <Text style={[styles.categoryPillText, isActive && styles.categoryPillTextActive]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Araç Bilgileri Card with 8 Rows */}
+          {/* Araç Bilgileri Card */}
           <View style={styles.vehicleInfoCard}>
             <View style={styles.vehicleInfoCardHeader}>
               <View style={styles.vehicleInfoIconCircle}>
@@ -1791,9 +1910,50 @@ export default function MobileDashboard() {
               <Text style={styles.vehicleInfoCardTitle}>Araç Bilgileri</Text>
             </View>
 
+            {/* 0. Vasıta Türü */}
+            <TouchableOpacity
+              style={[
+                styles.filterRowItem,
+                isCategoryCycling && { backgroundColor: '#fff7ed' },
+              ]}
+              onPress={() => !isCategoryCycling && openStepView('category')}
+              activeOpacity={0.7}
+              disabled={isCategoryCycling}
+            >
+              <Text style={styles.filterRowLabel}>Vasıta Türü</Text>
+              <View style={styles.filterRowRight}>
+                {isCategoryCycling ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ActivityIndicator size="small" color="#ea580c" />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#ea580c' }}>
+                      {cyclingCategoryText}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={selectedCategory ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                    {getCategoryLabel(selectedCategory)}
+                  </Text>
+                )}
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={isCategoryCycling ? '#ea580c' : '#cbd5e1'}
+                />
+              </View>
+            </TouchableOpacity>
+
             {/* 1. Marka */}
-            <TouchableOpacity style={styles.filterRowItem} onPress={() => openStepView('brand')}>
-              <Text style={styles.filterRowLabel}>Marka</Text>
+            <TouchableOpacity
+              style={[
+                styles.filterRowItem,
+                (!selectedCategory || isCategoryCycling) && styles.filterRowItemDisabled,
+              ]}
+              onPress={() => selectedCategory && !isCategoryCycling && openStepView('brand')}
+              disabled={!selectedCategory || isCategoryCycling}
+            >
+              <Text style={styles.filterRowLabel}>
+                {selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markası' : 'Marka'}
+              </Text>
               <View style={styles.filterRowRight}>
                 <Text style={selectedBrand ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
                   {selectedBrand ? selectedBrand.name : 'Seçilmedi'}
@@ -1804,7 +1964,11 @@ export default function MobileDashboard() {
 
             {/* 2. Model Ailesi */}
             <TouchableOpacity
-              style={[styles.filterRowItem, !selectedBrand && styles.filterRowItemDisabled]}
+              style={[
+                styles.filterRowItem,
+                selectedCategory === 'MOTORCYCLE' && { borderBottomWidth: 0 },
+                !selectedBrand && styles.filterRowItemDisabled,
+              ]}
               onPress={() => selectedBrand && openStepView('model')}
               disabled={!selectedBrand}
             >
@@ -1817,140 +1981,129 @@ export default function MobileDashboard() {
               </View>
             </TouchableOpacity>
 
-            {/* 3. Yıl */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedModel || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedModel && selectedCategory !== 'MOTORCYCLE' && openStepView('year')}
-              disabled={!selectedModel || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>Yıl</Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedYear ? selectedYear : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+            {/* Otomobil, Arazi/SUV & Minivan için Kalan 6 Varyant Alanı */}
+            {selectedCategory !== 'MOTORCYCLE' && (
+              <>
+                {/* 3. Yıl */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    !selectedModel && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedModel && openStepView('year')}
+                  disabled={!selectedModel}
+                >
+                  <Text style={styles.filterRowLabel}>Yıl</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedYear ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedYear ? selectedYear : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
 
-            {/* 4. Kasa Tipi */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedYear || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedYear && selectedCategory !== 'MOTORCYCLE' && openStepView('bodyType')}
-              disabled={!selectedYear || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>
-                {selectedCategory === 'MOTORCYCLE' ? 'Tip / Kasa Tipi' : 'Kasa Tipi'}
-              </Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+                {/* 4. Kasa Tipi */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    !selectedYear && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedYear && openStepView('bodyType')}
+                  disabled={!selectedYear}
+                >
+                  <Text style={styles.filterRowLabel}>Kasa Tipi</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedBodyType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedBodyType ? selectedBodyType : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
 
-            {/* 5. Motor / Versiyon */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedBodyType || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedBodyType && selectedCategory !== 'MOTORCYCLE' && openStepView('engine')}
-              disabled={!selectedBodyType || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedEngine ? selectedEngine : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+                {/* 5. Motor / Versiyon */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    !selectedBodyType && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedBodyType && openStepView('engine')}
+                  disabled={!selectedBodyType}
+                >
+                  <Text style={styles.filterRowLabel}>Motor / Versiyon</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedEngine ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedEngine ? selectedEngine : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
 
-            {/* 6. Yakıt */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedEngine || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedEngine && selectedCategory !== 'MOTORCYCLE' && openStepView('fuelType')}
-              disabled={!selectedEngine || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>
-                {selectedCategory === 'MOTORCYCLE' ? 'Yakıt / Güç Ünitesi' : 'Yakıt'}
-              </Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+                {/* 6. Yakıt */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    !selectedEngine && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedEngine && openStepView('fuelType')}
+                  disabled={!selectedEngine}
+                >
+                  <Text style={styles.filterRowLabel}>Yakıt Türü</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedFuelType ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedFuelType ? selectedFuelType : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
 
-            {/* 7. Şanzıman */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                (!selectedFuelType || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedFuelType && selectedCategory !== 'MOTORCYCLE' && openStepView('transmission')}
-              disabled={!selectedFuelType || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>
-                {selectedCategory === 'MOTORCYCLE' ? 'Motor Hacmi' : 'Şanzıman'}
-              </Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+                {/* 7. Şanzıman */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    !selectedFuelType && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedFuelType && openStepView('transmission')}
+                  disabled={!selectedFuelType}
+                >
+                  <Text style={styles.filterRowLabel}>Şanzıman Tipi</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedTransmission ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedTransmission ? selectedTransmission : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
 
-            {/* 8. Donanım */}
-            <TouchableOpacity
-              style={[
-                styles.filterRowItem,
-                { borderBottomWidth: 0 },
-                (!selectedTransmission || selectedCategory === 'MOTORCYCLE') && styles.filterRowItemDisabled,
-              ]}
-              onPress={() => selectedTransmission && selectedCategory !== 'MOTORCYCLE' && openStepView('trim')}
-              disabled={!selectedTransmission || selectedCategory === 'MOTORCYCLE'}
-            >
-              <Text style={styles.filterRowLabel}>
-                {selectedCategory === 'MOTORCYCLE' ? 'Vites Tipi' : 'Donanım'}
-              </Text>
-              <View style={styles.filterRowRight}>
-                <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
-                  {selectedTrim ? selectedTrim : 'Seçilmedi'}
-                </Text>
-                {selectedCategory !== 'MOTORCYCLE' && (
-                  <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
-                )}
-              </View>
-            </TouchableOpacity>
+                {/* 8. Donanım */}
+                <TouchableOpacity
+                  style={[
+                    styles.filterRowItem,
+                    { borderBottomWidth: 0 },
+                    !selectedTransmission && styles.filterRowItemDisabled,
+                  ]}
+                  onPress={() => selectedTransmission && openStepView('trim')}
+                  disabled={!selectedTransmission}
+                >
+                  <Text style={styles.filterRowLabel}>Donanım Paketi</Text>
+                  <View style={styles.filterRowRight}>
+                    <Text style={selectedTrim ? styles.filterRowValSelected : styles.filterRowValPlaceholder}>
+                      {selectedTrim ? selectedTrim : 'Seçilmedi'}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Bottom Orange Action Button */}
           <TouchableOpacity
-            style={[styles.refOrangeSubmitButton, (!selectedBrand || !selectedModel) && styles.refOrangeSubmitButtonDisabled]}
+            style={[
+              styles.refOrangeSubmitButton,
+              (!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling) && styles.refOrangeSubmitButtonDisabled,
+            ]}
             onPress={handleStartReport}
+            disabled={!selectedCategory || !selectedBrand || !selectedModel || isCategoryCycling}
           >
             <Text style={styles.refOrangeSubmitButtonText}>Sorgulamaya Başla</Text>
             <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
@@ -1969,21 +2122,25 @@ export default function MobileDashboard() {
             <View style={{ width: 24 }} />
           </View>
 
-          {/* Progress Indicator: Step Badge (e.g. 8/8) & Segmented Bar */}
-          <View style={styles.progressRow}>
-            <Text style={styles.progressText}>{getStepNumber()} / 8</Text>
-            <View style={styles.progressBarTrack}>
-              {Array.from({ length: 8 }, (_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.progressBarSegment,
-                    i < getStepNumber() && styles.progressBarSegmentActive,
-                  ]}
-                />
-              ))}
+          {/* Progress Indicator: Step Badge (e.g. 2/2 or 8/8) & Segmented Bar */}
+          {activeStep !== 'category' && (
+            <View style={styles.progressRow}>
+              <Text style={styles.progressText}>
+                {getStepNumber()} / {selectedCategory === 'MOTORCYCLE' ? 2 : 8}
+              </Text>
+              <View style={styles.progressBarTrack}>
+                {Array.from({ length: selectedCategory === 'MOTORCYCLE' ? 2 : 8 }, (_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.progressBarSegment,
+                      i < getStepNumber() && styles.progressBarSegmentActive,
+                    ]}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           <Text style={styles.refSubtitle}>{getStepSubtitle()}</Text>
 
@@ -2213,8 +2370,8 @@ export default function MobileDashboard() {
             </View>
           )}
 
-          {/* Search Bar matching reference UI (Hidden for Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
-          {activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
+          {/* Search Bar matching reference UI (Hidden for Category, Year, Body Type, Engine, Fuel Type, Transmission, and Trim selections) */}
+          {activeStep !== 'category' && activeStep !== 'year' && activeStep !== 'bodyType' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'transmission' && activeStep !== 'trim' && (
             <View style={styles.refSearchBox}>
               <Ionicons name="search-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
               <TextInput
@@ -2275,10 +2432,10 @@ export default function MobileDashboard() {
               )}
 
               {/* Options Section Header */}
-              {activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
+              {activeStep !== 'category' && activeStep !== 'engine' && activeStep !== 'fuelType' && activeStep !== 'trim' && (
                 <Text style={styles.sectionHeaderLabel}>
                   {activeStep === 'brand'
-                    ? 'Tüm Markalar'
+                    ? (selectedCategory === 'MOTORCYCLE' ? 'Motosiklet Markaları' : 'Tüm Markalar')
                     : activeStep === 'model'
                       ? 'Model Aileleri'
                       : activeStep === 'year'
@@ -2293,6 +2450,52 @@ export default function MobileDashboard() {
 
               {loadingOptions ? (
                 <ActivityIndicator size="large" color="#ea580c" style={{ marginVertical: 40 }} />
+              ) : activeStep === 'category' ? (
+                /* CATEGORY SELECTION LIST */
+                <View style={styles.categoryStepContainer}>
+                  {CATEGORY_ITEMS.map((cat) => {
+                    const isSelected = selectedCategory === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.categoryStepCard, isSelected && styles.categoryStepCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          handleCategoryChange(cat.id);
+                          setModalView('form');
+                        }}
+                      >
+                        <View style={styles.categoryStepCardLeft}>
+                          <View style={[styles.categoryStepIconCircle, isSelected && styles.categoryStepIconCircleSelected]}>
+                            <Ionicons
+                              name={cat.icon}
+                              size={22}
+                              color={isSelected ? '#ea580c' : '#0f172a'}
+                            />
+                          </View>
+                          <Text style={[styles.categoryStepTitle, isSelected && styles.categoryStepTitleSelected]}>
+                            {cat.name}
+                          </Text>
+                        </View>
+
+                        <View style={styles.categoryStepCardRight}>
+                          {isSelected ? (
+                            <Ionicons name="checkmark-circle" size={24} color="#ea580c" />
+                          ) : (
+                            <View style={styles.categoryStepUncheckedCircle} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  <View style={styles.engineInfoBanner}>
+                    <Ionicons name="information-circle-outline" size={18} color="#ea580c" />
+                    <Text style={styles.engineInfoBannerText}>
+                      Seçtiğiniz vasıta türüne göre ilgili marka, model ve teknik varyant kriterleri listelenecektir.
+                    </Text>
+                  </View>
+                </View>
               ) : activeStep === 'brand' ? (
                 getGroupedBrands().map((group) => (
                   <View key={group.key} style={styles.brandGroupBlock}>
@@ -3682,38 +3885,101 @@ const styles = StyleSheet.create({
     color: '#ea580c',
     fontWeight: '900',
   },
-  categoryPillsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 4,
+  categoryPillsScrollWrapper: {
     marginBottom: 16,
-    gap: 4,
+  },
+  categoryPillsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 2,
   },
   categoryPill: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   categoryPillActive: {
-    backgroundColor: '#0284c7',
-    shadowColor: '#0284c7',
+    backgroundColor: '#ea580c',
+    borderColor: '#c2410c',
+    shadowColor: '#ea580c',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   categoryPillText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#64748b',
     textAlign: 'center',
   },
   categoryPillTextActive: {
     color: '#ffffff',
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  categoryStepContainer: {
+    paddingVertical: 12,
+    gap: 12,
+  },
+  categoryStepCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  categoryStepCardSelected: {
+    borderColor: '#ea580c',
+    backgroundColor: '#fff7ed',
+  },
+  categoryStepCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  categoryStepIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryStepIconCircleSelected: {
+    backgroundColor: '#ffedd5',
+  },
+  categoryStepTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  categoryStepTitleSelected: {
+    color: '#c2410c',
+  },
+  categoryStepCardRight: {
+    marginLeft: 8,
+  },
+  categoryStepUncheckedCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
   },
 });
