@@ -19,14 +19,74 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatCanonicalPowerDisplay, formatCleanTransmissionName, normalizeVehicleReportPayload, formatVehicleAssessmentParagraphs, replacePsWithHp, calculateVehicleMtv } from '@used-car-intelligence/shared';
+import * as SharedModule from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
+const safeReplacePsWithHp = (text?: string): string => {
+  if (!text) return '';
+  try {
+    if (typeof (SharedModule as any)?.replacePsWithHp === 'function') {
+      return (SharedModule as any).replacePsWithHp(text);
+    }
+  } catch {}
+  return String(text).replace(/\b(\d+)\s*(?:ps|bg|beygir)\b/gi, '$1 HP');
+};
+
+const safeFormatCleanTransmissionName = (transmission?: string | null): string => {
+  if (!transmission) return 'Otomatik';
+  try {
+    if (typeof (SharedModule as any)?.formatCleanTransmissionName === 'function') {
+      return (SharedModule as any).formatCleanTransmissionName(transmission);
+    }
+  } catch {}
+  const lower = String(transmission).toLowerCase();
+  if (lower.includes('man') || lower.includes('düz')) return 'Manuel';
+  return 'Otomatik';
+};
+
+const safeFormatCanonicalPowerDisplay = (rawPower: any, unit?: any, semantic?: any): string => {
+  try {
+    if (typeof (SharedModule as any)?.formatCanonicalPowerDisplay === 'function') {
+      return (SharedModule as any).formatCanonicalPowerDisplay(rawPower, unit, semantic);
+    }
+  } catch {}
+  if (!rawPower) return '—';
+  return `${rawPower} HP`;
+};
+
+const safeFormatVehicleAssessmentParagraphs = (assessment?: string): string[] => {
+  if (!assessment) return [];
+  try {
+    if (typeof (SharedModule as any)?.formatVehicleAssessmentParagraphs === 'function') {
+      return (SharedModule as any).formatVehicleAssessmentParagraphs(assessment);
+    }
+  } catch {}
+  return String(assessment).split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+};
+
+const safeCalculateVehicleMtv = (params: any): any => {
+  try {
+    if (typeof (SharedModule as any)?.calculateVehicleMtv === 'function') {
+      return (SharedModule as any).calculateVehicleMtv(params);
+    }
+  } catch {}
+  return { displayInstallment: 'Hesaplanıyor' };
+};
+
+const safeNormalizeVehicleReportPayload = (payload: any): any => {
+  try {
+    if (typeof (SharedModule as any)?.normalizeVehicleReportPayload === 'function') {
+      return (SharedModule as any).normalizeVehicleReportPayload(payload);
+    }
+  } catch {}
+  return { data: payload };
+};
+
 const cleanRangeText = (text?: string): string => {
   if (!text) return '';
-  return replacePsWithHp(text)
+  return safeReplacePsWithHp(text)
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)yla\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "$1 kapasitesine sahiptir")
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)\s+ve\s+yaklaşık\s+\d+\s*km\s*menzil,\s*sık\s+mola\s+ihtiyacını\s+azaltır/gi, "$1 kapasitesi sunar")
     .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "")
@@ -411,7 +471,7 @@ function parseSuitabilityItems(rawList: any): SuitabilityItem[] {
 
 function normalizeReport(data: any): ComprehensiveReport {
   const rawPayload = data?.reportData || data?.report || data || {};
-  const normResult = normalizeVehicleReportPayload(rawPayload);
+  const normResult = safeNormalizeVehicleReportPayload(rawPayload);
   const rep = normResult.data || {};
 
   const identity = rep.vehicleIdentity || {};
@@ -1118,7 +1178,7 @@ export default function VehicleReportScreen() {
     ?? 'HP';
   const powerSemantic = report?.performanceUsage?.powerSemantic 
     ?? (report?.vehicleIdentity as any)?.powerSemantic;
-  const hpDisplay = formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
+  const hpDisplay = safeFormatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
   const isElectricVehicle = (report?.vehicleIdentity?.fuelType || '').toLowerCase().includes('elektrik');
   const rawDisplacement = report?.vehicleIdentity?.engineDisplacementCc
     ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.engineDisplacementCc
@@ -1136,7 +1196,7 @@ export default function VehicleReportScreen() {
         : 'Bu Araç Nasıl Bir Otomobil?'));
 
   const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '1598 cc');
-  const mtvResult = calculateVehicleMtv({
+  const mtvResult = safeCalculateVehicleMtv({
     modelYear: report?.vehicleIdentity?.modelYear,
     engineDisplacement: rawDisplacement || report?.vehicleIdentity?.engineDisplacementCc,
     fuelType: report?.vehicleIdentity?.fuelType,
@@ -1306,7 +1366,7 @@ export default function VehicleReportScreen() {
                 </Text>
 
                 <Text style={styles.heroSubTextLight} numberOfLines={1}>
-                  {report.vehicleIdentity.engineCode || ''} {params.trim ? `• ${params.trim}` : ''} {report.vehicleIdentity.transmissionName ? `• ${formatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}
+                  {report.vehicleIdentity.engineCode || ''} {params.trim ? `• ${params.trim}` : ''} {report.vehicleIdentity.transmissionName ? `• ${safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}
                 </Text>
               </View>
             </View>
@@ -1325,7 +1385,7 @@ export default function VehicleReportScreen() {
 
               <View style={styles.specChipLight}>
                 <Ionicons name="options-outline" size={13} color="#0284c7" />
-                <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
+                <Text style={styles.specChipTextLight}>{safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
               </View>
 
               <View style={styles.specChipLight}>
@@ -1405,11 +1465,11 @@ export default function VehicleReportScreen() {
               defaultOpen={true}
             >
               {Boolean(synthesis.vehicleCharacter.headline) && (
-                <Text style={styles.characterHeadlineLight}>{replacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
+                <Text style={styles.characterHeadlineLight}>{safeReplacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
               )}
               {Boolean(synthesis.vehicleCharacter.detailedAssessment) && (
                 <View style={{ gap: 8 }}>
-                  {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
+                  {safeFormatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
                     <Text key={idx} style={styles.bodyTextLight}>{cleanRangeText(para)}</Text>
                   ))}
                 </View>

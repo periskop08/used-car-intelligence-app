@@ -43,6 +43,13 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     };
   }
 
+  if (moduleName === '@used-car-intelligence/shared') {
+    return {
+      filePath: path.resolve(workspaceRoot, 'packages/shared/src/index.ts'),
+      type: 'sourceFile',
+    };
+  }
+
   if (originalResolveRequest) {
     return originalResolveRequest(context, moduleName, platform);
   }
