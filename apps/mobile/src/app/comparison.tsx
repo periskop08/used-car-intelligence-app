@@ -791,11 +791,12 @@ export default function ComparisonScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.success && json.variantId) {
+        const matchedId = json.variantId || json.modelId;
+        if (json.success && matchedId) {
           setSlots((prev) =>
-            prev.map((s) => (s.slotId === slot.slotId ? { ...s, variantId: json.variantId } : s))
+            prev.map((s) => (s.slotId === slot.slotId ? { ...s, variantId: matchedId } : s))
           );
-          return json.variantId;
+          return matchedId;
         }
       }
     } catch (e) {

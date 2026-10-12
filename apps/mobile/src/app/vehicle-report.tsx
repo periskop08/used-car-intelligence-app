@@ -790,6 +790,7 @@ export default function VehicleReportScreen() {
 
   const resolveVariantIdFromParams = async (): Promise<string | null> => {
     try {
+      const categoryParam = params.category ? String(params.category) : 'AUTOMOBILE';
       const queryCandidates = [
         {
           brand: params.brand,
@@ -800,6 +801,7 @@ export default function VehicleReportScreen() {
           fuelType: params.fuel,
           transmission: params.transmission,
           trim: params.trim,
+          category: categoryParam,
         },
         {
           brand: params.brand,
@@ -809,21 +811,25 @@ export default function VehicleReportScreen() {
           engine: params.engine,
           fuelType: params.fuel,
           transmission: params.transmission,
+          category: categoryParam,
         },
         {
           brand: params.brand,
           modelFamily: params.model,
           year: params.year,
           engine: params.engine,
+          category: categoryParam,
         },
         {
           brand: params.brand,
           modelFamily: params.model,
           year: params.year,
+          category: categoryParam,
         },
         {
           brand: params.brand,
           modelFamily: params.model,
+          category: categoryParam,
         },
       ];
 
@@ -838,8 +844,8 @@ export default function VehicleReportScreen() {
         const res = await fetch(`${API_URL}/vehicle-filters/match-variant?${query.toString()}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.variantId) {
-            return json.variantId;
+          if (json.success && (json.variantId || json.modelId)) {
+            return json.variantId || json.modelId;
           }
         }
       }
@@ -979,17 +985,38 @@ export default function VehicleReportScreen() {
         }
       }
 
+      const reqVehicleType = (params.category ? String(params.category) : 'AUTOMOBILE').toUpperCase();
+      const isMoto = reqVehicleType === 'MOTORCYCLE';
+      const effectiveSearchScope = {
+        vehicleType: reqVehicleType,
+        year: params.year,
+        bodyType: params.bodyType,
+        engine: params.engine,
+        fuel: params.fuel,
+        transmission: params.transmission,
+        trim: params.trim,
+      };
+
       const idempotencyKey = `vr_${finalVariantId}_${Date.now()}`;
+      const reportPayload: any = {
+        mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
+        entryPoint: 'VEHICLE_SEARCH',
+        idempotencyKey,
+        forceRefresh: true,
+        vehicleType: reqVehicleType,
+        searchScope: effectiveSearchScope,
+      };
+
+      if (isMoto) {
+        reportPayload.modelId = finalVariantId;
+      } else {
+        reportPayload.variantId = finalVariantId;
+      }
+
       const res = await fetch(`${API_URL}/vehicle-reports`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          mode: 'TORQUE_SCOUT_VEHICLE_REPORT',
-          variantId: finalVariantId,
-          entryPoint: 'VEHICLE_SEARCH',
-          idempotencyKey,
-          forceRefresh: true,
-        }),
+        body: JSON.stringify(reportPayload),
       });
 
       if (res.ok) {
