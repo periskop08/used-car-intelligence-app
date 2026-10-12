@@ -79,3 +79,26 @@ This workspace corresponds to the **TorqueScout** (formerly Used Car Intelligenc
   - `compromisesAndLimitations` (Tavizler ve Sınırlar) cannot contain advantages or praise.
   - Vehicles with verified automatic options cannot claim "otomatik şanzıman eksikliği", and vehicles that are strictly manual-only cannot have hallucinated automatic gearbox failure modes.
   - Zero serialization defects: `[object Object]` output is strictly forbidden across all report fields.
+
+## 🔒 LOCKED CONTEMPORARY TRIM EVALUATION, 100% REPORT-DRIVEN SPECS & CLEAN UI CONTRACT (FROZEN - DO NOT ALTER)
+* **Zero False Lack of Tech on Modern / Premium Trims:**
+  - Modern vehicles (2019+), premium/luxury brands (DS, BMW, Mercedes, Audi, Volvo, Porsche, Lexus, Land Rover, Jaguar, Alfa Romeo, Maserati, Mini, Tesla), and upper trims (Performance Line, Rivoli, Opera, Titanium, Highline, Cosmo, Elegance, AMG, M Sport, R-Line, Prestige, Lounge, Tekna, Platinum, GT Line, Laurin & Klement, Vignale, Insignia) have touchscreens, Apple CarPlay, Android Auto, Bluetooth, digital cockpits, and parking sensors as standard.
+  - The system MUST NEVER claim these modern/upper vehicles lack multimedia, CarPlay, Bluetooth, or parking sensors.
+  - Modern and upper trims have **`scorePenalty: 0` (Zero points deducted for equipment)**.
+  - Equipment score deductions (-2 to -3 points) are strictly reserved for genuine older (pre-2019) stripped/base trims (e.g. 2006 Impreza Active, 2011 Punto Pop, 2013 Clio Joy).
+  - Genuine contemporary nuances must be evaluated instead (touch-screen climate control ergonomics, Alcantara maintenance sensitivity, optional panoramic roofs or massaging seats).
+* **100% Report-Driven Horsepower & Displacement in Admin Panel (`AdminVehicleReportsService`):**
+  - In `/admin/vehicle-data/reports` and report details, displayed horsepower (`powerHp`) and displacement (`displacementCc`) are 100% report-driven from `report.reportData` (`vehicleIdentity` / `technicalSpecifications`).
+  - The system is completely decoupled from raw database `Engine` table placeholders (such as Arabam.com scraped 100 HP, 110 HP, 1600 cc junk). The report's own verified specifications are the sole and absolute source of truth.
+* **Clean & Distraction-Free Report UI Contract (`VehicleReportExpertSynthesis.tsx`):**
+  - In the user and admin vehicle report view, visual clutter is strictly eliminated:
+    - Zero `equipmentTier` badges ("Giriş / Baz Seviye", "Orta / Dengeli Seviye", "Üst / Dolu Seviye").
+    - Zero `scoreImpact` badges ("Satın Alma Puanı: Kesintisiz Tam Puan", "Satın Alma Puanı: -3 Puan (Donanım Kesintisi)").
+    - Zero score penalty footnote sentences (`💡 Satın Alma Puanı Değerlendirmesi: ...`).
+    - Zero raw English severity tags (`MODERATE`, `HIGH`, `CRITICAL`).
+  - Rich and substantive content boxes are preserved cleanly:
+    - Donanım Paketi title and narrative overview.
+    - Two-column contemporary pros (`✔ Günümüz Şartlarında Olumlu (Artıları)`) and cons (`✖ Günümüz Şartlarında Olumsuz (Eksiklikleri)`) cards with checked bullet points.
+* **Mandatory Warning & Gatekeeper Policy:**
+  - Any proposed modification, refactoring, or external touch directly or indirectly affecting contemporary trim evaluation, admin report spec resolution, or clean report UI components MUST trigger an explicit warning to the user before proceeding, requiring explicit confirmation. Modifying or regressing this locked system without direct user request is strictly prohibited.
+
