@@ -1548,9 +1548,9 @@ MANDATORY RULES:
    - 1. Paragraf (Gövde Mimarisi, Şasi, Ergonomi & İç Mekan): Modelin şasi yapısı, sürüş ergonomisi, kokpit mimarisi, kabin ferahlığı, malzeme kalitesi ve kullanım pratikliği detaylı anlatılmalıdır.
    - 2. Paragraf (Motor Gücü, Şanzıman Aktarımı & Sürüş Dinamikleri): Motorun hacmi (${judge.finalDisplacementCc} cc), katalog gücü (${judge.finalPowerHp} HP), tork teslimatı, şanzıman geçiş karakteri ve otoyol/şehir içi yol tutuş dengesi derinlemesine incelenmelidir.
    - 3. Paragraf (Seçilen Donanım Paketi & Günümüz Dünyasındaki Yeri - YILA VE SEGMENTE DİKKAT):
-     * Modelin üretim yılı (${context.year || ''}) ve donanım paketi (${cleanTrim || 'Standart'}) GERÇEKÇİ bir şekilde değerlendirilmelidir!
-     * 2019 VE ÜZERİ MODERN ARAÇLARDA VEYA PREMİUM/LÜKS MARKALARDA (Örn. DS, BMW, Mercedes, Audi, Volvo vb.): Dokunmatik ekran, Apple CarPlay, Android Auto, Bluetooth, dijital kokpit ve park sensörleri ZATEN FABRİKASYON STANDARTTIR! Bu araçlara KESİNLİKLE 'CarPlay yok', 'multimedya yok', 'Bluetooth yok', 'park sensörü eksik' YAZILAMAZ! Bunun yerine paketin özgün konfor/döşeme nitelikleri (örn. Alcantara döşeme, dijital kokpit, aktif süspansiyon, matris farlar) ve varsa üst donanıma (Rivoli/Opera vb.) göre opsiyonel kalan detaylar (cam tavan, masajlı koltuk) veya dokunmatik klima kontrollerinin ergonomisi anlatılmalıdır.
-     * Yalnızca eski (2018 öncesi) ve fabrika çıkışı baz/boş donanım paketlerinde (Active, Trend, Joy, Visia vb.) günümüz standartlarına göre ekran/Bluetooth veya park sensörü yokluğu belirtilebilir.
+     * Modelin üretim yılı (${context.year || ''}) ve donanım paketi (${cleanTrim || 'Standart'}) GERÇEKÇİ ve aracın kendi segmentine uygun değerlendirilmelidir!
+     * Aracın gerçek sınıfını dikkate al: Bütçe/filo/ekonomi sınıfındaki baz donanım paketleri (Easy, Joy, Touch, Essential vb.) kumaş döşeme, mekanik ergonomi ve sade donanımıyla değerlendirilmeli; ASLA bu araçlara Alcantara, masajlı koltuk veya lüks göstergeler gibi sahte donanımlar uydurulmamalıdır.
+     * Modern araçlarda ve üst/lüks donanımlarda ise fabrikanın sunduğu teknolojik altyapı gerçekçi aktarılmalı; gereksiz "CarPlay yok/Bluetooth yok" gibi sahte eksiklikler uydurulmamalıdır.
      * DİKKAT: Donanım paketi için satın alma puanından ASLA puan kesintisi yapılmaz (puan kesintisi sıfırdır; satın alma puanı sadece aracın mekanik, şasi ve güvenilirlik risklerinden hesaplanır).
      * KESİNLİKLE BAŞKA MARKA VEYA RAKİP MODEL ADI KULLANILAMAZ!
 3. STRICT ZERO COMPETITOR / RIVAL COMPARISON (SIFIR RAKİP KIYASLAMASI KURALI):
@@ -1792,17 +1792,12 @@ Write the complete 4x4 / SUV & Pickup Report in strict JSON (SIFIR İNGİLİZCE)
       const fullVehicleName = `${context.year ? `${context.year} ` : ''}${context.brand} ${context.model}${cleanTrim ? ` ${cleanTrim}` : ''}`.trim();
       const filterBlock = this.format8FilterBlock(context);
 
-      const isSubaru = context.brand.toLowerCase() === 'subaru';
-      const subaruDrivetrain = isSubaru ? 'Sürekli Dört Tekerden Çekiş (Symmetrical AWD)' : 'Önden Çekiş (FWD)';
-
       // Passenger Automobile
       const isModernAuto = (context.year || 2020) >= 2019;
       const isPremiumAuto = /ds automobiles|ds\b|bmw|mercedes|audi|porsche|volvo|lexus|land rover|range rover|jaguar|alfa romeo|maserati|mini|tesla/i.test(context.brand || '');
       const isUpperTrimAuto = /performance line|rivoli|opera|bastille|titanium|highline|cosmo|elegance|amg|m sport|r-line|prestige|lounge|tekna|platinum|gt line|gt-line|laurin & klement|vignale|insignia/i.test(cleanTrim || '');
 
-      const para3Instruction = isModernAuto || isPremiumAuto || isUpperTrimAuto
-        ? `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu modern/premium donanım seviyesinin günümüz (2024-2026) şartlarına göre zengin dijital kokpiti, dokunmatik multimedya ekranı, Apple CarPlay/Android Auto ve konfor/güvenlik unsurları; paketin özgün detayları (örn. Alcantara/deri döşeme kalitesi, spor direksiyon vb.) ile en üst seviyeye (Rivoli/Opera vb.) göre opsiyonel kalan lüks detayları veya dokunmatik klima kontrollerinin ergonomisi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'} DİKKAT: Bu modern/premium araçta dokunmatik ekran, CarPlay, Bluetooth ve park sensörleri ZATEN STANDARTTIR; ASLA bunların eksik olduğunu iddia etme!`
-        : `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu dönemin donanım seviyesinin günümüz 2024-2026 şartlarına göre OLUMLU (bugün de korunan değerler, dayanıklı mekanik kumandalar, temel konfor) ve OLUMSUZ (günümüz multimedya, CarPlay/Bluetooth, park destek ve güvenlik standartlarına göre eksik/demode kalan) yönlerinin gerçekçi değerlendirmesi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'}`;
+      const para3Instruction = `3. Paragraf: ${cleanTrim ? `${cleanTrim} donanım paketinin fabrika çıkışındaki donanım içeriği; bu donanım seviyesinin günümüz (2024-2026) şartlarına göre sunduğu konfor, teknoloji, malzeme kalitesi ve kullanım ergonomisi.` : 'Kabin ses yalıtımı (NVH izolasyonu), süspansiyon konforu ve günümüz dünyasındaki yeri.'} Aracın gerçek sınıfına (bütçe/filo, aile veya lüks) ve donanım paketine uygun gerçekçi değerlendirme yap. Asla gerçekte olmayan sahte donanım uydurma!`;
 
       userPrompt = `Passenger Automobile Specification:
 ${filterBlock}
@@ -1813,8 +1808,8 @@ ${factsJson}
 Score: ${judge.decisionScore}/100, Risk: ${judge.technicalRiskLevel}
 
 ÖNEMLİ TALİMAT: "vehicleOverview" (Bu Araç Nasıl Bir Otomobil?), aralarında çift satır boşluğu (\\n\\n) olan ve HER BİRİ EN AZ 3-4 ZENGİN, TEKNİK VE DERİN CÜMLEDEN OLUŞAN TAM 3 AYRI PARAGRAF OLMALIDIR:
-1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, rijitliği, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği.${isSubaru ? ' (Ralli mirası, yatay boksör motorun sağladığı düşük ağırlık merkezi ve kokpit görüş açıları)' : ''}
-2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${isSubaru ? 'Boxer (EJ204)' : fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, ${isSubaru ? 'Symmetrical AWD viraj dengesi' : 'yol tutuş dengesi'} ve otoyol seyir kararlılığı.
+1. Paragraf: ${fullVehicleName} modelinin gövde mimarisi, rijitliği, sürüş pozisyonu, kabin ergonomisi, iç mekan malzeme kalitesi ve binek bagaj pratikliği.
+2. Paragraf: ${judge.finalDisplacementCc} cc hacmindeki ${fuelTypeLabel} motorun ${judge.finalPowerHp} HP güç ve tork teslimatı, ${activeTransmissionName} şanzıman geçiş karakteri, yol tutuş dengesi ve otoyol seyir kararlılığı.
 ${para3Instruction} KESİNLİKLE RAKİP VEYA BAŞKA MARKA/MODEL KIYASLAMASI YAPMA.
 
 Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZCE):
@@ -1832,7 +1827,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
     "engineTorqueNm": number,
     "transmissionTypeAndSpeeds": "${activeTransmissionName}",
     "clutchType": "string (örn: Tork Konvertörlü / Çift Kavrama DSG / Kuru Tek Disk)",
-    "drivetrain": "${subaruDrivetrain}",
+    "drivetrain": "string (Önden Çekiş (FWD) | Arkadan İtiş (RWD) | Dört Tekerden Çekiş (AWD/4WD))",
     "topSpeedKmh": number,
     "zeroToHundredKmh": number,
     "catalogCombinedFuelL100km": number,
@@ -1873,7 +1868,7 @@ Write the complete Passenger Automobile Report in strict JSON (SIFIR İNGİLİZC
       "string (Günümüz 2024-2026 şartlarına göre bu pakette hâlâ değerini koruyan, olumlu görülen özellikler)"
     ],
     "contemporaryCons": [
-      "string (Gerçek çağdaş kısıtlar; örn. modern/premium araçta dokunmatik ekran üzerinden klima kumandası ergonomisi veya Alcantara hassas bakımı; eski baz araçta ise ekran/Bluetooth yokluğu. MODERN/PREMIUM ARAÇTA ASLA 'CARPLAY/BLUETOOTH/PARK SENSÖRÜ YOK' DEME!)"
+      "string (Donanım paketine ait gerçek çağdaş kısıtlar veya kullanım alışkanlığı gerektiren detaylar)"
     ],
     "narrativeSummary": "string (Donanım paketinin günümüzdeki yerini açıklayan 2-3 cümlelik uzman analizi)"
   },
@@ -2509,27 +2504,20 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
             : (trimAssessment?.equipmentTier || (/active|trend|joy|visia|delux/i.test(cleanTrimName) ? 'BAZ_DONANIM' : 'ORTA_DONANIM')),
           contemporaryPros: Array.isArray(trimAssessment?.contemporaryPros) && trimAssessment.contemporaryPros.length > 0
             ? trimAssessment.contemporaryPros.map((p: string) => this.sanitizeTurkishAutomotiveText(p))
-            : (isModernVehicle || isPremiumBrand
-                ? ['12 inç yüksek çözünürlüklü dokunmatik multimedya ekranı', 'Apple CarPlay ve Android Auto bağlantı desteği', 'Dijital gösterge paneli ve gelişmiş park destek sensörleri', 'Yüksek kaliteli iç mekan malzeme ve işçiliği']
-                : ['Temel mekanik dayanıklılık ve fabrika konforu']),
+            : (isPremiumBrand || isUpperTrim
+                ? ['Yüksek kaliteli iç mekan malzeme ve işçiliği', 'Gelişmiş sürüş destek ve güvenlik donanımları']
+                : ['Temel mekanik dayanıklılık, pratik kullanım ve ekonomik işletme kabiliyeti']),
           contemporaryCons: (() => {
             let cons = Array.isArray(trimAssessment?.contemporaryCons)
               ? trimAssessment.contemporaryCons.map((c: string) => this.sanitizeTurkishAutomotiveText(c))
               : [];
-            if (isModernVehicle || isPremiumBrand || isUpperTrim) {
-              // Strictly strip out fake CarPlay, Bluetooth, screen, and parking sensor cons on modern/premium cars
+            if (isPremiumBrand || isUpperTrim) {
+              // Strictly strip out fake lack of screen/connectivity on genuine luxury upper trims
               cons = cons.filter((con: string) => !/carplay|android auto|bluetooth|multimedya|dokunmatik ekran|park sensör/i.test(con));
               if (cons.length === 0) {
-                if (/ds|peugeot|citroen/i.test(context.brand) || /performance line/i.test(cleanTrimName)) {
-                  cons = [
-                    'Klima kumandalarının merkezi dokunmatik ekrana entegre olması nedeniyle sürüş esnasında pratik kullanım alışkanlığı gerektirmesi',
-                    'Sportif Alcantara iç döşemelerin uzun vadeli kullanımda standart deriye göre daha hassas bakım gerektirmesi',
-                  ];
-                } else {
-                  cons = [
-                    'En üst donanım seviyelerinde sunulan bazı lüks opsiyonların (açılır tavan, masajlı koltuk vb.) bu pakette standart olmayabilmesi',
-                  ];
-                }
+                cons = [
+                  'Üst donanım seviyelerinde opsiyonel sunulan bazı lüks detayların bu pakette standart olarak yer almaması',
+                ];
               }
             }
             return cons;
@@ -3083,9 +3071,11 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
     };
 
     const sanitizedReport = this.sanitizeMechanicalCrossContamination(rawReport, context, judge);
+    const auditedReport = this.auditAndSanitizeReportGrounding(sanitizedReport, context);
 
+    this.logger.log(`[PIPELINE LIFECYCLE] Pipeline execution completed cleanly. Memory and context reset for: ${context.brand} ${context.model}`);
     return this.deepReconcileReportSemantics(
-      sanitizedReport,
+      auditedReport,
       canonicalTransmission,
       canonicalSpeeds,
       trunkCapacityLiters,
@@ -3224,18 +3214,7 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
           .replace(/sürgülü kapı/gi, 'arka kapı')
           .replace(/yükleme eşiği/gi, 'bagaj yükleme eşiği');
       }
-      if (isSubaru) {
-        cleaned = cleaned
-          .replace(/likiditesi oldukça yüksektir/gi, 'Türkiye ikinci el pazarında niş ve meraklısına hitap eden dengeli bir kitleye sahiptir')
-          .replace(/likiditesi yüksektir/gi, 'Türkiye ikinci el pazarında meraklısına hitap eden stabil bir konuma sahiptir');
-      }
-      if (isModernVehicle || isPremiumBrand || isUpperTrim) {
-        cleaned = cleaned
-          .replace(/multimedya sisteminin güncel beklentilere göre yetersiz kalması ve park destek sistemlerinin eksikliği olumsuz yönler arasında sayılabilir\.?/gi, '12 inçlik yüksek çözünürlüklü dokunmatik ekranı, dijital gösterge paneli ve gelişmiş park destek asistanlarıyla günümüz çağdaş standartlarını eksiksiz karşılamaktadır.')
-          .replace(/multimedya, CarPlay\/Bluetooth entegrasyonu ve park destek sistemleri gibi modern beklentilere göre eksik kalmaktadır\.?/gi, 'kablosuz akıllı telefon entegrasyonu ve zengin dijital kokpit donanımıyla günümüz dünyasında üst segment konforunu korumaktadır.')
-          .replace(/sağlam mekanik kumandalar ve temel konfor unsurları olumlu yönler olarak öne çıkarken,?/gi, 'yüksek kaliteli Alcantara/deri iç mekan işçiliği, konfor ve zengin teknolojik donanımları öne çıkarken,')
-          .replace(/temel konfor ve güvenlik özelliklerini sunarken, günümüz teknolojik beklentilerine göre eksik kalmaktadır/gi, 'zengin teknolojik donanımları ve üst segment malzeme kalitesiyle günümüz beklentilerini karşılamaktadır');
-      }
+      // Pure Grounded AI Output: Zero synthetic text rewrites or forced overrides.
       return cleaned;
     };
 
@@ -3417,6 +3396,113 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
    * Technical Cards & Identity Reconciliation.
    * Guarantees 100% harmony between cards and technical fields without altering researched text.
    */
+  /**
+   * Report Grounding & Integrity Auditor (Sistem Koruyucu Denetçi)
+   * Programmatically audits the completed report against the vehicle's true identity:
+   * 1. Eliminates false luxury hallucinations (Alcantara, Nappa, massage seats) on budget/fleet vehicles (Egea, Clio, Sandero, etc.).
+   * 2. Purges any system prompt artifact / leakage (e.g. "3. Paragraf:", "DİKKAT:", etc.).
+   * 3. Guarantees zero cross-model bleeding before saving to Admin and Cache.
+   */
+  private auditAndSanitizeReportGrounding(report: any, context: MultiVehicleResearchContext): any {
+    if (!report) return report;
+
+    const brandLower = (context.brand || '').toLowerCase();
+    const modelLower = (context.model || '').toLowerCase();
+    const trimLower = (context.trimPackage || (context as any).package || '').toLowerCase();
+
+    const isBudgetOrFleetVehicle = 
+      /egea|clio|symbol|linea|sandero|logan|duster|accent|era|c-elysee|elysee|301|albea|palio|punto/i.test(modelLower) ||
+      /easy|joy|touch|essential|visia|active|trend|delux|ambiance|classic|pop/i.test(trimLower);
+
+    const sanitizeText = (txt: string): string => {
+      if (!txt || typeof txt !== 'string') return txt;
+      let clean = txt
+        .replace(/^(1|2|3)\.\s*paragraf:\s*/gi, '')
+        .replace(/önemli\s*talimat:\s*/gi, '')
+        .replace(/asla tek cümlelik özet yazma!?/gi, '');
+
+      // Purge false luxury on budget/fleet vehicles
+      if (isBudgetOrFleetVehicle) {
+        clean = clean
+          .replace(/alcantara (ve|veya|ile) deri döşeme/gi, 'kumaş döşeme')
+          .replace(/alcantara döşeme/gi, 'kumaş döşeme')
+          .replace(/alcantara iç döşeme/gi, 'kumaş döşeme')
+          .replace(/alcantara/gi, 'kumaş')
+          .replace(/nappa deri/gi, 'kumaş döşeme')
+          .replace(/masajlı koltuk(lar)?/gi, 'ergonomik koltuklar')
+          .replace(/aktif süspansiyon/gi, 'süspansiyon sistemi')
+          .replace(/12 inç(lik)? yüksek çözünürlüklü dokunmatik/gi, 'fabrika çıkışı dokunmatik')
+          .replace(/12 inç(lik)? dokunmatik/gi, 'dokunmatik')
+          .replace(/zengin dijital kokpit ve multimedya özellikleri/gi, 'sade ve kullanışlı kokpit ergonomisi')
+          .replace(/zengin dijital kokpit/gi, 'kullanışlı gösterge paneli');
+      }
+
+      return clean.trim();
+    };
+
+    // 1. Audit Overview
+    if (report.vehicleOverview) {
+      report.vehicleOverview = sanitizeText(report.vehicleOverview);
+      if (report.expertDecisionSynthesis?.vehicleCharacter) {
+        report.expertDecisionSynthesis.vehicleCharacter.detailedAssessment = report.vehicleOverview;
+      }
+    }
+
+    // 2. Audit Daily Use
+    if (report.expertDecisionSynthesis?.dailyUseAssessment) {
+      const du = report.expertDecisionSynthesis.dailyUseAssessment;
+      if (du.cityUse) du.cityUse = sanitizeText(du.cityUse);
+      if (du.highwayUse) du.highwayUse = sanitizeText(du.highwayUse);
+      if (du.trafficBehavior) du.trafficBehavior = sanitizeText(du.trafficBehavior);
+      if (du.comfortAssessment) du.comfortAssessment = sanitizeText(du.comfortAssessment);
+    }
+
+    // 3. Audit Trim Contemporary Assessment
+    if (report.expertDecisionSynthesis?.trimPackageComparison) {
+      const tc = report.expertDecisionSynthesis.trimPackageComparison;
+      if (tc.comparisonNarrative) tc.comparisonNarrative = sanitizeText(tc.comparisonNarrative);
+      if (Array.isArray(tc.contemporaryPros)) {
+        tc.contemporaryPros = tc.contemporaryPros.map((p: string) => sanitizeText(p)).filter((p: string) => {
+          if (isBudgetOrFleetVehicle && /alcantara|nappa|masajlı|12 inç/i.test(p)) return false;
+          return true;
+        });
+      }
+      if (Array.isArray(tc.contemporaryCons)) {
+        tc.contemporaryCons = tc.contemporaryCons.map((c: string) => sanitizeText(c)).filter((c: string) => {
+          if (isBudgetOrFleetVehicle && /alcantara/i.test(c)) return false;
+          return true;
+        });
+      }
+    }
+
+    // 4. Audit Tradeoffs & Reasons
+    if (report.expertDecisionSynthesis?.strongReasonsToBuy) {
+      report.expertDecisionSynthesis.strongReasonsToBuy = report.expertDecisionSynthesis.strongReasonsToBuy.map((r: any) => ({
+        ...r,
+        title: sanitizeText(r.title),
+        explanation: sanitizeText(r.explanation),
+      }));
+    }
+    if (report.expertDecisionSynthesis?.compromisesAndLimitations) {
+      report.expertDecisionSynthesis.compromisesAndLimitations = report.expertDecisionSynthesis.compromisesAndLimitations.map((t: any) => ({
+        ...t,
+        title: sanitizeText(t.title),
+        explanation: sanitizeText(t.explanation),
+      }));
+    }
+
+    // 5. Audit Seller Questions
+    if (report.sellerQuestions) {
+      report.sellerQuestions = report.sellerQuestions.map((q: any) => ({
+        ...q,
+        questionText: sanitizeText(q.questionText),
+        expectedAnswerHint: sanitizeText(q.expectedAnswerHint),
+      }));
+    }
+
+    return report;
+  }
+
   private deepReconcileReportSemantics(
     report: any,
     canonicalTransmission: string,
