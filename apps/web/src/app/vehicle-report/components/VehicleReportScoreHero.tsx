@@ -35,9 +35,10 @@ export default function VehicleReportScoreHero({ report }: VehicleReportScoreHer
     score: typeof rawScoreObj.score === 'number' ? rawScoreObj.score : (report.scoring?.buyabilityScore?.value ?? 80),
     confidenceScore: typeof rawScoreObj.confidenceScore === 'number' ? rawScoreObj.confidenceScore : 90,
     state: rawScoreObj.state || (
-      (rawScoreObj.score ?? 80) >= 85 ? 'EXCELLENT' :
-      (rawScoreObj.score ?? 80) >= 70 ? 'GOOD' :
-      (rawScoreObj.score ?? 80) >= 50 ? 'CAUTION' : 'HIGH_RISK'
+      (rawScoreObj.score ?? 80) >= 90 ? 'EXCELLENT' :
+      (rawScoreObj.score ?? 80) >= 78 ? 'GOOD' :
+      (rawScoreObj.score ?? 80) >= 65 ? 'CAUTION' :
+      (rawScoreObj.score ?? 80) >= 48 ? 'HIGH_RISK' : 'AVOID'
     ),
     scope: rawScoreObj.scope || 'VEHICLE',
     modelDecisionRisk: rawScoreObj.modelDecisionRisk ?? Math.max(0, 100 - (rawScoreObj.score ?? 80)),

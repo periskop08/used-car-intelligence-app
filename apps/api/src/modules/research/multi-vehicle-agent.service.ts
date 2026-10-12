@@ -1401,15 +1401,24 @@ Perform adversarial red-team audit. Output strict JSON.`;
     }
 
     const totalPenalty = finalApprovedFacts.reduce((sum, fact) => {
-      const penalty = fact.severity === 'CRITICAL' ? 10 : fact.severity === 'HIGH' ? 7 : fact.severity === 'MODERATE' ? 4 : 2;
+      const text = `${fact.title} ${(fact.symptoms || []).join(' ')} ${fact.userExperience || ''}`.toLowerCase();
+      const isOilBurnOrPiston = /yağ yakma|yağ eksiltme|oil consumption|piston segman|segman aşınma|yağ tüketimi/i.test(text);
+      const isChainOrMechatronic = /zincir uzama|chain stretch|timing chain|mekatronik|mechatronic|kuru kavrama|dq200|şanzıman vuruntu/i.test(text);
+
+      let effectiveSev = fact.severity;
+      if (effectiveSev === 'MODERATE' && (isOilBurnOrPiston || isChainOrMechatronic)) {
+        effectiveSev = 'HIGH';
+      }
+
+      const penalty = effectiveSev === 'CRITICAL' ? 22 : effectiveSev === 'HIGH' ? 12 : effectiveSev === 'MODERATE' ? 6 : 3;
       return sum + penalty;
     }, 0);
 
     const baseScore = 96;
-    let decisionScore = Math.max(50, Math.min(96, baseScore - totalPenalty));
+    let decisionScore = Math.max(35, Math.min(96, baseScore - totalPenalty));
 
     const technicalRiskLevel: 'DUSUK' | 'ORTA' | 'YUKSEK' | 'KRITIK' =
-      decisionScore >= 80 ? 'DUSUK' : decisionScore >= 70 ? 'ORTA' : decisionScore >= 60 ? 'YUKSEK' : 'KRITIK';
+      decisionScore >= 88 ? 'DUSUK' : decisionScore >= 76 ? 'ORTA' : decisionScore >= 60 ? 'YUKSEK' : 'KRITIK';
 
     const decisionRationale =
       agent1.vehicleType === 'MOTORCYCLE'
@@ -3160,19 +3169,29 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
         return true;
       });
 
+      // Ensure chronic oil burning, wet belt, or transmission mechatronic risks have realistic penalties
+      report.decisionScore.deductedRisks.forEach((risk: any) => {
+        const text = `${risk.title || ''} ${risk.reason || ''} ${risk.description || ''}`.toLowerCase();
+        if (/yağ yakma|yağ eksiltme|oil consumption|piston segman|segman aşınma|yağ tüketimi/i.test(text)) {
+          if (!risk.penalty || risk.penalty < 8) {
+            risk.penalty = 10;
+          }
+        }
+      });
+
       // Recalculate score from surviving valid risks
       const totalRiskPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0);
-      const calibratedScore = Math.max(50, Math.min(96, 96 - totalRiskPenalty));
+      const calibratedScore = Math.max(35, Math.min(96, 96 - totalRiskPenalty));
       report.decisionScore.score = calibratedScore;
       report.decisionScore.totalRiskPenalty = totalRiskPenalty;
-      report.decisionScore.riskLevel = calibratedScore >= 80 ? 'DUSUK' : calibratedScore >= 70 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK';
+      report.decisionScore.riskLevel = calibratedScore >= 88 ? 'DUSUK' : calibratedScore >= 76 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK';
 
       if (report.torqueScoutDecisionScoreV1) {
         report.torqueScoutDecisionScoreV1.score = calibratedScore;
         report.torqueScoutDecisionScoreV1.deductedRisks = report.decisionScore.deductedRisks;
         report.torqueScoutDecisionScoreV1.totalRiskPenalty = totalRiskPenalty;
         report.torqueScoutDecisionScoreV1.modelDecisionRisk = totalRiskPenalty;
-        report.torqueScoutDecisionScoreV1.state = calibratedScore >= 85 ? 'EXCELLENT' : calibratedScore >= 70 ? 'GOOD' : calibratedScore >= 50 ? 'CAUTION' : 'HIGH_RISK';
+        report.torqueScoutDecisionScoreV1.state = calibratedScore >= 90 ? 'EXCELLENT' : calibratedScore >= 78 ? 'GOOD' : calibratedScore >= 65 ? 'CAUTION' : 'HIGH_RISK';
       }
       if (report.scoring) {
         report.scoring.buyabilityScore = { value: calibratedScore };

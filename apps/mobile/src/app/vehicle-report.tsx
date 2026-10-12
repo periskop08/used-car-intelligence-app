@@ -1247,7 +1247,7 @@ export default function VehicleReportScreen() {
 
   const decisionScore = report?.torqueScoutDecisionScoreV1 || report?.scoringV6?.decisionScoreV1 || report?.scoringV6?.decisionScore;
   const numScore = decisionScore?.score ?? rawBuyability;
-  const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 70 ? 'GOOD' : numScore >= 50 ? 'CAUTION' : 'HIGH_RISK');
+  const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
 
   const getStateConfig = (state?: string) => {
     switch (state) {

@@ -82,13 +82,13 @@ export class TorqueScoutDecisionScoreService {
     let state: TorqueScoutDecisionScoreV1['state'] = 'INSUFFICIENT_DATA';
     if (score === null) {
       state = 'INSUFFICIENT_DATA';
-    } else if (score >= 85) {
+    } else if (score >= 90) {
       state = 'EXCELLENT';
-    } else if (score >= 70) {
+    } else if (score >= 78) {
       state = 'GOOD';
-    } else if (score >= 55) {
+    } else if (score >= 65) {
       state = 'CAUTION';
-    } else if (score >= 40) {
+    } else if (score >= 48) {
       state = 'HIGH_RISK';
     } else {
       state = 'AVOID';
@@ -352,7 +352,15 @@ export class TorqueScoutDecisionScoreService {
       text.includes('shudder') ||
       text.includes('kam mili') ||
       text.includes('camshaft') ||
-      text.includes('eksantrik')
+      text.includes('eksantrik') ||
+      text.includes('yağ yakma') ||
+      text.includes('yağ eksiltme') ||
+      text.includes('oil consumption') ||
+      text.includes('piston segman') ||
+      text.includes('segman aşınma') ||
+      text.includes('yağ tüketimi') ||
+      text.includes('pcv valfi') ||
+      text.includes('karter havalandırma')
     ) {
       return 'SERIOUS';
     }

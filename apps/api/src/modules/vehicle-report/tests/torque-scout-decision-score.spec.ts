@@ -275,7 +275,7 @@ describe('TorqueScout Decision Score Engine (5-Tier Impact & 3-Tier Evidence)', 
     // Final score: 100 - 13 = 87
     expect(result.totalRiskPenalty).toBe(13);
     expect(result.score).toBe(87);
-    expect(result.state).toBe('EXCELLENT');
+    expect(result.state).toBe('GOOD');
     expect(result.deductedRisks).toHaveLength(2);
   });
 
