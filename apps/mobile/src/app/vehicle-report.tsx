@@ -1060,8 +1060,12 @@ export default function VehicleReportScreen() {
             cacheData?.provider !== 'DETERMINISTIC_FALLBACK' &&
             cacheData?.reportData?.status !== 'SAFE_FALLBACK' &&
             cacheData?.status !== 'SAFE_FALLBACK';
+          const hasModernSynthesis = Boolean(
+            cacheData?.reportData?.expertDecisionSynthesis?.vehicleCharacter ||
+            cacheData?.reportData?.expertDecisionSynthesis?.contemporaryTrimEvaluation
+          );
 
-          if (isCompleted && isNotFallback && cacheData.reportData) {
+          if (isCompleted && isNotFallback && cacheData.reportData && hasModernSynthesis) {
             setReport(normalizeReport(cacheData));
             setLoading(false);
             return;
@@ -1386,6 +1390,24 @@ export default function VehicleReportScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Legacy Schema Version Warning & Free Upgrade Banner */}
+          {(!report.expertDecisionSynthesis || ((report as any).schemaVersion || 1) < 2) && (
+            <View style={styles.legacyUpgradeBannerLight}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Ionicons name="alert-circle" size={20} color="#d97706" />
+                <Text style={styles.legacyUpgradeTextLight}>
+                  Bu rapor eski prototip formatında hazırlanmıştır. Derin otomotiv uzman karar sentezini görmek için raporunuzu ücretsiz güncelleyebilirsiniz.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.legacyUpgradeBtnLight}
+                onPress={() => activeVariantId && fetchReport(activeVariantId, true)}
+              >
+                <Text style={styles.legacyUpgradeBtnTextLight}>Güncelle</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* 1. TOP HERO VEHICLE IDENTITY CARD WITH BRAND LOGO */}
           <View style={styles.heroCardLight}>
             <View style={styles.heroTopRow}>
@@ -1490,6 +1512,48 @@ export default function VehicleReportScreen() {
             </View>
           )}
 
+          {/* 2.2 TEKNİK ÖZELLİKLER KARTLARI (8-Card Dynamic Grid - Zero-Null Guarantee) */}
+          <View style={styles.specsCardLight}>
+            <View style={styles.specsHeaderRowLight}>
+              <Ionicons name="speedometer-outline" size={18} color="#0f172a" />
+              <Text style={styles.specsHeaderTitleLight}>Teknik Özellikler</Text>
+            </View>
+            <View style={styles.specsGridWrapLight}>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Motor Gücü</Text>
+                <Text style={styles.specValueLight}>{hpDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Güç Ünitesi' : 'Motor Hacmi'}</Text>
+                <Text style={styles.specValueLight}>{displacementDisplay || '—'}</Text>
+              </View>
+              <View style={[styles.specBoxLight, styles.specBoxHighlightLight]}>
+                <Text style={styles.specLabelLight}>MTV (Yıllık / Taksit)</Text>
+                <Text style={[styles.specValueLight, styles.specValueHighlightLight]}>{mtvDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Maksimum Hız</Text>
+                <Text style={styles.specValueLight}>{topSpeedDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isLowSpeedBike ? '0-50 / Hızlanma' : '0-100 Hızlanma'}</Text>
+                <Text style={styles.specValueLight}>{zeroToHundredDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isElectricVehicle ? 'Menzil (WLTP)' : 'Ort. Tüketim'}</Text>
+                <Text style={styles.specValueLight}>{fuelOrRangeDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>{isMotorcycle ? 'Depolama / Çanta' : 'Bagaj Hacmi'}</Text>
+                <Text style={styles.specValueLight}>{trunkDisplay || '—'}</Text>
+              </View>
+              <View style={styles.specBoxLight}>
+                <Text style={styles.specLabelLight}>Boş Ağırlık</Text>
+                <Text style={styles.specValueLight}>{weightDisplay || '—'}</Text>
+              </View>
+            </View>
+          </View>
+
           {/* 3. TORQUE SCOUT EXPERT DECISION SYNTHESIS SECTIONS IN LIGHT COLLAPSIBLE CARDS */}
 
           {/* 3.1 BU ARAÇ NASIL BİR OTOMOBİL / MOTOSİKLET / TİCARİ ARAÇ? */}
@@ -1546,9 +1610,11 @@ export default function VehicleReportScreen() {
               )}
 
               {/* Donanım Paketi ve Günümüz Standartları Değerlendirmesi */}
-              {Boolean(synthesis?.trimPackageComparison) && (() => {
-                const trimPkg = synthesis?.trimPackageComparison;
+              {Boolean((synthesis as any)?.contemporaryTrimEvaluation || (synthesis as any)?.trimPackageComparison) && (() => {
+                const trimPkg = ((synthesis as any)?.contemporaryTrimEvaluation || (synthesis as any)?.trimPackageComparison) as any;
                 if (!trimPkg) return null;
+                const trimTitle = trimPkg.selectedTrimName || trimPkg.trimName || (report?.vehicleIdentity as any)?.trim || 'Standart Donanım';
+                const narrative = trimPkg.overview || trimPkg.comparisonNarrative || '';
                 const pros = trimPkg.contemporaryPros || trimPkg.keyAddedFeatures || [];
                 const cons = trimPkg.contemporaryCons || trimPkg.missingFeaturesInLowerTrim || [];
                 return (
@@ -1556,13 +1622,13 @@ export default function VehicleReportScreen() {
                     <View style={styles.trimBoxHeaderLight}>
                       <Ionicons name="layers-outline" size={16} color="#d97706" />
                       <Text style={styles.trimBoxHeaderTextLight}>
-                        Donanım Paketi: <Text style={{ color: '#b45309', fontWeight: '900' }}>{trimPkg.selectedTrimName || 'Standart'}</Text>
+                        Donanım Paketi: <Text style={{ color: '#b45309', fontWeight: '900' }}>{trimTitle}</Text>
                       </Text>
                     </View>
 
-                    {Boolean(trimPkg.comparisonNarrative) && (
+                    {Boolean(narrative) && (
                       <Text style={styles.trimNarrativeTextLight}>
-                        {cleanRangeText(trimPkg.comparisonNarrative)}
+                        {cleanRangeText(narrative)}
                       </Text>
                     )}
 
@@ -1576,7 +1642,7 @@ export default function VehicleReportScreen() {
                         </View>
                         {pros.length > 0 ? (
                           <View style={{ gap: 4, marginTop: 4 }}>
-                            {pros.map((pro, pIdx) => (
+                            {pros.map((pro: any, pIdx: number) => (
                               <View key={pIdx} style={styles.trimBulletRowLight}>
                                 <Text style={styles.trimProBulletIconLight}>✔</Text>
                                 <Text style={styles.trimBulletTextLight}>{cleanRangeText(String(pro))}</Text>
@@ -1596,7 +1662,7 @@ export default function VehicleReportScreen() {
                         </View>
                         {cons.length > 0 ? (
                           <View style={{ gap: 4, marginTop: 4 }}>
-                            {cons.map((con, cIdx) => (
+                            {cons.map((con: any, cIdx: number) => (
                               <View key={cIdx} style={styles.trimBulletRowLight}>
                                 <Text style={styles.trimConBulletIconLight}>✖</Text>
                                 <Text style={styles.trimBulletTextLight}>{cleanRangeText(String(con))}</Text>
@@ -1672,6 +1738,73 @@ export default function VehicleReportScreen() {
                     <Text style={styles.motoEraRecDescLight}>
                       {cleanRangeText(motoEra.recommendedEraComparison)}
                     </Text>
+                  </View>
+                )}
+              </CollapsibleLightSection>
+            );
+          })()}
+
+          {/* 3.1.c MINIVAN / PANELVAN: TİCARİ UYGULAMA & ŞANZIMAN ANALİZİ */}
+          {Boolean((resolvedVehicleType === 'MINIVAN_PANELVAN' || resolvedVehicleType === 'COMMERCIAL') && (synthesis as any)?.commercialApplicationAnalysis) && (() => {
+            const commAnalysis = (synthesis as any)?.commercialApplicationAnalysis as any;
+            if (!commAnalysis) return null;
+            return (
+              <CollapsibleLightSection
+                title="Ticari Uygulama & Konfigürasyon Analizi"
+                subtitle="Şanzıman Karşılaştırması & Ağır Hizmet Yıpranma Riskleri"
+                badgeText={commAnalysis.configurationContext?.commercialMeaning}
+                iconName="bus-outline"
+                iconColor="#2563eb"
+                iconBgColor="#eff6ff"
+                borderColor="#bfdbfe"
+                titleColor="#1d4ed8"
+                defaultOpen={true}
+              >
+                {Boolean(commAnalysis.applicationSummary) && (
+                  <Text style={styles.bodyTextLight}>
+                    {cleanRangeText(commAnalysis.applicationSummary)}
+                  </Text>
+                )}
+
+                {/* Şanzıman Karşılaştırması: Manuel vs Otomatik */}
+                {(commAnalysis.manualTransmissionAnalysis || commAnalysis.automaticTransmissionAnalysis || commAnalysis.transmissionComparison) && (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    {Boolean(commAnalysis.manualTransmissionAnalysis) && (
+                      <View style={styles.transBoxLight}>
+                        <Text style={styles.transTitleLight}>Manuel Şanzıman Uygulaması</Text>
+                        <Text style={styles.transTextLight}>{cleanRangeText(commAnalysis.manualTransmissionAnalysis)}</Text>
+                      </View>
+                    )}
+                    {Boolean(commAnalysis.automaticTransmissionAnalysis) && (
+                      <View style={styles.transBoxLight}>
+                        <Text style={[styles.transTitleLight, { color: '#b45309' }]}>Otomatik Şanzıman Uygulaması</Text>
+                        <Text style={styles.transTextLight}>{cleanRangeText(commAnalysis.automaticTransmissionAnalysis)}</Text>
+                      </View>
+                    )}
+                    {Boolean(commAnalysis.transmissionComparison) && (
+                      <View style={styles.transComparisonNoteLight}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#1d4ed8' }}>💡 Uzman Kararı & Tavsiye:</Text>
+                        <Text style={{ fontSize: 11, color: '#1e3a8a', lineHeight: 16 }}>{cleanRangeText(commAnalysis.transmissionComparison)}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Ticari Kullanım Kaynaklı Yıpranma Riskleri */}
+                {Array.isArray(commAnalysis.commercialDutyRisks) && commAnalysis.commercialDutyRisks.length > 0 && (
+                  <View style={{ gap: 8, marginTop: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#c2410c', textTransform: 'uppercase' }}>
+                      Ticari Yıpranma Riskleri ve Kontrol Noktaları
+                    </Text>
+                    {commAnalysis.commercialDutyRisks.map((risk: any, rIdx: number) => (
+                      <View key={rIdx} style={styles.commDutyCardLight}>
+                        <Text style={styles.commDutyTitleLight}>{risk.title}</Text>
+                        <Text style={styles.commDutyRiskLight}>{cleanRangeText(risk.risk)}</Text>
+                        {Boolean(risk.checkRecommendation) && (
+                          <Text style={styles.commDutyCheckLight}>🔍 Kontrol: {cleanRangeText(risk.checkRecommendation)}</Text>
+                        )}
+                      </View>
+                    ))}
                   </View>
                 )}
               </CollapsibleLightSection>
@@ -1916,61 +2049,7 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* 5. TEKNİK ÖZELLİKLER */}
-          <CollapsibleLightSection
-            title="Teknik Özellikler"
-            badgeText="Fabrika Verileri"
-            iconName="list-outline"
-            iconColor="#0284c7"
-            iconBgColor="#f0f9ff"
-            borderColor="#bae6fd"
-            titleColor="#0369a1"
-            defaultOpen={true}
-          >
-            <View style={styles.techGridLight}>
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Motor Gücü</Text>
-                <Text style={styles.techValLight}>{hpDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Motor Hacmi</Text>
-                <Text style={styles.techValLight}>{displacementDisplay}</Text>
-              </View>
-
-              <View style={[styles.techCardLight, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
-                <Text style={styles.techLabelLight}>MTV</Text>
-                <Text style={[styles.techValLight, { color: '#ea580c' }]}>{mtvDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Maksimum Hız</Text>
-                <Text style={styles.techValLight}>{topSpeedDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>{isLowSpeedBike ? '0-50 / Hızlanma' : '0-100 Hızlanma'}</Text>
-                <Text style={styles.techValLight}>{zeroToHundredDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>{isElectricVehicle ? 'Menzil (WLTP)' : 'Ort. Tüketim'}</Text>
-                <Text style={styles.techValLight}>{fuelOrRangeDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>{isMotorcycle ? 'Depolama / Çanta' : 'Bagaj Hacmi'}</Text>
-                <Text style={styles.techValLight}>{trunkDisplay}</Text>
-              </View>
-
-              <View style={styles.techCardLight}>
-                <Text style={styles.techLabelLight}>Boş Ağırlık</Text>
-                <Text style={styles.techValLight}>{weightDisplay}</Text>
-              </View>
-            </View>
-          </CollapsibleLightSection>
-
-          {/* 6. SATICIYA SORULACAK KRİTİK SORULAR */}
+          {/* 4. SATICIYA SORULACAK KRİTİK SORULAR */}
           {Array.isArray(report.sellerQuestions) && report.sellerQuestions.length > 0 && (
             <CollapsibleLightSection
               title="Satıcıya Sorulacak Kritik Sorular"
@@ -3504,5 +3583,159 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#0e7490',
     lineHeight: 16,
+  },
+
+  // Legacy Schema Upgrade Banner Styles
+  legacyUpgradeBannerLight: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  legacyUpgradeTextLight: {
+    fontSize: 11,
+    color: '#92400e',
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  legacyUpgradeBtnLight: {
+    backgroundColor: '#d97706',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legacyUpgradeBtnTextLight: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // 8-Card Dynamic Technical Specifications Grid Styles
+  specsCardLight: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  specsHeaderRowLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 10,
+    marginBottom: 12,
+  },
+  specsHeaderTitleLight: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  specsGridWrapLight: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  specBoxLight: {
+    width: '48.5%',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 10,
+    minHeight: 64,
+    justifyContent: 'center',
+  },
+  specBoxHighlightLight: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+  },
+  specLabelLight: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  specValueLight: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  specValueHighlightLight: {
+    color: '#c2410c',
+  },
+
+  // Commercial Vehicle Application & Transmission Analysis Styles
+  commDutyCardLight: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  commDutyTitleLight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#b45309',
+  },
+  commDutyRiskLight: {
+    fontSize: 11,
+    color: '#78350f',
+    lineHeight: 16,
+  },
+  commDutyCheckLight: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#047857',
+    marginTop: 2,
+    borderTopWidth: 1,
+    borderTopColor: '#fef3c7',
+    paddingTop: 4,
+  },
+  transBoxLight: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  transTitleLight: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  transTextLight: {
+    fontSize: 11,
+    color: '#334155',
+    lineHeight: 16,
+  },
+  transComparisonNoteLight: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    padding: 10,
+    gap: 2,
   },
 });
