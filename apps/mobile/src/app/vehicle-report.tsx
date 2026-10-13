@@ -19,74 +19,22 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SharedModule from '@used-car-intelligence/shared';
+import {
+  ComprehensiveVehicleReport,
+  calculateVehicleMtv,
+  replacePsWithHp,
+  formatCanonicalPowerDisplay,
+  formatVehicleAssessmentParagraphs,
+  formatCleanTransmissionName,
+  resolveVehicleRangeKm,
+} from '@used-car-intelligence/shared';
 import IsiCepteRecommendationWidget from '../components/IsiCepteRecommendationWidget';
 
 const API_URL = 'https://used-car-api-hzmu.onrender.com';
 
-const safeReplacePsWithHp = (text?: string): string => {
-  if (!text) return '';
-  try {
-    if (typeof (SharedModule as any)?.replacePsWithHp === 'function') {
-      return (SharedModule as any).replacePsWithHp(text);
-    }
-  } catch {}
-  return String(text).replace(/\b(\d+)\s*(?:ps|bg|beygir)\b/gi, '$1 HP');
-};
-
-const safeFormatCleanTransmissionName = (transmission?: string | null): string => {
-  if (!transmission) return 'Otomatik';
-  try {
-    if (typeof (SharedModule as any)?.formatCleanTransmissionName === 'function') {
-      return (SharedModule as any).formatCleanTransmissionName(transmission);
-    }
-  } catch {}
-  const lower = String(transmission).toLowerCase();
-  if (lower.includes('man') || lower.includes('düz')) return 'Manuel';
-  return 'Otomatik';
-};
-
-const safeFormatCanonicalPowerDisplay = (rawPower: any, unit?: any, semantic?: any): string => {
-  try {
-    if (typeof (SharedModule as any)?.formatCanonicalPowerDisplay === 'function') {
-      return (SharedModule as any).formatCanonicalPowerDisplay(rawPower, unit, semantic);
-    }
-  } catch {}
-  if (!rawPower) return '—';
-  return `${rawPower} HP`;
-};
-
-const safeFormatVehicleAssessmentParagraphs = (assessment?: string): string[] => {
-  if (!assessment) return [];
-  try {
-    if (typeof (SharedModule as any)?.formatVehicleAssessmentParagraphs === 'function') {
-      return (SharedModule as any).formatVehicleAssessmentParagraphs(assessment);
-    }
-  } catch {}
-  return String(assessment).split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-};
-
-const safeCalculateVehicleMtv = (params: any): any => {
-  try {
-    if (typeof (SharedModule as any)?.calculateVehicleMtv === 'function') {
-      return (SharedModule as any).calculateVehicleMtv(params);
-    }
-  } catch {}
-  return { displayInstallment: 'Hesaplanıyor' };
-};
-
-const safeNormalizeVehicleReportPayload = (payload: any): any => {
-  try {
-    if (typeof (SharedModule as any)?.normalizeVehicleReportPayload === 'function') {
-      return (SharedModule as any).normalizeVehicleReportPayload(payload);
-    }
-  } catch {}
-  return { data: payload };
-};
-
 const cleanRangeText = (text?: string): string => {
   if (!text) return '';
-  return safeReplacePsWithHp(text)
+  return replacePsWithHp(text)
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)yla\s+tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "$1 kapasitesine sahiptir")
     .replace(/(\d+\s*litrelik\s+yakıt\s+deposu)\s+ve\s+yaklaşık\s+\d+\s*km\s*menzil,\s*sık\s+mola\s+ihtiyacını\s+azaltır/gi, "$1 kapasitesi sunar")
     .replace(/tam\s+depoda\s+yaklaşık\s+\d+\s*km\s*menzil\s+sunar/gi, "")
@@ -100,160 +48,27 @@ const cleanRangeText = (text?: string): string => {
     .trim();
 };
 
-const safeResolveVehicleRangeKm = (rep: any): number | null => {
-  if (!rep) return null;
-  const rawRange = 
-    rep.performanceUsage?.electricRangeWltpKm
-    ?? (rep.expertDecisionSynthesis as any)?.technicalSpecifications?.electricRangeWltpKm
-    ?? (rep as any)?.technicalSpecifications?.electricRangeWltpKm
-    ?? rep.performanceUsage?.rangeKm
-    ?? rep.performanceUsage?.estimatedRangeKm
-    ?? (rep.performanceUsage as any)?.electricRangeKm;
-
-  if (typeof rawRange === 'number' && rawRange > 0) return Math.round(rawRange);
-  if (typeof rawRange === 'string') {
-    const parsed = parseInt(rawRange.replace(/\D/g, ''), 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
+const extractReportData = (data: any): ComprehensiveVehicleReport | null => {
+  if (!data) return null;
+  let payload = data.reportData !== undefined ? data.reportData : data;
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch (e) {
+      return null;
+    }
   }
-
-  const fuel = (rep.vehicleIdentity?.fuelType || '').toLowerCase();
-  const isEv = fuel.includes('elektrik') || fuel.includes('electric') || fuel.includes('bev');
-  if (!isEv) return null;
-
-  return 420;
+  if (payload && typeof payload === 'object' && (payload.executiveSummary || payload.vehicleIdentity || payload.finalVerdict)) {
+    return {
+      ...payload,
+      vehicleType: data.vehicleType || payload.vehicleType || (payload.vehicleIdentity as any)?.vehicleType,
+      reportId: data.id || payload.reportId || payload.id,
+      likeCount: data.likeCount ?? payload.likeCount ?? 0,
+      dislikeCount: data.dislikeCount ?? payload.dislikeCount ?? 0,
+    } as ComprehensiveVehicleReport;
+  }
+  return null;
 };
-
-interface ConditionItem {
-  title: string;
-  text?: string;
-}
-
-interface SuitabilityItem {
-  group: string;
-  rationale?: string;
-}
-
-interface ComprehensiveReport {
-  id: string;
-  generatedAt?: string;
-  vehicleIdentity: {
-    brand: string;
-    model: string;
-    modelYear: number;
-    engineCode?: string;
-    enginePowerHp?: number;
-    engineDisplacementCc?: number;
-    sourcePowerValue?: number;
-    sourcePowerUnit?: string;
-    canonicalDisplayPowerHp?: number;
-    transmissionName?: string;
-    fuelType?: string;
-  };
-  scoring: {
-    buyabilityScore: { value: number | null };
-    technicalRiskScore: { value: number | null };
-  };
-  performanceUsage: {
-    powerHp?: number;
-    sourcePowerValue?: number;
-    sourcePowerUnit?: string;
-    canonicalDisplayPowerHp?: number;
-    powerSemantic?: string;
-    rangeFactorsNote?: string;
-    engineDisplacementCc?: number;
-    torqueNm?: number;
-    topSpeedKmh?: number;
-    zeroToHundredSec?: number;
-    zeroToHundredKmh?: number;
-    combinedFuelL100km?: number;
-    luggageCapacityL?: number;
-    trunkCapacityLiters?: number;
-    weightKg?: number;
-    curbWeightKg?: number;
-  };
-  torqueScoutDecisionScoreV1?: {
-    score: number | null;
-    state: string;
-    scope: string;
-    modelDecisionRisk?: number;
-    confidenceScore: number;
-  };
-  scoringV6?: any;
-  finalConditionalVerdict?: {
-    shortVerdict?: string;
-    detailedVerdict?: string;
-    confidence?: string;
-  };
-  finalVerdict?: {
-    shortVerdict?: string;
-    detailedVerdict?: string;
-    confidence?: string;
-    proceedIf?: any[];
-    walkAwayIf?: any[];
-  };
-  expertDecisionSynthesis?: {
-    vehicleCharacter?: {
-      headline?: string;
-      detailedAssessment?: string;
-    };
-    dailyUseAssessment?: {
-      cityUse?: string;
-      highwayUse?: string;
-      trafficBehavior?: string;
-      comfortAssessment?: string;
-    };
-    trimPackageComparison?: {
-      selectedTrimName?: string;
-      comparisonNarrative?: string;
-      contemporaryPros?: string[];
-      contemporaryCons?: string[];
-      keyAddedFeatures?: string[];
-      missingFeaturesInLowerTrim?: string[];
-    };
-    motorcycleEraAnalysis?: {
-      modelHistory?: string;
-      productionEras?: Array<{
-        eraName?: string;
-        startYear: number;
-        endYear?: number | null;
-        fuelSystem?: string;
-        displacementCc?: number;
-        powerHp?: number;
-        powerRange?: string;
-        hasAbs?: boolean;
-        brakingSystem?: string;
-        keyChanges?: string[] | string;
-      }>;
-      recommendedEraComparison?: string;
-    };
-    strongestReasonsToChoose?: Array<{ title: string; explanation: string }>;
-    compromisesAndLimitations?: Array<{ title: string; explanation: string }>;
-    finalConditionalVerdict?: {
-      shortVerdict?: string;
-      detailedVerdict?: string;
-      confidence?: string;
-    };
-  };
-  purchaseConditions: ConditionItem[];
-  walkAwayConditions: ConditionItem[];
-  suitableFor: SuitabilityItem[];
-  notSuitableFor: SuitabilityItem[];
-  prePurchaseChecks?: Array<{
-    title: string;
-    instruction: string;
-    priority: string;
-    targetComponent?: string;
-  }>;
-  sellerQuestions?: Array<{
-    questionText: string;
-    expectedAnswerHint?: string;
-    redFlagAnswerHint?: string;
-  }>;
-  executiveSummary?: {
-    oneSentenceSummary?: string;
-    biggestRisk?: string;
-  };
-}
 
 interface ModalDetailData {
   title: string;
@@ -411,153 +226,6 @@ function formatFuelTypeTr(fuel?: string): string {
   return fuel;
 }
 
-function parseConditionItems(rawList: any): ConditionItem[] {
-  if (!rawList) return [];
-  const list = Array.isArray(rawList) ? rawList : [rawList];
-  return list
-    .map((item: any) => {
-      if (typeof item === 'string') {
-        const trimmed = item.trim();
-        return trimmed && trimmed !== '[object Object]' ? { title: trimmed } : null;
-      }
-      if (typeof item === 'object' && item !== null) {
-        const title = item.condition || item.title || item.conditionText || item.text || item.heading || item.name || '';
-        const text = item.reason || item.explanation || (item.conditionText && item.title && item.conditionText !== item.title ? item.conditionText : item.description || item.detail);
-        const sTitle = typeof title === 'string' ? title.trim() : '';
-        const sText = typeof text === 'string' ? text.trim() : undefined;
-        if (sTitle && sTitle !== '[object Object]') {
-          return { title: sTitle, text: sText && sText !== sTitle ? sText : undefined };
-        }
-      }
-      return null;
-    })
-    .filter((x): x is ConditionItem => Boolean(x && x.title));
-}
-
-function parseSuitabilityItems(rawList: any): SuitabilityItem[] {
-  if (!rawList) return [];
-  const list = Array.isArray(rawList) ? rawList : [rawList];
-  return list
-    .map((item: any) => {
-      if (typeof item === 'string') {
-        const trimmed = item.trim();
-        return trimmed && trimmed !== '[object Object]' ? { group: trimmed } : null;
-      }
-      if (typeof item === 'object' && item !== null) {
-        const group =
-          item.profile ||
-          item.targetUserGroup ||
-          item.group ||
-          item.title ||
-          item.name ||
-          item.userGroup ||
-          '';
-        const rationale =
-          item.explanation ||
-          item.rationale ||
-          item.description ||
-          item.detail ||
-          '';
-        const sGroup = typeof group === 'string' ? group.trim() : '';
-        const sRationale = typeof rationale === 'string' ? rationale.trim() : undefined;
-        if (sGroup && sGroup !== '[object Object]') {
-          return { group: sGroup, rationale: sRationale };
-        }
-      }
-      return null;
-    })
-    .filter((x): x is SuitabilityItem => Boolean(x && x.group));
-}
-
-function normalizeReport(data: any): ComprehensiveReport {
-  const rawPayload = data?.reportData || data?.report || data || {};
-  const normResult = safeNormalizeVehicleReportPayload(rawPayload);
-  const rep = normResult.data || {};
-
-  const identity = rep.vehicleIdentity || {};
-  const scoring = rep.scoring || {
-    buyabilityScore: { value: 73 },
-    technicalRiskScore: { value: 30 },
-  };
-  const perf = rep.performanceUsage || {};
-  const synthesis = rep.expertDecisionSynthesis || {};
-  const verdict = rep.finalVerdict || {};
-
-  const purchaseConditions = parseConditionItems(
-    synthesis.purchaseConditions?.length ? synthesis.purchaseConditions : verdict.proceedIf
-  );
-
-  const walkAwayConditions = parseConditionItems(
-    synthesis.walkAwayConditions?.length ? synthesis.walkAwayConditions : verdict.walkAwayIf
-  );
-
-  const suitableFor = parseSuitabilityItems(synthesis.suitableFor);
-  const notSuitableFor = parseSuitabilityItems(synthesis.notSuitableFor);
-
-  const torqueScoutDecisionScoreV1 = rep.torqueScoutDecisionScoreV1 || rep.scoringV6?.decisionScoreV1 || rep.scoringV6?.decisionScore || null;
-  const finalConditionalVerdict = rep.finalConditionalVerdict || rep.finalVerdict || rep.expertDecisionSynthesis?.finalConditionalVerdict || null;
-
-  return {
-    id: rep.id || data?.id || `rep_${Date.now()}`,
-    generatedAt: rep.generatedAt || data?.generatedAt || new Date().toISOString(),
-    vehicleIdentity: {
-      brand: identity.brand || 'Araç',
-      model: identity.model || '',
-      modelYear: identity.modelYear || 2020,
-      engineCode: identity.engineCode,
-      enginePowerHp: identity.enginePowerHp || perf.powerHp,
-      engineDisplacementCc: identity.engineDisplacementCc ?? (rep as any).technicalSpecifications?.engineDisplacementCc,
-      sourcePowerValue: identity.sourcePowerValue ?? perf.sourcePowerValue,
-      sourcePowerUnit: identity.sourcePowerUnit ?? perf.sourcePowerUnit,
-      canonicalDisplayPowerHp: identity.canonicalDisplayPowerHp ?? perf.canonicalDisplayPowerHp,
-      transmissionName: identity.transmissionName || 'Otomatik',
-      fuelType: identity.fuelType || 'Benzin',
-    },
-    scoring: {
-      buyabilityScore: {
-        value: scoring.buyabilityScore?.value ?? 73,
-      },
-      technicalRiskScore: {
-        value: scoring.technicalRiskScore?.value ?? 30,
-      },
-    },
-    torqueScoutDecisionScoreV1,
-    scoringV6: rep.scoringV6 || null,
-    finalConditionalVerdict,
-    finalVerdict: rep.finalVerdict || null,
-    performanceUsage: {
-      powerHp: perf.powerHp || identity.enginePowerHp,
-      sourcePowerValue: perf.sourcePowerValue ?? identity.sourcePowerValue,
-      sourcePowerUnit: perf.sourcePowerUnit ?? identity.sourcePowerUnit,
-      canonicalDisplayPowerHp: perf.canonicalDisplayPowerHp ?? identity.canonicalDisplayPowerHp,
-      powerSemantic: perf.powerSemantic ?? identity.powerSemantic,
-      rangeFactorsNote: perf.rangeFactorsNote,
-      engineDisplacementCc: perf.engineDisplacementCc ?? identity.engineDisplacementCc,
-      torqueNm: perf.torqueNm,
-      topSpeedKmh: perf.topSpeedKmh,
-      zeroToHundredSec: perf.zeroToHundredSec || perf.zeroToHundredKmh,
-      combinedFuelL100km: perf.combinedFuelL100km,
-      luggageCapacityL: perf.luggageCapacityL || perf.trunkCapacityLiters,
-      trunkCapacityLiters: perf.trunkCapacityLiters || perf.luggageCapacityL,
-      weightKg: perf.weightKg || perf.curbWeightKg,
-      curbWeightKg: perf.curbWeightKg || perf.weightKg,
-    },
-    expertDecisionSynthesis: rep.expertDecisionSynthesis || {
-      vehicleCharacter: {
-        headline: rep.executiveSummary?.oneSentenceSummary || `${identity.modelYear || ''} ${identity.brand || ''} ${identity.model || ''} Derin Otomotiv Analizi`.trim(),
-        detailedAssessment: rep.executiveSummary?.detailedAssessment || rep.executiveSummary?.oneSentenceSummary || 'Model yılı, gövde rijitliği, motor karakteri ve şanzıman uyumu dengeli bir sürüş karakteri sunmaktadır.',
-      },
-    },
-    purchaseConditions,
-    walkAwayConditions,
-    suitableFor,
-    notSuitableFor,
-    prePurchaseChecks: Array.isArray(rep.prePurchaseChecks) ? rep.prePurchaseChecks : [],
-    sellerQuestions: Array.isArray(rep.sellerQuestions) ? rep.sellerQuestions : [],
-    executiveSummary: rep.executiveSummary,
-  };
-}
-
 interface CollapsibleLightProps {
   title: string;
   subtitle?: string;
@@ -630,7 +298,7 @@ export default function VehicleReportScreen() {
       : null;
 
   const [activeVariantId, setActiveVariantId] = useState<string | null>(rawVariantId);
-  const [report, setReport] = useState<ComprehensiveReport | null>(null);
+  const [report, setReport] = useState<ComprehensiveVehicleReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -1060,13 +728,14 @@ export default function VehicleReportScreen() {
             cacheData?.provider !== 'DETERMINISTIC_FALLBACK' &&
             cacheData?.reportData?.status !== 'SAFE_FALLBACK' &&
             cacheData?.status !== 'SAFE_FALLBACK';
+          const parsedCache = extractReportData(cacheData);
           const hasModernSynthesis = Boolean(
-            cacheData?.reportData?.expertDecisionSynthesis?.vehicleCharacter ||
-            cacheData?.reportData?.expertDecisionSynthesis?.contemporaryTrimEvaluation
+            parsedCache?.expertDecisionSynthesis?.vehicleCharacter ||
+            (parsedCache?.expertDecisionSynthesis as any)?.contemporaryTrimEvaluation
           );
 
-          if (isCompleted && isNotFallback && cacheData.reportData && hasModernSynthesis) {
-            setReport(normalizeReport(cacheData));
+          if (isCompleted && isNotFallback && parsedCache && hasModernSynthesis) {
+            setReport(parsedCache);
             setLoading(false);
             return;
           }
@@ -1115,14 +784,18 @@ export default function VehicleReportScreen() {
           const detailRes = await fetch(`${API_URL}/vehicle-reports/${reportId}`, { headers });
           if (detailRes.ok) {
             const detailData = await detailRes.json();
-            setReport(normalizeReport(detailData));
-            setLoading(false);
-            return;
+            const parsedDetail = extractReportData(detailData);
+            if (parsedDetail) {
+              setReport(parsedDetail);
+              setLoading(false);
+              return;
+            }
           }
         }
 
-        if (data && (data.reportData || data.expertDecisionSynthesis || data.vehicleIdentity)) {
-          setReport(normalizeReport(data));
+        const parsedDirect = extractReportData(data);
+        if (parsedDirect) {
+          setReport(parsedDirect);
           setLoading(false);
           return;
         }
@@ -1215,7 +888,7 @@ export default function VehicleReportScreen() {
     ?? 'HP';
   const powerSemantic = report?.performanceUsage?.powerSemantic 
     ?? (report?.vehicleIdentity as any)?.powerSemantic;
-  const hpDisplay = safeFormatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
+  const hpDisplay = formatCanonicalPowerDisplay(rawPower, powerUnit, powerSemantic);
   const isElectricVehicle = (report?.vehicleIdentity?.fuelType || '').toLowerCase().includes('elektrik');
   const rawDisplacement = report?.vehicleIdentity?.engineDisplacementCc
     ?? (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.engineDisplacementCc
@@ -1233,7 +906,7 @@ export default function VehicleReportScreen() {
         : 'Bu Araç Nasıl Bir Otomobil?'));
 
   const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '1598 cc');
-  const mtvResult = safeCalculateVehicleMtv({
+  const mtvResult = calculateVehicleMtv({
     modelYear: report?.vehicleIdentity?.modelYear,
     engineDisplacement: rawDisplacement || report?.vehicleIdentity?.engineDisplacementCc,
     fuelType: report?.vehicleIdentity?.fuelType,
@@ -1246,7 +919,7 @@ export default function VehicleReportScreen() {
   const topSpeedValue = report?.performanceUsage?.topSpeedKmh
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.topSpeedKmh
     || (report as any)?.technicalSpecifications?.topSpeedKmh;
-  const zeroToHundredValue = report?.performanceUsage?.zeroToHundredSec
+  const zeroToHundredValue = (report?.performanceUsage as any)?.zeroToHundredSec
     || report?.performanceUsage?.zeroToHundredKmh
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredSec
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.zeroToHundredKmh
@@ -1255,15 +928,15 @@ export default function VehicleReportScreen() {
   const combinedFuel = report?.performanceUsage?.combinedFuelL100km
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.combinedFuelL100km
     || (report as any)?.technicalSpecifications?.combinedFuelL100km;
-  const electricRangeKm = isElectricVehicle ? safeResolveVehicleRangeKm(report) : null;
-  const trunkValue = report?.performanceUsage?.trunkCapacityLiters
-    || report?.performanceUsage?.luggageCapacityL
+  const electricRangeKm = isElectricVehicle ? resolveVehicleRangeKm(report) : null;
+  const trunkValue = (report?.performanceUsage as any)?.trunkCapacityLiters
+    || (report?.performanceUsage as any)?.luggageCapacityL
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.trunkCapacityLiters
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.luggageCapacityL
     || (report as any)?.technicalSpecifications?.trunkCapacityLiters
     || (report as any)?.technicalSpecifications?.luggageCapacityL;
-  const weightValue = report?.performanceUsage?.curbWeightKg
-    || report?.performanceUsage?.weightKg
+  const weightValue = (report?.performanceUsage as any)?.curbWeightKg
+    || (report?.performanceUsage as any)?.weightKg
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.curbWeightKg
     || (report?.expertDecisionSynthesis as any)?.technicalSpecifications?.weightKg
     || (report as any)?.technicalSpecifications?.curbWeightKg
@@ -1282,7 +955,7 @@ export default function VehicleReportScreen() {
   const rawBuyability = report?.scoring?.buyabilityScore?.value ?? 73;
   const rawRisk = report?.scoring?.technicalRiskScore?.value ?? 30;
 
-  const decisionScore = report?.torqueScoutDecisionScoreV1 || report?.scoringV6?.decisionScoreV1 || report?.scoringV6?.decisionScore;
+  const decisionScore = report?.torqueScoutDecisionScoreV1 || report?.scoringV6?.decisionScoreV1 || (report?.scoringV6 as any)?.decisionScore;
   const numScore = decisionScore?.score ?? rawBuyability;
   const scoreState = decisionScore?.state || (numScore >= 90 ? 'EXCELLENT' : numScore >= 78 ? 'GOOD' : numScore >= 65 ? 'CAUTION' : numScore >= 48 ? 'HIGH_RISK' : 'AVOID');
 
@@ -1350,9 +1023,91 @@ export default function VehicleReportScreen() {
   const stateCfg = getStateConfig(scoreState);
   const harmonizedVerdict = (numScore >= 90 || scoreState === 'EXCELLENT')
     ? 'Sınıfında referans kondisyonda, kontrolleri teyit edilerek doğrudan değerlendirilebilir.'
-    : (report?.finalConditionalVerdict?.shortVerdict || report?.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict || stateCfg.verdict);
+    : ((report?.finalVerdict as any)?.shortVerdict || (report as any)?.finalConditionalVerdict?.shortVerdict || report?.expertDecisionSynthesis?.finalConditionalVerdict?.shortVerdict || stateCfg.verdict);
 
   const reportCode = `TS-${report?.vehicleIdentity?.modelYear || '2020'}-${String(report?.vehicleIdentity?.brand || 'CAR').substring(0, 2).toUpperCase()}-${report?.vehicleIdentity?.engineCode || '320i'}`;
+
+  const rawPurchase = (report?.expertDecisionSynthesis as any)?.purchaseConditions || (report?.finalVerdict as any)?.proceedIf || [];
+  const purchaseConditions = (Array.isArray(rawPurchase) ? rawPurchase : [rawPurchase])
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { title: trimmed } : null;
+      }
+      if (typeof item === 'object' && item !== null) {
+        const title = item.condition || item.title || item.conditionText || item.text || item.heading || item.name || '';
+        const text = item.reason || item.explanation || item.description || item.detail;
+        const sTitle = typeof title === 'string' ? title.trim() : '';
+        const sText = typeof text === 'string' ? text.trim() : undefined;
+        if (sTitle && sTitle !== '[object Object]') {
+          return { title: sTitle, text: sText && sText !== sTitle ? sText : undefined };
+        }
+      }
+      return null;
+    })
+    .filter((x: any): x is { title: string; text?: string } => Boolean(x && x.title));
+
+  const rawWalkAway = (report?.expertDecisionSynthesis as any)?.walkAwayConditions || (report?.finalVerdict as any)?.walkAwayIf || [];
+  const walkAwayConditions = (Array.isArray(rawWalkAway) ? rawWalkAway : [rawWalkAway])
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { title: trimmed } : null;
+      }
+      if (typeof item === 'object' && item !== null) {
+        const title = item.condition || item.title || item.conditionText || item.text || item.heading || item.name || '';
+        const text = item.reason || item.explanation || item.description || item.detail;
+        const sTitle = typeof title === 'string' ? title.trim() : '';
+        const sText = typeof text === 'string' ? text.trim() : undefined;
+        if (sTitle && sTitle !== '[object Object]') {
+          return { title: sTitle, text: sText && sText !== sTitle ? sText : undefined };
+        }
+      }
+      return null;
+    })
+    .filter((x: any): x is { title: string; text?: string } => Boolean(x && x.title));
+
+  const rawSuitableFor = (report?.expertDecisionSynthesis as any)?.suitableFor || (report as any)?.suitableFor || [];
+  const suitableFor = (Array.isArray(rawSuitableFor) ? rawSuitableFor : [rawSuitableFor])
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { group: trimmed } : null;
+      }
+      if (typeof item === 'object' && item !== null) {
+        const group = item.profile || item.targetUserGroup || item.group || item.title || item.name || '';
+        const rationale = item.explanation || item.rationale || item.description || item.detail;
+        const sGroup = typeof group === 'string' ? group.trim() : '';
+        const sRationale = typeof rationale === 'string' ? rationale.trim() : undefined;
+        if (sGroup && sGroup !== '[object Object]') {
+          return { group: sGroup, rationale: sRationale };
+        }
+      }
+      return null;
+    })
+    .filter((x: any): x is { group: string; rationale?: string } => Boolean(x && x.group));
+
+  const rawNotSuitableFor = (report?.expertDecisionSynthesis as any)?.notSuitableFor || (report as any)?.notSuitableFor || [];
+  const notSuitableFor = (Array.isArray(rawNotSuitableFor) ? rawNotSuitableFor : [rawNotSuitableFor])
+    .map((item: any) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        return trimmed && trimmed !== '[object Object]' ? { group: trimmed } : null;
+      }
+      if (typeof item === 'object' && item !== null) {
+        const group = item.profile || item.targetUserGroup || item.group || item.title || item.name || '';
+        const rationale = item.explanation || item.rationale || item.description || item.detail;
+        const sGroup = typeof group === 'string' ? group.trim() : '';
+        const sRationale = typeof rationale === 'string' ? rationale.trim() : undefined;
+        if (sGroup && sGroup !== '[object Object]') {
+          return { group: sGroup, rationale: sRationale };
+        }
+      }
+      return null;
+    })
+    .filter((x: any): x is { group: string; rationale?: string } => Boolean(x && x.group));
+
+  const sellerQuestions = report?.sellerQuestions || (report?.expertDecisionSynthesis as any)?.sellerQuestions || [];
 
   return (
     <View style={styles.containerLight}>
@@ -1423,7 +1178,7 @@ export default function VehicleReportScreen() {
                 <Text style={styles.heroSubTextLight} numberOfLines={1}>
                   {isMotorcycle
                     ? `${report.vehicleIdentity.brand} • ${report.vehicleIdentity.model}`
-                    : `${report.vehicleIdentity.engineCode || ''} ${params.trim ? `• ${params.trim}` : ''} ${report.vehicleIdentity.transmissionName ? `• ${safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}`
+                    : `${report.vehicleIdentity.engineCode || ''} ${params.trim ? `• ${params.trim}` : ''} ${report.vehicleIdentity.transmissionName ? `• ${formatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}`
                   }
                 </Text>
               </View>
@@ -1446,7 +1201,7 @@ export default function VehicleReportScreen() {
               {!isMotorcycle && (
                 <View style={styles.specChipLight}>
                   <Ionicons name="options-outline" size={13} color="#0284c7" />
-                  <Text style={styles.specChipTextLight}>{safeFormatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
+                  <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
                 </View>
               )}
 
@@ -1569,11 +1324,11 @@ export default function VehicleReportScreen() {
               defaultOpen={true}
             >
               {Boolean(synthesis.vehicleCharacter.headline) && (
-                <Text style={styles.characterHeadlineLight}>{safeReplacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
+                <Text style={styles.characterHeadlineLight}>{replacePsWithHp(synthesis.vehicleCharacter.headline)}</Text>
               )}
               {Boolean(synthesis.vehicleCharacter.detailedAssessment) && (
                 <View style={{ gap: 8 }}>
-                  {safeFormatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment).map((para, idx) => (
+                  {formatVehicleAssessmentParagraphs(synthesis.vehicleCharacter.detailedAssessment || '').map((para: string, idx: number) => (
                     <Text key={idx} style={styles.bodyTextLight}>{cleanRangeText(para)}</Text>
                   ))}
                 </View>
@@ -1836,7 +1591,7 @@ export default function VehicleReportScreen() {
                         subtitle: 'Tercih Etmek İçin Güçlü Neden',
                         type: 'green',
                         badge: `Neden #${idx + 1}`,
-                        content: item.explanation,
+                        content: item.explanation || item.title,
                         icon: 'checkmark-circle',
                       })
                     }
@@ -1878,7 +1633,7 @@ export default function VehicleReportScreen() {
                         subtitle: 'Taviz & Sınırlama Analizi',
                         type: 'orange',
                         badge: `Sınırlama #${idx + 1}`,
-                        content: item.explanation,
+                        content: item.explanation || item.title,
                         icon: 'alert-circle',
                       })
                     }
@@ -1896,7 +1651,7 @@ export default function VehicleReportScreen() {
           })()}
 
           {/* 3.4 KULLANICI PROFİL UYGUNLUK ANALİZİ */}
-          {Boolean(report.suitableFor?.length || report.notSuitableFor?.length) && (
+          {Boolean(suitableFor?.length || notSuitableFor?.length) && (
             <CollapsibleLightSection
               title="Kullanıcı Profil Uygunluk Analizi"
               badgeText="Uygunluk Rehberi"
@@ -1908,10 +1663,10 @@ export default function VehicleReportScreen() {
               defaultOpen={true}
             >
               <View style={styles.grid2ColLight}>
-                {Boolean(report.suitableFor && report.suitableFor.length > 0) && (
+                {Boolean(suitableFor && suitableFor.length > 0) && (
                   <View style={styles.suitableCardGreenLight}>
                     <Text style={styles.suitableTitleGreenLight}>👤 Kimler İçin İdeal?</Text>
-                    {report.suitableFor.map((item, idx) => (
+                    {suitableFor.map((item, idx) => (
                       <TouchableOpacity
                         key={idx}
                         activeOpacity={0.8}
@@ -1939,10 +1694,10 @@ export default function VehicleReportScreen() {
                   </View>
                 )}
 
-                {Boolean(report.notSuitableFor && report.notSuitableFor.length > 0) && (
+                {Boolean(notSuitableFor && notSuitableFor.length > 0) && (
                   <View style={styles.suitableCardRedLight}>
                     <Text style={styles.suitableTitleRedLight}>🚫 Kimler İçin Uygun Değil?</Text>
-                    {report.notSuitableFor.map((item, idx) => (
+                    {notSuitableFor.map((item, idx) => (
                       <TouchableOpacity
                         key={idx}
                         activeOpacity={0.8}
@@ -1974,10 +1729,10 @@ export default function VehicleReportScreen() {
           )}
 
           {/* 3.5 SATIN ALMA ONAY ŞARTLARI */}
-          {Boolean(report.purchaseConditions && report.purchaseConditions.length > 0) && (
+          {Boolean(purchaseConditions && purchaseConditions.length > 0) && (
             <CollapsibleLightSection
               title="Satın Alma Onay Şartları (Devam Et)"
-              badgeText={`${report.purchaseConditions.length} Kritik Onay`}
+              badgeText={`${purchaseConditions.length} Kritik Onay`}
               iconName="shield-checkmark-outline"
               iconColor="#16a34a"
               iconBgColor="#f0fdf4"
@@ -1985,7 +1740,7 @@ export default function VehicleReportScreen() {
               titleColor="#15803d"
               defaultOpen={true}
             >
-              {report.purchaseConditions.map((cond, idx) => (
+              {purchaseConditions.map((cond, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.8}
@@ -2012,10 +1767,10 @@ export default function VehicleReportScreen() {
           )}
 
           {/* 3.6 ALIMDAN VAZGEÇME ŞARTLARI */}
-          {Boolean(report.walkAwayConditions && report.walkAwayConditions.length > 0) && (
+          {Boolean(walkAwayConditions && walkAwayConditions.length > 0) && (
             <CollapsibleLightSection
               title="Alımdan Vazgeçme Şartları (Uzak Dur)"
-              badgeText={`${report.walkAwayConditions.length} Kırmızı Çizgi`}
+              badgeText={`${walkAwayConditions.length} Kırmızı Çizgi`}
               iconName="warning-outline"
               iconColor="#dc2626"
               iconBgColor="#fef2f2"
@@ -2023,7 +1778,7 @@ export default function VehicleReportScreen() {
               titleColor="#b91c1c"
               defaultOpen={true}
             >
-              {report.walkAwayConditions.map((cond, idx) => (
+              {walkAwayConditions.map((cond, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.8}
@@ -2050,10 +1805,10 @@ export default function VehicleReportScreen() {
           )}
 
           {/* 4. SATICIYA SORULACAK KRİTİK SORULAR */}
-          {Array.isArray(report.sellerQuestions) && report.sellerQuestions.length > 0 && (
+          {Array.isArray(sellerQuestions) && sellerQuestions.length > 0 && (
             <CollapsibleLightSection
               title="Satıcıya Sorulacak Kritik Sorular"
-              badgeText={`${report.sellerQuestions.length} Soru`}
+              badgeText={`${sellerQuestions.length} Soru`}
               iconName="help-circle-outline"
               iconColor="#6d28d9"
               iconBgColor="#f5f3ff"
@@ -2061,7 +1816,7 @@ export default function VehicleReportScreen() {
               titleColor="#6d28d9"
               defaultOpen={true}
             >
-              {(report.sellerQuestions || []).map((q, idx) => (
+              {sellerQuestions.map((q, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.8}
