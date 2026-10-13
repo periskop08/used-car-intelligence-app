@@ -63,6 +63,15 @@ export class VehicleService {
         orderBy: { name: 'asc' },
       });
     }
+    if (norm === 'SUV_PICKUP') {
+      return this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'SUV_PICKUP' } },
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
     const categoryWhere = getCategoryVariantWhere(category);
     return this.prisma.brand.findMany({
       where: {
@@ -92,6 +101,17 @@ export class VehicleService {
           vehicleType: 'MINIVAN_PANELVAN',
           isActive: true,
           variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        orderBy: { name: 'asc' },
+      });
+    }
+    if (norm === 'SUV_PICKUP') {
+      return this.prisma.model.findMany({
+        where: {
+          brandId,
+          vehicleType: 'SUV_PICKUP',
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'SUV_PICKUP' } },
         },
         orderBy: { name: 'asc' },
       });
