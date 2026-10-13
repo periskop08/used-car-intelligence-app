@@ -723,18 +723,14 @@ export default function VehicleReportScreen() {
         const cacheRes = await fetch(`${API_URL}/vehicle-reports/by-variant/${finalVariantId}/current`, { headers });
         if (cacheRes.ok) {
           const cacheData = await cacheRes.json();
+          const parsedCache = extractReportData(cacheData);
           const isCompleted = cacheData && cacheData.status === 'COMPLETED';
           const isNotFallback =
             cacheData?.provider !== 'DETERMINISTIC_FALLBACK' &&
             cacheData?.reportData?.status !== 'SAFE_FALLBACK' &&
             cacheData?.status !== 'SAFE_FALLBACK';
-          const parsedCache = extractReportData(cacheData);
-          const hasModernSynthesis = Boolean(
-            parsedCache?.expertDecisionSynthesis?.vehicleCharacter ||
-            (parsedCache?.expertDecisionSynthesis as any)?.contemporaryTrimEvaluation
-          );
 
-          if (isCompleted && isNotFallback && parsedCache && hasModernSynthesis) {
+          if (parsedCache && isCompleted && isNotFallback) {
             setReport(parsedCache);
             setLoading(false);
             return;
