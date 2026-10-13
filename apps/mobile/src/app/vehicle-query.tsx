@@ -112,7 +112,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setYears(data.data.map((y: any) => y.value.toString()));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((y: any) => y.value.toString());
+          setYears(list);
+          if (list.length === 1) {
+            setSelectedYear(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -125,7 +131,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setBodyTypes(data.data.map((b: any) => b.value));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((b: any) => b.value);
+          setBodyTypes(list);
+          if (list.length === 1) {
+            setSelectedBodyType(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -138,7 +150,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}&bodyType=${selectedBodyType}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setEngines(data.data.map((e: any) => e.value));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((e: any) => e.value);
+          setEngines(list);
+          if (list.length === 1) {
+            setSelectedEngine(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -151,7 +169,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(selectedEngine)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setFuelTypes(data.data.map((f: any) => f.value));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((f: any) => f.value);
+          setFuelTypes(list);
+          if (list.length === 1) {
+            setSelectedFuelType(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -164,7 +188,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(selectedEngine)}&fuelType=${selectedFuelType}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setTransmissions(data.data.map((t: any) => t.value));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((t: any) => t.value);
+          setTransmissions(list);
+          if (list.length === 1) {
+            setSelectedTransmission(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);
@@ -177,7 +207,13 @@ export default function VehicleQueryScreen() {
       const res = await fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(selectedBrand.name)}&modelFamily=${encodeURIComponent(selectedModel.name)}&year=${selectedYear}&bodyType=${selectedBodyType}&engine=${encodeURIComponent(selectedEngine)}&fuelType=${selectedFuelType}&transmission=${selectedTransmission}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success) setTrims(data.data.map((t: any) => t.value));
+        if (data.success && Array.isArray(data.data)) {
+          const list = data.data.map((t: any) => t.value);
+          setTrims(list);
+          if (list.length === 1) {
+            setSelectedTrim(list[0]);
+          }
+        }
       }
     } catch (e) {
       console.error(e);

@@ -1037,7 +1037,7 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setBodyTypes(list);
-          if (list.length === 1 && (cat === 'MINIVAN_PANELVAN' || cat === 'SUV_PICKUP')) {
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
             setSelectedBodyType(list[0]);
             fetchEngines(brandName, modelName, year, list[0], cat);
           }
@@ -1066,7 +1066,7 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setEngines(list);
-          if (list.length === 1 && (cat === 'MINIVAN_PANELVAN' || cat === 'SUV_PICKUP')) {
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
             setSelectedEngine(list[0]);
             fetchFuelTypes(brandName, modelName, year, bodyType, list[0], cat);
           }
@@ -1096,7 +1096,7 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setFuelTypes(list);
-          if (list.length === 1 && (cat === 'MINIVAN_PANELVAN' || cat === 'SUV_PICKUP')) {
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
             setSelectedFuelType(list[0]);
             fetchTransmissions(brandName, modelName, year, bodyType, engine, list[0], cat);
           }
@@ -1139,7 +1139,7 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setTransmissions(list);
-          if (list.length === 1 && (cat === 'MINIVAN_PANELVAN' || cat === 'SUV_PICKUP')) {
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
             setSelectedTransmission(list[0]);
             fetchTrims(brandName, modelName, year, bodyType, engine, fuelType, list[0], cat);
           }
@@ -1180,7 +1180,7 @@ export default function MobileDashboard() {
             typeof item === 'string' ? item : item.value || item.label || item.name || String(item)
           );
           setTrims(list);
-          if (list.length === 1 && (cat === 'MINIVAN_PANELVAN' || cat === 'SUV_PICKUP')) {
+          if (list.length === 1 && cat !== 'MOTORCYCLE') {
             setSelectedTrim(list[0]);
           }
         }

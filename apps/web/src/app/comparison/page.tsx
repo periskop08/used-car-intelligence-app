@@ -363,7 +363,7 @@ export default function ComparisonPage() {
           const yearList = res.data.map((y: any) => String(y.value));
           updateSlot(index, { years: yearList, loadingYears: false });
           if (yearList.length === 1) {
-            handleYearChange(index, yearList[0]);
+            handleYearChange(index, yearList[0], slot.selectedBrand, modelName);
           }
         } else {
           updateSlot(index, { loadingYears: false });
@@ -372,9 +372,11 @@ export default function ComparisonPage() {
       .catch(() => updateSlot(index, { loadingYears: false }));
   };
 
-  const handleYearChange = (index: number, yearVal: string) => {
+  const handleYearChange = (index: number, yearVal: string, explicitBrand?: string, explicitModel?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
 
     updateSlot(index, {
       selectedYear: yearVal,
@@ -390,84 +392,36 @@ export default function ComparisonPage() {
       transmissions: [],
       trims: [],
       loadingBodyTypes: !!yearVal,
-      loadingEngines: !!yearVal,
-      loadingFuels: !!yearVal,
-      loadingTransmissions: !!yearVal,
-      loadingTrims: !!yearVal,
+      loadingEngines: false,
+      loadingFuels: false,
+      loadingTransmissions: false,
+      loadingTrims: false,
     });
 
-    if (!yearVal || !slot.selectedBrand || !slot.selectedModel) return;
+    if (!yearVal || !brand || !model) return;
 
-    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}&category=${category}`;
-
-    fetch(`${API_URL}/vehicle-filters/body-types?${baseQuery}`)
+    fetch(`${API_URL}/vehicle-filters/body-types?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(yearVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { bodyTypes: res.data.map((b: any) => b.value), loadingBodyTypes: false });
+          const bodyList = res.data.map((b: any) => b.value);
+          updateSlot(index, { bodyTypes: bodyList, loadingBodyTypes: false });
+          if (bodyList.length === 1) {
+            handleBodyTypeChange(index, bodyList[0], brand, model, yearVal);
+          }
         } else {
           updateSlot(index, { loadingBodyTypes: false });
         }
       })
       .catch(() => updateSlot(index, { loadingBodyTypes: false }));
-
-    fetch(`${API_URL}/vehicle-filters/engines?${baseQuery}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { engines: res.data.map((e: any) => e.value), loadingEngines: false });
-        } else {
-          updateSlot(index, { loadingEngines: false });
-        }
-      })
-      .catch(() => updateSlot(index, { loadingEngines: false }));
-
-    fetch(`${API_URL}/vehicle-filters/fuel-types?${baseQuery}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { fuelTypes: res.data.map((f: any) => f.value), loadingFuels: false });
-        } else {
-          updateSlot(index, { loadingFuels: false });
-        }
-      })
-      .catch(() => updateSlot(index, { loadingFuels: false }));
-
-    fetch(`${API_URL}/vehicle-filters/transmissions?${baseQuery}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { transmissions: res.data.map((t: any) => t.value), loadingTransmissions: false });
-        } else {
-          updateSlot(index, { loadingTransmissions: false });
-        }
-      })
-      .catch(() => updateSlot(index, { loadingTransmissions: false }));
-
-    fetch(`${API_URL}/vehicle-filters/trims?${baseQuery}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { trims: res.data.map((tr: any) => tr.value), loadingTrims: false, matchedVariantId: res.autoVariantId || null });
-        } else {
-          updateSlot(index, { loadingTrims: false });
-        }
-      })
-      .catch(() => updateSlot(index, { loadingTrims: false }));
-
-    fetch(`${API_URL}/vehicle-filters/match-variant?${baseQuery}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && res.variantId) {
-          updateSlot(index, { matchedVariantId: res.variantId });
-        }
-      })
-      .catch(() => {});
   };
 
-  const handleBodyTypeChange = (index: number, bodyVal: string) => {
+  const handleBodyTypeChange = (index: number, bodyVal: string, explicitBrand?: string, explicitModel?: string, explicitYear?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
+    const year = explicitYear || slot.selectedYear;
 
     updateSlot(index, {
       selectedBodyType: bodyVal,
@@ -481,15 +435,22 @@ export default function ComparisonPage() {
       transmissions: [],
       trims: [],
       loadingEngines: !!bodyVal,
+      loadingFuels: false,
+      loadingTransmissions: false,
+      loadingTrims: false,
     });
 
-    if (!bodyVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear) return;
+    if (!bodyVal || !brand || !model || !year) return;
 
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}&category=${category}`)
+    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}&bodyType=${encodeURIComponent(bodyVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { engines: res.data.map((e: any) => e.value), loadingEngines: false });
+          const engineList = res.data.map((e: any) => e.value);
+          updateSlot(index, { engines: engineList, loadingEngines: false });
+          if (engineList.length === 1) {
+            handleEngineChange(index, engineList[0], brand, model, year, bodyVal);
+          }
         } else {
           updateSlot(index, { loadingEngines: false });
         }
@@ -497,9 +458,13 @@ export default function ComparisonPage() {
       .catch(() => updateSlot(index, { loadingEngines: false }));
   };
 
-  const handleEngineChange = (index: number, engineVal: string) => {
+  const handleEngineChange = (index: number, engineVal: string, explicitBrand?: string, explicitModel?: string, explicitYear?: string, explicitBody?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
+    const year = explicitYear || slot.selectedYear;
+    const body = explicitBody || slot.selectedBodyType;
 
     updateSlot(index, {
       selectedEngine: engineVal,
@@ -511,15 +476,21 @@ export default function ComparisonPage() {
       transmissions: [],
       trims: [],
       loadingFuels: !!engineVal,
+      loadingTransmissions: false,
+      loadingTrims: false,
     });
 
-    if (!engineVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
+    if (!engineVal || !brand || !model || !year || !body) return;
 
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}&category=${category}`)
+    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}&bodyType=${encodeURIComponent(body)}&engine=${encodeURIComponent(engineVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { fuelTypes: res.data.map((f: any) => f.value), loadingFuels: false });
+          const fuelList = res.data.map((f: any) => f.value);
+          updateSlot(index, { fuelTypes: fuelList, loadingFuels: false });
+          if (fuelList.length === 1) {
+            handleFuelTypeChange(index, fuelList[0], brand, model, year, body, engineVal);
+          }
         } else {
           updateSlot(index, { loadingFuels: false });
         }
@@ -527,9 +498,14 @@ export default function ComparisonPage() {
       .catch(() => updateSlot(index, { loadingFuels: false }));
   };
 
-  const handleFuelTypeChange = (index: number, fuelVal: string) => {
+  const handleFuelTypeChange = (index: number, fuelVal: string, explicitBrand?: string, explicitModel?: string, explicitYear?: string, explicitBody?: string, explicitEngine?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
+    const year = explicitYear || slot.selectedYear;
+    const body = explicitBody || slot.selectedBodyType;
+    const engine = explicitEngine || slot.selectedEngine;
 
     updateSlot(index, {
       selectedFuelType: fuelVal,
@@ -539,15 +515,20 @@ export default function ComparisonPage() {
       transmissions: [],
       trims: [],
       loadingTransmissions: !!fuelVal,
+      loadingTrims: false,
     });
 
-    if (!fuelVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine) return;
+    if (!fuelVal || !brand || !model || !year || !body || !engine) return;
 
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}&category=${category}`)
+    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}&bodyType=${encodeURIComponent(body)}&engine=${encodeURIComponent(engine)}&fuelType=${encodeURIComponent(fuelVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          updateSlot(index, { transmissions: res.data.map((t: any) => t.value), loadingTransmissions: false });
+          const transList = res.data.map((t: any) => t.value);
+          updateSlot(index, { transmissions: transList, loadingTransmissions: false });
+          if (transList.length === 1) {
+            handleTransmissionChange(index, transList[0], brand, model, year, body, engine, fuelVal);
+          }
         } else {
           updateSlot(index, { loadingTransmissions: false });
         }
@@ -555,9 +536,15 @@ export default function ComparisonPage() {
       .catch(() => updateSlot(index, { loadingTransmissions: false }));
   };
 
-  const handleTransmissionChange = (index: number, transVal: string) => {
+  const handleTransmissionChange = (index: number, transVal: string, explicitBrand?: string, explicitModel?: string, explicitYear?: string, explicitBody?: string, explicitEngine?: string, explicitFuel?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
+    const year = explicitYear || slot.selectedYear;
+    const body = explicitBody || slot.selectedBodyType;
+    const engine = explicitEngine || slot.selectedEngine;
+    const fuel = explicitFuel || slot.selectedFuelType;
 
     updateSlot(index, {
       selectedTransmission: transVal,
@@ -567,47 +554,74 @@ export default function ComparisonPage() {
       loadingTrims: !!transVal,
     });
 
-    if (!transVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType) return;
+    if (!transVal || !brand || !model || !year || !body || !engine || !fuel) return;
 
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}&category=${category}`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}&bodyType=${encodeURIComponent(body)}&engine=${encodeURIComponent(engine)}&fuelType=${encodeURIComponent(fuel)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
-          const trimOptions = res.data.map((tr: any) => tr.value);
+          const rawTrims = res.data.map((tr: any) => tr.value);
+          const cleanTrims = rawTrims.filter((t: string) => {
+            if (!t) return false;
+            const lower = t.toLowerCase().trim();
+            return !['bilmiyorum', 'seçiniz veya bilmiyorum', 'boş bırak', 'genel', 'farketmez', 'yok', 'none', 'null'].includes(lower);
+          });
+
           updateSlot(index, {
-            trims: trimOptions,
+            trims: cleanTrims,
             loadingTrims: false,
             matchedVariantId: res.autoVariantId || null,
           });
+
+          if (cleanTrims.length === 1) {
+            handleTrimChange(index, cleanTrims[0], brand, model, year, body, engine, fuel, transVal);
+          } else if (cleanTrims.length === 0) {
+            matchSlotVariant(index, brand, model, year, body, engine, fuel, transVal, "");
+          }
         } else {
           updateSlot(index, { loadingTrims: false });
+          matchSlotVariant(index, brand, model, year, body, engine, fuel, transVal, "");
         }
       })
       .catch(() => updateSlot(index, { loadingTrims: false }));
   };
 
-  const handleTrimChange = (index: number, trimVal: string) => {
+  const handleTrimChange = (index: number, trimVal: string, explicitBrand?: string, explicitModel?: string, explicitYear?: string, explicitBody?: string, explicitEngine?: string, explicitFuel?: string, explicitTrans?: string) => {
     const slot = slots[index];
     const category = slot.category;
+    const brand = explicitBrand || slot.selectedBrand;
+    const model = explicitModel || slot.selectedModel;
+    const year = explicitYear || slot.selectedYear;
+    const body = explicitBody || slot.selectedBodyType;
+    const engine = explicitEngine || slot.selectedEngine;
+    const fuel = explicitFuel || slot.selectedFuelType;
+    const transmission = explicitTrans || slot.selectedTransmission;
 
     updateSlot(index, {
       selectedTrim: trimVal,
       matchedVariantId: null,
     });
 
-    if (!trimVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType || !slot.selectedTransmission) return;
+    matchSlotVariant(index, brand, model, year, body, engine, fuel, transmission, trimVal, category);
+  };
+
+  const matchSlotVariant = (index: number, brand: string, model: string, year: string, bodyType: string, engine: string, fuelType: string, transmission: string, trim: string, cat?: VehicleSearchMode) => {
+    const slot = slots[index];
+    const category = cat || slot.category;
+
+    if (!brand || !model) return;
 
     const queryParams = new URLSearchParams({
-      brand: slot.selectedBrand,
-      model: slot.selectedModel,
-      year: slot.selectedYear,
-      bodyType: slot.selectedBodyType,
-      engine: slot.selectedEngine,
-      fuelType: slot.selectedFuelType,
-      transmission: slot.selectedTransmission,
-      trim: trimVal,
-      category: category,
+      brand,
+      model,
+      category,
     });
+    if (year) queryParams.set("year", year);
+    if (bodyType) queryParams.set("bodyType", bodyType);
+    if (engine) queryParams.set("engine", engine);
+    if (fuelType) queryParams.set("fuelType", fuelType);
+    if (transmission) queryParams.set("transmission", transmission);
+    if (trim) queryParams.set("trim", trim);
 
     fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
       .then(res => res.json())
@@ -616,6 +630,7 @@ export default function ComparisonPage() {
           updateSlot(index, { matchedVariantId: res.variantId });
         }
       })
+      .catch(() => {});
   };
 
   const [selectedPriority, setSelectedPriority] = useState<string>("BALANCED");

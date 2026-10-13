@@ -634,6 +634,10 @@ export default function ComparisonScreen() {
         if (Array.isArray(items)) {
           const list = items.map((i: any) => (typeof i === 'string' ? i : i.value || i.name || String(i)));
           setOptions(list);
+          if (list.length === 1 && targetStep >= 3 && searchMode !== 'MOTORCYCLE') {
+            handleSelectOption(list[0], targetStep, currentSlot as VehicleSlot);
+            return;
+          }
         } else {
           setOptions([]);
         }
@@ -659,13 +663,14 @@ export default function ComparisonScreen() {
     }
   };
 
-  const handleSelectOption = async (option: string) => {
+  const handleSelectOption = async (option: string, explicitStep?: number, explicitSlot?: VehicleSlot) => {
     if (!activeSlotId) return;
 
-    const currentSlot = slots.find((s) => s.slotId === activeSlotId) || { slotId: activeSlotId };
+    const currentStep = explicitStep !== undefined ? explicitStep : step;
+    const currentSlot = explicitSlot || slots.find((s) => s.slotId === activeSlotId) || { slotId: activeSlotId };
     const updatedSlot: VehicleSlot = { ...currentSlot };
 
-    if (step === 1) {
+    if (currentStep === 1) {
       updatedSlot.brand = option;
       updatedSlot.model = undefined;
       updatedSlot.year = undefined;
@@ -675,7 +680,7 @@ export default function ComparisonScreen() {
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 2) {
+    } else if (currentStep === 2) {
       updatedSlot.model = option;
       updatedSlot.year = undefined;
       updatedSlot.bodyType = undefined;
@@ -710,7 +715,7 @@ export default function ComparisonScreen() {
         }
         return;
       }
-    } else if (step === 3) {
+    } else if (currentStep === 3) {
       updatedSlot.year = option;
       updatedSlot.bodyType = undefined;
       updatedSlot.engineCode = undefined;
@@ -718,37 +723,37 @@ export default function ComparisonScreen() {
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 4) {
+    } else if (currentStep === 4) {
       updatedSlot.bodyType = option;
       updatedSlot.engineCode = undefined;
       updatedSlot.fuelType = undefined;
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 5) {
+    } else if (currentStep === 5) {
       updatedSlot.engineCode = option;
       updatedSlot.fuelType = undefined;
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 6) {
+    } else if (currentStep === 6) {
       updatedSlot.fuelType = option;
       updatedSlot.transmissionName = undefined;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 7) {
+    } else if (currentStep === 7) {
       updatedSlot.transmissionName = option;
       updatedSlot.trimName = undefined;
       updatedSlot.variantId = undefined;
-    } else if (step === 8) {
+    } else if (currentStep === 8) {
       updatedSlot.trimName = option;
     }
 
     const newSlots = slots.map((s) => (s.slotId === activeSlotId ? updatedSlot : s));
     setSlots(newSlots);
 
-    if (step < 8) {
-      const nextStep = step + 1;
+    if (currentStep < 8) {
+      const nextStep = currentStep + 1;
       setStep(nextStep);
       fetchStepOptions(nextStep, updatedSlot);
     } else {
