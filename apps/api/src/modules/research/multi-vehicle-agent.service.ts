@@ -3181,21 +3181,86 @@ Write the complete Minivan/Panelvan Commercial Report in strict JSON (SIFIR İNG
 
       // Recalculate score from surviving valid risks
       const totalRiskPenalty = report.decisionScore.deductedRisks.reduce((sum: number, r: any) => sum + (r.penalty || 0), 0);
-      const calibratedScore = Math.max(35, Math.min(96, 96 - totalRiskPenalty));
+
+      // Holistic Evaluation Deductions requested by user:
+      // 1. Satın Almadan Önce Bilinecek Tavizler (compromisesAndLimitations)
+      // 2. Kimler İçin Uygun Olmayabilir? (notSuitableFor)
+      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons)
+      // 4. Hangi Durumda Satın Almaktan Vazgeçilmeli? (walkAwayConditions)
+      const synth = report.expertDecisionSynthesis || {};
+
+      // 1. Tavizler (compromisesAndLimitations)
+      const rawCompromises: any[] = Array.isArray(synth.compromisesAndLimitations) ? synth.compromisesAndLimitations : [];
+      let compromisesDeduction = 0;
+      rawCompromises.forEach((item: any) => {
+        const text = `${item.title || ''} ${item.explanation || ''}`.toLowerCase();
+        if (!text.trim()) return;
+        const isSevereTradeoff = /yağ yakma|yağ eksiltme|oil consumption|çekiş düşüklüğü|yetersiz tork|rampada bayılma|yüksek yakıt|mekatronik|kuru kavrama|yalıtım zafiyeti|sert süspansiyon/i.test(text);
+        compromisesDeduction += isSevereTradeoff ? 3 : 2;
+      });
+      compromisesDeduction = Math.min(8, compromisesDeduction);
+
+      // 2. Kimler İçin Uygun Olmayabilir? (notSuitableFor)
+      const rawNotSuitable: any[] = Array.isArray(synth.notSuitableFor) ? synth.notSuitableFor : [];
+      let notSuitableDeduction = 0;
+      rawNotSuitable.forEach((item: any) => {
+        const text = `${typeof item === 'string' ? item : item.targetUserGroup || item.profile || item.group || item.title || ''}`.toLowerCase();
+        if (text.trim() && text !== '[object object]') {
+          notSuitableDeduction += 1.5;
+        }
+      });
+      notSuitableDeduction = Math.min(5, Math.round(notSuitableDeduction));
+
+      // 3. Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons)
+      const trimComp = synth.trimPackageComparison || synth.trimComparison || {};
+      const rawCons: any[] = Array.isArray(trimComp.contemporaryCons) ? trimComp.contemporaryCons : [];
+      let contemporaryConsDeduction = 0;
+      rawCons.forEach((con: any) => {
+        const text = String(con || '').toLowerCase().trim();
+        if (text && text !== '[object object]') {
+          contemporaryConsDeduction += 1.5;
+        }
+      });
+      contemporaryConsDeduction = Math.min(5, Math.round(contemporaryConsDeduction));
+
+      // 4. Hangi Durumda Satın Almaktan Vazgeçilmeli? (walkAwayConditions)
+      const rawWalks: any[] = Array.isArray(synth.walkAwayConditions) ? synth.walkAwayConditions : [];
+      let walkAwayDeduction = 0;
+      rawWalks.forEach((walk: any) => {
+        const text = `${typeof walk === 'string' ? walk : walk.condition || walk.title || walk.explanation || ''}`.toLowerCase();
+        if (text.trim() && text !== '[object object]') {
+          const isCriticalDealbreaker = /mavi duman|yağ yakma|motor kırma|hararet|şasi hasarı|podye|direk|mekatronik kilit|basınç kaybı/i.test(text);
+          walkAwayDeduction += isCriticalDealbreaker ? 2.5 : 1.5;
+        }
+      });
+      walkAwayDeduction = Math.min(6, Math.round(walkAwayDeduction));
+
+      const totalHolisticPenalty = compromisesDeduction + notSuitableDeduction + contemporaryConsDeduction + walkAwayDeduction;
+      const grandTotalPenalty = totalRiskPenalty + totalHolisticPenalty;
+
+      const calibratedScore = Math.max(30, Math.min(96, 96 - grandTotalPenalty));
       report.decisionScore.score = calibratedScore;
       report.decisionScore.totalRiskPenalty = totalRiskPenalty;
+      report.decisionScore.grandTotalPenalty = grandTotalPenalty;
+      report.decisionScore.holisticDeductions = {
+        compromisesDeduction,
+        notSuitableDeduction,
+        contemporaryConsDeduction,
+        walkAwayDeduction,
+        totalHolisticPenalty,
+      };
       report.decisionScore.riskLevel = calibratedScore >= 88 ? 'DUSUK' : calibratedScore >= 76 ? 'ORTA' : calibratedScore >= 60 ? 'YUKSEK' : 'KRITIK';
 
       if (report.torqueScoutDecisionScoreV1) {
         report.torqueScoutDecisionScoreV1.score = calibratedScore;
         report.torqueScoutDecisionScoreV1.deductedRisks = report.decisionScore.deductedRisks;
-        report.torqueScoutDecisionScoreV1.totalRiskPenalty = totalRiskPenalty;
-        report.torqueScoutDecisionScoreV1.modelDecisionRisk = totalRiskPenalty;
+        report.torqueScoutDecisionScoreV1.totalRiskPenalty = grandTotalPenalty;
+        report.torqueScoutDecisionScoreV1.modelDecisionRisk = grandTotalPenalty;
         report.torqueScoutDecisionScoreV1.state = calibratedScore >= 90 ? 'EXCELLENT' : calibratedScore >= 78 ? 'GOOD' : calibratedScore >= 65 ? 'CAUTION' : 'HIGH_RISK';
       }
       if (report.scoring) {
         report.scoring.buyabilityScore = { value: calibratedScore };
-        report.scoring.technicalRiskScore = { value: totalRiskPenalty };
+        report.scoring.technicalRiskScore = { value: grandTotalPenalty };
       }
     }
 

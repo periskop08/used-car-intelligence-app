@@ -431,4 +431,55 @@ describe('TorqueScout Decision Score Engine (5-Tier Impact & 3-Tier Evidence)', 
     expect(result.totalRiskPenalty).toBe(0);
     expect(result.deductedRisks).toHaveLength(0);
   });
+
+  it('Fixture 10: Holistic evaluation (compromises, notSuitableFor, contemporaryCons, walkAwayConditions) deducts points additively and realistically', () => {
+    const v6Scores = createBaseV6Scores();
+
+    // 1 moderate defect: -5 points (e.g. thermostat)
+    const coolingRisk: CanonicalRiskDefect = {
+      id: 'CANONICAL:THERMAL_COOLING:THERMOSTAT_SEEPAGE',
+      domain: 'THERMAL_COOLING',
+      title: 'Termostat Gövdesi Sızıntısı',
+      normalizedFailureMode: 'COOLANT_LEAK',
+      affectedComponent: 'Termostat Gövdesi',
+      severity: 3,
+      severityCategory: 'FUNCTIONAL_MINOR',
+      severityBasis: 'Grounded field evidence',
+      applicabilityState: 'EXACT',
+      verificationState: 'VERIFIED',
+      consequenceState: 'RESEARCHED_GROUNDED',
+      lifecycleState: 'VERIFIED',
+      scoringEligible: true,
+      sources: [],
+    };
+
+    const result = decisionScoreService.calculateDecisionScore({
+      v6Scores,
+      canonicalRisks: [coolingRisk], // -5
+      compromises: [
+        { title: 'Yetersiz Tork ve Çekiş Düşüklüğü', explanation: 'Atmosferik motor yüklü iken rampada bayılma yaşatır.' }, // -3 (severe)
+        { title: 'Yüksek Otoyol Tüketimi', explanation: 'Kısa oranlı şanzıman sebebiyle 120 km/s üzerinde yüksek devir çevirir.' }, // -2
+      ], // total compromises = -5
+      notSuitableFor: [
+        { targetUserGroup: 'Performans ve Seri Ara Hızlanma Bekleyenler' }, // -1.5
+        { targetUserGroup: 'Sürekli Uzun Yol ve Otoyol Seyahati Yapanlar' }, // -1.5
+      ], // total notSuitable = -3
+      contemporaryCons: [
+        'Kabin ses yalıtımı zayıf', // -1.5
+        'Sert plastik malzeme kalitesi', // -1.5
+      ], // total cons = -3
+      walkAwayConditions: [
+        { condition: 'Egzozdan mavi duman ve aşırı motor yağ yakma' }, // -2.5 (severe)
+        { condition: 'Şasi ve podye bölgesinde yapısal hasar' }, // -2.5 (severe)
+      ], // total walkAway = -5
+    });
+
+    // Defect penalty: 5
+    // Holistic penalty: 5 + 3 + 3 + 5 = 16
+    // Combined total penalty: 5 + 16 = 21
+    // Final score: 100 - 21 = 79
+    expect(result.score).toBe(79);
+    expect(result.state).toBe('GOOD');
+    expect(result.modelDecisionRisk).toBe(21);
+  });
 });

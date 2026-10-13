@@ -15,6 +15,10 @@ export interface DecisionScoreCalculationInput {
   recalls?: any[];
   priceModifier?: number;
   canonicalRisks?: CanonicalRiskDefect[];
+  compromises?: any[];
+  notSuitableFor?: any[];
+  contemporaryCons?: string[];
+  walkAwayConditions?: any[];
 }
 
 @Injectable()
@@ -38,10 +42,55 @@ export class TorqueScoutDecisionScoreService {
       v6Scores,
     );
 
-    const isInsufficient =
-      v6Scores.modelRiskState === 'INSUFFICIENT_RESEARCH' && totalRiskPenalty === 0;
+    // Calculate holistic deductions from narrative dimensions:
+    // A) Satın Almadan Önce Bilinecek Tavizler (compromisesAndLimitations)
+    let compromisesDeduction = 0;
+    (input.compromises || []).forEach((item: any) => {
+      const text = `${item.title || ''} ${item.explanation || ''}`.toLowerCase();
+      if (!text.trim()) return;
+      const isSevere = /yağ yakma|yağ eksiltme|oil consumption|çekiş düşüklüğü|yetersiz tork|rampada bayılma|yüksek yakıt|mekatronik|kuru kavrama|yalıtım zafiyeti|sert süspansiyon/i.test(text);
+      compromisesDeduction += isSevere ? 3 : 2;
+    });
+    compromisesDeduction = Math.min(8, compromisesDeduction);
 
-    const modelDecisionRisk = isInsufficient ? null : totalRiskPenalty;
+    // B) Kimler İçin Uygun Olmayabilir? (notSuitableFor)
+    let notSuitableDeduction = 0;
+    (input.notSuitableFor || []).forEach((item: any) => {
+      const text = `${typeof item === 'string' ? item : item.targetUserGroup || item.profile || item.group || item.title || ''}`.toLowerCase();
+      if (text.trim() && text !== '[object object]') {
+        notSuitableDeduction += 1.5;
+      }
+    });
+    notSuitableDeduction = Math.min(5, Math.round(notSuitableDeduction));
+
+    // C) Günümüz Şartlarında Olumsuz / Eksiklikleri (contemporaryCons)
+    let contemporaryConsDeduction = 0;
+    (input.contemporaryCons || []).forEach((con: any) => {
+      const text = String(con || '').toLowerCase().trim();
+      if (text && text !== '[object object]') {
+        contemporaryConsDeduction += 1.5;
+      }
+    });
+    contemporaryConsDeduction = Math.min(5, Math.round(contemporaryConsDeduction));
+
+    // D) Hangi Durumda Satın Almaktan Vazgeçilmeli? (walkAwayConditions)
+    let walkAwayDeduction = 0;
+    (input.walkAwayConditions || []).forEach((walk: any) => {
+      const text = `${typeof walk === 'string' ? walk : walk.condition || walk.title || walk.explanation || ''}`.toLowerCase();
+      if (text.trim() && text !== '[object object]') {
+        const isCritical = /mavi duman|yağ yakma|motor kırma|hararet|şasi hasarı|podye|direk|mekatronik kilit|basınç kaybı/i.test(text);
+        walkAwayDeduction += isCritical ? 2.5 : 1.5;
+      }
+    });
+    walkAwayDeduction = Math.min(6, Math.round(walkAwayDeduction));
+
+    const totalHolisticPenalty = compromisesDeduction + notSuitableDeduction + contemporaryConsDeduction + walkAwayDeduction;
+    const combinedTotalPenalty = totalRiskPenalty + totalHolisticPenalty;
+
+    const isInsufficient =
+      v6Scores.modelRiskState === 'INSUFFICIENT_RESEARCH' && combinedTotalPenalty === 0;
+
+    const modelDecisionRisk = isInsufficient ? null : combinedTotalPenalty;
 
     // 2. Determine Scope & Final Score (Base 100, additive deductions)
     const hasEligibleCondition =
@@ -61,18 +110,18 @@ export class TorqueScoutDecisionScoreService {
       scope = 'INSUFFICIENT_DATA';
       limitingReason = 'Bu araç varyantı için güvenilirlik araştırması henüz tamamlanmadı.';
     } else if (!hasEligibleCondition) {
-      // VARIANT-level score (Pure technical risk model: 100 - totalRiskPenalty)
+      // VARIANT-level score (Pure technical risk model: 100 - combinedTotalPenalty)
       scope = 'VARIANT';
       conditionRiskUsed = null;
 
-      const rawVariantScore = 100 - totalRiskPenalty;
+      const rawVariantScore = 100 - combinedTotalPenalty;
       score = Math.round(Math.min(100, Math.max(15, rawVariantScore)));
     } else {
       // VEHICLE-specific score (Combined technical & vehicle condition + price modifier)
       scope = 'VEHICLE';
       conditionRiskUsed = v6Scores.vehicleConditionRisk;
 
-      const baseVehicleScore = 100 - (0.45 * totalRiskPenalty + 0.55 * (v6Scores.vehicleConditionRisk ?? 0));
+      const baseVehicleScore = 100 - (0.45 * combinedTotalPenalty + 0.55 * (v6Scores.vehicleConditionRisk ?? 0));
       const adjustedScore = baseVehicleScore + clampedPriceModifier;
 
       score = Math.round(Math.min(100, Math.max(15, adjustedScore)));
