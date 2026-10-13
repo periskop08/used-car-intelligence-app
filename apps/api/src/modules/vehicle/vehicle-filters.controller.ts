@@ -22,7 +22,7 @@ export function getBodyTypeEnum(tr: string): string {
   const clean = tr.toLowerCase().trim();
   if (clean === 'sedan') return 'SEDAN';
   if (clean === 'hatchback') return 'HATCHBACK';
-  if (clean === 'suv') return 'SUV';
+  if (clean === 'suv' || clean === 'arazi, suv' || clean === 'arazi & suv' || clean === 'arazi / suv') return 'SUV';
   if (clean === 'coupe') return 'COUPE';
   if (clean === 'cabrio' || clean === 'cabriolet') return 'CONVERTIBLE';
   if (clean === 'wagon' || clean === 'station wagon') return 'WAGON';
@@ -123,10 +123,7 @@ export function getCategoryVariantWhere(category?: string): any {
     return { vehicleType: 'MINIVAN_PANELVAN' };
   }
   if (norm === 'SUV_PICKUP') {
-    return {
-      vehicleType: 'AUTOMOBILE',
-      bodyType: { in: ['SUV', 'PICKUP'] },
-    };
+    return { vehicleType: 'SUV_PICKUP' };
   }
   if (norm === 'ELECTRIC') {
     return {
@@ -283,7 +280,22 @@ export class VehicleFiltersController {
       };
     }
 
-    // AUTOMOBILE / SUV_PICKUP / ELECTRIC
+    if (norm === 'SUV_PICKUP') {
+      const brands = await this.prisma.brand.findMany({
+        where: {
+          isActive: true,
+          variants: { some: { status: 'APPROVED', vehicleType: 'SUV_PICKUP' } },
+        },
+        orderBy: { name: 'asc' },
+        select: { name: true },
+      });
+      return {
+        success: true,
+        data: brands.map(b => ({ label: b.name, value: b.name })),
+      };
+    }
+
+    // AUTOMOBILE / ELECTRIC
     const categoryWhere = getCategoryVariantWhere(category);
     const brands = await this.prisma.brand.findMany({
       where: {
@@ -335,6 +347,23 @@ export class VehicleFiltersController {
           brand: { name: { equals: brand, mode: 'insensitive' } },
           vehicleType: 'MINIVAN_PANELVAN',
           variants: { some: { status: 'APPROVED', vehicleType: 'MINIVAN_PANELVAN' } },
+        },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+      const modelsSet = new Set(models.map(m => m.name));
+      return {
+        success: true,
+        data: Array.from(modelsSet).sort((a, b) => a.localeCompare(b, 'tr')).map(name => ({ label: name, value: name })),
+      };
+    }
+
+    if (norm === 'SUV_PICKUP') {
+      const models = await this.prisma.model.findMany({
+        where: {
+          brand: { name: { equals: brand, mode: 'insensitive' } },
+          vehicleType: 'SUV_PICKUP',
+          variants: { some: { status: 'APPROVED', vehicleType: 'SUV_PICKUP' } },
         },
         select: { name: true },
         orderBy: { name: 'asc' },
@@ -684,7 +713,7 @@ export class VehicleFiltersController {
       };
     }
 
-    if (norm === 'MINIVAN_PANELVAN') {
+    if (norm === 'MINIVAN_PANELVAN' || norm === 'SUV_PICKUP') {
       return {
         success: true,
         data: [{ label: 'Manuel + Otomatik', value: 'Manuel + Otomatik' }],
@@ -786,15 +815,16 @@ export class VehicleFiltersController {
       return { success: true, data: [] };
     }
 
-    if (norm === 'MINIVAN_PANELVAN') {
+    if (norm === 'MINIVAN_PANELVAN' || norm === 'SUV_PICKUP') {
       const fuelEnums = targetFuel ? getFuelTypeEnums(targetFuel) : undefined;
       const variants = await this.prisma.vehicleVariant.findMany({
         where: {
           status: 'APPROVED',
-          vehicleType: 'MINIVAN_PANELVAN',
+          vehicleType: norm,
           brand: { name: { equals: brand, mode: 'insensitive' } },
           model: { name: { equals: targetModel, mode: 'insensitive' } },
           year: Number(year),
+          ...(targetBodyType ? { bodyType: getBodyTypeEnum(targetBodyType) as any } : {}),
           ...(fuelEnums ? { fuelType: { in: fuelEnums as any } } : {}),
         },
         select: {
