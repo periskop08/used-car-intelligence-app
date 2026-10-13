@@ -20,13 +20,6 @@ import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/commo
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-const SLOT_CATEGORIES: { key: VehicleSearchMode; label: string; icon: string }[] = [
-  { key: 'AUTOMOBILE', label: 'Otomobil', icon: '🚗' },
-  { key: 'SUV_PICKUP', label: 'Arazi & SUV', icon: '🚙' },
-  { key: 'COMMERCIAL', label: 'Ticari', icon: '🚐' },
-  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: '🏍️' },
-];
-
 interface SlotData {
   id: number;
   category: VehicleSearchMode;
@@ -159,16 +152,6 @@ export default function ComparisonPage() {
         return s;
       })
     );
-  };
-
-  const handleSlotCategoryChange = (index: number, newCategory: VehicleSearchMode) => {
-    if (slots[index]?.category === newCategory) return;
-    loadBrandsForCategory(newCategory);
-    setSlots(prev => {
-      const next = [...prev];
-      next[index] = createEmptySlot(prev[index].id, newCategory);
-      return next;
-    });
   };
 
   useEffect(() => {
@@ -836,12 +819,6 @@ export default function ComparisonPage() {
 
       {/* Vehicle Category Selector (Otomobil, Arazi SUV & Pickup, Minivan & Panelvan, Motosiklet) */}
       <div className="w-full bg-slate-900/60 p-2 sm:p-2.5 rounded-2xl border border-white/10 shadow-lg">
-        <div className="flex items-center justify-between px-1 mb-2">
-          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-            <span>⚡ Hızlı Kategori Seçimi:</span>
-            <span className="text-slate-500 font-normal hidden sm:inline">(Her araç kutusundan da türü bağımsız olarak seçebilirsiniz)</span>
-          </span>
-        </div>
         <VehicleSearchModeSelector
           value={searchMode}
           onChange={handleSearchModeChange}
@@ -861,53 +838,26 @@ export default function ComparisonPage() {
                 slot.id
               )}`}
             >
-              <div className="flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-orange-500">
-                    {slot.id}. ARAÇ SEÇİMİ
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {slot.matchedVariantId && (
-                      <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono font-bold">
-                        ✓ Hazır
-                      </span>
-                    )}
-                    {slot.selectedBrand && (
-                      <button
-                        type="button"
-                        onClick={() => clearSingleSlot(index)}
-                        className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
-                        title="Bu aracın seçimini temizle"
-                      >
-                        ✕ Temizle
-                      </button>
-                    )}
-                  </div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-500 flex items-center justify-between">
+                <span>{slot.id}. ARAÇ SEÇİMİ</span>
+                <div className="flex items-center gap-2">
+                  {slot.matchedVariantId && (
+                    <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono">
+                      ✓ Hazır
+                    </span>
+                  )}
+                  {slot.selectedBrand && (
+                    <button
+                      type="button"
+                      onClick={() => clearSingleSlot(index)}
+                      className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
+                      title="Bu aracın seçimini temizle"
+                    >
+                      ✕ Temizle
+                    </button>
+                  )}
                 </div>
-
-                {/* Per-Slot Category Switcher */}
-                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-900/90 rounded-xl border border-white/5 text-[11px]">
-                  {SLOT_CATEGORIES.map(cat => {
-                    const isCatActive = slot.category === cat.key;
-                    return (
-                      <button
-                        key={cat.key}
-                        type="button"
-                        onClick={() => handleSlotCategoryChange(index, cat.key)}
-                        className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg font-bold transition cursor-pointer text-center ${
-                          isCatActive
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-sm font-extrabold"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                        }`}
-                        title={cat.label}
-                      >
-                        <span>{cat.icon}</span>
-                        <span className="truncate">{cat.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              </h2>
 
               {/* Responsive Dropdown Grid */}
               <div className={`grid ${isCompact10 ? "grid-cols-1 md:grid-cols-2 gap-2.5" : "grid-cols-1 gap-3"}`}>
