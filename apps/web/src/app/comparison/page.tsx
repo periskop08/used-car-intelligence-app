@@ -20,8 +20,16 @@ import { VehicleSearchModeSelector, VehicleSearchMode } from "@/components/commo
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const SLOT_CATEGORIES: { key: VehicleSearchMode; label: string; icon: string }[] = [
+  { key: 'AUTOMOBILE', label: 'Otomobil', icon: '🚗' },
+  { key: 'SUV_PICKUP', label: 'Arazi & SUV', icon: '🚙' },
+  { key: 'COMMERCIAL', label: 'Ticari', icon: '🚐' },
+  { key: 'MOTORCYCLE', label: 'Motosiklet', icon: '🏍️' },
+];
+
 interface SlotData {
   id: number;
+  category: VehicleSearchMode;
   selectedBrand: string;
   selectedModel: string;
   selectedYear: string;
@@ -49,8 +57,9 @@ interface SlotData {
   loadingTrims: boolean;
 }
 
-const createEmptySlot = (id: number): SlotData => ({
+const createEmptySlot = (id: number, category: VehicleSearchMode = "AUTOMOBILE"): SlotData => ({
   id,
+  category,
   selectedBrand: "",
   selectedModel: "",
   selectedYear: "",
@@ -81,15 +90,19 @@ const createEmptySlot = (id: number): SlotData => ({
 export default function ComparisonPage() {
   const router = useRouter();
 
-  // Brands list (string values e.g. "Audi", "BMW")
-  const [brands, setBrands] = useState<string[]>([]);
+  // Brands cached per category (e.g. { AUTOMOBILE: ["Audi", "BMW"], SUV_PICKUP: ["Dacia", "Jeep"] })
+  const [brandsByCategory, setBrandsByCategory] = useState<Record<string, string[]>>({});
+  const fetchingBrandsRef = useRef<Record<string, boolean>>({});
 
   // User tier & limit
   const [userTier, setUserTier] = useState<string>("TANISMA");
   const [vehicleLimit, setVehicleLimit] = useState<number>(2);
 
+  // Selected vehicle category (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
+  const [searchMode, setSearchMode] = useState<VehicleSearchMode>("AUTOMOBILE");
+
   // Slots state (dynamically sized)
-  const [slots, setSlots] = useState<SlotData[]>([createEmptySlot(1), createEmptySlot(2)]);
+  const [slots, setSlots] = useState<SlotData[]>([createEmptySlot(1, "AUTOMOBILE"), createEmptySlot(2, "AUTOMOBILE")]);
 
   // Result comparison state
   const [comparisonResult, setComparisonResult] = useState<any>(null);
@@ -104,46 +117,66 @@ export default function ComparisonPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
-  // Selected vehicle category (AUTOMOBILE, SUV_PICKUP, COMMERCIAL, MOTORCYCLE)
-  const [searchMode, setSearchMode] = useState<VehicleSearchMode>("AUTOMOBILE");
+  // Fetch and cache brands for a specific category
+  const loadBrandsForCategory = async (mode: VehicleSearchMode) => {
+    if (brandsByCategory[mode]?.length || fetchingBrandsRef.current[mode]) return;
+    fetchingBrandsRef.current[mode] = true;
 
-  // Fetch initial brands and user quota/tier
-  const loadBrands = (mode: VehicleSearchMode = searchMode) => {
-    fetch(`${API_URL}/vehicle-filters/brands?category=${mode}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setBrands(res.data.map((b: any) => b.value));
-        } else {
-          fetch(`${API_URL}/vehicles/brands?category=${mode}`)
-            .then(r => r.json())
-            .then(bData => {
-              if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
-            })
-            .catch(() => null);
-        }
-      })
-      .catch(() => {
-        fetch(`${API_URL}/vehicles/brands?category=${mode}`)
-          .then(r => r.json())
-          .then(bData => {
-            if (Array.isArray(bData)) setBrands(bData.map((b: any) => b.name));
-          })
-          .catch(() => null);
-      });
+    try {
+      const res = await fetch(`${API_URL}/vehicle-filters/brands?category=${mode}`);
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+        const brandNames = data.data.map((b: any) => b.value);
+        setBrandsByCategory(prev => ({ ...prev, [mode]: brandNames }));
+        fetchingBrandsRef.current[mode] = false;
+        return;
+      }
+    } catch (e) {}
+
+    try {
+      const r = await fetch(`${API_URL}/vehicles/brands?category=${mode}`);
+      const bData = await r.json();
+      if (Array.isArray(bData)) {
+        const brandNames = bData.map((b: any) => b.name);
+        setBrandsByCategory(prev => ({ ...prev, [mode]: brandNames }));
+      }
+    } catch (e) {}
+    fetchingBrandsRef.current[mode] = false;
   };
 
   const handleSearchModeChange = (newMode: VehicleSearchMode) => {
     if (newMode === searchMode) return;
     setSearchMode(newMode);
-    setComparisonResult(null);
-    setError("");
-    setSlots(prev => prev.map(s => createEmptySlot(s.id)));
-    loadBrands(newMode);
+    loadBrandsForCategory(newMode);
+
+    // Update empty slots to the newly selected category so the user can immediately select in this category
+    // WITHOUT wiping any slot that is already filled or has a brand selected!
+    setSlots(prev =>
+      prev.map(s => {
+        if (!s.selectedBrand) {
+          return createEmptySlot(s.id, newMode);
+        }
+        return s;
+      })
+    );
+  };
+
+  const handleSlotCategoryChange = (index: number, newCategory: VehicleSearchMode) => {
+    if (slots[index]?.category === newCategory) return;
+    loadBrandsForCategory(newCategory);
+    setSlots(prev => {
+      const next = [...prev];
+      next[index] = createEmptySlot(prev[index].id, newCategory);
+      return next;
+    });
   };
 
   useEffect(() => {
-    loadBrands(searchMode);
+    loadBrandsForCategory(searchMode);
+    loadBrandsForCategory("AUTOMOBILE");
+    loadBrandsForCategory("SUV_PICKUP");
+    loadBrandsForCategory("COMMERCIAL");
+    loadBrandsForCategory("MOTORCYCLE");
 
     // Immediately check localStorage user state for instant 10/5 slots render
     const storedUserStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
@@ -184,7 +217,16 @@ export default function ComparisonPage() {
           setSearchMode(draft.searchMode);
         }
         if (Array.isArray(draft.slots) && draft.slots.length >= 2) {
-          setSlots(draft.slots);
+          const restoredSlots: SlotData[] = draft.slots.map((s: any, idx: number) => {
+            const cat: VehicleSearchMode = s.category || draft.searchMode || "AUTOMOBILE";
+            loadBrandsForCategory(cat);
+            return {
+              ...createEmptySlot(s.id || idx + 1, cat),
+              ...s,
+              category: cat,
+            };
+          });
+          setSlots(restoredSlots);
         }
         if (draft.selectedPriority) {
           setSelectedPriority(draft.selectedPriority);
@@ -206,7 +248,7 @@ export default function ComparisonPage() {
       if (prev.length === limit) return prev;
       const newSlots: SlotData[] = [];
       for (let i = 1; i <= limit; i++) {
-        newSlots.push(prev[i - 1] || createEmptySlot(i));
+        newSlots.push(prev[i - 1] || createEmptySlot(i, searchMode));
       }
       return newSlots;
     });
@@ -224,13 +266,16 @@ export default function ComparisonPage() {
   const clearSingleSlot = (index: number) => {
     setSlots(prev => {
       const next = [...prev];
-      next[index] = createEmptySlot(prev[index].id);
+      next[index] = createEmptySlot(prev[index].id, prev[index].category);
       return next;
     });
   };
 
   // Slot cascade handlers using /vehicle-filters/ endpoints
   const handleBrandChange = (index: number, brandName: string) => {
+    const slot = slots[index];
+    const category = slot?.category || "AUTOMOBILE";
+
     updateSlot(index, {
       selectedBrand: brandName,
       selectedModel: "",
@@ -253,7 +298,7 @@ export default function ComparisonPage() {
 
     if (!brandName) return;
 
-    fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brandName)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/models?brand=${encodeURIComponent(brandName)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -268,8 +313,9 @@ export default function ComparisonPage() {
   const handleModelChange = (index: number, modelName: string) => {
     const slot = slots[index];
     if (!modelName || !slot.selectedBrand) return;
+    const category = slot.category;
 
-    if (searchMode === 'MOTORCYCLE') {
+    if (category === 'MOTORCYCLE') {
       updateSlot(index, {
         selectedModel: modelName,
         selectedYear: "Tüm Üretim Yılları",
@@ -327,7 +373,7 @@ export default function ComparisonPage() {
       loadingYears: true,
     });
 
-    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(modelName)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/years?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(modelName)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -345,6 +391,8 @@ export default function ComparisonPage() {
 
   const handleYearChange = (index: number, yearVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedYear: yearVal,
       selectedBodyType: "",
@@ -367,7 +415,7 @@ export default function ComparisonPage() {
 
     if (!yearVal || !slot.selectedBrand || !slot.selectedModel) return;
 
-    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}&category=${searchMode}`;
+    const baseQuery = `brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${yearVal}&category=${category}`;
 
     fetch(`${API_URL}/vehicle-filters/body-types?${baseQuery}`)
       .then(res => res.json())
@@ -436,6 +484,8 @@ export default function ComparisonPage() {
 
   const handleBodyTypeChange = (index: number, bodyVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedBodyType: bodyVal,
       selectedEngine: "",
@@ -452,7 +502,7 @@ export default function ComparisonPage() {
 
     if (!bodyVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear) return;
 
-    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/engines?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(bodyVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -466,6 +516,8 @@ export default function ComparisonPage() {
 
   const handleEngineChange = (index: number, engineVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedEngine: engineVal,
       selectedFuelType: "",
@@ -480,7 +532,7 @@ export default function ComparisonPage() {
 
     if (!engineVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType) return;
 
-    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/fuel-types?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(engineVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -494,6 +546,8 @@ export default function ComparisonPage() {
 
   const handleFuelTypeChange = (index: number, fuelVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedFuelType: fuelVal,
       selectedTransmission: "",
@@ -506,7 +560,7 @@ export default function ComparisonPage() {
 
     if (!fuelVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine) return;
 
-    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/transmissions?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(fuelVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -520,6 +574,8 @@ export default function ComparisonPage() {
 
   const handleTransmissionChange = (index: number, transVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedTransmission: transVal,
       selectedTrim: "",
@@ -530,7 +586,7 @@ export default function ComparisonPage() {
 
     if (!transVal || !slot.selectedBrand || !slot.selectedModel || !slot.selectedYear || !slot.selectedBodyType || !slot.selectedEngine || !slot.selectedFuelType) return;
 
-    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}&category=${searchMode}`)
+    fetch(`${API_URL}/vehicle-filters/trims?brand=${encodeURIComponent(slot.selectedBrand)}&model=${encodeURIComponent(slot.selectedModel)}&year=${slot.selectedYear}&bodyType=${encodeURIComponent(slot.selectedBodyType)}&engine=${encodeURIComponent(slot.selectedEngine)}&fuelType=${encodeURIComponent(slot.selectedFuelType)}&transmissionType=${encodeURIComponent(transVal)}&transmission=${encodeURIComponent(transVal)}&category=${category}`)
       .then(res => res.json())
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
@@ -549,6 +605,8 @@ export default function ComparisonPage() {
 
   const handleTrimChange = (index: number, trimVal: string) => {
     const slot = slots[index];
+    const category = slot.category;
+
     updateSlot(index, {
       selectedTrim: trimVal,
       matchedVariantId: null,
@@ -565,7 +623,7 @@ export default function ComparisonPage() {
       fuelType: slot.selectedFuelType,
       transmission: slot.selectedTransmission,
       trim: trimVal,
-      category: searchMode,
+      category: category,
     });
 
     fetch(`${API_URL}/vehicle-filters/match-variant?${queryParams.toString()}`)
@@ -575,7 +633,6 @@ export default function ComparisonPage() {
           updateSlot(index, { matchedVariantId: res.variantId });
         }
       })
-      .catch(() => null);
   };
 
   const [selectedPriority, setSelectedPriority] = useState<string>("BALANCED");
@@ -666,7 +723,7 @@ export default function ComparisonPage() {
     }
     setComparisonResult(null);
     setError("");
-    setSlots(prev => prev.map(s => createEmptySlot(s.id)));
+    setSlots(prev => prev.map(s => createEmptySlot(s.id, s.category)));
   };
 
   // Send Chat Message Handler
@@ -779,6 +836,12 @@ export default function ComparisonPage() {
 
       {/* Vehicle Category Selector (Otomobil, Arazi SUV & Pickup, Minivan & Panelvan, Motosiklet) */}
       <div className="w-full bg-slate-900/60 p-2 sm:p-2.5 rounded-2xl border border-white/10 shadow-lg">
+        <div className="flex items-center justify-between px-1 mb-2">
+          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+            <span>⚡ Hızlı Kategori Seçimi:</span>
+            <span className="text-slate-500 font-normal hidden sm:inline">(Her araç kutusundan da türü bağımsız olarak seçebilirsiniz)</span>
+          </span>
+        </div>
         <VehicleSearchModeSelector
           value={searchMode}
           onChange={handleSearchModeChange}
@@ -798,25 +861,53 @@ export default function ComparisonPage() {
                 slot.id
               )}`}
             >
-              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-500 flex items-center justify-between">
-                <span>{slot.id}. ARAÇ SEÇİMİ</span>
-                <div className="flex items-center gap-2">
-                  {slot.matchedVariantId && (
-                    <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono">
-                      ✓ Hazır
-                    </span>
-                  )}
-                  {slot.selectedBrand && (
-                    <button
-                      onClick={() => clearSingleSlot(index)}
-                      className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
-                      title="Bu aracın seçimini temizle"
-                    >
-                      ✕ Temizle
-                    </button>
-                  )}
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-orange-500">
+                    {slot.id}. ARAÇ SEÇİMİ
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {slot.matchedVariantId && (
+                      <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded font-mono font-bold">
+                        ✓ Hazır
+                      </span>
+                    )}
+                    {slot.selectedBrand && (
+                      <button
+                        type="button"
+                        onClick={() => clearSingleSlot(index)}
+                        className="text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1"
+                        title="Bu aracın seçimini temizle"
+                      >
+                        ✕ Temizle
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </h2>
+
+                {/* Per-Slot Category Switcher */}
+                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-900/90 rounded-xl border border-white/5 text-[11px]">
+                  {SLOT_CATEGORIES.map(cat => {
+                    const isCatActive = slot.category === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => handleSlotCategoryChange(index, cat.key)}
+                        className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg font-bold transition cursor-pointer text-center ${
+                          isCatActive
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-sm font-extrabold"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                        }`}
+                        title={cat.label}
+                      >
+                        <span>{cat.icon}</span>
+                        <span className="truncate">{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Responsive Dropdown Grid */}
               <div className={`grid ${isCompact10 ? "grid-cols-1 md:grid-cols-2 gap-2.5" : "grid-cols-1 gap-3"}`}>
@@ -826,8 +917,10 @@ export default function ComparisonPage() {
                   onChange={e => handleBrandChange(index, e.target.value)}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition"
                 >
-                  <option value="">Marka Seçiniz...</option>
-                  {brands.map(b => (
+                  <option value="">
+                    {!(brandsByCategory[slot.category]?.length) ? "Markalar Yükleniyor..." : "Marka Seçiniz..."}
+                  </option>
+                  {(brandsByCategory[slot.category] || []).map(b => (
                     <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
@@ -849,7 +942,7 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedYear}
                   onChange={e => handleYearChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedModel || slot.loadingYears || slot.years.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedModel || slot.loadingYears || slot.years.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
                   <option value="">{slot.loadingYears ? "Yükleniyor..." : "Yıl Seçiniz..."}</option>
@@ -862,10 +955,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedBodyType}
                   onChange={e => handleBodyTypeChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedYear || slot.loadingBodyTypes || slot.bodyTypes.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedYear || slot.loadingBodyTypes || slot.bodyTypes.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Tip / Kasa Tipi Seçiniz..." : "Kasa Tipi Seçiniz...")}</option>
+                  <option value="">{slot.loadingBodyTypes ? "Yükleniyor..." : (slot.category === 'MOTORCYCLE' ? "Tip / Kasa Tipi Seçiniz..." : "Kasa Tipi Seçiniz...")}</option>
                   {slot.bodyTypes.map(b => (
                     <option key={b} value={b}>{b}</option>
                   ))}
@@ -875,10 +968,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedEngine}
                   onChange={e => handleEngineChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedBodyType || slot.loadingEngines || slot.engines.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedBodyType || slot.loadingEngines || slot.engines.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingEngines ? "Yükleniyor..." : "Motor / Versiyon Seçiniz..."}</option>
+                  <option value="">{slot.loadingEngines ? "Yükleniyor..." : (slot.category === 'MOTORCYCLE' ? "Motor / Versiyon Seçiniz..." : "Motor / Versiyon Seçiniz...")}</option>
                   {slot.engines.map(eng => (
                     <option key={eng} value={eng}>{eng}</option>
                   ))}
@@ -888,10 +981,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedFuelType}
                   onChange={e => handleFuelTypeChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedEngine || slot.loadingFuels || slot.fuelTypes.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedEngine || slot.loadingFuels || slot.fuelTypes.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingFuels ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Yakıt / Güç Ünitesi Seçiniz..." : "Yakıt Türü Seçiniz...")}</option>
+                  <option value="">{slot.loadingFuels ? "Yükleniyor..." : (slot.category === 'MOTORCYCLE' ? "Yakıt / Güç Ünitesi Seçiniz..." : "Yakıt Türü Seçiniz...")}</option>
                   {slot.fuelTypes.map(fuel => (
                     <option key={fuel} value={fuel}>{fuel}</option>
                   ))}
@@ -901,10 +994,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedTransmission}
                   onChange={e => handleTransmissionChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedFuelType || slot.loadingTransmissions || slot.transmissions.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedFuelType || slot.loadingTransmissions || slot.transmissions.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingTransmissions ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Motor Hacmi Seçiniz..." : "Şanzıman Tipi Seçiniz...")}</option>
+                  <option value="">{slot.loadingTransmissions ? "Yükleniyor..." : (slot.category === 'MOTORCYCLE' ? "Motor Hacmi Seçiniz..." : "Şanzıman Tipi Seçiniz...")}</option>
                   {slot.transmissions.map(trans => (
                     <option key={trans} value={trans}>{trans}</option>
                   ))}
@@ -914,10 +1007,10 @@ export default function ComparisonPage() {
                 <select
                   value={slot.selectedTrim}
                   onChange={e => handleTrimChange(index, e.target.value)}
-                  disabled={searchMode === 'MOTORCYCLE' || !slot.selectedTransmission || slot.loadingTrims || slot.trims.length === 0}
+                  disabled={slot.category === 'MOTORCYCLE' || !slot.selectedTransmission || slot.loadingTrims || slot.trims.length === 0}
                   className="bg-slate-900 border border-white/10 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:border-orange-500/50 transition disabled:opacity-50"
                 >
-                  <option value="">{slot.loadingTrims ? "Yükleniyor..." : (searchMode === 'MOTORCYCLE' ? "Vites Tipi Seçiniz..." : "Donanım Paketi Seçiniz...")}</option>
+                  <option value="">{slot.loadingTrims ? "Yükleniyor..." : (slot.category === 'MOTORCYCLE' ? "Vites Tipi Seçiniz..." : "Donanım Paketi Seçiniz...")}</option>
                   {slot.trims.map(tr => (
                     <option key={tr} value={tr}>{tr}</option>
                   ))}
