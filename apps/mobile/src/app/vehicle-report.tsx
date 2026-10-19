@@ -207,7 +207,7 @@ function getBrandLogoUrl(brandName?: string): string {
   return logoMap[b] || `https://img.icons8.com/color/96/${b}.png`;
 }
 
-function BrandLogoContainer({ brandName }: { brandName?: string }) {
+function BrandLogoContainer({ brandName, isMotorcycle }: { brandName?: string; isMotorcycle?: boolean }) {
   const [hasError, setHasError] = useState(false);
   const logoUrl = getBrandLogoUrl(brandName);
 
@@ -221,7 +221,7 @@ function BrandLogoContainer({ brandName }: { brandName?: string }) {
           onError={() => setHasError(true)}
         />
       ) : (
-        <Ionicons name="car-sport" size={28} color="#0f172a" />
+        <Ionicons name={isMotorcycle ? 'bicycle' : 'car-sport'} size={28} color={isMotorcycle ? '#ea580c' : '#0f172a'} />
       )}
     </View>
   );
@@ -538,7 +538,8 @@ export default function VehicleReportScreen() {
 
   const resolveVariantIdFromParams = async (): Promise<string | null> => {
     try {
-      const categoryParam = params.category ? String(params.category) : 'AUTOMOBILE';
+      const isMotoBrand = /hyosung|yamaha|kawasaki|ducati|harley|ktm|sym|kymco|vespa|piaggio|bajaj|cfmoto|mondial|rks|arora|yuki|motoguzzi|triumph|aprilia/i.test(String(params.brand || ''));
+      const categoryParam = isMotoBrand ? 'MOTORCYCLE' : (params.category ? String(params.category) : 'AUTOMOBILE');
       const cleanVal = (v: any) => {
         if (!v) return undefined;
         const s = String(v).trim();
@@ -731,13 +732,16 @@ export default function VehicleReportScreen() {
         ...(token ? { Authorization: `Bearer ${token}` } : { 'x-guest-token': 'guest_mobile' }),
       };
 
-      const reqVehicleType = (params.category ? String(params.category) : 'AUTOMOBILE').toUpperCase();
+      const isMotoBrand = /hyosung|yamaha|kawasaki|ducati|harley|ktm|sym|kymco|vespa|piaggio|bajaj|cfmoto|mondial|rks|arora|yuki|motoguzzi|triumph|aprilia/i.test(String(params.brand || ''));
+      const reqVehicleType = (isMotoBrand || (params.category && String(params.category).toUpperCase() === 'MOTORCYCLE'))
+        ? 'MOTORCYCLE'
+        : (params.category ? String(params.category) : 'AUTOMOBILE').toUpperCase();
       const isMoto = reqVehicleType === 'MOTORCYCLE';
-      const effectiveSearchScope = {
+      const effectiveSearchScope: any = {
         vehicleType: reqVehicleType,
-        year: params.year,
-        bodyType: params.bodyType,
-        engine: params.engine,
+        year: isMoto ? undefined : params.year,
+        bodyType: isMoto ? undefined : params.bodyType,
+        engine: isMoto ? undefined : params.engine,
         fuel: params.fuel,
         transmission: params.transmission,
         trim: params.trim,
@@ -884,19 +888,21 @@ export default function VehicleReportScreen() {
     ?? (report as any)?.technicalSpecifications?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.engineDisplacementCc
     ?? (report?.performanceUsage as any)?.displacementCc;
+  const isMotoBrand = /hyosung|yamaha|kawasaki|ducati|harley|ktm|sym|kymco|vespa|piaggio|bajaj|cfmoto|mondial|rks|arora|yuki|motoguzzi|triumph|aprilia/i.test(params.brand as string || report?.vehicleIdentity?.brand || '');
   const resolvedVehicleType = (
-    (params.vehicleType as string) ||
-    (params.category as string) ||
-    (report as any)?.vehicleType ||
     (report?.vehicleIdentity as any)?.vehicleType ||
     (report as any)?.vehicleType ||
     (report?.expertDecisionSynthesis?.motorcycleEraAnalysis ? 'MOTORCYCLE' : '') ||
-    ''
+    (isMotoBrand ? 'MOTORCYCLE' : '') ||
+    (params.vehicleType as string) ||
+    (params.category as string) ||
+    'AUTOMOBILE'
   ).toUpperCase();
   const isMotorcycle =
     resolvedVehicleType === 'MOTORCYCLE' ||
     Boolean((report as any)?.isMotorcycle) ||
-    Boolean(report?.expertDecisionSynthesis?.motorcycleEraAnalysis);
+    Boolean(report?.expertDecisionSynthesis?.motorcycleEraAnalysis) ||
+    isMotoBrand;
   const characterHeading = isMotorcycle
     ? 'Bu Araç Nasıl Bir Motosiklet?'
     : (resolvedVehicleType === 'SUV_PICKUP' || resolvedVehicleType === 'SUV'
@@ -905,7 +911,7 @@ export default function VehicleReportScreen() {
         ? 'Bu Araç Nasıl Bir Ticari Araç?'
         : 'Bu Araç Nasıl Bir Otomobil?'));
 
-  const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : '1598 cc');
+  const displacementDisplay = isElectricVehicle ? 'Elektrik' : (rawDisplacement ? `${rawDisplacement} cc` : (isMotorcycle ? '249 cc' : '1598 cc'));
   const mtvResult = calculateVehicleMtv({
     modelYear: report?.vehicleIdentity?.modelYear,
     engineDisplacement: rawDisplacement || report?.vehicleIdentity?.engineDisplacementCc,
@@ -952,7 +958,7 @@ export default function VehicleReportScreen() {
     ? `${zeroToHundredValue} sn` 
     : (isLowSpeedBike ? 'Şehir İçi (<80 km/h)' : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 125 ? '14.5 sn' : (rawDisplacement && rawDisplacement <= 250 ? '9.8 sn' : '6.5 sn')) : (hpValue && hpValue >= 200 ? '7.2 sn' : '9.5 sn')));
   const fuelOrRangeDisplay = isElectricVehicle ? (electricRangeKm ? `${electricRangeKm} km` : '420 km') : (combinedFuel ? `${combinedFuel} lt/100km` : (isMotorcycle ? '2.8 lt/100km' : '6.8 lt/100km'));
-  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? (isScooter ? 'Sele Altı Kask Gözü' : 'Yan Heybe / Çanta Uyumlu') : '450 lt');
+  const trunkDisplay = trunkValue ? `${trunkValue} lt` : (isMotorcycle ? (isScooter ? 'Sele Altı Kask Gözü' : 'Sele Altı / Çanta Uyumlu') : '450 lt');
   const weightDisplay = weightValue ? `${weightValue} kg` : (isMotorcycle ? (rawDisplacement && rawDisplacement <= 50 ? '88 kg' : '165 kg') : (isElectricVehicle ? '1850 kg' : '1380 kg'));
   const mtvDisplay = mtvResult ? mtvResult.displayInstallment : 'Hesaplanıyor';
 
@@ -1197,7 +1203,7 @@ export default function VehicleReportScreen() {
           <View style={styles.heroCardLight}>
             <View style={styles.heroTopRow}>
               {/* Brand Logo Container */}
-              <BrandLogoContainer brandName={report.vehicleIdentity.brand} />
+              <BrandLogoContainer brandName={report.vehicleIdentity.brand} isMotorcycle={isMotorcycle} />
 
               {/* Title & Subtitle */}
               <View style={{ flex: 1, gap: 3 }}>
@@ -1205,12 +1211,27 @@ export default function VehicleReportScreen() {
                   {typeof report.vehicleIdentity.modelYear === 'number' ? `${report.vehicleIdentity.modelYear} ` : ''}{report.vehicleIdentity.brand} {report.vehicleIdentity.model}
                 </Text>
 
-                <Text style={styles.heroSubTextLight} numberOfLines={1}>
-                  {isMotorcycle
-                    ? `${report.vehicleIdentity.brand} • ${report.vehicleIdentity.model}`
-                    : `${report.vehicleIdentity.engineCode || ''} ${params.trim ? `• ${params.trim}` : ''} ${report.vehicleIdentity.transmissionName ? `• ${formatCleanTransmissionName(report.vehicleIdentity.transmissionName)}` : ''}`
-                  }
-                </Text>
+                {(() => {
+                  const displacementLabel = isElectricVehicle ? 'Elektrik' : (displacementDisplay || '');
+                  const rawTrim = (params.trim || (report.vehicleIdentity as any)?.trim || (report as any)?.trimPackage || '').trim();
+                  const trimLabel = rawTrim && !/^(standart|standart donanım|standart kasa)$/i.test(rawTrim) ? rawTrim : (isMotorcycle ? 'Standart / Tüm Dönemler' : '');
+                  const powerStr = hpDisplay !== '—' ? `(${hpDisplay})` : '';
+                  const line1 = [displacementLabel, trimLabel, powerStr].filter(Boolean).join(' ');
+                  const transLabel = report.vehicleIdentity.transmissionName ? formatCleanTransmissionName(report.vehicleIdentity.transmissionName) : (params.transmission ? formatCleanTransmissionName(String(params.transmission)) : '');
+                  const fuelLabel = formatFuelTypeTr(report.vehicleIdentity.fuelType);
+                  const consLabel = fuelOrRangeDisplay;
+                  const line2Parts = [transLabel, fuelLabel, consLabel].filter(Boolean);
+                  return (
+                    <View style={{ gap: 2, marginTop: 1 }}>
+                      {Boolean(line1) && <Text style={styles.heroSubTextLight} numberOfLines={1}>{line1}</Text>}
+                      {line2Parts.length > 0 && (
+                        <Text style={[styles.heroSubTextLight, { fontSize: 11, color: '#64748b' }]} numberOfLines={1}>
+                          {line2Parts.join(' • ')}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()}
               </View>
             </View>
 
@@ -1228,12 +1249,10 @@ export default function VehicleReportScreen() {
                 <Text style={styles.specChipTextLight}>{formatFuelTypeTr(report.vehicleIdentity.fuelType)}</Text>
               </View>
 
-              {!isMotorcycle && (
-                <View style={styles.specChipLight}>
-                  <Ionicons name="options-outline" size={13} color="#0284c7" />
-                  <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || 'Otomatik'}</Text>
-                </View>
-              )}
+              <View style={styles.specChipLight}>
+                <Ionicons name="options-outline" size={13} color="#0284c7" />
+                <Text style={styles.specChipTextLight}>{formatCleanTransmissionName(report.vehicleIdentity.transmissionName) || (isMotorcycle ? 'Manuel' : 'Otomatik')}</Text>
+              </View>
 
               <View style={styles.specChipLight}>
                 <Ionicons name={isMotorcycle ? 'bicycle-outline' : 'car-outline'} size={13} color="#0284c7" />
@@ -1618,12 +1637,12 @@ export default function VehicleReportScreen() {
             );
           })()}
 
-          {/* 3.3 GÖZ ÖNÜNDE BULUNDURULACAK TAVİZLER VE SINIRLAMALAR */}
+          {/* 3.3 SATIN ALMADAN ÖNCE BİLİNECEK TAVİZLER */}
           {Boolean(synthesis?.compromisesAndLimitations && synthesis.compromisesAndLimitations.length > 0) && (() => {
             const compromises = synthesis?.compromisesAndLimitations || [];
             return (
               <CollapsibleLightSection
-                title="Göz Önünde Bulundurulacak Tavizler ve Sınırlamalar"
+                title="Satın Almadan Önce Bilinecek Tavizler"
                 badgeText={`${compromises.length} Sınırlama`}
                 iconName="alert-circle-outline"
                 iconColor="#f97316"
@@ -1675,7 +1694,7 @@ export default function VehicleReportScreen() {
               <View style={styles.grid2ColLight}>
                 {Boolean(suitableFor && suitableFor.length > 0) && (
                   <View style={styles.suitableCardGreenLight}>
-                    <Text style={styles.suitableTitleGreenLight}>👤 Kimler İçin İdeal?</Text>
+                    <Text style={styles.suitableTitleGreenLight}>👤 Kimler İçin Mantıklı?</Text>
                     {suitableFor.map((item, idx) => (
                       <TouchableOpacity
                         key={idx}
@@ -1706,7 +1725,7 @@ export default function VehicleReportScreen() {
 
                 {Boolean(notSuitableFor && notSuitableFor.length > 0) && (
                   <View style={styles.suitableCardRedLight}>
-                    <Text style={styles.suitableTitleRedLight}>🚫 Kimler İçin Uygun Değil?</Text>
+                    <Text style={styles.suitableTitleRedLight}>🚫 Kimler İçin Uygun Olmayabilir?</Text>
                     {notSuitableFor.map((item, idx) => (
                       <TouchableOpacity
                         key={idx}
@@ -1738,10 +1757,10 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* 3.5 SATIN ALMA ONAY ŞARTLARI */}
+          {/* 3.5 HANGİ ŞARTLARDA DEĞERLENDİRİLEBİLİR? */}
           {Boolean(purchaseConditions && purchaseConditions.length > 0) && (
             <CollapsibleLightSection
-              title="Satın Alma Onay Şartları (Devam Et)"
+              title="Hangi Şartlarda Değerlendirilebilir?"
               badgeText={`${purchaseConditions.length} Kritik Onay`}
               iconName="shield-checkmark-outline"
               iconColor="#16a34a"
@@ -1776,10 +1795,10 @@ export default function VehicleReportScreen() {
             </CollapsibleLightSection>
           )}
 
-          {/* 3.6 ALIMDAN VAZGEÇME ŞARTLARI */}
+          {/* 3.6 HANGİ DURUMDA SATIN ALMAKTAN VAZGEÇİLMELİ? */}
           {Boolean(walkAwayConditions && walkAwayConditions.length > 0) && (
             <CollapsibleLightSection
-              title="Alımdan Vazgeçme Şartları (Uzak Dur)"
+              title="Hangi Durumda Satın Almaktan Vazgeçilmeli?"
               badgeText={`${walkAwayConditions.length} Kırmızı Çizgi`}
               iconName="warning-outline"
               iconColor="#dc2626"
@@ -1998,10 +2017,10 @@ export default function VehicleReportScreen() {
                     <Ionicons name="open-outline" size={16} color="#6d28d9" style={{ marginLeft: 6 }} />
                   </View>
                   {Boolean(q.expectedAnswerHint) && (
-                    <Text style={styles.expectedTextLight} numberOfLines={1}>✔ Beklenen: {q.expectedAnswerHint}</Text>
+                    <Text style={styles.expectedTextLight} numberOfLines={2}>✔ Beklenen Cevap: {q.expectedAnswerHint}</Text>
                   )}
                   {Boolean(q.redFlagAnswerHint) && (
-                    <Text style={styles.redFlagTextLight} numberOfLines={1}>🚩 Şüphe: {q.redFlagAnswerHint}</Text>
+                    <Text style={styles.redFlagTextLight} numberOfLines={2}>🚩 Şüphe Uyandıracak Cevap: {q.redFlagAnswerHint}</Text>
                   )}
                 </TouchableOpacity>
               ))}

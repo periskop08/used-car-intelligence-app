@@ -1198,19 +1198,22 @@ export default function MobileDashboard() {
 
   const handleStartReport = () => {
     if (selectedBrand && selectedModel) {
-      const isMoto = selectedCategory === 'MOTORCYCLE';
+      const isMotoBrand = /hyosung|yamaha|kawasaki|ducati|harley|ktm|sym|kymco|vespa|piaggio|bajaj|cfmoto|mondial|rks|arora|yuki|motoguzzi|triumph|aprilia/i.test(selectedBrand.name);
+      const isMoto = selectedCategory === 'MOTORCYCLE' || isMotoBrand;
+      const effectiveCategory = isMoto ? 'MOTORCYCLE' : (selectedCategory || 'AUTOMOBILE');
+
       router.push({
         pathname: '/vehicle-report',
         params: {
           brand: selectedBrand.name,
           model: selectedModel.name,
-          year: selectedYear && !selectedYear.startsWith('Tüm') ? selectedYear : (isMoto ? undefined : '2020'),
-          bodyType: selectedBodyType && !selectedBodyType.startsWith('Tüm') ? selectedBodyType : (isMoto ? undefined : 'Sedan'),
-          engine: selectedEngine && !selectedEngine.startsWith('Tüm') ? selectedEngine : (isMoto ? undefined : '1.6'),
-          fuel: selectedFuelType && selectedFuelType !== 'Tümü' ? selectedFuelType : (isMoto ? undefined : 'Benzin'),
-          transmission: selectedTransmission && !selectedTransmission.startsWith('Tüm') ? selectedTransmission : (isMoto ? undefined : 'Otomatik'),
-          trim: selectedTrim && !selectedTrim.startsWith('Tüm') ? selectedTrim : (isMoto ? undefined : 'M Sport'),
-          category: selectedCategory || 'AUTOMOBILE',
+          year: selectedYear && !selectedYear.startsWith('Tüm') ? selectedYear : undefined,
+          bodyType: selectedBodyType && !selectedBodyType.startsWith('Tüm') ? selectedBodyType : undefined,
+          engine: selectedEngine && !selectedEngine.startsWith('Tüm') ? selectedEngine : undefined,
+          fuel: selectedFuelType && selectedFuelType !== 'Tümü' ? selectedFuelType : undefined,
+          transmission: selectedTransmission && !selectedTransmission.startsWith('Tüm') ? selectedTransmission : undefined,
+          trim: selectedTrim && !selectedTrim.startsWith('Tüm') ? selectedTrim : undefined,
+          category: effectiveCategory,
         },
       });
       setQueryModalVisible(false);
