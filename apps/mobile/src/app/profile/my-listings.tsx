@@ -128,8 +128,96 @@ export default function MyListingsScreen() {
     }
   };
 
-  const formatPrice = (val: number) => {
-    return new Intl.NumberFormat('tr-TR').format(val || 0);
+  const handleToggleStatus = async (item: ListingItem) => {
+    const isCurrentlyActive = item.status === 'ACTIVE';
+    const newStatus = isCurrentlyActive ? 'PASSIVE' : 'ACTIVE';
+    const actionText = isCurrentlyActive ? 'Yayından Kaldır' : 'Yeniden Yayına Al';
+
+    Alert.alert(
+      actionText,
+      `Bu ilanı ${isCurrentlyActive ? 'yayından kaldırmak' : 'tekrar yayına almak'} istediğinize emin misiniz?`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: actionText,
+          onPress: async () => {
+            try {
+              const token =
+                (await AsyncStorage.getItem('accessToken')) ||
+                (await AsyncStorage.getItem('token'));
+              if (!token) return;
+
+              const res = await fetch(`${API_URL}/me/listings/${item.id}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ status: newStatus }),
+              });
+
+              if (res.ok) {
+                Alert.alert('Bilgi', `İlanınız ${isCurrentlyActive ? 'yayından kaldırıldı' : 'yayına alındı'}.`);
+                fetchMyListings();
+              } else {
+                const fbRes = await fetch(`${API_URL}/listings/${item.id}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ status: newStatus }),
+                });
+                if (fbRes.ok) {
+                  Alert.alert('Bilgi', `İlanınız ${isCurrentlyActive ? 'yayından kaldırıldı' : 'yayına alındı'}.`);
+                  fetchMyListings();
+                } else {
+                  Alert.alert('Hata', 'Durum güncellenemedi.');
+                }
+              }
+            } catch (e) {
+              Alert.alert('Hata', 'Bağlantı hatası oluştu.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteListing = (item: ListingItem) => {
+    Alert.alert(
+      'İlanı Sil',
+      'Bu ilanı tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Evet, Sil',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token =
+                (await AsyncStorage.getItem('accessToken')) ||
+                (await AsyncStorage.getItem('token'));
+              if (!token) return;
+
+              const res = await fetch(`${API_URL}/me/listings/${item.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+
+              if (res.ok) {
+                Alert.alert('Silindi', 'İlanınız başarıyla silindi.');
+                fetchMyListings();
+              } else {
+                Alert.alert('Hata', 'İlan silinemedi.');
+              }
+            } catch (e) {
+              Alert.alert('Hata', 'Silme işlemi sırasında hata oluştu.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -227,47 +315,84 @@ export default function MyListingsScreen() {
                 item.photos?.[0]?.url;
 
               return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.listingCard}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/listings/${item.id}` as any)}
-                >
-                  <View style={styles.cardImageWrap}>
-                    {imgUrl ? (
-                      <ExpoImage
-                        source={{ uri: resolveMediaUrl(imgUrl) }}
-                        style={styles.cardImage}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-                    ) : (
-                      <View style={styles.cardImageFallback}>
-                        <Ionicons name="car-sport" size={28} color="#cbd5e1" />
-                      </View>
-                    )}
-                    <View style={[styles.badgePill, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>
-                      {item.title || `${item.brand?.name || ''} ${item.model?.name || ''}`}
-                    </Text>
-
-                    <Text style={styles.cardPrice}>
-                      {formatPrice(item.price)} TL
-                    </Text>
-
-                    <View style={styles.cardMetaRow}>
-                      {item.year && <Text style={styles.cardMetaText}>{item.year} Yıl</Text>}
-                      {item.mileage !== undefined && (
-                        <Text style={styles.cardMetaText}>• {new Intl.NumberFormat('tr-TR').format(item.mileage)} KM</Text>
+                <View key={item.id} style={styles.listingCardWrap}>
+                  <TouchableOpacity
+                    style={styles.listingCard}
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/listings/${item.id}` as any)}
+                  >
+                    <View style={styles.cardImageWrap}>
+                      {imgUrl ? (
+                        <ExpoImage
+                          source={{ uri: resolveMediaUrl(imgUrl) }}
+                          style={styles.cardImage}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                        />
+                      ) : (
+                        <View style={styles.cardImageFallback}>
+                          <Ionicons name="car-sport" size={28} color="#cbd5e1" />
+                        </View>
                       )}
+                      <View style={[styles.badgePill, { backgroundColor: badge.bg }]}>
+                        <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
+                      </View>
                     </View>
+
+                    <View style={styles.cardContent}>
+                      <Text style={styles.cardTitle} numberOfLines={2}>
+                        {item.title || `${item.brand?.name || ''} ${item.model?.name || ''}`}
+                      </Text>
+
+                      <Text style={styles.cardPrice}>
+                        {formatPrice(item.price)} TL
+                      </Text>
+
+                      <View style={styles.cardMetaRow}>
+                        {item.year && <Text style={styles.cardMetaText}>{item.year} Yıl</Text>}
+                        {item.mileage !== undefined && (
+                          <Text style={styles.cardMetaText}>• {new Intl.NumberFormat('tr-TR').format(item.mileage)} KM</Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* ACTION TOOLBAR: DÜZENLE, YAYINDAN KALDIR / AL, SİL */}
+                  <View style={styles.cardActionsBar}>
+                    <TouchableOpacity
+                      style={styles.cardActionBtn}
+                      activeOpacity={0.7}
+                      onPress={() => router.push(`/edit-listing?id=${item.id}` as any)}
+                    >
+                      <Ionicons name="pencil" size={13} color="#ea580c" />
+                      <Text style={styles.cardActionBtnText}>Düzenle</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.cardActionBtn}
+                      activeOpacity={0.7}
+                      onPress={() => handleToggleStatus(item)}
+                    >
+                      <Ionicons
+                        name={item.status === 'ACTIVE' ? 'pause-circle-outline' : 'play-circle-outline'}
+                        size={14}
+                        color="#334155"
+                      />
+                      <Text style={[styles.cardActionBtnText, { color: '#334155' }]}>
+                        {item.status === 'ACTIVE' ? 'Yayından Kaldır' : 'Yayına Al'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.cardActionBtn, styles.cardActionBtnDanger]}
+                      activeOpacity={0.7}
+                      onPress={() => handleDeleteListing(item)}
+                    >
+                      <Ionicons name="trash-outline" size={13} color="#dc2626" />
+                      <Text style={[styles.cardActionBtnText, { color: '#dc2626' }]}>Sil</Text>
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </View>
               );
             })
           )}
@@ -433,18 +558,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  listingCard: {
+  listingCardWrap: {
     backgroundColor: '#ffffff',
     borderRadius: 18,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    flexDirection: 'row',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
+  },
+  listingCard: {
+    flexDirection: 'row',
+  },
+  cardActionsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
+    gap: 8,
+  },
+  cardActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  cardActionBtnDanger: {
+    borderColor: '#fecaca',
+    backgroundColor: '#fff5f5',
+  },
+  cardActionBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#ea580c',
   },
   cardImageWrap: {
     width: 120,

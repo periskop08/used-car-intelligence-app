@@ -190,6 +190,8 @@ export default function PackagesScreen() {
     fetchProfile();
   };
 
+  const [purchasing, setPurchasing] = useState(false);
+
   const rawTier = userProfile?.subscriptionTier || 'TANISMA';
   const currentTier =
     rawTier === 'FREE'
@@ -200,21 +202,121 @@ export default function PackagesScreen() {
       ? 'PROFESYONEL'
       : rawTier;
 
-  const handlePurchasePlan = (plan: MonthlyPlan) => {
+  const handlePurchasePlan = async (plan: MonthlyPlan) => {
     if (currentTier === plan.code) {
       Alert.alert('Bilgi', 'Şu an bu paketi kullanmaktasınız.');
       return;
     }
+
     Alert.alert(
-      'Paket Yükseltme',
-      `${plan.name} (${plan.price === 0 ? '0 TL' : `${plan.price} TL / ay`}) paketine geçiş yapmak için web sitemizdeki güvenli ödeme merkezine yönlendirileceksiniz.`
+      `${plan.name} Paketine Geçiş`,
+      `${plan.name} (${plan.price === 0 ? 'Ücretsiz' : `${plan.price} TL / ay`}) paketine geçmek istiyor musunuz? İlan kotanız ve AI rapor haklarınız anında güncellenecektir.`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Onayla ve Başlat',
+          onPress: async () => {
+            const token =
+              (await AsyncStorage.getItem('accessToken')) ||
+              (await AsyncStorage.getItem('token'));
+            if (!token) {
+              Alert.alert('Giriş Yapın', 'Paket yükseltmek için lütfen giriş yapın.', [
+                { text: 'Giriş Yap', onPress: () => router.push('/login' as any) },
+                { text: 'Vazgeç', style: 'cancel' },
+              ]);
+              return;
+            }
+
+            setPurchasing(true);
+            try {
+              const res = await fetch(`${API_URL}/subscriptions/upgrade`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ tier: plan.code }),
+              });
+              const data = await res.json();
+              if (res.ok) {
+                Alert.alert(
+                  'Tebrikler! 🎉',
+                  `${plan.name} paketiniz başarıyla aktif edildi. Yeni haklarınız hesabınıza tanımlandı!`
+                );
+                fetchProfile();
+              } else {
+                Alert.alert('Hata', data.message || 'Paket yükseltme işlemi tamamlanamadı.');
+              }
+            } catch (err) {
+              Alert.alert('Hata', 'İşlem sırasında bir hata oluştu. Lütfen bağlantınızı kontrol edin.');
+            } finally {
+              setPurchasing(false);
+            }
+          },
+        },
+      ]
     );
   };
 
-  const handlePurchaseBuyerPkg = (pkg: BuyerPackage) => {
+  const handlePurchaseBuyerPkg = async (pkg: BuyerPackage) => {
     Alert.alert(
-      'Alıcı Paketi Satın Al',
-      `${pkg.name} (${pkg.priceText} - Tek Seferlik) paketini hesabınıza tanımlamak için web sitemizdeki güvenli ödeme merkezine yönlendirileceksiniz.`
+      `${pkg.name} Satın Al`,
+      `${pkg.name} (${pkg.priceText}) paketini hesabınıza tanımlamak istiyor musunuz?\n\n• ${pkg.reports} Araç Raporu\n• ${pkg.questions} AI Soru Hakkı`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Satın Al ve Tanımla',
+          onPress: async () => {
+            const token =
+              (await AsyncStorage.getItem('accessToken')) ||
+              (await AsyncStorage.getItem('token'));
+            if (!token) {
+              Alert.alert('Giriş Yapın', 'Paket satın almak için lütfen giriş yapın.', [
+                { text: 'Giriş Yap', onPress: () => router.push('/login' as any) },
+                { text: 'Vazgeç', style: 'cancel' },
+              ]);
+              return;
+            }
+
+            setPurchasing(true);
+            try {
+              let userObj: any = null;
+              const userRaw = await AsyncStorage.getItem('user');
+              if (userRaw) {
+                try {
+                  userObj = JSON.parse(userRaw);
+                } catch {}
+              }
+
+              const res = await fetch(`${API_URL}/buyer-packages/purchase`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  userId: userObj?.id || undefined,
+                  packageCode: pkg.code,
+                }),
+              });
+              const data = await res.json();
+              if (res.ok) {
+                Alert.alert(
+                  'Tebrikler! 🎉',
+                  `${pkg.name} haklarınız (${pkg.reports} Rapor, ${pkg.questions} AI Soru) anında hesabınıza eklendi.`
+                );
+                fetchProfile();
+              } else {
+                Alert.alert('Hata', data.message || 'Satın alma işlemi tamamlanamadı.');
+              }
+            } catch (err) {
+              Alert.alert('Hata', 'İşlem sırasında bir hata oluştu.');
+            } finally {
+              setPurchasing(false);
+            }
+          },
+        },
+      ]
     );
   };
 
